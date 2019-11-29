@@ -16,9 +16,11 @@ from commons.esclient import EsClient
 
 
 APP_CONFIG = {
-    "esHost":            os.getenv("ES_HOST", "http://localhost:9200"),
+    "esHost":            os.getenv("ES_HOST", "http://elasticsearch:9200"),
+    #"esHost":            os.getenv("ES_HOST", "http://localhost:9200"),
     "logLevel":          os.getenv("LOGGING_LEVEL", "DEBUG"),
-    "amqpUrl":           os.getenv("AMQP_URL", "amqp://rabbitmq:rabbitmq@localhost:5672"),
+    "amqpUrl":           os.getenv("AMQP_URL", "amqp://rabbitmq:rabbitmq@rabbitmq:5672"),
+    #"amqpUrl":           os.getenv("AMQP_URL", "amqp://rabbitmq:rabbitmq@localhost:5672"),
     "exchangeName":      os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
     "analyzerPriority":  os.getenv("ANALYZER_PRIORITY", "1"),
     "analyzerIndex":     os.getenv("ANALYZER_INDEX", "true"),
@@ -55,8 +57,6 @@ class ThreadConnectionAwaiter(threading.Thread):
         self.daemon = True
 
     def run(self):
-        logger.info("Starting waiting for AMQP connection")
-
         self.num_of_retries = 0
         while True:
             try:
@@ -140,12 +140,13 @@ def init_amqp(amqp_client, request_handler):
 log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.conf')
 logging.config.fileConfig(log_file_path)
 logger = logging.getLogger("analyzerApp")
-print(logger.disabled)
 
 application = create_application()
 CORS(application)
 
 program_initialized = False
+
+logger.info("Starting waiting for AMQP connection")
 amqp_connection_awaiter = ThreadConnectionAwaiter()
 amqp_connection_awaiter.start()
 amqp_connection_awaiter.join()

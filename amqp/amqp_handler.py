@@ -1,7 +1,7 @@
 import logging
 import json
 import pika
-import launch_objects
+import commons.launch_objects as launch_objects
 
 logger = logging.getLogger("analyzerApp.amqpHandler")
 

@@ -66,14 +66,14 @@ class EsClient:
                                                max_retries=5, retry_on_timeout=True)
 
     def create_index(self, index_name):
-        logger.info("Creating '%s' Elasticsearch index" % str(index_name))
+        logger.debug("Creating '%s' Elasticsearch index" % str(index_name))
 
         try:
             response = self.es.indices.create(index=str(index_name), body={
                 'settings': DEFAULT_INDEX_SETTINGS,
                 'mappings': DEFAULT_MAPPING_SETTINGS,
             })
-
+            logger.debug("Created '%s' Elasticsearch index" % str(index_name))
             return commons.launch_objects.Response(**response)
         except Exception as err:
             logger.error("Couldn't create index")
@@ -118,12 +118,12 @@ class EsClient:
         try:
             resp = self.es.indices.delete(index=str(index_name))
 
-            logger.info("Deleted index %s"%str(index_name))
+            logger.debug("Deleted index %s"%str(index_name))
             return commons.launch_objects.Response(**resp)
         except Exception as err:
             exc_info = sys.exc_info()
             error_info = ''.join(traceback.format_exception(*exc_info))
-            logger.error("Not found %s"%str(index_name))
+            logger.error("Not found %s for deleting"%str(index_name))
             logger.error(err)
             return commons.launch_objects.Response(**{"acknowledged": False, "error": error_info})
 
@@ -132,7 +132,7 @@ class EsClient:
             return self.create_index(index_name)
 
     def index_logs(self, launches):
-        logger.info("Indexing logs for %d launches"% len(launches))
+        logger.debug("Indexing logs for %d launches"% len(launches))
         bodies = []
         for launch in launches:
             self.create_index_if_not_exists(str(launch.project))
@@ -160,16 +160,18 @@ class EsClient:
                     }}
 
                     bodies.append(body)
-        return self.bulk_index(bodies)
+        result = self.bulk_index(bodies)
+        logger.debug("Finished indexing logs for %d launches"% len(launches))
+        return result
 
     def bulk_index(self, bodies):
-        logger.info('Indexing %d logs...' % len(bodies))
+        logger.debug('Indexing %d logs...' % len(bodies))
         try:
             success_count, errors = elasticsearch.helpers.bulk(self.es, bodies, chunk_size=1000, request_timeout=30, refresh=True)
 
-            logger.error("Processed %d logs"%success_count)
+            logger.debug("Processed %d logs"%success_count)
             if len(errors) > 0:
-                logger.info("Occured errors ", errors)
+                logger.debug("Occured errors ", errors)
             return commons.launch_objects.BulkResponse(took = success_count, errors = len(errors) > 0) # check how to set status and items
         except Exception as err:
             logger.error("Error in bulk")
@@ -177,7 +179,7 @@ class EsClient:
             return commons.launch_objects.BulkResponse(took = 0, errors = True) # check how to set status and items
 
     def delete_logs(self, clean_index):
-        logger.info("Delete logs {}".format(clean_index.ids))
+        logger.debug("Delete logs {} for the project {}".format(clean_index.ids, clean_index.project))
 
         bodies = []
         for _id in clean_index.ids:
@@ -186,7 +188,9 @@ class EsClient:
                 "_id":      _id,
                 "_index":   clean_index.project,
             })
-        return self.bulk_index(bodies)
+        result = self.bulk_index(bodies)
+        logger.debug("Finished deleting logs {} for the project {}".format(clean_index.ids, clean_index.project))
+        return result
 
     def build_search_query(self, searchReq, message):
         return {"query": {
@@ -217,6 +221,7 @@ class EsClient:
 
     def search_logs(self, searchReq):
         keys = set()
+        logger.debug("Started searching by request %s"%searchReq.json())
         for message in searchReq.logMessages:
             sanitizedMsg = utils.sanitize_text(utils.first_lines(message, searchReq.logLines))
             query = self.build_search_query(searchReq, sanitizedMsg)
@@ -229,6 +234,7 @@ class EsClient:
                     logger.error("Id %s is not integer"%rs["_id"])
                     logId = rs["_id"]
                 keys.add(logId)
+        logger.debug("Finished searching by request %s with %d results"%(searchReq.json(), len(keys)))
         return list(keys)
 
     def build_more_like_this_query(self, minDocFreq, minTermFreq, maxQueryTerms, minShouldMatch, logMessage):
@@ -282,7 +288,7 @@ class EsClient:
         return query
 
     def analyze_logs(self, launches):
-        logger.info("Started analysis for %d launches"%len(launches))
+        logger.debug("Started analysis for %d launches"%len(launches))
         results = []
 
         for launch in launches:
@@ -314,7 +320,7 @@ class EsClient:
                     results.append(commons.launch_objects.AnalysisResult(testItem = test_item.testItemId,
                                                                          issueType = predicted_issue_type,
                                                                          relevantItem = relevant_item))
-
+        logger.debug("Finished analysis for %d launches with %d results"%(len(launches), len(results)))
         return results
 
     def calculate_scores(self, res, k, issue_types):

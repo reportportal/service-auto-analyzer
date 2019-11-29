@@ -6,7 +6,7 @@ import json
 import os
 import elasticsearch
 import elasticsearch.helpers
-import launch_objects
+import commons.launch_objects
 import utils
 import logging
 import sys
@@ -74,11 +74,11 @@ class EsClient:
                 'mappings': DEFAULT_MAPPING_SETTINGS,
             })
 
-            return launch_objects.Response(**response)
+            return commons.launch_objects.Response(**response)
         except Exception as err:
             logger.error("Couldn't create index")
             logger.error(err)
-            return launch_objects.Response()
+            return commons.launch_objects.Response()
 
     def send_request(self, url, method):
         try:
@@ -119,13 +119,13 @@ class EsClient:
             resp = self.es.indices.delete(index=str(index_name))
 
             logger.info("Deleted index %s"%str(index_name))
-            return launch_objects.Response(**resp)
+            return commons.launch_objects.Response(**resp)
         except Exception as err:
             exc_info = sys.exc_info()
             error_info = ''.join(traceback.format_exception(*exc_info))
             logger.error("Not found %s"%str(index_name))
             logger.error(err)
-            return launch_objects.Response(**{"acknowledged": False, "error": error_info})
+            return commons.launch_objects.Response(**{"acknowledged": False, "error": error_info})
 
     def create_index_if_not_exists(self, index_name):
         if not self.index_exists(index_name):
@@ -170,11 +170,11 @@ class EsClient:
             logger.error("Processed %d logs"%success_count)
             if len(errors) > 0:
                 logger.info("Occured errors ", errors)
-            return launch_objects.BulkResponse(took = success_count, errors = len(errors) > 0) # check how to set status and items
+            return commons.launch_objects.BulkResponse(took = success_count, errors = len(errors) > 0) # check how to set status and items
         except Exception as err:
             logger.error("Error in bulk")
             logger.error(err)
-            return launch_objects.BulkResponse(took = 0, errors = True) # check how to set status and items
+            return commons.launch_objects.BulkResponse(took = 0, errors = True) # check how to set status and items
 
     def delete_logs(self, clean_index):
         logger.info("Delete logs {}".format(clean_index.ids))
@@ -311,9 +311,9 @@ class EsClient:
 
                 if predicted_issue_type != "":
                     relevant_item = issue_types[predicted_issue_type]["mrHit"]["_source"]["test_item"]
-                    results.append(launch_objects.AnalysisResult(testItem = test_item.testItemId,
-                                                                 issueType = predicted_issue_type,
-                                                                 relevantItem = relevant_item))
+                    results.append(commons.launch_objects.AnalysisResult(testItem = test_item.testItemId,
+                                                                         issueType = predicted_issue_type,
+                                                                         relevantItem = relevant_item))
 
         return results
 

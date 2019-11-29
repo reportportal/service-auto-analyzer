@@ -1,0 +1,22 @@
+{
+    "took": 63,
+    "errors": false,
+    "items": [
+        {
+            "index": {
+                "_index": "idx2",
+                "_type": "log",
+                "_id": "0001",
+                "_version": 1,
+                "result": "created",
+                "_shards": {
+                    "total": 1,
+                    "successful": 1,
+                    "failed": 0
+                },
+                "created": true,
+                "status": 201
+            }
+        }
+    ]
+}

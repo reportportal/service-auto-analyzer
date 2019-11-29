@@ -1,0 +1,60 @@
+{
+    "took": 13,
+    "timed_out": false,
+    "_shards": {
+        "total": 1,
+        "successful": 1,
+        "failed": 0
+    },
+    "hits": {
+        "total": {
+            "value": 2,
+            "relation": "eq"
+        },
+        "max_score": 20,
+        "hits": [
+            {
+                "_index": "idx4",
+                "_type": "log",
+                "_id": "1",
+                "_score": 15,
+                "_source": {
+                    "issue_type": "AB001",
+                    "launch_name": "Launch 1",
+                    "log_level": 40000,
+                    "message": "Message AB",
+                    "test_item": 1,
+                    "unique_id": "0001"
+                }
+            },
+            {
+                "_index": "idx4",
+                "_type": "log",
+                "_id": "2",
+                "_score": 10,
+                "_source": {
+                    "issue_type": "PB001",
+                    "launch_name": "Launch 1",
+                    "log_level": 40000,
+                    "message": "Message PB",
+                    "test_item": 1,
+                    "unique_id": "0001"
+                }
+            },
+            {
+                "_index": "idx4",
+                "_type": "log",
+                "_id": "3",
+                "_score": 10,
+                "_source": {
+                    "issue_type": "PB001",
+                    "launch_name": "Launch 1",
+                    "log_level": 40000,
+                    "message": "Message PB",
+                    "test_item": 1,
+                    "unique_id": "0001"
+                }
+            }
+        ]
+    }
+}

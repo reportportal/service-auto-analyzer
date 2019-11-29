@@ -7,7 +7,7 @@ import os
 import elasticsearch
 import elasticsearch.helpers
 import commons.launch_objects
-import utils
+import utils.utils as utils
 import logging
 import sys
 

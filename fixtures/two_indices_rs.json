@@ -1,0 +1,26 @@
+[
+    {
+        "health": "yellow",
+        "status": "open",
+        "index": "idx0",
+        "uuid": "sGD-VQy5StS1jIUbuo3R7A",
+        "pri": "1",
+        "rep": "1",
+        "docs.count": "353400",
+        "docs.deleted": "0",
+        "store.size": "37.9mb",
+        "pri.store.size": "37.9mb"
+    },
+    {
+        "health": "yellow",
+        "status": "open",
+        "index": "idx1",
+        "uuid": "DoA20IojS72IdaFSN8CX9Q",
+        "pri": "1",
+        "rep": "1",
+        "docs.count": "38771",
+        "docs.deleted": "0",
+        "store.size": "11.2mb",
+        "pri.store.size": "11.2mb"
+    }
+]

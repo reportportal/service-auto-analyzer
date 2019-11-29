@@ -1,0 +1,14 @@
+{
+	"_id":1,
+	"_index":2,
+	"_source": {
+		"is_auto_analyzed":false,
+		"issue_type":"ti001",
+		"launch_id":1234567892,
+		"launch_name":"Launch with test items with logs",
+		"log_level":40000,
+		"message":"Message ",
+		"test_item":2,
+		"unique_id":"unique1"
+	}
+}

@@ -1,0 +1,14 @@
+[{
+  "launchId": 1234567891,
+  "project": 1,
+    "launchName": "Launch with test items without logs",
+    "testItems": [
+        {
+          "testItemId": 1,
+            "uniqueId": "unique1",
+            "issueType": "ti001",
+            "isAutoAnalyzed": false,
+            "logs": []
+        }
+    ]
+}]

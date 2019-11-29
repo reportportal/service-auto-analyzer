@@ -140,6 +140,7 @@ def init_amqp(amqp_client, request_handler):
 log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.conf')
 logging.config.fileConfig(log_file_path)
 logger = logging.getLogger("analyzerApp")
+print(logger.disabled)
 
 application = create_application()
 CORS(application)

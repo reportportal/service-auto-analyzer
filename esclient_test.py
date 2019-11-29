@@ -9,7 +9,6 @@ import json
 import logging
 import sys
 import warnings
-logging.getLogger("analyzerApp").disabled = True # set False for debugging
 
 import commons.launch_objects as launch_objects
 import commons.esclient as esclient
@@ -49,6 +48,9 @@ class TestEsClient(unittest.TestCase):
         self.delete_logs_rs                                 = "delete_logs_rs.json"
         self.es_host = "http://localhost:9200"
         logging.disable(logging.CRITICAL)
+
+    def tearDown(self):
+        logging.disable(logging.DEBUG)
 
     def get_fixture(self, fixture_name):
         with open(os.path.join("fixtures", fixture_name), "r") as f:

@@ -124,11 +124,11 @@ def init_amqp(amqp_client, request_handler):
     create_thread(create_ampq_client().receive,
         (APP_CONFIG["exchangeName"], delete_queue, True, False, False, False,
      lambda channel, method, props, body: amqp_handler.handle_delete_request(channel,
-        method, props, body, request_handler.delete_logs)))
+        method, props, body, request_handler.delete_index)))
     create_thread(create_ampq_client().receive,
         (APP_CONFIG["exchangeName"], clean_queue, True, False, False, False,
      lambda channel, method, props, body: amqp_handler.handle_clean_request(channel,
-        method, props, body, request_handler.delete_index)))
+        method, props, body, request_handler.delete_logs)))
     create_thread(create_ampq_client().receive,
         (APP_CONFIG["exchangeName"], search_queue, True, False, False, False,
      lambda channel, method, props, body: amqp_handler.handle_amqp_request(channel,

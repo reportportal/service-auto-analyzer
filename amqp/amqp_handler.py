@@ -63,7 +63,7 @@ def handle_amqp_request(channel, method, props, body,
     logger.debug("Finished processing %s method"%method)
     return True
 
-def handle_clean_request(channel, method, props, body, request_handler):
+def handle_delete_request(channel, method, props, body, request_handler):
     logger.debug("Started processing %s method"%method)
     index_id = None
     try:
@@ -81,7 +81,7 @@ def handle_clean_request(channel, method, props, body, request_handler):
     logger.debug("Finished processing %s method"%method)
     return True
 
-def handle_delete_request(channel, method, props, body, request_handler):
+def handle_clean_request(channel, method, props, body, request_handler):
     logger.debug("Started processing %s method"%method)
     clean_index = None
     try:

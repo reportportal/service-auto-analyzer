@@ -96,10 +96,10 @@ clean_index_data = {
 
 method = sys.argv[1] if len(sys.argv) > 0 else "index"
 print(" [x] calling method %s"%method)
-if method.strip() in ["clean"]:
+if method.strip() in ["delete"]:
     rpc.call_without_wait("34", method)
     print("Method '%s' was called"%method)
-elif method.strip() in ["delete"]:
+elif method.strip() in ["clean"]:
     rpc.call_without_wait(json.dumps(clean_index_data), method)
     print("Method '%s' was called"%method)
 elif method.strip() in ["search"]: 

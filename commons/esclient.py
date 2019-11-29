@@ -230,10 +230,10 @@ class EsClient:
             for rs in res["hits"]["hits"]:
                 try:
                     logId = int(rs["_id"])
+                    keys.add(logId)
                 except:
                     logger.error("Id %s is not integer"%rs["_id"])
                     logId = rs["_id"]
-                keys.add(logId)
         logger.debug("Finished searching by request %s with %d results"%(searchReq.json(), len(keys)))
         return list(keys)
 

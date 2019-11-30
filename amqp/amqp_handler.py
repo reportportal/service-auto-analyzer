@@ -23,7 +23,8 @@ def prepare_index_response_data(response):
 def handle_amqp_request(channel, method, props, body,
         request_handler, prepare_data_func = prepare_launches,
         prepare_response_data = prepare_search_response_data):
-    logger.debug("Started processing %s method"%method)
+    logger.debug("Started processing {} method".format(method))
+    logger.debug("Started processing data {}".format(body))
     try:
         launches = json.loads(body, strict=False)
     except Exception as err:
@@ -60,11 +61,12 @@ def handle_amqp_request(channel, method, props, body,
     except Exception as err:
         logger.error("Failed to publish result")
         logger.error(err)
-    logger.debug("Finished processing %s method"%method)
+    logger.debug("Finished processing {} method".format(method))
     return True
 
 def handle_delete_request(channel, method, props, body, request_handler):
-    logger.debug("Started processing %s method"%method)
+    logger.debug("Started processing {} method".format(method))
+    logger.debug("Started processing data {}".format(body))
     index_id = None
     try:
         index_id = int(body)
@@ -78,11 +80,12 @@ def handle_delete_request(channel, method, props, body, request_handler):
         logger.error("Failed to delete index")
         logger.error(err)
         return
-    logger.debug("Finished processing %s method"%method)
+    logger.debug("Finished processing {} method".format(method))
     return True
 
 def handle_clean_request(channel, method, props, body, request_handler):
-    logger.debug("Started processing %s method"%method)
+    logger.debug("Started processing {} method".format(method))
+    logger.debug("Started processing data {}".format(body))
     clean_index = None
     try:
         clean_index = json.loads(body, strict=False)
@@ -102,5 +105,5 @@ def handle_clean_request(channel, method, props, body, request_handler):
         logger.error("Failed to clean index")
         logger.error(err)
         return
-    logger.debug("Finished processing %s method"%method)
+    logger.debug("Finished processing {} method".format(method))
     return True

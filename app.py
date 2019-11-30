@@ -22,9 +22,9 @@ APP_CONFIG = {
     "amqpUrl":           os.getenv("AMQP_URL", "amqp://rabbitmq:rabbitmq@rabbitmq:5672"),
     #"amqpUrl":           os.getenv("AMQP_URL", "amqp://rabbitmq:rabbitmq@localhost:5672"),
     "exchangeName":      os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
-    "analyzerPriority":  os.getenv("ANALYZER_PRIORITY", "1"),
-    "analyzerIndex":     os.getenv("ANALYZER_INDEX", "true"),
-    "analyzerLogSearch": os.getenv("ANALYZER_LOG_SEARCH", "true"),
+    "analyzerPriority":  os.getenv("ANALYZER_PRIORITY", 1),
+    "analyzerIndex":     os.getenv("ANALYZER_INDEX", True),
+    "analyzerLogSearch": os.getenv("ANALYZER_LOG_SEARCH", True),
 }
 
 SEARCH_CONFIG = {

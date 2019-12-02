@@ -35,6 +35,7 @@ class TestEsClient(unittest.TestCase):
         self.launch_wo_test_items                           = "launch_wo_test_items.json"
         self.launch_w_test_items_wo_logs                    = "launch_w_test_items_wo_logs.json"
         self.launch_w_test_items_w_logs                     = "launch_w_test_items_w_logs.json"
+        self.launch_w_test_items_w_empty_logs               = "launch_w_test_items_w_empty_logs.json"
         self.index_logs_rq                                  = "index_logs_rq.json"
         self.index_logs_rs                                  = "index_logs_rs.json"
         self.search_rq                                      = "search_rq.json"
@@ -302,6 +303,17 @@ class TestEsClient(unittest.TestCase):
                 },
                 {
                     "test_calls":     [{
+                                        "method":         httpretty.GET,
+                                        "uri":            "/2",
+                                        "status":         HTTPStatus.OK,
+                                        "content_type":   "application/json",
+                                      }],
+                    "index_rq":       self.get_fixture(self.launch_w_test_items_w_empty_logs),
+                    "has_errors":     False,
+                    "expected_count": 0, 
+                },
+                {
+                    "test_calls":     [{
                                             "method":         httpretty.GET,
                                             "uri":            "/2",
                                             "status":         HTTPStatus.NOT_FOUND,
@@ -376,6 +388,12 @@ class TestEsClient(unittest.TestCase):
                 {
                     "test_calls":     [],
                     "index_rq":       self.get_fixture(self.launch_w_test_items_wo_logs),
+                    "expected_count": 0,
+                    "expected_issue_type": "",
+                },
+                {
+                    "test_calls":     [],
+                    "index_rq":       self.get_fixture(self.launch_w_test_items_w_empty_logs),
                     "expected_count": 0,
                     "expected_issue_type": "",
                 },

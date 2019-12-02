@@ -8,7 +8,7 @@ class RpcClient(object):
     def __init__(self):
         self.connection = pika.BlockingConnection(
             pika.connection.\
-        URLParameters("amqp://rabbitmq:rabbitmq@rabbit:5672/analyzer?heartbeat=600"))
+        URLParameters("amqp://rabbitmq:rabbitmq@localhost:5672/analyzer?heartbeat=600"))
 
         self.channel = self.connection.channel()
 

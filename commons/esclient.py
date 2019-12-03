@@ -10,6 +10,7 @@ import commons.launch_objects
 import utils.utils as utils
 import logging
 import sys
+import copy
 
 ERROR_LOGGING_LEVEL = 40000
 
@@ -134,10 +135,14 @@ class EsClient:
     def index_logs(self, launches):
         logger.debug("Indexing logs for %d launches"% len(launches))
         bodies = []
+        test_item_ids = []
+        project = None
         for launch in launches:
             self.create_index_if_not_exists(str(launch.project))
+            project = str(launch.project)
 
             for test_item in launch.testItems:
+                logs_added = False
                 for log in test_item.logs:
 
                     if log.logLevel < ERROR_LOGGING_LEVEL or log.message.strip() == "":
@@ -156,13 +161,111 @@ class EsClient:
                             "is_auto_analyzed": test_item.isAutoAnalyzed,
                             "issue_type":       test_item.issueType,
                             "log_level":        log.logLevel,
+                            "original_message": log.message,
                             "message":          message,
+                            "is_merged":        False
                     }}
 
                     bodies.append(body)
+                    logs_added = True
+                if logs_added:
+                    test_item_ids.append(str(test_item.testItemId))
         result = self.bulk_index(bodies)
+        result = self.merge_logs(test_item_ids, project)
         logger.debug("Finished indexing logs for %d launches"% len(launches))
         return result
+
+    def merge_logs(self, test_item_ids, project):
+        bodies = []
+        self.delete_merged_logs(test_item_ids, project)
+        for test_item_id in test_item_ids:
+            res = self.es.search(index = project, body = self.get_test_item_query(test_item_id, False))
+            merged_logs = self.decompose_logs_merged_and_without_duplicates(res["hits"]["hits"])
+            bodies.extend(merged_logs)
+        return self.bulk_index(bodies)
+
+    def delete_merged_logs(self, test_items_to_delete, project):
+        logger.debug("Delete merged logs for %d test items"% len(test_items_to_delete))
+        bodies = []
+        for test_item_id  in test_items_to_delete:
+            res = self.es.search(index=project, body = self.get_test_item_query(test_item_id, True))
+            for log in res["hits"]["hits"]:
+                bodies.append({
+                    "_op_type":"delete",
+                    "_id":log["_id"],
+                    "_index":project
+                })
+        if len(bodies) > 0:
+            self.bulk_index(bodies)
+
+    def get_test_item_query(self, test_item_id, is_merged):
+        return {"size":10000,
+                "query": {
+                    "bool": {
+                        "must":[
+                            {"term" : { "test_item": test_item_id}},
+                            {"term" : { "is_merged": is_merged}}
+                        ]
+                    }
+                }}
+
+    def decompose_logs_merged_and_without_duplicates(self, logs):
+        log_level_messages = {}
+        log_level_ids_to_add = {}
+        log_level_ids_merged = {}
+        logs_unique_log_level = {}
+
+        for log in logs:
+            if log["_source"]["message"].strip() == "":
+                continue
+
+            log_level = log["_source"]["log_level"]
+
+            if log_level not in log_level_messages:
+                log_level_messages[log_level] = ""
+            if log_level not in log_level_ids_to_add:
+                log_level_ids_to_add[log_level] = []
+            if log_level not in logs_unique_log_level:
+                logs_unique_log_level[log_level] = set()
+
+            if utils.calculate_line_number(log["_source"]["original_message"]) <= 2:
+                if log_level not in log_level_ids_merged:
+                    log_level_ids_merged[log_level] = log
+                message = log["_source"]["message"]
+                normalized_msg = " ".join(message.strip().lower().split())
+                if normalized_msg not in logs_unique_log_level[log_level]:
+                    logs_unique_log_level[log_level].add(normalized_msg)
+                    log_level_messages[log_level] = log_level_messages[log_level] + message + "\r\n"
+            else:
+                log_level_ids_to_add[log_level].append(log["_id"])
+
+        new_logs = []
+        for log in logs:
+            if log["_source"]["message"].strip() == "":
+                continue
+            log_level = log["_source"]["log_level"]
+
+            if log["_id"] in log_level_ids_to_add[log_level]:
+                normalized_message = log["_source"]["message"]
+
+                if log_level_messages[log_level].strip() != "":
+                    new_logs.append(self.prepare_new_log(log, str(log["_id"]) + "_m",
+                        normalized_message + "\r\n" + log_level_messages[log["_source"]["log_level"]]))
+                new_logs.append(self.prepare_new_log(log, str(log["_id"]) + "_big", normalized_message))
+
+        for log_level in log_level_messages:
+
+            if len(log_level_ids_to_add[log_level]) == 0:
+                log = log_level_ids_merged[log_level]
+                new_logs.append(self.prepare_new_log(log, str(log["_id"]) + "_m", log_level_messages[log_level]))
+        return new_logs
+
+    def prepare_new_log(self, old_log, new_id, message):
+        merged_log = copy.deepcopy(old_log)
+        merged_log["_source"]["is_merged"] = True
+        merged_log["_id"] = new_id
+        merged_log["_source"]["message"] = message
+        return merged_log
 
     def bulk_index(self, bodies):
         logger.debug('Indexing %d logs...' % len(bodies))
@@ -180,6 +283,14 @@ class EsClient:
 
     def delete_logs(self, clean_index):
         logger.debug("Delete logs {} for the project {}".format(clean_index.ids, clean_index.project))
+        test_item_ids = set()
+        try:
+            all_logs = self.es.search(index= clean_index.project, body = self.build_search_test_item_ids_query(clean_index.ids))
+            for res in all_logs["hits"]["hits"]:
+                test_item_ids.add(res["_source"]["test_item"])
+        except Exception as err:
+            logger.error("Couldn't find test items for logs")
+            logger.error(err)
 
         bodies = []
         for _id in clean_index.ids:
@@ -189,8 +300,23 @@ class EsClient:
                 "_index":   clean_index.project,
             })
         result = self.bulk_index(bodies)
+        result_merge = self.merge_logs(list(test_item_ids), clean_index.project)
         logger.debug("Finished deleting logs {} for the project {}".format(clean_index.ids, clean_index.project))
         return result
+
+    def build_search_test_item_ids_query(self, log_ids):
+        return {"size": 10000,
+                "query": {
+                    "bool": {
+                        "must": [
+                            {"range":{"log_level":{"gte": ERROR_LOGGING_LEVEL}}},
+                            {"exists":{"field":"issue_type"}},
+                            {"term":{"is_merged":False}},
+                            {"terms": {"_id": log_ids}},
+                        ]
+                    }
+                },
+            }
 
     def build_search_query(self, searchReq, message):
         return {"query": {
@@ -201,6 +327,7 @@ class EsClient:
                         "must": [
                             {"range":{"log_level":{"gte": ERROR_LOGGING_LEVEL}}},
                             {"exists":{"field":"issue_type"}},
+                            {"term":{"is_merged":True}},
                             {
                                 "bool": {
                                     "should": [
@@ -229,11 +356,10 @@ class EsClient:
 
             for rs in res["hits"]["hits"]:
                 try:
-                    logId = int(rs["_id"])
+                    logId = int(re.search("\d+",rs["_id"]).group(0))
                     keys.add(logId)
                 except:
                     logger.error("Id %s is not integer"%rs["_id"])
-                    logId = rs["_id"]
         logger.debug("Finished searching by request %s with %d results"%(searchReq.json(), len(keys)))
         return list(keys)
 
@@ -263,6 +389,7 @@ class EsClient:
                             "must": [
                                 {"range":{"log_level":{"gte": ERROR_LOGGING_LEVEL}}},
                                 {"exists":{"field":"issue_type"}},
+                                {"term":{"is_merged":True}},
                             ],
                             "should" : [
                                 { "term": {"unique_id": {"value": uniqueId, "boost": abs(self.search_cfg["BoostUniqueID"])}}},
@@ -287,6 +414,25 @@ class EsClient:
                                                                         self.search_cfg["MaxQueryTerms"], minShouldMatch, message))
         return query
 
+    def get_elasticsearch_results_for_test_items(self, launch, test_item):
+        full_results = []
+        prepared_logs = [{"_id":log.logId, 
+                          "_source":{ 
+                                "original_message": utils.sanitize_text(utils.first_lines(log.message, launch.analyzerConfig.numberOfLogLines)),
+                                "message":          log.message, 
+                                "log_level":        log.logLevel,
+                         }} for log in test_item.logs]
+        for log in self.decompose_logs_merged_and_without_duplicates(prepared_logs):
+
+            if log["_source"]["log_level"] < ERROR_LOGGING_LEVEL and log["_source"]["message"].strip() != "":
+                continue
+
+            query = self.build_analyze_query(launch, test_item.uniqueId, log["_source"]["message"])
+
+            res = self.es.search(index=str(launch.project), body = query)
+            full_results.append((log["_source"]["message"], res))
+        return full_results
+
     def analyze_logs(self, launches):
         logger.debug("Started analysis for %d launches"%len(launches))
         results = []
@@ -295,16 +441,7 @@ class EsClient:
             for test_item in launch.testItems:
                 issue_types = {}
 
-                for log in test_item.logs:
-                    if log.logLevel < ERROR_LOGGING_LEVEL or log.message.strip() == "":
-                        continue
-
-                    message = utils.sanitize_text(utils.first_lines(log.message, launch.analyzerConfig.numberOfLogLines))
-
-                    query = self.build_analyze_query(launch, test_item.uniqueId, message)
-
-                    res = self.es.search(index=str(launch.project), body = query)
-
+                for log_message, res in self.get_elasticsearch_results_for_test_items(launch, test_item):
                     issue_types = self.calculate_scores(res, 10, issue_types)
 
                 predicted_issue_type = ""

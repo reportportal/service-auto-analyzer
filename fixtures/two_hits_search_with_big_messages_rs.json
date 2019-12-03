@@ -22,8 +22,8 @@
                     "issue_type": "AB001",
                     "launch_name": "Launch 1",
                     "log_level": 40000,
-                    "original_message": "Message AB",
-                    "message": "Message AB",
+                    "original_message": "Message AB \r\n Message AB \r\n Message AB",
+                    "message": "Message AB \r\n Message AB \r\n Message AB",
                     "test_item": 1,
                     "unique_id": "unique1"
                 }
@@ -37,8 +37,8 @@
                     "issue_type": "PB001",
                     "launch_name": "Launch 1",
                     "log_level": 40000,
-                    "original_message": "Message PB",
-                    "message": "Message PB",
+                    "original_message": "Message PB \r\n Message PB \r\n Message PB",
+                    "message": "Message PB \r\n Message PB \r\n Message PB",
                     "test_item": 1,
                     "unique_id": "unique1"
                 }

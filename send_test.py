@@ -64,7 +64,7 @@ index_data = [{
         "numberOfLogLines": -1,
         "isAutoAnalyzerEnabled": True,
         "analyzerMode": "ALL",
-        "indexingRunning": True
+        "indexingRunning": True,
     },
     "testItems": [
         {"testItemId": 2,
@@ -75,7 +75,10 @@ index_data = [{
         "logs": [
             {"logId": 3,
             "logLevel": 40000,
-            "message": "error occured"}
+            "message": "error occured"},
+            {"logId": 4,
+            "logLevel": 40000,
+            "message": "error occured \r\n error found \r\n error mined"},
         ]}
     ]
 }]
@@ -87,15 +90,15 @@ search_data = {
         "projectId": 34,
         "filteredLaunchIds": [1],
         "logMessages": ["error occured"],
-        "logLines": -1
+        "logLines": -1,
     }
 
 clean_index_data = {
     "ids": [3],
-    "project": 34
+    "project": 34,
 }
 
-method = sys.argv[1] if len(sys.argv) > 0 else "index"
+method = sys.argv[1] if len(sys.argv) > 1 else "index"
 print(" [x] calling method %s"%method)
 if method.strip() in ["delete"]:
     rpc.call_without_wait("34", method)

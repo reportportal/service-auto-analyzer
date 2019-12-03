@@ -7,7 +7,7 @@ class AnalyzerConf(BaseModel):
     minDocFreq: float = 0
     minTermFreq: float = 0
     minShouldMatch: int = 0
-    numberOfLogLines: int = 0
+    numberOfLogLines: int = -1
     isAutoAnalyzerEnabled: bool = True
     indexingRunning: bool = True
 

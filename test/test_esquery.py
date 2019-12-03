@@ -54,6 +54,10 @@ class TestEsQuery(unittest.TestCase):
                                 "field": "issue_type",
                             },
                         },
+                        {   "term": {
+                                "is_merged":True,
+                            }
+                        },
                         {
                             "more_like_this": {
                                 "fields":               ["message"],

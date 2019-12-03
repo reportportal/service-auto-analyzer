@@ -12,12 +12,12 @@
                 {
                   "logId": 1,
                     "logLevel": 40000,
-                    "message": "Message 1 \r\n Message 2 \r\n Message 3"
+                    "message": "Message 1"
                 },
                 {
-                  "logId": 2,
+                  "logId": 3,
                     "logLevel": 40000,
-                    "message": "Message 2 \r\n Message 4 \r\n Message 5"
+                    "message": "Message 3 \r\n Message 4"
                 }
             ]
         }

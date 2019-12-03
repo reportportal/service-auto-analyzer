@@ -22,6 +22,7 @@
                     "issue_type": "AB001",
                     "launch_name": "Launch 1",
                     "log_level": 40000,
+                    "original_message": "Message AB",
                     "message": "Message AB",
                     "test_item": 1,
                     "unique_id": "unique1"

@@ -418,8 +418,9 @@ class EsClient:
         full_results = []
         prepared_logs = [{"_id":log.logId, 
                           "_source":{ 
-                                "original_message": utils.sanitize_text(utils.first_lines(log.message, launch.analyzerConfig.numberOfLogLines)),
-                                "message":          log.message, 
+                                "message":          utils.sanitize_text(utils.first_lines(log.message, 
+                                                                                          launch.analyzerConfig.numberOfLogLines)),
+                                "original_message": log.message, 
                                 "log_level":        log.logLevel,
                          }} for log in test_item.logs]
         for log in self.decompose_logs_merged_and_without_duplicates(prepared_logs):

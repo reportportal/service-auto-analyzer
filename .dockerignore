@@ -1,0 +1,17 @@
+**/__pycache__
+**/*.pyc
+**/env/
+**/venv/
+**/fixtures/
+**/test/
+.bumpversion.cgf
+.git/
+.gitignore
+**/*.log
+Docker*
+Jenkins*
+Makefile
+**/*.md
+**/*.bat
+send_test.py
+requirements_windows.txt

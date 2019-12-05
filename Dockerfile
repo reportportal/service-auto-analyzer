@@ -14,18 +14,9 @@ RUN apt-get update && apt-get install -y libxml2 curl \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=0 /venv /venv
 
-RUN mkdir /backend/
-RUN mkdir /backend/amqp
-RUN mkdir /backend/commons
-RUN mkdir /backend/utils
 WORKDIR /backend/
 
-ADD *.py /backend/
-ADD *.conf /backend/
-ADD amqp/*.py /backend/amqp/
-ADD commons/*.py /backend/commons/
-ADD utils/*.py /backend/utils/
-ADD VERSION /backend/
+COPY . .
 
 # uWSGI will listen on this port
 EXPOSE 5000

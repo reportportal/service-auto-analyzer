@@ -25,6 +25,7 @@ ADD *.conf /backend/
 ADD amqp/*.py /backend/amqp/
 ADD commons/*.py /backend/commons/
 ADD utils/*.py /backend/utils/
+ADD VERSION /backend/
 
 # uWSGI will listen on this port
 EXPOSE 5000

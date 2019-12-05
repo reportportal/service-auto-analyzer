@@ -102,7 +102,7 @@ def declare_exchange(channel, queues, config):
                 "analyzer_index":      config["analyzerIndex"],
                 "analyzer_priority":   config["analyzerPriority"],
                 "analyzer_log_search": config["analyzerLogSearch"],
-                "version":             1 #to do create versioning,
+                "version":             version,
             })
     except Exception as err:
         logger.error("Failed to declare exchange")
@@ -153,9 +153,17 @@ def init_amqp(amqp_client, request_handler):
         prepare_response_data = amqp_handler.prepare_search_response_data
         )))
 
+def read_version():
+    version_filename = "VERSION"
+    if os.path.exists(version_filename):
+        with open(version_filename, "r") as f:
+            return f.read().strip()
+    return ""
+
 log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.conf')
 logging.config.fileConfig(log_file_path)
 logger = logging.getLogger("analyzerApp")
+version = read_version()
 
 application = create_application()
 CORS(application)

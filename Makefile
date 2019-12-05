@@ -10,9 +10,9 @@ PYTHON=${VENV_NAME}/bin/python3
 venv: $(VENV_NAME)/bin/activate
 
 $(VENV_NAME)/bin/activate: requirements.txt
-    test -d $(VENV_NAME) || virtualenv -p python3 $(VENV_NAME)
-    $(VENV_NAME)/bin/pip install --no-cache-dir -r requirements.txt
-    touch $(VENV_NAME)/bin/activate
+	test -d $(VENV_NAME) || virtualenv -p python3 $(VENV_NAME)
+	$(VENV_NAME)/bin/pip install --no-cache-dir -r requirements.txt
+	touch $(VENV_NAME)/bin/activate
 
 test: venv
 	${PYTHON} -m unittest

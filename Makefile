@@ -1,5 +1,5 @@
-IMAGE_NAME=reportportal/service-analyzer$(IMAGE_POSTFIX)
-IMAGE_NAME_DEV=reportportal-dev-5/service-analyzer
+IMAGE_NAME=reportportal/service-auto-analyzer$(IMAGE_POSTFIX)
+IMAGE_NAME_DEV=reportportal-dev-5/service-auto-analyzer
 
 VENV_NAME?=venv
 VENV_ACTIVATE=. $(VENV_NAME)/bin/activate

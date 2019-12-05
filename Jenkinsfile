@@ -4,7 +4,7 @@ node {
 
     load "$JENKINS_HOME/jobvars.env"
 
-    dir('src/github.com/reportportal/service-analyzer') {
+    dir('src/github.com/reportportal/service-auto-analyzer') {
 
         stage('Checkout') {
             checkout scm

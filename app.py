@@ -180,12 +180,8 @@ if amqp_connection_awaiter.client is not None:
 else:
     logger.error("Amqp connection was not established")
 
-@application.route('/', methods=['GET'])
-def get_analyzer_info():
-    return "Analyzer is running"
-
 if __name__ == '__main__':
-    logger.info("Program started")
-
+    
     if program_initialized:
-        application.run(host='0.0.0.0', port=5000)
+        logger.info("Analyzer has started")
+        application.run()

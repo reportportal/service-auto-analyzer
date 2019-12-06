@@ -5,7 +5,7 @@ VENV_NAME?=venv
 VENV_ACTIVATE=. $(VENV_NAME)/bin/activate
 PYTHON=${VENV_NAME}/bin/python3
 
-.PHONY: build-release build-image-dev build-image pushDev venv test
+.PHONY: build-release build-image-dev build-image pushDev venv test checkstyle build
 
 venv: $(VENV_NAME)/bin/activate
 
@@ -16,6 +16,9 @@ $(VENV_NAME)/bin/activate: requirements.txt
 
 test: venv
 	${PYTHON} -m unittest
+
+checkstyle: venv
+	${PYTHON} -m flake8
 
 build-release: venv
 	bump2version --new-version ${v} release
@@ -31,4 +34,6 @@ pushDev:
 	if [ -d ${REGISTRY} ] ; then echo "Provide registry"; exit 1 ; fi
 	docker tag "$(IMAGE_NAME)" "$(REGISTRY)/$(IMAGE_NAME):latest"
 	docker push "$(REGISTRY)/$(IMAGE_NAME):latest"
+
+build: checkstyle, test
 

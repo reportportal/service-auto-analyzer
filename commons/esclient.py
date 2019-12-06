@@ -241,6 +241,39 @@ class EsClient:
                 }}
 
     @staticmethod
+    def merge_big_and_small_logs(logs, log_level_ids_to_add,
+                                 log_level_messages, log_level_ids_merged):
+        """Merge big message logs with small ones"""
+        new_logs = []
+        for log in logs:
+            if log["_source"]["message"].strip() == "":
+                continue
+            log_level = log["_source"]["log_level"]
+
+            if log["_id"] in log_level_ids_to_add[log_level]:
+                normalized_message = log["_source"]["message"]
+
+                if log_level_messages[log_level].strip() != "":
+                    merged_message = normalized_message + "\r\n" +\
+                        log_level_messages[log["_source"]["log_level"]]
+                    new_logs.append(
+                        EsClient.prepare_new_log(
+                            log, str(log["_id"]) + "_m",
+                            merged_message))
+                new_logs.append(EsClient.prepare_new_log(
+                    log, str(log["_id"]) + "_big",
+                    normalized_message))
+
+        for log_level in log_level_messages:
+
+            if len(log_level_ids_to_add[log_level]) == 0:
+                log = log_level_ids_merged[log_level]
+                new_logs.append(EsClient.prepare_new_log(
+                    log, str(log["_id"]) + "_m",
+                    log_level_messages[log_level]))
+        return new_logs
+
+    @staticmethod
     def decompose_logs_merged_and_without_duplicates(logs):
         """Merge big logs with small ones without duplcates"""
         log_level_messages = {}
@@ -273,34 +306,8 @@ class EsClient:
             else:
                 log_level_ids_to_add[log_level].append(log["_id"])
 
-        new_logs = []
-        for log in logs:
-            if log["_source"]["message"].strip() == "":
-                continue
-            log_level = log["_source"]["log_level"]
-
-            if log["_id"] in log_level_ids_to_add[log_level]:
-                normalized_message = log["_source"]["message"]
-
-                if log_level_messages[log_level].strip() != "":
-                    merged_message = normalized_message + "\r\n" +\
-                        log_level_messages[log["_source"]["log_level"]]
-                    new_logs.append(
-                        EsClient.prepare_new_log(
-                            log, str(log["_id"]) + "_m",
-                            merged_message))
-                new_logs.append(EsClient.prepare_new_log(
-                    log, str(log["_id"]) + "_big",
-                    normalized_message))
-
-        for log_level in log_level_messages:
-
-            if len(log_level_ids_to_add[log_level]) == 0:
-                log = log_level_ids_merged[log_level]
-                new_logs.append(EsClient.prepare_new_log(
-                    log, str(log["_id"]) + "_m",
-                    log_level_messages[log_level]))
-        return new_logs
+        return EsClient.merge_big_and_small_logs(logs, log_level_ids_to_add,
+                                                 log_level_messages, log_level_ids_merged)
 
     @staticmethod
     def prepare_new_log(old_log, new_id, message):

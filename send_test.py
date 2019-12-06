@@ -21,12 +21,13 @@ import pika
 
 # This file can be used for checking app functionality locally
 
+
 class RpcClient():
     """RpcClient helps to use RPC type of communication with rabbitmq"""
     def __init__(self):
         self.connection = pika.BlockingConnection(
-            pika.connection.\
-        URLParameters("amqp://rabbitmq:rabbitmq@localhost:5672/analyzer?heartbeat=600"))
+            pika.connection.
+            URLParameters("amqp://rabbitmq:rabbitmq@localhost:5672/analyzer?heartbeat=600"))
         self.response = None
         self.corr_id = None
 
@@ -73,6 +74,7 @@ class RpcClient():
             ),
             body=message)
 
+
 rpc = RpcClient()
 
 index_data = [{
@@ -100,20 +102,18 @@ index_data = [{
               "message": "error occured"},
              {"logId": 4,
               "logLevel": 40000,
-              "message": "error occured \r\n error found \r\n error mined"},]
-        }
+              "message": "error occured \r\n error found \r\n error mined"}, ]}
     ]
 }]
 
 search_data = {
-        "launchId": 4,
-        "launchName": "dsfdsf",
-        "itemId": 3,
-        "projectId": 34,
-        "filteredLaunchIds": [1],
-        "logMessages": ["error occured",],
-        "logLines": -1,
-    }
+    "launchId": 4,
+    "launchName": "dsfdsf",
+    "itemId": 3,
+    "projectId": 34,
+    "filteredLaunchIds": [1],
+    "logMessages": ["error occured", ],
+    "logLines": -1, }
 
 clean_index_data = {
     "ids": [3],
@@ -121,13 +121,13 @@ clean_index_data = {
 }
 
 used_method = sys.argv[1] if len(sys.argv) > 1 else "index"
-print(" [x] calling method %s"%used_method)
+print(" [x] calling method %s" % used_method)
 if used_method.strip() in ["delete"]:
     rpc.call_without_wait("34", used_method)
-    print("Method '%s' was called"%used_method)
+    print("Method '%s' was called" % used_method)
 elif used_method.strip() in ["clean"]:
     rpc.call_without_wait(json.dumps(clean_index_data), used_method)
-    print("Method '%s' was called"%used_method)
+    print("Method '%s' was called" % used_method)
 elif used_method.strip() in ["search"]:
     response = rpc.call(json.dumps(search_data), used_method)
     print(" [.] Got %r" % response)

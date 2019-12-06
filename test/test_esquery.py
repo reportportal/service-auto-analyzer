@@ -15,10 +15,11 @@
 """
 
 import unittest
-import sure
+import sure # noqa
 
 import commons.launch_objects as launch_objects
 import commons.esclient as esclient
+
 
 class TestEsQuery(unittest.TestCase):
     """Tests building analyze query"""
@@ -58,29 +59,29 @@ class TestEsQuery(unittest.TestCase):
             "query": {
                 "bool": {
                     "must_not": [
-                        {"wildcard":{"issue_type":"TI*"}},
-                        {"wildcard":{"issue_type":"ti*"}},
+                        {"wildcard": {"issue_type": "TI*"}},
+                        {"wildcard": {"issue_type": "ti*"}},
                     ],
                     "must": [
                         {"range": {
                             "log_level": {
-                                "gte": error_logging_level,},
+                                "gte": error_logging_level,
                             },
-                        },
+                        }, },
                         {"exists": {
-                            "field": "issue_type",},
-                        },
+                            "field": "issue_type",
+                        }, },
                         {"term": {
-                            "is_merged":True,},
-                        },
+                            "is_merged": True,
+                        }, },
                         {"more_like_this": {
                             "fields":               ["message"],
                             "like":                 log_message,
                             "min_doc_freq":         search_cfg["MinDocFreq"],
                             "min_term_freq":        search_cfg["MinTermFreq"],
                             "minimum_should_match": "5<" + search_cfg["MinShouldMatch"],
-                            "max_query_terms":      search_cfg["MaxQueryTerms"],},
-                        },
+                            "max_query_terms":      search_cfg["MaxQueryTerms"],
+                        }, },
                     ],
                     "should": [
                         {"term": {
@@ -105,6 +106,7 @@ class TestEsQuery(unittest.TestCase):
                 },
             },
         }
+
 
 if __name__ == '__main__':
     unittest.main()

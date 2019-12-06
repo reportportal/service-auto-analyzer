@@ -72,12 +72,13 @@ DEFAULT_MAPPING_SETTINGS = {
 
 logger = logging.getLogger("analyzerApp.esclient")
 
+
 class EsClient:
     """Elasticsearch client implementation"""
     def __init__(self, host="http://localhost:9200", search_cfg={}):
         self.host = host
         self.search_cfg = search_cfg
-        self.es_client = elasticsearch.Elasticsearch([host], timeout=30,\
+        self.es_client = elasticsearch.Elasticsearch([host], timeout=30,
                                                      max_retries=5, retry_on_timeout=True)
 
     def create_index(self, index_name):
@@ -130,11 +131,11 @@ class EsClient:
         """Checks whether index exists"""
         try:
             index = self.es_client.indices.get(index=str(index_name))
-            return index
+            return index is not None
         except Exception as err:
             logger.error("Index %s was not found", str(index_name))
             logger.error(err)
-            return None
+            return False
 
     def delete_index(self, index_name):
         """Delete the whole index"""
@@ -214,14 +215,14 @@ class EsClient:
     def _delete_merged_logs(self, test_items_to_delete, project):
         logger.debug("Delete merged logs for %d test items", len(test_items_to_delete))
         bodies = []
-        for test_item_id  in test_items_to_delete:
+        for test_item_id in test_items_to_delete:
             res = self.es_client.search(index=project,
                                         body=EsClient.get_test_item_query(test_item_id, True))
             for log in res["hits"]["hits"]:
                 bodies.append({
-                    "_op_type":"delete",
-                    "_id":log["_id"],
-                    "_index":project
+                    "_op_type": "delete",
+                    "_id": log["_id"],
+                    "_index": project,
                 })
         if len(bodies) > 0:
             self._bulk_index(bodies)
@@ -229,12 +230,12 @@ class EsClient:
     @staticmethod
     def get_test_item_query(test_item_id, is_merged):
         """Build test item query"""
-        return {"size":10000,
+        return {"size": 10000,
                 "query": {
                     "bool": {
-                        "must":[
-                            {"term" : {"test_item": test_item_id}},
-                            {"term" : {"is_merged": is_merged}}
+                        "must": [
+                            {"term": {"test_item": test_item_id}},
+                            {"term": {"is_merged": is_merged}}
                         ]
                     }
                 }}
@@ -268,7 +269,7 @@ class EsClient:
                 if normalized_msg not in logs_unique_log_level[log_level]:
                     logs_unique_log_level[log_level].add(normalized_msg)
                     log_level_messages[log_level] = log_level_messages[log_level]\
-                                                    + message + "\r\n"
+                        + message + "\r\n"
             else:
                 log_level_ids_to_add[log_level].append(log["_id"])
 
@@ -282,11 +283,12 @@ class EsClient:
                 normalized_message = log["_source"]["message"]
 
                 if log_level_messages[log_level].strip() != "":
+                    merged_message = normalized_message + "\r\n" +\
+                        log_level_messages[log["_source"]["log_level"]]
                     new_logs.append(
                         EsClient.prepare_new_log(
                             log, str(log["_id"]) + "_m",
-                            normalized_message + "\r\n"
-                            + log_level_messages[log["_source"]["log_level"]]))
+                            merged_message))
                 new_logs.append(EsClient.prepare_new_log(
                     log, str(log["_id"]) + "_big",
                     normalized_message))
@@ -362,42 +364,42 @@ class EsClient:
                 "query": {
                     "bool": {
                         "must": [
-                            {"range":{"log_level":{"gte": ERROR_LOGGING_LEVEL}}},
-                            {"exists":{"field":"issue_type"}},
-                            {"term":{"is_merged":False}},
+                            {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
+                            {"exists": {"field": "issue_type"}},
+                            {"term": {"is_merged": False}},
                             {"terms": {"_id": log_ids}},
                         ]
                     }
-                },}
+                }, }
 
     def build_search_query(self, search_req, message):
         """Build search query"""
         return {"query": {
             "bool": {
-                "must_not":{
-                    "term" : {"test_item": {"value": search_req.itemId, "boost":1.0}}
+                "must_not": {
+                    "term": {"test_item": {"value": search_req.itemId, "boost": 1.0}}
                 },
                 "must": [
-                    {"range":{"log_level":{"gte": ERROR_LOGGING_LEVEL}}},
-                    {"exists":{"field":"issue_type"}},
-                    {"term":{"is_merged":True}},
+                    {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
+                    {"exists": {"field": "issue_type"}},
+                    {"term": {"is_merged": True}},
                     {
                         "bool": {
                             "should": [
-                                {"wildcard":{"issue_type":"TI*"}},
-                                {"wildcard":{"issue_type":"ti*"}},
+                                {"wildcard": {"issue_type": "TI*"}},
+                                {"wildcard": {"issue_type": "ti*"}},
                             ]
                         }
                     },
                     {"terms": {"launch_id": search_req.filteredLaunchIds}},
-                    EsClient.build_more_like_this_query(1, 1, self.search_cfg["MaxQueryTerms"],
-                                                        self.search_cfg["SearchLogsMinShouldMatch"],
-                                                        message),
+                    EsClient.
+                    build_more_like_this_query(1, 1, self.search_cfg["MaxQueryTerms"],
+                                               self.search_cfg["SearchLogsMinShouldMatch"],
+                                               message),
                 ],
-                "should" : [
-                    {"term": {"is_auto_analyzed": {"value":"false", "boost": 1.0}}},
-                ]
-                }}}
+                "should": [
+                    {"term": {"is_auto_analyzed": {"value": "false", "boost": 1.0}}},
+                ]}}}
 
     def search_logs(self, search_req):
         """Get all logs similar to given logs"""
@@ -423,45 +425,45 @@ class EsClient:
     def build_more_like_this_query(min_doc_freq, min_term_freq, max_query_terms,
                                    min_should_match, log_message):
         """Build more like this query"""
-        return {"more_like_this":{
+        return {"more_like_this": {
             "fields":               ["message"],
             "like":                 log_message,
             "min_doc_freq":         min_doc_freq,
             "min_term_freq":        min_term_freq,
-            "minimum_should_match": "5<"+min_should_match,
-            "max_query_terms":      max_query_terms,}}
+            "minimum_should_match": "5<" + min_should_match,
+            "max_query_terms":      max_query_terms, }}
 
     def build_analyze_query(self, launch, unique_id, message, size=10):
         """Build analyze query"""
         min_doc_freq = launch.analyzerConfig.minDocFreq\
-                       if launch.analyzerConfig.minDocFreq > 0\
-                       else self.search_cfg["MinDocFreq"]
+            if launch.analyzerConfig.minDocFreq > 0\
+            else self.search_cfg["MinDocFreq"]
         min_term_freq = launch.analyzerConfig.minTermFreq\
-                        if launch.analyzerConfig.minTermFreq > 0\
-                        else self.search_cfg["MinTermFreq"]
+            if launch.analyzerConfig.minTermFreq > 0\
+            else self.search_cfg["MinTermFreq"]
         min_should_match = "{}%".format(launch.analyzerConfig.minShouldMatch)\
-                           if launch.analyzerConfig.minShouldMatch > 0\
-                           else self.search_cfg["MinShouldMatch"]
+            if launch.analyzerConfig.minShouldMatch > 0\
+            else self.search_cfg["MinShouldMatch"]
 
-        query = {"size":size,
+        query = {"size": size,
                  "query": {
                      "bool": {
                          "must_not": [
-                             {"wildcard":{"issue_type":"TI*"}},
-                             {"wildcard":{"issue_type":"ti*"}},
+                             {"wildcard": {"issue_type": "TI*"}},
+                             {"wildcard": {"issue_type": "ti*"}},
                          ],
                          "must": [
-                             {"range":{"log_level":{"gte": ERROR_LOGGING_LEVEL}}},
-                             {"exists":{"field":"issue_type"}},
-                             {"term":{"is_merged":True}},
+                             {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
+                             {"exists": {"field": "issue_type"}},
+                             {"term": {"is_merged": True}},
                          ],
-                         "should" : [
+                         "should": [
                              {"term": {"unique_id": {
                                  "value": unique_id,
                                  "boost": abs(self.search_cfg["BoostUniqueID"])}}},
                              {"term": {"is_auto_analyzed": {
                                  "value": str(self.search_cfg["BoostAA"] < 0).lower(),
-                                 "boost": abs(self.search_cfg["BoostAA"])}}},
+                                 "boost": abs(self.search_cfg["BoostAA"]), }}},
                          ]}}}
 
         if launch.analyzerConfig.analyzerMode in ["LAUNCH_NAME"]:
@@ -496,13 +498,13 @@ class EsClient:
 
     def _get_elasticsearch_results_for_test_items(self, launch, test_item):
         full_results = []
-        prepared_logs = [{"_id":log.logId,
+        prepared_logs = [{"_id": log.logId,
                           "_source": {
                               "message": utils.sanitize_text(utils.first_lines(
                                   log.message,
                                   launch.analyzerConfig.numberOfLogLines)),
                               "original_message": log.message,
-                              "log_level":        log.logLevel,}} for log in test_item.logs]
+                              "log_level":        log.logLevel, }} for log in test_item.logs]
         for log in EsClient.decompose_logs_merged_and_without_duplicates(prepared_logs):
 
             if log["_source"]["log_level"] < ERROR_LOGGING_LEVEL and\
@@ -538,8 +540,8 @@ class EsClient:
                             predicted_issue_type = key
 
                 if predicted_issue_type != "":
-                    relevant_item = issue_types[predicted_issue_type]\
-                                               ["mrHit"]["_source"]["test_item"]
+                    relevant_item =\
+                        issue_types[predicted_issue_type]["mrHit"]["_source"]["test_item"]
                     results.append(
                         commons.launch_objects.AnalysisResult(testItem=test_item.testItemId,
                                                               issueType=predicted_issue_type,
@@ -563,7 +565,7 @@ class EsClient:
                     if hit["_score"] > issue_type_item["mrHit"]["_score"]:
                         issue_types[hit["_source"]["issue_type"]]["mrHit"] = hit
                 else:
-                    issue_types[hit["_source"]["issue_type"]] = {"mrHit": hit, "score":0}
+                    issue_types[hit["_source"]["issue_type"]] = {"mrHit": hit, "score": 0}
 
             for hit in hits:
                 curr_score = hit["_score"] / total_score

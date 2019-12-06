@@ -29,10 +29,10 @@ from commons.esclient import EsClient
 
 
 APP_CONFIG = {
-    #"esHost":            os.getenv("ES_HOST", "http://elasticsearch:9200"),
+    # "esHost":            os.getenv("ES_HOST", "http://elasticsearch:9200"),
     "esHost":            os.getenv("ES_HOST", "http://localhost:9200"),
     "logLevel":          os.getenv("LOGGING_LEVEL", "DEBUG"),
-    #"amqpUrl":           os.getenv("AMQP_URL", "amqp://rabbitmq:rabbitmq@rabbitmq:5672"),
+    # "amqpUrl":           os.getenv("AMQP_URL", "amqp://rabbitmq:rabbitmq@rabbitmq:5672"),
     "amqpUrl":           os.getenv("AMQP_URL", "amqp://rabbitmq:rabbitmq@localhost:5672"),
     "exchangeName":      os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
     "analyzerPriority":  int(os.getenv("ANALYZER_PRIORITY", "1")),
@@ -51,10 +51,12 @@ SEARCH_CONFIG = {
     "SearchLogsMinShouldMatch": os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "98%"),
 }
 
+
 def create_application():
     """Creates a Flask application"""
     _application = Flask(__name__)
     return _application
+
 
 def create_thread(func, args):
     """Creates a thread with specified function and arguments"""
@@ -62,6 +64,7 @@ def create_thread(func, args):
     thread.daemon = True
     thread.start()
     return thread
+
 
 class ThreadConnectionAwaiter(threading.Thread):
     """ThreadConnectionAwaiter waits for amqp connection establishment"""
@@ -87,35 +90,39 @@ class ThreadConnectionAwaiter(threading.Thread):
                     break
                 time.sleep(10)
 
+
 def create_ampq_client():
     """Creates AMQP client"""
     amqp_full_url = "{}/{}?heartbeat=600".format(APP_CONFIG["amqpUrl"], APP_CONFIG["exchangeName"])\
         if "heartbeat" not in APP_CONFIG["amqpUrl"] else APP_CONFIG["amqpUrl"]
-    return AmqpClient(pika.BlockingConnection(\
+    return AmqpClient(pika.BlockingConnection(
         pika.connection.URLParameters(amqp_full_url)))
+
 
 def create_es_client():
     """Creates Elasticsearch client"""
     return EsClient(APP_CONFIG["esHost"], SEARCH_CONFIG)
 
+
 def declare_exchange(channel, config):
     """Declares exchange for rabbitmq"""
     logger.info("ExchangeName: %s", config["exchangeName"])
     try:
-        channel.exchange_declare(exchange=config["exchangeName"], exchange_type='direct',\
-            durable=False, auto_delete=True, internal=False, arguments={
-                "analyzer":            config["exchangeName"],
-                "analyzer_index":      config["analyzerIndex"],
-                "analyzer_priority":   config["analyzerPriority"],
-                "analyzer_log_search": config["analyzerLogSearch"],
-                "version":             version,
-            })
+        channel.exchange_declare(exchange=config["exchangeName"], exchange_type='direct',
+                                 durable=False, auto_delete=True, internal=False,
+                                 arguments={
+                                     "analyzer":            config["exchangeName"],
+                                     "analyzer_index":      config["analyzerIndex"],
+                                     "analyzer_priority":   config["analyzerPriority"],
+                                     "analyzer_log_search": config["analyzerLogSearch"],
+                                     "version":             version, })
     except Exception as err:
         logger.error("Failed to declare exchange")
         logger.error(err)
         return False
     logger.info("Exchange '%s' has been declared", config["exchangeName"])
     return True
+
 
 def init_amqp(_amqp_client, request_handler):
     """Initialize rabbitmq queues, exchange and stars threads for queue messages processing"""
@@ -138,15 +145,15 @@ def init_amqp(_amqp_client, request_handler):
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.index_logs,
-                                                    prepare_response_data=
-                                                    amqp_handler.prepare_index_response_data)))
+                                                    prepare_response_data=amqp_handler.
+                                                    prepare_index_response_data)))
     create_thread(create_ampq_client().receive,
                   (APP_CONFIG["exchangeName"], analyze_queue, True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.analyze_logs,
-                                                    prepare_response_data=
-                                                    amqp_handler.prepare_analyze_response_data)))
+                                                    prepare_response_data=amqp_handler.
+                                                    prepare_analyze_response_data)))
     create_thread(create_ampq_client().receive,
                   (APP_CONFIG["exchangeName"], delete_queue, True, False,
                    lambda channel, method, props, body:
@@ -162,10 +169,11 @@ def init_amqp(_amqp_client, request_handler):
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.search_logs,
-                                                    prepare_data_func=
-                                                    amqp_handler.prepare_search_logs,
-                                                    prepare_response_data=
-                                                    amqp_handler.prepare_search_response_data)))
+                                                    prepare_data_func=amqp_handler.
+                                                    prepare_search_logs,
+                                                    prepare_response_data=amqp_handler.
+                                                    prepare_search_response_data)))
+
 
 def read_version():
     """Reads the application build version"""
@@ -174,6 +182,7 @@ def read_version():
         with open(version_filename, "r") as file:
             return file.read().strip()
     return ""
+
 
 log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.conf')
 logging.config.fileConfig(log_file_path)

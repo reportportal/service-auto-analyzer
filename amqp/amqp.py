@@ -19,6 +19,7 @@ import os
 
 logger = logging.getLogger("analyzerApp.amqp")
 
+
 class AmqpClient:
     """AmqpClient handles communication with rabbitmq"""
     def __init__(self, connection):

@@ -17,6 +17,7 @@
 from typing import List
 from pydantic import BaseModel
 
+
 class AnalyzerConf(BaseModel):
     """Analyzer config object"""
     analyzerMode: str = "ALL"
@@ -27,11 +28,13 @@ class AnalyzerConf(BaseModel):
     isAutoAnalyzerEnabled: bool = True
     indexingRunning: bool = True
 
+
 class Log(BaseModel):
     """Log object"""
     logId: int
     logLevel: int = 0
     message: str
+
 
 class TestItem(BaseModel):
     """Test item object"""
@@ -42,6 +45,7 @@ class TestItem(BaseModel):
     originalIssueType: str = ""
     logs: List[Log] = []
 
+
 class Launch(BaseModel):
     """Launch object"""
     launchId: int
@@ -50,16 +54,19 @@ class Launch(BaseModel):
     analyzerConfig: AnalyzerConf = AnalyzerConf()
     testItems: List[TestItem] = []
 
+
 class AnalysisResult(BaseModel):
     """Analysis result object"""
     testItem: int
     issueType: str
     relevantItem: int
 
+
 class CleanIndex(BaseModel):
     """Clean index object"""
     ids: List[int]
     project: int
+
 
 class SearchLogs(BaseModel):
     """Search logs object"""
@@ -71,11 +78,13 @@ class SearchLogs(BaseModel):
     logMessages: List[str]
     logLines: int
 
+
 class Response(BaseModel):
     """Response object"""
     acknowledged: bool = False
     error: str = ""
     status: int = 0
+
 
 class IndexResult(BaseModel):
     """Index result object"""
@@ -87,9 +96,11 @@ class IndexResult(BaseModel):
     created: bool
     status: int
 
+
 class Item(BaseModel):
     """Index item object"""
     index: IndexResult
+
 
 class BulkResponse(BaseModel):
     """Bulk response object"""

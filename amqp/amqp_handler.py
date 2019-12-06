@@ -21,26 +21,32 @@ import commons.launch_objects as launch_objects
 
 logger = logging.getLogger("analyzerApp.amqpHandler")
 
+
 def prepare_launches(launches):
     """Function for deserializing array of launches"""
     return [launch_objects.Launch(**launch) for launch in launches]
+
 
 def prepare_search_logs(search_data):
     """Function for deserializing search logs object"""
     return launch_objects.SearchLogs(**search_data)
 
+
 def prepare_search_response_data(response):
     """Function for serializing response from search request"""
     return json.dumps(response)
+
 
 def prepare_analyze_response_data(response):
     """Function for serializing response from analyze request"""
     return json.dumps([resp.dict() for resp in response])
 
+
 def prepare_index_response_data(response):
     """Function for serializing response from index request
     and other objects, which are pydantic objects"""
     return response.json()
+
 
 def handle_amqp_request(channel, method, props, body,
                         request_handler, prepare_data_func=prepare_launches,
@@ -87,6 +93,7 @@ def handle_amqp_request(channel, method, props, body,
     logger.debug("Finished processing %s method", method)
     return True
 
+
 def handle_delete_request(method, props, body, request_handler):
     """Function for handling amqp reuqest: delete"""
     logger.debug("Started processing %s method %s props", method, props)
@@ -106,6 +113,7 @@ def handle_delete_request(method, props, body, request_handler):
         return False
     logger.debug("Finished processing %s method", method)
     return True
+
 
 def handle_clean_request(method, props, body, request_handler):
     """Function for handling amqp reuqest: clean"""

@@ -8,3 +8,4 @@ requests==2.22.0
 httpretty==0.9.7
 sure==1.4.11
 bump2version==0.5.11
+pylint==2.4.4

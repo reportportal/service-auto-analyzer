@@ -18,13 +18,10 @@ import unittest
 import json
 import os
 from http import HTTPStatus
+import logging
+import warnings
 import sure
 import httpretty
-import requests
-import json
-import logging
-import sys
-import warnings
 
 import commons.launch_objects as launch_objects
 import commons.esclient as esclient
@@ -526,153 +523,136 @@ class TestEsClient(unittest.TestCase):
                     "expected_issue_type": "",
                 },
                 {
-                    "test_calls":     [{
-                                          "method":         httpretty.GET,
-                                          "uri":            "/2/_search",
-                                          "status":         HTTPStatus.OK,
-                                          "content_type":   "application/json",
-                                          "rq":             self.get_fixture(self.search_rq),
-                                          "rs":             self.get_fixture(self.no_hits_search_rs),
+                    "test_calls":     [{"method":       httpretty.GET,
+                                        "uri":          "/2/_search",
+                                        "status":       HTTPStatus.OK,
+                                        "content_type": "application/json",
+                                        "rq":           self.get_fixture(self.search_rq),
+                                        "rs":           self.get_fixture(self.no_hits_search_rs),
                                        },
-                                       {
-                                          "method":         httpretty.GET,
-                                          "uri":            "/2/_search",
-                                          "status":         HTTPStatus.OK,
-                                          "content_type":   "application/json",
-                                          "rq":             self.get_fixture(self.search_rq),
-                                          "rs":             self.get_fixture(self.no_hits_search_rs),
-                                       },
-                                      ],
+                                       {"method":       httpretty.GET,
+                                        "uri":          "/2/_search",
+                                        "status":       HTTPStatus.OK,
+                                        "content_type": "application/json",
+                                        "rq":           self.get_fixture(self.search_rq),
+                                        "rs":           self.get_fixture(self.no_hits_search_rs),
+                                       },],
                     "index_rq":       self.get_fixture(self.launch_w_test_items_w_logs),
                     "expected_count": 0,
                     "expected_issue_type": "",
                 },
                 {
-                    "test_calls":     [{
-                                          "method":         httpretty.GET,
-                                          "uri":            "/2/_search",
-                                          "status":         HTTPStatus.OK,
-                                          "content_type":   "application/json",
-                                          "rq":             self.get_fixture(self.search_rq),
-                                          "rs":             self.get_fixture(self.no_hits_search_rs),
+                    "test_calls":     [{"method":       httpretty.GET,
+                                        "uri":          "/2/_search",
+                                        "status":       HTTPStatus.OK,
+                                        "content_type": "application/json",
+                                        "rq":           self.get_fixture(self.search_rq),
+                                        "rs":           self.get_fixture(self.no_hits_search_rs),
                                        },
-                                       {
-                                          "method":         httpretty.GET,
-                                          "uri":            "/2/_search",
-                                          "status":         HTTPStatus.OK,
-                                          "content_type":   "application/json",
-                                          "rq":             self.get_fixture(self.search_rq),
-                                          "rs":             self.get_fixture(self.one_hit_search_rs),
-                                       },
-                                      ],
+                                       {"method":       httpretty.GET,
+                                        "uri":          "/2/_search",
+                                        "status":       HTTPStatus.OK,
+                                        "content_type": "application/json",
+                                        "rq":           self.get_fixture(self.search_rq),
+                                        "rs":           self.get_fixture(self.one_hit_search_rs),
+                                       },],
                     "index_rq":       self.get_fixture(self.launch_w_test_items_w_logs),
                     "expected_count": 1,
                     "expected_issue_type": "AB001",
                 },
                 {
-                    "test_calls":     [{
-                                          "method":         httpretty.GET,
-                                          "uri":            "/2/_search",
-                                          "status":         HTTPStatus.OK,
-                                          "content_type":   "application/json",
-                                          "rq":             self.get_fixture(self.search_rq),
-                                          "rs":             self.get_fixture(self.one_hit_search_rs),
+                    "test_calls":     [{"method":       httpretty.GET,
+                                        "uri":          "/2/_search",
+                                        "status":       HTTPStatus.OK,
+                                        "content_type": "application/json",
+                                        "rq":           self.get_fixture(self.search_rq),
+                                        "rs":           self.get_fixture(self.one_hit_search_rs),
                                        },
-                                       {
-                                          "method":         httpretty.GET,
-                                          "uri":            "/2/_search",
-                                          "status":         HTTPStatus.OK,
-                                          "content_type":   "application/json",
-                                          "rq":             self.get_fixture(self.search_rq),
-                                          "rs":             self.get_fixture(self.two_hits_search_rs),
-                                       },
-                                      ],
+                                       {"method":       httpretty.GET,
+                                        "uri":          "/2/_search",
+                                        "status":       HTTPStatus.OK,
+                                        "content_type": "application/json",
+                                        "rq":           self.get_fixture(self.search_rq),
+                                        "rs":           self.get_fixture(self.two_hits_search_rs),
+                                       },],
                     "index_rq":       self.get_fixture(self.launch_w_test_items_w_logs),
                     "expected_count": 1,
                     "expected_issue_type": "AB001",
                 },
                 {
-                    "test_calls":     [{
-                                          "method":         httpretty.GET,
-                                          "uri":            "/2/_search",
-                                          "status":         HTTPStatus.OK,
-                                          "content_type":   "application/json",
-                                          "rq":             self.get_fixture(self.search_rq),
-                                          "rs":             self.get_fixture(self.two_hits_search_rs),
+                    "test_calls":     [{"method":       httpretty.GET,
+                                        "uri":          "/2/_search",
+                                        "status":       HTTPStatus.OK,
+                                        "content_type": "application/json",
+                                        "rq":           self.get_fixture(self.search_rq),
+                                        "rs":           self.get_fixture(self.two_hits_search_rs),
                                        },
-                                       {
-                                          "method":         httpretty.GET,
-                                          "uri":            "/2/_search",
-                                          "status":         HTTPStatus.OK,
-                                          "content_type":   "application/json",
-                                          "rq":             self.get_fixture(self.search_rq),
-                                          "rs":             self.get_fixture(self.three_hits_search_rs),
-                                       },
-                                      ],
+                                       {"method":       httpretty.GET,
+                                        "uri":          "/2/_search",
+                                        "status":       HTTPStatus.OK,
+                                        "content_type": "application/json",
+                                        "rq":           self.get_fixture(self.search_rq),
+                                        "rs":           self.get_fixture(
+                                            self.three_hits_search_rs),
+                                       },],
                     "index_rq":       self.get_fixture(self.launch_w_test_items_w_logs),
                     "expected_count": 1,
                     "expected_issue_type": "AB001",
                 },
                 {
-                    "test_calls":     [{
-                                          "method":         httpretty.GET,
-                                          "uri":            "/2/_search",
-                                          "status":         HTTPStatus.OK,
-                                          "content_type":   "application/json",
-                                          "rq":             self.get_fixture(self.search_rq),
-                                          "rs":             self.get_fixture(self.no_hits_search_rs),
-                                       },
-                                       {
-                                          "method":         httpretty.GET,
-                                          "uri":            "/2/_search",
-                                          "status":         HTTPStatus.OK,
-                                          "content_type":   "application/json",
-                                          "rq":             self.get_fixture(self.search_rq),
-                                          "rs":             self.get_fixture(self.three_hits_search_rs),
-                                       },
-                                      ],
+                    "test_calls":     [{"method":      httpretty.GET,
+                                        "uri":          "/2/_search",
+                                        "status":       HTTPStatus.OK,
+                                        "content_type": "application/json",
+                                        "rq":           self.get_fixture(self.search_rq),
+                                        "rs":           self.get_fixture(
+                                            self.no_hits_search_rs),
+                                        },
+                                       {"method":       httpretty.GET,
+                                        "uri":          "/2/_search",
+                                        "status":       HTTPStatus.OK,
+                                        "content_type": "application/json",
+                                        "rq":           self.get_fixture(self.search_rq),
+                                        "rs":           self.get_fixture(
+                                            self.three_hits_search_rs),
+                                        },],
                     "index_rq":       self.get_fixture(self.launch_w_test_items_w_logs),
                     "expected_count": 1,
                     "expected_issue_type": "PB001",
                 },
                 {
-                    "test_calls":     [
-                                       {
-                                          "method":         httpretty.GET,
-                                          "uri":            "/2/_search",
-                                          "status":         HTTPStatus.OK,
-                                          "content_type":   "application/json",
-                                          "rq":             self.get_fixture(self.search_rq),
-                                          "rs":             self.get_fixture(self.two_hits_search_rs),
-                                       },
-                                      ],
-                    "index_rq":       self.get_fixture(self.launch_w_test_items_w_logs_different_log_level),
+                    "test_calls":     [{"method":       httpretty.GET,
+                                        "uri":          "/2/_search",
+                                        "status":       HTTPStatus.OK,
+                                        "content_type": "application/json",
+                                        "rq":           self.get_fixture(self.search_rq),
+                                        "rs":           self.get_fixture(
+                                            self.two_hits_search_rs),},],
+                    "index_rq":       self.get_fixture(
+                        self.launch_w_test_items_w_logs_different_log_level),
                     "expected_count": 1,
                     "expected_issue_type": "AB001",
                 },
                 {
-                    "test_calls":     [
-                                       {
-                                          "method":         httpretty.GET,
-                                          "uri":            "/2/_search",
-                                          "status":         HTTPStatus.OK,
-                                          "content_type":   "application/json",
-                                          "rq":             self.get_fixture(self.search_rq),
-                                          "rs":             self.get_fixture(self.two_hits_search_rs),
-                                       },
-                                      ],
-                    "index_rq":       self.get_fixture(self.launch_w_test_items_w_logs_to_be_merged),
+                    "test_calls":     [{"method":       httpretty.GET,
+                                        "uri":          "/2/_search",
+                                        "status":       HTTPStatus.OK,
+                                        "content_type": "application/json",
+                                        "rq":           self.get_fixture(self.search_rq),
+                                        "rs":           self.get_fixture(
+                                            self.two_hits_search_rs),},],
+                    "index_rq":       self.get_fixture(
+                        self.launch_w_test_items_w_logs_to_be_merged),
                     "expected_count": 1,
                     "expected_issue_type": "AB001",
-                },
-            ]
+                },]
 
         for test in tests:
             self.start_server(test["test_calls"])
 
-            es_client = esclient.EsClient(host = self.es_host, search_cfg = self.get_default_search_config())
+            es_client = esclient.EsClient(host=self.es_host,
+                                          search_cfg=self.get_default_search_config())
             launches = [launch_objects.Launch(**launch) for launch in json.loads(test["index_rq"])]
-            
             response = es_client.analyze_logs(launches)
 
             response.should.have.length_of(test["expected_count"])

@@ -14,19 +14,17 @@
 * limitations under the License.
 """
 
-import requests
-import json
 import traceback
 import re
 import json
-import os
+import logging
+import sys
+import copy
+import requests
 import elasticsearch
 import elasticsearch.helpers
 import commons.launch_objects
 import utils.utils as utils
-import logging
-import sys
-import copy
 
 ERROR_LOGGING_LEVEL = 40000
 
@@ -35,8 +33,8 @@ DEFAULT_INDEX_SETTINGS = {
     'analysis': {
         "analyzer": {
             "standard_english_analyzer": {
-              "type": "standard",
-              "stopwords": "_english_",
+                "type": "standard",
+                "stopwords": "_english_",
             }
         }
     }
@@ -75,81 +73,92 @@ DEFAULT_MAPPING_SETTINGS = {
 logger = logging.getLogger("analyzerApp.esclient")
 
 class EsClient:
-
-    def __init__(self, host = "http://localhost:9200", search_cfg = {}):
+    """Elasticsearch client implementation"""
+    def __init__(self, host="http://localhost:9200", search_cfg={}):
         self.host = host
         self.search_cfg = search_cfg
-        self.es = elasticsearch.Elasticsearch([host],timeout=30,\
-                                               max_retries=5, retry_on_timeout=True)
+        self.es_client = elasticsearch.Elasticsearch([host], timeout=30,\
+                                                     max_retries=5, retry_on_timeout=True)
 
     def create_index(self, index_name):
-        logger.debug("Creating '%s' Elasticsearch index" % str(index_name))
+        """Create index in elasticsearch"""
+        logger.debug("Creating '%s' Elasticsearch index", str(index_name))
 
         try:
-            response = self.es.indices.create(index=str(index_name), body={
+            response = self.es_client.indices.create(index=str(index_name), body={
                 'settings': DEFAULT_INDEX_SETTINGS,
                 'mappings': DEFAULT_MAPPING_SETTINGS,
             })
-            logger.debug("Created '%s' Elasticsearch index" % str(index_name))
+            logger.debug("Created '%s' Elasticsearch index", str(index_name))
             return commons.launch_objects.Response(**response)
         except Exception as err:
             logger.error("Couldn't create index")
             logger.error(err)
             return commons.launch_objects.Response()
 
-    def send_request(self, url, method):
+    @staticmethod
+    def send_request(url, method):
+        """Send request with specified url and http method"""
         try:
-            rs = requests.get(url) if method == "GET" else {}
-            data = rs._content.decode("utf-8")
+            response = requests.get(url) if method == "GET" else {}
+            data = response._content.decode("utf-8")
             content = json.loads(data, strict=False)
             return content
         except Exception as err:
-            logger.error("Error with loading url: %s"%url)
+            logger.error("Error with loading url: %s", url)
             logger.error(err)
         return []
 
     def is_healthy(self):
+        """Check whether elasticsearch is healthy"""
         try:
             url = utils.build_url(self.host, ["_cluster/health"])
-            res = self.send_request(url, "GET")
-            return res["status"] in ["green","yellow"]
+            res = EsClient.send_request(url, "GET")
+            return res["status"] in ["green", "yellow"]
         except Exception as err:
             logger.error("Elasticsearch is not healthy")
-            return False
-
-    def list_indices(self):
-        url = utils.build_url(self.host, ["_cat", "indices?format=json"])
-        res = self.send_request(url, "GET")
-        return res
-
-    def index_exists(self, index_name):
-        try:
-            index = self.es.indices.get(index=str(index_name))
-            return True
-        except Exception as err:
-            logger.error("Index %s was not found"%str(index_name))
             logger.error(err)
             return False
 
-    def delete_index(self, index_name):
-        try:
-            resp = self.es.indices.delete(index=str(index_name))
+    def list_indices(self):
+        """Get all indices from elasticsearch"""
+        url = utils.build_url(self.host, ["_cat", "indices?format=json"])
+        res = EsClient.send_request(url, "GET")
+        return res
 
-            logger.debug("Deleted index %s"%str(index_name))
+    def index_exists(self, index_name):
+        """Checks whether index exists"""
+        try:
+            index = self.es_client.indices.get(index=str(index_name))
+            return index
+        except Exception as err:
+            logger.error("Index %s was not found", str(index_name))
+            logger.error(err)
+            return None
+
+    def delete_index(self, index_name):
+        """Delete the whole index"""
+        try:
+            resp = self.es_client.indices.delete(index=str(index_name))
+
+            logger.debug("Deleted index %s", str(index_name))
             return commons.launch_objects.Response(**resp)
         except Exception as err:
             exc_info = sys.exc_info()
             error_info = ''.join(traceback.format_exception(*exc_info))
-            logger.error("Not found %s for deleting"%str(index_name))
+            logger.error("Not found %s for deleting", str(index_name))
             logger.error(err)
             return commons.launch_objects.Response(**{"acknowledged": False, "error": error_info})
 
     def create_index_if_not_exists(self, index_name):
+        """Creates index if it doesn't not exist"""
         if not self.index_exists(index_name):
             return self.create_index(index_name)
+        return True
 
     def index_logs(self, launches):
-        logger.debug("Indexing logs for %d launches"% len(launches))
+        """Index launches to the index with project name"""
+        logger.debug("Indexing logs for %d launches", len(launches))
         bodies = []
         test_item_ids = []
         project = None
@@ -164,7 +173,9 @@ class EsClient:
                     if log.logLevel < ERROR_LOGGING_LEVEL or log.message.strip() == "":
                         continue
 
-                    message = utils.sanitize_text(utils.first_lines(log.message, launch.analyzerConfig.numberOfLogLines))
+                    message = utils.sanitize_text(
+                        utils.first_lines(log.message,
+                                          launch.analyzerConfig.numberOfLogLines))
 
                     body = {
                         "_id":    log.logId,
@@ -179,32 +190,33 @@ class EsClient:
                             "log_level":        log.logLevel,
                             "original_message": log.message,
                             "message":          message,
-                            "is_merged":        False
-                    }}
+                            "is_merged":        False}}
 
                     bodies.append(body)
                     logs_added = True
                 if logs_added:
                     test_item_ids.append(str(test_item.testItemId))
-        result = self.bulk_index(bodies)
-        result = self.merge_logs(test_item_ids, project)
-        logger.debug("Finished indexing logs for %d launches"% len(launches))
+        result = self._bulk_index(bodies)
+        result = self._merge_logs(test_item_ids, project)
+        logger.debug("Finished indexing logs for %d launches", len(launches))
         return result
 
-    def merge_logs(self, test_item_ids, project):
+    def _merge_logs(self, test_item_ids, project):
         bodies = []
-        self.delete_merged_logs(test_item_ids, project)
+        self._delete_merged_logs(test_item_ids, project)
         for test_item_id in test_item_ids:
-            res = self.es.search(index = project, body = self.get_test_item_query(test_item_id, False))
-            merged_logs = self.decompose_logs_merged_and_without_duplicates(res["hits"]["hits"])
+            res = self.es_client.search(index=project,
+                                        body=EsClient.get_test_item_query(test_item_id, False))
+            merged_logs = EsClient.decompose_logs_merged_and_without_duplicates(res["hits"]["hits"])
             bodies.extend(merged_logs)
-        return self.bulk_index(bodies)
+        return self._bulk_index(bodies)
 
-    def delete_merged_logs(self, test_items_to_delete, project):
-        logger.debug("Delete merged logs for %d test items"% len(test_items_to_delete))
+    def _delete_merged_logs(self, test_items_to_delete, project):
+        logger.debug("Delete merged logs for %d test items", len(test_items_to_delete))
         bodies = []
         for test_item_id  in test_items_to_delete:
-            res = self.es.search(index=project, body = self.get_test_item_query(test_item_id, True))
+            res = self.es_client.search(index=project,
+                                        body=EsClient.get_test_item_query(test_item_id, True))
             for log in res["hits"]["hits"]:
                 bodies.append({
                     "_op_type":"delete",
@@ -212,20 +224,24 @@ class EsClient:
                     "_index":project
                 })
         if len(bodies) > 0:
-            self.bulk_index(bodies)
+            self._bulk_index(bodies)
 
-    def get_test_item_query(self, test_item_id, is_merged):
+    @staticmethod
+    def get_test_item_query(test_item_id, is_merged):
+        """Build test item query"""
         return {"size":10000,
                 "query": {
                     "bool": {
                         "must":[
-                            {"term" : { "test_item": test_item_id}},
-                            {"term" : { "is_merged": is_merged}}
+                            {"term" : {"test_item": test_item_id}},
+                            {"term" : {"is_merged": is_merged}}
                         ]
                     }
                 }}
 
-    def decompose_logs_merged_and_without_duplicates(self, logs):
+    @staticmethod
+    def decompose_logs_merged_and_without_duplicates(logs):
+        """Merge big logs with small ones without duplcates"""
         log_level_messages = {}
         log_level_ids_to_add = {}
         log_level_ids_merged = {}
@@ -251,7 +267,8 @@ class EsClient:
                 normalized_msg = " ".join(message.strip().lower().split())
                 if normalized_msg not in logs_unique_log_level[log_level]:
                     logs_unique_log_level[log_level].add(normalized_msg)
-                    log_level_messages[log_level] = log_level_messages[log_level] + message + "\r\n"
+                    log_level_messages[log_level] = log_level_messages[log_level]\
+                                                    + message + "\r\n"
             else:
                 log_level_ids_to_add[log_level].append(log["_id"])
 
@@ -265,43 +282,60 @@ class EsClient:
                 normalized_message = log["_source"]["message"]
 
                 if log_level_messages[log_level].strip() != "":
-                    new_logs.append(self.prepare_new_log(log, str(log["_id"]) + "_m",
-                        normalized_message + "\r\n" + log_level_messages[log["_source"]["log_level"]]))
-                new_logs.append(self.prepare_new_log(log, str(log["_id"]) + "_big", normalized_message))
+                    new_logs.append(
+                        EsClient.prepare_new_log(
+                            log, str(log["_id"]) + "_m",
+                            normalized_message + "\r\n"
+                            + log_level_messages[log["_source"]["log_level"]]))
+                new_logs.append(EsClient.prepare_new_log(
+                    log, str(log["_id"]) + "_big",
+                    normalized_message))
 
         for log_level in log_level_messages:
 
             if len(log_level_ids_to_add[log_level]) == 0:
                 log = log_level_ids_merged[log_level]
-                new_logs.append(self.prepare_new_log(log, str(log["_id"]) + "_m", log_level_messages[log_level]))
+                new_logs.append(EsClient.prepare_new_log(
+                    log, str(log["_id"]) + "_m",
+                    log_level_messages[log_level]))
         return new_logs
 
-    def prepare_new_log(self, old_log, new_id, message):
+    @staticmethod
+    def prepare_new_log(old_log, new_id, message):
+        """Prepare updated log"""
         merged_log = copy.deepcopy(old_log)
         merged_log["_source"]["is_merged"] = True
         merged_log["_id"] = new_id
         merged_log["_source"]["message"] = message
         return merged_log
 
-    def bulk_index(self, bodies):
-        logger.debug('Indexing %d logs...' % len(bodies))
+    def _bulk_index(self, bodies):
+        logger.debug("Indexing %d logs...", len(bodies))
         try:
-            success_count, errors = elasticsearch.helpers.bulk(self.es, bodies, chunk_size=1000, request_timeout=30, refresh=True)
+            success_count, errors = elasticsearch.helpers.bulk(self.es_client,
+                                                               bodies,
+                                                               chunk_size=1000,
+                                                               request_timeout=30,
+                                                               refresh=True)
 
-            logger.debug("Processed %d logs"%success_count)
+            logger.debug("Processed %d logs", success_count)
             if len(errors) > 0:
-                logger.debug("Occured errors ", errors)
-            return commons.launch_objects.BulkResponse(took = success_count, errors = len(errors) > 0) # check how to set status and items
+                logger.debug("Occured errors %s", errors)
+            return commons.launch_objects.BulkResponse(took=success_count, errors=len(errors) > 0)
         except Exception as err:
             logger.error("Error in bulk")
             logger.error(err)
-            return commons.launch_objects.BulkResponse(took = 0, errors = True) # check how to set status and items
+            return commons.launch_objects.BulkResponse(took=0, errors=True)
 
     def delete_logs(self, clean_index):
-        logger.debug("Delete logs {} for the project {}".format(clean_index.ids, clean_index.project))
+        """Delete logs from elasticsearch"""
+        logger.debug("Delete logs %s for the project %s",
+                     clean_index.ids, clean_index.project)
         test_item_ids = set()
         try:
-            all_logs = self.es.search(index= clean_index.project, body = self.build_search_test_item_ids_query(clean_index.ids))
+            all_logs = self.es_client.search(index=clean_index.project,
+                                             body=EsClient.build_search_test_item_ids_query(
+                                                 clean_index.ids))
             for res in all_logs["hits"]["hits"]:
                 test_item_ids.add(res["_source"]["test_item"])
         except Exception as err:
@@ -315,12 +349,15 @@ class EsClient:
                 "_id":      _id,
                 "_index":   clean_index.project,
             })
-        result = self.bulk_index(bodies)
-        result_merge = self.merge_logs(list(test_item_ids), clean_index.project)
-        logger.debug("Finished deleting logs {} for the project {}".format(clean_index.ids, clean_index.project))
+        result = self._bulk_index(bodies)
+        self._merge_logs(list(test_item_ids), clean_index.project)
+        logger.debug("Finished deleting logs %s for the project %s",
+                     clean_index.ids, clean_index.project)
         return result
 
-    def build_search_test_item_ids_query(self, log_ids):
+    @staticmethod
+    def build_search_test_item_ids_query(log_ids):
+        """Build search test item ids query"""
         return {"size": 10000,
                 "query": {
                     "bool": {
@@ -331,135 +368,166 @@ class EsClient:
                             {"terms": {"_id": log_ids}},
                         ]
                     }
-                },
-            }
+                },}
 
-    def build_search_query(self, searchReq, message):
+    def build_search_query(self, search_req, message):
+        """Build search query"""
         return {"query": {
-                    "bool": {
-                        "must_not":{
-                            "term" : { "test_item": {"value": searchReq.itemId, "boost":1.0}}
-                        },
-                        "must": [
-                            {"range":{"log_level":{"gte": ERROR_LOGGING_LEVEL}}},
-                            {"exists":{"field":"issue_type"}},
-                            {"term":{"is_merged":True}},
-                            {
-                                "bool": {
-                                    "should": [
-                                        {"wildcard":{"issue_type":"TI*"}},
-                                        {"wildcard":{"issue_type":"ti*"}},
-                                    ]
-                                }
-                            },
-                            {"terms": {"launch_id": searchReq.filteredLaunchIds}},
-                            self.build_more_like_this_query(1, 1, self.search_cfg["MaxQueryTerms"],
-                                self.search_cfg["SearchLogsMinShouldMatch"], message),
-                        ],
-                        "should" : [
-                            {"term": {"is_auto_analyzed": {"value":"false", "boost": 1.0}}},
-                        ]
-                    }
-                }}
-
-    def search_logs(self, searchReq):
-        keys = set()
-        logger.debug("Started searching by request %s"%searchReq.json())
-        for message in searchReq.logMessages:
-            sanitizedMsg = utils.sanitize_text(utils.first_lines(message, searchReq.logLines))
-            query = self.build_search_query(searchReq, sanitizedMsg)
-            res = self.es.search(index=str(searchReq.projectId), body = query)
-
-            for rs in res["hits"]["hits"]:
-                try:
-                    logId = int(re.search("\d+",rs["_id"]).group(0))
-                    keys.add(logId)
-                except:
-                    logger.error("Id %s is not integer"%rs["_id"])
-        logger.debug("Finished searching by request %s with %d results"%(searchReq.json(), len(keys)))
-        return list(keys)
-
-    def build_more_like_this_query(self, minDocFreq, minTermFreq, maxQueryTerms, minShouldMatch, logMessage):
-        return {"more_like_this":{
-                    "fields":               ["message"],
-                    "like":                 logMessage,
-                    "min_doc_freq":         minDocFreq,
-                    "min_term_freq":        minTermFreq,
-                    "minimum_should_match": "5<"+minShouldMatch,
-                    "max_query_terms":      maxQueryTerms,
-                }}
-
-    def build_analyze_query(self, launch, uniqueId, message, size = 10):
-        minDocFreq = launch.analyzerConfig.minDocFreq if launch.analyzerConfig.minDocFreq > 0 else self.search_cfg["MinDocFreq"]
-        minTermFreq = launch.analyzerConfig.minTermFreq if launch.analyzerConfig.minTermFreq > 0 else self.search_cfg["MinTermFreq"]
-        minShouldMatch = "{}%".format(launch.analyzerConfig.minShouldMatch) if launch.analyzerConfig.minShouldMatch > 0\
-                                                                            else self.search_cfg["MinShouldMatch"]
-
-        query =  {  "size":size,
-                    "query": {
+            "bool": {
+                "must_not":{
+                    "term" : {"test_item": {"value": search_req.itemId, "boost":1.0}}
+                },
+                "must": [
+                    {"range":{"log_level":{"gte": ERROR_LOGGING_LEVEL}}},
+                    {"exists":{"field":"issue_type"}},
+                    {"term":{"is_merged":True}},
+                    {
                         "bool": {
-                            "must_not": [
+                            "should": [
                                 {"wildcard":{"issue_type":"TI*"}},
                                 {"wildcard":{"issue_type":"ti*"}},
-                            ], 
-                            "must": [
-                                {"range":{"log_level":{"gte": ERROR_LOGGING_LEVEL}}},
-                                {"exists":{"field":"issue_type"}},
-                                {"term":{"is_merged":True}},
-                            ],
-                            "should" : [
-                                { "term": {"unique_id": {"value": uniqueId, "boost": abs(self.search_cfg["BoostUniqueID"])}}},
-                                {"term": {"is_auto_analyzed": {"value":str(self.search_cfg["BoostAA"] < 0).lower(),
-                                                               "boost": abs(self.search_cfg["BoostAA"])}}},
                             ]
                         }
-                }}
+                    },
+                    {"terms": {"launch_id": search_req.filteredLaunchIds}},
+                    EsClient.build_more_like_this_query(1, 1, self.search_cfg["MaxQueryTerms"],
+                                                        self.search_cfg["SearchLogsMinShouldMatch"],
+                                                        message),
+                ],
+                "should" : [
+                    {"term": {"is_auto_analyzed": {"value":"false", "boost": 1.0}}},
+                ]
+                }}}
+
+    def search_logs(self, search_req):
+        """Get all logs similar to given logs"""
+        keys = set()
+        logger.debug("Started searching by request %s", search_req.json())
+        for message in search_req.logMessages:
+            sanitized_msg = utils.sanitize_text(utils.first_lines(message, search_req.logLines))
+            query = self.build_search_query(search_req, sanitized_msg)
+            res = self.es_client.search(index=str(search_req.projectId), body=query)
+
+            for result in res["hits"]["hits"]:
+                try:
+                    log_id = int(re.search(r"\d+", result["_id"]).group(0))
+                    keys.add(log_id)
+                except Exception as err:
+                    logger.error("Id %s is not integer", result["_id"])
+                    logger.error(err)
+        logger.debug("Finished searching by request %s with %d results",
+                     search_req.json(), len(keys))
+        return list(keys)
+
+    @staticmethod
+    def build_more_like_this_query(min_doc_freq, min_term_freq, max_query_terms,
+                                   min_should_match, log_message):
+        """Build more like this query"""
+        return {"more_like_this":{
+            "fields":               ["message"],
+            "like":                 log_message,
+            "min_doc_freq":         min_doc_freq,
+            "min_term_freq":        min_term_freq,
+            "minimum_should_match": "5<"+min_should_match,
+            "max_query_terms":      max_query_terms,}}
+
+    def build_analyze_query(self, launch, unique_id, message, size=10):
+        """Build analyze query"""
+        min_doc_freq = launch.analyzerConfig.minDocFreq\
+                       if launch.analyzerConfig.minDocFreq > 0\
+                       else self.search_cfg["MinDocFreq"]
+        min_term_freq = launch.analyzerConfig.minTermFreq\
+                        if launch.analyzerConfig.minTermFreq > 0\
+                        else self.search_cfg["MinTermFreq"]
+        min_should_match = "{}%".format(launch.analyzerConfig.minShouldMatch)\
+                           if launch.analyzerConfig.minShouldMatch > 0\
+                           else self.search_cfg["MinShouldMatch"]
+
+        query = {"size":size,
+                 "query": {
+                     "bool": {
+                         "must_not": [
+                             {"wildcard":{"issue_type":"TI*"}},
+                             {"wildcard":{"issue_type":"ti*"}},
+                         ],
+                         "must": [
+                             {"range":{"log_level":{"gte": ERROR_LOGGING_LEVEL}}},
+                             {"exists":{"field":"issue_type"}},
+                             {"term":{"is_merged":True}},
+                         ],
+                         "should" : [
+                             {"term": {"unique_id": {
+                                 "value": unique_id,
+                                 "boost": abs(self.search_cfg["BoostUniqueID"])}}},
+                             {"term": {"is_auto_analyzed": {
+                                 "value": str(self.search_cfg["BoostAA"] < 0).lower(),
+                                 "boost": abs(self.search_cfg["BoostAA"])}}},
+                         ]}}}
 
         if launch.analyzerConfig.analyzerMode in ["LAUNCH_NAME"]:
-            query["query"]["bool"]["must"].append({"term": {"launch_name": {"value": launch.launchName}}})
-            query["query"]["bool"]["must"].append(self.build_more_like_this_query(minDocFreq, minTermFreq,
-                                                                        self.search_cfg["MaxQueryTerms"], minShouldMatch, message))
+            query["query"]["bool"]["must"].append(
+                {"term": {
+                    "launch_name": {
+                        "value": launch.launchName}}})
+            query["query"]["bool"]["must"].append(
+                EsClient.build_more_like_this_query(min_doc_freq, min_term_freq,
+                                                    self.search_cfg["MaxQueryTerms"],
+                                                    min_should_match, message))
         elif launch.analyzerConfig.analyzerMode in ["CURRENT_LAUNCH"]:
-            query["query"]["bool"]["must"].append({"term": {"launch_id": {"value": launch.launchId}}})
-            query["query"]["bool"]["must"].append(self.build_more_like_this_query(1, minTermFreq,
-                                                                        self.search_cfg["MaxQueryTerms"], minShouldMatch, message))
+            query["query"]["bool"]["must"].append(
+                {"term": {
+                    "launch_id": {
+                        "value": launch.launchId}}})
+            query["query"]["bool"]["must"].append(
+                EsClient.build_more_like_this_query(min_doc_freq, min_term_freq,
+                                                    self.search_cfg["MaxQueryTerms"],
+                                                    min_should_match, message))
         else:
-            query["query"]["bool"]["should"].append({"term": {"launch_name": {"value": launch.launchName,
-                                                                              "boost": abs(self.search_cfg["BoostLaunch"])}}})
-            query["query"]["bool"]["must"].append(self.build_more_like_this_query(minDocFreq, minTermFreq,
-                                                                        self.search_cfg["MaxQueryTerms"], minShouldMatch, message))
+            query["query"]["bool"]["should"].append(
+                {"term": {
+                    "launch_name": {
+                        "value": launch.launchName,
+                        "boost": abs(self.search_cfg["BoostLaunch"])}}})
+            query["query"]["bool"]["must"].append(
+                EsClient.build_more_like_this_query(min_doc_freq, min_term_freq,
+                                                    self.search_cfg["MaxQueryTerms"],
+                                                    min_should_match, message))
         return query
 
-    def get_elasticsearch_results_for_test_items(self, launch, test_item):
+    def _get_elasticsearch_results_for_test_items(self, launch, test_item):
         full_results = []
-        prepared_logs = [{"_id":log.logId, 
-                          "_source":{ 
-                                "message":          utils.sanitize_text(utils.first_lines(log.message, 
-                                                                                          launch.analyzerConfig.numberOfLogLines)),
-                                "original_message": log.message, 
-                                "log_level":        log.logLevel,
-                         }} for log in test_item.logs]
-        for log in self.decompose_logs_merged_and_without_duplicates(prepared_logs):
+        prepared_logs = [{"_id":log.logId,
+                          "_source": {
+                              "message": utils.sanitize_text(utils.first_lines(
+                                  log.message,
+                                  launch.analyzerConfig.numberOfLogLines)),
+                              "original_message": log.message,
+                              "log_level":        log.logLevel,}} for log in test_item.logs]
+        for log in EsClient.decompose_logs_merged_and_without_duplicates(prepared_logs):
 
-            if log["_source"]["log_level"] < ERROR_LOGGING_LEVEL and log["_source"]["message"].strip() != "":
+            if log["_source"]["log_level"] < ERROR_LOGGING_LEVEL and\
+               log["_source"]["message"].strip() != "":
                 continue
 
-            query = self.build_analyze_query(launch, test_item.uniqueId, log["_source"]["message"])
+            query = self.build_analyze_query(launch, test_item.uniqueId,
+                                             log["_source"]["message"])
 
-            res = self.es.search(index=str(launch.project), body = query)
+            res = self.es_client.search(index=str(launch.project), body=query)
             full_results.append((log["_source"]["message"], res))
         return full_results
 
     def analyze_logs(self, launches):
-        logger.debug("Started analysis for %d launches"%len(launches))
+        """Analyze launches"""
+        logger.debug("Started analysis for %d launches", len(launches))
         results = []
 
         for launch in launches:
             for test_item in launch.testItems:
                 issue_types = {}
-
-                for log_message, res in self.get_elasticsearch_results_for_test_items(launch, test_item):
-                    issue_types = self.calculate_scores(res, 10, issue_types)
+                elastic_results = self._get_elasticsearch_results_for_test_items(launch,
+                                                                                 test_item)
+                for _, res in elastic_results:
+                    issue_types = EsClient.calculate_scores(res, 10, issue_types)
 
                 predicted_issue_type = ""
                 if len(issue_types) > 0:
@@ -470,14 +538,19 @@ class EsClient:
                             predicted_issue_type = key
 
                 if predicted_issue_type != "":
-                    relevant_item = issue_types[predicted_issue_type]["mrHit"]["_source"]["test_item"]
-                    results.append(commons.launch_objects.AnalysisResult(testItem = test_item.testItemId,
-                                                                         issueType = predicted_issue_type,
-                                                                         relevantItem = relevant_item))
-        logger.debug("Finished analysis for %d launches with %d results"%(len(launches), len(results)))
+                    relevant_item = issue_types[predicted_issue_type]\
+                                               ["mrHit"]["_source"]["test_item"]
+                    results.append(
+                        commons.launch_objects.AnalysisResult(testItem=test_item.testItemId,
+                                                              issueType=predicted_issue_type,
+                                                              relevantItem=relevant_item))
+        logger.debug("Finished analysis for %d launches with %d results",
+                     len(launches), len(results))
         return results
 
-    def calculate_scores(self, res, k, issue_types):
+    @staticmethod
+    def calculate_scores(res, k, issue_types):
+        """Calculate scores for defect types"""
         if res["hits"]["total"]["value"] > 0:
             total_score = 0
             hits = res["hits"]["hits"][:k]

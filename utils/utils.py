@@ -17,13 +17,17 @@
 import re
 
 def sanitize_text(text):
-    return re.sub("\d+", "", text)
+    """Sanitize text by deleting all numbers"""
+    return re.sub(r"\d+", "", text)
 
 def calculate_line_number(text):
+    """Calculate line numbers in the text"""
     return len([line for line in text.split("\n") if line.strip() != ""])
 
-def first_lines(log_str, n):
-    return "\n".join((log_str.split("\n")[:n])) if n >= 0 else log_str
+def first_lines(log_str, n_lines):
+    """Take n first lines"""
+    return "\n".join((log_str.split("\n")[:n_lines])) if n_lines >= 0 else log_str
 
 def build_url(main_url, url_params):
+    """Build url by concating url and url_params"""
     return main_url + "/" + "/".join(url_params)

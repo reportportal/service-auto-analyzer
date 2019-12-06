@@ -13,18 +13,22 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 """
-### This file can be used for checking app functionality locally
-import pika
+
 import sys
 import uuid
 import json
+import pika
 
-class RpcClient(object):
+# This file can be used for checking app functionality locally
 
+class RpcClient():
+    """RpcClient helps to use RPC type of communication with rabbitmq"""
     def __init__(self):
         self.connection = pika.BlockingConnection(
             pika.connection.\
         URLParameters("amqp://rabbitmq:rabbitmq@localhost:5672/analyzer?heartbeat=600"))
+        self.response = None
+        self.corr_id = None
 
         self.channel = self.connection.channel()
 
@@ -33,14 +37,15 @@ class RpcClient(object):
 
         self.channel.basic_consume(
             queue=self.callback_queue,
-            on_message_callback=self.on_response,
+            on_message_callback=lambda channel, method, props, body: self._on_response(props, body),
             auto_ack=True)
 
-    def on_response(self, ch, method, props, body):
+    def _on_response(self, props, body):
         if self.corr_id == props.correlation_id:
             self.response = body
 
     def call(self, message, method):
+        """RpcClient sends a message to a queue and waits for the answer"""
         self.response = None
         self.corr_id = str(uuid.uuid4())
         self.channel.basic_publish(
@@ -57,6 +62,7 @@ class RpcClient(object):
         return json.loads(self.response)
 
     def call_without_wait(self, message, method):
+        """RpcClient sends a message to a queue and doesn't wait for the answer"""
         self.corr_id = str(uuid.uuid4())
         self.channel.basic_publish(
             exchange='analyzer',
@@ -84,18 +90,18 @@ index_data = [{
     },
     "testItems": [
         {"testItemId": 2,
-        "uniqueId": "df",
-        "isAutoAnalyzed": False,
-        "issueType": "pb001",
-        "originalIssueType": "PB001",
-        "logs": [
-            {"logId": 3,
-            "logLevel": 40000,
-            "message": "error occured"},
-            {"logId": 4,
-            "logLevel": 40000,
-            "message": "error occured \r\n error found \r\n error mined"},
-        ]}
+         "uniqueId": "df",
+         "isAutoAnalyzed": False,
+         "issueType": "pb001",
+         "originalIssueType": "PB001",
+         "logs": [
+             {"logId": 3,
+              "logLevel": 40000,
+              "message": "error occured"},
+             {"logId": 4,
+              "logLevel": 40000,
+              "message": "error occured \r\n error found \r\n error mined"},]
+        }
     ]
 }]
 
@@ -105,7 +111,7 @@ search_data = {
         "itemId": 3,
         "projectId": 34,
         "filteredLaunchIds": [1],
-        "logMessages": ["error occured"],
+        "logMessages": ["error occured",],
         "logLines": -1,
     }
 
@@ -114,17 +120,17 @@ clean_index_data = {
     "project": 34,
 }
 
-method = sys.argv[1] if len(sys.argv) > 1 else "index"
-print(" [x] calling method %s"%method)
-if method.strip() in ["delete"]:
-    rpc.call_without_wait("34", method)
-    print("Method '%s' was called"%method)
-elif method.strip() in ["clean"]:
-    rpc.call_without_wait(json.dumps(clean_index_data), method)
-    print("Method '%s' was called"%method)
-elif method.strip() in ["search"]: 
-    response = rpc.call(json.dumps(search_data), method)
+used_method = sys.argv[1] if len(sys.argv) > 1 else "index"
+print(" [x] calling method %s"%used_method)
+if used_method.strip() in ["delete"]:
+    rpc.call_without_wait("34", used_method)
+    print("Method '%s' was called"%used_method)
+elif used_method.strip() in ["clean"]:
+    rpc.call_without_wait(json.dumps(clean_index_data), used_method)
+    print("Method '%s' was called"%used_method)
+elif used_method.strip() in ["search"]:
+    response = rpc.call(json.dumps(search_data), used_method)
     print(" [.] Got %r" % response)
 else:
-    response = rpc.call(json.dumps(index_data), method)
+    response = rpc.call(json.dumps(index_data), used_method)
     print(" [.] Got %r" % response)

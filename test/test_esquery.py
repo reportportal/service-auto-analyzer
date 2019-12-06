@@ -16,15 +16,15 @@
 
 import unittest
 import sure
-import sys
-import os
 
 import commons.launch_objects as launch_objects
 import commons.esclient as esclient
 
 class TestEsQuery(unittest.TestCase):
+    """Tests building analyze query"""
 
     def test_build_analyze_query(self):
+        """Tests building analyze query"""
         search_cfg = {
             "MinShouldMatch": "80%",
             "MinTermFreq":    25,
@@ -34,21 +34,25 @@ class TestEsQuery(unittest.TestCase):
             "BoostUniqueID":  3,
             "MaxQueryTerms":  50,
         }
-        ERROR_LOGGING_LEVEL = 40000
+        error_logging_level = 40000
 
-        es_client = esclient.EsClient(search_cfg = search_cfg)
+        es_client = esclient.EsClient(search_cfg=search_cfg)
         launch = launch_objects.Launch(**{
-                                    "analyzerConfig": {"analyzerMode": "SearchModeAll"}, 
-                                    "launchId": 123, 
-                                    "launchName": "Launch name",
-                                    "project": 1
-                                    })
+            "analyzerConfig": {"analyzerMode": "SearchModeAll"},
+            "launchId": 123,
+            "launchName": "Launch name",
+            "project": 1})
         query_from_esclient = es_client.build_analyze_query(launch, "unique", "hello world")
-        demo_query = self.build_demo_query(search_cfg, "ALL", "Launch name", "unique", "hello world", ERROR_LOGGING_LEVEL)
+        demo_query = TestEsQuery.build_demo_query(search_cfg, "Launch name",
+                                                  "unique", "hello world",
+                                                  error_logging_level)
 
         query_from_esclient.should.equal(demo_query)
 
-    def build_demo_query(self, search_cfg, mode, launch_name, unique_id, log_message, error_logging_level):
+    @staticmethod
+    def build_demo_query(search_cfg, launch_name,
+                         unique_id, log_message, error_logging_level):
+        """Build demo analyze query"""
         return {
             "size": 10,
             "query": {
@@ -58,31 +62,24 @@ class TestEsQuery(unittest.TestCase):
                         {"wildcard":{"issue_type":"ti*"}},
                     ],
                     "must": [
-                        {
-                            "range": {
-                                "log_level": {
-                                    "gte": error_logging_level,
-                                },
+                        {"range": {
+                            "log_level": {
+                                "gte": error_logging_level,},
                             },
                         },
-                        {
-                            "exists": {
-                                "field": "issue_type",
-                            },
+                        {"exists": {
+                            "field": "issue_type",},
                         },
-                        {   "term": {
-                                "is_merged":True,
-                            }
+                        {"term": {
+                            "is_merged":True,},
                         },
-                        {
-                            "more_like_this": {
-                                "fields":               ["message"],
-                                "like":                 log_message,
-                                "min_doc_freq":         search_cfg["MinDocFreq"],
-                                "min_term_freq":        search_cfg["MinTermFreq"],
-                                "minimum_should_match": "5<" + search_cfg["MinShouldMatch"],
-                                "max_query_terms":      search_cfg["MaxQueryTerms"],
-                            },
+                        {"more_like_this": {
+                            "fields":               ["message"],
+                            "like":                 log_message,
+                            "min_doc_freq":         search_cfg["MinDocFreq"],
+                            "min_term_freq":        search_cfg["MinTermFreq"],
+                            "minimum_should_match": "5<" + search_cfg["MinShouldMatch"],
+                            "max_query_terms":      search_cfg["MaxQueryTerms"],},
                         },
                     ],
                     "should": [

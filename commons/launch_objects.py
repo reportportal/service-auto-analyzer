@@ -14,11 +14,11 @@
 * limitations under the License.
 """
 
-from datetime import datetime
 from typing import List
 from pydantic import BaseModel
 
 class AnalyzerConf(BaseModel):
+    """Analyzer config object"""
     analyzerMode: str = "ALL"
     minDocFreq: float = 0
     minTermFreq: float = 0
@@ -28,11 +28,13 @@ class AnalyzerConf(BaseModel):
     indexingRunning: bool = True
 
 class Log(BaseModel):
+    """Log object"""
     logId: int
     logLevel: int = 0
     message: str
 
 class TestItem(BaseModel):
+    """Test item object"""
     testItemId: int
     uniqueId: str
     isAutoAnalyzed: bool
@@ -41,6 +43,7 @@ class TestItem(BaseModel):
     logs: List[Log] = []
 
 class Launch(BaseModel):
+    """Launch object"""
     launchId: int
     project: int
     launchName: str = ""
@@ -48,15 +51,18 @@ class Launch(BaseModel):
     testItems: List[TestItem] = []
 
 class AnalysisResult(BaseModel):
+    """Analysis result object"""
     testItem: int
     issueType: str
     relevantItem: int
 
 class CleanIndex(BaseModel):
+    """Clean index object"""
     ids: List[int]
     project: int
 
 class SearchLogs(BaseModel):
+    """Search logs object"""
     launchId: int
     launchName: str
     itemId: int
@@ -65,16 +71,14 @@ class SearchLogs(BaseModel):
     logMessages: List[str]
     logLines: int
 
-class SearchLogConfig(BaseModel):
-    searchMode: str
-    numberOfLogLines: int
-
 class Response(BaseModel):
+    """Response object"""
     acknowledged: bool = False
     error: str = ""
     status: int = 0
 
 class IndexResult(BaseModel):
+    """Index result object"""
     _index: str
     _type: str
     _id: str
@@ -84,9 +88,11 @@ class IndexResult(BaseModel):
     status: int
 
 class Item(BaseModel):
+    """Index item object"""
     index: IndexResult
 
 class BulkResponse(BaseModel):
+    """Bulk response object"""
     took: int
     errors: bool
     items: List[Item] = []

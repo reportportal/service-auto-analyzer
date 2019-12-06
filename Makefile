@@ -35,5 +35,5 @@ pushDev:
 	docker tag "$(IMAGE_NAME)" "$(REGISTRY)/$(IMAGE_NAME):latest"
 	docker push "$(REGISTRY)/$(IMAGE_NAME):latest"
 
-build: checkstyle, test
+build: checkstyle test
 

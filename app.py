@@ -29,11 +29,11 @@ from commons.esclient import EsClient
 
 
 APP_CONFIG = {
-    # "esHost":            os.getenv("ES_HOST", "http://elasticsearch:9200"),
-    "esHost":            os.getenv("ES_HOST", "http://localhost:9200"),
+    "esHost":            os.getenv("ES_HOST", "http://elasticsearch:9200"),
+    # "esHost":            os.getenv("ES_HOST", "http://localhost:9200"),
     "logLevel":          os.getenv("LOGGING_LEVEL", "DEBUG"),
-    # "amqpUrl":           os.getenv("AMQP_URL", "amqp://rabbitmq:rabbitmq@rabbitmq:5672"),
-    "amqpUrl":           os.getenv("AMQP_URL", "amqp://rabbitmq:rabbitmq@localhost:5672"),
+    "amqpUrl":           os.getenv("AMQP_URL", "amqp://rabbitmq:rabbitmq@rabbitmq:5672"),
+    # "amqpUrl":           os.getenv("AMQP_URL", "amqp://rabbitmq:rabbitmq@localhost:5672"),
     "exchangeName":      os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
     "analyzerPriority":  int(os.getenv("ANALYZER_PRIORITY", "1")),
     "analyzerIndex":     json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),

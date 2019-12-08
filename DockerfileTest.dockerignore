@@ -2,15 +2,12 @@
 **/*.pyc
 **/env/
 **/venv/
-**/test/
-**/fixtures/
 .bumpversion.cgf
 .git/
 .gitignore
 **/*.log
 Docker*
 Jenkins*
-Makefile
 **/*.md
 **/*.bat
 send_test.py

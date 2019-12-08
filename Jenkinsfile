@@ -11,7 +11,7 @@ node {
         }
 
         stage('Build') {
-            withEnv(["IMAGE_POSTFIX=-dev", "BUILD_NUMBER=${env.BUILD_NUMBER}"]) {
+            withEnv(["IMAGE_POSTFIX=-dev", "BUILD_NUMBER=${env.BUILD_NUMBER}", "DOCKER_BUILDKIT=1"]) {
                 docker.withServer("$DOCKER_HOST") {
                     stage('Test Docker Image') {
                         sh """

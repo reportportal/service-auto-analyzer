@@ -5,7 +5,7 @@ IMAGE_NAME_TEST=reportportal/service-auto-analyzer_test
 VENV_NAME?=venv
 PYTHON=/${VENV_NAME}/bin/python3
 
-.PHONY: build-release build-image-dev build-image pushDev venv test checkstyle build venv/bin/activate
+.PHONY: build-release build-image-dev build-image pushDev venv test checkstyle test-all build-image-test run-test
 
 venv: 
 	touch /$(VENV_NAME)/bin/activate
@@ -17,7 +17,7 @@ checkstyle: venv
 	${PYTHON} -m flake8
 
 build-release: venv
-	${PYTHON} -m bumpversion --new-version ${v} patch
+	${PYTHON} -m bumpversion --new-version ${v} build
 
 build-image-dev:
 	docker build -t "$(IMAGE_NAME_DEV)" --build-arg version=${v} -f Dockerfile .

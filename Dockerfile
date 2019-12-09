@@ -24,8 +24,6 @@ WORKDIR /backend/
 
 COPY . .
 COPY --from=0 VERSION .bumpversion.cfg ./
-RUN cat VERSION
-RUN cat .bumpversion.cfg
 
 # uWSGI will listen on this port
 EXPOSE 5000

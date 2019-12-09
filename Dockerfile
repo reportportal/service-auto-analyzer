@@ -1,12 +1,17 @@
 FROM python:3.7.4
 
 RUN apt-get update && apt-get install -y build-essential
+ARG version
 
 ADD requirements.txt /requirements.txt
 
 RUN python -m venv /venv \
     && /venv/bin/pip install -U pip \
     && LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "/venv/bin/pip install --no-cache-dir -r /requirements.txt"
+
+ENV VERSION=$version
+COPY ./ ./
+RUN make build-release v=${VERSION}
 
 # Multistage
 FROM python:3.7.4-slim
@@ -16,7 +21,7 @@ COPY --from=0 /venv /venv
 
 WORKDIR /backend/
 
-COPY . .
+COPY --from=0 . .
 
 # uWSGI will listen on this port
 EXPOSE 5000

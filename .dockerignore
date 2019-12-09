@@ -10,7 +10,6 @@
 **/*.log
 Docker*
 Jenkins*
-Makefile
 **/*.md
 **/*.bat
 send_test.py

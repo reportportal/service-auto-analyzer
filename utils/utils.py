@@ -19,7 +19,7 @@ import re
 
 def sanitize_text(text):
     """Sanitize text by deleting all numbers"""
-    return re.sub(r"\d+", "",text)
+    return re.sub(r"\d+", "", text)
 
 
 def calculate_line_number(text):

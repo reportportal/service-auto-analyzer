@@ -23,6 +23,8 @@ import copy
 import requests
 import elasticsearch
 import elasticsearch.helpers
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.feature_extraction.text import CountVectorizer
 import commons.launch_objects
 import utils.utils as utils
 
@@ -414,13 +416,22 @@ class EsClient:
         logger.debug("Started searching by request %s", search_req.json())
         for message in search_req.logMessages:
             sanitized_msg = utils.sanitize_text(utils.first_lines(message, search_req.logLines))
+            msg_words = " ".join(utils.split_words(sanitized_msg))
             query = self.build_search_query(search_req, sanitized_msg)
             res = self.es_client.search(index=str(search_req.projectId), body=query)
 
             for result in res["hits"]["hits"]:
                 try:
                     log_id = int(re.search(r"\d+", result["_id"]).group(0))
-                    keys.add(log_id)
+                    log_query_words = " ".join(utils.split_words(result["_source"]["message"]))
+                    vectorizer = CountVectorizer(binary=True,
+                                                 analyzer="word",
+                                                 token_pattern="[^ ]+")
+                    count_vector_matrix = vectorizer.fit_transform([msg_words, log_query_words])
+                    similarity_percent = float(cosine_similarity(count_vector_matrix[0],
+                                                                 count_vector_matrix[1]))
+                    if similarity_percent >= self.search_cfg["SearchLogsMinSimilarity"]:
+                        keys.add(log_id)
                 except Exception as err:
                     logger.error("Id %s is not integer", result["_id"])
                     logger.error(err)

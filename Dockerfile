@@ -9,6 +9,9 @@ RUN python -m venv /venv \
     && /venv/bin/pip install -U pip \
     && LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "/venv/bin/pip install --no-cache-dir -r /requirements.txt"
 
+RUN touch /venv/bin/activate
+RUN /venv/bin/python3 -m nltk.downloader stopwords
+
 ENV VERSION=$version
 COPY ./ ./
 
@@ -19,6 +22,8 @@ FROM python:3.7.4-slim
 RUN apt-get update && apt-get install -y libxml2 curl \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=0 /venv /venv
+RUN mkdir /root/nltk_data
+COPY --from=0 /root/nltk_data /root/nltk_data/
 
 WORKDIR /backend/
 

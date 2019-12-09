@@ -90,20 +90,29 @@ index_data = [{
         "analyzerMode": "ALL",
         "indexingRunning": True,
     },
-    "testItems": [
-        {"testItemId": 2,
-         "uniqueId": "df",
-         "isAutoAnalyzed": False,
-         "issueType": "pb001",
-         "originalIssueType": "PB001",
-         "logs": [
-             {"logId": 3,
-              "logLevel": 40000,
-              "message": "error occured"},
-             {"logId": 4,
-              "logLevel": 40000,
-              "message": "error occured \r\n error found \r\n error mined"}, ]}
-    ]
+    "testItems": [{"testItemId": 2,
+                   "uniqueId": "df",
+                   "isAutoAnalyzed": False,
+                   "issueType": "pb001",
+                   "originalIssueType": "PB001",
+                   "logs": [
+                       {"logId": 3,
+                        "logLevel": 40000,
+                        "message": "error occured"},
+                       {"logId": 4,
+                        "logLevel": 40000,
+                        "message": "error occured \r\n error found \r\n error mined"}, ]
+                   },
+                  {"testItemId": 5,
+                   "uniqueId": "df1",
+                   "isAutoAnalyzed": False,
+                   "issueType": "ti001",
+                   "originalIssueType": "TI001",
+                   "logs": [
+                       {"logId": 5,
+                        "logLevel": 40000,
+                        "message": "error occured \r\n error found \r\n error mined"}, ]
+                   }, ],
 }]
 
 search_data = {
@@ -112,7 +121,7 @@ search_data = {
     "itemId": 3,
     "projectId": 34,
     "filteredLaunchIds": [1],
-    "logMessages": ["error occured", ],
+    "logMessages": ["error occured found mined", ],
     "logLines": -1, }
 
 clean_index_data = {

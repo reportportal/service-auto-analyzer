@@ -15,6 +15,8 @@
 """
 
 import re
+import string
+import nltk
 
 
 def sanitize_text(text):
@@ -35,3 +37,19 @@ def first_lines(log_str, n_lines):
 def build_url(main_url, url_params):
     """Build url by concating url and url_params"""
     return main_url + "/" + "/".join(url_params)
+
+
+def split_words(text, min_word_length=0):
+    all_words = set()
+    stopwords = set(nltk.corpus.stopwords.words("english"))
+    replace_symbols = r"[<>\{:,!?\}\[\];=\(\)\'\"]|\.\.\."
+    text = re.sub(replace_symbols, " ", text)
+    res = text.split()
+    translate_map = {}
+    for punct in string.punctuation:
+        translate_map[punct] = " "
+    for w in res:
+        w = re.sub(r"\s+", " ", w.translate(w.maketrans(translate_map))).strip().lower()
+        if w != "" and w not in stopwords and len(w) >= min_word_length and re.search(r"\w", w):
+            all_words.add(w)
+    return list(all_words)

@@ -22,7 +22,10 @@ COPY --from=0 /venv /venv
 
 WORKDIR /backend/
 
-COPY --from=0 . .
+COPY . .
+COPY --from=0 VERSION .bumpversion.cfg ./
+RUN cat VERSION
+RUN cat .bumpversion.cfg
 
 # uWSGI will listen on this port
 EXPOSE 5000

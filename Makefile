@@ -17,7 +17,7 @@ checkstyle: venv
 	${PYTHON} -m flake8
 
 build-release: venv
-	/${VENV_NAME}/bin/python -m bump2version --new-version ${v} release
+	${PYTHON} -m bumpversion --new-version ${v} patch
 
 build-image-dev:
 	docker build -t "$(IMAGE_NAME_DEV)" --build-arg version=${v} -f Dockerfile .

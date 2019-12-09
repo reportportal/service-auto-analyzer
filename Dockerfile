@@ -11,6 +11,7 @@ RUN python -m venv /venv \
 
 ENV VERSION=$version
 COPY ./ ./
+RUN make checkstyle
 RUN make build-release v=${VERSION}
 
 # Multistage

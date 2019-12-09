@@ -1,0 +1,32 @@
+#!groovy
+
+node {
+
+    load "$JENKINS_HOME/jobvars.env"
+
+    dir('src/github.com/reportportal/service-auto-analyzer') {
+
+        stage('Checkout') {
+            checkout scm
+            sh 'git checkout master'
+            sh 'git pull'
+        }
+
+        stage('Build') {
+            withEnv(["RELEASE_VERSION=${RELEASE_VERSION}", "DOCKER_BUILDKIT=1"]) {
+                docker.withServer("$DOCKER_HOST") {
+                    stage('Test Docker Image') {
+                        sh """
+                            make build-image-test
+                            make run-test
+                        """
+                    }
+                    stage('Build Docker Image') {
+                        sh 'make build-image v=${RELEASE_VERSION}'
+                    }
+                }
+            }
+        }
+
+    }
+}

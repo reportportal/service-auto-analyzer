@@ -268,7 +268,8 @@ class EsClient:
 
         for log_level in log_level_messages:
 
-            if len(log_level_ids_to_add[log_level]) == 0:
+            if len(log_level_ids_to_add[log_level]) == 0 and\
+               log_level_messages[log_level].strip() != "":
                 log = log_level_ids_merged[log_level]
                 new_logs.append(EsClient.prepare_new_log(
                     log, str(log["_id"]) + "_m",
@@ -415,6 +416,8 @@ class EsClient:
         keys = set()
         logger.debug("Started searching by request %s", search_req.json())
         for message in search_req.logMessages:
+            if message.strip() == "":
+                continue
             sanitized_msg = utils.sanitize_text(utils.first_lines(message, search_req.logLines))
             msg_words = " ".join(utils.split_words(sanitized_msg))
             query = self.build_search_query(search_req, sanitized_msg)
@@ -525,8 +528,8 @@ class EsClient:
                               "log_level":        log.logLevel, }} for log in test_item.logs]
         for log in EsClient.decompose_logs_merged_and_without_duplicates(prepared_logs):
 
-            if log["_source"]["log_level"] < ERROR_LOGGING_LEVEL and\
-               log["_source"]["message"].strip() != "":
+            if log["_source"]["log_level"] < ERROR_LOGGING_LEVEL or\
+               log["_source"]["message"].strip() == "":
                 continue
 
             query = self.build_analyze_query(launch, test_item.uniqueId,

@@ -40,6 +40,7 @@ def build_url(main_url, url_params):
 
 
 def split_words(text, min_word_length=0):
+    """Splits words by space and punctuation marks"""
     all_words = set()
     stopwords = set(nltk.corpus.stopwords.words("english"))
     replace_symbols = r"[<>\{:,!?\}\[\];=\(\)\'\"]|\.\.\."

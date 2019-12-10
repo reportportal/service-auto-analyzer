@@ -59,7 +59,9 @@ class TestEsClient(unittest.TestCase):
         self.search_rq = "search_rq.json"
         self.no_hits_search_rs = "no_hits_search_rs.json"
         self.one_hit_search_rs = "one_hit_search_rs.json"
+        self.one_hit_search_rs_search_logs = "one_hit_search_rs_search_logs.json"
         self.two_hits_search_rs = "two_hits_search_rs.json"
+        self.two_hits_search_rs_search_logs = "two_hits_search_rs_search_logs.json"
         self.three_hits_search_rs = "three_hits_search_rs.json"
         self.launch_w_test_items_w_logs_different_log_level =\
             "launch_w_test_items_w_logs_different_log_level.json"
@@ -90,6 +92,8 @@ class TestEsClient(unittest.TestCase):
             "BoostLaunch":    2,
             "BoostUniqueID":  2,
             "MaxQueryTerms":  50,
+            "SearchLogsMinShouldMatch": "98%",
+            "SearchLogsMinSimilarity": 0.9,
         }
 
     def _start_server(self, test_calls):
@@ -351,6 +355,88 @@ class TestEsClient(unittest.TestCase):
 
             test["has_errors"].should.equal(response.errors)
             test["expected_count"].should.equal(response.took)
+
+            TestEsClient.shutdown_server(test["test_calls"])
+
+    @ignore_warnings
+    def test_search_logs(self):
+        """Test search logs"""
+        tests = [
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1/_search",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             TestEsClient.get_fixture(self.search_rq),
+                                    "rs":             TestEsClient.get_fixture(
+                                        self.no_hits_search_rs),
+                                    }, ],
+                "rq":             launch_objects.SearchLogs(launchId=1,
+                                                            launchName="Launch 1",
+                                                            itemId=3,
+                                                            projectId=1,
+                                                            filteredLaunchIds=[1],
+                                                            logMessages=["error"],
+                                                            logLines=-1),
+                "expected_count": 0
+            },
+            {
+                "test_calls":     [],
+                "rq":             launch_objects.SearchLogs(launchId=1,
+                                                            launchName="Launch 1",
+                                                            itemId=3,
+                                                            projectId=1,
+                                                            filteredLaunchIds=[1],
+                                                            logMessages=[""],
+                                                            logLines=-1),
+                "expected_count": 0
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1/_search",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             TestEsClient.get_fixture(self.search_rq),
+                                    "rs":             TestEsClient.get_fixture(
+                                        self.one_hit_search_rs_search_logs),
+                                    }, ],
+                "rq":             launch_objects.SearchLogs(launchId=1,
+                                                            launchName="Launch 1",
+                                                            itemId=3,
+                                                            projectId=1,
+                                                            filteredLaunchIds=[1],
+                                                            logMessages=["error"],
+                                                            logLines=-1),
+                "expected_count": 0
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1/_search",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             TestEsClient.get_fixture(self.search_rq),
+                                    "rs":             TestEsClient.get_fixture(
+                                        self.two_hits_search_rs_search_logs),
+                                    }, ],
+                "rq":             launch_objects.SearchLogs(launchId=1,
+                                                            launchName="Launch 1",
+                                                            itemId=3,
+                                                            projectId=1,
+                                                            filteredLaunchIds=[1],
+                                                            logMessages=["error occured once"],
+                                                            logLines=-1),
+                "expected_count": 1
+            },
+        ]
+
+        for test in tests:
+            self._start_server(test["test_calls"])
+
+            es_client = esclient.EsClient(host=self.es_host,
+                                          search_cfg=TestEsClient.get_default_search_config())
+
+            response = es_client.search_logs(test["rq"])
+            response.should.have.length_of(test["expected_count"])
 
             TestEsClient.shutdown_server(test["test_calls"])
 

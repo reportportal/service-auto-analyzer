@@ -13,7 +13,7 @@ node {
         }
 
         stage('Build') {
-            withEnv(["RELEASE_VERSION=${RELEASE_VERSION}", "DOCKER_BUILDKIT=1"]) {
+            withEnv(["GOPATH=${JENKINS_HOME}/workspace/${JOB_NAME}", "GO111MODULE=on", "RELEASE_VERSION=${RELEASE_VERSION}", "DOCKER_BUILDKIT=1"]) {
                 docker.withServer("$DOCKER_HOST") {
                     stage('Test Docker Image') {
                         sh """
@@ -22,7 +22,10 @@ node {
                         """
                     }
                     stage('Build Docker Image') {
+                        env.PATH = "${GOPATH}/bin:$PATH"
+                        sh 'go version'
                         sh 'make build-image v=${RELEASE_VERSION}'
+                        sh 'make release v=${RELEASE_VERSION}'
                     }
                 }
             }

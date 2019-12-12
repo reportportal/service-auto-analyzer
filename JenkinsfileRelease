@@ -9,7 +9,7 @@ node {
         stage('Checkout') {
             checkout scm
             sh 'git checkout master'
-            sh 'git pull'
+            sh 'git reset --hard origin/master'
         }
 
         stage('Build') {

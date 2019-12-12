@@ -15,7 +15,7 @@ RUN /venv/bin/python3 -m nltk.downloader stopwords
 ENV VERSION=$version
 COPY ./ ./
 
-RUN make release v=${VERSION}
+RUN make build-release v=${VERSION}
 
 # Multistage
 FROM python:3.7.4-slim

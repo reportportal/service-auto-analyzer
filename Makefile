@@ -7,11 +7,7 @@ PYTHON=/${VENV_NAME}/bin/python3
 BUILD_DEPS:= github.com/avarabyeu/releaser
 GO = go
 
-.PHONY: build-release build-image-dev build-image pushDev venv test checkstyle test-all build-image-test run-test get-build-deps
-
-get-build-deps:
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.17.1
-	$(GO) get $(BUILD_DEPS)
+.PHONY: build-release build-image-dev build-image pushDev venv test checkstyle test-all build-image-test run-test
 
 venv: 
 	touch /$(VENV_NAME)/bin/activate
@@ -22,7 +18,7 @@ test: venv
 checkstyle: venv
 	${PYTHON} -m flake8
 
-release: get-build-deps
+release:
 	$(eval v := $(or $(v),$(shell releaser bump)))
 	# make sure latest version is bumped to file
 	releaser bump --version ${v}

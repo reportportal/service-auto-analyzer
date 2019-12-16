@@ -17,6 +17,9 @@
 import re
 import string
 import nltk
+import logging
+
+logger = logging.getLogger("analyzerApp.utils")
 
 
 def sanitize_text(text):
@@ -53,4 +56,23 @@ def split_words(text, min_word_length=0):
         w = re.sub(r"\s+", " ", w.translate(w.maketrans(translate_map))).strip().lower()
         if w != "" and w not in stopwords and len(w) >= min_word_length and re.search(r"\w", w):
             all_words.add(w)
+    return list(all_words)
+
+
+def find_query_words_count_from_explanation(elastic_res):
+    """Find information about matched words in elasticsearch query"""
+    index_query_words_details = None
+    all_words = set()
+    try:
+        for idx, field in enumerate(elastic_res["_explanation"]["details"]):
+            for detail in field["details"]:
+                if "weight(message:" in detail["description"].lower():
+                    index_query_words_details = idx
+                    break
+        for detail in elastic_res["_explanation"]["details"][index_query_words_details]["details"]:
+            word = re.search(r"weight\(message:(.+) in", detail["description"]).group(1)
+            all_words.add(word)
+    except Exception as err:
+        logger.error(err)
+        return []
     return list(all_words)

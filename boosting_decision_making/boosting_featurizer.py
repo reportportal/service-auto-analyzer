@@ -17,6 +17,9 @@
 from utils import utils
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import CountVectorizer
+import logging
+
+logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
 
 class BoostingFeaturizer:
@@ -27,19 +30,19 @@ class BoostingFeaturizer:
         self.scores_by_issue_type = None
 
         self.feature_functions = {
-            0: (self.calculate_score, {}),
-            1: (self.calculate_place, {}),
-            2: (self.calculate_max_score_and_pos, {"return_val_name": "max_score"}),
-            3: (self.calculate_max_score_and_pos, {"return_val_name": "max_score_pos"}),
-            4: (self.calculate_min_score_and_pos, {"return_val_name": "min_score"}),
-            5: (self.calculate_min_score_and_pos, {"return_val_name": "min_score_pos"}),
-            6: (self.calculate_percent_count_items_and_mean, {"return_val_name": "mean_score"}),
-            7: (self.calculate_percent_count_items_and_mean,
+            0: (self._calculate_score, {}),
+            1: (self._calculate_place, {}),
+            2: (self._calculate_max_score_and_pos, {"return_val_name": "max_score"}),
+            3: (self._calculate_max_score_and_pos, {"return_val_name": "max_score_pos"}),
+            4: (self._calculate_min_score_and_pos, {"return_val_name": "min_score"}),
+            5: (self._calculate_min_score_and_pos, {"return_val_name": "min_score_pos"}),
+            6: (self._calculate_percent_count_items_and_mean, {"return_val_name": "mean_score"}),
+            7: (self._calculate_percent_count_items_and_mean,
                 {"return_val_name": "cnt_items_percent"}),
-            8: (self.calculate_max_score_and_pos, {"return_val_name": "max_score_global_percent"}),
-            9: (self.calculate_percent_issue_types, {}),
-            10: (self.calculate_query_terms_percent, {}),
-            11: (self.calculate_similarity_percent, {}),
+            8: (self._calculate_max_score_and_pos, {"return_val_name": "max_score_global_percent"}),
+            9: (self._calculate_percent_issue_types, {}),
+            10: (self._calculate_query_terms_percent, {}),
+            11: (self._calculate_similarity_percent, {}),
         }
 
         if type(feature_ids) == str:
@@ -47,8 +50,8 @@ class BoostingFeaturizer:
         else:
             self.feature_ids = feature_ids
 
-    def calculate_percent_issue_types(self):
-        scores_by_issue_type = self.calculate_score()
+    def _calculate_percent_issue_types(self):
+        scores_by_issue_type = self._calculate_score()
         percent_by_issue_type = {}
         for issue_type in scores_by_issue_type:
             percent_by_issue_type[issue_type] = 1 / len(scores_by_issue_type)\
@@ -79,12 +82,12 @@ class BoostingFeaturizer:
                     (hit["normalized_score"] / len(self.all_results))
         return self.scores_by_issue_type
 
-    def calculate_score(self):
+    def _calculate_score(self):
         scores_by_issue_type = self.find_most_relevant_by_type()
         return dict([(item, scores_by_issue_type[item]["score"]) for item in scores_by_issue_type])
 
-    def calculate_place(self):
-        scores_by_issue_type = self.calculate_score()
+    def _calculate_place(self):
+        scores_by_issue_type = self._calculate_score()
         place_by_issue_type = {}
         for idx, issue_type_item in enumerate(sorted(scores_by_issue_type.items(),
                                                      key=lambda x: x[1],
@@ -92,7 +95,7 @@ class BoostingFeaturizer:
             place_by_issue_type[issue_type_item[0]] = 1 / (1 + idx)
         return place_by_issue_type
 
-    def calculate_max_score_and_pos(self, return_val_name="max_score"):
+    def _calculate_max_score_and_pos(self, return_val_name="max_score"):
         max_scores_by_issue_type = {}
         max_score_global = 0
         for log_message, es_results in self.all_results:
@@ -113,7 +116,7 @@ class BoostingFeaturizer:
         return dict([(item, max_scores_by_issue_type[item][return_val_name])
                     for item in max_scores_by_issue_type])
 
-    def calculate_min_score_and_pos(self, return_val_name="min_score"):
+    def _calculate_min_score_and_pos(self, return_val_name="min_score"):
         min_scores_by_issue_type = {}
         for log_message, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
@@ -126,7 +129,7 @@ class BoostingFeaturizer:
         return dict([(item, min_scores_by_issue_type[item][return_val_name])
                     for item in min_scores_by_issue_type])
 
-    def calculate_percent_count_items_and_mean(self, return_val_name="mean_score"):
+    def _calculate_percent_count_items_and_mean(self, return_val_name="mean_score"):
         cnt_items_by_issue_type = {}
         cnt_items_glob = 0
         for log_message, es_results in self.all_results:
@@ -158,13 +161,11 @@ class BoostingFeaturizer:
 
             for hit in es_results["hits"]["hits"]:
                 hit["normalized_score"] = hit["_score"] / total_score
-                for config_field in self.config:
-                    hit[config_field] = self.config[config_field]
 
             all_results.append((log_message, es_results["hits"]["hits"]))
         return all_results
 
-    def calculate_query_terms_percent(self):
+    def _calculate_query_terms_percent(self):
         scores_by_issue_type = self.find_most_relevant_by_type()
         query_terms_percent_by_type = {}
         for issue_type in scores_by_issue_type:
@@ -172,20 +173,19 @@ class BoostingFeaturizer:
                 scores_by_issue_type[issue_type]["mrHit"])
 
             all_log_words = utils.split_words(scores_by_issue_type[issue_type]["log_message"])
-            max_query_terms = scores_by_issue_type[issue_type]["mrHit"]["max_query_terms"]
 
             query_terms_percent_by_type[issue_type] =\
-                (scores_by_issue_type[issue_type]["mrHit"]["min_should_match"]
-                    if len(all_log_words) >= max_query_terms
-                    else len(all_query_words) / max_query_terms)
+                (self.config["min_should_match"]
+                    if len(all_log_words) >= self.config["max_query_terms"]
+                    else len(all_query_words) / self.config["max_query_terms"])
         return query_terms_percent_by_type
 
-    def calculate_similarity_percent(self):
+    def _calculate_similarity_percent(self):
         scores_by_issue_type = self.find_most_relevant_by_type()
         similarity_percent_by_type = {}
         for issue_type in scores_by_issue_type:
-            min_word_length = scores_by_issue_type[issue_type]["mrHit"]["min_word_length"]\
-                if "min_word_length" in scores_by_issue_type[issue_type]["mrHit"] else 0
+            min_word_length = self.config["min_word_length"]\
+                if "min_word_length" in self.config else 0
             similar_message = scores_by_issue_type[issue_type]["mrHit"]["_source"]["message"]
             all_message_words = utils.split_words(similar_message, min_word_length=min_word_length)
             query_message = scores_by_issue_type[issue_type]["log_message"]
@@ -197,24 +197,26 @@ class BoostingFeaturizer:
                 float(cosine_similarity(count_vector_matrix[0], count_vector_matrix[1]))
         return similarity_percent_by_type
 
-    def gather_features_info(self, test_item):
-        issue_types = self.find_most_relevant_by_type()
+    def gather_features_info(self):
+        """Gather all features from feature_ids for a test item"""
         gathered_data = []
-        labels = []
         issue_type_names = []
         issue_type_by_index = {}
+        try:
+            issue_types = self.find_most_relevant_by_type()
 
-        for idx, issue_type in enumerate(issue_types):
-            gathered_data.append([])
-            issue_type_by_index[issue_type] = idx
-            issue_type_names.append(issue_type)
-            label = 0
-            labels.append(label)
+            for idx, issue_type in enumerate(issue_types):
+                gathered_data.append([])
+                issue_type_by_index[issue_type] = idx
+                issue_type_names.append(issue_type)
 
-        for feature in self.feature_ids:
-            func, args = self.feature_functions[feature]
-            result = func(**args)
-            for issue_type in result:
-                gathered_data[issue_type_by_index[issue_type]].append(result[issue_type])
+            for feature in self.feature_ids:
+                func, args = self.feature_functions[feature]
+                result = func(**args)
+                for issue_type in result:
+                    gathered_data[issue_type_by_index[issue_type]].append(result[issue_type])
+        except Exception as err:
+            logger.error("Errors in boosting features calculation")
+            logger.error(err)
 
-        return gathered_data, labels, issue_type_names
+        return gathered_data, issue_type_names

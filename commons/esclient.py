@@ -560,8 +560,8 @@ class EsClient:
                         "min_word_length": self.search_cfg["MinWordLength"],
                     },
                     feature_ids=self.boosting_decision_maker.get_feature_ids())
-                feature_data, _, issue_type_names =\
-                    boosting_data_gatherer.gather_features_info(test_item)
+                feature_data, issue_type_names =\
+                    boosting_data_gatherer.gather_features_info()
 
                 if len(feature_data) > 0:
 

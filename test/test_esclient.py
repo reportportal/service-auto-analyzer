@@ -15,6 +15,7 @@
 """
 
 import unittest
+from unittest.mock import MagicMock
 import json
 import os
 from http import HTTPStatus
@@ -25,6 +26,7 @@ import httpretty
 
 import commons.launch_objects as launch_objects
 import commons.esclient as esclient
+from boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
 
 
 def ignore_warnings(method):
@@ -94,6 +96,7 @@ class TestEsClient(unittest.TestCase):
             "MaxQueryTerms":  50,
             "SearchLogsMinShouldMatch": "98%",
             "SearchLogsMinSimilarity": 0.9,
+            "MinWordLength":  0,
         }
 
     def _start_server(self, test_calls):
@@ -608,18 +611,23 @@ class TestEsClient(unittest.TestCase):
                 "index_rq":            TestEsClient.get_fixture(self.launch_wo_test_items),
                 "expected_count":      0,
                 "expected_issue_type": "",
+                "boost_predict":       ([], [])
             },
             {
-                "test_calls":     [],
-                "index_rq":       TestEsClient.get_fixture(self.launch_w_test_items_wo_logs),
-                "expected_count": 0,
+                "test_calls":          [],
+                "index_rq":            TestEsClient.get_fixture(
+                    self.launch_w_test_items_wo_logs),
+                "expected_count":      0,
                 "expected_issue_type": "",
+                "boost_predict":       ([], [])
             },
             {
-                "test_calls":     [],
-                "index_rq":       TestEsClient.get_fixture(self.launch_w_test_items_w_empty_logs),
-                "expected_count": 0,
+                "test_calls":          [],
+                "index_rq":            TestEsClient.get_fixture(
+                    self.launch_w_test_items_w_empty_logs),
+                "expected_count":      0,
                 "expected_issue_type": "",
+                "boost_predict":       ([], [])
             },
             {
                 "test_calls":     [{"method":       httpretty.GET,
@@ -639,8 +647,9 @@ class TestEsClient(unittest.TestCase):
                                         self.no_hits_search_rs),
                                     }, ],
                 "index_rq":       TestEsClient.get_fixture(self.launch_w_test_items_w_logs),
-                "expected_count": 0,
+                "expected_count":      0,
                 "expected_issue_type": "",
+                "boost_predict":       ([], [])
             },
             {
                 "test_calls":     [{"method":       httpretty.GET,
@@ -662,6 +671,7 @@ class TestEsClient(unittest.TestCase):
                 "index_rq":       TestEsClient.get_fixture(self.launch_w_test_items_w_logs),
                 "expected_count": 1,
                 "expected_issue_type": "AB001",
+                "boost_predict":       ([1], [[0.2, 0.8]])
             },
             {
                 "test_calls":     [{"method":       httpretty.GET,
@@ -683,6 +693,7 @@ class TestEsClient(unittest.TestCase):
                 "index_rq":       TestEsClient.get_fixture(self.launch_w_test_items_w_logs),
                 "expected_count": 1,
                 "expected_issue_type": "AB001",
+                "boost_predict":       ([1, 0], [[0.2, 0.8], [0.7, 0.3]])
             },
             {
                 "test_calls":     [{"method":       httpretty.GET,
@@ -704,6 +715,7 @@ class TestEsClient(unittest.TestCase):
                 "index_rq":       TestEsClient.get_fixture(self.launch_w_test_items_w_logs),
                 "expected_count": 1,
                 "expected_issue_type": "AB001",
+                "boost_predict":       ([1, 1], [[0.2, 0.8], [0.3, 0.7]])
             },
             {
                 "test_calls":     [{"method":      httpretty.GET,
@@ -725,6 +737,7 @@ class TestEsClient(unittest.TestCase):
                 "index_rq":       TestEsClient.get_fixture(self.launch_w_test_items_w_logs),
                 "expected_count": 1,
                 "expected_issue_type": "PB001",
+                "boost_predict":       ([0, 1], [[0.8, 0.2], [0.3, 0.7]])
             },
             {
                 "test_calls":     [{"method":       httpretty.GET,
@@ -739,6 +752,7 @@ class TestEsClient(unittest.TestCase):
                     self.launch_w_test_items_w_logs_different_log_level),
                 "expected_count": 1,
                 "expected_issue_type": "AB001",
+                "boost_predict":       ([1, 0], [[0.2, 0.8], [0.7, 0.3]])
             },
             {
                 "test_calls":     [{"method":       httpretty.GET,
@@ -753,6 +767,7 @@ class TestEsClient(unittest.TestCase):
                     self.launch_w_test_items_w_logs_to_be_merged),
                 "expected_count": 1,
                 "expected_issue_type": "AB001",
+                "boost_predict":       ([1, 0], [[0.2, 0.8], [0.7, 0.3]])
             },
         ]
 
@@ -761,6 +776,10 @@ class TestEsClient(unittest.TestCase):
 
             es_client = esclient.EsClient(host=self.es_host,
                                           search_cfg=TestEsClient.get_default_search_config())
+            _boosting_decision_maker = BoostingDecisionMaker()
+            _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
+            _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])
+            es_client.set_boosting_decision_maker(_boosting_decision_maker)
             launches = [launch_objects.Launch(**launch) for launch in json.loads(test["index_rq"])]
             response = es_client.analyze_logs(launches)
 

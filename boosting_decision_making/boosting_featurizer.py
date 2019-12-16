@@ -1,3 +1,19 @@
+"""
+* Copyright 2019 EPAM Systems
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+* http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+"""
+
 from utils import utils
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import CountVectorizer
@@ -137,15 +153,15 @@ class BoostingFeaturizer:
         all_results = []
         for log_message, es_results in all_elastic_results:
             total_score = 0
-            for hit in es_results:
+            for hit in es_results["hits"]["hits"]:
                 total_score += hit["_score"]
 
-            for hit in es_results:
+            for hit in es_results["hits"]["hits"]:
                 hit["normalized_score"] = hit["_score"] / total_score
                 for config_field in self.config:
                     hit[config_field] = self.config[config_field]
 
-            all_results.append((log_message, es_results))
+            all_results.append((log_message, es_results["hits"]["hits"]))
         return all_results
 
     def calculate_query_terms_percent(self):

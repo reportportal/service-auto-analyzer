@@ -49,7 +49,8 @@ SEARCH_CONFIG = {
     "BoostUniqueID":            float(os.getenv("ES_BOOST_UNIQUE_ID", "2.0")),
     "MaxQueryTerms":            int(os.getenv("ES_MAX_QUERY_TERMS", "50")),
     "SearchLogsMinShouldMatch": os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "98%"),
-    "SearchLogsMinSimilarity": float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.9")),
+    "SearchLogsMinSimilarity":  float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.9")),
+    "MinWordLength":            int(os.getenv("ES_MIN_WORD_LENGTH", "0")),
 }
 
 

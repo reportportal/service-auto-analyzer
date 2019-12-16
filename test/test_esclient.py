@@ -157,16 +157,17 @@ class TestEsClient(unittest.TestCase):
                 "expected_count": 0,
             },
         ]
-        for test in tests:
-            self._start_server(test["test_calls"])
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
 
-            es_client = esclient.EsClient(host=self.es_host,
-                                          search_cfg=TestEsClient.get_default_search_config())
+                es_client = esclient.EsClient(host=self.es_host,
+                                              search_cfg=TestEsClient.get_default_search_config())
 
-            response = es_client.list_indices()
-            response.should.have.length_of(test["expected_count"])
+                response = es_client.list_indices()
+                response.should.have.length_of(test["expected_count"])
 
-            TestEsClient.shutdown_server(test["test_calls"])
+                TestEsClient.shutdown_server(test["test_calls"])
 
     @ignore_warnings
     def test_create_index(self):
@@ -194,16 +195,17 @@ class TestEsClient(unittest.TestCase):
                 "acknowledged": False,
             },
         ]
-        for test in tests:
-            self._start_server(test["test_calls"])
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
 
-            es_client = esclient.EsClient(host=self.es_host,
-                                          search_cfg=TestEsClient.get_default_search_config())
+                es_client = esclient.EsClient(host=self.es_host,
+                                              search_cfg=TestEsClient.get_default_search_config())
 
-            response = es_client.create_index(test["index"])
-            response.acknowledged.should.equal(test["acknowledged"])
+                response = es_client.create_index(test["index"])
+                response.acknowledged.should.equal(test["acknowledged"])
 
-            TestEsClient.shutdown_server(test["test_calls"])
+                TestEsClient.shutdown_server(test["test_calls"])
 
     @ignore_warnings
     def test_exists_index(self):
@@ -226,16 +228,17 @@ class TestEsClient(unittest.TestCase):
                 "index":        "idx1",
             },
         ]
-        for test in tests:
-            self._start_server(test["test_calls"])
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
 
-            es_client = esclient.EsClient(host=self.es_host,
-                                          search_cfg=TestEsClient.get_default_search_config())
+                es_client = esclient.EsClient(host=self.es_host,
+                                              search_cfg=TestEsClient.get_default_search_config())
 
-            response = es_client.index_exists(test["index"])
-            response.should.equal(test["exists"])
+                response = es_client.index_exists(test["index"])
+                response.should.equal(test["exists"])
 
-            TestEsClient.shutdown_server(test["test_calls"])
+                TestEsClient.shutdown_server(test["test_calls"])
 
     @ignore_warnings
     def test_delete_index(self):
@@ -262,17 +265,18 @@ class TestEsClient(unittest.TestCase):
                 "has_errors": True,
             },
         ]
-        for test in tests:
-            self._start_server(test["test_calls"])
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
 
-            es_client = esclient.EsClient(host=self.es_host,
-                                          search_cfg=TestEsClient.get_default_search_config())
+                es_client = esclient.EsClient(host=self.es_host,
+                                              search_cfg=TestEsClient.get_default_search_config())
 
-            response = es_client.delete_index(test["index"])
+                response = es_client.delete_index(test["index"])
 
-            test["has_errors"].should.equal(len(response.error) > 0)
+                test["has_errors"].should.equal(len(response.error) > 0)
 
-            TestEsClient.shutdown_server(test["test_calls"])
+                TestEsClient.shutdown_server(test["test_calls"])
 
     @ignore_warnings
     def test_clean_index(self):
@@ -348,18 +352,19 @@ class TestEsClient(unittest.TestCase):
             },
         ]
 
-        for test in tests:
-            self._start_server(test["test_calls"])
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
 
-            es_client = esclient.EsClient(host=self.es_host,
-                                          search_cfg=TestEsClient.get_default_search_config())
+                es_client = esclient.EsClient(host=self.es_host,
+                                              search_cfg=TestEsClient.get_default_search_config())
 
-            response = es_client.delete_logs(test["rq"])
+                response = es_client.delete_logs(test["rq"])
 
-            test["has_errors"].should.equal(response.errors)
-            test["expected_count"].should.equal(response.took)
+                test["has_errors"].should.equal(response.errors)
+                test["expected_count"].should.equal(response.took)
 
-            TestEsClient.shutdown_server(test["test_calls"])
+                TestEsClient.shutdown_server(test["test_calls"])
 
     @ignore_warnings
     def test_search_logs(self):
@@ -432,16 +437,17 @@ class TestEsClient(unittest.TestCase):
             },
         ]
 
-        for test in tests:
-            self._start_server(test["test_calls"])
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
 
-            es_client = esclient.EsClient(host=self.es_host,
-                                          search_cfg=TestEsClient.get_default_search_config())
+                es_client = esclient.EsClient(host=self.es_host,
+                                              search_cfg=TestEsClient.get_default_search_config())
 
-            response = es_client.search_logs(test["rq"])
-            response.should.have.length_of(test["expected_count"])
+                response = es_client.search_logs(test["rq"])
+                response.should.have.length_of(test["expected_count"])
 
-            TestEsClient.shutdown_server(test["test_calls"])
+                TestEsClient.shutdown_server(test["test_calls"])
 
     @ignore_warnings
     def test_index_logs(self):
@@ -589,18 +595,20 @@ class TestEsClient(unittest.TestCase):
             },
         ]
 
-        for test in tests:
-            self._start_server(test["test_calls"])
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
 
-            es_client = esclient.EsClient(host=self.es_host,
-                                          search_cfg=TestEsClient.get_default_search_config())
-            launches = [launch_objects.Launch(**launch) for launch in json.loads(test["index_rq"])]
-            response = es_client.index_logs(launches)
+                es_client = esclient.EsClient(host=self.es_host,
+                                              search_cfg=TestEsClient.get_default_search_config())
+                launches = [launch_objects.Launch(**launch)
+                            for launch in json.loads(test["index_rq"])]
+                response = es_client.index_logs(launches)
 
-            test["has_errors"].should.equal(response.errors)
-            test["expected_count"].should.equal(response.took)
+                test["has_errors"].should.equal(response.errors)
+                test["expected_count"].should.equal(response.took)
 
-            TestEsClient.shutdown_server(test["test_calls"])
+                TestEsClient.shutdown_server(test["test_calls"])
 
     @ignore_warnings
     def test_analyze_logs(self):
@@ -771,24 +779,26 @@ class TestEsClient(unittest.TestCase):
             },
         ]
 
-        for test in tests:
-            self._start_server(test["test_calls"])
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
 
-            es_client = esclient.EsClient(host=self.es_host,
-                                          search_cfg=TestEsClient.get_default_search_config())
-            _boosting_decision_maker = BoostingDecisionMaker()
-            _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
-            _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])
-            es_client.set_boosting_decision_maker(_boosting_decision_maker)
-            launches = [launch_objects.Launch(**launch) for launch in json.loads(test["index_rq"])]
-            response = es_client.analyze_logs(launches)
+                es_client = esclient.EsClient(host=self.es_host,
+                                              search_cfg=TestEsClient.get_default_search_config())
+                _boosting_decision_maker = BoostingDecisionMaker()
+                _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
+                _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])
+                es_client.set_boosting_decision_maker(_boosting_decision_maker)
+                launches = [launch_objects.Launch(**launch)
+                            for launch in json.loads(test["index_rq"])]
+                response = es_client.analyze_logs(launches)
 
-            response.should.have.length_of(test["expected_count"])
+                response.should.have.length_of(test["expected_count"])
 
-            if test["expected_issue_type"] != "":
-                test["expected_issue_type"].should.equal(response[0].issueType)
+                if test["expected_issue_type"] != "":
+                    test["expected_issue_type"].should.equal(response[0].issueType)
 
-            TestEsClient.shutdown_server(test["test_calls"])
+                TestEsClient.shutdown_server(test["test_calls"])
 
 
 if __name__ == '__main__':

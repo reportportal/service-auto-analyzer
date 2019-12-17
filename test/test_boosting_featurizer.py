@@ -47,7 +47,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
         logging.disable(logging.DEBUG)
 
     @staticmethod
-    def _get_default_config():
+    def get_default_config():
         """Get default config"""
         return {
             "max_query_terms":  50,
@@ -66,20 +66,20 @@ class TestBoostingFeaturizer(unittest.TestCase):
         tests = [
             {
                 "elastic_results": [],
-                "config":          TestBoostingFeaturizer._get_default_config(),
+                "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          [],
             },
             {
                 "elastic_results": [(self.get_fixture(self.log_message)["log_message"],
                                      self.get_fixture(self.one_hit_search_rs_explained))],
-                "config":          TestBoostingFeaturizer._get_default_config(),
+                "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          [[{"_score": 158.08437,
                                       "normalized_score": 1.0, }]],
             },
             {
                 "elastic_results": [(self.get_fixture(self.log_message)["log_message"],
                                      self.get_fixture(self.two_hits_search_rs_explained))],
-                "config":          TestBoostingFeaturizer._get_default_config(),
+                "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          [[{"_score": 158.08437,
                                       "normalized_score": 0.6709,
                                       },
@@ -106,13 +106,13 @@ class TestBoostingFeaturizer(unittest.TestCase):
         tests = [
             {
                 "elastic_results": [],
-                "config":          TestBoostingFeaturizer._get_default_config(),
+                "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          {},
             },
             {
                 "elastic_results": [(self.get_fixture(self.log_message)["log_message"],
                                      self.get_fixture(self.one_hit_search_rs_explained))],
-                "config":          TestBoostingFeaturizer._get_default_config(),
+                "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          {"AB001": {"mrHit": {"_score": 158.08437,
                                                         "_id": "1"},
                                               "log_message": self.get_fixture(
@@ -123,7 +123,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
             {
                 "elastic_results": [(self.get_fixture(self.log_message)["log_message"],
                                      self.get_fixture(self.two_hits_search_rs_explained))],
-                "config":          TestBoostingFeaturizer._get_default_config(),
+                "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          {"AB001": {"mrHit": {"_score": 158.08437,
                                                         "_id": "1"},
                                               "log_message": self.get_fixture(
@@ -141,7 +141,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                      self.get_fixture(self.two_hits_search_rs_explained)),
                                     (self.get_fixture(self.log_message)["log_message"],
                                      self.get_fixture(self.one_hit_search_rs_explained))],
-                "config":          TestBoostingFeaturizer._get_default_config(),
+                "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          {"AB001": {"mrHit": {"_score": 158.08437,
                                                         "_id": "1"},
                                               "log_message": self.get_fixture(
@@ -181,19 +181,19 @@ class TestBoostingFeaturizer(unittest.TestCase):
         tests = [
             {
                 "elastic_results": [],
-                "config":          TestBoostingFeaturizer._get_default_config(),
+                "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          {},
             },
             {
                 "elastic_results": [(self.get_fixture(self.log_message)["log_message"],
                                      self.get_fixture(self.one_hit_search_rs_explained))],
-                "config":          TestBoostingFeaturizer._get_default_config(),
+                "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          {"AB001": [1.0] * 12, }
             },
             {
                 "elastic_results": [(self.get_fixture(self.log_message)["log_message"],
                                      self.get_fixture(self.two_hits_search_rs_explained))],
-                "config":          TestBoostingFeaturizer._get_default_config(),
+                "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          {"AB001": [0.6709, 1.0, 0.6709,
                                               1.0, 0.6709, 1.0, 0.6709,
                                               0.5, 1.0, 0.5, 1.0, 1.0],
@@ -206,7 +206,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                      self.get_fixture(self.two_hits_search_rs_explained)),
                                     (self.get_fixture(self.log_message)["log_message"],
                                      self.get_fixture(self.one_hit_search_rs_explained))],
-                "config":          TestBoostingFeaturizer._get_default_config(),
+                "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          {"AB001": [0.8355, 1.0, 1.0, 1.0,
                                               0.6709, 1.0, 0.8355, 0.6667,
                                               1.0, 0.5, 1.0, 1.0],

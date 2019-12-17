@@ -26,6 +26,7 @@ from flask_cors import CORS
 import amqp.amqp_handler as amqp_handler
 from amqp.amqp import AmqpClient
 from commons.esclient import EsClient
+from boosting_decision_making import boosting_decision_maker
 
 
 APP_CONFIG = {
@@ -38,6 +39,7 @@ APP_CONFIG = {
     "analyzerPriority":  int(os.getenv("ANALYZER_PRIORITY", "1")),
     "analyzerIndex":     json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),
     "analyzerLogSearch": json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower()),
+    "boostModelFolder":  os.getenv("BOOST_MODEL_FOLDER")
 }
 
 SEARCH_CONFIG = {
@@ -103,7 +105,10 @@ def create_ampq_client():
 
 def create_es_client():
     """Creates Elasticsearch client"""
-    return EsClient(APP_CONFIG["esHost"], SEARCH_CONFIG)
+    _es_client = EsClient(APP_CONFIG["esHost"], SEARCH_CONFIG)
+    decision_maker = boosting_decision_maker.BoostingDecisionMaker(APP_CONFIG["boostModelFolder"])
+    _es_client.set_boosting_decision_maker(decision_maker)
+    return _es_client
 
 
 def declare_exchange(channel, config):

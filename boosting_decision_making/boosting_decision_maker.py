@@ -19,6 +19,7 @@ from sklearn.metrics import classification_report, confusion_matrix
 import os
 import pickle
 import logging
+from utils import utils
 
 logger = logging.getLogger("analyzerApp.boosting_decision_maker")
 
@@ -37,7 +38,8 @@ class BoostingDecisionMaker:
             self.load_model(folder)
 
     def get_feature_ids(self):
-        return self.feature_ids
+        return utils.transform_string_feature_range_into_list(self.feature_ids)\
+            if type(self.feature_ids) == str else self.feature_ids
 
     def add_config_info(self, full_config, features):
         self.full_config = full_config
@@ -71,4 +73,6 @@ class BoostingDecisionMaker:
         logger.info(classification_report(valid_test_labels, res))
 
     def predict(self, data):
+        if len(data) == 0:
+            return [], []
         return self.xg_boost.predict(data), self.xg_boost.predict_proba(data)

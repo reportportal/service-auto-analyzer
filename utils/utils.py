@@ -76,3 +76,17 @@ def find_query_words_count_from_explanation(elastic_res):
         logger.error(err)
         return []
     return list(all_words)
+
+
+def transform_string_feature_range_into_list(text):
+    """Converts features from string to list of ids"""
+    values = []
+    for part in text.split(","):
+        if part.strip() == "":
+            continue
+        if "-" in part:
+            start, end = part.split("-")[:2]
+            values.extend(list(range(int(start), int(end) + 1)))
+        else:
+            values.append(int(part))
+    return values

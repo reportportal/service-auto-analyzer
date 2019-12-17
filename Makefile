@@ -12,6 +12,11 @@ GO = go
 get-build-deps:
 	$(GO) get $(BUILD_DEPS)
 
+$(VENV_NAME)/bin/activate: requirements.txt
+    test -d $(VENV_NAME) || virtualenv -p python3 $(VENV_NAME)
+    $(VENV_NAME)/bin/pip install --no-cache-dir -r requirements.txt
+    touch $(VENV_NAME)/bin/activate
+
 venv: 
 	touch /$(VENV_NAME)/bin/activate
 
@@ -26,7 +31,7 @@ release-go: get-build-deps
 	# make sure latest version is bumped to file
 	releaser bump --version ${v}
 
-release: venv
+release: $(VENV_NAME)/bin/activate
 	${PYTHON} -m bumpversion --new-version ${v} build
 	${PYTHON} -m bumpversion patch --no-tag
 	git push origin master --tags

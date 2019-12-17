@@ -21,10 +21,15 @@ test: venv
 checkstyle: venv
 	${PYTHON} -m flake8
 
-release: get-build-deps
+release-go: get-build-deps
 	$(eval v := $(or $(v),$(shell releaser bump)))
 	# make sure latest version is bumped to file
 	releaser bump --version ${v}
+
+release: venv
+	${PYTHON} -m bumpversion --new-version ${v} build
+	${PYTHON} -m bumpversion patch --no-tag
+	git push origin master --tags
 
 build-release: venv
 	${PYTHON} -m bumpversion --new-version ${v} build

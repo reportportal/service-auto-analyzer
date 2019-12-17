@@ -13,13 +13,14 @@ RUN touch /venv/bin/activate
 RUN /venv/bin/python3 -m nltk.downloader stopwords
 
 ENV VERSION=$version
+
 COPY ./ ./
 
 RUN make build-release v=${VERSION}
 
 # Multistage
 FROM python:3.7.4-slim
-RUN apt-get update && apt-get install -y libxml2 curl \
+RUN apt-get update && apt-get install -y libxml2 curl libgomp1\
     && rm -rf /var/lib/apt/lists/*
 COPY --from=0 /venv /venv
 RUN mkdir /root/nltk_data
@@ -38,6 +39,7 @@ EXPOSE 3031
 ENV FLASK_APP=app.py UWSGI_WSGI_FILE=app.py UWSGI_SOCKET=:3031 UWSGI_HTTP=:5000 UWSGI_VIRTUALENV=/venv UWSGI_MASTER=1 UWSGI_WORKERS=2 UWSGI_THREADS=8 UWSGI_LAZY_APPS=1 UWSGI_WSGI_ENV_BEHAVIOR=holy PYTHONDONTWRITEBYTECODE=1
 ENV PATH="/venv/bin:${PATH}"
 ENV PYTHONPATH="/backend"
+ENV BOOST_MODEL_FOLDER="/backend/model/0.1"
 
 # Start uWSGI
 CMD ["/venv/bin/uwsgi", "--http-auto-chunked", "--http-keepalive"]

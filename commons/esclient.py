@@ -26,7 +26,9 @@ import elasticsearch.helpers
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import CountVectorizer
 import commons.launch_objects
+from commons.launch_objects import AnalysisResult
 import utils.utils as utils
+from boosting_decision_making import boosting_featurizer
 
 ERROR_LOGGING_LEVEL = 40000
 
@@ -82,6 +84,10 @@ class EsClient:
         self.search_cfg = search_cfg
         self.es_client = elasticsearch.Elasticsearch([host], timeout=30,
                                                      max_retries=5, retry_on_timeout=True)
+        self.boosting_decision_maker = None
+
+    def set_boosting_decision_maker(self, boosting_decision_maker):
+        self.boosting_decision_maker = boosting_decision_maker
 
     def create_index(self, index_name):
         """Create index in elasticsearch"""
@@ -456,12 +462,8 @@ class EsClient:
 
     def build_analyze_query(self, launch, unique_id, message, size=10):
         """Build analyze query"""
-        min_doc_freq = launch.analyzerConfig.minDocFreq\
-            if launch.analyzerConfig.minDocFreq > 0\
-            else self.search_cfg["MinDocFreq"]
-        min_term_freq = launch.analyzerConfig.minTermFreq\
-            if launch.analyzerConfig.minTermFreq > 0\
-            else self.search_cfg["MinTermFreq"]
+        min_doc_freq = self.search_cfg["MinDocFreq"]
+        min_term_freq = self.search_cfg["MinTermFreq"]
         min_should_match = "{}%".format(launch.analyzerConfig.minShouldMatch)\
             if launch.analyzerConfig.minShouldMatch > 0\
             else self.search_cfg["MinShouldMatch"]
@@ -546,49 +548,41 @@ class EsClient:
 
         for launch in launches:
             for test_item in launch.testItems:
-                issue_types = {}
                 elastic_results = self._get_elasticsearch_results_for_test_items(launch,
                                                                                  test_item)
-                for _, res in elastic_results:
-                    issue_types = EsClient.calculate_scores(res, 10, issue_types)
+                boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
+                    elastic_results,
+                    {
+                        "max_query_terms": self.search_cfg["MaxQueryTerms"],
+                        "min_should_match": float(launch.analyzerConfig.minShouldMatch) / 100
+                        if launch.analyzerConfig.minShouldMatch > 0 else
+                        float(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0)) / 100,
+                        "min_word_length": self.search_cfg["MinWordLength"],
+                    },
+                    feature_ids=self.boosting_decision_maker.get_feature_ids())
+                feature_data, issue_type_names =\
+                    boosting_data_gatherer.gather_features_info()
 
-                predicted_issue_type = ""
-                if len(issue_types) > 0:
+                if len(feature_data) > 0:
+
+                    predicted_labels, predicted_labels_probability =\
+                        self.boosting_decision_maker.predict(feature_data)
+
+                    predicted_issue_type = ""
                     max_val = 0.0
-                    for key in issue_types:
-                        if issue_types[key]["score"] > max_val:
-                            max_val = issue_types[key]["score"]
-                            predicted_issue_type = key
+                    for i in range(len(predicted_labels)):
+                        if predicted_labels[i] == 1 and\
+                                predicted_labels_probability[i][1] > max_val:
+                            max_val = predicted_labels_probability[i][1]
+                            predicted_issue_type = issue_type_names[i]
 
-                if predicted_issue_type != "":
-                    relevant_item =\
-                        issue_types[predicted_issue_type]["mrHit"]["_source"]["test_item"]
-                    results.append(
-                        commons.launch_objects.AnalysisResult(testItem=test_item.testItemId,
-                                                              issueType=predicted_issue_type,
-                                                              relevantItem=relevant_item))
+                    if predicted_issue_type != "":
+                        chosen_type =\
+                            boosting_data_gatherer.scores_by_issue_type[predicted_issue_type]
+                        relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
+                        results.append(AnalysisResult(testItem=test_item.testItemId,
+                                                      issueType=predicted_issue_type,
+                                                      relevantItem=relevant_item))
         logger.debug("Finished analysis for %d launches with %d results",
                      len(launches), len(results))
         return results
-
-    @staticmethod
-    def calculate_scores(res, k, issue_types):
-        """Calculate scores for defect types"""
-        if res["hits"]["total"]["value"] > 0:
-            total_score = 0
-            hits = res["hits"]["hits"][:k]
-
-            for hit in hits:
-                total_score += hit["_score"]
-
-                if hit["_source"]["issue_type"] in issue_types:
-                    issue_type_item = issue_types[hit["_source"]["issue_type"]]
-                    if hit["_score"] > issue_type_item["mrHit"]["_score"]:
-                        issue_types[hit["_source"]["issue_type"]]["mrHit"] = hit
-                else:
-                    issue_types[hit["_source"]["issue_type"]] = {"mrHit": hit, "score": 0}
-
-            for hit in hits:
-                curr_score = hit["_score"] / total_score
-                issue_types[hit["_source"]["issue_type"]]["score"] += curr_score
-        return issue_types

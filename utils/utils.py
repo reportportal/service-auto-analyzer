@@ -17,6 +17,9 @@
 import re
 import string
 import nltk
+import logging
+
+logger = logging.getLogger("analyzerApp.utils")
 
 
 def sanitize_text(text):
@@ -54,3 +57,36 @@ def split_words(text, min_word_length=0):
         if w != "" and w not in stopwords and len(w) >= min_word_length and re.search(r"\w", w):
             all_words.add(w)
     return list(all_words)
+
+
+def find_query_words_count_from_explanation(elastic_res):
+    """Find information about matched words in elasticsearch query"""
+    index_query_words_details = None
+    all_words = set()
+    try:
+        for idx, field in enumerate(elastic_res["_explanation"]["details"]):
+            for detail in field["details"]:
+                if "weight(message:" in detail["description"].lower():
+                    index_query_words_details = idx
+                    break
+        for detail in elastic_res["_explanation"]["details"][index_query_words_details]["details"]:
+            word = re.search(r"weight\(message:(.+) in", detail["description"]).group(1)
+            all_words.add(word)
+    except Exception as err:
+        logger.error(err)
+        return []
+    return list(all_words)
+
+
+def transform_string_feature_range_into_list(text):
+    """Converts features from string to list of ids"""
+    values = []
+    for part in text.split(","):
+        if part.strip() == "":
+            continue
+        if "-" in part:
+            start, end = part.split("-")[:2]
+            values.extend(list(range(int(start), int(end) + 1)))
+        else:
+            values.append(int(part))
+    return values

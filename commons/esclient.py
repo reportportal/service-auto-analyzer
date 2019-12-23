@@ -212,20 +212,36 @@ class EsClient:
 
     def _merge_logs(self, test_item_ids, project):
         bodies = []
+        batch_size = 100
         self._delete_merged_logs(test_item_ids, project)
-        for test_item_id in test_item_ids:
+        for i in range(int(len(test_item_ids) / batch_size) + 1):
+            test_items = test_item_ids[i * batch_size: (i + 1) * batch_size]
+            if len(test_items) == 0:
+                continue
             res = self.es_client.search(index=project,
-                                        body=EsClient.get_test_item_query(test_item_id, False))
-            merged_logs = EsClient.decompose_logs_merged_and_without_duplicates(res["hits"]["hits"])
-            bodies.extend(merged_logs)
+                                        body=EsClient.get_test_item_query(test_items, False))
+            test_items_dict = {}
+            for r in res["hits"]["hits"]:
+                test_item_id = r["_source"]["test_item"]
+                if test_item_id not in test_items_dict:
+                    test_items_dict[test_item_id] = []
+                test_items_dict[test_item_id].append(r)
+            for test_item_id in test_items_dict:
+                merged_logs = EsClient.decompose_logs_merged_and_without_duplicates(
+                    test_items_dict[test_item_id])
+                bodies.extend(merged_logs)
         return self._bulk_index(bodies)
 
     def _delete_merged_logs(self, test_items_to_delete, project):
         logger.debug("Delete merged logs for %d test items", len(test_items_to_delete))
         bodies = []
-        for test_item_id in test_items_to_delete:
+        batch_size = 100
+        for i in range(int(len(test_items_to_delete) / batch_size) + 1):
+            test_item_ids = test_items_to_delete[i * batch_size: (i + 1) * batch_size]
+            if len(test_item_ids) == 0:
+                continue
             res = self.es_client.search(index=project,
-                                        body=EsClient.get_test_item_query(test_item_id, True))
+                                        body=EsClient.get_test_item_query(test_item_ids, True))
             for log in res["hits"]["hits"]:
                 bodies.append({
                     "_op_type": "delete",
@@ -236,13 +252,13 @@ class EsClient:
             self._bulk_index(bodies)
 
     @staticmethod
-    def get_test_item_query(test_item_id, is_merged):
+    def get_test_item_query(test_item_ids, is_merged):
         """Build test item query"""
         return {"size": 10000,
                 "query": {
                     "bool": {
                         "must": [
-                            {"term": {"test_item": test_item_id}},
+                            {"terms": {"test_item": test_item_ids}},
                             {"term": {"is_merged": is_merged}}
                         ]
                     }

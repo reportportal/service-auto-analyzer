@@ -180,21 +180,39 @@ class BoostingFeaturizer:
                     else len(all_query_words) / self.config["max_query_terms"])
         return query_terms_percent_by_type
 
-    def _calculate_similarity_percent(self):
+    def _calculate_similarity_percent(self, field_name="message", log_field="log_message"):
         scores_by_issue_type = self.find_most_relevant_by_type()
         similarity_percent_by_type = {}
+        messages_to_check = {}
+        all_messages = []
+        message_index = 0
         for issue_type in scores_by_issue_type:
             min_word_length = self.config["min_word_length"]\
                 if "min_word_length" in self.config else 0
             similar_message = scores_by_issue_type[issue_type]["mrHit"]["_source"]["message"]
-            all_message_words = utils.split_words(similar_message, min_word_length=min_word_length)
+            all_message_words = " ".join(utils.split_words(similar_message,
+                                                           min_word_length=min_word_length))
             query_message = scores_by_issue_type[issue_type]["log_message"]
-            all_log_query_words = utils.split_words(query_message, min_word_length=min_word_length)
+            all_log_query_words = " ".join(utils.split_words(query_message,
+                                                             min_word_length=min_word_length))
+            if all_message_words.strip() == "" and all_log_query_words.strip() == "":
+                similarity_percent_by_type[issue_type] = 1.0
+            elif all_message_words.strip() == "" or all_log_query_words.strip() == "":
+                similarity_percent_by_type[issue_type] = 0.0
+            else:
+                all_messages.append(all_message_words)
+                all_messages.append(all_log_query_words)
+                messages_to_check[issue_type] = [message_index, message_index + 1]
+                message_index += 2
+
+        if len(all_messages) > 0:
             vectorizer = CountVectorizer(binary=True, analyzer="word", token_pattern="[^ ]+")
-            count_vector_matrix = vectorizer.fit_transform([" ".join(all_message_words),
-                                                            " ".join(all_log_query_words)])
-            similarity_percent_by_type[issue_type] =\
-                float(cosine_similarity(count_vector_matrix[0], count_vector_matrix[1]))
+            count_vector_matrix = vectorizer.fit_transform(all_messages)
+            for issue_type in messages_to_check:
+                indices_to_check = messages_to_check[issue_type]
+                similarity_percent_by_type[issue_type] =\
+                    float(cosine_similarity(count_vector_matrix[indices_to_check[0]],
+                                            count_vector_matrix[indices_to_check[1]]))
         return similarity_percent_by_type
 
     def gather_features_info(self):

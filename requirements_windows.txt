@@ -1,6 +1,6 @@
 flask==1.1.1
 flask-cors==3.0.8
-waitress==1.4.0
+waitress==1.4.1
 pika==1.1.0
 pydantic==1.1.1
 elasticsearch==7.0.0

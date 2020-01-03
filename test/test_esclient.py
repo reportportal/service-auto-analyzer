@@ -798,6 +798,9 @@ class TestEsClient(unittest.TestCase):
                 if test["expected_issue_type"] != "":
                     test["expected_issue_type"].should.equal(response[0].issueType)
 
+                if "expected_id" in test:
+                    test["expected_id"].should.equal(response[0].relevantItem)
+
                 TestEsClient.shutdown_server(test["test_calls"])
 
 

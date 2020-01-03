@@ -106,6 +106,7 @@ def create_ampq_client():
 def create_es_client():
     """Creates Elasticsearch client"""
     _es_client = EsClient(APP_CONFIG["esHost"], SEARCH_CONFIG)
+    print(os.getenv("BOOST_MODEL_FOLDER"))
     decision_maker = boosting_decision_maker.BoostingDecisionMaker(APP_CONFIG["boostModelFolder"])
     _es_client.set_boosting_decision_maker(decision_maker)
     return _es_client

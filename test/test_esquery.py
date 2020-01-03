@@ -56,6 +56,8 @@ class TestEsQuery(unittest.TestCase):
         """Build demo analyze query"""
         return {
             "size": 10,
+            "sort": ["_score",
+                     {"start_time": "desc"}, ],
             "query": {
                 "bool": {
                     "must_not": [

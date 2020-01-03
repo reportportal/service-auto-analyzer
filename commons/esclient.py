@@ -71,6 +71,10 @@ DEFAULT_MAPPING_SETTINGS = {
         "is_merged": {
             "type": "boolean"
         },
+        "start_time": {
+            "type":   "date",
+            "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        }
     }
 }
 
@@ -199,7 +203,8 @@ class EsClient:
                             "log_level":        log.logLevel,
                             "original_message": log.message,
                             "message":          message,
-                            "is_merged":        False}}
+                            "is_merged":        False,
+                            "start_time":    test_item.startTime.strftime("%Y-%m-%d %H:%M:%S")}}
 
                     bodies.append(body)
                     logs_added = True
@@ -485,6 +490,8 @@ class EsClient:
             else self.search_cfg["MinShouldMatch"]
 
         query = {"size": size,
+                 "sort": ["_score",
+                          {"start_time": "desc"}, ],
                  "query": {
                      "bool": {
                          "must_not": [

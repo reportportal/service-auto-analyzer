@@ -16,6 +16,7 @@
 
 from typing import List
 from pydantic import BaseModel
+from datetime import datetime
 
 
 class AnalyzerConf(BaseModel):
@@ -43,6 +44,7 @@ class TestItem(BaseModel):
     isAutoAnalyzed: bool
     issueType: str = ""
     originalIssueType: str = ""
+    startTime: datetime = datetime.now()
     logs: List[Log] = []
 
 

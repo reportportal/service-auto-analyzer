@@ -41,8 +41,18 @@ class BoostingFeaturizer:
                 {"return_val_name": "cnt_items_percent"}),
             8: (self._calculate_max_score_and_pos, {"return_val_name": "max_score_global_percent"}),
             9: (self._calculate_percent_issue_types, {}),
-            10: (self._calculate_query_terms_percent, {}),
-            11: (self._calculate_similarity_percent, {}),
+            10: (self._calculate_query_terms_percent,
+                 {"field_name": "message", "log_field": "log_message"}),
+            11: (self._calculate_similarity_percent,
+                 {"field_name": "message", "log_field": "log_message"}),
+            13: (self._calculate_similarity_percent,
+                 {"field_name": "additional_info", "log_field": "additional_info"}),
+            14: (self._has_test_item_several_logs, {}),
+            15: (self._has_query_several_logs, {}),
+            16: (self._calculate_query_terms_percent,
+                 {"field_name": "message", "log_field": "log_message"}),
+            17: (self._calculate_query_terms_percent,
+                 {"field_name": "additional_info", "log_field": "additional_info"}),
         }
 
         if type(feature_ids) == str:
@@ -58,23 +68,45 @@ class BoostingFeaturizer:
                 if len(scores_by_issue_type) > 0 else 0
         return percent_by_issue_type
 
+    def _has_test_item_several_logs(self):
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        has_several_logs_by_type = {}
+        for issue_type in scores_by_issue_type:
+            additional_info =\
+                scores_by_issue_type[issue_type]["additional_info"]
+            has_several_logs_by_type[issue_type] = int(additional_info.strip() != "")
+        return has_several_logs_by_type
+
+    def _has_query_several_logs(self):
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        has_several_logs_by_type = {}
+        for issue_type in scores_by_issue_type:
+            additional_info = scores_by_issue_type[issue_type]["additional_info"]
+            has_several_logs_by_type[issue_type] = int(additional_info.strip() != "")
+        return has_several_logs_by_type
+
     def find_most_relevant_by_type(self):
         if self.scores_by_issue_type is not None:
             return self.scores_by_issue_type
         self.scores_by_issue_type = {}
-        for log_message, es_results in self.all_results:
+        for log, es_results in self.all_results:
             for hit in es_results:
                 issue_type = hit["_source"]["issue_type"]
 
                 if issue_type not in self.scores_by_issue_type:
-                    self.scores_by_issue_type[issue_type] = {"mrHit": hit,
-                                                             "log_message": log_message,
-                                                             "score": 0}
+                    self.scores_by_issue_type[issue_type] = {
+                        "mrHit": hit,
+                        "log_message": log["_source"]["message"],
+                        "additional_info": log["_source"]["additional_info"],
+                        "score": 0}
 
                 issue_type_item = self.scores_by_issue_type[issue_type]
                 if hit["_score"] > issue_type_item["mrHit"]["_score"]:
                     self.scores_by_issue_type[issue_type]["mrHit"] = hit
-                    self.scores_by_issue_type[issue_type]["log_message"] = log_message
+                    self.scores_by_issue_type[issue_type]["log_message"] =\
+                        log["_source"]["message"]
+                    self.scores_by_issue_type[issue_type]["additional_info"] =\
+                        log["_source"]["additional_info"]
 
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
@@ -98,7 +130,7 @@ class BoostingFeaturizer:
     def _calculate_max_score_and_pos(self, return_val_name="max_score"):
         max_scores_by_issue_type = {}
         max_score_global = 0
-        for log_message, es_results in self.all_results:
+        for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
 
@@ -118,7 +150,7 @@ class BoostingFeaturizer:
 
     def _calculate_min_score_and_pos(self, return_val_name="min_score"):
         min_scores_by_issue_type = {}
-        for log_message, es_results in self.all_results:
+        for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
 
@@ -132,7 +164,7 @@ class BoostingFeaturizer:
     def _calculate_percent_count_items_and_mean(self, return_val_name="mean_score"):
         cnt_items_by_issue_type = {}
         cnt_items_glob = 0
-        for log_message, es_results in self.all_results:
+        for log, es_results in self.all_results:
             cnt_items_glob += len(es_results)
 
             for idx, hit in enumerate(es_results):
@@ -154,7 +186,7 @@ class BoostingFeaturizer:
 
     def normalize_results(self, all_elastic_results):
         all_results = []
-        for log_message, es_results in all_elastic_results:
+        for log, es_results in all_elastic_results:
             total_score = 0
             for hit in es_results["hits"]["hits"]:
                 total_score += hit["_score"]
@@ -162,22 +194,25 @@ class BoostingFeaturizer:
             for hit in es_results["hits"]["hits"]:
                 hit["normalized_score"] = hit["_score"] / total_score
 
-            all_results.append((log_message, es_results["hits"]["hits"]))
+            all_results.append((log, es_results["hits"]["hits"]))
         return all_results
 
-    def _calculate_query_terms_percent(self):
+    def _calculate_query_terms_percent(self, field_name="message", log_field="log_message"):
         scores_by_issue_type = self.find_most_relevant_by_type()
         query_terms_percent_by_type = {}
         for issue_type in scores_by_issue_type:
             all_query_words = utils.find_query_words_count_from_explanation(
-                scores_by_issue_type[issue_type]["mrHit"])
+                scores_by_issue_type[issue_type]["mrHit"], field_name=field_name)
 
-            all_log_words = utils.split_words(scores_by_issue_type[issue_type]["log_message"])
+            all_log_words = utils.split_words(scores_by_issue_type[issue_type][log_field])
 
-            query_terms_percent_by_type[issue_type] =\
-                (self.config["min_should_match"]
-                    if len(all_log_words) >= self.config["max_query_terms"]
-                    else len(all_query_words) / self.config["max_query_terms"])
+            if len(all_log_words) == 0:
+                query_terms_percent_by_type[issue_type] = 1.0
+            else:
+                terms_percent = min(len(all_query_words) / len(all_log_words), 1.0)
+                query_terms_percent_by_type[issue_type] = round((
+                    terms_percent if len(all_log_words) <= self.config["max_query_terms"]
+                    else len(all_query_words) / self.config["max_query_terms"]), 3)
         return query_terms_percent_by_type
 
     def _calculate_similarity_percent(self, field_name="message", log_field="log_message"):
@@ -189,10 +224,10 @@ class BoostingFeaturizer:
         for issue_type in scores_by_issue_type:
             min_word_length = self.config["min_word_length"]\
                 if "min_word_length" in self.config else 0
-            similar_message = scores_by_issue_type[issue_type]["mrHit"]["_source"]["message"]
+            similar_message = scores_by_issue_type[issue_type]["mrHit"]["_source"][field_name]
             all_message_words = " ".join(utils.split_words(similar_message,
                                                            min_word_length=min_word_length))
-            query_message = scores_by_issue_type[issue_type]["log_message"]
+            query_message = scores_by_issue_type[issue_type][log_field]
             all_log_query_words = " ".join(utils.split_words(query_message,
                                                              min_word_length=min_word_length))
             if all_message_words.strip() == "" and all_log_query_words.strip() == "":
@@ -211,8 +246,8 @@ class BoostingFeaturizer:
             for issue_type in messages_to_check:
                 indices_to_check = messages_to_check[issue_type]
                 similarity_percent_by_type[issue_type] =\
-                    float(cosine_similarity(count_vector_matrix[indices_to_check[0]],
-                                            count_vector_matrix[indices_to_check[1]]))
+                    round(float(cosine_similarity(count_vector_matrix[indices_to_check[0]],
+                                                  count_vector_matrix[indices_to_check[1]])), 3)
         return similarity_percent_by_type
 
     def gather_features_info(self):

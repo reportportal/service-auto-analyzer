@@ -42,38 +42,50 @@ def build_url(main_url, url_params):
     return main_url + "/" + "/".join(url_params)
 
 
-def split_words(text, min_word_length=0):
-    """Splits words by space and punctuation marks"""
-    all_words = set()
+def split_words(text, min_word_length=0, only_unique=True, split_urls=True):
+    all_words = set() if only_unique else []
     stopwords = set(nltk.corpus.stopwords.words("english"))
     replace_symbols = r"[<>\{:,!?\}\[\];=\(\)\'\"]|\.\.\."
     text = re.sub(replace_symbols, " ", text)
     res = text.split()
     translate_map = {}
     for punct in string.punctuation:
-        translate_map[punct] = " "
-    for w in res:
-        w = re.sub(r"\s+", " ", w.translate(w.maketrans(translate_map))).strip().lower()
-        if w != "" and w not in stopwords and len(w) >= min_word_length and re.search(r"\w", w):
-            all_words.add(w)
+        if punct != "." and (split_urls or punct not in ["/", "\\"]):
+            translate_map[punct] = " "
+    for word_part in res:
+        word_part = re.sub(r"\s+", " ",
+                           word_part.translate(word_part.maketrans(translate_map))).strip().lower()
+        word_part = re.sub(r"\.+\b|\b\.+", "", word_part)
+        for w in word_part.split():
+            if w != "" and w not in stopwords and len(w) >= min_word_length and re.search(r"\w", w):
+                if only_unique:
+                    all_words.add(w)
+                else:
+                    all_words.append(w)
     return list(all_words)
 
 
-def find_query_words_count_from_explanation(elastic_res):
+def find_query_words_count_from_explanation(elastic_res, field_name="message"):
     """Find information about matched words in elasticsearch query"""
     index_query_words_details = None
     all_words = set()
     try:
         for idx, field in enumerate(elastic_res["_explanation"]["details"]):
+            if "weight(%s:" % field_name in field["description"].lower():
+                word = re.search(r"weight\(%s:(.+) in" % field_name, field["description"]).group(1)
+                all_words.add(word)
+                break
             for detail in field["details"]:
-                if "weight(message:" in detail["description"].lower():
+                if "weight(%s:" % field_name in detail["description"].lower():
                     index_query_words_details = idx
                     break
-        for detail in elastic_res["_explanation"]["details"][index_query_words_details]["details"]:
-            word = re.search(r"weight\(message:(.+) in", detail["description"]).group(1)
-            all_words.add(word)
-    except Exception as err:
-        logger.error(err)
+        if index_query_words_details:
+            field_explaination = elastic_res["_explanation"]["details"]
+            for detail in field_explaination[index_query_words_details]["details"]:
+                word = re.search(r"weight\(%s:(.+) in" % field_name, detail["description"]).group(1)
+                all_words.add(word)
+    except Exception as e:
+        logger.error(e)
         return []
     return list(all_words)
 

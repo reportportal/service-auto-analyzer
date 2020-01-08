@@ -56,6 +56,10 @@ DEFAULT_MAPPING_SETTINGS = {
             "type":     "text",
             "analyzer": "standard_english_analyzer"
         },
+        "additional_info": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
         "log_level": {
             "type": "integer",
         },
@@ -92,6 +96,10 @@ class EsClient:
 
     def set_boosting_decision_maker(self, boosting_decision_maker):
         self.boosting_decision_maker = boosting_decision_maker
+
+    @staticmethod
+    def compress(text):
+        return " ".join(list(set(utils.split_words(text))))
 
     def create_index(self, index_name):
         """Create index in elasticsearch"""
@@ -204,7 +212,8 @@ class EsClient:
                             "original_message": log.message,
                             "message":          message,
                             "is_merged":        False,
-                            "start_time":    test_item.startTime.strftime("%Y-%m-%d %H:%M:%S")}}
+                            "start_time":    test_item.startTime.strftime("%Y-%m-%d %H:%M:%S"),
+                            "additional_info":  "", }}
 
                     bodies.append(body)
                     logs_added = True
@@ -281,17 +290,10 @@ class EsClient:
 
             if log["_id"] in log_level_ids_to_add[log_level]:
                 normalized_message = log["_source"]["message"]
-
-                if log_level_messages[log_level].strip() != "":
-                    merged_message = normalized_message + "\r\n" +\
-                        log_level_messages[log["_source"]["log_level"]]
-                    new_logs.append(
-                        EsClient.prepare_new_log(
-                            log, str(log["_id"]) + "_m",
-                            merged_message))
+                additional_info = EsClient.compress(log_level_messages[log["_source"]["log_level"]])
                 new_logs.append(EsClient.prepare_new_log(
                     log, str(log["_id"]) + "_big",
-                    normalized_message))
+                    normalized_message, additional_info))
 
         for log_level in log_level_messages:
 
@@ -299,8 +301,8 @@ class EsClient:
                log_level_messages[log_level].strip() != "":
                 log = log_level_ids_merged[log_level]
                 new_logs.append(EsClient.prepare_new_log(
-                    log, str(log["_id"]) + "_m",
-                    log_level_messages[log_level]))
+                    log, str(log["_id"]) + "_m", "",
+                    EsClient.compress(log_level_messages[log_level])))
         return new_logs
 
     @staticmethod
@@ -324,7 +326,9 @@ class EsClient:
             if log_level not in logs_unique_log_level:
                 logs_unique_log_level[log_level] = set()
 
-            if utils.calculate_line_number(log["_source"]["original_message"]) <= 2:
+            if utils.calculate_line_number(log["_source"]["original_message"]) <= 2 and\
+                    len(utils.split_words(log["_source"]["original_message"],
+                        split_urls=False)) <= 100:
                 if log_level not in log_level_ids_merged:
                     log_level_ids_merged[log_level] = log
                 message = log["_source"]["message"]
@@ -340,12 +344,13 @@ class EsClient:
                                                  log_level_messages, log_level_ids_merged)
 
     @staticmethod
-    def prepare_new_log(old_log, new_id, message):
+    def prepare_new_log(old_log, new_id, message, additional_info):
         """Prepare updated log"""
         merged_log = copy.deepcopy(old_log)
         merged_log["_source"]["is_merged"] = True
         merged_log["_id"] = new_id
         merged_log["_source"]["message"] = message
+        merged_log["_source"]["additional_info"] = additional_info
         return merged_log
 
     def _bulk_index(self, bodies):
@@ -471,17 +476,19 @@ class EsClient:
 
     @staticmethod
     def build_more_like_this_query(max_query_terms,
-                                   min_should_match, log_message):
+                                   min_should_match, log_message,
+                                   field_name="message", boost=1.0):
         """Build more like this query"""
         return {"more_like_this": {
-            "fields":               ["message"],
+            "fields":               [field_name],
             "like":                 log_message,
             "min_doc_freq":         1,
             "min_term_freq":        1,
             "minimum_should_match": "5<" + min_should_match,
-            "max_query_terms":      max_query_terms, }}
+            "max_query_terms":      max_query_terms,
+            "boost": boost, }}
 
-    def build_analyze_query(self, launch, unique_id, message, size=10):
+    def build_analyze_query(self, launch, unique_id, message, additional_info, size=10):
         """Build analyze query"""
         min_should_match = "{}%".format(launch.analyzerConfig.minShouldMatch)\
             if launch.analyzerConfig.minShouldMatch > 0\
@@ -515,26 +522,33 @@ class EsClient:
                 {"term": {
                     "launch_name": {
                         "value": launch.launchName}}})
-            query["query"]["bool"]["must"].append(
-                EsClient.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                    min_should_match, message))
         elif launch.analyzerConfig.analyzerMode in ["CURRENT_LAUNCH"]:
             query["query"]["bool"]["must"].append(
                 {"term": {
                     "launch_id": {
                         "value": launch.launchId}}})
-            query["query"]["bool"]["must"].append(
-                EsClient.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                    min_should_match, message))
         else:
             query["query"]["bool"]["should"].append(
                 {"term": {
                     "launch_name": {
                         "value": launch.launchName,
                         "boost": abs(self.search_cfg["BoostLaunch"])}}})
+        if message.strip() != "":
             query["query"]["bool"]["must"].append(
-                EsClient.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                    min_should_match, message))
+                self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                min_should_match,
+                                                message, field_name="message",
+                                                boost=2.0))
+            query["query"]["bool"]["should"].append(
+                self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                "80%", additional_info,
+                                                field_name="additional_info", boost=0.5))
+        else:
+            query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
+            query["query"]["bool"]["must"].append(
+                self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                min_should_match, additional_info,
+                                                field_name="additional_info"))
         return query
 
     def _get_elasticsearch_results_for_test_items(self, launch, test_item):
@@ -548,15 +562,19 @@ class EsClient:
                               "log_level":        log.logLevel, }} for log in test_item.logs]
         for log in EsClient.decompose_logs_merged_and_without_duplicates(prepared_logs):
 
+            message = log["_source"]["message"]
+            additional_info = log["_source"]["additional_info"]
+
             if log["_source"]["log_level"] < ERROR_LOGGING_LEVEL or\
-               log["_source"]["message"].strip() == "":
+               (message.strip() == "" and additional_info.strip() == ""):
                 continue
 
             query = self.build_analyze_query(launch, test_item.uniqueId,
-                                             log["_source"]["message"])
+                                             message,
+                                             additional_info)
 
-            res = self.es_client.search(index=str(launch.project), body=query)
-            full_results.append((log["_source"]["message"], res))
+            res = self.es_client.search(index=str(launch.project), body=query, explain=True)
+            full_results.append((log, res))
         return full_results
 
     def analyze_logs(self, launches):

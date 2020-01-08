@@ -82,19 +82,19 @@ class TestBoostingModel(unittest.TestCase):
         boost_model_results = self.get_fixture(self.boost_model_results)
         tests = [
             {
-                "elastic_results": [(self.get_fixture(self.log_message)["log_message"],
+                "elastic_results": [(self.get_fixture(self.log_message),
                                      self.get_fixture(self.one_hit_search_rs_explained))],
                 "config":          TestBoostingModel.get_default_config(),
             },
             {
-                "elastic_results": [(self.get_fixture(self.log_message)["log_message"],
+                "elastic_results": [(self.get_fixture(self.log_message),
                                      self.get_fixture(self.two_hits_search_rs_explained))],
                 "config":          TestBoostingModel.get_default_config(),
             },
             {
-                "elastic_results": [(self.get_fixture(self.log_message)["log_message"],
+                "elastic_results": [(self.get_fixture(self.log_message),
                                      self.get_fixture(self.two_hits_search_rs_explained)),
-                                    (self.get_fixture(self.log_message)["log_message"],
+                                    (self.get_fixture(self.log_message),
                                      self.get_fixture(self.one_hit_search_rs_explained))],
                 "config":          TestBoostingModel.get_default_config(),
             },
@@ -105,8 +105,10 @@ class TestBoostingModel(unittest.TestCase):
                                                       decision_maker.get_feature_ids())
             with sure.ensure('Error in the test case number: {0}', idx):
                 gathered_data, issue_type_names = _boosting_featurizer.gather_features_info()
+                gathered_data.should.equal(boost_model_results[str(idx)][0],
+                                           epsilon=self.epsilon)
                 predict_label, predict_probability = decision_maker.predict(gathered_data)
-                predict_label.tolist().should.equal(boost_model_results[str(idx)][0],
+                predict_label.tolist().should.equal(boost_model_results[str(idx)][1],
                                                     epsilon=self.epsilon)
-                predict_probability.tolist().should.equal(boost_model_results[str(idx)][1],
+                predict_probability.tolist().should.equal(boost_model_results[str(idx)][2],
                                                           epsilon=self.epsilon)

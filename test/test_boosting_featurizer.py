@@ -70,14 +70,14 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 "result":          [],
             },
             {
-                "elastic_results": [(self.get_fixture(self.log_message)["log_message"],
+                "elastic_results": [(self.get_fixture(self.log_message),
                                      self.get_fixture(self.one_hit_search_rs_explained))],
                 "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          [[{"_score": 158.08437,
                                       "normalized_score": 1.0, }]],
             },
             {
-                "elastic_results": [(self.get_fixture(self.log_message)["log_message"],
+                "elastic_results": [(self.get_fixture(self.log_message),
                                      self.get_fixture(self.two_hits_search_rs_explained))],
                 "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          [[{"_score": 158.08437,
@@ -110,47 +110,55 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 "result":          {},
             },
             {
-                "elastic_results": [(self.get_fixture(self.log_message)["log_message"],
+                "elastic_results": [(self.get_fixture(self.log_message),
                                      self.get_fixture(self.one_hit_search_rs_explained))],
                 "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          {"AB001": {"mrHit": {"_score": 158.08437,
                                                         "_id": "1"},
                                               "log_message": self.get_fixture(
-                                                  self.log_message)["log_message"],
+                                                  self.log_message)["_source"]["message"],
+                                              "additional_info": self.get_fixture(
+                                                  self.log_message)["_source"]["additional_info"],
                                               "score": 1.0, },
                                     }
             },
             {
-                "elastic_results": [(self.get_fixture(self.log_message)["log_message"],
+                "elastic_results": [(self.get_fixture(self.log_message),
                                      self.get_fixture(self.two_hits_search_rs_explained))],
                 "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          {"AB001": {"mrHit": {"_score": 158.08437,
                                                         "_id": "1"},
                                               "log_message": self.get_fixture(
-                                                  self.log_message)["log_message"],
+                                                  self.log_message)["_source"]["message"],
                                               "score": 0.6709, },
                                     "PB001": {"mrHit": {"_score": 77.53298,
                                                         "_id": "2"},
                                               "log_message": self.get_fixture(
-                                                  self.log_message)["log_message"],
+                                                  self.log_message)["_source"]["message"],
+                                              "additional_info": self.get_fixture(
+                                                  self.log_message)["_source"]["additional_info"],
                                               "score": 0.3291, },
                                     }
             },
             {
-                "elastic_results": [(self.get_fixture(self.log_message)["log_message"],
+                "elastic_results": [(self.get_fixture(self.log_message),
                                      self.get_fixture(self.two_hits_search_rs_explained)),
-                                    (self.get_fixture(self.log_message)["log_message"],
+                                    (self.get_fixture(self.log_message),
                                      self.get_fixture(self.one_hit_search_rs_explained))],
                 "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          {"AB001": {"mrHit": {"_score": 158.08437,
                                                         "_id": "1"},
                                               "log_message": self.get_fixture(
-                                                  self.log_message)["log_message"],
+                                                  self.log_message)["_source"]["message"],
+                                              "additional_info": self.get_fixture(
+                                                  self.log_message)["_source"]["additional_info"],
                                               "score": 0.8355, },
                                     "PB001": {"mrHit": {"_score": 77.53298,
                                                         "_id": "2"},
                                               "log_message": self.get_fixture(
-                                                  self.log_message)["log_message"],
+                                                  self.log_message)["_source"]["message"],
+                                              "additional_info": self.get_fixture(
+                                                  self.log_message)["_source"]["additional_info"],
                                               "score": 0.1645, },
                                     }
             },
@@ -174,62 +182,3 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                 result_field_dict = test["result"][issue_type][field][field_dict]
                                 elastic_res[field][field_dict].should.equal(result_field_dict,
                                                                             epsilon=self.epsilon)
-
-    @ignore_warnings
-    def test_calculate_features(self):
-        all_features = list(BoostingFeaturizer([], [], []).feature_functions.keys())
-        tests = [
-            {
-                "elastic_results": [],
-                "config":          TestBoostingFeaturizer.get_default_config(),
-                "result":          {},
-            },
-            {
-                "elastic_results": [(self.get_fixture(self.log_message)["log_message"],
-                                     self.get_fixture(self.one_hit_search_rs_explained))],
-                "config":          TestBoostingFeaturizer.get_default_config(),
-                "result":          {"AB001": [1.0] * 12, }
-            },
-            {
-                "elastic_results": [(self.get_fixture(self.log_message)["log_message"],
-                                     self.get_fixture(self.two_hits_search_rs_explained))],
-                "config":          TestBoostingFeaturizer.get_default_config(),
-                "result":          {"AB001": [0.6709, 1.0, 0.6709,
-                                              1.0, 0.6709, 1.0, 0.6709,
-                                              0.5, 1.0, 0.5, 1.0, 1.0],
-                                    "PB001": [0.3291, 0.5, 0.3291, 0.5,
-                                              0.3291, 0.5, 0.3291, 0.5,
-                                              0.4905, 0.5, 0.86, 0.8835], }
-            },
-            {
-                "elastic_results": [(self.get_fixture(self.log_message)["log_message"],
-                                     self.get_fixture(self.two_hits_search_rs_explained)),
-                                    (self.get_fixture(self.log_message)["log_message"],
-                                     self.get_fixture(self.one_hit_search_rs_explained))],
-                "config":          TestBoostingFeaturizer.get_default_config(),
-                "result":          {"AB001": [0.8355, 1.0, 1.0, 1.0,
-                                              0.6709, 1.0, 0.8355, 0.6667,
-                                              1.0, 0.5, 1.0, 1.0],
-                                    "PB001": [0.1645, 0.5, 0.3291,
-                                              0.5, 0.3291, 0.5, 0.3291,
-                                              0.3334, 0.3291, 0.5, 0.86, 0.8835], }
-            },
-        ]
-        for idx, test in enumerate(tests):
-            _boosting_featurizer = BoostingFeaturizer(test["elastic_results"],
-                                                      test["config"],
-                                                      all_features)
-            for feature in _boosting_featurizer.feature_functions:
-                func, args = _boosting_featurizer.feature_functions[feature]
-                result = func(**args)
-                with sure.ensure('Error in the calculating feature: {0}, test case number: {1}',
-                                 feature, idx):
-                    result.should.have.length_of(len(test["result"]))
-                    for issue_type in result:
-                        result[issue_type].should.equal(test["result"][issue_type][feature],
-                                                        epsilon=self.epsilon)
-            with sure.ensure('Error in the test case number: {0}', idx):
-                gathered_data, issue_type_names = _boosting_featurizer.gather_features_info()
-                for i in range(len(issue_type_names)):
-                    gathered_data[i].should.equal(test["result"][issue_type_names[i]],
-                                                  epsilon=self.epsilon)

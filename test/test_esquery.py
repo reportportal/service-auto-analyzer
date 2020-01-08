@@ -28,8 +28,6 @@ class TestEsQuery(unittest.TestCase):
         """Tests building analyze query"""
         search_cfg = {
             "MinShouldMatch": "80%",
-            "MinTermFreq":    25,
-            "MinDocFreq":     30,
             "BoostAA":        10,
             "BoostLaunch":    5,
             "BoostUniqueID":  3,
@@ -43,16 +41,17 @@ class TestEsQuery(unittest.TestCase):
             "launchId": 123,
             "launchName": "Launch name",
             "project": 1})
-        query_from_esclient = es_client.build_analyze_query(launch, "unique", "hello world")
+        query_from_esclient = es_client.build_analyze_query(launch, "unique", "hello world", "")
         demo_query = TestEsQuery.build_demo_query(search_cfg, "Launch name",
                                                   "unique", "hello world",
-                                                  error_logging_level)
+                                                  error_logging_level, "")
 
         query_from_esclient.should.equal(demo_query)
 
     @staticmethod
     def build_demo_query(search_cfg, launch_name,
-                         unique_id, log_message, error_logging_level):
+                         unique_id, log_message, error_logging_level,
+                         additional_info):
         """Build demo analyze query"""
         return {
             "size": 10,
@@ -79,10 +78,11 @@ class TestEsQuery(unittest.TestCase):
                         {"more_like_this": {
                             "fields":               ["message"],
                             "like":                 log_message,
-                            "min_doc_freq":         search_cfg["MinDocFreq"],
-                            "min_term_freq":        search_cfg["MinTermFreq"],
+                            "min_doc_freq":         1,
+                            "min_term_freq":        1,
                             "minimum_should_match": "5<" + search_cfg["MinShouldMatch"],
                             "max_query_terms":      search_cfg["MaxQueryTerms"],
+                            "boost":                2.0,
                         }, },
                     ],
                     "should": [
@@ -103,6 +103,15 @@ class TestEsQuery(unittest.TestCase):
                                 "value": launch_name,
                                 "boost": abs(search_cfg["BoostLaunch"]),
                             },
+                        }},
+                        {"more_like_this": {
+                            "fields":               ["additional_info"],
+                            "like":                 additional_info,
+                            "min_doc_freq":         1,
+                            "min_term_freq":        1,
+                            "minimum_should_match": "5<" + search_cfg["MinShouldMatch"],
+                            "max_query_terms":      search_cfg["MaxQueryTerms"],
+                            "boost":                0.5,
                         }},
                     ],
                 },

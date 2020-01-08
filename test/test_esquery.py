@@ -28,8 +28,6 @@ class TestEsQuery(unittest.TestCase):
         """Tests building analyze query"""
         search_cfg = {
             "MinShouldMatch": "80%",
-            "MinTermFreq":    25,
-            "MinDocFreq":     30,
             "BoostAA":        10,
             "BoostLaunch":    5,
             "BoostUniqueID":  3,
@@ -79,8 +77,8 @@ class TestEsQuery(unittest.TestCase):
                         {"more_like_this": {
                             "fields":               ["message"],
                             "like":                 log_message,
-                            "min_doc_freq":         search_cfg["MinDocFreq"],
-                            "min_term_freq":        search_cfg["MinTermFreq"],
+                            "min_doc_freq":         1,
+                            "min_term_freq":        1,
                             "minimum_should_match": "5<" + search_cfg["MinShouldMatch"],
                             "max_query_terms":      search_cfg["MaxQueryTerms"],
                         }, },

@@ -430,7 +430,7 @@ class EsClient:
                     },
                     {"terms": {"launch_id": search_req.filteredLaunchIds}},
                     EsClient.
-                    build_more_like_this_query(1, 1, self.search_cfg["MaxQueryTerms"],
+                    build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
                                                self.search_cfg["SearchLogsMinShouldMatch"],
                                                message),
                 ],
@@ -470,21 +470,19 @@ class EsClient:
         return list(keys)
 
     @staticmethod
-    def build_more_like_this_query(min_doc_freq, min_term_freq, max_query_terms,
+    def build_more_like_this_query(max_query_terms,
                                    min_should_match, log_message):
         """Build more like this query"""
         return {"more_like_this": {
             "fields":               ["message"],
             "like":                 log_message,
-            "min_doc_freq":         min_doc_freq,
-            "min_term_freq":        min_term_freq,
+            "min_doc_freq":         1,
+            "min_term_freq":        1,
             "minimum_should_match": "5<" + min_should_match,
             "max_query_terms":      max_query_terms, }}
 
     def build_analyze_query(self, launch, unique_id, message, size=10):
         """Build analyze query"""
-        min_doc_freq = self.search_cfg["MinDocFreq"]
-        min_term_freq = self.search_cfg["MinTermFreq"]
         min_should_match = "{}%".format(launch.analyzerConfig.minShouldMatch)\
             if launch.analyzerConfig.minShouldMatch > 0\
             else self.search_cfg["MinShouldMatch"]
@@ -518,8 +516,7 @@ class EsClient:
                     "launch_name": {
                         "value": launch.launchName}}})
             query["query"]["bool"]["must"].append(
-                EsClient.build_more_like_this_query(min_doc_freq, min_term_freq,
-                                                    self.search_cfg["MaxQueryTerms"],
+                EsClient.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
                                                     min_should_match, message))
         elif launch.analyzerConfig.analyzerMode in ["CURRENT_LAUNCH"]:
             query["query"]["bool"]["must"].append(
@@ -527,8 +524,7 @@ class EsClient:
                     "launch_id": {
                         "value": launch.launchId}}})
             query["query"]["bool"]["must"].append(
-                EsClient.build_more_like_this_query(min_doc_freq, min_term_freq,
-                                                    self.search_cfg["MaxQueryTerms"],
+                EsClient.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
                                                     min_should_match, message))
         else:
             query["query"]["bool"]["should"].append(
@@ -537,8 +533,7 @@ class EsClient:
                         "value": launch.launchName,
                         "boost": abs(self.search_cfg["BoostLaunch"])}}})
             query["query"]["bool"]["must"].append(
-                EsClient.build_more_like_this_query(min_doc_freq, min_term_freq,
-                                                    self.search_cfg["MaxQueryTerms"],
+                EsClient.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
                                                     min_should_match, message))
         return query
 

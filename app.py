@@ -44,8 +44,6 @@ APP_CONFIG = {
 
 SEARCH_CONFIG = {
     "MinShouldMatch":           os.getenv("ES_MIN_SHOULD_MATCH", "80%"),
-    "MinTermFreq":              int(os.getenv("ES_MIN_TERM_FREQ", "1")),
-    "MinDocFreq":               int(os.getenv("ES_MIN_DOC_FREQ", "1")),
     "BoostAA":                  float(os.getenv("ES_BOOST_AA", "2.0")),
     "BoostLaunch":              float(os.getenv("ES_BOOST_LAUNCH", "2.0")),
     "BoostUniqueID":            float(os.getenv("ES_BOOST_UNIQUE_ID", "2.0")),

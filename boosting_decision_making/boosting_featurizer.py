@@ -98,6 +98,7 @@ class BoostingFeaturizer:
                         "mrHit": hit,
                         "log_message": log["_source"]["message"],
                         "additional_info": log["_source"]["additional_info"],
+                        "log_id": log["_id"],
                         "score": 0}
 
                 issue_type_item = self.scores_by_issue_type[issue_type]
@@ -107,6 +108,7 @@ class BoostingFeaturizer:
                         log["_source"]["message"]
                     self.scores_by_issue_type[issue_type]["additional_info"] =\
                         log["_source"]["additional_info"]
+                    self.scores_by_issue_type[issue_type]["log_id"] = log["_id"]
 
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
@@ -221,6 +223,7 @@ class BoostingFeaturizer:
         messages_to_check = {}
         all_messages = []
         message_index = 0
+        log_message_index = {}
         for issue_type in scores_by_issue_type:
             min_word_length = self.config["min_word_length"]\
                 if "min_word_length" in self.config else 0
@@ -235,10 +238,20 @@ class BoostingFeaturizer:
             elif all_message_words.strip() == "" or all_log_query_words.strip() == "":
                 similarity_percent_by_type[issue_type] = 0.0
             else:
+                new_message_ind = message_index
                 all_messages.append(all_message_words)
-                all_messages.append(all_log_query_words)
-                messages_to_check[issue_type] = [message_index, message_index + 1]
-                message_index += 2
+                message_index += 1
+
+                log_message_index_in_array = message_index
+                if scores_by_issue_type[issue_type]["log_id"] not in log_message_index:
+                    all_messages.append(all_log_query_words)
+                    log_message_index[scores_by_issue_type[issue_type]["log_id"]] =\
+                        log_message_index_in_array
+                    message_index += 1
+                else:
+                    log_message_index_in_array =\
+                        log_message_index[scores_by_issue_type[issue_type]["log_id"]]
+                messages_to_check[issue_type] = [new_message_ind, log_message_index_in_array]
 
         if len(all_messages) > 0:
             vectorizer = CountVectorizer(binary=True, analyzer="word", token_pattern="[^ ]+")

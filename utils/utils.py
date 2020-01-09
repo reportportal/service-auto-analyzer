@@ -79,7 +79,7 @@ def find_query_words_count_from_explanation(elastic_res, field_name="message"):
                 if "weight(%s:" % field_name in detail["description"].lower():
                     index_query_words_details = idx
                     break
-        if index_query_words_details:
+        if index_query_words_details is not None:
             field_explaination = elastic_res["_explanation"]["details"]
             for detail in field_explaination[index_query_words_details]["details"]:
                 word = re.search(r"weight\(%s:(.+) in" % field_name, detail["description"]).group(1)

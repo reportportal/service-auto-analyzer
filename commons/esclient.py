@@ -271,7 +271,7 @@ class EsClient:
         return {"size": 10000,
                 "query": {
                     "bool": {
-                        "must": [
+                        "filter": [
                             {"terms": {"test_item": test_item_ids}},
                             {"term": {"is_merged": is_merged}}
                         ]
@@ -405,7 +405,7 @@ class EsClient:
         return {"size": 10000,
                 "query": {
                     "bool": {
-                        "must": [
+                        "filter": [
                             {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
                             {"exists": {"field": "issue_type"}},
                             {"term": {"is_merged": False}},
@@ -418,13 +418,15 @@ class EsClient:
         """Build search query"""
         return {"query": {
             "bool": {
+                "filter": [
+                    {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
+                    {"exists": {"field": "issue_type"}},
+                    {"term": {"is_merged": True}},
+                ],
                 "must_not": {
                     "term": {"test_item": {"value": search_req.itemId, "boost": 1.0}}
                 },
                 "must": [
-                    {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
-                    {"exists": {"field": "issue_type"}},
-                    {"term": {"is_merged": True}},
                     {
                         "bool": {
                             "should": [
@@ -499,15 +501,16 @@ class EsClient:
                           {"start_time": "desc"}, ],
                  "query": {
                      "bool": {
-                         "must_not": [
-                             {"wildcard": {"issue_type": "TI*"}},
-                             {"wildcard": {"issue_type": "ti*"}},
-                         ],
-                         "must": [
+                         "filter": [
                              {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
                              {"exists": {"field": "issue_type"}},
                              {"term": {"is_merged": True}},
                          ],
+                         "must_not": [
+                             {"wildcard": {"issue_type": "TI*"}},
+                             {"wildcard": {"issue_type": "ti*"}},
+                         ],
+                         "must": [],
                          "should": [
                              {"term": {"unique_id": {
                                  "value": unique_id,

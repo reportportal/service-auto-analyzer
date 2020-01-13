@@ -46,13 +46,15 @@ class BoostingFeaturizer:
             11: (self._calculate_similarity_percent,
                  {"field_name": "message", "log_field": "log_message"}),
             13: (self._calculate_similarity_percent,
-                 {"field_name": "additional_info", "log_field": "additional_info"}),
+                 {"field_name": "merged_small_logs", "log_field": "merged_small_logs"}),
             14: (self._has_test_item_several_logs, {}),
             15: (self._has_query_several_logs, {}),
             16: (self._calculate_query_terms_percent,
                  {"field_name": "message", "log_field": "log_message"}),
             17: (self._calculate_query_terms_percent,
-                 {"field_name": "additional_info", "log_field": "additional_info"}),
+                 {"field_name": "merged_small_logs", "log_field": "merged_small_logs"}),
+            18: (self._calculate_similarity_percent,
+                 {"field_name": "message_part_to_check", "log_field": "message_part_to_check"}),
         }
 
         if type(feature_ids) == str:
@@ -72,17 +74,17 @@ class BoostingFeaturizer:
         scores_by_issue_type = self.find_most_relevant_by_type()
         has_several_logs_by_type = {}
         for issue_type in scores_by_issue_type:
-            additional_info =\
-                scores_by_issue_type[issue_type]["additional_info"]
-            has_several_logs_by_type[issue_type] = int(additional_info.strip() != "")
+            merged_small_logs =\
+                scores_by_issue_type[issue_type]["merged_small_logs"]
+            has_several_logs_by_type[issue_type] = int(merged_small_logs.strip() != "")
         return has_several_logs_by_type
 
     def _has_query_several_logs(self):
         scores_by_issue_type = self.find_most_relevant_by_type()
         has_several_logs_by_type = {}
         for issue_type in scores_by_issue_type:
-            additional_info = scores_by_issue_type[issue_type]["additional_info"]
-            has_several_logs_by_type[issue_type] = int(additional_info.strip() != "")
+            merged_small_logs = scores_by_issue_type[issue_type]["merged_small_logs"]
+            has_several_logs_by_type[issue_type] = int(merged_small_logs.strip() != "")
         return has_several_logs_by_type
 
     def find_most_relevant_by_type(self):
@@ -97,7 +99,8 @@ class BoostingFeaturizer:
                     self.scores_by_issue_type[issue_type] = {
                         "mrHit": hit,
                         "log_message": log["_source"]["message"],
-                        "additional_info": log["_source"]["additional_info"],
+                        "merged_small_logs": log["_source"]["merged_small_logs"],
+                        "message_part_to_check": log["_source"]["message_part_to_check"],
                         "log_id": log["_id"],
                         "score": 0}
 
@@ -106,8 +109,10 @@ class BoostingFeaturizer:
                     self.scores_by_issue_type[issue_type]["mrHit"] = hit
                     self.scores_by_issue_type[issue_type]["log_message"] =\
                         log["_source"]["message"]
-                    self.scores_by_issue_type[issue_type]["additional_info"] =\
-                        log["_source"]["additional_info"]
+                    self.scores_by_issue_type[issue_type]["merged_small_logs"] =\
+                        log["_source"]["merged_small_logs"]
+                    self.scores_by_issue_type[issue_type]["message_part_to_check"] =\
+                        log["_source"]["message_part_to_check"]
                     self.scores_by_issue_type[issue_type]["log_id"] = log["_id"]
 
             for idx, hit in enumerate(es_results):
@@ -270,17 +275,15 @@ class BoostingFeaturizer:
         issue_type_by_index = {}
         try:
             issue_types = self.find_most_relevant_by_type()
-
             for idx, issue_type in enumerate(issue_types):
                 gathered_data.append([])
                 issue_type_by_index[issue_type] = idx
                 issue_type_names.append(issue_type)
-
             for feature in self.feature_ids:
                 func, args = self.feature_functions[feature]
                 result = func(**args)
                 for issue_type in result:
-                    gathered_data[issue_type_by_index[issue_type]].append(result[issue_type])
+                    gathered_data[issue_type_by_index[issue_type]].append(round(result[issue_type], 3))
         except Exception as err:
             logger.error("Errors in boosting features calculation")
             logger.error(err)

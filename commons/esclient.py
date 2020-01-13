@@ -56,9 +56,19 @@ DEFAULT_MAPPING_SETTINGS = {
             "type":     "text",
             "analyzer": "standard_english_analyzer"
         },
-        "additional_info": {
+        "merged_small_logs": {
             "type":     "text",
             "analyzer": "standard_english_analyzer"
+        },
+        "message_part_to_check": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer",
+        },
+        "original_message_lines": {
+            "type": "integer",
+        },
+        "original_message_words_number": {
+            "type": "integer",
         },
         "log_level": {
             "type": "integer",
@@ -194,28 +204,7 @@ class EsClient:
                     if log.logLevel < ERROR_LOGGING_LEVEL or log.message.strip() == "":
                         continue
 
-                    message = utils.sanitize_text(
-                        utils.first_lines(log.message,
-                                          launch.analyzerConfig.numberOfLogLines))
-
-                    body = {
-                        "_id":    log.logId,
-                        "_index": launch.project,
-                        "_source": {
-                            "launch_id":        launch.launchId,
-                            "launch_name":      launch.launchName,
-                            "test_item":        test_item.testItemId,
-                            "unique_id":        test_item.uniqueId,
-                            "is_auto_analyzed": test_item.isAutoAnalyzed,
-                            "issue_type":       test_item.issueType,
-                            "log_level":        log.logLevel,
-                            "original_message": log.message,
-                            "message":          message,
-                            "is_merged":        False,
-                            "start_time":    test_item.startTime.strftime("%Y-%m-%d %H:%M:%S"),
-                            "additional_info":  "", }}
-
-                    bodies.append(body)
+                    bodies.append(self._prepare_log(launch, test_item, log))
                     logs_added = True
                 if logs_added:
                     test_item_ids.append(str(test_item.testItemId))
@@ -223,6 +212,35 @@ class EsClient:
         result = self._merge_logs(test_item_ids, project)
         logger.debug("Finished indexing logs for %d launches", len(launches))
         return result
+
+    def _prepare_log(self, launch, test_item, log):
+        message = utils.sanitize_text(
+            utils.first_lines(log.message,
+                              launch.analyzerConfig.numberOfLogLines))
+
+        additional_lines_to_check = 2 if launch.analyzerConfig.numberOfLogLines == -1 else -1
+        message_part_to_check = utils.sanitize_text(
+            utils.first_lines(log.message, additional_lines_to_check))
+
+        return {
+            "_id":    log.logId,
+            "_index": launch.project,
+            "_source": {
+                "launch_id":        launch.launchId,
+                "launch_name":      launch.launchName,
+                "test_item":        test_item.testItemId,
+                "unique_id":        test_item.uniqueId,
+                "is_auto_analyzed": test_item.isAutoAnalyzed,
+                "issue_type":       test_item.issueType,
+                "log_level":        log.logLevel,
+                "original_message_lines": utils.calculate_line_number(log.message),
+                "original_message_words_number": len(
+                    utils.split_words(log.message, split_urls=False)),
+                "message":          message,
+                "is_merged":        False,
+                "start_time":       test_item.startTime.strftime("%Y-%m-%d %H:%M:%S"),
+                "merged_small_logs":  "",
+                "message_part_to_check": message_part_to_check, }}
 
     def _merge_logs(self, test_item_ids, project):
         bodies = []
@@ -290,10 +308,12 @@ class EsClient:
 
             if log["_id"] in log_level_ids_to_add[log_level]:
                 normalized_message = log["_source"]["message"]
-                additional_info = EsClient.compress(log_level_messages[log["_source"]["log_level"]])
+                message_part = log["_source"]["message_part_to_check"]
+                merged_small_logs = EsClient.compress(
+                    log_level_messages[log["_source"]["log_level"]])
                 new_logs.append(EsClient.prepare_new_log(
                     log, str(log["_id"]) + "_big",
-                    normalized_message, additional_info))
+                    normalized_message, merged_small_logs, message_part))
 
         for log_level in log_level_messages:
 
@@ -302,7 +322,7 @@ class EsClient:
                 log = log_level_ids_merged[log_level]
                 new_logs.append(EsClient.prepare_new_log(
                     log, str(log["_id"]) + "_m", "",
-                    EsClient.compress(log_level_messages[log_level])))
+                    EsClient.compress(log_level_messages[log_level]), ""))
         return new_logs
 
     @staticmethod
@@ -326,9 +346,8 @@ class EsClient:
             if log_level not in logs_unique_log_level:
                 logs_unique_log_level[log_level] = set()
 
-            if utils.calculate_line_number(log["_source"]["original_message"]) <= 2 and\
-                    len(utils.split_words(log["_source"]["original_message"],
-                        split_urls=False)) <= 100:
+            if log["_source"]["original_message_lines"] <= 2 and\
+                    log["_source"]["original_message_words_number"] <= 100:
                 if log_level not in log_level_ids_merged:
                     log_level_ids_merged[log_level] = log
                 message = log["_source"]["message"]
@@ -344,13 +363,14 @@ class EsClient:
                                                  log_level_messages, log_level_ids_merged)
 
     @staticmethod
-    def prepare_new_log(old_log, new_id, message, additional_info):
+    def prepare_new_log(old_log, new_id, message, merged_small_logs, message_part):
         """Prepare updated log"""
         merged_log = copy.deepcopy(old_log)
         merged_log["_source"]["is_merged"] = True
         merged_log["_id"] = new_id
         merged_log["_source"]["message"] = message
-        merged_log["_source"]["additional_info"] = additional_info
+        merged_log["_source"]["merged_small_logs"] = merged_small_logs
+        merged_log["_source"]["message_part_to_check"] = message_part
         return merged_log
 
     def _bulk_index(self, bodies):
@@ -490,7 +510,7 @@ class EsClient:
             "max_query_terms":      max_query_terms,
             "boost": boost, }}
 
-    def build_analyze_query(self, launch, unique_id, message, additional_info, size=10):
+    def build_analyze_query(self, launch, unique_id, log, size=10):
         """Build analyze query"""
         min_should_match = "{}%".format(launch.analyzerConfig.minShouldMatch)\
             if launch.analyzerConfig.minShouldMatch > 0\
@@ -536,45 +556,48 @@ class EsClient:
                     "launch_name": {
                         "value": launch.launchName,
                         "boost": abs(self.search_cfg["BoostLaunch"])}}})
-        if message.strip() != "":
+        if log["_source"]["message"].strip() != "":
+            log_lines = launch.analyzerConfig.numberOfLogLines
             query["query"]["bool"]["must"].append(
                 self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
                                                 min_should_match,
-                                                message, field_name="message",
-                                                boost=2.0))
+                                                log["_source"]["message"],
+                                                field_name="message",
+                                                boost=(3.0 if log_lines != -1 else 2.0)))
             query["query"]["bool"]["should"].append(
                 self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                "80%", additional_info,
-                                                field_name="additional_info", boost=0.5))
+                                                "80%",
+                                                log["_source"]["merged_small_logs"],
+                                                field_name="merged_small_logs",
+                                                boost=0.5))
+            query["query"]["bool"]["should"].append(
+                self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                min_should_match,
+                                                log["_source"]["message_part_to_check"],
+                                                field_name="message_part_to_check",
+                                                boost=(3.0 if log_lines == -1 else 1.0)))
         else:
             query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
             query["query"]["bool"]["must"].append(
                 self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                min_should_match, additional_info,
-                                                field_name="additional_info"))
+                                                min_should_match,
+                                                log["_source"]["merged_small_logs"],
+                                                field_name="merged_small_logs"))
         return query
 
     def _get_elasticsearch_results_for_test_items(self, launch, test_item):
         full_results = []
-        prepared_logs = [{"_id": log.logId,
-                          "_source": {
-                              "message": utils.sanitize_text(utils.first_lines(
-                                  log.message,
-                                  launch.analyzerConfig.numberOfLogLines)),
-                              "original_message": log.message,
-                              "log_level":        log.logLevel, }} for log in test_item.logs]
+        prepared_logs = [self._prepare_log(launch, test_item, log)
+                         for log in test_item.logs if log.logLevel >= ERROR_LOGGING_LEVEL]
         for log in EsClient.decompose_logs_merged_and_without_duplicates(prepared_logs):
-
             message = log["_source"]["message"]
-            additional_info = log["_source"]["additional_info"]
+            merged_small_logs = log["_source"]["merged_small_logs"]
 
             if log["_source"]["log_level"] < ERROR_LOGGING_LEVEL or\
-               (message.strip() == "" and additional_info.strip() == ""):
+               (message.strip() == "" and merged_small_logs.strip() == ""):
                 continue
 
-            query = self.build_analyze_query(launch, test_item.uniqueId,
-                                             message,
-                                             additional_info)
+            query = self.build_analyze_query(launch, test_item.uniqueId, log)
 
             res = self.es_client.search(index=str(launch.project), body=query, explain=True)
             full_results.append((log, res))

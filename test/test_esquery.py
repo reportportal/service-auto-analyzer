@@ -60,17 +60,24 @@ class TestEsQuery(unittest.TestCase):
             "launchId": 123,
             "launchName": "Launch name",
             "project": 1})
-        query_from_esclient = es_client.build_analyze_query(launch, "unique", "hello world", "")
+        log = {
+            "_id":    1,
+            "_index": 1,
+            "_source": {
+                "unique_id":        "unique",
+                "message":          "hello world",
+                "merged_small_logs":  "",
+                "message_part_to_check": "hello world", }}
+        query_from_esclient = es_client.build_analyze_query(launch, "unique", log)
         demo_query = TestEsQuery.build_demo_query(search_cfg, "Launch name",
-                                                  "unique", "hello world",
-                                                  error_logging_level, "")
+                                                  "unique", log,
+                                                  error_logging_level)
 
         query_from_esclient.should.equal(demo_query)
 
     @staticmethod
     def build_demo_query(search_cfg, launch_name,
-                         unique_id, log_message, error_logging_level,
-                         additional_info):
+                         unique_id, log, error_logging_level):
         """Build demo analyze query"""
         return {
             "size": 10,
@@ -90,7 +97,7 @@ class TestEsQuery(unittest.TestCase):
                     "must": [
                         {"more_like_this": {
                             "fields":               ["message"],
-                            "like":                 log_message,
+                            "like":                 log["_source"]["message"],
                             "min_doc_freq":         1,
                             "min_term_freq":        1,
                             "minimum_should_match": "5<" + search_cfg["MinShouldMatch"],
@@ -118,13 +125,22 @@ class TestEsQuery(unittest.TestCase):
                             },
                         }},
                         {"more_like_this": {
-                            "fields":               ["additional_info"],
-                            "like":                 additional_info,
+                            "fields":               ["merged_small_logs"],
+                            "like":                 log["_source"]["merged_small_logs"],
+                            "min_doc_freq":         1,
+                            "min_term_freq":        1,
+                            "minimum_should_match": "5<80%",
+                            "max_query_terms":      search_cfg["MaxQueryTerms"],
+                            "boost":                0.5,
+                        }},
+                        {"more_like_this": {
+                            "fields":               ["message_part_to_check"],
+                            "like":                 log["_source"]["message_part_to_check"],
                             "min_doc_freq":         1,
                             "min_term_freq":        1,
                             "minimum_should_match": "5<" + search_cfg["MinShouldMatch"],
                             "max_query_terms":      search_cfg["MaxQueryTerms"],
-                            "boost":                0.5,
+                            "boost":                3.0,
                         }},
                     ],
                 },

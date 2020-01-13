@@ -487,6 +487,8 @@ class EsClient:
                     count_vector_matrix = vectorizer.fit_transform([msg_words, log_query_words])
                     similarity_percent = float(cosine_similarity(count_vector_matrix[0],
                                                                  count_vector_matrix[1]))
+                    logger.debug("Log with id %s has %.3f similarity with the log '%s'",
+                                 log_id, similarity_percent, message)
                     if similarity_percent >= self.search_cfg["SearchLogsMinSimilarity"]:
                         keys.add(log_id)
                 except Exception as err:
@@ -598,8 +600,14 @@ class EsClient:
                 continue
 
             query = self.build_analyze_query(launch, test_item.uniqueId, log)
+            logger.debug("Searched log %s", log)
 
             res = self.es_client.search(index=str(launch.project), body=query, explain=True)
+            logger.debug("Results from Elasticsearch: %d results", len(res["hits"]["hits"]))
+            for elastic_res in res["hits"]["hits"]:
+                logger.debug("Id %s; Index %s; Score %s",
+                             elastic_res["_id"], elastic_res["_index"], elastic_res["_score"])
+                logger.debug("Result all fields %s", elastic_res["_source"])
             full_results.append((log, res))
         return full_results
 
@@ -630,6 +638,11 @@ class EsClient:
                     predicted_labels, predicted_labels_probability =\
                         self.boosting_decision_maker.predict(feature_data)
 
+                    for i in range(len(issue_type_names)):
+                        logger.debug("Issue type %s has probability %.3f",
+                                     issue_type_names[i],
+                                     predicted_labels_probability[i][1])
+
                     predicted_issue_type = ""
                     max_val = 0.0
                     for i in range(len(predicted_labels)):
@@ -642,9 +655,15 @@ class EsClient:
                         chosen_type =\
                             boosting_data_gatherer.scores_by_issue_type[predicted_issue_type]
                         relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
-                        results.append(AnalysisResult(testItem=test_item.testItemId,
-                                                      issueType=predicted_issue_type,
-                                                      relevantItem=relevant_item))
+                        analysis_result = AnalysisResult(testItem=test_item.testItemId,
+                                                         issueType=predicted_issue_type,
+                                                         relevantItem=relevant_item)
+                        results.append(analysis_result)
+                        logger.debug(analysis_result)
+                    else:
+                        logger.debug("Test item %s has no relevant items", test_item.testItemId)
+                else:
+                    logger.debug("There are no results for test item ", test_item.testItemId)
         logger.debug("Finished analysis for %d launches with %d results",
                      len(launches), len(results))
         return results

@@ -639,6 +639,14 @@ class EsClient:
                         self.boosting_decision_maker.predict(feature_data)
 
                     for i in range(len(issue_type_names)):
+                        logger.debug("Most relevant item with issue type %s has id %s",
+                                     issue_type_names[i],
+                                     boosting_data_gatherer.
+                                     scores_by_issue_type[issue_type_names[i]]["mrHit"]["_id"])
+                        logger.debug("Most relevant item with issue type %s with info %s",
+                                     issue_type_names[i],
+                                     boosting_data_gatherer.
+                                     scores_by_issue_type[issue_type_names[i]]["mrHit"]["_source"])
                         logger.debug("Issue type %s has probability %.3f",
                                      issue_type_names[i],
                                      predicted_labels_probability[i][1])

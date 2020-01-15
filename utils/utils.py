@@ -43,7 +43,8 @@ def build_url(main_url, url_params):
 
 
 def split_words(text, min_word_length=0, only_unique=True, split_urls=True):
-    all_words = set() if only_unique else []
+    all_unique_words = set()
+    all_words = []
     stopwords = set(nltk.corpus.stopwords.words("english"))
     replace_symbols = r"[<>\{:,!?\}\[\];=\(\)\'\"]|\.\.\."
     text = re.sub(replace_symbols, " ", text)
@@ -58,11 +59,10 @@ def split_words(text, min_word_length=0, only_unique=True, split_urls=True):
         word_part = re.sub(r"\.+\b|\b\.+", "", word_part)
         for w in word_part.split():
             if w != "" and w not in stopwords and len(w) >= min_word_length and re.search(r"\w", w):
-                if only_unique:
-                    all_words.add(w)
-                else:
+                if not only_unique or w not in all_unique_words:
                     all_words.append(w)
-    return list(all_words)
+                    all_unique_words.add(w)
+    return all_words
 
 
 def find_query_words_count_from_explanation(elastic_res, field_name="message"):

@@ -109,7 +109,7 @@ class EsClient:
 
     @staticmethod
     def compress(text):
-        return " ".join(list(set(utils.split_words(text))))
+        return " ".join(utils.split_words(text, only_unique=True))
 
     def create_index(self, index_name):
         """Create index in elasticsearch"""

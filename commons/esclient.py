@@ -290,7 +290,7 @@ class EsClient:
                 "query": {
                     "bool": {
                         "filter": [
-                            {"terms": {"test_item": test_item_ids}},
+                            {"terms": {"test_item": [str(_id) for _id in test_item_ids]}},
                             {"term": {"is_merged": is_merged}}
                         ]
                     }
@@ -429,7 +429,7 @@ class EsClient:
                             {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
                             {"exists": {"field": "issue_type"}},
                             {"term": {"is_merged": False}},
-                            {"terms": {"_id": log_ids}},
+                            {"terms": {"_id": [str(log_id) for log_id in log_ids]}},
                         ]
                     }
                 }, }
@@ -647,9 +647,10 @@ class EsClient:
                                      issue_type_names[i],
                                      boosting_data_gatherer.
                                      scores_by_issue_type[issue_type_names[i]]["mrHit"]["_source"])
-                        logger.debug("Issue type %s has probability %.3f",
+                        logger.debug("Issue type %s has probability %.3f for features %s",
                                      issue_type_names[i],
-                                     predicted_labels_probability[i][1])
+                                     predicted_labels_probability[i][1],
+                                     feature_data[i])
 
                     predicted_issue_type = ""
                     max_val = 0.0

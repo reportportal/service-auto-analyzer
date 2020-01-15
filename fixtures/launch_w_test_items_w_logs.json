@@ -5,19 +5,20 @@
     "testItems": [
         {
             "uniqueId": "unique1",
-            "testItemId": 2,
+            "testItemId": 1,
             "issueType": "ti001",
+            "startTime": "2020-01-15 10:57:43",
             "isAutoAnalyzed": false,
             "logs": [
                 {
                   "logId": 1,
-                    "logLevel": 40000,
-                    "message": "Message 1 \r\n Message 2 \r\n Message 3"
+                  "logLevel": 40000,
+                  "message": "Message 1 \r\n Message 2 \r\n Message 3"
                 },
                 {
                   "logId": 2,
-                    "logLevel": 40000,
-                    "message": "Message 2 \r\n Message 4 \r\n Message 5"
+                  "logLevel": 40000,
+                  "message": "Message 2 \r\n Message 4 \r\n Message 5"
                 }
             ]
         }

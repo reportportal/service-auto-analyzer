@@ -607,8 +607,6 @@ class TestEsClient(unittest.TestCase):
                                     "uri":            "/_bulk?refresh=true",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
-                                    "rq":             TestEsClient.get_fixture(
-                                        self.index_logs_rq_different_log_level_merged),
                                     "rs":             TestEsClient.get_fixture(
                                         self.index_logs_rs_different_log_level),
                                     }, ],
@@ -792,8 +790,6 @@ class TestEsClient(unittest.TestCase):
                                     "uri":          "/2/_search?explain=true",
                                     "status":       HTTPStatus.OK,
                                     "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(
-                                        self.search_rq_to_be_merged),
                                     "rs":           TestEsClient.get_fixture(
                                         self.two_hits_search_rs),
                                     }, ],

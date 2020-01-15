@@ -67,7 +67,10 @@ class TestEsQuery(unittest.TestCase):
                 "unique_id":        "unique",
                 "message":          "hello world",
                 "merged_small_logs":  "",
-                "message_part_to_check": "hello world", }}
+                "message_part_to_check": "hello world",
+                "detected_message_with_numbers": "hello world 1",
+                "stacktrace": "",
+                "only_numbers": "1"}}
         query_from_esclient = es_client.build_analyze_query(launch, "unique", log)
         demo_query = TestEsQuery.build_demo_query(search_cfg, "Launch name",
                                                   "unique", log,
@@ -138,7 +141,16 @@ class TestEsQuery(unittest.TestCase):
                             "like":                 log["_source"]["message_part_to_check"],
                             "min_doc_freq":         1,
                             "min_term_freq":        1,
-                            "minimum_should_match": "5<" + search_cfg["MinShouldMatch"],
+                            "minimum_should_match": "5<80%",
+                            "max_query_terms":      search_cfg["MaxQueryTerms"],
+                            "boost":                3.0,
+                        }},
+                        {"more_like_this": {
+                            "fields":               ["only_numbers"],
+                            "like":                 log["_source"]["only_numbers"],
+                            "min_doc_freq":         1,
+                            "min_term_freq":        1,
+                            "minimum_should_match": "1",
                             "max_query_terms":      search_cfg["MaxQueryTerms"],
                             "boost":                3.0,
                         }},

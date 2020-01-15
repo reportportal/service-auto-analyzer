@@ -55,6 +55,26 @@ class BoostingFeaturizer:
                  {"field_name": "merged_small_logs", "log_field": "merged_small_logs"}),
             18: (self._calculate_similarity_percent,
                  {"field_name": "message_part_to_check", "log_field": "message_part_to_check"}),
+            19: (self._calculate_similarity_percent,
+                 {"field_name": "detected_message_with_numbers",
+                  "log_field": "detected_message_with_numbers"}),
+            20: (self._calculate_query_terms_percent,
+                 {"field_name": "message_part_to_check", "log_field": "message_part_to_check"}),
+            21: (self._calculate_query_terms_percent,
+                 {"field_name": "detected_message_with_numbers",
+                  "log_field": "detected_message_with_numbers"}),
+            22: (self._calculate_query_terms_percent,
+                 {"field_name": "stacktrace", "log_field": "stacktrace"}),
+            23: (self._calculate_similarity_percent,
+                 {"field_name": "stacktrace", "log_field": "stacktrace"}),
+            24: (self._calculate_query_terms_percent,
+                 {"field_name": "only_numbers", "log_field": "only_numbers"}),
+            25: (self._calculate_similarity_percent,
+                 {"field_name": "only_numbers", "log_field": "only_numbers"}),
+            26: (self._calculate_max_score_and_pos, {"return_val_name": "max_score", "scaled": True}),
+            27: (self._calculate_min_score_and_pos, {"return_val_name": "min_score", "scaled": True}),
+            28: (self._calculate_percent_count_items_and_mean,
+                 {"return_val_name": "mean_score", "scaled": True}),
         }
 
         if type(feature_ids) == str:
@@ -134,7 +154,7 @@ class BoostingFeaturizer:
             place_by_issue_type[issue_type_item[0]] = 1 / (1 + idx)
         return place_by_issue_type
 
-    def _calculate_max_score_and_pos(self, return_val_name="max_score"):
+    def _calculate_max_score_and_pos(self, return_val_name="max_score", scaled=False):
         max_scores_by_issue_type = {}
         max_score_global = 0
         for log, es_results in self.all_results:
@@ -151,31 +171,44 @@ class BoostingFeaturizer:
         for issue_type in max_scores_by_issue_type:
             max_scores_by_issue_type[issue_type]["max_score_global_percent"] =\
                 max_scores_by_issue_type[issue_type]["max_score"] / max_score_global
+            if scaled:
+                max_scores_by_issue_type[issue_type]["max_score"] /= max_score_global
 
         return dict([(item, max_scores_by_issue_type[item][return_val_name])
                     for item in max_scores_by_issue_type])
 
-    def _calculate_min_score_and_pos(self, return_val_name="min_score"):
+    def _calculate_min_score_and_pos(self, return_val_name="min_score", scaled=False):
         min_scores_by_issue_type = {}
+        max_score_global = 0
         for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
+
+                if hit["normalized_score"] > max_score_global:
+                    max_score_global = hit["normalized_score"]
 
                 if issue_type not in min_scores_by_issue_type or\
                         hit["normalized_score"] < min_scores_by_issue_type[issue_type]["min_score"]:
                     min_scores_by_issue_type[issue_type] = {"min_score": hit["normalized_score"],
                                                             "min_score_pos": 1 / (1 + idx), }
+        for issue_type in min_scores_by_issue_type:
+            if scaled:
+                min_scores_by_issue_type[issue_type]["min_score"] /= max_score_global
         return dict([(item, min_scores_by_issue_type[item][return_val_name])
                     for item in min_scores_by_issue_type])
 
-    def _calculate_percent_count_items_and_mean(self, return_val_name="mean_score"):
+    def _calculate_percent_count_items_and_mean(self, return_val_name="mean_score", scaled=False):
         cnt_items_by_issue_type = {}
         cnt_items_glob = 0
+        max_score_global = 0
         for log, es_results in self.all_results:
             cnt_items_glob += len(es_results)
 
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
+
+                if hit["normalized_score"] > max_score_global:
+                    max_score_global = hit["normalized_score"]
 
                 if issue_type not in cnt_items_by_issue_type:
                     cnt_items_by_issue_type[issue_type] = {"mean_score": 0,
@@ -188,6 +221,8 @@ class BoostingFeaturizer:
             cnt_items_by_issue_type[issue_type]["mean_score"] /=\
                 cnt_items_by_issue_type[issue_type]["cnt_items_percent"]
             cnt_items_by_issue_type[issue_type]["cnt_items_percent"] /= cnt_items_glob
+            if scaled:
+                cnt_items_by_issue_type[issue_type]["mean_score"] /= max_score_global
         return dict([(item, cnt_items_by_issue_type[item][return_val_name])
                     for item in cnt_items_by_issue_type])
 

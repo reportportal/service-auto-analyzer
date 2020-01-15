@@ -64,6 +64,18 @@ DEFAULT_MAPPING_SETTINGS = {
             "type":     "text",
             "analyzer": "standard_english_analyzer",
         },
+        "detected_message_with_numbers": {
+            "type":     "text",
+            "index":    False,
+        },
+        "only_numbers": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer",
+        },
+        "stacktrace": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer",
+        },
         "original_message_lines": {
             "type": "integer",
         },
@@ -218,9 +230,17 @@ class EsClient:
             utils.first_lines(log.message,
                               launch.analyzerConfig.numberOfLogLines))
 
-        additional_lines_to_check = 2 if launch.analyzerConfig.numberOfLogLines == -1 else -1
-        message_part_to_check = utils.sanitize_text(
-            utils.first_lines(log.message, additional_lines_to_check))
+        detected_message = utils.detect_log_description(log.message,
+                                                        default_log_number=2,
+                                                        choose_by_algorythm=True)
+        stacktrace = utils.sanitize_text("\n".join(
+            log.message.split("\n")[utils.calculate_line_number(detected_message):]))
+
+        detected_message_with_numbers = utils.remove_starting_datetime(detected_message)
+        detected_message = utils.sanitize_text(detected_message)
+        detected_message_only_numbers = re.sub(r"[^\d ]", "", detected_message_with_numbers)
+        detected_message_only_numbers = " ".join(
+            utils.split_words(detected_message_only_numbers, only_unique=True))
 
         return {
             "_id":    log.logId,
@@ -240,7 +260,10 @@ class EsClient:
                 "is_merged":        False,
                 "start_time":       test_item.startTime.strftime("%Y-%m-%d %H:%M:%S"),
                 "merged_small_logs":  "",
-                "message_part_to_check": message_part_to_check, }}
+                "message_part_to_check": detected_message,
+                "detected_message_with_numbers": detected_message_with_numbers,
+                "stacktrace":                    stacktrace,
+                "only_numbers":                  detected_message_only_numbers}}
 
     def _merge_logs(self, test_item_ids, project):
         bodies = []
@@ -308,12 +331,11 @@ class EsClient:
 
             if log["_id"] in log_level_ids_to_add[log_level]:
                 normalized_message = log["_source"]["message"]
-                message_part = log["_source"]["message_part_to_check"]
                 merged_small_logs = EsClient.compress(
                     log_level_messages[log["_source"]["log_level"]])
                 new_logs.append(EsClient.prepare_new_log(
                     log, str(log["_id"]) + "_big",
-                    normalized_message, merged_small_logs, message_part))
+                    normalized_message, merged_small_logs))
 
         for log_level in log_level_messages:
 
@@ -322,7 +344,9 @@ class EsClient:
                 log = log_level_ids_merged[log_level]
                 new_logs.append(EsClient.prepare_new_log(
                     log, str(log["_id"]) + "_m", "",
-                    EsClient.compress(log_level_messages[log_level]), ""))
+                    EsClient.compress(log_level_messages[log_level]),
+                    fields_to_clean=["message_part_to_check", "only_numbers",
+                                     "detected_message_with_numbers", "stacktrace"]))
         return new_logs
 
     @staticmethod
@@ -363,14 +387,15 @@ class EsClient:
                                                  log_level_messages, log_level_ids_merged)
 
     @staticmethod
-    def prepare_new_log(old_log, new_id, message, merged_small_logs, message_part):
+    def prepare_new_log(old_log, new_id, message, merged_small_logs, fields_to_clean=[]):
         """Prepare updated log"""
         merged_log = copy.deepcopy(old_log)
         merged_log["_source"]["is_merged"] = True
         merged_log["_id"] = new_id
         merged_log["_source"]["message"] = message
         merged_log["_source"]["merged_small_logs"] = merged_small_logs
-        merged_log["_source"]["message_part_to_check"] = message_part
+        for field in fields_to_clean:
+            merged_log["_source"][field] = ""
         return merged_log
 
     def _bulk_index(self, bodies):
@@ -501,14 +526,16 @@ class EsClient:
     @staticmethod
     def build_more_like_this_query(max_query_terms,
                                    min_should_match, log_message,
-                                   field_name="message", boost=1.0):
+                                   field_name="message", boost=1.0,
+                                   override_min_should_match=None):
         """Build more like this query"""
         return {"more_like_this": {
             "fields":               [field_name],
             "like":                 log_message,
             "min_doc_freq":         1,
             "min_term_freq":        1,
-            "minimum_should_match": "5<" + min_should_match,
+            "minimum_should_match":
+                ("5<" + min_should_match) if override_min_should_match is None else override_min_should_match,
             "max_query_terms":      max_query_terms,
             "boost": boost, }}
 
@@ -574,10 +601,23 @@ class EsClient:
                                                 boost=0.5))
             query["query"]["bool"]["should"].append(
                 self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                min_should_match,
+                                                "80%",
                                                 log["_source"]["message_part_to_check"],
                                                 field_name="message_part_to_check",
-                                                boost=(3.0 if log_lines == -1 else 1.0)))
+                                                boost=3.0))
+            if log_lines != -1:
+                query["query"]["bool"]["should"].append(
+                    self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                    "60%",
+                                                    log["_source"]["stacktrace"],
+                                                    field_name="stacktrace", boost=1.0))
+            query["query"]["bool"]["should"].append(
+                self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                "1",
+                                                log["_source"]["only_numbers"],
+                                                field_name="only_numbers",
+                                                boost=3.0,
+                                                override_min_should_match="1"))
         else:
             query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
             query["query"]["bool"]["must"].append(

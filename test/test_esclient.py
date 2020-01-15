@@ -60,6 +60,7 @@ class TestEsClient(unittest.TestCase):
         self.index_logs_rq_big_messages = "index_logs_rq_big_messages.json"
         self.index_logs_rs = "index_logs_rs.json"
         self.search_rq = "search_rq.json"
+        self.search_rq_another_log = "search_rq_another_log.json"
         self.search_rq_different_logs = "search_rq_different_logs.json"
         self.search_rq_to_be_merged = "search_rq_to_be_merged.json"
         self.no_hits_search_rs = "no_hits_search_rs.json"
@@ -674,7 +675,8 @@ class TestEsClient(unittest.TestCase):
                                     "uri":          "/2/_search?explain=true",
                                     "status":       HTTPStatus.OK,
                                     "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(self.search_rq),
+                                    "rq":           TestEsClient.get_fixture(
+                                        self.search_rq_another_log),
                                     "rs":           TestEsClient.get_fixture(
                                         self.no_hits_search_rs),
                                     }, ],
@@ -696,7 +698,8 @@ class TestEsClient(unittest.TestCase):
                                     "uri":          "/2/_search?explain=true",
                                     "status":       HTTPStatus.OK,
                                     "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(self.search_rq),
+                                    "rq":           TestEsClient.get_fixture(
+                                        self.search_rq_another_log),
                                     "rs":           TestEsClient.get_fixture(
                                         self.one_hit_search_rs),
                                     }, ],
@@ -718,7 +721,8 @@ class TestEsClient(unittest.TestCase):
                                     "uri":          "/2/_search?explain=true",
                                     "status":       HTTPStatus.OK,
                                     "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(self.search_rq),
+                                    "rq":           TestEsClient.get_fixture(
+                                        self.search_rq_another_log),
                                     "rs":           TestEsClient.get_fixture(
                                         self.two_hits_search_rs),
                                     }, ],
@@ -740,7 +744,8 @@ class TestEsClient(unittest.TestCase):
                                     "uri":          "/2/_search?explain=true",
                                     "status":       HTTPStatus.OK,
                                     "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(self.search_rq),
+                                    "rq":           TestEsClient.get_fixture(
+                                        self.search_rq_another_log),
                                     "rs":           TestEsClient.get_fixture(
                                         self.three_hits_search_rs),
                                     }, ],
@@ -762,7 +767,8 @@ class TestEsClient(unittest.TestCase):
                                     "uri":          "/2/_search?explain=true",
                                     "status":       HTTPStatus.OK,
                                     "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(self.search_rq),
+                                    "rq":           TestEsClient.get_fixture(
+                                        self.search_rq_another_log),
                                     "rs":           TestEsClient.get_fixture(
                                         self.three_hits_search_rs),
                                     }, ],
@@ -805,7 +811,7 @@ class TestEsClient(unittest.TestCase):
             },
         ]
 
-        for idx, test in enumerate(tests[9:]):
+        for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
 

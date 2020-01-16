@@ -19,6 +19,7 @@ import string
 import nltk
 import logging
 from dateutil.parser import parse
+import urllib
 
 logger = logging.getLogger("analyzerApp.utils")
 file_extensions = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
@@ -203,3 +204,14 @@ def detect_log_description_and_stacktrace(message, default_log_number=2,
             return reverse_log(log_message), reverse_log(stacktrace)
         return log_message, stacktrace
     return message, ""
+
+
+def fix_big_encoded_urls(message):
+    """Decodes urls encoded with %12 and etc. and removes brackets to separate url"""
+    try:
+        new_message = urllib.parse.unquote(message)
+    except: # noqa
+        pass
+    if new_message != message:
+        return re.sub(r"[\(\)\{\}#%]", " ", new_message)
+    return message

@@ -226,21 +226,21 @@ class EsClient:
         return result
 
     def _prepare_log(self, launch, test_item, log):
+        log.message = utils.delete_empty_lines(log.message)
         message = utils.sanitize_text(
             utils.first_lines(log.message,
                               launch.analyzerConfig.numberOfLogLines))
 
-        detected_message = utils.detect_log_description(log.message,
-                                                        default_log_number=2,
-                                                        choose_by_algorythm=True)
-        stacktrace = utils.sanitize_text("\n".join(
-            log.message.split("\n")[utils.calculate_line_number(detected_message):]))
+        detected_message, stacktrace = utils.detect_log_description_and_stacktrace(
+            log.message,
+            default_log_number=1,
+            choose_by_algorythm=True)
 
         detected_message_with_numbers = utils.remove_starting_datetime(detected_message)
         detected_message = utils.sanitize_text(detected_message)
-        detected_message_only_numbers = re.sub(r"[^\d ]", "", detected_message_with_numbers)
-        detected_message_only_numbers = " ".join(
-            utils.split_words(detected_message_only_numbers, only_unique=True))
+        stacktrace = utils.sanitize_text(stacktrace)
+
+        detected_message_only_numbers = utils.find_only_numbers(detected_message_with_numbers)
 
         return {
             "_id":    log.logId,
@@ -687,8 +687,9 @@ class EsClient:
                                      issue_type_names[i],
                                      boosting_data_gatherer.
                                      scores_by_issue_type[issue_type_names[i]]["mrHit"]["_source"])
-                        logger.debug("Issue type %s has probability %.3f for features %s",
+                        logger.debug("Issue type %s has label %d and probability %.3f for features %s",
                                      issue_type_names[i],
+                                     predicted_labels[i],
                                      predicted_labels_probability[i][1],
                                      feature_data[i])
 

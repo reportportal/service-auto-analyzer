@@ -29,6 +29,7 @@ import commons.launch_objects
 from commons.launch_objects import AnalysisResult
 import utils.utils as utils
 from boosting_decision_making import boosting_featurizer
+import urllib
 
 ERROR_LOGGING_LEVEL = 40000
 
@@ -227,6 +228,10 @@ class EsClient:
 
     def _prepare_log(self, launch, test_item, log):
         log.message = utils.delete_empty_lines(log.message)
+        try:
+            log.message = urllib.parse.unquote(log.message)
+        except: # noqa
+            pass
         message = utils.sanitize_text(
             utils.first_lines(log.message,
                               launch.analyzerConfig.numberOfLogLines))

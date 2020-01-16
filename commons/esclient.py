@@ -407,7 +407,7 @@ class EsClient:
                                                                bodies,
                                                                chunk_size=1000,
                                                                request_timeout=30,
-                                                               refresh=True)
+                                                               refresh='wait_for')
 
             logger.debug("Processed %d logs", success_count)
             if len(errors) > 0:

@@ -28,7 +28,8 @@
                     "test_item": 1,
                     "unique_id": "0001",
                     "detected_message": "Message AB",
-                    "merged_small_logs": ""
+                    "merged_small_logs": "",
+                    "start_time": "2020-01-15 10:57:43"
                 }
             },
             {
@@ -46,7 +47,8 @@
                     "test_item": 1,
                     "unique_id": "0001",
                     "detected_message": "Message PB",
-                    "merged_small_logs": ""
+                    "merged_small_logs": "",
+                    "start_time": "2020-01-15 10:57:43"
                 }
             },
             {
@@ -64,7 +66,8 @@
                     "test_item": 1,
                     "unique_id": "0001",
                     "detected_message": "Message PB",
-                    "merged_small_logs": ""
+                    "merged_small_logs": "",
+                    "start_time": "2020-01-15 10:57:43"
                 }
             }
         ]

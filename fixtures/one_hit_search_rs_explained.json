@@ -28,6 +28,7 @@
                     "test_item": 1,
                     "unique_id": "unique1",
                     "merged_small_logs": "",
+                    "start_time": "2020-01-15 10:57:43",
                     "detected_message": "java.lang.NullPointerException\n\tat tv.horizon.web.ta.ui.elements.assets.Promotion.setFeed(Promotion.java:)"
                 },
                 "_explanation": {

@@ -28,6 +28,7 @@
                     "test_item": 1,
                     "unique_id": "unique1",
                     "detected_message": "Message AB",
+                    "start_time": "2020-01-15 10:57:43",
                     "merged_small_logs": ""
                 }
             },
@@ -46,6 +47,7 @@
                     "test_item": 1,
                     "unique_id": "unique1",
                     "detected_message": "Message PB",
+                    "start_time": "2020-01-15 10:57:43",
                     "merged_small_logs": ""
                 }
             }

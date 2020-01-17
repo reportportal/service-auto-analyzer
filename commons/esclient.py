@@ -235,7 +235,7 @@ class EsClient:
 
         detected_message, stacktrace = utils.detect_log_description_and_stacktrace(
             cleaned_message,
-            default_log_number=1,
+            default_log_number=2,
             choose_by_algorythm=True)
 
         detected_message_with_numbers = utils.remove_starting_datetime(detected_message)
@@ -606,7 +606,7 @@ class EsClient:
                                                 "80%",
                                                 log["_source"]["detected_message"],
                                                 field_name="detected_message",
-                                                boost=3.0))
+                                                boost=(3.0 if log_lines == -1 else 2.0)))
             if log_lines != -1:
                 query["query"]["bool"]["should"].append(
                     self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
@@ -626,7 +626,8 @@ class EsClient:
                 self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
                                                 min_should_match,
                                                 log["_source"]["merged_small_logs"],
-                                                field_name="merged_small_logs"))
+                                                field_name="merged_small_logs",
+                                                boost=2.0))
         return query
 
     def _get_elasticsearch_results_for_test_items(self, launch, test_item):
@@ -697,11 +698,19 @@ class EsClient:
 
                     predicted_issue_type = ""
                     max_val = 0.0
+                    max_val_start_time = None
                     for i in range(len(predicted_labels)):
-                        if predicted_labels[i] == 1 and\
-                                predicted_labels_probability[i][1] > max_val:
-                            max_val = predicted_labels_probability[i][1]
-                            predicted_issue_type = issue_type_names[i]
+                        if predicted_labels[i] == 1:
+                            issue_type = issue_type_names[i]
+                            chosen_type =\
+                                boosting_data_gatherer.scores_by_issue_type[issue_type]
+                            start_time = chosen_type["mrHit"]["_source"]["start_time"]
+                            if (predicted_labels_probability[i][1] > max_val) or\
+                                    ((predicted_labels_probability[i][1] == max_val) and # noqa
+                                        (max_val_start_time is None or start_time > max_val_start_time)):
+                                max_val = predicted_labels_probability[i][1]
+                                predicted_issue_type = issue_type
+                                max_val_start_time = start_time
 
                     if predicted_issue_type != "":
                         chosen_type =\

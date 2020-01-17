@@ -67,7 +67,7 @@ class TestEsQuery(unittest.TestCase):
                 "unique_id":        "unique",
                 "message":          "hello world",
                 "merged_small_logs":  "",
-                "message_part_to_check": "hello world",
+                "detected_message": "hello world",
                 "detected_message_with_numbers": "hello world 1",
                 "stacktrace": "",
                 "only_numbers": "1"}}
@@ -137,8 +137,8 @@ class TestEsQuery(unittest.TestCase):
                             "boost":                0.5,
                         }},
                         {"more_like_this": {
-                            "fields":               ["message_part_to_check"],
-                            "like":                 log["_source"]["message_part_to_check"],
+                            "fields":               ["detected_message"],
+                            "like":                 log["_source"]["detected_message"],
                             "min_doc_freq":         1,
                             "min_term_freq":        1,
                             "minimum_should_match": "5<80%",

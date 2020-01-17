@@ -27,7 +27,7 @@
                     "message": "Message AB",
                     "test_item": 1,
                     "unique_id": "0001",
-                    "message_part_to_check": "Message AB",
+                    "detected_message": "Message AB",
                     "merged_small_logs": ""
                 }
             },
@@ -45,7 +45,7 @@
                     "message": "Message PB",
                     "test_item": 1,
                     "unique_id": "0001",
-                    "message_part_to_check": "Message PB",
+                    "detected_message": "Message PB",
                     "merged_small_logs": ""
                 }
             },
@@ -63,7 +63,7 @@
                     "message": "Message PB",
                     "test_item": 1,
                     "unique_id": "0001",
-                    "message_part_to_check": "Message PB",
+                    "detected_message": "Message PB",
                     "merged_small_logs": ""
                 }
             }

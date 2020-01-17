@@ -28,7 +28,7 @@
                     "test_item": 1,
                     "unique_id": "unique1",
                     "merged_small_logs": "",
-                    "message_part_to_check": "java.lang.NullPointerException\n\tat tv.horizon.web.ta.ui.elements.assets.Promotion.setFeed(Promotion.java:)"
+                    "detected_message": "java.lang.NullPointerException\n\tat tv.horizon.web.ta.ui.elements.assets.Promotion.setFeed(Promotion.java:)"
                 },
                 "_explanation": {
                      "value": 158.08437,
@@ -1513,7 +1513,7 @@
                     "test_item": 2,
                     "unique_id": "unique2",
                     "merged_small_logs": "",
-                    "message_part_to_check": "java.lang.NullPointerException\n\tat tv.horizon.web.ta.services.common.FeedManager.getAspot(FeedManager.java:)"
+                    "detected_message": "java.lang.NullPointerException\n\tat tv.horizon.web.ta.services.common.FeedManager.getAspot(FeedManager.java:)"
                 },
                 "_explanation": {
                  "value": 77.53298,

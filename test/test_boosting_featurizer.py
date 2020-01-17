@@ -119,8 +119,8 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                                   self.log_message)["_source"]["message"],
                                               "merged_small_logs": self.get_fixture(
                                                   self.log_message)["_source"]["merged_small_logs"],
-                                              "message_part_to_check": self.get_fixture(
-                                                  self.log_message)["_source"]["message_part_to_check"],
+                                              "detected_message": self.get_fixture(
+                                                  self.log_message)["_source"]["detected_message"],
                                               "score": 1.0, },
                                     }
             },
@@ -139,8 +139,8 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                                   self.log_message)["_source"]["message"],
                                               "merged_small_logs": self.get_fixture(
                                                   self.log_message)["_source"]["merged_small_logs"],
-                                              "message_part_to_check": self.get_fixture(
-                                                  self.log_message)["_source"]["message_part_to_check"],
+                                              "detected_message": self.get_fixture(
+                                                  self.log_message)["_source"]["detected_message"],
                                               "score": 0.3291, },
                                     }
             },
@@ -156,8 +156,8 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                                   self.log_message)["_source"]["message"],
                                               "merged_small_logs": self.get_fixture(
                                                   self.log_message)["_source"]["merged_small_logs"],
-                                              "message_part_to_check": self.get_fixture(
-                                                  self.log_message)["_source"]["message_part_to_check"],
+                                              "detected_message": self.get_fixture(
+                                                  self.log_message)["_source"]["detected_message"],
                                               "score": 0.8355, },
                                     "PB001": {"mrHit": {"_score": 77.53298,
                                                         "_id": "2"},
@@ -165,8 +165,8 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                                   self.log_message)["_source"]["message"],
                                               "merged_small_logs": self.get_fixture(
                                                   self.log_message)["_source"]["merged_small_logs"],
-                                              "message_part_to_check": self.get_fixture(
-                                                  self.log_message)["_source"]["message_part_to_check"],
+                                              "detected_message": self.get_fixture(
+                                                  self.log_message)["_source"]["detected_message"],
                                               "score": 0.1645, },
                                     }
             },

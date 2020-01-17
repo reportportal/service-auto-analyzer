@@ -60,7 +60,7 @@ DEFAULT_MAPPING_SETTINGS = {
             "type":     "text",
             "analyzer": "standard_english_analyzer"
         },
-        "message_part_to_check": {
+        "detected_message": {
             "type":     "text",
             "analyzer": "standard_english_analyzer",
         },
@@ -262,7 +262,7 @@ class EsClient:
                 "is_merged":        False,
                 "start_time":       test_item.startTime.strftime("%Y-%m-%d %H:%M:%S"),
                 "merged_small_logs":  "",
-                "message_part_to_check": detected_message,
+                "detected_message": detected_message,
                 "detected_message_with_numbers": detected_message_with_numbers,
                 "stacktrace":                    stacktrace,
                 "only_numbers":                  detected_message_only_numbers}}
@@ -347,7 +347,7 @@ class EsClient:
                 new_logs.append(EsClient.prepare_new_log(
                     log, str(log["_id"]) + "_m", "",
                     EsClient.compress(log_level_messages[log_level]),
-                    fields_to_clean=["message_part_to_check", "only_numbers",
+                    fields_to_clean=["detected_message", "only_numbers",
                                      "detected_message_with_numbers", "stacktrace"]))
         return new_logs
 
@@ -604,8 +604,8 @@ class EsClient:
             query["query"]["bool"]["should"].append(
                 self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
                                                 "80%",
-                                                log["_source"]["message_part_to_check"],
-                                                field_name="message_part_to_check",
+                                                log["_source"]["detected_message"],
+                                                field_name="detected_message",
                                                 boost=3.0))
             if log_lines != -1:
                 query["query"]["bool"]["should"].append(

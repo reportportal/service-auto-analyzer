@@ -27,7 +27,7 @@
                     "original_message_words_number": 2,
                     "test_item": 1,
                     "unique_id": "unique1",
-                    "message_part_to_check": "Message AB \r\n Message AB",
+                    "detected_message": "Message AB \r\n Message AB",
                     "merged_small_logs": ""
                 }
             },
@@ -45,7 +45,7 @@
                     "original_message_words_number": 2,
                     "test_item": 1,
                     "unique_id": "unique1",
-                    "message_part_to_check": "Message AB \r\n Message AB",
+                    "detected_message": "Message AB \r\n Message AB",
                     "merged_small_logs": ""
                 }
             }

@@ -54,12 +54,12 @@ class BoostingFeaturizer:
             17: (self._calculate_query_terms_percent,
                  {"field_name": "merged_small_logs", "log_field": "merged_small_logs"}),
             18: (self._calculate_similarity_percent,
-                 {"field_name": "message_part_to_check", "log_field": "message_part_to_check"}),
+                 {"field_name": "detected_message", "log_field": "detected_message"}),
             19: (self._calculate_similarity_percent,
                  {"field_name": "detected_message_with_numbers",
                   "log_field": "detected_message_with_numbers"}),
             20: (self._calculate_query_terms_percent,
-                 {"field_name": "message_part_to_check", "log_field": "message_part_to_check"}),
+                 {"field_name": "detected_message", "log_field": "detected_message"}),
             21: (self._calculate_query_terms_percent,
                  {"field_name": "detected_message_with_numbers",
                   "log_field": "detected_message_with_numbers"}),
@@ -120,7 +120,7 @@ class BoostingFeaturizer:
                         "mrHit": hit,
                         "log_message": log["_source"]["message"],
                         "merged_small_logs": log["_source"]["merged_small_logs"],
-                        "message_part_to_check": log["_source"]["message_part_to_check"],
+                        "detected_message": log["_source"]["detected_message"],
                         "log_id": log["_id"],
                         "score": 0}
 
@@ -131,8 +131,8 @@ class BoostingFeaturizer:
                         log["_source"]["message"]
                     self.scores_by_issue_type[issue_type]["merged_small_logs"] =\
                         log["_source"]["merged_small_logs"]
-                    self.scores_by_issue_type[issue_type]["message_part_to_check"] =\
-                        log["_source"]["message_part_to_check"]
+                    self.scores_by_issue_type[issue_type]["detected_message"] =\
+                        log["_source"]["detected_message"]
                     self.scores_by_issue_type[issue_type]["log_id"] = log["_id"]
 
             for idx, hit in enumerate(es_results):

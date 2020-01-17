@@ -44,9 +44,9 @@ APP_CONFIG = {
 
 SEARCH_CONFIG = {
     "MinShouldMatch":           os.getenv("ES_MIN_SHOULD_MATCH", "80%"),
-    "BoostAA":                  float(os.getenv("ES_BOOST_AA", "2.0")),
-    "BoostLaunch":              float(os.getenv("ES_BOOST_LAUNCH", "2.0")),
-    "BoostUniqueID":            float(os.getenv("ES_BOOST_UNIQUE_ID", "2.0")),
+    "BoostAA":                  float(os.getenv("ES_BOOST_AA", "-8.0")),
+    "BoostLaunch":              float(os.getenv("ES_BOOST_LAUNCH", "8.0")),
+    "BoostUniqueID":            float(os.getenv("ES_BOOST_UNIQUE_ID", "8.0")),
     "MaxQueryTerms":            int(os.getenv("ES_MAX_QUERY_TERMS", "50")),
     "SearchLogsMinShouldMatch": os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "90%"),
     "SearchLogsMinSimilarity":  float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.9")),

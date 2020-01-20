@@ -65,6 +65,7 @@ class TestEsQuery(unittest.TestCase):
             "_index": 1,
             "_source": {
                 "unique_id":        "unique",
+                "test_case_hash":   1,
                 "message":          "hello world",
                 "merged_small_logs":  "",
                 "detected_message": "hello world",
@@ -112,6 +113,12 @@ class TestEsQuery(unittest.TestCase):
                         {"term": {
                             "unique_id": {
                                 "value": unique_id,
+                                "boost": abs(search_cfg["BoostUniqueID"]),
+                            },
+                        }},
+                        {"term": {
+                            "test_case_hash": {
+                                "value": log["_source"]["test_case_hash"],
                                 "boost": abs(search_cfg["BoostUniqueID"]),
                             },
                         }},

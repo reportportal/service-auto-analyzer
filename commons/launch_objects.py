@@ -43,6 +43,7 @@ class TestItem(BaseModel):
     issueType: str = ""
     originalIssueType: str = ""
     startTime: datetime = datetime.now()
+    testCaseHash: int = 0
     logs: List[Log] = []
 
 

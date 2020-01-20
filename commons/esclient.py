@@ -85,6 +85,9 @@ DEFAULT_MAPPING_SETTINGS = {
         "log_level": {
             "type": "integer",
         },
+        "test_case_hash": {
+            "type": "integer",
+        },
         "launch_name": {
             "type": "keyword",
         },
@@ -252,6 +255,7 @@ class EsClient:
                 "launch_name":      launch.launchName,
                 "test_item":        test_item.testItemId,
                 "unique_id":        test_item.uniqueId,
+                "test_case_hash":   test_item.testCaseHash,
                 "is_auto_analyzed": test_item.isAutoAnalyzed,
                 "issue_type":       test_item.issueType,
                 "log_level":        log.logLevel,
@@ -569,6 +573,9 @@ class EsClient:
                          "should": [
                              {"term": {"unique_id": {
                                  "value": unique_id,
+                                 "boost": abs(self.search_cfg["BoostUniqueID"])}}},
+                             {"term": {"test_case_hash": {
+                                 "value": log["_source"]["test_case_hash"],
                                  "boost": abs(self.search_cfg["BoostUniqueID"])}}},
                              {"term": {"is_auto_analyzed": {
                                  "value": str(self.search_cfg["BoostAA"] < 0).lower(),

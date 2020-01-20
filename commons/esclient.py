@@ -684,6 +684,7 @@ class EsClient:
                         if launch.analyzerConfig.minShouldMatch > 0 else
                         float(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0)) / 100,
                         "min_word_length": self.search_cfg["MinWordLength"],
+                        "filter_min_should_match": self.search_cfg["FilterMinShouldMatch"]
                     },
                     feature_ids=self.boosting_decision_maker.get_feature_ids())
                 feature_data, issue_type_names =\

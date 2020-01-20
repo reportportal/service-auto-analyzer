@@ -31,6 +31,10 @@ from commons.esclient import EsClient
 from boosting_decision_making import boosting_decision_maker
 
 
+def get_bool_value(str):
+    return True if str.lower() == "true" else False
+
+
 APP_CONFIG = {
     "esHost":            os.getenv("ES_HOST", "http://elasticsearch:9200"),
     # "esHost":            os.getenv("ES_HOST", "http://localhost:9200"),
@@ -53,6 +57,7 @@ SEARCH_CONFIG = {
     "SearchLogsMinShouldMatch": os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "90%"),
     "SearchLogsMinSimilarity":  float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.9")),
     "MinWordLength":            int(os.getenv("ES_MIN_WORD_LENGTH", "0")),
+    "FilterMinShouldMatch":     get_bool_value(os.getenv("FILTER_MIN_SHOULD_MATCH", "true")),
 }
 
 

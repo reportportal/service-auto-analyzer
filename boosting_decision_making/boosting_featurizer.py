@@ -26,6 +26,8 @@ class BoostingFeaturizer:
 
     def __init__(self, all_results, config, feature_ids):
         self.config = config
+        if "filter_min_should_match" in self.config and self.config["filter_min_should_match"]:
+            all_results = self.filter_by_min_should_match(all_results)
         self.all_results = self.normalize_results(all_results)
         self.scores_by_issue_type = None
 
@@ -42,35 +44,33 @@ class BoostingFeaturizer:
             8: (self._calculate_max_score_and_pos, {"return_val_name": "max_score_global_percent"}),
             9: (self._calculate_percent_issue_types, {}),
             10: (self._calculate_query_terms_percent,
-                 {"field_name": "message", "log_field": "log_message"}),
+                 {"field_name": "message"}),
             11: (self._calculate_similarity_percent,
-                 {"field_name": "message", "log_field": "log_message"}),
+                 {"field_name": "message"}),
             13: (self._calculate_similarity_percent,
-                 {"field_name": "merged_small_logs", "log_field": "merged_small_logs"}),
+                 {"field_name": "merged_small_logs"}),
             14: (self._has_test_item_several_logs, {}),
             15: (self._has_query_several_logs, {}),
             16: (self._calculate_query_terms_percent,
-                 {"field_name": "message", "log_field": "log_message"}),
+                 {"field_name": "message"}),
             17: (self._calculate_query_terms_percent,
-                 {"field_name": "merged_small_logs", "log_field": "merged_small_logs"}),
+                 {"field_name": "merged_small_logs"}),
             18: (self._calculate_similarity_percent,
-                 {"field_name": "detected_message", "log_field": "detected_message"}),
+                 {"field_name": "detected_message"}),
             19: (self._calculate_similarity_percent,
-                 {"field_name": "detected_message_with_numbers",
-                  "log_field": "detected_message_with_numbers"}),
+                 {"field_name": "detected_message_with_numbers"}),
             20: (self._calculate_query_terms_percent,
-                 {"field_name": "detected_message", "log_field": "detected_message"}),
+                 {"field_name": "detected_message"}),
             21: (self._calculate_query_terms_percent,
-                 {"field_name": "detected_message_with_numbers",
-                  "log_field": "detected_message_with_numbers"}),
+                 {"field_name": "detected_message_with_numbers"}),
             22: (self._calculate_query_terms_percent,
-                 {"field_name": "stacktrace", "log_field": "stacktrace"}),
+                 {"field_name": "stacktrace"}),
             23: (self._calculate_similarity_percent,
-                 {"field_name": "stacktrace", "log_field": "stacktrace"}),
+                 {"field_name": "stacktrace"}),
             24: (self._calculate_query_terms_percent,
-                 {"field_name": "only_numbers", "log_field": "only_numbers"}),
+                 {"field_name": "only_numbers"}),
             25: (self._calculate_similarity_percent,
-                 {"field_name": "only_numbers", "log_field": "only_numbers"}),
+                 {"field_name": "only_numbers"}),
             26: (self._calculate_max_score_and_pos, {"return_val_name": "max_score", "scaled": True}),
             27: (self._calculate_min_score_and_pos, {"return_val_name": "min_score", "scaled": True}),
             28: (self._calculate_percent_count_items_and_mean,
@@ -81,6 +81,97 @@ class BoostingFeaturizer:
             self.feature_ids = utils.transform_string_feature_range_into_list(feature_ids)
         else:
             self.feature_ids = feature_ids
+
+    def filter_by_min_should_match(self, all_results):
+        all_results = self.calculate_sim_percent_logs(all_results)
+        new_results = []
+        for log, res in all_results:
+            new_elastic_res = []
+            for elastic_res in res["hits"]["hits"]:
+                if elastic_res["similarity"] >= self.config["min_should_match"]:
+                    new_elastic_res.append(elastic_res)
+            if len(new_elastic_res) > 0:
+                new_results.append((log, {"hits": {"hits": new_elastic_res}}))
+        return new_results
+
+    def calculate_sim_percent_logs(self, all_results):
+        all_results_similarity = {}
+        rearranged_items = []
+        for log, res in all_results:
+            for elastic_res in res["hits"]["hits"]:
+                rearranged_items.append((elastic_res["_id"], log, elastic_res))
+
+        all_messages, messages_to_check, all_results_similarity =\
+            self._prepare_message_for_similarity_check(rearranged_items,
+                                                       "message",
+                                                       for_filter=True)
+
+        calculated_similarity = self._calculate_similarity(all_messages, messages_to_check)
+        for key, val in calculated_similarity.items():
+            all_results_similarity[key] = val
+
+        for log, elastic_res in all_results:
+            for res in elastic_res["hits"]["hits"]:
+                res["similarity"] = all_results_similarity[res["_id"]]
+        return all_results
+
+    def _calculate_similarity(self, all_messages, messages_to_check):
+        if len(all_messages) > 0:
+            all_results_similarity = {}
+            vectorizer = CountVectorizer(binary=True, analyzer="word", token_pattern="[^ ]+")
+            count_vector_matrix = vectorizer.fit_transform(all_messages)
+            for res_id in messages_to_check:
+                indices_to_check = messages_to_check[res_id]
+                all_results_similarity[res_id] =\
+                    round(float(cosine_similarity(count_vector_matrix[indices_to_check[0]],
+                          count_vector_matrix[indices_to_check[1]])), 3)
+            return all_results_similarity
+        return {}
+
+    def _prepare_message_for_similarity_check(self, items, field_name, for_filter=False):
+        all_results_similarity = {}
+        messages_to_check = {}
+        all_messages = []
+        message_index = 0
+        log_message_index = {}
+        for group_id, log, elastic_res in items:
+            min_word_length = self.config["min_word_length"] if "min_word_length" in self.config else 0
+
+            all_message_words = " ".join(utils.split_words(elastic_res["_source"][field_name],
+                                         min_word_length=min_word_length))
+            all_log_query_words = " ".join(utils.split_words(log["_source"][field_name],
+                                           min_word_length=min_word_length))
+            if for_filter:
+                elastic_res["similarity_field"] = field_name
+            if all_message_words.strip() == "" and all_log_query_words.strip() == "":
+                if for_filter:
+                    all_message_words = " ".join(utils.split_words(
+                        elastic_res["_source"]["merged_small_logs"],
+                        min_word_length=min_word_length))
+                    all_log_query_words = " ".join(utils.split_words(
+                        log["_source"]["merged_small_logs"],
+                        min_word_length=min_word_length))
+                    elastic_res["similarity_field"] = "merged_small_logs"
+                else:
+                    all_results_similarity[group_id] = 1.0
+            if all_message_words.strip() == "" or all_log_query_words.strip() == "":
+                if group_id not in all_results_similarity:
+                    all_results_similarity[group_id] = 0.0
+            else:
+                new_message_ind = message_index
+                all_messages.append(all_message_words)
+                message_index += 1
+
+                log_message_index_in_array = message_index
+                if log["_id"] not in log_message_index:
+                    all_messages.append(all_log_query_words)
+                    log_message_index[log["_id"]] = log_message_index_in_array
+                    message_index += 1
+                else:
+                    log_message_index_in_array =\
+                        log_message_index[log["_id"]]
+                messages_to_check[group_id] = [new_message_ind, log_message_index_in_array]
+        return all_messages, messages_to_check, all_results_similarity
 
     def _calculate_percent_issue_types(self):
         scores_by_issue_type = self._calculate_score()
@@ -95,7 +186,7 @@ class BoostingFeaturizer:
         has_several_logs_by_type = {}
         for issue_type in scores_by_issue_type:
             merged_small_logs =\
-                scores_by_issue_type[issue_type]["merged_small_logs"]
+                scores_by_issue_type[issue_type]["mrHit"]["_source"]["merged_small_logs"]
             has_several_logs_by_type[issue_type] = int(merged_small_logs.strip() != "")
         return has_several_logs_by_type
 
@@ -103,7 +194,8 @@ class BoostingFeaturizer:
         scores_by_issue_type = self.find_most_relevant_by_type()
         has_several_logs_by_type = {}
         for issue_type in scores_by_issue_type:
-            merged_small_logs = scores_by_issue_type[issue_type]["merged_small_logs"]
+            merged_small_logs =\
+                scores_by_issue_type[issue_type]["compared_log"]["_source"]["merged_small_logs"]
             has_several_logs_by_type[issue_type] = int(merged_small_logs.strip() != "")
         return has_several_logs_by_type
 
@@ -118,22 +210,13 @@ class BoostingFeaturizer:
                 if issue_type not in self.scores_by_issue_type:
                     self.scores_by_issue_type[issue_type] = {
                         "mrHit": hit,
-                        "log_message": log["_source"]["message"],
-                        "merged_small_logs": log["_source"]["merged_small_logs"],
-                        "detected_message": log["_source"]["detected_message"],
-                        "log_id": log["_id"],
+                        "compared_log": log,
                         "score": 0}
 
                 issue_type_item = self.scores_by_issue_type[issue_type]
                 if hit["_score"] > issue_type_item["mrHit"]["_score"]:
                     self.scores_by_issue_type[issue_type]["mrHit"] = hit
-                    self.scores_by_issue_type[issue_type]["log_message"] =\
-                        log["_source"]["message"]
-                    self.scores_by_issue_type[issue_type]["merged_small_logs"] =\
-                        log["_source"]["merged_small_logs"]
-                    self.scores_by_issue_type[issue_type]["detected_message"] =\
-                        log["_source"]["detected_message"]
-                    self.scores_by_issue_type[issue_type]["log_id"] = log["_id"]
+                    self.scores_by_issue_type[issue_type]["compared_log"] = log
 
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
@@ -239,68 +322,42 @@ class BoostingFeaturizer:
             all_results.append((log, es_results["hits"]["hits"]))
         return all_results
 
-    def _calculate_query_terms_percent(self, field_name="message", log_field="log_message"):
+    def _calculate_query_terms_percent(self, field_name="message"):
         scores_by_issue_type = self.find_most_relevant_by_type()
         query_terms_percent_by_type = {}
         for issue_type in scores_by_issue_type:
             all_query_words = utils.find_query_words_count_from_explanation(
                 scores_by_issue_type[issue_type]["mrHit"], field_name=field_name)
 
-            all_log_words = utils.split_words(scores_by_issue_type[issue_type][log_field])
+            all_log_words = utils.split_words(
+                scores_by_issue_type[issue_type]["compared_log"]["_source"][field_name])
 
             if len(all_log_words) == 0:
                 query_terms_percent_by_type[issue_type] = 1.0
             else:
                 terms_percent = min(len(all_query_words) / len(all_log_words), 1.0)
-                query_terms_percent_by_type[issue_type] = round((
+                query_terms_percent_by_type[issue_type] = (
                     terms_percent if len(all_log_words) <= self.config["max_query_terms"]
-                    else len(all_query_words) / self.config["max_query_terms"]), 3)
+                    else len(all_query_words) / self.config["max_query_terms"])
         return query_terms_percent_by_type
 
-    def _calculate_similarity_percent(self, field_name="message", log_field="log_message"):
+    def _calculate_similarity_percent(self, field_name="message"):
         scores_by_issue_type = self.find_most_relevant_by_type()
-        similarity_percent_by_type = {}
-        messages_to_check = {}
-        all_messages = []
-        message_index = 0
-        log_message_index = {}
+        rearranged_items = []
         for issue_type in scores_by_issue_type:
-            min_word_length = self.config["min_word_length"]\
-                if "min_word_length" in self.config else 0
-            similar_message = scores_by_issue_type[issue_type]["mrHit"]["_source"][field_name]
-            all_message_words = " ".join(utils.split_words(similar_message,
-                                                           min_word_length=min_word_length))
-            query_message = scores_by_issue_type[issue_type][log_field]
-            all_log_query_words = " ".join(utils.split_words(query_message,
-                                                             min_word_length=min_word_length))
-            if all_message_words.strip() == "" and all_log_query_words.strip() == "":
-                similarity_percent_by_type[issue_type] = 1.0
-            elif all_message_words.strip() == "" or all_log_query_words.strip() == "":
-                similarity_percent_by_type[issue_type] = 0.0
-            else:
-                new_message_ind = message_index
-                all_messages.append(all_message_words)
-                message_index += 1
+            rearranged_items.append((issue_type,
+                                     scores_by_issue_type[issue_type]["compared_log"],
+                                     scores_by_issue_type[issue_type]["mrHit"]))
 
-                log_message_index_in_array = message_index
-                if scores_by_issue_type[issue_type]["log_id"] not in log_message_index:
-                    all_messages.append(all_log_query_words)
-                    log_message_index[scores_by_issue_type[issue_type]["log_id"]] =\
-                        log_message_index_in_array
-                    message_index += 1
-                else:
-                    log_message_index_in_array =\
-                        log_message_index[scores_by_issue_type[issue_type]["log_id"]]
-                messages_to_check[issue_type] = [new_message_ind, log_message_index_in_array]
+        all_messages, messages_to_check, similarity_percent_by_type =\
+            self._prepare_message_for_similarity_check(rearranged_items,
+                                                       field_name,
+                                                       for_filter=False)
 
-        if len(all_messages) > 0:
-            vectorizer = CountVectorizer(binary=True, analyzer="word", token_pattern="[^ ]+")
-            count_vector_matrix = vectorizer.fit_transform(all_messages)
-            for issue_type in messages_to_check:
-                indices_to_check = messages_to_check[issue_type]
-                similarity_percent_by_type[issue_type] =\
-                    round(float(cosine_similarity(count_vector_matrix[indices_to_check[0]],
-                                                  count_vector_matrix[indices_to_check[1]])), 3)
+        calculated_similarity = self._calculate_similarity(all_messages, messages_to_check)
+        for key, val in calculated_similarity.items():
+            similarity_percent_by_type[key] = val
+
         return similarity_percent_by_type
 
     def gather_features_info(self):

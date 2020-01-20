@@ -115,12 +115,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          {"AB001": {"mrHit": {"_score": 158.08437,
                                                         "_id": "1"},
-                                              "log_message": self.get_fixture(
-                                                  self.log_message)["_source"]["message"],
-                                              "merged_small_logs": self.get_fixture(
-                                                  self.log_message)["_source"]["merged_small_logs"],
-                                              "detected_message": self.get_fixture(
-                                                  self.log_message)["_source"]["detected_message"],
+                                              "compared_log": self.get_fixture(self.log_message),
                                               "score": 1.0, },
                                     }
             },
@@ -130,17 +125,11 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          {"AB001": {"mrHit": {"_score": 158.08437,
                                                         "_id": "1"},
-                                              "log_message": self.get_fixture(
-                                                  self.log_message)["_source"]["message"],
+                                              "compared_log": self.get_fixture(self.log_message),
                                               "score": 0.6709, },
                                     "PB001": {"mrHit": {"_score": 77.53298,
                                                         "_id": "2"},
-                                              "log_message": self.get_fixture(
-                                                  self.log_message)["_source"]["message"],
-                                              "merged_small_logs": self.get_fixture(
-                                                  self.log_message)["_source"]["merged_small_logs"],
-                                              "detected_message": self.get_fixture(
-                                                  self.log_message)["_source"]["detected_message"],
+                                              "compared_log": self.get_fixture(self.log_message),
                                               "score": 0.3291, },
                                     }
             },
@@ -152,21 +141,11 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          {"AB001": {"mrHit": {"_score": 158.08437,
                                                         "_id": "1"},
-                                              "log_message": self.get_fixture(
-                                                  self.log_message)["_source"]["message"],
-                                              "merged_small_logs": self.get_fixture(
-                                                  self.log_message)["_source"]["merged_small_logs"],
-                                              "detected_message": self.get_fixture(
-                                                  self.log_message)["_source"]["detected_message"],
+                                              "compared_log": self.get_fixture(self.log_message),
                                               "score": 0.8355, },
                                     "PB001": {"mrHit": {"_score": 77.53298,
                                                         "_id": "2"},
-                                              "log_message": self.get_fixture(
-                                                  self.log_message)["_source"]["message"],
-                                              "merged_small_logs": self.get_fixture(
-                                                  self.log_message)["_source"]["merged_small_logs"],
-                                              "detected_message": self.get_fixture(
-                                                  self.log_message)["_source"]["detected_message"],
+                                              "compared_log": self.get_fixture(self.log_message),
                                               "score": 0.1645, },
                                     }
             },

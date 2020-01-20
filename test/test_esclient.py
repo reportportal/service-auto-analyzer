@@ -53,6 +53,8 @@ class TestEsClient(unittest.TestCase):
         self.launch_wo_test_items = "launch_wo_test_items.json"
         self.launch_w_test_items_wo_logs = "launch_w_test_items_wo_logs.json"
         self.launch_w_test_items_w_logs = "launch_w_test_items_w_logs.json"
+        self.launch_w_test_items_w_logs_filtered =\
+            "launch_w_test_items_w_logs_filtered.json"
         self.launch_w_test_items_w_empty_logs = "launch_w_test_items_w_empty_logs.json"
         self.launch_w_test_items_w_logs_to_be_merged =\
             "launch_w_test_items_w_logs_to_be_merged.json"
@@ -60,6 +62,7 @@ class TestEsClient(unittest.TestCase):
         self.index_logs_rq_big_messages = "index_logs_rq_big_messages.json"
         self.index_logs_rs = "index_logs_rs.json"
         self.search_rq = "search_rq.json"
+        self.search_rq_filtered = "search_rq_filtered.json"
         self.search_rq_another_log = "search_rq_another_log.json"
         self.search_rq_different_logs = "search_rq_different_logs.json"
         self.search_rq_to_be_merged = "search_rq_to_be_merged.json"
@@ -109,6 +112,7 @@ class TestEsClient(unittest.TestCase):
             "SearchLogsMinShouldMatch": "98%",
             "SearchLogsMinSimilarity": 0.9,
             "MinWordLength":  0,
+            "FilterMinShouldMatch": False
         }
 
     def _start_server(self, test_calls):
@@ -864,14 +868,81 @@ class TestEsClient(unittest.TestCase):
                 "expected_issue_type": "AB001",
                 "boost_predict":       ([1, 0], [[0.2, 0.8], [0.7, 0.3]])
             },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/2/_search?explain=true",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(
+                                        self.search_rq_to_be_merged),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.two_hits_search_rs),
+                                    }, ],
+                "index_rq":       TestEsClient.get_fixture(
+                    self.launch_w_test_items_w_logs_to_be_merged),
+                "config": {
+                    "MinShouldMatch": "80%",
+                    "MinTermFreq":    1,
+                    "MinDocFreq":     1,
+                    "BoostAA":        2,
+                    "BoostLaunch":    2,
+                    "BoostUniqueID":  2,
+                    "MaxQueryTerms":  50,
+                    "SearchLogsMinShouldMatch": "98%",
+                    "SearchLogsMinSimilarity": 0.9,
+                    "MinWordLength":  0,
+                    "FilterMinShouldMatch": True
+                },
+                "expected_count": 0,
+                "expected_issue_type": "",
+                "boost_predict":       ([], [])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/2/_search?explain=true",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(
+                                        self.search_rq_filtered),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.two_hits_search_rs),
+                                    }, ],
+                "index_rq":       TestEsClient.get_fixture(
+                    self.launch_w_test_items_w_logs_filtered),
+                "config": {
+                    "MinShouldMatch": "80%",
+                    "MinTermFreq":    1,
+                    "MinDocFreq":     1,
+                    "BoostAA":        2,
+                    "BoostLaunch":    2,
+                    "BoostUniqueID":  2,
+                    "MaxQueryTerms":  50,
+                    "SearchLogsMinShouldMatch": "98%",
+                    "SearchLogsMinSimilarity": 0.9,
+                    "MinWordLength":  0,
+                    "FilterMinShouldMatch": True
+                },
+                "expected_count": 1,
+                "expected_issue_type": "AB001",
+                "boost_predict":       ([1], [[0.2, 0.8]])
+            },
         ]
 
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
-
+                config = TestEsClient.get_default_search_config()\
+                    if "config" not in test else test["config"]
                 es_client = esclient.EsClient(host=self.es_host,
-                                              search_cfg=TestEsClient.get_default_search_config())
+                                              search_cfg=config)
                 _boosting_decision_maker = BoostingDecisionMaker()
                 _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
                 _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])

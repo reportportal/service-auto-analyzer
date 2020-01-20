@@ -147,13 +147,12 @@ def remove_starting_datetime(text, remove_first_digits=False):
 
 def delete_line_numbers(text):
     """Deletes line numbers in the stacktrace"""
-    pattern_part = "|".join([r"(?<=\.%s:)" % ext for ext in file_extensions])
     text = re.sub(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)", r"\g<1>#\g<2>", text)
 
     res = re.sub(r"(?<=:)\d+(?=\)?\]?(\n|\r\n|$))", " ", text)
     res = re.sub(r"((?<=line )|(?<=line))\s*\d+\s*((?=, in)|(?=,in)|(?=\n)|(?=\r\n)|(?=$))",
                  " ", res, flags=re.I)
-    res = re.sub(r"(%s)\s*\d+" % pattern_part, " ", res, flags=re.I)
+    res = re.sub("|".join([r"\.%s" % ext for ext in file_extensions]), " ", res, flags=re.I)
     res = re.sub(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})#(\d+)", r"\g<1>:\g<2>", res)
     return res
 
@@ -175,8 +174,8 @@ def is_python_log(log):
     return False
 
 
-def detect_log_description_and_stacktrace(message, default_log_number=2,
-                                          max_log_lines=10, choose_by_algorythm=False):
+def detect_log_description_and_stacktrace(message, default_log_number=1,
+                                          max_log_lines=5, choose_by_algorythm=True):
     """Split a log into a log message and stacktrace"""
     message = delete_empty_lines(message)
     if default_log_number == -1:
@@ -191,10 +190,11 @@ def detect_log_description_and_stacktrace(message, default_log_number=2,
             if modified_line != line:
                 log_message_lines = idx
                 break
+        if log_message_lines == calculate_line_number(message) or\
+                log_message_lines == -1:
+            log_message_lines = max_log_lines
         if log_message_lines < default_log_number:
             log_message_lines = default_log_number
-        if log_message_lines == calculate_line_number(message):
-            log_message_lines = max_log_lines
         if not choose_by_algorythm:
             if log_message_lines > max_log_lines:
                 log_message_lines = max_log_lines

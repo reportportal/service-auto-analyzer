@@ -143,7 +143,7 @@ class TestEsQuery(unittest.TestCase):
                             "min_term_freq":        1,
                             "minimum_should_match": "5<80%",
                             "max_query_terms":      search_cfg["MaxQueryTerms"],
-                            "boost":                3.0,
+                            "boost":                4.0,
                         }},
                         {"more_like_this": {
                             "fields":               ["only_numbers"],
@@ -152,7 +152,7 @@ class TestEsQuery(unittest.TestCase):
                             "min_term_freq":        1,
                             "minimum_should_match": "1",
                             "max_query_terms":      search_cfg["MaxQueryTerms"],
-                            "boost":                3.0,
+                            "boost":                4.0,
                         }},
                     ],
                 },

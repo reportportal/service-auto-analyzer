@@ -235,7 +235,7 @@ class EsClient:
 
         detected_message, stacktrace = utils.detect_log_description_and_stacktrace(
             cleaned_message,
-            default_log_number=2,
+            default_log_number=1,
             choose_by_algorythm=True)
 
         detected_message_with_numbers = utils.remove_starting_datetime(detected_message)
@@ -598,7 +598,7 @@ class EsClient:
                                                 min_should_match,
                                                 log["_source"]["message"],
                                                 field_name="message",
-                                                boost=(3.0 if log_lines != -1 else 2.0)))
+                                                boost=(4.0 if log_lines != -1 else 2.0)))
             query["query"]["bool"]["should"].append(
                 self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
                                                 "80%",
@@ -610,7 +610,7 @@ class EsClient:
                                                 "80%",
                                                 log["_source"]["detected_message"],
                                                 field_name="detected_message",
-                                                boost=(3.0 if log_lines == -1 else 2.0)))
+                                                boost=(4.0 if log_lines == -1 else 2.0)))
             if log_lines != -1:
                 query["query"]["bool"]["should"].append(
                     self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
@@ -622,7 +622,7 @@ class EsClient:
                                                 "1",
                                                 log["_source"]["only_numbers"],
                                                 field_name="only_numbers",
-                                                boost=3.0,
+                                                boost=4.0,
                                                 override_min_should_match="1"))
         else:
             query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})

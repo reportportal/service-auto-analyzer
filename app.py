@@ -16,6 +16,8 @@
 
 import logging
 import logging.config
+from signal import signal, SIGINT
+from sys import exit
 import os
 import threading
 import time
@@ -68,35 +70,11 @@ def create_thread(func, args):
     return thread
 
 
-class ThreadConnectionAwaiter(threading.Thread):
-    """ThreadConnectionAwaiter waits for amqp connection establishment"""
-    def __init__(self):
-        threading.Thread.__init__(self)
-        self.num_of_retries = 10
-        self.client = None
-        self.daemon = True
-
-    def run(self):
-        """ThreadConnectionAwaiter starts to wait for amqp connection establishment"""
-        self.num_of_retries = 10
-        while True:
-            try:
-                self.client = create_ampq_client()
-                break
-            except Exception as err:
-                self.num_of_retries -= 1
-                logger.error("Amqp connection was not established. %d tries are left",
-                             self.num_of_retries)
-                logger.error(err)
-                if self.num_of_retries <= 0:
-                    break
-                time.sleep(10)
-
-
 def create_ampq_client():
     """Creates AMQP client"""
     amqp_full_url = "{}/{}?heartbeat=600".format(APP_CONFIG["amqpUrl"], APP_CONFIG["exchangeName"])\
         if "heartbeat" not in APP_CONFIG["amqpUrl"] else APP_CONFIG["amqpUrl"]
+    logger.info("Try connect to %s" % amqp_full_url)
     return AmqpClient(pika.BlockingConnection(
         pika.connection.URLParameters(amqp_full_url)))
 
@@ -104,7 +82,6 @@ def create_ampq_client():
 def create_es_client():
     """Creates Elasticsearch client"""
     _es_client = EsClient(APP_CONFIG["esHost"], SEARCH_CONFIG)
-    print(os.getenv("BOOST_MODEL_FOLDER"))
     decision_maker = boosting_decision_maker.BoostingDecisionMaker(APP_CONFIG["boostModelFolder"])
     _es_client.set_boosting_decision_maker(decision_maker)
     return _es_client
@@ -198,20 +175,27 @@ version = read_version()
 application = create_application()
 CORS(application)
 
-program_initialized = False
 
-logger.info("Starting waiting for AMQP connection")
-amqp_connection_awaiter = ThreadConnectionAwaiter()
-amqp_connection_awaiter.start()
-amqp_connection_awaiter.join()
-if amqp_connection_awaiter.client is not None:
-    amqp_client = amqp_connection_awaiter.client
-    init_amqp(amqp_client, create_es_client())
-    program_initialized = True
-else:
-    logger.error("Amqp connection was not established")
+def handler(signal_received, frame):
+    print('The analyzer has stopped')
+    exit(0)
+
 
 if __name__ == '__main__':
-    if program_initialized:
-        logger.info("Analyzer has started")
-        application.run(host="0.0.0.0", port=5002)
+    signal(SIGINT, handler)
+    while True:
+        try:
+            logger.info("Starting waiting for AMQP connection")
+            try:
+                amqp_client = create_ampq_client()
+            except Exception as err:
+                logger.error("Amqp connection was not established")
+                logger.error(err)
+                time.sleep(10)
+                continue
+            init_amqp(amqp_client, create_es_client())
+            logger.info("Analyzer has started")
+            application.run(host="0.0.0.0", port=5002)
+        except Exception as err:
+            logger.error("The analyzer has failed")
+            logger.error(err)

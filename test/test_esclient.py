@@ -302,6 +302,10 @@ class TestEsClient(unittest.TestCase):
         tests = [
             {
                 "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":         httpretty.GET,
                                     "uri":            "/1/_search",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
@@ -352,19 +356,8 @@ class TestEsClient(unittest.TestCase):
             },
             {
                 "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/2/_search",
+                                    "uri":            "/2",
                                     "status":         HTTPStatus.NOT_FOUND,
-                                    "content_type":   "application/json",
-                                    "rq":             TestEsClient.get_fixture(
-                                        self.search_not_merged_logs_for_delete),
-                                    "rs":             TestEsClient.get_fixture(
-                                        self.no_hits_search_rs),
-                                    },
-                                   {"method":         httpretty.POST,
-                                    "uri":            "/_bulk?refresh=wait_for",
-                                    "status":         HTTPStatus.NOT_FOUND,
-                                    "content_type":   "application/json",
-                                    "rs":             TestEsClient.get_fixture(self.delete_logs_rs),
                                     }, ],
                 "rq":             launch_objects.CleanIndex(ids=[1], project=2),
                 "has_errors":     True,
@@ -392,6 +385,10 @@ class TestEsClient(unittest.TestCase):
         tests = [
             {
                 "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":         httpretty.GET,
                                     "uri":            "/1/_search",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
@@ -409,7 +406,10 @@ class TestEsClient(unittest.TestCase):
                 "expected_count": 0
             },
             {
-                "test_calls":     [],
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.OK,
+                                    }, ],
                 "rq":             launch_objects.SearchLogs(launchId=1,
                                                             launchName="Launch 1",
                                                             itemId=3,
@@ -421,6 +421,10 @@ class TestEsClient(unittest.TestCase):
             },
             {
                 "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":         httpretty.GET,
                                     "uri":            "/1/_search",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
@@ -439,6 +443,10 @@ class TestEsClient(unittest.TestCase):
             },
             {
                 "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":         httpretty.GET,
                                     "uri":            "/1/_search",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
@@ -640,14 +648,20 @@ class TestEsClient(unittest.TestCase):
         """Test analyzing logs"""
         tests = [
             {
-                "test_calls":          [],
+                "test_calls":          [{"method":         httpretty.GET,
+                                         "uri":            "/1",
+                                         "status":         HTTPStatus.OK,
+                                         }, ],
                 "index_rq":            TestEsClient.get_fixture(self.launch_wo_test_items),
                 "expected_count":      0,
                 "expected_issue_type": "",
                 "boost_predict":       ([], [])
             },
             {
-                "test_calls":          [],
+                "test_calls":          [{"method":         httpretty.GET,
+                                         "uri":            "/1",
+                                         "status":         HTTPStatus.OK,
+                                         }, ],
                 "index_rq":            TestEsClient.get_fixture(
                     self.launch_w_test_items_wo_logs),
                 "expected_count":      0,
@@ -655,7 +669,10 @@ class TestEsClient(unittest.TestCase):
                 "boost_predict":       ([], [])
             },
             {
-                "test_calls":          [],
+                "test_calls":          [{"method":         httpretty.GET,
+                                         "uri":            "/2",
+                                         "status":         HTTPStatus.OK,
+                                         }, ],
                 "index_rq":            TestEsClient.get_fixture(
                     self.launch_w_test_items_w_empty_logs),
                 "expected_count":      0,
@@ -663,7 +680,11 @@ class TestEsClient(unittest.TestCase):
                 "boost_predict":       ([], [])
             },
             {
-                "test_calls":     [{"method":       httpretty.GET,
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
                                     "uri":          "/2/_search?explain=true",
                                     "status":       HTTPStatus.OK,
                                     "content_type": "application/json",
@@ -686,7 +707,21 @@ class TestEsClient(unittest.TestCase):
                 "boost_predict":       ([], [])
             },
             {
-                "test_calls":     [{"method":       httpretty.GET,
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.NOT_FOUND,
+                                    }, ],
+                "index_rq":       TestEsClient.get_fixture(self.launch_w_test_items_w_logs),
+                "expected_count":      0,
+                "expected_issue_type": "",
+                "boost_predict":       ([], [])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
                                     "uri":          "/2/_search?explain=true",
                                     "status":       HTTPStatus.OK,
                                     "content_type": "application/json",
@@ -709,7 +744,11 @@ class TestEsClient(unittest.TestCase):
                 "boost_predict":       ([1], [[0.2, 0.8]])
             },
             {
-                "test_calls":     [{"method":       httpretty.GET,
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
                                     "uri":          "/2/_search?explain=true",
                                     "status":       HTTPStatus.OK,
                                     "content_type": "application/json",
@@ -732,7 +771,11 @@ class TestEsClient(unittest.TestCase):
                 "boost_predict":       ([1, 0], [[0.2, 0.8], [0.7, 0.3]])
             },
             {
-                "test_calls":     [{"method":       httpretty.GET,
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
                                     "uri":          "/2/_search?explain=true",
                                     "status":       HTTPStatus.OK,
                                     "content_type": "application/json",
@@ -755,7 +798,11 @@ class TestEsClient(unittest.TestCase):
                 "boost_predict":       ([1, 1], [[0.2, 0.8], [0.3, 0.7]])
             },
             {
-                "test_calls":     [{"method":      httpretty.GET,
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":      httpretty.GET,
                                     "uri":          "/2/_search?explain=true",
                                     "status":       HTTPStatus.OK,
                                     "content_type": "application/json",
@@ -778,7 +825,11 @@ class TestEsClient(unittest.TestCase):
                 "boost_predict":       ([0, 1], [[0.8, 0.2], [0.3, 0.7]])
             },
             {
-                "test_calls":     [{"method":       httpretty.GET,
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
                                     "uri":          "/2/_search?explain=true",
                                     "status":       HTTPStatus.OK,
                                     "content_type": "application/json",
@@ -794,7 +845,11 @@ class TestEsClient(unittest.TestCase):
                 "boost_predict":       ([1, 0], [[0.2, 0.8], [0.7, 0.3]])
             },
             {
-                "test_calls":     [{"method":       httpretty.GET,
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
                                     "uri":          "/2/_search?explain=true",
                                     "status":       HTTPStatus.OK,
                                     "content_type": "application/json",

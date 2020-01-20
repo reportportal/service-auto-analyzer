@@ -422,6 +422,8 @@ class EsClient:
         """Delete logs from elasticsearch"""
         logger.debug("Delete logs %s for the project %s",
                      clean_index.ids, clean_index.project)
+        if not self.index_exists(clean_index.project):
+            return commons.launch_objects.BulkResponse(took=0, errors=True)
         test_item_ids = set()
         try:
             all_logs = self.es_client.search(index=clean_index.project,
@@ -496,6 +498,8 @@ class EsClient:
         """Get all logs similar to given logs"""
         keys = set()
         logger.debug("Started searching by request %s", search_req.json())
+        if not self.index_exists(str(search_req.projectId)):
+            return []
         for message in search_req.logMessages:
             if message.strip() == "":
                 continue
@@ -660,6 +664,8 @@ class EsClient:
         results = []
 
         for launch in launches:
+            if not self.index_exists(str(launch.project)):
+                continue
             for test_item in launch.testItems:
                 elastic_results = self._get_elasticsearch_results_for_test_items(launch,
                                                                                  test_item)

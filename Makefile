@@ -22,9 +22,9 @@ checkstyle: venv
 	${PYTHON} -m flake8
 
 release: $(VENV_NAME)/bin/activate
-	${PYTHON} -m bumpversion --new-version ${v} build
+	${PYTHON} -m bumpversion --new-version ${v} build --tag --tag_name "v${v}"
 	${PYTHON} -m bumpversion patch --no-tag
-	git push origin master --tags
+	git push origin master "v${v}"
 
 build-release: venv
 	${PYTHON} -m bumpversion --new-version ${v} build

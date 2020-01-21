@@ -42,7 +42,7 @@ class TestItem(BaseModel):
     isAutoAnalyzed: bool
     issueType: str = ""
     originalIssueType: str = ""
-    startTime: datetime = datetime.now()
+    startTime: List[int] = list(datetime.now().timetuple())[:7]
     testCaseHash: int = 0
     logs: List[Log] = []
 

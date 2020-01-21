@@ -29,6 +29,8 @@ import commons.launch_objects
 from commons.launch_objects import AnalysisResult
 import utils.utils as utils
 from boosting_decision_making import boosting_featurizer
+from time import time
+from datetime import datetime
 
 ERROR_LOGGING_LEVEL = 40000
 
@@ -204,7 +206,8 @@ class EsClient:
 
     def index_logs(self, launches):
         """Index launches to the index with project name"""
-        logger.debug("Indexing logs for %d launches", len(launches))
+        logger.info("Indexing logs for %d launches", len(launches))
+        t_start = time()
         bodies = []
         test_item_ids = []
         project = None
@@ -223,9 +226,10 @@ class EsClient:
                     logs_added = True
                 if logs_added:
                     test_item_ids.append(str(test_item.testItemId))
-        result = self._bulk_index(bodies)
+        result = self._bulk_index(bodies, refresh=False)
         result = self._merge_logs(test_item_ids, project)
-        logger.debug("Finished indexing logs for %d launches", len(launches))
+        logger.info("Finished indexing logs for %d launches. It took %.2f sec.",
+                    len(launches), time() - t_start)
         return result
 
     def _prepare_log(self, launch, test_item, log):
@@ -264,7 +268,7 @@ class EsClient:
                     utils.split_words(log.message, split_urls=False)),
                 "message":          message,
                 "is_merged":        False,
-                "start_time":       test_item.startTime.strftime("%Y-%m-%d %H:%M:%S"),
+                "start_time":       datetime(*test_item.startTime[:6]).strftime("%Y-%m-%d %H:%M:%S"),
                 "merged_small_logs":  "",
                 "detected_message": detected_message,
                 "detected_message_with_numbers": detected_message_with_numbers,
@@ -291,7 +295,7 @@ class EsClient:
                 merged_logs = EsClient.decompose_logs_merged_and_without_duplicates(
                     test_items_dict[test_item_id])
                 bodies.extend(merged_logs)
-        return self._bulk_index(bodies)
+        return self._bulk_index(bodies, refresh=True)
 
     def _delete_merged_logs(self, test_items_to_delete, project):
         logger.debug("Delete merged logs for %d test items", len(test_items_to_delete))
@@ -310,7 +314,7 @@ class EsClient:
                     "_index": project,
                 })
         if len(bodies) > 0:
-            self._bulk_index(bodies)
+            self._bulk_index(bodies, refresh=False)
 
     @staticmethod
     def get_test_item_query(test_item_ids, is_merged):
@@ -404,14 +408,14 @@ class EsClient:
             merged_log["_source"][field] = ""
         return merged_log
 
-    def _bulk_index(self, bodies):
+    def _bulk_index(self, bodies, refresh=True):
         logger.debug("Indexing %d logs...", len(bodies))
         try:
             success_count, errors = elasticsearch.helpers.bulk(self.es_client,
                                                                bodies,
                                                                chunk_size=1000,
                                                                request_timeout=30,
-                                                               refresh=True)
+                                                               refresh=refresh)
 
             logger.debug("Processed %d logs", success_count)
             if len(errors) > 0:
@@ -424,8 +428,9 @@ class EsClient:
 
     def delete_logs(self, clean_index):
         """Delete logs from elasticsearch"""
-        logger.debug("Delete logs %s for the project %s",
-                     clean_index.ids, clean_index.project)
+        logger.info("Delete logs %s for the project %s",
+                    clean_index.ids, clean_index.project)
+        t_start = time()
         if not self.index_exists(clean_index.project):
             return commons.launch_objects.BulkResponse(took=0, errors=True)
         test_item_ids = set()
@@ -446,10 +451,10 @@ class EsClient:
                 "_id":      _id,
                 "_index":   clean_index.project,
             })
-        result = self._bulk_index(bodies)
+        result = self._bulk_index(bodies, refresh=False)
         self._merge_logs(list(test_item_ids), clean_index.project)
-        logger.debug("Finished deleting logs %s for the project %s",
-                     clean_index.ids, clean_index.project)
+        logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
+                    clean_index.ids, clean_index.project, time() - t_start)
         return result
 
     @staticmethod
@@ -501,7 +506,8 @@ class EsClient:
     def search_logs(self, search_req):
         """Get all logs similar to given logs"""
         keys = set()
-        logger.debug("Started searching by request %s", search_req.json())
+        logger.info("Started searching by request %s", search_req.json())
+        t_start = time()
         if not self.index_exists(str(search_req.projectId)):
             return []
         for message in search_req.logMessages:
@@ -529,8 +535,8 @@ class EsClient:
                 except Exception as err:
                     logger.error("Id %s is not integer", result["_id"])
                     logger.error(err)
-        logger.debug("Finished searching by request %s with %d results",
-                     search_req.json(), len(keys))
+        logger.info("Finished searching by request %s with %d results. It took %.2f sec.",
+                    search_req.json(), len(keys), time() - t_start)
         return list(keys)
 
     @staticmethod
@@ -654,10 +660,12 @@ class EsClient:
                 continue
 
             query = self.build_analyze_query(launch, test_item.uniqueId, log)
-            logger.debug("Searched log %s", log)
+            logger.debug("ES query %s", query)
 
+            t = time()
             res = self.es_client.search(index=str(launch.project), body=query, explain=True)
-            logger.debug("Results from Elasticsearch: %d results", len(res["hits"]["hits"]))
+            logger.debug("Results from Elasticsearch: %d results. It took %.2f sec.",
+                         len(res["hits"]["hits"]), time() - t)
             for elastic_res in res["hits"]["hits"]:
                 logger.debug("Id %s; Index %s; Score %s",
                              elastic_res["_id"], elastic_res["_index"], elastic_res["_score"])
@@ -667,12 +675,13 @@ class EsClient:
 
     def choose_fields_to_filter(self, filter_min_should_match, log_lines):
         if filter_min_should_match:
-            return ["detected_message", "message"] if log_lines == -1 else ["message"]
+            return ["detected_message"] if log_lines == -1 else ["message"]
         return []
 
     def analyze_logs(self, launches):
         """Analyze launches"""
-        logger.debug("Started analysis for %d launches", len(launches))
+        logger.info("Started analysis for %d launches", len(launches))
+        t_start = time()
         results = []
 
         for launch in launches:
@@ -680,8 +689,12 @@ class EsClient:
                 continue
             for test_item in launch.testItems:
                 chosen_log_lines = launch.analyzerConfig.numberOfLogLines
+                t = time()
                 elastic_results = self._get_elasticsearch_results_for_test_items(launch,
                                                                                  test_item)
+                logger.debug("Searched ES for test_item %s for %.2f sec.", test_item.testItemId,
+                             time() - t)
+                t = time()
                 boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
                     elastic_results,
                     {
@@ -696,7 +709,8 @@ class EsClient:
                     feature_ids=self.boosting_decision_maker.get_feature_ids())
                 feature_data, issue_type_names =\
                     boosting_data_gatherer.gather_features_info()
-
+                logger.debug("Gathered boosting features for test_item %s for %.2f sec.",
+                             test_item.testItemId, time() - t)
                 if len(feature_data) > 0:
 
                     predicted_labels, predicted_labels_probability =\
@@ -746,6 +760,6 @@ class EsClient:
                         logger.debug("Test item %s has no relevant items", test_item.testItemId)
                 else:
                     logger.debug("There are no results for test item ", test_item.testItemId)
-        logger.debug("Finished analysis for %d launches with %d results",
-                     len(launches), len(results))
+        logger.info("Finished analysis for %d launches with %d results. It took %.2f sec.",
+                    len(launches), len(results), time() - t_start)
         return results

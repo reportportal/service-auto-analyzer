@@ -7,7 +7,7 @@
             "uniqueId": "unique1",
             "testItemId": 1,
             "issueType": "ti001",
-            "startTime": "2020-01-15 10:57:43",
+            "startTime": [2020,1,15,10,57,43],
             "isAutoAnalyzed": false,
             "logs": [
                 {

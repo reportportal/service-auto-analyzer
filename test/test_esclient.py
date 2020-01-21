@@ -319,7 +319,7 @@ class TestEsClient(unittest.TestCase):
                                         self.one_hit_search_rs),
                                     },
                                    {"method":         httpretty.POST,
-                                    "uri":            "/_bulk?refresh=true",
+                                    "uri":            "/_bulk?refresh=false",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rs":             TestEsClient.get_fixture(
@@ -334,7 +334,7 @@ class TestEsClient(unittest.TestCase):
                                         self.one_hit_search_rs),
                                     },
                                    {"method":         httpretty.POST,
-                                    "uri":            "/_bulk?refresh=true",
+                                    "uri":            "/_bulk?refresh=false",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rs":             TestEsClient.get_fixture(self.delete_logs_rs),
@@ -528,7 +528,7 @@ class TestEsClient(unittest.TestCase):
                                         self.index_created_rs),
                                     },
                                    {"method":         httpretty.POST,
-                                    "uri":            "/_bulk?refresh=true",
+                                    "uri":            "/_bulk?refresh=false",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rq":             TestEsClient.get_fixture(
@@ -546,7 +546,7 @@ class TestEsClient(unittest.TestCase):
                                         self.two_hits_search_with_big_messages_rs),
                                     },
                                    {"method":         httpretty.POST,
-                                    "uri":            "/_bulk?refresh=true",
+                                    "uri":            "/_bulk?refresh=false",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rs":             TestEsClient.get_fixture(
@@ -586,7 +586,7 @@ class TestEsClient(unittest.TestCase):
                                         self.index_created_rs),
                                     },
                                    {"method":         httpretty.POST,
-                                    "uri":            "/_bulk?refresh=true",
+                                    "uri":            "/_bulk?refresh=false",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rq":             TestEsClient.get_fixture(
@@ -603,7 +603,7 @@ class TestEsClient(unittest.TestCase):
                                         self.one_hit_search_rs),
                                     },
                                    {"method":         httpretty.POST,
-                                    "uri":            "/_bulk?refresh=true",
+                                    "uri":            "/_bulk?refresh=false",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rs":             TestEsClient.get_fixture(self.delete_logs_rs),

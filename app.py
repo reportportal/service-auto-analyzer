@@ -186,10 +186,11 @@ def handler(signal_received, frame):
     exit(0)
 
 
-if __name__ == '__main__':
-    signal(SIGINT, handler)
-    while True:
-        try:
+signal(SIGINT, handler)
+ampq_connected = False
+while True:
+    try:
+        if not ampq_connected:
             logger.info("Starting waiting for AMQP connection")
             try:
                 amqp_client = create_ampq_client()
@@ -199,8 +200,10 @@ if __name__ == '__main__':
                 time.sleep(10)
                 continue
             init_amqp(amqp_client, create_es_client())
+            ampq_connected = True
             logger.info("Analyzer has started")
-            application.run(host="0.0.0.0", port=5002)
-        except Exception as err:
-            logger.error("The analyzer has failed")
-            logger.error(err)
+            # application.run(host="0.0.0.0", port=5002)
+    except Exception as err:
+        logger.error("The analyzer has failed")
+        logger.error(err)
+        ampq_connected = False

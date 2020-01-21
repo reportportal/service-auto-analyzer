@@ -411,7 +411,7 @@ class EsClient:
                                                                bodies,
                                                                chunk_size=1000,
                                                                request_timeout=30,
-                                                               refresh='wait_for')
+                                                               refresh=True)
 
             logger.debug("Processed %d logs", success_count)
             if len(errors) > 0:
@@ -665,6 +665,11 @@ class EsClient:
             full_results.append((log, res))
         return full_results
 
+    def choose_fields_to_filter(self, filter_min_should_match, log_lines):
+        if filter_min_should_match:
+            return ["detected_message", "message"] if log_lines == -1 else ["message"]
+        return []
+
     def analyze_logs(self, launches):
         """Analyze launches"""
         logger.debug("Started analysis for %d launches", len(launches))
@@ -674,6 +679,7 @@ class EsClient:
             if not self.index_exists(str(launch.project)):
                 continue
             for test_item in launch.testItems:
+                chosen_log_lines = launch.analyzerConfig.numberOfLogLines
                 elastic_results = self._get_elasticsearch_results_for_test_items(launch,
                                                                                  test_item)
                 boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
@@ -684,7 +690,8 @@ class EsClient:
                         if launch.analyzerConfig.minShouldMatch > 0 else
                         float(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0)) / 100,
                         "min_word_length": self.search_cfg["MinWordLength"],
-                        "filter_min_should_match": self.search_cfg["FilterMinShouldMatch"]
+                        "filter_min_should_match": self.choose_fields_to_filter(
+                            self.search_cfg["FilterMinShouldMatch"], chosen_log_lines)
                     },
                     feature_ids=self.boosting_decision_maker.get_feature_ids())
                 feature_data, issue_type_names =\

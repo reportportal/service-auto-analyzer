@@ -57,7 +57,7 @@ class TestBoostingModel(unittest.TestCase):
             "max_query_terms":  50,
             "min_should_match": 0.8,
             "min_word_length":  0,
-            "filter_min_should_match": True
+            "filter_min_should_match": ["detected_message", "message"]
         }
 
     @staticmethod

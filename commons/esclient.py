@@ -23,7 +23,8 @@ import copy
 import requests
 import elasticsearch
 import elasticsearch.helpers
-from sklearn.metrics.pairwise import cosine_similarity
+from scipy import spatial
+import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 import commons.launch_objects
 from commons.launch_objects import AnalysisResult
@@ -526,8 +527,9 @@ class EsClient:
                                                  analyzer="word",
                                                  token_pattern="[^ ]+")
                     count_vector_matrix = vectorizer.fit_transform([msg_words, log_query_words])
-                    similarity_percent = float(cosine_similarity(count_vector_matrix[0],
-                                                                 count_vector_matrix[1]))
+                    similarity_percent = round(1 - spatial.distance.cosine(
+                        np.asarray(count_vector_matrix[0].toarray()),
+                        np.asarray(count_vector_matrix[1].toarray())), 3)
                     logger.debug("Log with id %s has %.3f similarity with the log '%s'",
                                  log_id, similarity_percent, message)
                     if similarity_percent >= self.search_cfg["SearchLogsMinSimilarity"]:
@@ -666,16 +668,16 @@ class EsClient:
             res = self.es_client.search(index=str(launch.project), body=query)
             logger.debug("Results from Elasticsearch: %d results. It took %.2f sec.",
                          len(res["hits"]["hits"]), time() - t)
-            # for elastic_res in res["hits"]["hits"]:
-            #    logger.debug("Id %s; Index %s; Score %s",
-            #                 elastic_res["_id"], elastic_res["_index"], elastic_res["_score"])
-            #    logger.debug("Result all fields %s", elastic_res["_source"])
+            for elastic_res in res["hits"]["hits"]:
+                logger.debug("Id %s; Index %s; Score %s",
+                             elastic_res["_id"], elastic_res["_index"], elastic_res["_score"])
+                logger.debug("Result all fields %s", elastic_res["_source"])
             full_results.append((log, res))
         return full_results
 
     def choose_fields_to_filter(self, filter_min_should_match, log_lines):
         if filter_min_should_match:
-            return ["detected_message"] if log_lines == -1 else ["message"]
+            return ["detected_message", "message"] if log_lines == -1 else ["message"]
         return []
 
     def analyze_logs(self, launches):
@@ -716,7 +718,7 @@ class EsClient:
                     predicted_labels, predicted_labels_probability =\
                         self.boosting_decision_maker.predict(feature_data)
 
-                    """for i in range(len(issue_type_names)):
+                    for i in range(len(issue_type_names)):
                         logger.debug("Most relevant item with issue type %s has id %s",
                                      issue_type_names[i],
                                      boosting_data_gatherer.
@@ -729,7 +731,7 @@ class EsClient:
                                      issue_type_names[i],
                                      predicted_labels[i],
                                      predicted_labels_probability[i][1],
-                                     feature_data[i])"""
+                                     feature_data[i])
 
                     predicted_issue_type = ""
                     max_val = 0.0

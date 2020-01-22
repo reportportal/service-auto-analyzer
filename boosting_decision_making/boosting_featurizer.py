@@ -15,9 +15,11 @@
 """
 
 from utils import utils
-from sklearn.metrics.pairwise import cosine_similarity
+from scipy import spatial
+import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 import logging
+from threading import Thread
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
@@ -26,6 +28,7 @@ class BoostingFeaturizer:
 
     def __init__(self, all_results, config, feature_ids):
         self.config = config
+        self.prepare_word_vectors(all_results)
         if "filter_min_should_match" in self.config:
             for field in self.config["filter_min_should_match"]:
                 all_results = self.filter_by_min_should_match(all_results, field=field)
@@ -69,6 +72,56 @@ class BoostingFeaturizer:
         else:
             self.feature_ids = feature_ids
 
+    class CountVectorizerThread(Thread):
+        def __init__(self, fields, all_results, min_word_length):
+            Thread.__init__(self)
+            self.fields = fields
+            self.min_word_length = min_word_length
+            self.all_results = all_results
+            self.dict_count_vectorizer = {}
+            self.all_text_field_ids = {}
+
+        def run(self):
+            for field in self.fields:
+                log_field_ids = {}
+                index_in_message_array = 0
+                count_vector_matrix = None
+                all_messages = []
+                for log, res in self.all_results:
+                    for obj in [log] + res["hits"]["hits"]:
+                        if obj["_id"] not in log_field_ids:
+                            text = " ".join(utils.split_words(obj["_source"][field],
+                                            min_word_length=self.min_word_length))
+                            if text.strip() == "":
+                                log_field_ids[obj["_id"]] = -1
+                            else:
+                                all_messages.append(text)
+                                log_field_ids[obj["_id"]] = index_in_message_array
+                                index_in_message_array += 1
+                if len(all_messages) > 0:
+                    vectorizer = CountVectorizer(binary=True, analyzer="word", token_pattern="[^ ]+")
+                    count_vector_matrix = vectorizer.fit_transform(all_messages)
+                self.all_text_field_ids[field] = log_field_ids
+                self.dict_count_vectorizer[field] = count_vector_matrix
+
+    @utils.ignore_warnings
+    def prepare_word_vectors(self, all_results):
+        self.all_text_field_ids = {}
+        self.dict_count_vectorizer = {}
+        min_word_length = self.config["min_word_length"] if "min_word_length" in self.config else 0
+        threads = []
+        for fields in [["message", "detected_message", "detected_message_with_numbers"],
+                       ["merged_small_logs", "stacktrace", "only_numbers"]]:
+            thread = BoostingFeaturizer.CountVectorizerThread(fields, all_results, min_word_length)
+            threads.append(thread)
+            thread.start()
+        for thread in threads:
+            thread.join()
+        for thread in threads:
+            for field in thread.fields:
+                self.all_text_field_ids[field] = thread.all_text_field_ids[field]
+                self.dict_count_vectorizer[field] = thread.dict_count_vectorizer[field]
+
     def filter_by_min_should_match(self, all_results, field="message"):
         all_results = self.calculate_sim_percent_logs(all_results, field=field)
         new_results = []
@@ -84,45 +137,24 @@ class BoostingFeaturizer:
         return new_results
 
     def calculate_sim_percent_logs(self, all_results, field="message"):
-        all_results_similarity = {}
         rearranged_items = []
         for log, res in all_results:
             for elastic_res in res["hits"]["hits"]:
-                rearranged_items.append((elastic_res["_id"], log, elastic_res))
+                rearranged_items.append(((elastic_res["_id"], log["_id"]), log, elastic_res))
 
-        all_messages, messages_to_check, all_results_similarity, sim_field_dict =\
-            self._prepare_message_for_similarity_check(rearranged_items,
-                                                       field,
-                                                       for_filter=True)
-
-        calculated_similarity = self._calculate_similarity(all_messages, messages_to_check)
-        for key, val in calculated_similarity.items():
-            all_results_similarity[key] = val
+        all_results_similarity, sim_field_dict =\
+            self._calculate_field_similarity(rearranged_items,
+                                             field,
+                                             for_filter=True)
 
         for log, elastic_res in all_results:
             for res in elastic_res["hits"]["hits"]:
-                res[sim_field_dict[res["_id"]]] = all_results_similarity[res["_id"]]
+                group_id = (res["_id"], log["_id"])
+                res[sim_field_dict[group_id]] = all_results_similarity[group_id]
         return all_results
 
-    def _calculate_similarity(self, all_messages, messages_to_check):
-        if len(all_messages) > 0:
-            all_results_similarity = {}
-            vectorizer = CountVectorizer(binary=True, analyzer="word", token_pattern="[^ ]+")
-            count_vector_matrix = vectorizer.fit_transform(all_messages)
-            for res_id in messages_to_check:
-                indices_to_check = messages_to_check[res_id]
-                all_results_similarity[res_id] =\
-                    round(float(cosine_similarity(count_vector_matrix[indices_to_check[0]],
-                          count_vector_matrix[indices_to_check[1]])), 3)
-            return all_results_similarity
-        return {}
-
-    def _prepare_message_for_similarity_check(self, items, field_name, for_filter=False):
+    def _calculate_field_similarity(self, items, field_name, for_filter=False):
         all_results_similarity = {}
-        messages_to_check = {}
-        all_messages = []
-        message_index = 0
-        log_message_index = {}
         sim_field_dict = {}
         for group_id, log, elastic_res in items:
             sim_field = "similarity_%s" % field_name
@@ -130,44 +162,29 @@ class BoostingFeaturizer:
             if sim_field in elastic_res:
                 all_results_similarity[group_id] = elastic_res[sim_field]
                 continue
-            min_word_length = self.config["min_word_length"] if "min_word_length" in self.config else 0
-
-            all_message_words = " ".join(utils.split_words(elastic_res["_source"][field_name],
-                                         min_word_length=min_word_length))
-            all_log_query_words = " ".join(utils.split_words(log["_source"][field_name],
-                                           min_word_length=min_word_length))
-
-            if all_message_words.strip() == "" and all_log_query_words.strip() == "":
+            index_query_message = self.all_text_field_ids[field_name][log["_id"]]
+            index_log_message = self.all_text_field_ids[field_name][elastic_res["_id"]]
+            if index_query_message < 0 and index_log_message < 0:
                 if for_filter:
-                    all_message_words = " ".join(utils.split_words(
-                        elastic_res["_source"]["merged_small_logs"],
-                        min_word_length=min_word_length))
-                    all_log_query_words = " ".join(utils.split_words(
-                        log["_source"]["merged_small_logs"],
-                        min_word_length=min_word_length))
+                    index_query_message = self.all_text_field_ids["merged_small_logs"][log["_id"]]
+                    index_log_message = self.all_text_field_ids["merged_small_logs"][elastic_res["_id"]]
                     sim_field = "similarity_merged_small_logs"
                 else:
                     all_results_similarity[group_id] = 1.0
             sim_field_dict[group_id] = sim_field
 
-            if all_message_words.strip() == "" or all_log_query_words.strip() == "":
+            if index_query_message < 0 or index_log_message < 0:
                 if group_id not in all_results_similarity:
                     all_results_similarity[group_id] = 0.0
             else:
-                new_message_ind = message_index
-                all_messages.append(all_message_words)
-                message_index += 1
+                all_results_similarity[group_id] =\
+                    round(1 - spatial.distance.cosine(
+                        np.asarray(
+                            self.dict_count_vectorizer[field_name][index_query_message][0].toarray()),
+                        np.asarray(
+                            self.dict_count_vectorizer[field_name][index_log_message][0].toarray())), 3)
 
-                log_message_index_in_array = message_index
-                if log["_id"] not in log_message_index:
-                    all_messages.append(all_log_query_words)
-                    log_message_index[log["_id"]] = log_message_index_in_array
-                    message_index += 1
-                else:
-                    log_message_index_in_array =\
-                        log_message_index[log["_id"]]
-                messages_to_check[group_id] = [new_message_ind, log_message_index_in_array]
-        return all_messages, messages_to_check, all_results_similarity, sim_field_dict
+        return all_results_similarity, sim_field_dict
 
     def _calculate_percent_issue_types(self):
         scores_by_issue_type = self._calculate_score()
@@ -345,17 +362,14 @@ class BoostingFeaturizer:
                                      scores_by_issue_type[issue_type]["compared_log"],
                                      scores_by_issue_type[issue_type]["mrHit"]))
 
-        all_messages, messages_to_check, similarity_percent_by_type, sim_field_dict =\
-            self._prepare_message_for_similarity_check(rearranged_items,
-                                                       field_name,
-                                                       for_filter=False)
-
-        calculated_similarity = self._calculate_similarity(all_messages, messages_to_check)
-        for key, val in calculated_similarity.items():
-            similarity_percent_by_type[key] = val
+        similarity_percent_by_type, sim_field_dict =\
+            self._calculate_field_similarity(rearranged_items,
+                                             field_name,
+                                             for_filter=False)
 
         return similarity_percent_by_type
 
+    @utils.ignore_warnings
     def gather_features_info(self):
         """Gather all features from feature_ids for a test item"""
         gathered_data = []

@@ -23,7 +23,8 @@ import copy
 import requests
 import elasticsearch
 import elasticsearch.helpers
-from sklearn.metrics.pairwise import cosine_similarity
+from scipy import spatial
+import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 import commons.launch_objects
 from commons.launch_objects import AnalysisResult
@@ -226,7 +227,7 @@ class EsClient:
                     logs_added = True
                 if logs_added:
                     test_item_ids.append(str(test_item.testItemId))
-        result = self._bulk_index(bodies, refresh=False)
+        result = self._bulk_index(bodies)
         result = self._merge_logs(test_item_ids, project)
         logger.info("Finished indexing logs for %d launches. It took %.2f sec.",
                     len(launches), time() - t_start)
@@ -295,7 +296,7 @@ class EsClient:
                 merged_logs = EsClient.decompose_logs_merged_and_without_duplicates(
                     test_items_dict[test_item_id])
                 bodies.extend(merged_logs)
-        return self._bulk_index(bodies, refresh=True)
+        return self._bulk_index(bodies)
 
     def _delete_merged_logs(self, test_items_to_delete, project):
         logger.debug("Delete merged logs for %d test items", len(test_items_to_delete))
@@ -314,7 +315,7 @@ class EsClient:
                     "_index": project,
                 })
         if len(bodies) > 0:
-            self._bulk_index(bodies, refresh=False)
+            self._bulk_index(bodies)
 
     @staticmethod
     def get_test_item_query(test_item_ids, is_merged):
@@ -451,7 +452,7 @@ class EsClient:
                 "_id":      _id,
                 "_index":   clean_index.project,
             })
-        result = self._bulk_index(bodies, refresh=False)
+        result = self._bulk_index(bodies)
         self._merge_logs(list(test_item_ids), clean_index.project)
         logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
                     clean_index.ids, clean_index.project, time() - t_start)
@@ -526,8 +527,9 @@ class EsClient:
                                                  analyzer="word",
                                                  token_pattern="[^ ]+")
                     count_vector_matrix = vectorizer.fit_transform([msg_words, log_query_words])
-                    similarity_percent = float(cosine_similarity(count_vector_matrix[0],
-                                                                 count_vector_matrix[1]))
+                    similarity_percent = round(1 - spatial.distance.cosine(
+                        np.asarray(count_vector_matrix[0].toarray()),
+                        np.asarray(count_vector_matrix[1].toarray())), 3)
                     logger.debug("Log with id %s has %.3f similarity with the log '%s'",
                                  log_id, similarity_percent, message)
                     if similarity_percent >= self.search_cfg["SearchLogsMinSimilarity"]:
@@ -663,7 +665,7 @@ class EsClient:
             logger.debug("ES query %s", query)
 
             t = time()
-            res = self.es_client.search(index=str(launch.project), body=query, explain=True)
+            res = self.es_client.search(index=str(launch.project), body=query)
             logger.debug("Results from Elasticsearch: %d results. It took %.2f sec.",
                          len(res["hits"]["hits"]), time() - t)
             for elastic_res in res["hits"]["hits"]:
@@ -675,7 +677,7 @@ class EsClient:
 
     def choose_fields_to_filter(self, filter_min_should_match, log_lines):
         if filter_min_should_match:
-            return ["detected_message"] if log_lines == -1 else ["message"]
+            return ["detected_message", "message"] if log_lines == -1 else ["message"]
         return []
 
     def analyze_logs(self, launches):
@@ -759,7 +761,7 @@ class EsClient:
                     else:
                         logger.debug("Test item %s has no relevant items", test_item.testItemId)
                 else:
-                    logger.debug("There are no results for test item ", test_item.testItemId)
+                    logger.debug("There are no results for test item %s", test_item.testItemId)
         logger.info("Finished analysis for %d launches with %d results. It took %.2f sec.",
                     len(launches), len(results), time() - t_start)
         return results

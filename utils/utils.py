@@ -20,9 +20,21 @@ import nltk
 import logging
 from dateutil.parser import parse
 import urllib
+import warnings
 
 logger = logging.getLogger("analyzerApp.utils")
 file_extensions = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
+stopwords = set(nltk.corpus.stopwords.words("english"))
+
+
+def ignore_warnings(method):
+    """Decorator for ignoring warnings"""
+    def _inner(*args, **kwargs):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            result = method(*args, **kwargs)
+        return result
+    return _inner
 
 
 def sanitize_text(text):
@@ -58,7 +70,6 @@ def reverse_log(log):
 def split_words(text, min_word_length=0, only_unique=True, split_urls=True):
     all_unique_words = set()
     all_words = []
-    stopwords = set(nltk.corpus.stopwords.words("english"))
     replace_symbols = r"[<>\{:,!?\}\[\];=\(\)\'\"]|\.\.\."
     text = re.sub(replace_symbols, " ", text)
     res = text.split()

@@ -29,7 +29,10 @@
                     "start_time": "2020-01-15 10:57:43",
                     "unique_id": "unique1",
                     "detected_message": "Message AB",
-                    "merged_small_logs": ""
+                    "detected_message_with_numbers": "Message AB",
+                    "only_numbers": "Message AB",
+                    "merged_small_logs": "",
+                    "stacktrace": ""
                 }
             }
         ]

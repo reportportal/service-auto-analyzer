@@ -28,6 +28,9 @@
                     "test_item": 1,
                     "unique_id": "unique1",
                     "detected_message": "Message AB",
+                    "detected_message_with_numbers": "Message AB",
+                    "only_numbers": "",
+                    "stacktrace": "",
                     "start_time": "2020-01-15 10:57:43",
                     "merged_small_logs": ""
                 }
@@ -47,6 +50,9 @@
                     "test_item": 1,
                     "unique_id": "unique1",
                     "detected_message": "Message PB",
+                    "detected_message_with_numbers": "Message PB",
+                    "only_numbers": "",
+                    "stacktrace": "",
                     "start_time": "2020-01-15 10:57:43",
                     "merged_small_logs": ""
                 }

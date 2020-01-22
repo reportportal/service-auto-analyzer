@@ -17,32 +17,23 @@
 import unittest
 import sure # noqa
 import logging
-import warnings
 
 import commons.launch_objects as launch_objects
 import commons.esclient as esclient
-
-
-def ignore_warnings(method):
-    """Decorator for ignoring warnings"""
-    def _inner(*args, **kwargs):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            result = method(*args, **kwargs)
-        return result
-    return _inner
+from utils import utils
 
 
 class TestEsQuery(unittest.TestCase):
     """Tests building analyze query"""
-
+    @utils.ignore_warnings
     def setUp(self):
         logging.disable(logging.CRITICAL)
 
+    @utils.ignore_warnings
     def tearDown(self):
         logging.disable(logging.DEBUG)
 
-    @ignore_warnings
+    @utils.ignore_warnings
     def test_build_analyze_query(self):
         """Tests building analyze query"""
         search_cfg = {
@@ -80,6 +71,7 @@ class TestEsQuery(unittest.TestCase):
         query_from_esclient.should.equal(demo_query)
 
     @staticmethod
+    @utils.ignore_warnings
     def build_demo_query(search_cfg, launch_name,
                          unique_id, log, error_logging_level):
         """Build demo analyze query"""
@@ -166,7 +158,7 @@ class TestEsQuery(unittest.TestCase):
             },
         }
 
-    @ignore_warnings
+    @utils.ignore_warnings
     def test_build_search_query(self):
         """Tests building analyze query"""
         search_cfg = {
@@ -196,6 +188,7 @@ class TestEsQuery(unittest.TestCase):
         query_from_esclient.should.equal(demo_query)
 
     @staticmethod
+    @utils.ignore_warnings
     def build_demo_search_query(search_cfg, search_req, message, error_logging_level):
         """Build search query"""
         return {"query": {

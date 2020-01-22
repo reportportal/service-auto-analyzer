@@ -16,28 +16,18 @@
 
 import unittest
 import logging
-import warnings
 import os
 import json
 import sure # noqa
 import numpy as np
 from boosting_decision_making.boosting_featurizer import BoostingFeaturizer
 from boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
-
-
-def ignore_warnings(method):
-    """Decorator for ignoring warnings"""
-    def _inner(*args, **kwargs):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            result = method(*args, **kwargs)
-        return result
-    return _inner
+from utils import utils
 
 
 class TestBoostingModel(unittest.TestCase):
     """Tests boosting model prediction functionality"""
-
+    @utils.ignore_warnings
     def setUp(self):
         self.one_hit_search_rs_explained = "one_hit_search_rs_explained.json"
         self.two_hits_search_rs_explained = "two_hits_search_rs_explained.json"
@@ -47,10 +37,12 @@ class TestBoostingModel(unittest.TestCase):
         self.boost_model_folder = os.getenv("BOOST_MODEL_FOLDER")
         logging.disable(logging.CRITICAL)
 
+    @utils.ignore_warnings
     def tearDown(self):
         logging.disable(logging.DEBUG)
 
     @staticmethod
+    @utils.ignore_warnings
     def get_default_config():
         """Get default config"""
         return {
@@ -61,12 +53,13 @@ class TestBoostingModel(unittest.TestCase):
         }
 
     @staticmethod
+    @utils.ignore_warnings
     def get_fixture(fixture_name, jsonify=True):
         """Read fixture from file"""
         with open(os.path.join("fixtures", fixture_name), "r") as file:
             return file.read() if not jsonify else json.loads(file.read())
 
-    @ignore_warnings
+    @utils.ignore_warnings
     def test_random_run(self):
         print("Boost model folder: ", self.boost_model_folder)
         decision_maker = BoostingDecisionMaker(self.boost_model_folder)
@@ -76,7 +69,7 @@ class TestBoostingModel(unittest.TestCase):
         result.should.have.length_of(test_data_size)
         result_probability.should.have.length_of(test_data_size)
 
-    @ignore_warnings
+    @utils.ignore_warnings
     def test_full_data_check(self):
         print("Boost model folder: ", self.boost_model_folder)
         decision_maker = BoostingDecisionMaker(self.boost_model_folder)

@@ -1,5 +1,5 @@
 IMAGE_NAME=reportportal/service-auto-analyzer$(IMAGE_POSTFIX)
-IMAGE_NAME_DEV=reportportal-dev-5-1/service-auto-analyzer
+IMAGE_NAME_DEV=reportportal-dev/service-auto-analyzer
 IMAGE_NAME_TEST=reportportal/service-auto-analyzer_test
 
 VENV_NAME?=venv

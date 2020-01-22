@@ -663,13 +663,13 @@ class EsClient:
             logger.debug("ES query %s", query)
 
             t = time()
-            res = self.es_client.search(index=str(launch.project), body=query, explain=True)
+            res = self.es_client.search(index=str(launch.project), body=query)
             logger.debug("Results from Elasticsearch: %d results. It took %.2f sec.",
                          len(res["hits"]["hits"]), time() - t)
-            for elastic_res in res["hits"]["hits"]:
-                logger.debug("Id %s; Index %s; Score %s",
-                             elastic_res["_id"], elastic_res["_index"], elastic_res["_score"])
-                logger.debug("Result all fields %s", elastic_res["_source"])
+            # for elastic_res in res["hits"]["hits"]:
+            #    logger.debug("Id %s; Index %s; Score %s",
+            #                 elastic_res["_id"], elastic_res["_index"], elastic_res["_score"])
+            #    logger.debug("Result all fields %s", elastic_res["_source"])
             full_results.append((log, res))
         return full_results
 
@@ -716,7 +716,7 @@ class EsClient:
                     predicted_labels, predicted_labels_probability =\
                         self.boosting_decision_maker.predict(feature_data)
 
-                    for i in range(len(issue_type_names)):
+                    """for i in range(len(issue_type_names)):
                         logger.debug("Most relevant item with issue type %s has id %s",
                                      issue_type_names[i],
                                      boosting_data_gatherer.
@@ -729,7 +729,7 @@ class EsClient:
                                      issue_type_names[i],
                                      predicted_labels[i],
                                      predicted_labels_probability[i][1],
-                                     feature_data[i])
+                                     feature_data[i])"""
 
                     predicted_issue_type = ""
                     max_val = 0.0
@@ -759,7 +759,7 @@ class EsClient:
                     else:
                         logger.debug("Test item %s has no relevant items", test_item.testItemId)
                 else:
-                    logger.debug("There are no results for test item ", test_item.testItemId)
+                    logger.debug("There are no results for test item %s", test_item.testItemId)
         logger.info("Finished analysis for %d launches with %d results. It took %.2f sec.",
                     len(launches), len(results), time() - t_start)
         return results

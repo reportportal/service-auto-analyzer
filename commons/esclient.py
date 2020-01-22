@@ -226,7 +226,7 @@ class EsClient:
                     logs_added = True
                 if logs_added:
                     test_item_ids.append(str(test_item.testItemId))
-        result = self._bulk_index(bodies, refresh=False)
+        result = self._bulk_index(bodies)
         result = self._merge_logs(test_item_ids, project)
         logger.info("Finished indexing logs for %d launches. It took %.2f sec.",
                     len(launches), time() - t_start)
@@ -295,7 +295,7 @@ class EsClient:
                 merged_logs = EsClient.decompose_logs_merged_and_without_duplicates(
                     test_items_dict[test_item_id])
                 bodies.extend(merged_logs)
-        return self._bulk_index(bodies, refresh=True)
+        return self._bulk_index(bodies)
 
     def _delete_merged_logs(self, test_items_to_delete, project):
         logger.debug("Delete merged logs for %d test items", len(test_items_to_delete))
@@ -314,7 +314,7 @@ class EsClient:
                     "_index": project,
                 })
         if len(bodies) > 0:
-            self._bulk_index(bodies, refresh=False)
+            self._bulk_index(bodies)
 
     @staticmethod
     def get_test_item_query(test_item_ids, is_merged):
@@ -451,7 +451,7 @@ class EsClient:
                 "_id":      _id,
                 "_index":   clean_index.project,
             })
-        result = self._bulk_index(bodies, refresh=False)
+        result = self._bulk_index(bodies)
         self._merge_logs(list(test_item_ids), clean_index.project)
         logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
                     clean_index.ids, clean_index.project, time() - t_start)

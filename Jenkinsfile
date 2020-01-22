@@ -23,7 +23,7 @@ node {
                         """
         }
         stage('Deploy Container') {
-            sh "docker-compose up -f $COMPOSE_FILE_RP_5_1 -p reportportal51 -d --force-recreate analyzer"
+            sh "docker-compose -f $COMPOSE_FILE_RP_5_1 -p reportportal51 up -d --force-recreate analyzer"
         }
     }
 }

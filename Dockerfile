@@ -1,26 +1,25 @@
 FROM python:3.7.4
 
 RUN apt-get update && apt-get install -y build-essential
-ARG version
-ARG prod
+RUN mkdir /backend/
+WORKDIR /backend/
 
-ADD requirements.txt /requirements.txt
+ADD requirements.txt requirements.txt
 
 RUN python -m venv /venv \
     && /venv/bin/pip install -U pip \
-    && LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "/venv/bin/pip install --no-cache-dir -r /requirements.txt"
+    && LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "/venv/bin/pip install --no-cache-dir -r requirements.txt"
 
 RUN touch /venv/bin/activate
 RUN /venv/bin/python3 -m nltk.downloader stopwords
 
-WORKDIR /backend/
-
+ARG version
+ARG prod
 ENV BOOST_MODEL_FOLDER="/backend/model/0.5"
 
 COPY ./ ./
 
 RUN make test-all
-
 RUN if ["$prod" = "true"] ; then make release v=$version ; else make build-release v=$version ; fi
 
 # Multistage
@@ -47,4 +46,5 @@ ENV PYTHONPATH="/backend"
 ENV BOOST_MODEL_FOLDER="/backend/model/0.5"
 
 # Start uWSGI
-CMD ["/venv/bin/uwsgi", "--http-auto-chunked", "--http-keepalive"]
+#CMD ["/venv/bin/uwsgi", "--http-auto-chunked", "--http-keepalive"]
+CMD ["/venv/bin/uwsgi"]

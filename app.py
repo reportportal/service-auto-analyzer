@@ -174,6 +174,12 @@ def read_version():
 
 log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.conf')
 logging.config.fileConfig(log_file_path)
+if APP_CONFIG["logLevel"].lower() == "debug":
+    logging.disable(logging.NOTSET)
+elif APP_CONFIG["logLevel"].lower() == "info":
+    logging.disable(logging.DEBUG)
+else:
+    logging.disable(logging.INFO)
 logger = logging.getLogger("analyzerApp")
 version = read_version()
 

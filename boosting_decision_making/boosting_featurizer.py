@@ -175,7 +175,7 @@ class BoostingFeaturizer:
                     all_results_similarity[group_id] = 1.0
             sim_field_dict[group_id] = sim_field
 
-            if index_query_message < 0 or index_query_message < 0:
+            if index_query_message < 0 or index_log_message < 0:
                 if group_id not in all_results_similarity:
                     all_results_similarity[group_id] = 0.0
             else:

@@ -35,11 +35,5 @@ build-image-dev:
 build-image:
 	docker build -t "$(IMAGE_NAME)" --build-arg version=${v} --build-arg prod="true" -f Dockerfile .
 
-build-image-test:
-	docker build -t "$(IMAGE_NAME_TEST)" -f DockerfileTest .
-
-run-test:
-	docker run --rm "$(IMAGE_NAME_TEST)"
-
 test-all: checkstyle test
 

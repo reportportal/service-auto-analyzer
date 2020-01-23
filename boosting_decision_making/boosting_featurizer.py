@@ -158,31 +158,33 @@ class BoostingFeaturizer:
         sim_field_dict = {}
         for group_id, log, elastic_res in items:
             sim_field = "similarity_%s" % field_name
+            field_to_check = field_name
 
             if sim_field in elastic_res:
                 all_results_similarity[group_id] = elastic_res[sim_field]
                 continue
-            index_query_message = self.all_text_field_ids[field_name][log["_id"]]
-            index_log_message = self.all_text_field_ids[field_name][elastic_res["_id"]]
+            index_query_message = self.all_text_field_ids[field_to_check][log["_id"]]
+            index_log_message = self.all_text_field_ids[field_to_check][elastic_res["_id"]]
             if index_query_message < 0 and index_log_message < 0:
                 if for_filter:
                     index_query_message = self.all_text_field_ids["merged_small_logs"][log["_id"]]
                     index_log_message = self.all_text_field_ids["merged_small_logs"][elastic_res["_id"]]
                     sim_field = "similarity_merged_small_logs"
+                    field_to_check = "merged_small_logs"
                 else:
                     all_results_similarity[group_id] = 1.0
             sim_field_dict[group_id] = sim_field
 
-            if index_query_message < 0 or index_log_message < 0:
+            if index_query_message < 0 or index_query_message < 0:
                 if group_id not in all_results_similarity:
                     all_results_similarity[group_id] = 0.0
             else:
                 all_results_similarity[group_id] =\
                     round(1 - spatial.distance.cosine(
                         np.asarray(
-                            self.dict_count_vectorizer[field_name][index_query_message][0].toarray()),
+                            self.dict_count_vectorizer[field_to_check][index_query_message][0].toarray()),
                         np.asarray(
-                            self.dict_count_vectorizer[field_name][index_log_message][0].toarray())), 3)
+                            self.dict_count_vectorizer[field_to_check][index_log_message][0].toarray())), 3)
 
         return all_results_similarity, sim_field_dict
 

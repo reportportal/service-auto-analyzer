@@ -9,12 +9,6 @@ node {
     }
 
     docker.withServer("$DOCKER_HOST") {
-        stage('Test Docker Image') {
-            sh """
-                            make build-image-test
-                            make run-test
-                        """
-        }
         stage('Build Docker Image') {
             sh """
                             MAJOR_VER=\$(cat VERSION)

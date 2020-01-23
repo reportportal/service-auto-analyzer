@@ -34,7 +34,7 @@ COPY --from=0 /root/nltk_data /root/nltk_data/
 WORKDIR /backend/
 
 COPY . .
-COPY --from=0 VERSION .bumpversion.cfg ./
+COPY --from=0 /backend/VERSION /backend/.bumpversion.cfg ./
 
 # uWSGI will listen on this port
 EXPOSE 5000

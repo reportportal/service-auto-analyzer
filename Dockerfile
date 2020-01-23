@@ -13,11 +13,13 @@ RUN python -m venv /venv \
 RUN touch /venv/bin/activate
 RUN /venv/bin/python3 -m nltk.downloader stopwords
 
+WORKDIR /backend/
+
 ENV BOOST_MODEL_FOLDER="/backend/model/0.5"
 
 COPY ./ ./
 
-CMD ["make", "test-all"]
+RUN make test-all
 
 RUN if ["$prod" = "true"] ; then make release v=$version ; else make build-release v=$version ; fi
 

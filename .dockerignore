@@ -2,8 +2,6 @@
 **/*.pyc
 **/env/
 **/venv/
-**/test/
-**/fixtures/
 .bumpversion.cgf
 .git/
 .gitignore

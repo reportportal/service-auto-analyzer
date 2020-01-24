@@ -1,0 +1,60 @@
+{
+    "took": 13,
+    "timed_out": false,
+    "_shards": {
+        "total": 1,
+        "successful": 1,
+        "failed": 0
+    },
+    "hits": {
+        "total": {
+            "value": 2,
+            "relation": "eq"
+        },
+        "max_score": 158.08437,
+        "hits": [
+            {
+                "_index": "idx2",
+                "_type": "log",
+                "_id": "1",
+                "_score": 158.08437,
+                "_source": {
+                    "issue_type": "AB001",
+                    "launch_name": "Launch 1",
+                    "log_level": 40000,
+                    "original_message_lines": 2,
+                    "original_message_words_number": 6,
+                    "message": "",
+                    "test_item": 1,
+                    "unique_id": "unique1",
+                    "merged_small_logs": "report portal returned error found screenshot",
+                    "detected_message": "",
+                    "stacktrace": "",
+                    "detected_message_with_numbers": "",
+                    "only_numbers": ""
+                }
+            },
+            {
+                "_index": "idx2",
+                "_type": "log",
+                "_id": "2",
+                "_score": 77.53298,
+                "_source": {
+                    "issue_type": "PB001",
+                    "launch_name": "Launch 1",
+                    "log_level": 40000,
+                    "original_message_lines": 2,
+                    "original_message_words_number": 7,
+                    "message": "",
+                    "test_item": 2,
+                    "unique_id": "unique2",
+                    "merged_small_logs": "report portal returned first assertionerror found screenshot",
+                    "detected_message": "",
+                    "detected_message_with_numbers": "",
+                    "only_numbers": "",
+                    "stacktrace": ""                
+              }
+            }
+        ]
+    }
+}

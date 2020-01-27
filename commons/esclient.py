@@ -480,7 +480,7 @@ class EsClient:
                 "filter": [
                     {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
                     {"exists": {"field": "issue_type"}},
-                    {"term": {"is_merged": True}},
+                    {"term": {"is_merged": False}},
                 ],
                 "must_not": {
                     "term": {"test_item": {"value": search_req.itemId, "boost": 1.0}}
@@ -518,25 +518,34 @@ class EsClient:
             msg_words = " ".join(utils.split_words(sanitized_msg))
             query = self.build_search_query(search_req, sanitized_msg)
             res = self.es_client.search(index=str(search_req.projectId), body=query)
+            messages_by_ids = {}
+            message_index_id = 1
+            all_messages = [msg_words]
 
             for result in res["hits"]["hits"]:
                 try:
                     log_id = int(re.search(r"\d+", result["_id"]).group(0))
-                    log_query_words = " ".join(utils.split_words(result["_source"]["message"]))
-                    vectorizer = CountVectorizer(binary=True,
-                                                 analyzer="word",
-                                                 token_pattern="[^ ]+")
-                    count_vector_matrix = vectorizer.fit_transform([msg_words, log_query_words])
+                    if log_id not in messages_by_ids:
+                        log_query_words = " ".join(utils.split_words(result["_source"]["message"]))
+                        all_messages.append(log_query_words)
+                        messages_by_ids[log_id] = message_index_id
+                        message_index_id += 1
+                except Exception as err:
+                    logger.error("Id %s is not integer", result["_id"])
+                    logger.error(err)
+            if len(all_messages) > 1:
+                vectorizer = CountVectorizer(binary=True,
+                                             analyzer="word",
+                                             token_pattern="[^ ]+")
+                count_vector_matrix = vectorizer.fit_transform(all_messages)
+                for log_id in messages_by_ids:
                     similarity_percent = round(1 - spatial.distance.cosine(
                         np.asarray(count_vector_matrix[0].toarray()),
-                        np.asarray(count_vector_matrix[1].toarray())), 3)
+                        np.asarray(count_vector_matrix[messages_by_ids[log_id]].toarray())), 3)
                     logger.debug("Log with id %s has %.3f similarity with the log '%s'",
                                  log_id, similarity_percent, message)
                     if similarity_percent >= self.search_cfg["SearchLogsMinSimilarity"]:
                         keys.add(log_id)
-                except Exception as err:
-                    logger.error("Id %s is not integer", result["_id"])
-                    logger.error(err)
         logger.info("Finished searching by request %s with %d results. It took %.2f sec.",
                     search_req.json(), len(keys), time() - t_start)
         return list(keys)

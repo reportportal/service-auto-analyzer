@@ -27,7 +27,7 @@ release: install-dependencies
 	git push origin master "v${v}"
 
 build-release: venv
-	${PYTHON} -m bumpversion build --no-commit --no-tag --allow-dirty
+	${PYTHON} -m bumpversion --new-version ${v} build --no-commit --no-tag --allow-dirty
 
 build-image-dev:
 	docker build -t "$(IMAGE_NAME_DEV)" --build-arg version=${v} --build-arg prod="false" -f Dockerfile .

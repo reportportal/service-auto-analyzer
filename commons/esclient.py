@@ -585,6 +585,8 @@ class EsClient:
                          "must_not": [
                              {"wildcard": {"issue_type": "TI*"}},
                              {"wildcard": {"issue_type": "ti*"}},
+                             {"wildcard": {"issue_type": "nd*"}},
+                             {"wildcard": {"issue_type": "ND*"}},
                          ],
                          "must": [],
                          "should": [

@@ -475,34 +475,36 @@ class EsClient:
 
     def build_search_query(self, search_req, message):
         """Build search query"""
-        return {"query": {
-            "bool": {
-                "filter": [
-                    {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
-                    {"exists": {"field": "issue_type"}},
-                    {"term": {"is_merged": False}},
-                ],
-                "must_not": {
-                    "term": {"test_item": {"value": search_req.itemId, "boost": 1.0}}
-                },
-                "must": [
-                    {
-                        "bool": {
-                            "should": [
-                                {"wildcard": {"issue_type": "TI*"}},
-                                {"wildcard": {"issue_type": "ti*"}},
-                            ]
-                        }
+        return {
+            "size": 10000,
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
+                        {"exists": {"field": "issue_type"}},
+                        {"term": {"is_merged": False}},
+                    ],
+                    "must_not": {
+                        "term": {"test_item": {"value": search_req.itemId, "boost": 1.0}}
                     },
-                    {"terms": {"launch_id": search_req.filteredLaunchIds}},
-                    EsClient.
-                    build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                               self.search_cfg["SearchLogsMinShouldMatch"],
-                                               message),
-                ],
-                "should": [
-                    {"term": {"is_auto_analyzed": {"value": "false", "boost": 1.0}}},
-                ]}}}
+                    "must": [
+                        {
+                            "bool": {
+                                "should": [
+                                    {"wildcard": {"issue_type": "TI*"}},
+                                    {"wildcard": {"issue_type": "ti*"}},
+                                ]
+                            }
+                        },
+                        {"terms": {"launch_id": search_req.filteredLaunchIds}},
+                        EsClient.
+                        build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                   self.search_cfg["SearchLogsMinShouldMatch"],
+                                                   message),
+                    ],
+                    "should": [
+                        {"term": {"is_auto_analyzed": {"value": "false", "boost": 1.0}}},
+                    ]}}}
 
     def search_logs(self, search_req):
         """Get all logs similar to given logs"""

@@ -57,6 +57,7 @@ class TestEsQuery(unittest.TestCase):
             "_source": {
                 "unique_id":        "unique",
                 "test_case_hash":   1,
+                "test_item":        123,
                 "message":          "hello world",
                 "merged_small_logs":  "",
                 "detected_message": "hello world",
@@ -91,6 +92,7 @@ class TestEsQuery(unittest.TestCase):
                         {"wildcard": {"issue_type": "ti*"}},
                         {"wildcard": {"issue_type": "nd*"}},
                         {"wildcard": {"issue_type": "ND*"}},
+                        {"term": {"test_item": log["_source"]["test_item"]}}
                     ],
                     "must": [
                         {"more_like_this": {

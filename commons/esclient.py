@@ -589,6 +589,7 @@ class EsClient:
                              {"wildcard": {"issue_type": "ti*"}},
                              {"wildcard": {"issue_type": "nd*"}},
                              {"wildcard": {"issue_type": "ND*"}},
+                             {"term": {"test_item": log["_source"]["test_item"]}}
                          ],
                          "must": [],
                          "should": [

@@ -112,7 +112,7 @@ class TestEsClient(unittest.TestCase):
     @utils.ignore_warnings
     def _start_server(self, test_calls):
         httpretty.reset()
-        httpretty.enable()
+        httpretty.enable(allow_net_connect=False)
         for test_info in test_calls:
             if "content_type" in test_info:
                 httpretty.register_uri(
@@ -306,7 +306,7 @@ class TestEsClient(unittest.TestCase):
                                     "status":         HTTPStatus.OK,
                                     },
                                    {"method":         httpretty.GET,
-                                    "uri":            "/1/_search",
+                                    "uri":            "/1/_search?scroll=5m&size=1000",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rq":             TestEsClient.get_fixture(
@@ -322,7 +322,7 @@ class TestEsClient(unittest.TestCase):
                                         self.delete_logs_rs),
                                     },
                                    {"method":         httpretty.GET,
-                                    "uri":            "/1/_search",
+                                    "uri":            "/1/_search?scroll=5m&size=1000",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rq":             TestEsClient.get_fixture(self.search_merged_logs),
@@ -336,7 +336,7 @@ class TestEsClient(unittest.TestCase):
                                     "rs":             TestEsClient.get_fixture(self.delete_logs_rs),
                                     },
                                    {"method":         httpretty.GET,
-                                    "uri":            "/1/_search",
+                                    "uri":            "/1/_search?scroll=5m&size=1000",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rq":             TestEsClient.get_fixture(self.search_not_merged_logs),
@@ -371,6 +371,8 @@ class TestEsClient(unittest.TestCase):
 
                 es_client = esclient.EsClient(host=self.es_host,
                                               search_cfg=TestEsClient.get_default_search_config())
+                es_client.es_client.scroll = MagicMock(return_value=json.loads(
+                    TestEsClient.get_fixture(self.no_hits_search_rs)))
 
                 response = es_client.delete_logs(test["rq"])
 
@@ -533,7 +535,7 @@ class TestEsClient(unittest.TestCase):
                                         self.index_logs_rs),
                                     },
                                    {"method":         httpretty.GET,
-                                    "uri":            "/2/_search",
+                                    "uri":            "/2/_search?scroll=5m&size=1000",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rq":             TestEsClient.get_fixture(
@@ -549,7 +551,7 @@ class TestEsClient(unittest.TestCase):
                                         self.delete_logs_rs),
                                     },
                                    {"method":         httpretty.GET,
-                                    "uri":            "/2/_search",
+                                    "uri":            "/2/_search?scroll=5m&size=1000",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rq":             TestEsClient.get_fixture(
@@ -591,7 +593,7 @@ class TestEsClient(unittest.TestCase):
                                         self.index_logs_rs_different_log_level),
                                     },
                                    {"method":         httpretty.GET,
-                                    "uri":            "/2/_search",
+                                    "uri":            "/2/_search?scroll=5m&size=1000",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rq":             TestEsClient.get_fixture(self.search_merged_logs),
@@ -605,7 +607,7 @@ class TestEsClient(unittest.TestCase):
                                     "rs":             TestEsClient.get_fixture(self.delete_logs_rs),
                                     },
                                    {"method":         httpretty.GET,
-                                    "uri":            "/2/_search",
+                                    "uri":            "/2/_search?scroll=5m&size=1000",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rq":             TestEsClient.get_fixture(self.search_not_merged_logs),
@@ -634,6 +636,8 @@ class TestEsClient(unittest.TestCase):
 
                 es_client = esclient.EsClient(host=self.es_host,
                                               search_cfg=TestEsClient.get_default_search_config())
+                es_client.es_client.scroll = MagicMock(return_value=json.loads(
+                    TestEsClient.get_fixture(self.no_hits_search_rs)))
                 launches = [launch_objects.Launch(**launch)
                             for launch in json.loads(test["index_rq"])]
                 response = es_client.index_logs(launches)

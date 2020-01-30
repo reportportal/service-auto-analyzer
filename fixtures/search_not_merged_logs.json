@@ -1,1 +1,1 @@
-{"query": {"bool": {"filter": [{"terms": {"test_item": ["1"]}}, {"term": {"is_merged": false}}]}}, "size": 10000}
+{"query": {"bool": {"filter": [{"terms": {"test_item": ["1"]}}, {"term": {"is_merged": false}}]}}, "size": 10000, "sort":"_doc"}

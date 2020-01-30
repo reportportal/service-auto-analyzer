@@ -278,16 +278,16 @@ class EsClient:
 
     def _merge_logs(self, test_item_ids, project):
         bodies = []
-        batch_size = 100
+        batch_size = 1000
         self._delete_merged_logs(test_item_ids, project)
         for i in range(int(len(test_item_ids) / batch_size) + 1):
             test_items = test_item_ids[i * batch_size: (i + 1) * batch_size]
             if len(test_items) == 0:
                 continue
-            res = self.es_client.search(index=project,
-                                        body=EsClient.get_test_item_query(test_items, False))
             test_items_dict = {}
-            for r in res["hits"]["hits"]:
+            for r in elasticsearch.helpers.scan(self.es_client,
+                                                query=EsClient.get_test_item_query(test_items, False),
+                                                index=project):
                 test_item_id = r["_source"]["test_item"]
                 if test_item_id not in test_items_dict:
                     test_items_dict[test_item_id] = []
@@ -301,18 +301,18 @@ class EsClient:
     def _delete_merged_logs(self, test_items_to_delete, project):
         logger.debug("Delete merged logs for %d test items", len(test_items_to_delete))
         bodies = []
-        batch_size = 100
+        batch_size = 1000
         for i in range(int(len(test_items_to_delete) / batch_size) + 1):
             test_item_ids = test_items_to_delete[i * batch_size: (i + 1) * batch_size]
             if len(test_item_ids) == 0:
                 continue
-            res = self.es_client.search(index=project,
-                                        body=EsClient.get_test_item_query(test_item_ids, True))
-            for log in res["hits"]["hits"]:
+            for log in elasticsearch.helpers.scan(self.es_client,
+                                                  query=EsClient.get_test_item_query(test_item_ids, True),
+                                                  index=project):
                 bodies.append({
                     "_op_type": "delete",
                     "_id": log["_id"],
-                    "_index": project,
+                    "_index": project
                 })
         if len(bodies) > 0:
             self._bulk_index(bodies)
@@ -436,10 +436,11 @@ class EsClient:
             return commons.launch_objects.BulkResponse(took=0, errors=True)
         test_item_ids = set()
         try:
-            all_logs = self.es_client.search(index=clean_index.project,
-                                             body=EsClient.build_search_test_item_ids_query(
-                                                 clean_index.ids))
-            for res in all_logs["hits"]["hits"]:
+            for res in elasticsearch.helpers.scan(self.es_client,
+                                                  query=EsClient.build_search_test_item_ids_query(
+                                                      clean_index.ids),
+                                                  index=clean_index.project,
+                                                  scroll="5m"):
                 test_item_ids.add(res["_source"]["test_item"])
         except Exception as err:
             logger.error("Couldn't find test items for logs")

@@ -1,1 +1,1 @@
-{"query": {"bool": {"filter": [{"range": {"log_level": {"gte": 40000}}}, {"exists": {"field": "issue_type"}}, {"term": {"is_merged": false}}, {"terms": {"_id": ["1"]}}]}}, "size": 10000}
+{"query": {"bool": {"filter": [{"range": {"log_level": {"gte": 40000}}}, {"exists": {"field": "issue_type"}}, {"term": {"is_merged": false}}, {"terms": {"_id": ["1"]}}]}}, "size": 10000, "sort": "_doc"}

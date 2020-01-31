@@ -33,6 +33,7 @@ from boosting_decision_making import boosting_featurizer
 from time import time
 from datetime import datetime
 from multiprocessing import Pool
+from concurrent.futures import ThreadPoolExecutor
 
 ERROR_LOGGING_LEVEL = 40000
 
@@ -718,11 +719,16 @@ class EsClient:
                         launch_test_id_dict[(launch.launchId, test_item.testItemId)] = []
                     launch_test_id_dict[(launch.launchId, test_item.testItemId)].append(index_log_id)
                     index_log_id += 1
+        partial_batches = []
         for i in range(int(len(batches) / batch_size) + 1):
             part_batch = batches[i * batch_size: (i + 1) * batch_size]
             if len(part_batch) == 0:
                 continue
-            results_all.extend(self.es_client.msearch("\n".join(part_batch) + "\n")["responses"])
+            partial_batches.append("\n".join(part_batch) + "\n")
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            results = executor.map(self.es_client.msearch, partial_batches)
+        for r in results:
+            results_all.extend(r["responses"])
         for launch in launches:
             for test_item in launch.testItems:
                 if (launch.launchId, test_item.testItemId) not in launch_test_id_dict:
@@ -743,7 +749,7 @@ class EsClient:
         logger.debug("Searched ES for all test items for %.2f sec.", time() - t_start)
 
         t = time()
-        batch_size = 100
+        batch_size = 50
         num_chunks = int(len(es_results) / batch_size) + 1
 
         es_results_to_process = []
@@ -760,7 +766,7 @@ class EsClient:
             "filter_min_should_match": self.search_cfg["FilterMinShouldMatch"]
         }
 
-        sequentially = True  # True if len(es_results_to_process) < 2 else False
+        sequentially = True  #True if len(es_results_to_process) < 2 else False
         if not sequentially:
             try:
                 pool = Pool(processes=2)

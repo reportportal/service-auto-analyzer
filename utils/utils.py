@@ -70,22 +70,20 @@ def reverse_log(log):
 def split_words(text, min_word_length=0, only_unique=True, split_urls=True):
     all_unique_words = set()
     all_words = []
-    replace_symbols = r"[<>\{:,!?\}\[\];=\(\)\'\"]|\.\.\."
-    text = re.sub(replace_symbols, " ", text)
-    res = text.split()
     translate_map = {}
-    for punct in string.punctuation:
+    for punct in string.punctuation + "<>{}[];=()'\"":
         if punct != "." and (split_urls or punct not in ["/", "\\"]):
             translate_map[punct] = " "
-    for word_part in res:
-        word_part = re.sub(r"\s+", " ",
-                           word_part.translate(word_part.maketrans(translate_map))).strip().lower()
-        word_part = re.sub(r"\.+\b|\b\.+", "", word_part)
+    text = text.translate(text.maketrans(translate_map)).strip().strip(".")
+    for word_part in text.split():
+        word_part = word_part.strip().strip(".").lower()
         for w in word_part.split():
-            if w != "" and w not in stopwords and len(w) >= min_word_length and re.search(r"\w", w):
+            if w != "" and len(w) >= min_word_length:
+                if w in stopwords:
+                    continue
                 if not only_unique or w not in all_unique_words:
-                    all_words.append(w)
                     all_unique_words.add(w)
+                    all_words.append(w)
     return all_words
 
 

@@ -32,6 +32,7 @@ import utils.utils as utils
 from boosting_decision_making import boosting_featurizer
 from time import time
 from datetime import datetime
+from multiprocessing import Pool
 
 ERROR_LOGGING_LEVEL = 40000
 
@@ -686,31 +687,6 @@ class EsClient:
                                                 boost=2.0))
         return query
 
-    def _get_elasticsearch_results_for_test_items(self, launch, test_item):
-        full_results = []
-        prepared_logs = [self._prepare_log(launch, test_item, log)
-                         for log in test_item.logs if log.logLevel >= ERROR_LOGGING_LEVEL]
-        for log in EsClient.decompose_logs_merged_and_without_duplicates(prepared_logs):
-            message = log["_source"]["message"]
-            merged_small_logs = log["_source"]["merged_small_logs"]
-
-            if log["_source"]["log_level"] < ERROR_LOGGING_LEVEL or\
-               (message.strip() == "" and merged_small_logs.strip() == ""):
-                continue
-
-            query = self.build_analyze_query(launch, test_item.uniqueId, log)
-            logger.debug("ES query %s", query)
-
-            t = time()
-            res = self.es_client.search(index=str(launch.project), body=query)
-            logger.debug("Results from Elasticsearch: %d results. It took %.2f sec.",
-                         len(res["hits"]["hits"]), time() - t)
-            for elastic_res in res["hits"]["hits"]:
-                logger.debug("Id %s; Index %s; Score %s",
-                             elastic_res["_id"], elastic_res["_index"], elastic_res["_score"])
-            full_results.append((log, res))
-        return full_results
-
     def get_bulk_search_results(self, launches):
         batch_size = 50
         batches = []
@@ -784,11 +760,26 @@ class EsClient:
             "filter_min_should_match": self.search_cfg["FilterMinShouldMatch"]
         }
 
-        process_results = []
+        sequentially = True  # True if len(es_results_to_process) < 2 else False
+        if not sequentially:
+            try:
+                pool = Pool(processes=2)
+                process_results = pool.map(
+                    calculate_features,
+                    [(res, self.boosting_decision_maker.get_feature_ids(), i, config, True)
+                     for i, res in enumerate(es_results_to_process)])
+            except Exception as e:
+                logger.error("Couldn't process items in parallel. It will be processed sequentially.")
+                logger.error(e)
+                sequentially = True
 
-        for i, res in enumerate(es_results_to_process):
-            process_results.extend(
-                calculate_features((res, self.boosting_decision_maker.get_feature_ids(), i, config, False)))
+        if sequentially:
+            process_results = []
+
+            for i, res in enumerate(es_results_to_process):
+                process_results.extend(
+                    calculate_features(
+                        (res, self.boosting_decision_maker.get_feature_ids(), i, config, False)))
         logger.debug("Prepared features for all test items for %.2f sec.", time() - t)
 
         for idx, features_gathered in process_results:

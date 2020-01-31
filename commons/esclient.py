@@ -749,7 +749,7 @@ class EsClient:
         logger.debug("Searched ES for all test items for %.2f sec.", time() - t_start)
 
         t = time()
-        batch_size = 50
+        batch_size = 100
         num_chunks = int(len(es_results) / batch_size) + 1
 
         es_results_to_process = []
@@ -766,26 +766,39 @@ class EsClient:
             "filter_min_should_match": self.search_cfg["FilterMinShouldMatch"]
         }
 
-        sequentially = True  #True if len(es_results_to_process) < 2 else False
+        sequentially = True if len(es_results_to_process) < 2 else False
+        process_results = []
         if not sequentially:
             try:
-                pool = Pool(processes=2)
-                process_results = pool.map(
-                    calculate_features,
-                    [(res, self.boosting_decision_maker.get_feature_ids(), i, config, True)
-                     for i, res in enumerate(es_results_to_process)])
+                with Pool(processes=4) as pool:
+                    process_results = pool.map(
+                        calculate_features,
+                        [(res, self.boosting_decision_maker.get_feature_ids(), i, config, True)
+                         for i, res in enumerate(es_results_to_process)])
             except Exception as e:
                 logger.error("Couldn't process items in parallel. It will be processed sequentially.")
                 logger.error(e)
                 sequentially = True
 
+        map_with_process_results = {}
+        if len(process_results) != len(es_results_to_process) and not sequentially:
+            logger.error("Couldn't process items in parallel. It will be processed sequentially.")
+            sequentially = True
+            for i, result in enumerate(process_results):
+                map_with_process_results[result[0]] = i
+
         if sequentially:
-            process_results = []
+            new_process_results = []
 
             for i, res in enumerate(es_results_to_process):
-                process_results.extend(
-                    calculate_features(
-                        (res, self.boosting_decision_maker.get_feature_ids(), i, config, False)))
+                if i in map_with_process_results:
+                    new_process_results.append(process_results[map_with_process_results[i]])
+                else:
+                    new_process_results.extend(
+                        calculate_features(
+                            (res, self.boosting_decision_maker.get_feature_ids(), i, config, False)))
+
+            process_results = new_process_results
         logger.debug("Prepared features for all test items for %.2f sec.", time() - t)
 
         for idx, features_gathered in process_results:

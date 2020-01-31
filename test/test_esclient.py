@@ -86,10 +86,10 @@ class TestEsClient(unittest.TestCase):
 
     @staticmethod
     @utils.ignore_warnings
-    def get_fixture(fixture_name):
+    def get_fixture(fixture_name, to_json=False):
         """Read fixture from file"""
         with open(os.path.join("fixtures", fixture_name), "r") as file:
-            return file.read()
+            return file.read() if not to_json else json.loads(file.read())
 
     @staticmethod
     @utils.ignore_warnings
@@ -687,24 +687,9 @@ class TestEsClient(unittest.TestCase):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/2",
                                     "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/2/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(self.search_rq),
-                                    "rs":           TestEsClient.get_fixture(
-                                        self.no_hits_search_rs),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/2/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(
-                                        self.search_rq_another_log),
-                                    "rs":           TestEsClient.get_fixture(
-                                        self.no_hits_search_rs),
                                     }, ],
+                "msearch_results": [TestEsClient.get_fixture(self.no_hits_search_rs, to_json=True),
+                                    TestEsClient.get_fixture(self.no_hits_search_rs, to_json=True)],
                 "index_rq":       TestEsClient.get_fixture(self.launch_w_test_items_w_logs),
                 "expected_count":      0,
                 "expected_issue_type": "",
@@ -724,24 +709,9 @@ class TestEsClient(unittest.TestCase):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/2",
                                     "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/2/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(self.search_rq),
-                                    "rs":           TestEsClient.get_fixture(
-                                        self.no_hits_search_rs),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/2/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(
-                                        self.search_rq_another_log),
-                                    "rs":           TestEsClient.get_fixture(
-                                        self.one_hit_search_rs),
-                                    }, ],
+                                    }],
+                "msearch_results": [TestEsClient.get_fixture(self.no_hits_search_rs, to_json=True),
+                                    TestEsClient.get_fixture(self.one_hit_search_rs, to_json=True)],
                 "index_rq":       TestEsClient.get_fixture(self.launch_w_test_items_w_logs),
                 "expected_count": 1,
                 "expected_issue_type": "AB001",
@@ -751,24 +721,9 @@ class TestEsClient(unittest.TestCase):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/2",
                                     "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/2/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(self.search_rq),
-                                    "rs":           TestEsClient.get_fixture(
-                                        self.one_hit_search_rs),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/2/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(
-                                        self.search_rq_another_log),
-                                    "rs":           TestEsClient.get_fixture(
-                                        self.two_hits_search_rs),
-                                    }, ],
+                                    }],
+                "msearch_results": [TestEsClient.get_fixture(self.one_hit_search_rs, to_json=True),
+                                    TestEsClient.get_fixture(self.two_hits_search_rs, to_json=True)],
                 "index_rq":       TestEsClient.get_fixture(self.launch_w_test_items_w_logs),
                 "expected_count": 1,
                 "expected_issue_type": "AB001",
@@ -778,24 +733,9 @@ class TestEsClient(unittest.TestCase):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/2",
                                     "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/2/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(self.search_rq),
-                                    "rs":           TestEsClient.get_fixture(
-                                        self.two_hits_search_rs),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/2/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(
-                                        self.search_rq_another_log),
-                                    "rs":           TestEsClient.get_fixture(
-                                        self.three_hits_search_rs),
-                                    }, ],
+                                    }],
+                "msearch_results": [TestEsClient.get_fixture(self.two_hits_search_rs, to_json=True),
+                                    TestEsClient.get_fixture(self.three_hits_search_rs, to_json=True)],
                 "index_rq":       TestEsClient.get_fixture(self.launch_w_test_items_w_logs),
                 "expected_count": 1,
                 "expected_issue_type": "AB001",
@@ -805,24 +745,9 @@ class TestEsClient(unittest.TestCase):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/2",
                                     "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":      httpretty.GET,
-                                    "uri":          "/2/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(self.search_rq),
-                                    "rs":           TestEsClient.get_fixture(
-                                        self.no_hits_search_rs),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/2/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(
-                                        self.search_rq_another_log),
-                                    "rs":           TestEsClient.get_fixture(
-                                        self.three_hits_search_rs),
-                                    }, ],
+                                    }],
+                "msearch_results": [TestEsClient.get_fixture(self.no_hits_search_rs, to_json=True),
+                                    TestEsClient.get_fixture(self.three_hits_search_rs, to_json=True)],
                 "index_rq":       TestEsClient.get_fixture(self.launch_w_test_items_w_logs),
                 "expected_count": 1,
                 "expected_issue_type": "PB001",
@@ -832,16 +757,8 @@ class TestEsClient(unittest.TestCase):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/2",
                                     "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/2/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(
-                                        self.search_rq_different_logs),
-                                    "rs":           TestEsClient.get_fixture(
-                                        self.two_hits_search_rs),
-                                    }, ],
+                                    }],
+                "msearch_results": [TestEsClient.get_fixture(self.two_hits_search_rs, to_json=True)],
                 "index_rq":       TestEsClient.get_fixture(
                     self.launch_w_test_items_w_logs_different_log_level),
                 "expected_count": 1,
@@ -852,16 +769,8 @@ class TestEsClient(unittest.TestCase):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/2",
                                     "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/2/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(
-                                        self.search_rq_to_be_merged),
-                                    "rs":           TestEsClient.get_fixture(
-                                        self.two_hits_search_rs),
-                                    }, ],
+                                    }],
+                "msearch_results": [TestEsClient.get_fixture(self.two_hits_search_rs, to_json=True)],
                 "index_rq":       TestEsClient.get_fixture(
                     self.launch_w_test_items_w_logs_to_be_merged),
                 "expected_count": 1,
@@ -872,16 +781,8 @@ class TestEsClient(unittest.TestCase):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/2",
                                     "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/2/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(
-                                        self.search_rq_to_be_merged),
-                                    "rs":           TestEsClient.get_fixture(
-                                        self.two_hits_search_rs),
-                                    }, ],
+                                    }],
+                "msearch_results": [TestEsClient.get_fixture(self.two_hits_search_rs, to_json=True)],
                 "index_rq":       TestEsClient.get_fixture(
                     self.launch_w_test_items_w_logs_to_be_merged),
                 "config": {
@@ -905,16 +806,8 @@ class TestEsClient(unittest.TestCase):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/2",
                                     "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/2/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           TestEsClient.get_fixture(
-                                        self.search_rq_filtered),
-                                    "rs":           TestEsClient.get_fixture(
-                                        self.two_hits_search_rs),
-                                    }, ],
+                                    }],
+                "msearch_results": [TestEsClient.get_fixture(self.two_hits_search_rs, to_json=True)],
                 "index_rq":       TestEsClient.get_fixture(
                     self.launch_w_test_items_w_logs_filtered),
                 "config": {
@@ -946,6 +839,9 @@ class TestEsClient(unittest.TestCase):
                 _boosting_decision_maker = BoostingDecisionMaker()
                 _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
                 _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])
+                if "msearch_results" in test:
+                    es_client.es_client.msearch = MagicMock(
+                        return_value={"responses": test["msearch_results"]})
                 es_client.set_boosting_decision_maker(_boosting_decision_maker)
                 launches = [launch_objects.Launch(**launch)
                             for launch in json.loads(test["index_rq"])]

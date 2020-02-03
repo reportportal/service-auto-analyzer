@@ -1,4 +1,4 @@
-{"index":{"_index":"idx3","_type":"log","_id":"1_big"}}
-{"issue_type":"AB001","launch_name":"Launch 1","log_level":40000,"message":"Message AB \r\n Message AB \r\n Message AB","original_message_lines":3,"original_message_words_number":2,"test_item":1,"unique_id":"unique1","detected_message":"Message AB \r\n Message AB","merged_small_logs":"","is_merged":true}
-{"index":{"_index":"idx3","_type":"log","_id":"2_big"}}
-{"issue_type":"PB001","launch_name":"Launch 1","log_level":40000,"message":"Message PB \r\n Message PB \r\n Message PB","original_message_lines":3,"original_message_words_number":2,"test_item":1,"unique_id":"unique1","detected_message":"Message AB \r\n Message AB","merged_small_logs":"","is_merged":true}
+{"update":{"_index":"idx3","_id":"1"}}
+{"doc":{"merged_small_logs":""}}
+{"update":{"_index":"idx3","_id":"2"}}
+{"doc":{"merged_small_logs":""}}

@@ -319,7 +319,16 @@ class EsClient:
             for test_item_id in test_items_dict:
                 merged_logs = EsClient.decompose_logs_merged_and_without_duplicates(
                     test_items_dict[test_item_id])
-                bodies.extend(merged_logs)
+                for log in merged_logs:
+                    if log["_source"]["is_merged"]:
+                        bodies.append(log)
+                    else:
+                        bodies.append({
+                            "_op_type": "update",
+                            "_id": log["_id"],
+                            "_index": log["_index"],
+                            "doc": {"merged_small_logs": log["_source"]["merged_small_logs"]}
+                        })
         return self._bulk_index(bodies)
 
     def _delete_merged_logs(self, test_items_to_delete, project):
@@ -365,12 +374,10 @@ class EsClient:
             log_level = log["_source"]["log_level"]
 
             if log["_id"] in log_level_ids_to_add[log_level]:
-                normalized_message = log["_source"]["message"]
                 merged_small_logs = EsClient.compress(
                     log_level_messages[log["_source"]["log_level"]])
                 new_logs.append(EsClient.prepare_new_log(
-                    log, str(log["_id"]) + "_big",
-                    normalized_message, merged_small_logs))
+                    log, log["_id"], False, merged_small_logs))
 
         for log_level in log_level_messages:
 
@@ -378,9 +385,9 @@ class EsClient:
                log_level_messages[log_level].strip() != "":
                 log = log_level_ids_merged[log_level]
                 new_logs.append(EsClient.prepare_new_log(
-                    log, str(log["_id"]) + "_m", "",
+                    log, str(log["_id"]) + "_m", True,
                     EsClient.compress(log_level_messages[log_level]),
-                    fields_to_clean=["detected_message", "only_numbers",
+                    fields_to_clean=["message", "detected_message", "only_numbers",
                                      "detected_message_with_numbers", "stacktrace"]))
         return new_logs
 
@@ -422,18 +429,19 @@ class EsClient:
                                                  log_level_messages, log_level_ids_merged)
 
     @staticmethod
-    def prepare_new_log(old_log, new_id, message, merged_small_logs, fields_to_clean=[]):
+    def prepare_new_log(old_log, new_id, is_merged, merged_small_logs, fields_to_clean=[]):
         """Prepare updated log"""
         merged_log = copy.deepcopy(old_log)
-        merged_log["_source"]["is_merged"] = True
+        merged_log["_source"]["is_merged"] = is_merged
         merged_log["_id"] = new_id
-        merged_log["_source"]["message"] = message
         merged_log["_source"]["merged_small_logs"] = merged_small_logs
         for field in fields_to_clean:
             merged_log["_source"][field] = ""
         return merged_log
 
     def _bulk_index(self, bodies, refresh=True):
+        if len(bodies) == 0:
+            return commons.launch_objects.BulkResponse(took=0, errors=False)
         logger.debug("Indexing %d logs...", len(bodies))
         try:
             success_count, errors = elasticsearch.helpers.bulk(self.es_client,
@@ -607,7 +615,6 @@ class EsClient:
                          "filter": [
                              {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
                              {"exists": {"field": "issue_type"}},
-                             {"term": {"is_merged": True}},
                          ],
                          "must_not": [
                              {"wildcard": {"issue_type": "TI*"}},
@@ -647,6 +654,7 @@ class EsClient:
                         "boost": abs(self.search_cfg["BoostLaunch"])}}})
         if log["_source"]["message"].strip() != "":
             log_lines = launch.analyzerConfig.numberOfLogLines
+            query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
             query["query"]["bool"]["must"].append(
                 self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
                                                 min_should_match,
@@ -679,6 +687,7 @@ class EsClient:
                                                 boost=4.0,
                                                 override_min_should_match="1"))
         else:
+            query["query"]["bool"]["filter"].append({"term": {"is_merged": True}})
             query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
             query["query"]["bool"]["must"].append(
                 self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],

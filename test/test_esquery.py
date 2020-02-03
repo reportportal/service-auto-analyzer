@@ -85,7 +85,7 @@ class TestEsQuery(unittest.TestCase):
                     "filter": [
                         {"range": {"log_level": {"gte": error_logging_level}}},
                         {"exists": {"field": "issue_type"}},
-                        {"term": {"is_merged": True}},
+                        {"term": {"is_merged": False}},
                     ],
                     "must_not": [
                         {"wildcard": {"issue_type": "TI*"}},

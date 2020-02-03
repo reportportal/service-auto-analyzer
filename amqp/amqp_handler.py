@@ -32,6 +32,11 @@ def prepare_search_logs(search_data):
     return launch_objects.SearchLogs(**search_data)
 
 
+def prepare_clean_index(clean_index):
+    """Function for deserializing clean index object"""
+    return launch_objects.CleanIndex(**clean_index)
+
+
 def prepare_search_response_data(response):
     """Function for serializing response from search request"""
     return json.dumps(response)
@@ -109,33 +114,6 @@ def handle_delete_request(method, props, body, request_handler):
         request_handler(index_id)
     except Exception as err:
         logger.error("Failed to delete index")
-        logger.error(err)
-        return False
-    logger.debug("Finished processing %s method", method)
-    return True
-
-
-def handle_clean_request(method, props, body, request_handler):
-    """Function for handling amqp reuqest: clean"""
-    logger.debug("Started processing %s method %s props", method, props)
-    logger.debug("Started processing data %s", body)
-    clean_index = None
-    try:
-        clean_index = json.loads(body, strict=False)
-    except Exception as err:
-        logger.error("Failed to load json from body")
-        logger.error(err)
-        return False
-    try:
-        clean_index = launch_objects.CleanIndex(**clean_index)
-    except Exception as err:
-        logger.error("Failed to transform clean index into object")
-        logger.error(err)
-        return False
-    try:
-        request_handler(clean_index)
-    except Exception as err:
-        logger.error("Failed to clean index")
         logger.error(err)
         return False
     logger.debug("Finished processing %s method", method)

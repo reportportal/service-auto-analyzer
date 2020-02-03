@@ -150,8 +150,12 @@ def init_amqp(_amqp_client, request_handler):
     create_thread(create_ampq_client().receive,
                   (APP_CONFIG["exchangeName"], clean_queue, True, False,
                    lambda channel, method, props, body:
-                   amqp_handler.handle_clean_request(method, props, body,
-                                                     request_handler.delete_logs)))
+                   amqp_handler.handle_amqp_request(channel, method, props, body,
+                                                    request_handler.delete_logs,
+                                                    prepare_data_func=amqp_handler.
+                                                    prepare_clean_index,
+                                                    prepare_response_data=amqp_handler.
+                                                    prepare_index_response_data)))
     create_thread(create_ampq_client().receive,
                   (APP_CONFIG["exchangeName"], search_queue, True, False,
                    lambda channel, method, props, body:

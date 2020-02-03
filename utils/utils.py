@@ -176,11 +176,17 @@ def is_python_log(log):
     """Tries to find whether a log was for the python language"""
     found_file_extensions = []
     for file_extension in file_extensions:
-        if re.search(r".\.%s\b" % file_extension, log):
+        if re.search(r"\.%s(?!\.)\b" % file_extension, log):
             found_file_extensions.append(file_extension)
     if len(found_file_extensions) == 1 and found_file_extensions[0] == "py":
         return True
     return False
+
+
+def reverse_log_if_needed(message):
+    if is_python_log(message):
+        return reverse_log(message)
+    return message
 
 
 def detect_log_description_and_stacktrace(message, default_log_number=1,
@@ -190,9 +196,6 @@ def detect_log_description_and_stacktrace(message, default_log_number=1,
     if default_log_number == -1:
         return message, ""
     if calculate_line_number(message) > 2:
-        is_python = is_python_log(message)
-        if is_python:
-            message = reverse_log(message)
         log_message_lines = -1
         for idx, line in enumerate(message.split("\n")):
             modified_line = delete_line_numbers(line)
@@ -209,8 +212,6 @@ def detect_log_description_and_stacktrace(message, default_log_number=1,
                 log_message_lines = max_log_lines
         log_message = first_lines(message, log_message_lines)
         stacktrace = "\n".join(message.split("\n")[log_message_lines:])
-        if is_python:
-            return reverse_log(log_message), reverse_log(stacktrace)
         return log_message, stacktrace
     return message, ""
 

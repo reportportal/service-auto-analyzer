@@ -260,6 +260,7 @@ class EsClient:
     def _prepare_log(self, launch, test_item, log):
         log.message = utils.delete_empty_lines(log.message)
         cleaned_message = utils.fix_big_encoded_urls(log.message)
+        cleaned_message = utils.reverse_log_if_needed(cleaned_message)
 
         message = utils.sanitize_text(
             utils.first_lines(cleaned_message,
@@ -549,6 +550,7 @@ class EsClient:
         for message in search_req.logMessages:
             if message.strip() == "":
                 continue
+            message = utils.reverse_log_if_needed(message)
             sanitized_msg = utils.sanitize_text(utils.first_lines(message, search_req.logLines))
             msg_words = " ".join(utils.split_words(sanitized_msg))
             query = self.build_search_query(search_req, sanitized_msg)

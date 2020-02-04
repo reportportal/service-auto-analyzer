@@ -231,3 +231,13 @@ def choose_fields_to_filter(filter_min_should_match, log_lines):
     if filter_min_should_match:
         return ["detected_message", "message"] if log_lines == -1 else ["message"]
     return []
+
+
+def find_unique_stacktrace(message):
+    all_unique = set()
+    all_lines = []
+    for idx, line in enumerate(message.split("\n")):
+        if line.strip() not in all_unique:
+            all_unique.add(line.strip())
+            all_lines.append(line)
+    return "\n".join(all_lines)

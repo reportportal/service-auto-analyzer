@@ -73,3 +73,4 @@ class AmqpClient:
         except Exception as err:
             logger.error("Failed to consume messages pid(%d) in queue %s", os.getpid(), queue)
             logger.error(err)
+            raise

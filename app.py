@@ -70,7 +70,6 @@ def create_application():
 def create_thread(func, args):
     """Creates a thread with specified function and arguments"""
     thread = threading.Thread(target=func, args=args)
-    thread.daemon = True
     thread.start()
     return thread
 
@@ -127,44 +126,46 @@ def init_amqp(_amqp_client, request_handler):
             logger.error("Failed to declare amqp objects")
             logger.error(err)
             return
+    threads = []
 
-    create_thread(create_ampq_client().receive,
-                  (APP_CONFIG["exchangeName"], index_queue, True, False,
+    threads.append(create_thread(create_ampq_client().receive,
+                   (APP_CONFIG["exchangeName"], index_queue, True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.index_logs,
                                                     prepare_response_data=amqp_handler.
-                                                    prepare_index_response_data)))
-    create_thread(create_ampq_client().receive,
-                  (APP_CONFIG["exchangeName"], analyze_queue, True, False,
+                                                    prepare_index_response_data))))
+    threads.append(create_thread(create_ampq_client().receive,
+                   (APP_CONFIG["exchangeName"], analyze_queue, True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.analyze_logs,
                                                     prepare_response_data=amqp_handler.
-                                                    prepare_analyze_response_data)))
-    create_thread(create_ampq_client().receive,
-                  (APP_CONFIG["exchangeName"], delete_queue, True, False,
+                                                    prepare_analyze_response_data))))
+    threads.append(create_thread(create_ampq_client().receive,
+                   (APP_CONFIG["exchangeName"], delete_queue, True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_delete_request(method, props, body,
-                                                      request_handler.delete_index)))
-    create_thread(create_ampq_client().receive,
-                  (APP_CONFIG["exchangeName"], clean_queue, True, False,
+                                                      request_handler.delete_index))))
+    threads.append(create_thread(create_ampq_client().receive,
+                   (APP_CONFIG["exchangeName"], clean_queue, True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.delete_logs,
                                                     prepare_data_func=amqp_handler.
                                                     prepare_clean_index,
                                                     prepare_response_data=amqp_handler.
-                                                    prepare_index_response_data)))
-    create_thread(create_ampq_client().receive,
-                  (APP_CONFIG["exchangeName"], search_queue, True, False,
+                                                    prepare_index_response_data))))
+    threads.append(create_thread(create_ampq_client().receive,
+                   (APP_CONFIG["exchangeName"], search_queue, True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.search_logs,
                                                     prepare_data_func=amqp_handler.
                                                     prepare_search_logs,
                                                     prepare_response_data=amqp_handler.
-                                                    prepare_search_response_data)))
+                                                    prepare_search_response_data))))
+    return threads
 
 
 def read_version():
@@ -197,23 +198,24 @@ def handler(signal_received, frame):
 
 
 signal(SIGINT, handler)
-ampq_connected = False
 while True:
     try:
-        if not ampq_connected:
-            logger.info("Starting waiting for AMQP connection")
-            try:
-                amqp_client = create_ampq_client()
-            except Exception as err:
-                logger.error("Amqp connection was not established")
-                logger.error(err)
-                time.sleep(10)
-                continue
-            init_amqp(amqp_client, create_es_client())
-            ampq_connected = True
-            logger.info("Analyzer has started")
-            break
+        logger.info("Starting waiting for AMQP connection")
+        try:
+            amqp_client = create_ampq_client()
+        except Exception as err:
+            logger.error("Amqp connection was not established")
+            logger.error(err)
+            time.sleep(10)
+            continue
+        threads = init_amqp(amqp_client, create_es_client())
+        logger.info("Analyzer has started")
+        break
     except Exception as err:
         logger.error("The analyzer has failed")
         logger.error(err)
-        ampq_connected = False
+
+for th in threads:
+    th.join()
+logger.info("The analyzer has finished")
+exit(0)

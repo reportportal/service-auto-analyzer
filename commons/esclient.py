@@ -782,11 +782,11 @@ class EsClient:
             "filter_min_should_match": self.search_cfg["FilterMinShouldMatch"]
         }
 
-        sequentially = True if len(es_results_to_process) < 2 else False
+        sequentially = True  # if len(es_results_to_process) < 2 else False
         process_results = []
         if not sequentially:
             try:
-                with Pool(processes=4) as pool:
+                with Pool(processes=2) as pool:
                     process_results = pool.map(
                         calculate_features,
                         [(res, self.boosting_decision_maker.get_feature_ids(), i, config, True)

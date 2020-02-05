@@ -782,7 +782,7 @@ class EsClient:
             "filter_min_should_match": self.search_cfg["FilterMinShouldMatch"]
         }
 
-        sequentially = True if len(es_results_to_process) < 2 else False
+        sequentially = True  # if len(es_results_to_process) < 2 else False
         process_results = []
         if not sequentially:
             try:

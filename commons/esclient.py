@@ -515,7 +515,7 @@ class EsClient:
     def build_search_query(self, search_req, message):
         """Build search query"""
         return {
-            "size": 10,
+            "size": 10000,
             "query": {
                 "bool": {
                     "filter": [

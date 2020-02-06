@@ -196,7 +196,7 @@ class TestEsQuery(unittest.TestCase):
     def build_demo_search_query(search_cfg, search_req, message, error_logging_level):
         """Build search query"""
         return {
-            "size": 10,
+            "size": 10000,
             "query": {
                 "bool": {
                     "filter": [

@@ -87,31 +87,6 @@ def split_words(text, min_word_length=0, only_unique=True, split_urls=True):
     return all_words
 
 
-def find_query_words_count_from_explanation(elastic_res, field_name="message"):
-    """Find information about matched words in elasticsearch query"""
-    index_query_words_details = None
-    all_words = set()
-    try:
-        for idx, field in enumerate(elastic_res["_explanation"]["details"]):
-            if "weight(%s:" % field_name in field["description"].lower():
-                word = re.search(r"weight\(%s:(.+) in" % field_name, field["description"]).group(1)
-                all_words.add(word)
-                break
-            for detail in field["details"]:
-                if "weight(%s:" % field_name in detail["description"].lower():
-                    index_query_words_details = idx
-                    break
-        if index_query_words_details is not None:
-            field_explaination = elastic_res["_explanation"]["details"]
-            for detail in field_explaination[index_query_words_details]["details"]:
-                word = re.search(r"weight\(%s:(.+) in" % field_name, detail["description"]).group(1)
-                all_words.add(word)
-    except Exception as e:
-        logger.error(e)
-        return []
-    return list(all_words)
-
-
 def transform_string_feature_range_into_list(text):
     """Converts features from string to list of ids"""
     values = []

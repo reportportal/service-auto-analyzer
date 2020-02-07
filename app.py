@@ -45,7 +45,7 @@ APP_CONFIG = {
     "analyzerPriority":  int(os.getenv("ANALYZER_PRIORITY", "1")),
     "analyzerIndex":     json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),
     "analyzerLogSearch": json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower()),
-    "boostModelFolder":  os.getenv("BOOST_MODEL_FOLDER")
+    "boostModelFolder":  os.getenv("BOOST_MODEL_FOLDER"),
 }
 
 SEARCH_CONFIG = {
@@ -58,6 +58,7 @@ SEARCH_CONFIG = {
     "SearchLogsMinSimilarity":  float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.9")),
     "MinWordLength":            int(os.getenv("ES_MIN_WORD_LENGTH", "0")),
     "FilterMinShouldMatch":     get_bool_value(os.getenv("FILTER_MIN_SHOULD_MATCH", "true")),
+    "AllowParallelAnalysis": json.loads(os.getenv("ALLOW_PARALLEL_ANALYSIS", "false").lower())
 }
 
 

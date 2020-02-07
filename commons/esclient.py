@@ -715,6 +715,15 @@ class EsClient:
                                                 boost=2.0))
         return query
 
+    def leave_only_unique_logs(self, logs):
+        unique_logs = set()
+        all_logs = []
+        for log in logs:
+            if log.message.strip() not in unique_logs:
+                all_logs.append(log)
+                unique_logs.add(log.message.strip())
+        return all_logs
+
     def prepare_query_for_batches(self, launches):
         all_queries = []
         all_query_logs = []
@@ -724,9 +733,11 @@ class EsClient:
             if not self.index_exists(str(launch.project)):
                 continue
             for test_item in launch.testItems:
+                unique_logs = self.leave_only_unique_logs(test_item.logs)
                 prepared_logs = [self._prepare_log(launch, test_item, log)
-                                 for log in test_item.logs if log.logLevel >= ERROR_LOGGING_LEVEL]
+                                 for log in unique_logs if log.logLevel >= ERROR_LOGGING_LEVEL]
                 results = self.decompose_logs_merged_and_without_duplicates(prepared_logs)
+
                 for log in results:
                     message = log["_source"]["message"].strip()
                     merged_logs = log["_source"]["merged_small_logs"].strip()

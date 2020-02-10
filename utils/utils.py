@@ -138,6 +138,9 @@ def delete_line_numbers(text):
                  " ", res, flags=re.I)
     res = re.sub("|".join([r"\.%s(?!\.)\b" % ext for ext in file_extensions]), " ", res, flags=re.I)
     res = re.sub(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})#(\d+)", r"\g<1>:\g<2>", res)
+    if re.search(r"^[\s]*at .*\(.*?\)[\s]*$", res):
+        res = re.sub(r"\d", "", res)
+        res = "# " + res
     return res
 
 

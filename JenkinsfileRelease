@@ -15,15 +15,8 @@ node {
         stage('Build') {
             withEnv(["RELEASE_VERSION=${RELEASE_VERSION}", "DOCKER_BUILDKIT=1"]) {
                 docker.withServer("$DOCKER_HOST") {
-                    stage('Test Docker Image') {
-                        sh """
-                            make build-image-test
-                            make run-test
-                        """
-                    }
                     stage('Build Docker Image') {
                         sh 'make build-image v=${RELEASE_VERSION}'
-                        sh 'make release v=${RELEASE_VERSION}'
                     }
                 }
             }

@@ -270,7 +270,7 @@ class TestEsClient(unittest.TestCase):
                                 "rs":             TestEsClient.get_fixture(self.index_deleted_rs),
                                 }, ],
                 "index":      1,
-                "has_errors": False,
+                "result":     1,
             },
             {
                 "test_calls": [{"method":         httpretty.DELETE,
@@ -280,7 +280,7 @@ class TestEsClient(unittest.TestCase):
                                 "rs":             TestEsClient.get_fixture(self.index_not_found_rs),
                                 }, ],
                 "index":      2,
-                "has_errors": True,
+                "result":     0,
             },
         ]
         for idx, test in enumerate(tests):
@@ -292,7 +292,7 @@ class TestEsClient(unittest.TestCase):
 
                 response = es_client.delete_index(test["index"])
 
-                test["has_errors"].should.equal(len(response.error) > 0)
+                test["result"].should.equal(response)
 
                 TestEsClient.shutdown_server(test["test_calls"])
 
@@ -351,7 +351,6 @@ class TestEsClient(unittest.TestCase):
                                     "rs":             TestEsClient.get_fixture(self.index_logs_rs),
                                     }, ],
                 "rq":             launch_objects.CleanIndex(ids=[1], project=1),
-                "has_errors":     False,
                 "expected_count": 1
             },
             {
@@ -360,7 +359,6 @@ class TestEsClient(unittest.TestCase):
                                     "status":         HTTPStatus.NOT_FOUND,
                                     }, ],
                 "rq":             launch_objects.CleanIndex(ids=[1], project=2),
-                "has_errors":     True,
                 "expected_count": 0
             },
         ]
@@ -376,8 +374,7 @@ class TestEsClient(unittest.TestCase):
 
                 response = es_client.delete_logs(test["rq"])
 
-                test["has_errors"].should.equal(response.errors)
-                test["expected_count"].should.equal(response.took)
+                test["expected_count"].should.equal(response)
 
                 TestEsClient.shutdown_server(test["test_calls"])
 

@@ -146,8 +146,12 @@ def init_amqp(_amqp_client, request_handler):
     threads.append(create_thread(create_ampq_client().receive,
                    (APP_CONFIG["exchangeName"], delete_queue, True, False,
                    lambda channel, method, props, body:
-                   amqp_handler.handle_delete_request(method, props, body,
-                                                      request_handler.delete_index))))
+                   amqp_handler.handle_amqp_request(channel, method, props, body,
+                                                    request_handler.delete_index,
+                                                    prepare_data_func=amqp_handler.
+                                                    prepare_delete_index,
+                                                    prepare_response_data=amqp_handler.
+                                                    output_result))))
     threads.append(create_thread(create_ampq_client().receive,
                    (APP_CONFIG["exchangeName"], clean_queue, True, False,
                    lambda channel, method, props, body:
@@ -156,7 +160,7 @@ def init_amqp(_amqp_client, request_handler):
                                                     prepare_data_func=amqp_handler.
                                                     prepare_clean_index,
                                                     prepare_response_data=amqp_handler.
-                                                    prepare_index_response_data))))
+                                                    output_result))))
     threads.append(create_thread(create_ampq_client().receive,
                    (APP_CONFIG["exchangeName"], search_queue, True, False,
                    lambda channel, method, props, body:
@@ -191,6 +195,7 @@ version = read_version()
 
 application = create_application()
 CORS(application)
+threads = []
 
 
 def handler(signal_received, frame):
@@ -215,6 +220,7 @@ while True:
     except Exception as err:
         logger.error("The analyzer has failed")
         logger.error(err)
+
 
 for th in threads:
     th.join()

@@ -14,11 +14,9 @@
 * limitations under the License.
 """
 
-import traceback
 import re
 import json
 import logging
-import sys
 import copy
 import requests
 import elasticsearch
@@ -212,16 +210,14 @@ class EsClient:
     def delete_index(self, index_name):
         """Delete the whole index"""
         try:
-            resp = self.es_client.indices.delete(index=str(index_name))
+            self.es_client.indices.delete(index=str(index_name))
 
             logger.debug("Deleted index %s", str(index_name))
-            return commons.launch_objects.Response(**resp)
+            return 1
         except Exception as err:
-            exc_info = sys.exc_info()
-            error_info = ''.join(traceback.format_exception(*exc_info))
             logger.error("Not found %s for deleting", str(index_name))
             logger.error(err)
-            return commons.launch_objects.Response(**{"acknowledged": False, "error": error_info})
+            return 0
 
     def create_index_if_not_exists(self, index_name):
         """Creates index if it doesn't not exist"""
@@ -473,7 +469,7 @@ class EsClient:
                     clean_index.ids, clean_index.project)
         t_start = time()
         if not self.index_exists(clean_index.project):
-            return commons.launch_objects.BulkResponse(took=0, errors=True)
+            return 0
         test_item_ids = set()
         try:
             for res in elasticsearch.helpers.scan(self.es_client,
@@ -497,7 +493,7 @@ class EsClient:
         self._merge_logs(list(test_item_ids), clean_index.project)
         logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
                     clean_index.ids, clean_index.project, time() - t_start)
-        return result
+        return result.took
 
     @staticmethod
     def build_search_test_item_ids_query(log_ids):

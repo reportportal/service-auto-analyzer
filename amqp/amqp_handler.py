@@ -37,6 +37,11 @@ def prepare_clean_index(clean_index):
     return launch_objects.CleanIndex(**clean_index)
 
 
+def prepare_delete_index(body):
+    """Function for deserializing index id object"""
+    return int(body)
+
+
 def prepare_search_response_data(response):
     """Function for serializing response from search request"""
     return json.dumps(response)
@@ -51,6 +56,11 @@ def prepare_index_response_data(response):
     """Function for serializing response from index request
     and other objects, which are pydantic objects"""
     return response.json()
+
+
+def output_result(response):
+    """Function for serializing int object"""
+    return str(response)
 
 
 def handle_amqp_request(channel, method, props, body,
@@ -95,26 +105,5 @@ def handle_amqp_request(channel, method, props, body,
     except Exception as err:
         logger.error("Failed to publish result")
         logger.error(err)
-    logger.debug("Finished processing %s method", method)
-    return True
-
-
-def handle_delete_request(method, props, body, request_handler):
-    """Function for handling amqp reuqest: delete"""
-    logger.debug("Started processing %s method %s props", method, props)
-    logger.debug("Started processing data %s", body)
-    index_id = None
-    try:
-        index_id = int(body)
-    except Exception as err:
-        logger.error("Failed to transform index_id to int")
-        logger.error(err)
-        return False
-    try:
-        request_handler(index_id)
-    except Exception as err:
-        logger.error("Failed to delete index")
-        logger.error(err)
-        return False
     logger.debug("Finished processing %s method", method)
     return True

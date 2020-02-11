@@ -211,10 +211,13 @@ def choose_fields_to_filter(filter_min_should_match, log_lines):
     return []
 
 
-def find_unique_stacktrace(message):
+def leave_only_unique_lines(message):
     all_unique = set()
     all_lines = []
     for idx, line in enumerate(message.split("\n")):
+        # To remove lines with 'For documentation on this error please visit ...url'
+        if "documentation" in line.lower() and "error" in line.lower() and "visit" in line.lower():
+            continue
         if line.strip() not in all_unique:
             all_unique.add(line.strip())
             all_lines.append(line)

@@ -271,16 +271,18 @@ class EsClient:
             default_log_number=1,
             choose_by_algorythm=True)
 
-        stacktrace = utils.find_unique_stacktrace(stacktrace)
-
-        if launch.analyzerConfig.numberOfLogLines == -1 and stacktrace.strip() != "":
-            message = utils.sanitize_text(detected_message + "\n" + stacktrace)
-
         detected_message_with_numbers = utils.remove_starting_datetime(detected_message)
         detected_message = utils.sanitize_text(detected_message)
         stacktrace = utils.sanitize_text(stacktrace)
 
+        stacktrace = utils.leave_only_unique_lines(stacktrace)
+        detected_message = utils.leave_only_unique_lines(detected_message)
+        detected_message_with_numbers = utils.leave_only_unique_lines(detected_message_with_numbers)
+
         detected_message_only_numbers = utils.find_only_numbers(detected_message_with_numbers)
+
+        if launch.analyzerConfig.numberOfLogLines == -1 and stacktrace.strip() != "":
+            message = utils.sanitize_text(detected_message + "\n" + stacktrace)
 
         return {
             "_id":    log.logId,

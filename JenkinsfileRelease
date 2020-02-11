@@ -23,6 +23,7 @@ node {
                     }
                     stage('Build Docker Image') {
                         sh 'make build-image v=${RELEASE_VERSION}'
+                        sh 'make release v=${RELEASE_VERSION}'
                     }
                 }
             }

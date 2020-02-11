@@ -1,4 +1,5 @@
 {
+    "_scroll_id":"DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAADl8Wa1lLdFBYRHlRanF6V3BoS1lpRjhQQQ==",
     "took": 13,
     "timed_out": false,
     "_shards": {
@@ -30,7 +31,7 @@
                     "unique_id": "unique1",
                     "detected_message": "Message AB",
                     "detected_message_with_numbers": "Message AB",
-                    "only_numbers": "Message AB",
+                    "only_numbers": "",
                     "merged_small_logs": "",
                     "stacktrace": ""
                 }

@@ -1,20 +1,25 @@
 FROM python:3.7.4
 
 RUN apt-get update && apt-get install -y build-essential
-ARG version
-ARG prod
+RUN mkdir /backend/
+WORKDIR /backend/
 
-ADD requirements.txt /requirements.txt
+ADD requirements.txt requirements.txt
 
 RUN python -m venv /venv \
     && /venv/bin/pip install -U pip \
-    && LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "/venv/bin/pip install --no-cache-dir -r /requirements.txt"
+    && LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "/venv/bin/pip install --no-cache-dir -r requirements.txt"
 
 RUN touch /venv/bin/activate
 RUN /venv/bin/python3 -m nltk.downloader stopwords
 
+ARG version
+ARG prod
+ENV BOOST_MODEL_FOLDER="/backend/model/0.5"
+
 COPY ./ ./
 
+RUN make test-all
 RUN if ["$prod" = "true"] ; then make release v=$version ; else make build-release v=$version ; fi
 
 # Multistage
@@ -28,7 +33,7 @@ COPY --from=0 /root/nltk_data /root/nltk_data/
 WORKDIR /backend/
 
 COPY . .
-COPY --from=0 VERSION .bumpversion.cfg ./
+COPY --from=0 /backend/VERSION /backend/.bumpversion.cfg ./
 
 # uWSGI will listen on this port
 EXPOSE 5000
@@ -39,6 +44,7 @@ ENV FLASK_APP=app.py UWSGI_WSGI_FILE=app.py UWSGI_SOCKET=:3031 UWSGI_HTTP=:5000 
 ENV PATH="/venv/bin:${PATH}"
 ENV PYTHONPATH="/backend"
 ENV BOOST_MODEL_FOLDER="/backend/model/0.5"
-
+#ENV LOGGING_LEVEL="INFO"
 # Start uWSGI
-CMD ["/venv/bin/uwsgi", "--http-auto-chunked", "--http-keepalive"]
+#CMD ["/venv/bin/uwsgi", "--http-auto-chunked", "--http-keepalive"]
+CMD ["/venv/bin/uwsgi"]

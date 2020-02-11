@@ -100,7 +100,7 @@ class BoostingFeaturizer:
                                 index_in_message_array += 1
                 if len(all_messages) > 0:
                     vectorizer = CountVectorizer(binary=True, analyzer="word", token_pattern="[^ ]+")
-                    count_vector_matrix = vectorizer.fit_transform(all_messages)
+                    count_vector_matrix = np.asarray(vectorizer.fit_transform(all_messages).toarray())
                 self.all_text_field_ids[field] = log_field_ids
                 self.dict_count_vectorizer[field] = count_vector_matrix
 
@@ -175,16 +175,14 @@ class BoostingFeaturizer:
                     all_results_similarity[group_id] = 1.0
             sim_field_dict[group_id] = sim_field
 
-            if index_query_message < 0 or index_query_message < 0:
+            if index_query_message < 0 or index_log_message < 0:
                 if group_id not in all_results_similarity:
                     all_results_similarity[group_id] = 0.0
             else:
                 all_results_similarity[group_id] =\
                     round(1 - spatial.distance.cosine(
-                        np.asarray(
-                            self.dict_count_vectorizer[field_to_check][index_query_message][0].toarray()),
-                        np.asarray(
-                            self.dict_count_vectorizer[field_to_check][index_log_message][0].toarray())), 3)
+                        self.dict_count_vectorizer[field_to_check][index_query_message],
+                        self.dict_count_vectorizer[field_to_check][index_log_message]), 3)
 
         return all_results_similarity, sim_field_dict
 

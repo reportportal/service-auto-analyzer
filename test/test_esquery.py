@@ -57,6 +57,7 @@ class TestEsQuery(unittest.TestCase):
             "_source": {
                 "unique_id":        "unique",
                 "test_case_hash":   1,
+                "test_item":        123,
                 "message":          "hello world",
                 "merged_small_logs":  "",
                 "detected_message": "hello world",
@@ -84,11 +85,14 @@ class TestEsQuery(unittest.TestCase):
                     "filter": [
                         {"range": {"log_level": {"gte": error_logging_level}}},
                         {"exists": {"field": "issue_type"}},
-                        {"term": {"is_merged": True}},
+                        {"term": {"is_merged": False}},
                     ],
                     "must_not": [
                         {"wildcard": {"issue_type": "TI*"}},
                         {"wildcard": {"issue_type": "ti*"}},
+                        {"wildcard": {"issue_type": "nd*"}},
+                        {"wildcard": {"issue_type": "ND*"}},
+                        {"term": {"test_item": log["_source"]["test_item"]}}
                     ],
                     "must": [
                         {"more_like_this": {
@@ -191,39 +195,41 @@ class TestEsQuery(unittest.TestCase):
     @utils.ignore_warnings
     def build_demo_search_query(search_cfg, search_req, message, error_logging_level):
         """Build search query"""
-        return {"query": {
-            "bool": {
-                "filter": [
-                    {"range": {"log_level": {"gte": error_logging_level}}},
-                    {"exists": {"field": "issue_type"}},
-                    {"term": {"is_merged": True}},
-                ],
-                "must_not": {
-                    "term": {"test_item": {"value": search_req.itemId, "boost": 1.0}}
-                },
-                "must": [
-                    {
-                        "bool": {
-                            "should": [
-                                {"wildcard": {"issue_type": "TI*"}},
-                                {"wildcard": {"issue_type": "ti*"}},
-                            ]
-                        }
+        return {
+            "size": 10000,
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"range": {"log_level": {"gte": error_logging_level}}},
+                        {"exists": {"field": "issue_type"}},
+                        {"term": {"is_merged": False}},
+                    ],
+                    "must_not": {
+                        "term": {"test_item": {"value": search_req.itemId, "boost": 1.0}}
                     },
-                    {"terms": {"launch_id": search_req.filteredLaunchIds}},
-                    {"more_like_this": {
-                        "fields":               ["message"],
-                        "like":                 message,
-                        "min_doc_freq":         1,
-                        "min_term_freq":        1,
-                        "minimum_should_match": "5<" + search_cfg["SearchLogsMinShouldMatch"],
-                        "max_query_terms":      search_cfg["MaxQueryTerms"],
-                        "boost":                1.0,
-                    }},
-                ],
-                "should": [
-                    {"term": {"is_auto_analyzed": {"value": "false", "boost": 1.0}}},
-                ]}}}
+                    "must": [
+                        {
+                            "bool": {
+                                "should": [
+                                    {"wildcard": {"issue_type": "TI*"}},
+                                    {"wildcard": {"issue_type": "ti*"}},
+                                ]
+                            }
+                        },
+                        {"terms": {"launch_id": search_req.filteredLaunchIds}},
+                        {"more_like_this": {
+                            "fields":               ["message"],
+                            "like":                 message,
+                            "min_doc_freq":         1,
+                            "min_term_freq":        1,
+                            "minimum_should_match": "5<" + search_cfg["SearchLogsMinShouldMatch"],
+                            "max_query_terms":      search_cfg["MaxQueryTerms"],
+                            "boost":                1.0,
+                        }},
+                    ],
+                    "should": [
+                        {"term": {"is_auto_analyzed": {"value": "false", "boost": 1.0}}},
+                    ]}}}
 
 
 if __name__ == '__main__':

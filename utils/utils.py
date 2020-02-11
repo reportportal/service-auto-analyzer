@@ -70,48 +70,21 @@ def reverse_log(log):
 def split_words(text, min_word_length=0, only_unique=True, split_urls=True):
     all_unique_words = set()
     all_words = []
-    replace_symbols = r"[<>\{:,!?\}\[\];=\(\)\'\"]|\.\.\."
-    text = re.sub(replace_symbols, " ", text)
-    res = text.split()
     translate_map = {}
-    for punct in string.punctuation:
+    for punct in string.punctuation + "<>{}[];=()'\"":
         if punct != "." and (split_urls or punct not in ["/", "\\"]):
             translate_map[punct] = " "
-    for word_part in res:
-        word_part = re.sub(r"\s+", " ",
-                           word_part.translate(word_part.maketrans(translate_map))).strip().lower()
-        word_part = re.sub(r"\.+\b|\b\.+", "", word_part)
+    text = text.translate(text.maketrans(translate_map)).strip().strip(".")
+    for word_part in text.split():
+        word_part = word_part.strip().strip(".").lower()
         for w in word_part.split():
-            if w != "" and w not in stopwords and len(w) >= min_word_length and re.search(r"\w", w):
+            if w != "" and len(w) >= min_word_length:
+                if w in stopwords:
+                    continue
                 if not only_unique or w not in all_unique_words:
-                    all_words.append(w)
                     all_unique_words.add(w)
+                    all_words.append(w)
     return all_words
-
-
-def find_query_words_count_from_explanation(elastic_res, field_name="message"):
-    """Find information about matched words in elasticsearch query"""
-    index_query_words_details = None
-    all_words = set()
-    try:
-        for idx, field in enumerate(elastic_res["_explanation"]["details"]):
-            if "weight(%s:" % field_name in field["description"].lower():
-                word = re.search(r"weight\(%s:(.+) in" % field_name, field["description"]).group(1)
-                all_words.add(word)
-                break
-            for detail in field["details"]:
-                if "weight(%s:" % field_name in detail["description"].lower():
-                    index_query_words_details = idx
-                    break
-        if index_query_words_details is not None:
-            field_explaination = elastic_res["_explanation"]["details"]
-            for detail in field_explaination[index_query_words_details]["details"]:
-                word = re.search(r"weight\(%s:(.+) in" % field_name, detail["description"]).group(1)
-                all_words.add(word)
-    except Exception as e:
-        logger.error(e)
-        return []
-    return list(all_words)
 
 
 def transform_string_feature_range_into_list(text):
@@ -163,8 +136,11 @@ def delete_line_numbers(text):
     res = re.sub(r"(?<=:)\d+(?=\)?\]?(\n|\r\n|$))", " ", text)
     res = re.sub(r"((?<=line )|(?<=line))\s*\d+\s*((?=, in)|(?=,in)|(?=\n)|(?=\r\n)|(?=$))",
                  " ", res, flags=re.I)
-    res = re.sub("|".join([r"\.%s" % ext for ext in file_extensions]), " ", res, flags=re.I)
+    res = re.sub("|".join([r"\.%s(?!\.)\b" % ext for ext in file_extensions]), " ", res, flags=re.I)
     res = re.sub(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})#(\d+)", r"\g<1>:\g<2>", res)
+    if re.search(r"^[\s]*at .*\(.*?\)[\s]*$", res):
+        res = re.sub(r"\d", "", res)
+        res = "# " + res
     return res
 
 
@@ -178,11 +154,17 @@ def is_python_log(log):
     """Tries to find whether a log was for the python language"""
     found_file_extensions = []
     for file_extension in file_extensions:
-        if re.search(r".\.%s\b" % file_extension, log):
+        if re.search(r"\.%s(?!\.)\b" % file_extension, log):
             found_file_extensions.append(file_extension)
     if len(found_file_extensions) == 1 and found_file_extensions[0] == "py":
         return True
     return False
+
+
+def reverse_log_if_needed(message):
+    if is_python_log(message):
+        return reverse_log(message)
+    return message
 
 
 def detect_log_description_and_stacktrace(message, default_log_number=1,
@@ -192,9 +174,6 @@ def detect_log_description_and_stacktrace(message, default_log_number=1,
     if default_log_number == -1:
         return message, ""
     if calculate_line_number(message) > 2:
-        is_python = is_python_log(message)
-        if is_python:
-            message = reverse_log(message)
         log_message_lines = -1
         for idx, line in enumerate(message.split("\n")):
             modified_line = delete_line_numbers(line)
@@ -211,8 +190,6 @@ def detect_log_description_and_stacktrace(message, default_log_number=1,
                 log_message_lines = max_log_lines
         log_message = first_lines(message, log_message_lines)
         stacktrace = "\n".join(message.split("\n")[log_message_lines:])
-        if is_python:
-            return reverse_log(log_message), reverse_log(stacktrace)
         return log_message, stacktrace
     return message, ""
 
@@ -226,3 +203,22 @@ def fix_big_encoded_urls(message):
     if new_message != message:
         return re.sub(r"[\(\)\{\}#%]", " ", new_message)
     return message
+
+
+def choose_fields_to_filter(filter_min_should_match, log_lines):
+    if filter_min_should_match:
+        return ["detected_message", "message"] if log_lines == -1 else ["message"]
+    return []
+
+
+def leave_only_unique_lines(message):
+    all_unique = set()
+    all_lines = []
+    for idx, line in enumerate(message.split("\n")):
+        # To remove lines with 'For documentation on this error please visit ...url'
+        if "documentation" in line.lower() and "error" in line.lower() and "visit" in line.lower():
+            continue
+        if line.strip() not in all_unique:
+            all_unique.add(line.strip())
+            all_lines.append(line)
+    return "\n".join(all_lines)

@@ -31,7 +31,9 @@ class TestBoostingModel(unittest.TestCase):
     def setUp(self):
         self.one_hit_search_rs_explained = "one_hit_search_rs_explained.json"
         self.two_hits_search_rs_explained = "two_hits_search_rs_explained.json"
+        self.two_hits_search_rs_small_logs = "two_hits_search_rs_small_logs.json"
         self.log_message = "log_message.json"
+        self.log_message_only_small_logs = "log_message_only_small_logs.json"
         self.boost_model_results = "boost_model_results.json"
         self.epsilon = 0.0001
         self.boost_model_folder = os.getenv("BOOST_MODEL_FOLDER")
@@ -90,6 +92,11 @@ class TestBoostingModel(unittest.TestCase):
                                      self.get_fixture(self.two_hits_search_rs_explained)),
                                     (self.get_fixture(self.log_message),
                                      self.get_fixture(self.one_hit_search_rs_explained))],
+                "config":          TestBoostingModel.get_default_config(),
+            },
+            {
+                "elastic_results": [(self.get_fixture(self.log_message_only_small_logs),
+                                     self.get_fixture(self.two_hits_search_rs_small_logs))],
                 "config":          TestBoostingModel.get_default_config(),
             },
         ]

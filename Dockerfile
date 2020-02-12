@@ -20,7 +20,7 @@ ENV BOOST_MODEL_FOLDER="/backend/model/0.5"
 COPY ./ ./
 
 RUN make test-all
-RUN if [ "$prod" = "true" ]; then make release v=$version; else if [ "$version" != "" ]; then make build-release v=$version; fi ; fi
+RUN if [ "$prod" = "true" ]; then make build-release v=$version; else if [ "$version" != "" ]; then make build-release v=$version; fi ; fi
 
 # Multistage
 FROM python:3.7.4-slim

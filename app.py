@@ -77,8 +77,7 @@ def create_thread(func, args):
 
 def create_ampq_client():
     """Creates AMQP client"""
-    amqp_full_url = "{}/{}?heartbeat=600".format(APP_CONFIG["amqpUrl"], APP_CONFIG["exchangeName"])\
-        if "heartbeat" not in APP_CONFIG["amqpUrl"] else APP_CONFIG["amqpUrl"]
+    amqp_full_url = APP_CONFIG["amqpUrl"].rstrip("\\").rstrip("/") + "/analyzer?heartbeat=600"
     logger.info("Try connect to %s" % amqp_full_url)
     return AmqpClient(pika.BlockingConnection(
         pika.connection.URLParameters(amqp_full_url)))

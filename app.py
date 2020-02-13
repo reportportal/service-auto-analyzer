@@ -36,8 +36,8 @@ def get_bool_value(str):
 
 
 APP_CONFIG = {
-    "esHost":            os.getenv("ES_HOST", "http://elasticsearch:9200"),
-    # "esHost":            os.getenv("ES_HOST", "http://localhost:9200"),
+    "esHost":            os.getenv("ES_HOSTS", "http://elasticsearch:9200"),
+    # "esHost":            os.getenv("ES_HOSTS", "http://localhost:9200"),
     "logLevel":          os.getenv("LOGGING_LEVEL", "DEBUG"),
     "amqpUrl":           os.getenv("AMQP_URL", "amqp://rabbitmq:rabbitmq@rabbitmq:5672"),
     # "amqpUrl":           os.getenv("AMQP_URL", "amqp://rabbitmq:rabbitmq@localhost:5672"),
@@ -51,7 +51,7 @@ APP_CONFIG = {
 SEARCH_CONFIG = {
     "MinShouldMatch":           os.getenv("ES_MIN_SHOULD_MATCH", "80%"),
     "BoostAA":                  float(os.getenv("ES_BOOST_AA", "-8.0")),
-    "BoostLaunch":              float(os.getenv("ES_BOOST_LAUNCH", "8.0")),
+    "BoostLaunch":              float(os.getenv("ES_BOOST_LAUNCH", "4.0")),
     "BoostUniqueID":            float(os.getenv("ES_BOOST_UNIQUE_ID", "8.0")),
     "MaxQueryTerms":            int(os.getenv("ES_MAX_QUERY_TERMS", "50")),
     "SearchLogsMinShouldMatch": os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "80%"),

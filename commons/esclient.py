@@ -154,7 +154,7 @@ class EsClient:
     def create_index(self, index_name):
         """Create index in elasticsearch"""
         logger.debug("Creating '%s' Elasticsearch index", str(index_name))
-
+        logger.info("ES Url %s", self.host)
         try:
             response = self.es_client.indices.create(index=str(index_name), body={
                 'settings': DEFAULT_INDEX_SETTINGS,
@@ -164,6 +164,7 @@ class EsClient:
             return commons.launch_objects.Response(**response)
         except Exception as err:
             logger.error("Couldn't create index")
+            logger.error("ES Url %s", self.host)
             logger.error(err)
             return commons.launch_objects.Response()
 
@@ -204,6 +205,7 @@ class EsClient:
             return index is not None
         except Exception as err:
             logger.error("Index %s was not found", str(index_name))
+            logger.error("ES Url %s", self.host)
             logger.error(err)
             return False
 
@@ -211,11 +213,12 @@ class EsClient:
         """Delete the whole index"""
         try:
             self.es_client.indices.delete(index=str(index_name))
-
+            logger.info("ES Url %s", self.host)
             logger.debug("Deleted index %s", str(index_name))
             return 1
         except Exception as err:
             logger.error("Not found %s for deleting", str(index_name))
+            logger.error("ES Url %s", self.host)
             logger.error(err)
             return 0
 
@@ -228,6 +231,7 @@ class EsClient:
     def index_logs(self, launches):
         """Index launches to the index with project name"""
         logger.info("Indexing logs for %d launches", len(launches))
+        logger.info("ES Url %s", self.host)
         t_start = time()
         bodies = []
         test_item_ids = []
@@ -460,6 +464,7 @@ class EsClient:
             return commons.launch_objects.BulkResponse(took=success_count, errors=len(errors) > 0)
         except Exception as err:
             logger.error("Error in bulk")
+            logger.error("ES Url %s", self.host)
             logger.error(err)
             return commons.launch_objects.BulkResponse(took=0, errors=True)
 
@@ -467,6 +472,7 @@ class EsClient:
         """Delete logs from elasticsearch"""
         logger.info("Delete logs %s for the project %s",
                     clean_index.ids, clean_index.project)
+        logger.info("ES Url %s", self.host)
         t_start = time()
         if not self.index_exists(clean_index.project):
             return 0
@@ -547,6 +553,7 @@ class EsClient:
         """Get all logs similar to given logs"""
         similar_log_ids = set()
         logger.info("Started searching by request %s", search_req.json())
+        logger.info("ES Url %s", self.host)
         t_start = time()
         if not self.index_exists(str(search_req.projectId)):
             return []
@@ -864,6 +871,7 @@ class EsClient:
     @utils.ignore_warnings
     def analyze_logs(self, launches):
         logger.info("Started analysis for %d launches", len(launches))
+        logger.info("ES Url %s", self.host)
         results = []
 
         t_start = time()

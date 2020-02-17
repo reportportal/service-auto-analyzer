@@ -13,7 +13,7 @@
                 {
                   "logId": 1,
                     "logLevel": 40000,
-                    "message": "Message 1"
+                    "message": "<html>Message <b>1</b></html>"
                 },
                 {
                   "logId": 3,

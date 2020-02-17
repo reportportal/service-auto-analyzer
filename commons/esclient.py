@@ -261,6 +261,7 @@ class EsClient:
         message = utils.fix_big_encoded_urls(message)
         message = utils.reverse_log_if_needed(message)
         message = utils.remove_generated_parts(message)
+        message = utils.clean_html(message)
         message = utils.delete_empty_lines(message)
         return message
 

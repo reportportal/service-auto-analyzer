@@ -225,6 +225,7 @@ def leave_only_unique_lines(message):
 
 
 def remove_generated_parts(message):
+    """Removes lines with '<generated>' keyword and removes parts, like $ab24b, @c321e from words"""
     all_lines = []
     for line in message.split("\n"):
         if "<generated>" in line.lower():
@@ -256,3 +257,41 @@ def remove_generated_parts(message):
         line = re.sub(r"\.+", ".", line)
         all_lines.append(line)
     return "\n".join(all_lines)
+
+
+def clean_text_from_html_tags(message):
+    """Removes style and script tags together with inner text and removes html tags"""
+    regex_style_tag = re.compile('<style.*?>[\\s\\S]*?</style>')
+    message = re.sub(regex_style_tag, " ", message)
+    regex_script_tag = re.compile('<script.*?>[\\s\\S]*?</script>')
+    message = re.sub(regex_script_tag, " ", message)
+    regex_html_tags = re.compile('<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
+    message = re.sub(regex_html_tags, " ", message)
+    return message
+
+
+def clean_html(message):
+    """Removes html tags inside the parts with <.*?html.*?>...</html>"""
+    all_lines = []
+    started_html = False
+    finished_with_html_tag = False
+    html_part = []
+    for idx, line in enumerate(message.split("\n")):
+        if re.search(r"<.*?html.*?>", line):
+            started_html = True
+            html_part.append(line)
+        else:
+            if started_html:
+                html_part.append(line)
+            else:
+                all_lines.append(line)
+        if "</html>" in line:
+            finished_with_html_tag = True
+        if finished_with_html_tag:
+            all_lines.append(clean_text_from_html_tags("\n".join(html_part)))
+            html_part = []
+            finished_with_html_tag = False
+            started_html = False
+    if len(html_part) > 0:
+        all_lines.extend(html_part)
+    return delete_empty_lines("\n".join(all_lines))

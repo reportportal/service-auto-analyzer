@@ -74,10 +74,10 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                      self.get_fixture(self.two_hits_search_rs_explained))],
                 "config":          TestBoostingFeaturizer.get_default_config(),
                 "result":          [[{"_score": 158.08437,
-                                      "normalized_score": 0.6709,
+                                      "normalized_score": 1.0,
                                       },
                                      {"_score": 77.53298,
-                                      "normalized_score": 0.3291,
+                                      "normalized_score": 0.4904,
                                       }, ]],
             },
         ]
@@ -135,11 +135,11 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 "result":          {"AB001": {"mrHit": {"_score": 158.08437,
                                                         "_id": "1"},
                                               "compared_log": self.get_fixture(self.log_message),
-                                              "score": 0.8355, },
+                                              "score": 0.8031, },
                                     "PB001": {"mrHit": {"_score": 77.53298,
                                                         "_id": "2"},
                                               "compared_log": self.get_fixture(self.log_message),
-                                              "score": 0.1645, },
+                                              "score": 0.1969, },
                                     }
             },
         ]

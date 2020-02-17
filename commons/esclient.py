@@ -262,9 +262,9 @@ class EsClient:
         cleaned_message = utils.fix_big_encoded_urls(log.message)
         cleaned_message = utils.reverse_log_if_needed(cleaned_message)
 
-        message = utils.sanitize_text(
+        message = utils.leave_only_unique_lines(utils.sanitize_text(
             utils.first_lines(cleaned_message,
-                              launch.analyzerConfig.numberOfLogLines))
+                              launch.analyzerConfig.numberOfLogLines)))
 
         detected_message, stacktrace = utils.detect_log_description_and_stacktrace(
             cleaned_message,
@@ -280,9 +280,6 @@ class EsClient:
         detected_message_with_numbers = utils.leave_only_unique_lines(detected_message_with_numbers)
 
         detected_message_only_numbers = utils.find_only_numbers(detected_message_with_numbers)
-
-        if launch.analyzerConfig.numberOfLogLines == -1 and stacktrace.strip() != "":
-            message = utils.sanitize_text(detected_message + "\n" + stacktrace)
 
         return {
             "_id":    log.logId,

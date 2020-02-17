@@ -258,9 +258,10 @@ class EsClient:
         return result
 
     def clean_message(self, message):
-        message = utils.delete_empty_lines(message)
         message = utils.fix_big_encoded_urls(message)
         message = utils.reverse_log_if_needed(message)
+        message = utils.remove_generated_parts(message)
+        message = utils.delete_empty_lines(message)
         return message
 
     def _prepare_log(self, launch, test_item, log):

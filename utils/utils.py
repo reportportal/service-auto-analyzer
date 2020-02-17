@@ -222,3 +222,37 @@ def leave_only_unique_lines(message):
             all_unique.add(line.strip())
             all_lines.append(line)
     return "\n".join(all_lines)
+
+
+def remove_generated_parts(message):
+    all_lines = []
+    for line in message.split("\n"):
+        if "<generated>" in line.lower():
+            continue
+        for symbol in [r"\$", "@"]:
+            all_found_parts = set()
+            for m in re.finditer(r"%s+(.+?)\b" % symbol, line):
+                found_part = m.group(1).strip().strip(symbol).strip()
+                if found_part != "":
+                    all_found_parts.add((found_part, m.group(0).strip()))
+            sorted_parts = sorted(list(all_found_parts), key=lambda x: len(x[1]), reverse=True)
+            for found_part in sorted_parts:
+                whole_found_part = found_part[1].replace("$", r"\$")
+                found_part = found_part[0]
+                part_to_replace = ""
+                if re.search(r"\d", found_part):
+                    part_with_numbers_in_the_end = re.search(r"[a-zA-z]{5,}\d+", found_part)
+                    if part_with_numbers_in_the_end and part_with_numbers_in_the_end.group(0) == found_part:
+                        part_to_replace = " %s" % found_part
+                    else:
+                        part_to_replace = ""
+                else:
+                    part_to_replace = ".%s" % found_part
+                try:
+                    line = re.sub(whole_found_part, part_to_replace, line)
+                except: # noqa
+                    pass
+
+        line = re.sub(r"\.+", ".", line)
+        all_lines.append(line)
+    return "\n".join(all_lines)

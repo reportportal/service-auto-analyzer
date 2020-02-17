@@ -257,10 +257,14 @@ class EsClient:
                     len(launches), time() - t_start)
         return result
 
+    def clean_message(self, message):
+        message = utils.delete_empty_lines(message)
+        message = utils.fix_big_encoded_urls(message)
+        message = utils.reverse_log_if_needed(message)
+        return message
+
     def _prepare_log(self, launch, test_item, log):
-        log.message = utils.delete_empty_lines(log.message)
-        cleaned_message = utils.fix_big_encoded_urls(log.message)
-        cleaned_message = utils.reverse_log_if_needed(cleaned_message)
+        cleaned_message = self.clean_message(log.message)
 
         message = utils.leave_only_unique_lines(utils.sanitize_text(
             utils.first_lines(cleaned_message,
@@ -558,8 +562,10 @@ class EsClient:
         for message in search_req.logMessages:
             if message.strip() == "":
                 continue
-            message = utils.reverse_log_if_needed(message)
-            sanitized_msg = utils.sanitize_text(utils.first_lines(message, search_req.logLines))
+            cleaned_message = self.clean_message(message)
+            sanitized_msg = utils.leave_only_unique_lines(utils.sanitize_text(
+                utils.first_lines(cleaned_message, search_req.logLines)))
+
             msg_words = " ".join(utils.split_words(sanitized_msg))
             if msg_words in searched_logs:
                 continue

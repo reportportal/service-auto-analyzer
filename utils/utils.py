@@ -146,7 +146,7 @@ def delete_line_numbers(text):
 
 def find_only_numbers(detected_message_with_numbers):
     """Removes all non digit symbols and concatenates unique numbers"""
-    detected_message_only_numbers = re.sub(r"[^\d ]", "", detected_message_with_numbers)
+    detected_message_only_numbers = re.sub(r"[^\d \._]", "", detected_message_with_numbers)
     return " ".join(split_words(detected_message_only_numbers, only_unique=True))
 
 

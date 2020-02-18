@@ -300,3 +300,7 @@ def clean_html(message):
     if len(html_part) > 0:
         all_lines.extend(html_part)
     return delete_empty_lines("\n".join(all_lines))
+
+
+def replace_tabs_for_newlines(message):
+    return message.replace("\t", "\n")

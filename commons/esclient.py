@@ -258,6 +258,7 @@ class EsClient:
         return result
 
     def clean_message(self, message):
+        message = utils.replace_tabs_for_newlines(message)
         message = utils.fix_big_encoded_urls(message)
         message = utils.reverse_log_if_needed(message)
         message = utils.remove_generated_parts(message)
@@ -299,9 +300,9 @@ class EsClient:
                 "is_auto_analyzed": test_item.isAutoAnalyzed,
                 "issue_type":       test_item.issueType,
                 "log_level":        log.logLevel,
-                "original_message_lines": utils.calculate_line_number(log.message),
+                "original_message_lines": utils.calculate_line_number(cleaned_message),
                 "original_message_words_number": len(
-                    utils.split_words(log.message, split_urls=False)),
+                    utils.split_words(cleaned_message, split_urls=False)),
                 "message":          message,
                 "is_merged":        False,
                 "start_time":       datetime(*test_item.startTime[:6]).strftime("%Y-%m-%d %H:%M:%S"),

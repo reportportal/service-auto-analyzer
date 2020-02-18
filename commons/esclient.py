@@ -252,7 +252,7 @@ class EsClient:
                 if logs_added:
                     test_item_ids.append(str(test_item.testItemId))
         result = self._bulk_index(bodies)
-        result = self._merge_logs(test_item_ids, project)
+        self._merge_logs(test_item_ids, project)
         logger.info("Finished indexing logs for %d launches. It took %.2f sec.",
                     len(launches), time() - t_start)
         return result

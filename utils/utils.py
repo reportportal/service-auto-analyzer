@@ -172,30 +172,52 @@ def reverse_log_if_needed(message):
     return message
 
 
-def detect_log_description_and_stacktrace(message, default_log_number=1,
-                                          max_log_lines=5, choose_by_algorythm=True):
+def has_stacktrace_keywords(line):
+    normalized_line = line.lower()
+    for key_word in ["stacktrace", "stack trace", "stack-trace", "traceback"]:
+        if re.search(r"\s*%s\s*:\s*$" % key_word, normalized_line):
+            return True
+        if "end of " in normalized_line and key_word in normalized_line:
+            return True
+    return False
+
+
+def has_more_lines_pattern(line):
+    normalized_line = line.lower().strip()
+    result = re.search(r"\.\.\.\s*\d+ more\s*$", normalized_line)
+    if result and result.group(0) == line:
+        return True
+    return False
+
+
+def detect_log_description_and_stacktrace(message, default_log_number=1, max_log_lines=5):
     """Split a log into a log message and stacktrace"""
     message = delete_empty_lines(message)
     if default_log_number == -1:
         return message, ""
     if calculate_line_number(message) > 2:
-        log_message_lines = -1
-        for idx, line in enumerate(message.split("\n")):
+        split_lines = message.split("\n")
+        detected_message_lines = []
+        stacktrace_lines = []
+        for idx, line in enumerate(split_lines):
             modified_line = delete_line_numbers(line)
+            if has_stacktrace_keywords(line) or has_more_lines_pattern(line):
+                continue
             if modified_line != line:
-                log_message_lines = idx
-                break
-        if log_message_lines == calculate_line_number(message) or\
-                log_message_lines == -1:
-            log_message_lines = max_log_lines
-        if log_message_lines < default_log_number:
-            log_message_lines = default_log_number
-        if not choose_by_algorythm:
-            if log_message_lines > max_log_lines:
-                log_message_lines = max_log_lines
-        log_message = first_lines(message, log_message_lines)
-        stacktrace = "\n".join(message.split("\n")[log_message_lines:])
-        return log_message, stacktrace
+                stacktrace_lines.append(line)
+            else:
+                detected_message_lines.append(line)
+
+        if len(detected_message_lines) == len(split_lines):
+            stacktrace_lines = detected_message_lines[max_log_lines:]
+            detected_message_lines = detected_message_lines[:max_log_lines]
+
+        if len(detected_message_lines) < default_log_number:
+            all_message = detected_message_lines + stacktrace_lines
+            detected_message_lines = all_message[:default_log_number]
+            stacktrace_lines = all_message[default_log_number:]
+
+        return "\n".join(detected_message_lines), "\n".join(stacktrace_lines)
     return message, ""
 
 

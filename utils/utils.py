@@ -185,8 +185,8 @@ def has_stacktrace_keywords(line):
 
 def has_more_lines_pattern(line):
     normalized_line = line.lower().strip()
-    result = re.search(r"\.\.\.\s*\d+ more\s*$", normalized_line)
-    if result and result.group(0) == line:
+    result = re.search(r"^\s*\.+\s*\d+\s+more\s*$", normalized_line)
+    if result and result.group(0) == normalized_line:
         return True
     return False
 
@@ -257,6 +257,8 @@ def remove_generated_parts(message):
     all_lines = []
     for line in message.split("\n"):
         if "<generated>" in line.lower():
+            continue
+        if has_stacktrace_keywords(line) or has_more_lines_pattern(line):
             continue
         for symbol in [r"\$", "@"]:
             all_found_parts = set()
@@ -330,6 +332,6 @@ def replace_tabs_for_newlines(message):
 
 
 def remove_credentials_from_url(url):
-    o = urlparse(url)
-    new_netloc = re.sub("^.+?:.+?@", "", o.netloc)
-    return url.replace(o.netloc, new_netloc)
+    parsed_url = urlparse(url)
+    new_netloc = re.sub("^.+?:.+?@", "", parsed_url.netloc)
+    return url.replace(parsed_url.netloc, new_netloc)

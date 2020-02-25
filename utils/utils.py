@@ -20,6 +20,7 @@ import nltk
 import logging
 from dateutil.parser import parse
 import urllib
+from urllib.parse import urlparse
 import warnings
 
 logger = logging.getLogger("analyzerApp.utils")
@@ -326,3 +327,9 @@ def clean_html(message):
 
 def replace_tabs_for_newlines(message):
     return message.replace("\t", "\n")
+
+
+def remove_credentials_from_url(url):
+    o = urlparse(url)
+    new_netloc = re.sub("^.+?:.+?@", "", o.netloc)
+    return url.replace(o.netloc, new_netloc)

@@ -202,8 +202,6 @@ def detect_log_description_and_stacktrace(message, default_log_number=1, max_log
         stacktrace_lines = []
         for idx, line in enumerate(split_lines):
             modified_line = delete_line_numbers(line)
-            if has_stacktrace_keywords(line) or has_more_lines_pattern(line):
-                continue
             if modified_line != line:
                 stacktrace_lines.append(line)
             else:

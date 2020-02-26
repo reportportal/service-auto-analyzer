@@ -233,7 +233,7 @@ def fix_big_encoded_urls(message):
 
 def choose_fields_to_filter(filter_min_should_match, log_lines):
     if filter_min_should_match:
-        return ["detected_message", "message"] if log_lines == -1 else ["message"]
+        return ["detected_message", "stacktrace"] if log_lines == -1 else ["message"]
     return []
 
 

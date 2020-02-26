@@ -155,7 +155,8 @@ class BoostingFeaturizer:
             index_query_message = self.all_text_field_ids[field_to_check][log["_id"]]
             index_log_message = self.all_text_field_ids[field_to_check][elastic_res["_id"]]
             if index_query_message < 0 and index_log_message < 0:
-                if for_filter:
+                if for_filter and field_to_check in ["message", "detected_message",
+                                                     "detected_message_with_numbers"]:
                     index_query_message = self.all_text_field_ids["merged_small_logs"][log["_id"]]
                     index_log_message = self.all_text_field_ids["merged_small_logs"][elastic_res["_id"]]
                     sim_field = "similarity_merged_small_logs"

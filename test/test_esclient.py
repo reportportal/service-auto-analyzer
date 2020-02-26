@@ -826,7 +826,7 @@ class TestEsClient(unittest.TestCase):
             },
         ]
 
-        for idx, test in enumerate(tests):
+        for idx, test in enumerate(tests[12:]):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
                 config = TestEsClient.get_default_search_config()\

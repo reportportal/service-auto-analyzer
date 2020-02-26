@@ -96,8 +96,17 @@ class TestEsQuery(unittest.TestCase):
                     ],
                     "must": [
                         {"more_like_this": {
-                            "fields":               ["message"],
-                            "like":                 log["_source"]["message"],
+                            "fields":               ["detected_message"],
+                            "like":                 log["_source"]["detected_message"],
+                            "min_doc_freq":         1,
+                            "min_term_freq":        1,
+                            "minimum_should_match": "5<" + search_cfg["MinShouldMatch"],
+                            "max_query_terms":      search_cfg["MaxQueryTerms"],
+                            "boost":                4.0,
+                        }, },
+                        {"more_like_this": {
+                            "fields":               ["stacktrace"],
+                            "like":                 log["_source"]["stacktrace"],
                             "min_doc_freq":         1,
                             "min_term_freq":        1,
                             "minimum_should_match": "5<" + search_cfg["MinShouldMatch"],
@@ -138,15 +147,6 @@ class TestEsQuery(unittest.TestCase):
                             "minimum_should_match": "5<80%",
                             "max_query_terms":      search_cfg["MaxQueryTerms"],
                             "boost":                0.5,
-                        }},
-                        {"more_like_this": {
-                            "fields":               ["detected_message"],
-                            "like":                 log["_source"]["detected_message"],
-                            "min_doc_freq":         1,
-                            "min_term_freq":        1,
-                            "minimum_should_match": "5<80%",
-                            "max_query_terms":      search_cfg["MaxQueryTerms"],
-                            "boost":                4.0,
                         }},
                         {"more_like_this": {
                             "fields":               ["only_numbers"],

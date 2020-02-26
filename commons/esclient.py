@@ -683,30 +683,43 @@ class EsClient:
         if log["_source"]["message"].strip() != "":
             log_lines = launch.analyzerConfig.numberOfLogLines
             query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
-            query["query"]["bool"]["must"].append(
-                self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                min_should_match,
-                                                log["_source"]["message"],
-                                                field_name="message",
-                                                boost=(4.0 if log_lines != -1 else 2.0)))
+            if log_lines == -1:
+                query["query"]["bool"]["must"].append(
+                    self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                    min_should_match,
+                                                    log["_source"]["detected_message"],
+                                                    field_name="detected_message",
+                                                    boost=4.0))
+                query["query"]["bool"]["must"].append(
+                    self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                    min_should_match,
+                                                    log["_source"]["stacktrace"],
+                                                    field_name="stacktrace",
+                                                    boost=2.0))
+            else:
+                query["query"]["bool"]["must"].append(
+                    self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                    min_should_match,
+                                                    log["_source"]["message"],
+                                                    field_name="message",
+                                                    boost=4.0))
+                query["query"]["bool"]["should"].append(
+                    self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                    "80%",
+                                                    log["_source"]["detected_message"],
+                                                    field_name="detected_message",
+                                                    boost=2.0))
+                query["query"]["bool"]["should"].append(
+                    self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                    "60%",
+                                                    log["_source"]["stacktrace"],
+                                                    field_name="stacktrace", boost=1.0))
             query["query"]["bool"]["should"].append(
                 self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
                                                 "80%",
                                                 log["_source"]["merged_small_logs"],
                                                 field_name="merged_small_logs",
                                                 boost=0.5))
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                "80%",
-                                                log["_source"]["detected_message"],
-                                                field_name="detected_message",
-                                                boost=(4.0 if log_lines == -1 else 2.0)))
-            if log_lines != -1:
-                query["query"]["bool"]["should"].append(
-                    self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                    "60%",
-                                                    log["_source"]["stacktrace"],
-                                                    field_name="stacktrace", boost=1.0))
             query["query"]["bool"]["should"].append(
                 self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
                                                 "1",

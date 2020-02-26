@@ -34,7 +34,7 @@ class TestEsQuery(unittest.TestCase):
         logging.disable(logging.DEBUG)
 
     @utils.ignore_warnings
-    def test_build_analyze_query(self):
+    def test_build_analyze_query_all_logs_empty_stacktrace(self):
         """Tests building analyze query"""
         search_cfg = {
             "MinShouldMatch": "80%",
@@ -65,16 +65,139 @@ class TestEsQuery(unittest.TestCase):
                 "stacktrace": "",
                 "only_numbers": "1"}}
         query_from_esclient = es_client.build_analyze_query(launch, "unique", log)
-        demo_query = TestEsQuery.build_demo_query(search_cfg, "Launch name",
-                                                  "unique", log,
-                                                  error_logging_level)
+        demo_query = TestEsQuery.build_demo_query_all_logs_empty_stacktrace(
+            search_cfg, "Launch name",
+            "unique", log,
+            error_logging_level)
+
+        query_from_esclient.should.equal(demo_query)
+
+    @utils.ignore_warnings
+    def test_build_analyze_query_all_logs_nonempty_stacktrace(self):
+        """Tests building analyze query"""
+        search_cfg = {
+            "MinShouldMatch": "80%",
+            "BoostAA":        10,
+            "BoostLaunch":    5,
+            "BoostUniqueID":  3,
+            "MaxQueryTerms":  50,
+        }
+        error_logging_level = 40000
+
+        es_client = esclient.EsClient(search_cfg=search_cfg)
+        launch = launch_objects.Launch(**{
+            "analyzerConfig": {"analyzerMode": "SearchModeAll"},
+            "launchId": 123,
+            "launchName": "Launch name",
+            "project": 1})
+        log = {
+            "_id":    1,
+            "_index": 1,
+            "_source": {
+                "unique_id":        "unique",
+                "test_case_hash":   1,
+                "test_item":        123,
+                "message":          "hello world",
+                "merged_small_logs":  "",
+                "detected_message": "hello world",
+                "detected_message_with_numbers": "hello world 1",
+                "stacktrace": "invoke.method(arg)",
+                "only_numbers": "1"}}
+        query_from_esclient = es_client.build_analyze_query(launch, "unique", log)
+        demo_query = TestEsQuery.build_demo_query_all_logs_nonempty_stacktrace(
+            search_cfg, "Launch name",
+            "unique", log,
+            error_logging_level)
 
         query_from_esclient.should.equal(demo_query)
 
     @staticmethod
     @utils.ignore_warnings
-    def build_demo_query(search_cfg, launch_name,
-                         unique_id, log, error_logging_level):
+    def build_demo_query_all_logs_empty_stacktrace(search_cfg, launch_name,
+                                                   unique_id, log, error_logging_level):
+        """Build demo analyze query"""
+        return {
+            "size": 10,
+            "sort": ["_score",
+                     {"start_time": "desc"}, ],
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"range": {"log_level": {"gte": error_logging_level}}},
+                        {"exists": {"field": "issue_type"}},
+                        {"term": {"is_merged": False}},
+                    ],
+                    "must_not": [
+                        {"wildcard": {"issue_type": "TI*"}},
+                        {"wildcard": {"issue_type": "ti*"}},
+                        {"wildcard": {"issue_type": "nd*"}},
+                        {"wildcard": {"issue_type": "ND*"}},
+                        {"term": {"test_item": log["_source"]["test_item"]}},
+                        {"wildcard": {"stacktrace": "*"}}
+                    ],
+                    "must": [
+                        {"more_like_this": {
+                            "fields":               ["detected_message"],
+                            "like":                 log["_source"]["detected_message"],
+                            "min_doc_freq":         1,
+                            "min_term_freq":        1,
+                            "minimum_should_match": "5<" + search_cfg["MinShouldMatch"],
+                            "max_query_terms":      search_cfg["MaxQueryTerms"],
+                            "boost":                4.0,
+                        }, },
+                    ],
+                    "should": [
+                        {"term": {
+                            "unique_id": {
+                                "value": unique_id,
+                                "boost": abs(search_cfg["BoostUniqueID"]),
+                            },
+                        }},
+                        {"term": {
+                            "test_case_hash": {
+                                "value": log["_source"]["test_case_hash"],
+                                "boost": abs(search_cfg["BoostUniqueID"]),
+                            },
+                        }},
+                        {"term": {
+                            "is_auto_analyzed": {
+                                "value": str(search_cfg["BoostAA"] < 0).lower(),
+                                "boost": abs(search_cfg["BoostAA"]),
+                            },
+                        }},
+                        {"term": {
+                            "launch_name": {
+                                "value": launch_name,
+                                "boost": abs(search_cfg["BoostLaunch"]),
+                            },
+                        }},
+                        {"more_like_this": {
+                            "fields":               ["merged_small_logs"],
+                            "like":                 log["_source"]["merged_small_logs"],
+                            "min_doc_freq":         1,
+                            "min_term_freq":        1,
+                            "minimum_should_match": "5<80%",
+                            "max_query_terms":      search_cfg["MaxQueryTerms"],
+                            "boost":                0.5,
+                        }},
+                        {"more_like_this": {
+                            "fields":               ["only_numbers"],
+                            "like":                 log["_source"]["only_numbers"],
+                            "min_doc_freq":         1,
+                            "min_term_freq":        1,
+                            "minimum_should_match": "1",
+                            "max_query_terms":      search_cfg["MaxQueryTerms"],
+                            "boost":                4.0,
+                        }},
+                    ],
+                },
+            },
+        }
+
+    @staticmethod
+    @utils.ignore_warnings
+    def build_demo_query_all_logs_nonempty_stacktrace(search_cfg, launch_name,
+                                                      unique_id, log, error_logging_level):
         """Build demo analyze query"""
         return {
             "size": 10,

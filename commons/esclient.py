@@ -690,12 +690,15 @@ class EsClient:
                                                     log["_source"]["detected_message"],
                                                     field_name="detected_message",
                                                     boost=4.0))
-                query["query"]["bool"]["must"].append(
-                    self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                    min_should_match,
-                                                    log["_source"]["stacktrace"],
-                                                    field_name="stacktrace",
-                                                    boost=2.0))
+                if log["_source"]["stacktrace"].strip() != "":
+                    query["query"]["bool"]["must"].append(
+                        self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                        min_should_match,
+                                                        log["_source"]["stacktrace"],
+                                                        field_name="stacktrace",
+                                                        boost=2.0))
+                else:
+                    query["query"]["bool"]["must_not"].append({"wildcard": {"stacktrace": "*"}})
             else:
                 query["query"]["bool"]["must"].append(
                     self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],

@@ -76,7 +76,7 @@ class TestEsQuery(unittest.TestCase):
             "MinWordLength":  0,
             "BoostModelFolderAllLines":    os.getenv("BOOST_MODEL_FOLDER_ALL_LINES", ""),
             "BoostModelFolderNotAllLines": os.getenv("BOOST_MODEL_FOLDER_NOT_ALL_LINES", ""),
-            "SimilarityWeightsFolder":     os.getenv("SIMILARITY_WEIGHTS_FOLDER", ""),
+            "SimilarityWeightsFolder":     os.getenv("SIMILARITY_WEIGHTS_FOLDER", "")
         }
 
     @utils.ignore_warnings

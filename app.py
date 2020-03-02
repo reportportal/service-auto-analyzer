@@ -54,7 +54,7 @@ SEARCH_CONFIG = {
     "BoostModelFolderAllLines":    "",
     "BoostModelFolderNotAllLines": "",
     "SuggestBoostModelFolder":    "",
-    "SimilarityWeightsFolder":     "",
+    "SimilarityWeightsFolder":     ""
 }
 
 

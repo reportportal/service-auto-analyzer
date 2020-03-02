@@ -39,6 +39,7 @@ class BoostingFeaturizer:
             "message_without_params_extended",
             "message_extended",
             "detected_message_extended"]
+
         self.feature_functions = {
             0: (self._calculate_score, {}),
             1: (self._calculate_place, {}),

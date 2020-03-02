@@ -45,6 +45,7 @@ class TestBoostingModel(unittest.TestCase):
         self.suggest_boost_model_folder =\
             model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
         self.weights_folder = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
+
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings
@@ -129,6 +130,7 @@ class TestBoostingModel(unittest.TestCase):
                     "decision_maker":  _decision_maker
                 },
             ])
+
         for idx, test in enumerate(tests):
             feature_ids = test["decision_maker"].get_feature_ids()
             weight_log_sim = None

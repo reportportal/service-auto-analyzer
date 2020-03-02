@@ -32,6 +32,7 @@ from time import time
 from datetime import datetime
 from multiprocessing import Pool
 from concurrent.futures import ThreadPoolExecutor
+from boosting_decision_making import log_similarity_calculator
 
 ERROR_LOGGING_LEVEL = 40000
 
@@ -125,6 +126,8 @@ def calculate_features(params):
                 "min_word_length": config["min_word_length"],
                 "filter_min_should_match": utils.choose_fields_to_filter(config["filter_min_should_match"],
                                                                          analyzer_config.numberOfLogLines),
+                "similarity_weights_folder": config["similarity_weights_folder"],
+                "number_of_log_lines": analyzer_config.numberOfLogLines
             },
             feature_ids=feature_ids)
         part_train_calc_data, issue_type_names = _boosting_data_gatherer.gather_features_info()
@@ -143,6 +146,10 @@ class EsClient:
         self.es_client = elasticsearch.Elasticsearch([host], timeout=30,
                                                      max_retries=5, retry_on_timeout=True)
         self.boosting_decision_maker = None
+        self.weighted_log_similarity_calculator = None
+        if self.search_cfg["SimilarityWeightsFolder"].strip() != "":
+            self.weighted_log_similarity_calculator = log_similarity_calculator.LogSimilarityCalculator(
+                folder=self.search_cfg["SimilarityWeightsFolder"])
 
     def set_boosting_decision_maker(self, boosting_decision_maker):
         self.boosting_decision_maker = boosting_decision_maker
@@ -564,37 +571,67 @@ class EsClient:
         for message in search_req.logMessages:
             if message.strip() == "":
                 continue
-            cleaned_message = self.clean_message(message)
-            sanitized_msg = utils.leave_only_unique_lines(utils.sanitize_text(
-                utils.first_lines(cleaned_message, search_req.logLines)))
+            cleaned_message = utils.first_lines(utils.leave_only_unique_lines(
+                self.clean_message(message)), search_req.logLines)
 
+            sanitized_msg = utils.leave_only_unique_lines(utils.sanitize_text(
+                cleaned_message))
             msg_words = " ".join(utils.split_words(sanitized_msg))
-            if msg_words in searched_logs:
+            if msg_words in searched_logs or msg_words.strip() == "":
                 continue
             searched_logs.add(msg_words)
             query = self.build_search_query(search_req, sanitized_msg)
             res = self.es_client.search(index=str(search_req.projectId), body=query)
             similar_log_ids = similar_log_ids.union(
-                self.find_similar_logs_by_cosine_similarity(msg_words, message, res))
+                self.find_similar_logs_by_cosine_similarity(msg_words, cleaned_message,
+                                                            search_req.logLines, res))
 
         logger.info("Finished searching by request %s with %d results. It took %.2f sec.",
                     search_req.json(), len(similar_log_ids), time() - t_start)
         return list(similar_log_ids)
 
-    def find_similar_logs_by_cosine_similarity(self, msg_words, message, res):
+    def find_similar_logs_by_cosine_similarity(self, msg_words, cleaned_message, log_lines, res):
         similar_log_ids = set()
         messages_by_ids = {}
-        message_index_id = 1
-        all_messages = [msg_words]
+
+        weighted_log_similarity_calculator = self.weighted_log_similarity_calculator
+        if log_lines != -1:
+            weighted_log_similarity_calculator = None
+
+        if weighted_log_similarity_calculator is not None:
+            detected_message, stacktrace = utils.detect_log_description_and_stacktrace(
+                cleaned_message,
+                default_log_number=1)
+
+            detected_message = utils.sanitize_text(detected_message)
+            stacktrace = utils.sanitize_text(stacktrace)
+            detected_message = utils.leave_only_unique_lines(detected_message)
+            stacktrace = utils.leave_only_unique_lines(stacktrace)
+            all_messages = weighted_log_similarity_calculator.message_to_array(
+                detected_message,
+                stacktrace)
+        else:
+            all_messages = [msg_words]
+        message_index_id = len(all_messages)
+        query_message_index_finish = len(all_messages) - 1
 
         for result in res["hits"]["hits"]:
             try:
                 log_id = int(re.search(r"\d+", result["_id"]).group(0))
                 if log_id not in messages_by_ids:
-                    log_query_words = " ".join(utils.split_words(result["_source"]["message"]))
-                    all_messages.append(log_query_words)
-                    messages_by_ids[log_id] = message_index_id
-                    message_index_id += 1
+                    if weighted_log_similarity_calculator is not None:
+                        text = weighted_log_similarity_calculator.message_to_array(
+                            result["_source"]["detected_message"],
+                            result["_source"]["stacktrace"])
+                        all_messages.extend(text)
+                        messages_by_ids[log_id] = [message_index_id,
+                                                   len(all_messages) - 1]
+                        message_index_id += len(text)
+                    else:
+                        log_query_words = " ".join(utils.split_words(result["_source"]["message"]))
+                        all_messages.append(log_query_words)
+                        messages_by_ids[log_id] = message_index_id
+                        message_index_id += 1
             except Exception as err:
                 logger.error("Id %s is not integer", result["_id"])
                 logger.error(err)
@@ -602,13 +639,21 @@ class EsClient:
             vectorizer = CountVectorizer(binary=True,
                                          analyzer="word",
                                          token_pattern="[^ ]+")
-            count_vector_matrix = vectorizer.fit_transform(all_messages)
+            count_vector_matrix = np.asarray(vectorizer.fit_transform(all_messages).toarray())
             for log_id in messages_by_ids:
-                similarity_percent = round(1 - spatial.distance.cosine(
-                    np.asarray(count_vector_matrix[0].toarray()),
-                    np.asarray(count_vector_matrix[messages_by_ids[log_id]].toarray())), 3)
+                if weighted_log_similarity_calculator is not None:
+                    query_vector = weighted_log_similarity_calculator.weigh_data_rows(
+                        count_vector_matrix[0:query_message_index_finish + 1])
+                    log_vector = weighted_log_similarity_calculator.weigh_data_rows(
+                        count_vector_matrix[messages_by_ids[log_id][0]:messages_by_ids[log_id][1] + 1])
+                    similarity_percent =\
+                        round(1 - spatial.distance.cosine(query_vector, log_vector), 3)
+                else:
+                    similarity_percent = round(1 - spatial.distance.cosine(
+                        count_vector_matrix[0],
+                        count_vector_matrix[messages_by_ids[log_id]]), 3)
                 logger.debug("Log with id %s has %.3f similarity with the log '%s'",
-                             log_id, similarity_percent, message)
+                             log_id, similarity_percent, cleaned_message)
                 if similarity_percent >= self.search_cfg["SearchLogsMinSimilarity"]:
                     similar_log_ids.add(log_id)
         return similar_log_ids
@@ -824,7 +869,8 @@ class EsClient:
             "max_query_terms": self.search_cfg["MaxQueryTerms"],
             "min_should_match": self.search_cfg["MinShouldMatch"],
             "min_word_length": self.search_cfg["MinWordLength"],
-            "filter_min_should_match": self.search_cfg["FilterMinShouldMatch"]
+            "filter_min_should_match": self.search_cfg["FilterMinShouldMatch"],
+            "similarity_weights_folder": self.search_cfg["SimilarityWeightsFolder"]
         }
 
         process_results, map_with_process_results = [], {}

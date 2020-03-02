@@ -45,6 +45,9 @@ class TestBoostingFeaturizer(unittest.TestCase):
             "max_query_terms":  50,
             "min_should_match": 0.8,
             "min_word_length":  0,
+            "filter_min_should_match": [],
+            "similarity_weights_folder": os.getenv("SIMILARITY_WEIGHTS_FOLDER", ""),
+            "number_of_log_lines": -1
         }
 
     @staticmethod

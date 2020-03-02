@@ -58,9 +58,13 @@ def build_url(main_url, url_params):
     return main_url + "/" + "/".join(url_params)
 
 
+def filter_empty_lines(log_lines):
+    return [line for line in log_lines if line.strip() != ""]
+
+
 def delete_empty_lines(log):
     """Delete empty lines"""
-    return "\n".join([line for line in log.split("\n") if line.strip() != ""])
+    return "\n".join(filter_empty_lines(log.split("\n")))
 
 
 def reverse_log(log):

@@ -45,8 +45,7 @@ APP_CONFIG = {
     "exchangeName":      os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
     "analyzerPriority":  int(os.getenv("ANALYZER_PRIORITY", "1")),
     "analyzerIndex":     json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),
-    "analyzerLogSearch": json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower()),
-    "boostModelFolder":  os.getenv("BOOST_MODEL_FOLDER"),
+    "analyzerLogSearch": json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower())
 }
 
 SEARCH_CONFIG = {
@@ -59,7 +58,9 @@ SEARCH_CONFIG = {
     "SearchLogsMinSimilarity":  float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.9")),
     "MinWordLength":            int(os.getenv("ES_MIN_WORD_LENGTH", "0")),
     "FilterMinShouldMatch":     get_bool_value(os.getenv("FILTER_MIN_SHOULD_MATCH", "true")),
-    "AllowParallelAnalysis": json.loads(os.getenv("ALLOW_PARALLEL_ANALYSIS", "false").lower())
+    "AllowParallelAnalysis": json.loads(os.getenv("ALLOW_PARALLEL_ANALYSIS", "false").lower()),
+    "BoostModelFolder":      os.getenv("BOOST_MODEL_FOLDER"),
+    "SimilarityWeightsFolder": os.getenv("SIMILARITY_WEIGHTS_FOLDER", ""),
 }
 
 
@@ -87,7 +88,7 @@ def create_ampq_client():
 def create_es_client():
     """Creates Elasticsearch client"""
     _es_client = EsClient(APP_CONFIG["esHost"], SEARCH_CONFIG)
-    decision_maker = boosting_decision_maker.BoostingDecisionMaker(APP_CONFIG["boostModelFolder"])
+    decision_maker = boosting_decision_maker.BoostingDecisionMaker(SEARCH_CONFIG["BoostModelFolder"])
     _es_client.set_boosting_decision_maker(decision_maker)
     return _es_client
 

@@ -16,6 +16,7 @@ RUN /venv/bin/python3 -m nltk.downloader stopwords
 ARG version
 ARG prod
 ENV BOOST_MODEL_FOLDER="/backend/model/0.6"
+ENV SIMILARITY_WEIGHTS_FOLDER="/backend/model/weights_0.1"
 
 COPY ./ ./
 
@@ -44,6 +45,7 @@ ENV FLASK_APP=app.py UWSGI_WSGI_FILE=app.py UWSGI_SOCKET=:3031 UWSGI_HTTP=:5000 
 ENV PATH="/venv/bin:${PATH}"
 ENV PYTHONPATH="/backend"
 ENV BOOST_MODEL_FOLDER="/backend/model/0.6"
+ENV SIMILARITY_WEIGHTS_FOLDER="/backend/model/weights_0.1"
 #ENV LOGGING_LEVEL="INFO"
 # Start uWSGI
 #CMD ["/venv/bin/uwsgi", "--http-auto-chunked", "--http-keepalive"]

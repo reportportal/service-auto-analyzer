@@ -20,6 +20,7 @@ import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 import logging
 from threading import Thread
+from boosting_decision_making.log_similarity_calculator import LogSimilarityCalculator
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
@@ -28,6 +29,10 @@ class BoostingFeaturizer:
 
     def __init__(self, all_results, config, feature_ids):
         self.config = config
+        self.weighted_log_similarity_calculator = None
+        if self.config["similarity_weights_folder"].strip() != "":
+            self.weighted_log_similarity_calculator = LogSimilarityCalculator(
+                folder=self.config["similarity_weights_folder"])
         self.prepare_word_vectors(all_results)
         if "filter_min_should_match" in self.config:
             for field in self.config["filter_min_should_match"]:
@@ -62,10 +67,11 @@ class BoostingFeaturizer:
             self.feature_ids = feature_ids
 
     class CountVectorizerThread(Thread):
-        def __init__(self, fields, all_results, min_word_length):
+        def __init__(self, fields, all_results, config, weight_calculator):
             Thread.__init__(self)
             self.fields = fields
-            self.min_word_length = min_word_length
+            self.config = config
+            self.weight_calculator = weight_calculator
             self.all_results = all_results
             self.dict_count_vectorizer = {}
             self.all_text_field_ids = {}
@@ -79,14 +85,38 @@ class BoostingFeaturizer:
                 for log, res in self.all_results:
                     for obj in [log] + res["hits"]["hits"]:
                         if obj["_id"] not in log_field_ids:
-                            text = " ".join(utils.split_words(obj["_source"][field],
-                                            min_word_length=self.min_word_length))
-                            if text.strip() == "":
-                                log_field_ids[obj["_id"]] = -1
+                            if self.weight_calculator is None:
+                                text = " ".join(utils.split_words(obj["_source"][field],
+                                                min_word_length=self.config["min_word_length"]))
+                                if text.strip() == "":
+                                    log_field_ids[obj["_id"]] = -1
+                                else:
+                                    all_messages.append(text)
+                                    log_field_ids[obj["_id"]] = index_in_message_array
+                                    index_in_message_array += 1
                             else:
-                                all_messages.append(text)
-                                log_field_ids[obj["_id"]] = index_in_message_array
-                                index_in_message_array += 1
+                                if obj["_source"][field].strip() == "":
+                                    log_field_ids[obj["_id"]] = -1
+                                else:
+                                    text = []
+                                    if field == "message" and self.config["number_of_log_lines"] == -1:
+                                        text = self.weight_calculator.message_to_array(
+                                            obj["_source"]["detected_message"],
+                                            obj["_source"]["stacktrace"])
+                                    elif field == "stacktrace":
+                                        text = self.weight_calculator.message_to_array(
+                                            "", obj["_source"]["stacktrace"])
+                                    else:
+                                        text = utils.filter_empty_lines([" ".join(utils.split_words(
+                                            obj["_source"][field],
+                                            min_word_length=self.config["min_word_length"]))])
+                                    if len(text) == 0:
+                                        log_field_ids[obj["_id"]] = -1
+                                    else:
+                                        all_messages.extend(text)
+                                        log_field_ids[obj["_id"]] = [index_in_message_array,
+                                                                     len(all_messages) - 1]
+                                        index_in_message_array += len(text)
                 if len(all_messages) > 0:
                     vectorizer = CountVectorizer(binary=True, analyzer="word", token_pattern="[^ ]+")
                     count_vector_matrix = np.asarray(vectorizer.fit_transform(all_messages).toarray())
@@ -97,11 +127,13 @@ class BoostingFeaturizer:
     def prepare_word_vectors(self, all_results):
         self.all_text_field_ids = {}
         self.dict_count_vectorizer = {}
-        min_word_length = self.config["min_word_length"] if "min_word_length" in self.config else 0
+        if "min_word_length" not in self.config:
+            self.config["min_word_length"] = 0
         threads = []
         for fields in [["message", "detected_message", "detected_message_with_numbers"],
                        ["merged_small_logs", "stacktrace", "only_numbers"]]:
-            thread = BoostingFeaturizer.CountVectorizerThread(fields, all_results, min_word_length)
+            thread = BoostingFeaturizer.CountVectorizerThread(fields, all_results, self.config,
+                                                              self.weighted_log_similarity_calculator)
             threads.append(thread)
             thread.start()
         for thread in threads:
@@ -154,7 +186,8 @@ class BoostingFeaturizer:
                 continue
             index_query_message = self.all_text_field_ids[field_to_check][log["_id"]]
             index_log_message = self.all_text_field_ids[field_to_check][elastic_res["_id"]]
-            if index_query_message < 0 and index_log_message < 0:
+            if (type(index_query_message) == int and index_query_message < 0) and\
+                    (type(index_log_message) == int and index_log_message < 0):
                 if for_filter and field_to_check in ["message", "detected_message",
                                                      "detected_message_with_numbers"]:
                     index_query_message = self.all_text_field_ids["merged_small_logs"][log["_id"]]
@@ -165,14 +198,24 @@ class BoostingFeaturizer:
                     all_results_similarity[group_id] = 1.0
             sim_field_dict[group_id] = sim_field
 
-            if index_query_message < 0 or index_log_message < 0:
+            if (type(index_query_message) == int and index_query_message < 0) or\
+                    (type(index_log_message) == int and index_log_message < 0):
                 if group_id not in all_results_similarity:
                     all_results_similarity[group_id] = 0.0
             else:
-                all_results_similarity[group_id] =\
-                    round(1 - spatial.distance.cosine(
-                        self.dict_count_vectorizer[field_to_check][index_query_message],
-                        self.dict_count_vectorizer[field_to_check][index_log_message]), 3)
+                if self.weighted_log_similarity_calculator is None:
+                    all_results_similarity[group_id] =\
+                        round(1 - spatial.distance.cosine(
+                            self.dict_count_vectorizer[field_to_check][index_query_message],
+                            self.dict_count_vectorizer[field_to_check][index_log_message]), 3)
+                else:
+                    field_lines_array = self.dict_count_vectorizer[field_to_check]
+                    query_vector = self.weighted_log_similarity_calculator.weigh_data_rows(
+                        field_lines_array[index_query_message[0]:index_query_message[1] + 1])
+                    log_vector = self.weighted_log_similarity_calculator.weigh_data_rows(
+                        field_lines_array[index_log_message[0]:index_log_message[1] + 1])
+                    all_results_similarity[group_id] =\
+                        round(1 - spatial.distance.cosine(query_vector, log_vector), 3)
 
         return all_results_similarity, sim_field_dict
 

@@ -106,7 +106,8 @@ class TestEsClient(unittest.TestCase):
             "SearchLogsMinShouldMatch": "98%",
             "SearchLogsMinSimilarity": 0.9,
             "MinWordLength":  0,
-            "FilterMinShouldMatch": False
+            "FilterMinShouldMatch": False,
+            "SimilarityWeightsFolder": os.getenv("SIMILARITY_WEIGHTS_FOLDER", "")
         }
 
     @utils.ignore_warnings
@@ -793,7 +794,8 @@ class TestEsClient(unittest.TestCase):
                     "SearchLogsMinShouldMatch": "98%",
                     "SearchLogsMinSimilarity": 0.9,
                     "MinWordLength":  0,
-                    "FilterMinShouldMatch": True
+                    "FilterMinShouldMatch": True,
+                    "SimilarityWeightsFolder": os.getenv("SIMILARITY_WEIGHTS_FOLDER", "")
                 },
                 "expected_count": 0,
                 "expected_issue_type": "",
@@ -818,7 +820,8 @@ class TestEsClient(unittest.TestCase):
                     "SearchLogsMinShouldMatch": "98%",
                     "SearchLogsMinSimilarity": 0.9,
                     "MinWordLength":  0,
-                    "FilterMinShouldMatch": True
+                    "FilterMinShouldMatch": True,
+                    "SimilarityWeightsFolder": os.getenv("SIMILARITY_WEIGHTS_FOLDER", "")
                 },
                 "expected_count": 1,
                 "expected_issue_type": "AB001",

@@ -114,7 +114,7 @@ DEFAULT_MAPPING_SETTINGS = {
 
 
 def calculate_features(params):
-    es_results_to_process, feature_ids, idx, config, parallel = params
+    es_results_to_process, feature_ids, idx, config, parallel, weight_calculator = params
     features_gathered = []
     for analyzer_config, test_item, searched_res in es_results_to_process:
         min_should_match = analyzer_config.minShouldMatch / 100 if analyzer_config.minShouldMatch > 0 else\
@@ -130,7 +130,8 @@ def calculate_features(params):
                 "similarity_weights_folder": config["similarity_weights_folder"],
                 "number_of_log_lines": analyzer_config.numberOfLogLines
             },
-            feature_ids=feature_ids[0] if analyzer_config.numberOfLogLines == -1 else feature_ids[1])
+            feature_ids=feature_ids[0] if analyzer_config.numberOfLogLines == -1 else feature_ids[1],
+            weighted_log_similarity_calculator=weight_calculator)
         part_train_calc_data, issue_type_names = _boosting_data_gatherer.gather_features_info()
         features_gathered.append((part_train_calc_data, issue_type_names, _boosting_data_gatherer))
     return (idx, features_gathered) if parallel else [(idx, features_gathered)]
@@ -896,7 +897,8 @@ class EsClient:
                 not_all_line_features = self.get_decision_maker(2).get_feature_ids()
                 process_results = pool.map(
                     calculate_features,
-                    [(res, (all_line_features, not_all_line_features), i, config, True)
+                    [(res, (all_line_features, not_all_line_features), i, config, True,
+                      self.weighted_log_similarity_calculator)
                      for i, res in enumerate(es_results_to_process)])
         except Exception as e:
             logger.error("Couldn't process items in parallel. It will be processed sequentially.")
@@ -921,7 +923,8 @@ class EsClient:
                 not_all_line_features = self.get_decision_maker(2).get_feature_ids()
                 process_results.extend(
                     calculate_features(
-                        (res, (all_line_features, not_all_line_features), i, config, False)))
+                        (res, (all_line_features, not_all_line_features), i, config, False,
+                            self.weighted_log_similarity_calculator)))
         return process_results
 
     def choose_issue_type(self, predicted_labels, predicted_labels_probability,

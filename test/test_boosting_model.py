@@ -22,6 +22,7 @@ import sure # noqa
 import numpy as np
 from boosting_decision_making.boosting_featurizer import BoostingFeaturizer
 from boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
+from boosting_decision_making import log_similarity_calculator
 from utils import utils
 
 
@@ -123,9 +124,14 @@ class TestBoostingModel(unittest.TestCase):
             ])
         for idx, test in enumerate(tests):
             feature_ids = test["decision_maker"].get_feature_ids()
+            weight_log_sim = None
+            if self.weights_folder.strip() != "":
+                weight_log_sim = log_similarity_calculator.\
+                    LogSimilarityCalculator(folder=self.weights_folder)
             _boosting_featurizer = BoostingFeaturizer(test["elastic_results"],
                                                       test["config"],
-                                                      feature_ids)
+                                                      feature_ids,
+                                                      weighted_log_similarity_calculator=weight_log_sim)
             with sure.ensure('Error in the test case number: {0}', idx):
                 gathered_data, issue_type_names = _boosting_featurizer.gather_features_info()
                 gathered_data.should.equal(boost_model_results[str(idx)][0],

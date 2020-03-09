@@ -20,19 +20,16 @@ import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 import logging
 from threading import Thread
-from boosting_decision_making.log_similarity_calculator import LogSimilarityCalculator
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
 
 class BoostingFeaturizer:
 
-    def __init__(self, all_results, config, feature_ids):
+    def __init__(self, all_results, config, feature_ids,
+                 weighted_log_similarity_calculator=None):
         self.config = config
-        self.weighted_log_similarity_calculator = None
-        if self.config["similarity_weights_folder"].strip() != "":
-            self.weighted_log_similarity_calculator = LogSimilarityCalculator(
-                folder=self.config["similarity_weights_folder"])
+        self.weighted_log_similarity_calculator = weighted_log_similarity_calculator
         self.prepare_word_vectors(all_results)
         if "filter_min_should_match" in self.config:
             for field in self.config["filter_min_should_match"]:

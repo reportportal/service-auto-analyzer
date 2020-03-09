@@ -36,7 +36,8 @@ class TestBoostingModel(unittest.TestCase):
         self.log_message_only_small_logs = "log_message_only_small_logs.json"
         self.boost_model_results = "boost_model_results.json"
         self.epsilon = 0.0001
-        self.boost_model_folder = os.getenv("BOOST_MODEL_FOLDER")
+        self.boost_model_folder_all_lines = os.getenv("BOOST_MODEL_FOLDER_ALL_LINES")
+        self.boost_model_folder_not_all_lines = os.getenv("BOOST_MODEL_FOLDER_NOT_ALL_LINES")
         self.weights_folder = os.getenv("SIMILARITY_WEIGHTS_FOLDER", "")
         logging.disable(logging.CRITICAL)
 
@@ -45,15 +46,15 @@ class TestBoostingModel(unittest.TestCase):
         logging.disable(logging.DEBUG)
 
     @utils.ignore_warnings
-    def get_default_config(self):
+    def get_default_config(self, number_of_log_lines, filter_fields=["detected_message", "stacktrace"]):
         """Get default config"""
         return {
             "max_query_terms":  50,
             "min_should_match": 0.8,
             "min_word_length":  0,
-            "filter_min_should_match": ["detected_message", "message"],
+            "filter_min_should_match": filter_fields,
             "similarity_weights_folder": self.weights_folder,
-            "number_of_log_lines": -1
+            "number_of_log_lines": number_of_log_lines
         }
 
     @staticmethod
@@ -65,54 +66,72 @@ class TestBoostingModel(unittest.TestCase):
 
     @utils.ignore_warnings
     def test_random_run(self):
-        print("Boost model folder: ", self.boost_model_folder)
+        print("Boost model folder all lines: ", self.boost_model_folder_all_lines)
+        print("Boost model folder not all lines: ", self.boost_model_folder_not_all_lines)
         print("Weights model folder: ", self.weights_folder)
-        decision_maker = BoostingDecisionMaker(self.boost_model_folder)
-        test_data_size = 5
-        random_data = np.random.rand(test_data_size, len(decision_maker.get_feature_ids()))
-        result, result_probability = decision_maker.predict(random_data)
-        result.should.have.length_of(test_data_size)
-        result_probability.should.have.length_of(test_data_size)
+        for folder in [self.boost_model_folder_all_lines, self.boost_model_folder_not_all_lines]:
+            decision_maker = BoostingDecisionMaker(folder)
+            test_data_size = 5
+            random_data = np.random.rand(test_data_size, len(decision_maker.get_feature_ids()))
+            result, result_probability = decision_maker.predict(random_data)
+            result.should.have.length_of(test_data_size)
+            result_probability.should.have.length_of(test_data_size)
 
     @utils.ignore_warnings
     def test_full_data_check(self):
-        print("Boost model folder: ", self.boost_model_folder)
+        print("Boost model folder all lines: ", self.boost_model_folder_all_lines)
+        print("Boost model folder not all lines: ", self.boost_model_folder_not_all_lines)
         print("Weights model folder: ", self.weights_folder)
-        decision_maker = BoostingDecisionMaker(self.boost_model_folder)
+        decision_maker_all_lines = BoostingDecisionMaker(self.boost_model_folder_all_lines)
+        decision_maker_not_all_lines = BoostingDecisionMaker(self.boost_model_folder_not_all_lines)
         boost_model_results = self.get_fixture(self.boost_model_results)
-        tests = [
-            {
-                "elastic_results": [(self.get_fixture(self.log_message),
-                                     self.get_fixture(self.one_hit_search_rs_explained))],
-                "config":          self.get_default_config(),
-            },
-            {
-                "elastic_results": [(self.get_fixture(self.log_message),
-                                     self.get_fixture(self.two_hits_search_rs_explained))],
-                "config":          self.get_default_config(),
-            },
-            {
-                "elastic_results": [(self.get_fixture(self.log_message),
-                                     self.get_fixture(self.two_hits_search_rs_explained)),
-                                    (self.get_fixture(self.log_message),
-                                     self.get_fixture(self.one_hit_search_rs_explained))],
-                "config":          self.get_default_config(),
-            },
-            {
-                "elastic_results": [(self.get_fixture(self.log_message_only_small_logs),
-                                     self.get_fixture(self.two_hits_search_rs_small_logs))],
-                "config":          self.get_default_config(),
-            },
-        ]
+        tests = []
+        for log_lines, filter_fields, decision_maker in [
+                (-1, ["detected_message", "stacktrace"], decision_maker_all_lines),
+                (2, ["message"], decision_maker_not_all_lines)]:
+            tests.extend([
+                {
+                    "elastic_results": [(self.get_fixture(self.log_message),
+                                         self.get_fixture(self.one_hit_search_rs_explained))],
+                    "config":          self.get_default_config(number_of_log_lines=log_lines,
+                                                               filter_fields=filter_fields),
+                    "decision_maker":  decision_maker
+                },
+                {
+                    "elastic_results": [(self.get_fixture(self.log_message),
+                                         self.get_fixture(self.two_hits_search_rs_explained))],
+                    "config":          self.get_default_config(number_of_log_lines=log_lines,
+                                                               filter_fields=filter_fields),
+                    "decision_maker":  decision_maker
+                },
+                {
+                    "elastic_results": [(self.get_fixture(self.log_message),
+                                         self.get_fixture(self.two_hits_search_rs_explained)),
+                                        (self.get_fixture(self.log_message),
+                                         self.get_fixture(self.one_hit_search_rs_explained))],
+                    "config":          self.get_default_config(number_of_log_lines=log_lines,
+                                                               filter_fields=filter_fields),
+                    "decision_maker":  decision_maker
+                },
+                {
+                    "elastic_results": [(self.get_fixture(self.log_message_only_small_logs),
+                                         self.get_fixture(self.two_hits_search_rs_small_logs))],
+                    "config":          self.get_default_config(number_of_log_lines=log_lines,
+                                                               filter_fields=filter_fields),
+                    "decision_maker":  decision_maker
+                },
+            ])
         for idx, test in enumerate(tests):
+            feature_ids = test["decision_maker"].get_feature_ids()
             _boosting_featurizer = BoostingFeaturizer(test["elastic_results"],
                                                       test["config"],
-                                                      decision_maker.get_feature_ids())
+                                                      feature_ids)
             with sure.ensure('Error in the test case number: {0}', idx):
                 gathered_data, issue_type_names = _boosting_featurizer.gather_features_info()
                 gathered_data.should.equal(boost_model_results[str(idx)][0],
                                            epsilon=self.epsilon)
-                predict_label, predict_probability = decision_maker.predict(gathered_data)
+                predict_label, predict_probability = test["decision_maker"].predict(
+                    gathered_data)
                 predict_label.tolist().should.equal(boost_model_results[str(idx)][1],
                                                     epsilon=self.epsilon)
                 predict_probability.tolist().should.equal(boost_model_results[str(idx)][2],

@@ -43,7 +43,9 @@ class TestEsQuery(unittest.TestCase):
             "BoostLaunch":    5,
             "BoostUniqueID":  3,
             "MaxQueryTerms":  50,
-            "SimilarityWeightsFolder": os.getenv("SIMILARITY_WEIGHTS_FOLDER", "")
+            "BoostModelFolderAllLines":    os.getenv("BOOST_MODEL_FOLDER_ALL_LINES", ""),
+            "BoostModelFolderNotAllLines": os.getenv("BOOST_MODEL_FOLDER_NOT_ALL_LINES", ""),
+            "SimilarityWeightsFolder":     os.getenv("SIMILARITY_WEIGHTS_FOLDER", ""),
         }
         error_logging_level = 40000
 
@@ -83,7 +85,9 @@ class TestEsQuery(unittest.TestCase):
             "BoostLaunch":    5,
             "BoostUniqueID":  3,
             "MaxQueryTerms":  50,
-            "SimilarityWeightsFolder": os.getenv("SIMILARITY_WEIGHTS_FOLDER", "")
+            "BoostModelFolderAllLines":    os.getenv("BOOST_MODEL_FOLDER_ALL_LINES", ""),
+            "BoostModelFolderNotAllLines": os.getenv("BOOST_MODEL_FOLDER_NOT_ALL_LINES", ""),
+            "SimilarityWeightsFolder":     os.getenv("SIMILARITY_WEIGHTS_FOLDER", ""),
         }
         error_logging_level = 40000
 
@@ -123,7 +127,9 @@ class TestEsQuery(unittest.TestCase):
             "BoostLaunch":    5,
             "BoostUniqueID":  3,
             "MaxQueryTerms":  50,
-            "SimilarityWeightsFolder": os.getenv("SIMILARITY_WEIGHTS_FOLDER", "")
+            "BoostModelFolderAllLines":    os.getenv("BOOST_MODEL_FOLDER_ALL_LINES", ""),
+            "BoostModelFolderNotAllLines": os.getenv("BOOST_MODEL_FOLDER_NOT_ALL_LINES", ""),
+            "SimilarityWeightsFolder":     os.getenv("SIMILARITY_WEIGHTS_FOLDER", ""),
         }
         error_logging_level = 40000
 
@@ -163,7 +169,9 @@ class TestEsQuery(unittest.TestCase):
             "BoostLaunch":    5,
             "BoostUniqueID":  3,
             "MaxQueryTerms":  50,
-            "SimilarityWeightsFolder": os.getenv("SIMILARITY_WEIGHTS_FOLDER", "")
+            "BoostModelFolderAllLines":    os.getenv("BOOST_MODEL_FOLDER_ALL_LINES", ""),
+            "BoostModelFolderNotAllLines": os.getenv("BOOST_MODEL_FOLDER_NOT_ALL_LINES", ""),
+            "SimilarityWeightsFolder":     os.getenv("SIMILARITY_WEIGHTS_FOLDER", ""),
         }
         error_logging_level = 40000
 
@@ -544,7 +552,9 @@ class TestEsQuery(unittest.TestCase):
             "MaxQueryTerms":  50,
             "SearchLogsMinShouldMatch": "90%",
             "SearchLogsMinSimilarity":  0.9,
-            "SimilarityWeightsFolder": os.getenv("SIMILARITY_WEIGHTS_FOLDER", "")
+            "BoostModelFolderAllLines":    os.getenv("BOOST_MODEL_FOLDER_ALL_LINES", ""),
+            "BoostModelFolderNotAllLines": os.getenv("BOOST_MODEL_FOLDER_NOT_ALL_LINES", ""),
+            "SimilarityWeightsFolder":     os.getenv("SIMILARITY_WEIGHTS_FOLDER", ""),
         }
         error_logging_level = 40000
 

@@ -28,7 +28,6 @@ from flask_cors import CORS
 import amqp.amqp_handler as amqp_handler
 from amqp.amqp import AmqpClient
 from commons.esclient import EsClient
-from boosting_decision_making import boosting_decision_maker
 from utils import utils
 
 
@@ -49,18 +48,19 @@ APP_CONFIG = {
 }
 
 SEARCH_CONFIG = {
-    "MinShouldMatch":           os.getenv("ES_MIN_SHOULD_MATCH", "80%"),
-    "BoostAA":                  float(os.getenv("ES_BOOST_AA", "-8.0")),
-    "BoostLaunch":              float(os.getenv("ES_BOOST_LAUNCH", "4.0")),
-    "BoostUniqueID":            float(os.getenv("ES_BOOST_UNIQUE_ID", "8.0")),
-    "MaxQueryTerms":            int(os.getenv("ES_MAX_QUERY_TERMS", "50")),
-    "SearchLogsMinShouldMatch": os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "80%"),
-    "SearchLogsMinSimilarity":  float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.9")),
-    "MinWordLength":            int(os.getenv("ES_MIN_WORD_LENGTH", "0")),
-    "FilterMinShouldMatch":     get_bool_value(os.getenv("FILTER_MIN_SHOULD_MATCH", "true")),
-    "AllowParallelAnalysis": json.loads(os.getenv("ALLOW_PARALLEL_ANALYSIS", "false").lower()),
-    "BoostModelFolder":      os.getenv("BOOST_MODEL_FOLDER"),
-    "SimilarityWeightsFolder": os.getenv("SIMILARITY_WEIGHTS_FOLDER", ""),
+    "MinShouldMatch":              os.getenv("ES_MIN_SHOULD_MATCH", "80%"),
+    "BoostAA":                     float(os.getenv("ES_BOOST_AA", "-8.0")),
+    "BoostLaunch":                 float(os.getenv("ES_BOOST_LAUNCH", "4.0")),
+    "BoostUniqueID":               float(os.getenv("ES_BOOST_UNIQUE_ID", "8.0")),
+    "MaxQueryTerms":               int(os.getenv("ES_MAX_QUERY_TERMS", "50")),
+    "SearchLogsMinShouldMatch":    os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "80%"),
+    "SearchLogsMinSimilarity":     float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.9")),
+    "MinWordLength":               int(os.getenv("ES_MIN_WORD_LENGTH", "0")),
+    "FilterMinShouldMatch":        get_bool_value(os.getenv("FILTER_MIN_SHOULD_MATCH", "true")),
+    "AllowParallelAnalysis":       json.loads(os.getenv("ALLOW_PARALLEL_ANALYSIS", "false").lower()),
+    "BoostModelFolderAllLines":    os.getenv("BOOST_MODEL_FOLDER_ALL_LINES", ""),
+    "BoostModelFolderNotAllLines": os.getenv("BOOST_MODEL_FOLDER_NOT_ALL_LINES", ""),
+    "SimilarityWeightsFolder":     os.getenv("SIMILARITY_WEIGHTS_FOLDER", ""),
 }
 
 
@@ -87,10 +87,7 @@ def create_ampq_client():
 
 def create_es_client():
     """Creates Elasticsearch client"""
-    _es_client = EsClient(APP_CONFIG["esHost"], SEARCH_CONFIG)
-    decision_maker = boosting_decision_maker.BoostingDecisionMaker(SEARCH_CONFIG["BoostModelFolder"])
-    _es_client.set_boosting_decision_maker(decision_maker)
-    return _es_client
+    return EsClient(APP_CONFIG["esHost"], SEARCH_CONFIG)
 
 
 def declare_exchange(channel, config):

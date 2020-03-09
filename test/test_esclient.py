@@ -93,7 +93,7 @@ class TestEsClient(unittest.TestCase):
 
     @staticmethod
     @utils.ignore_warnings
-    def get_default_search_config():
+    def get_default_search_config(filter_min_should_match=False):
         """Get default search config"""
         return {
             "MinShouldMatch": "80%",
@@ -106,8 +106,10 @@ class TestEsClient(unittest.TestCase):
             "SearchLogsMinShouldMatch": "98%",
             "SearchLogsMinSimilarity": 0.9,
             "MinWordLength":  0,
-            "FilterMinShouldMatch": False,
-            "SimilarityWeightsFolder": os.getenv("SIMILARITY_WEIGHTS_FOLDER", "")
+            "FilterMinShouldMatch": filter_min_should_match,
+            "BoostModelFolderAllLines":    os.getenv("BOOST_MODEL_FOLDER_ALL_LINES", ""),
+            "BoostModelFolderNotAllLines": os.getenv("BOOST_MODEL_FOLDER_NOT_ALL_LINES", ""),
+            "SimilarityWeightsFolder":     os.getenv("SIMILARITY_WEIGHTS_FOLDER", ""),
         }
 
     @utils.ignore_warnings
@@ -783,20 +785,7 @@ class TestEsClient(unittest.TestCase):
                 "msearch_results": [TestEsClient.get_fixture(self.two_hits_search_rs, to_json=True)],
                 "index_rq":       TestEsClient.get_fixture(
                     self.launch_w_test_items_w_logs_to_be_merged),
-                "config": {
-                    "MinShouldMatch": "80%",
-                    "MinTermFreq":    1,
-                    "MinDocFreq":     1,
-                    "BoostAA":        2,
-                    "BoostLaunch":    2,
-                    "BoostUniqueID":  2,
-                    "MaxQueryTerms":  50,
-                    "SearchLogsMinShouldMatch": "98%",
-                    "SearchLogsMinSimilarity": 0.9,
-                    "MinWordLength":  0,
-                    "FilterMinShouldMatch": True,
-                    "SimilarityWeightsFolder": os.getenv("SIMILARITY_WEIGHTS_FOLDER", "")
-                },
+                "config": TestEsClient.get_default_search_config(filter_min_should_match=True),
                 "expected_count": 0,
                 "expected_issue_type": "",
                 "boost_predict":       ([], [])
@@ -809,20 +798,7 @@ class TestEsClient(unittest.TestCase):
                 "msearch_results": [TestEsClient.get_fixture(self.two_hits_search_rs, to_json=True)],
                 "index_rq":       TestEsClient.get_fixture(
                     self.launch_w_test_items_w_logs_filtered),
-                "config": {
-                    "MinShouldMatch": "80%",
-                    "MinTermFreq":    1,
-                    "MinDocFreq":     1,
-                    "BoostAA":        2,
-                    "BoostLaunch":    2,
-                    "BoostUniqueID":  2,
-                    "MaxQueryTerms":  50,
-                    "SearchLogsMinShouldMatch": "98%",
-                    "SearchLogsMinSimilarity": 0.9,
-                    "MinWordLength":  0,
-                    "FilterMinShouldMatch": True,
-                    "SimilarityWeightsFolder": os.getenv("SIMILARITY_WEIGHTS_FOLDER", "")
-                },
+                "config": TestEsClient.get_default_search_config(filter_min_should_match=True),
                 "expected_count": 1,
                 "expected_issue_type": "AB001",
                 "boost_predict":       ([1], [[0.2, 0.8]])
@@ -842,7 +818,7 @@ class TestEsClient(unittest.TestCase):
                 if "msearch_results" in test:
                     es_client.es_client.msearch = MagicMock(
                         return_value={"responses": test["msearch_results"]})
-                es_client.set_boosting_decision_maker(_boosting_decision_maker)
+                es_client.boosting_decision_maker_all_lines = _boosting_decision_maker
                 launches = [launch_objects.Launch(**launch)
                             for launch in json.loads(test["index_rq"])]
                 response = es_client.analyze_logs(launches)

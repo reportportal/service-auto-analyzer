@@ -33,6 +33,7 @@ from datetime import datetime
 from multiprocessing import Pool
 from concurrent.futures import ThreadPoolExecutor
 from boosting_decision_making import log_similarity_calculator
+from boosting_decision_making import boosting_decision_maker
 
 ERROR_LOGGING_LEVEL = 40000
 
@@ -129,7 +130,7 @@ def calculate_features(params):
                 "similarity_weights_folder": config["similarity_weights_folder"],
                 "number_of_log_lines": analyzer_config.numberOfLogLines
             },
-            feature_ids=feature_ids)
+            feature_ids=feature_ids[0] if analyzer_config.numberOfLogLines == -1 else feature_ids[1])
         part_train_calc_data, issue_type_names = _boosting_data_gatherer.gather_features_info()
         features_gathered.append((part_train_calc_data, issue_type_names, _boosting_data_gatherer))
     return (idx, features_gathered) if parallel else [(idx, features_gathered)]
@@ -145,18 +146,21 @@ class EsClient:
         self.search_cfg = search_cfg
         self.es_client = elasticsearch.Elasticsearch([host], timeout=30,
                                                      max_retries=5, retry_on_timeout=True)
-        self.boosting_decision_maker = None
+        self.boosting_decision_maker_all_lines = None
+        self.boosting_decision_maker_not_all_lines = None
         self.weighted_log_similarity_calculator = None
+        self.initialize_decision_makers()
+
+    def initialize_decision_makers(self):
+        if self.search_cfg["BoostModelFolderAllLines"].strip() != "":
+            self.boosting_decision_maker_all_lines = boosting_decision_maker.BoostingDecisionMaker(
+                folder=self.search_cfg["BoostModelFolderAllLines"])
+        if self.search_cfg["BoostModelFolderNotAllLines"].strip() != "":
+            self.boosting_decision_maker_not_all_lines = boosting_decision_maker.BoostingDecisionMaker(
+                folder=self.search_cfg["BoostModelFolderNotAllLines"])
         if self.search_cfg["SimilarityWeightsFolder"].strip() != "":
-            self.weighted_log_similarity_calculator = log_similarity_calculator.LogSimilarityCalculator(
-                folder=self.search_cfg["SimilarityWeightsFolder"])
-
-    def set_boosting_decision_maker(self, boosting_decision_maker):
-        self.boosting_decision_maker = boosting_decision_maker
-
-    @staticmethod
-    def compress(text):
-        return " ".join(utils.split_words(text, only_unique=True))
+            self.weighted_log_similarity_calculator = log_similarity_calculator.\
+                LogSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
 
     def create_index(self, index_name):
         """Create index in elasticsearch"""
@@ -392,7 +396,7 @@ class EsClient:
             log_level = log["_source"]["log_level"]
 
             if log["_id"] in log_level_ids_to_add[log_level]:
-                merged_small_logs = EsClient.compress(
+                merged_small_logs = utils.compress(
                     log_level_messages[log["_source"]["log_level"]])
                 new_logs.append(EsClient.prepare_new_log(
                     log, log["_id"], False, merged_small_logs))
@@ -404,7 +408,7 @@ class EsClient:
                 log = log_level_ids_merged[log_level]
                 new_logs.append(EsClient.prepare_new_log(
                     log, str(log["_id"]) + "_m", True,
-                    EsClient.compress(log_level_messages[log_level]),
+                    utils.compress(log_level_messages[log_level]),
                     fields_to_clean=["message", "detected_message", "only_numbers",
                                      "detected_message_with_numbers", "stacktrace"]))
         return new_logs
@@ -888,9 +892,11 @@ class EsClient:
         process_results = []
         try:
             with Pool(processes=2) as pool:
+                all_line_features = self.get_decision_maker(-1).get_feature_ids()
+                not_all_line_features = self.get_decision_maker(2).get_feature_ids()
                 process_results = pool.map(
                     calculate_features,
-                    [(res, self.boosting_decision_maker.get_feature_ids(), i, config, True)
+                    [(res, (all_line_features, not_all_line_features), i, config, True)
                      for i, res in enumerate(es_results_to_process)])
         except Exception as e:
             logger.error("Couldn't process items in parallel. It will be processed sequentially.")
@@ -911,9 +917,11 @@ class EsClient:
             if i in map_with_process_results:
                 process_results.append(old_results[map_with_process_results[i]])
             else:
+                all_line_features = self.get_decision_maker(-1).get_feature_ids()
+                not_all_line_features = self.get_decision_maker(2).get_feature_ids()
                 process_results.extend(
                     calculate_features(
-                        (res, self.boosting_decision_maker.get_feature_ids(), i, config, False)))
+                        (res, (all_line_features, not_all_line_features), i, config, False)))
         return process_results
 
     def choose_issue_type(self, predicted_labels, predicted_labels_probability,
@@ -934,6 +942,11 @@ class EsClient:
                     predicted_issue_type = issue_type
                     max_val_start_time = start_time
         return predicted_issue_type
+
+    def get_decision_maker(self, number_of_log_lines):
+        if number_of_log_lines != -1 and self.boosting_decision_maker_not_all_lines is None:
+            return self.boosting_decision_maker_not_all_lines
+        return self.boosting_decision_maker_all_lines
 
     @utils.ignore_warnings
     def analyze_logs(self, launches):
@@ -956,8 +969,9 @@ class EsClient:
 
                 if len(feature_data) > 0:
 
+                    boosting_decision_maker = self.get_decision_maker(analyzer_config.numberOfLogLines)
                     predicted_labels, predicted_labels_probability =\
-                        self.boosting_decision_maker.predict(feature_data)
+                        boosting_decision_maker.predict(feature_data)
 
                     for i in range(len(issue_type_names)):
                         logger.debug("Most relevant item with issue type %s has id %s",

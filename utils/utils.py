@@ -38,6 +38,11 @@ def ignore_warnings(method):
     return _inner
 
 
+def compress(text):
+    """compress sentence to consist of only unique words"""
+    return " ".join(split_words(text, only_unique=True))
+
+
 def sanitize_text(text):
     """Sanitize text by deleting all numbers"""
     return re.sub(r"\d+", "", text)

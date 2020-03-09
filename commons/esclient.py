@@ -38,7 +38,6 @@ from threading import Thread
 
 ERROR_LOGGING_LEVEL = 40000
 
-
 logger = logging.getLogger("analyzerApp.esclient")
 
 
@@ -362,6 +361,95 @@ class EsClient:
         if bodies:
             self._bulk_index(bodies)
 
+    @staticmethod
+    def get_test_item_query(test_item_ids, is_merged):
+        """Build test item query"""
+        return {"size": 10000,
+                "query": {
+                    "bool": {
+                        "filter": [
+                            {"terms": {"test_item": [str(_id) for _id in test_item_ids]}},
+                            {"term": {"is_merged": is_merged}}
+                        ]
+                    }
+                }}
+
+    @staticmethod
+    def merge_big_and_small_logs(logs, log_level_ids_to_add,
+                                 log_level_messages, log_level_ids_merged):
+        """Merge big message logs with small ones"""
+        new_logs = []
+        for log in logs:
+            if not log["_source"]["message"].strip():
+                continue
+            log_level = log["_source"]["log_level"]
+
+            if log["_id"] in log_level_ids_to_add[log_level]:
+                merged_small_logs = utils.compress(
+                    log_level_messages[log["_source"]["log_level"]])
+                new_logs.append(EsClient.prepare_new_log(
+                    log, log["_id"], False, merged_small_logs))
+
+        for log_level in log_level_messages:
+
+            if not log_level_ids_to_add[log_level] \
+                    and log_level_messages[log_level].strip():
+                log = log_level_ids_merged[log_level]
+                new_logs.append(EsClient.prepare_new_log(
+                    log, str(log["_id"]) + "_m", True,
+                    utils.compress(log_level_messages[log_level]),
+                    fields_to_clean=["message", "detected_message", "only_numbers",
+                                     "detected_message_with_numbers", "stacktrace"]))
+        return new_logs
+
+    @staticmethod
+    def decompose_logs_merged_and_without_duplicates(logs):
+        """Merge big logs with small ones without duplcates"""
+        log_level_messages = {}
+        log_level_ids_to_add = {}
+        log_level_ids_merged = {}
+        logs_unique_log_level = {}
+
+        for log in logs:
+            if not log["_source"]["message"].strip():
+                continue
+
+            log_level = log["_source"]["log_level"]
+
+            if log_level not in log_level_messages:
+                log_level_messages[log_level] = ""
+            if log_level not in log_level_ids_to_add:
+                log_level_ids_to_add[log_level] = []
+            if log_level not in logs_unique_log_level:
+                logs_unique_log_level[log_level] = set()
+
+            if log["_source"]["original_message_lines"] <= 2 and\
+                    log["_source"]["original_message_words_number"] <= 100:
+                if log_level not in log_level_ids_merged:
+                    log_level_ids_merged[log_level] = log
+                message = log["_source"]["message"]
+                normalized_msg = " ".join(message.strip().lower().split())
+                if normalized_msg not in logs_unique_log_level[log_level]:
+                    logs_unique_log_level[log_level].add(normalized_msg)
+                    log_level_messages[log_level] = log_level_messages[log_level]\
+                        + message + "\r\n"
+            else:
+                log_level_ids_to_add[log_level].append(log["_id"])
+
+        return EsClient.merge_big_and_small_logs(logs, log_level_ids_to_add,
+                                                 log_level_messages, log_level_ids_merged)
+
+    @staticmethod
+    def prepare_new_log(old_log, new_id, is_merged, merged_small_logs, fields_to_clean=[]):
+        """Prepare updated log"""
+        merged_log = copy.deepcopy(old_log)
+        merged_log["_source"]["is_merged"] = is_merged
+        merged_log["_id"] = new_id
+        merged_log["_source"]["merged_small_logs"] = merged_small_logs
+        for field in fields_to_clean:
+            merged_log["_source"][field] = ""
+        return merged_log
+
     def _bulk_index(self, bodies, refresh=True):
         if not bodies:
             return commons.launch_objects.BulkResponse(took=0, errors=False)
@@ -468,6 +556,336 @@ class EsClient:
                     search_req.json(), len(similar_log_ids), time() - t_start)
         return [SearchLogInfo(logId=log_info[0],
                               testItemId=log_info[1]) for log_info in similar_log_ids]
+
+    def find_similar_logs_by_cosine_similarity(self, msg_words, cleaned_message, log_lines, res):
+        similar_log_ids = set()
+        messages_by_ids = {}
+
+        weighted_log_similarity_calculator = self.weighted_log_similarity_calculator
+        if log_lines != -1:
+            weighted_log_similarity_calculator = None
+
+        if weighted_log_similarity_calculator is not None:
+            detected_message, stacktrace = utils.detect_log_description_and_stacktrace(
+                cleaned_message,
+                default_log_number=1)
+
+            detected_message = utils.sanitize_text(detected_message)
+            stacktrace = utils.sanitize_text(stacktrace)
+            detected_message = utils.leave_only_unique_lines(detected_message)
+            stacktrace = utils.leave_only_unique_lines(stacktrace)
+            all_messages = weighted_log_similarity_calculator.message_to_array(
+                detected_message,
+                stacktrace)
+        else:
+            all_messages = [msg_words]
+        message_index_id = len(all_messages)
+        query_message_index_finish = len(all_messages) - 1
+
+        for result in res["hits"]["hits"]:
+            try:
+                log_id = (int(re.search(r"\d+", result["_id"]).group(0)), int(result["_source"]["test_item"]))
+                if log_id not in messages_by_ids:
+                    if weighted_log_similarity_calculator is not None:
+                        text = weighted_log_similarity_calculator.message_to_array(
+                            result["_source"]["detected_message"],
+                            result["_source"]["stacktrace"])
+                        all_messages.extend(text)
+                        messages_by_ids[log_id] = [message_index_id,
+                                                   len(all_messages) - 1]
+                        message_index_id += len(text)
+                    else:
+                        log_query_words = " ".join(utils.split_words(result["_source"]["message"]))
+                        all_messages.append(log_query_words)
+                        messages_by_ids[log_id] = message_index_id
+                        message_index_id += 1
+            except Exception as err:
+                logger.error("Id %s is not integer", result["_id"])
+                logger.error(err)
+        if all_messages:
+            vectorizer = CountVectorizer(binary=True,
+                                         analyzer="word",
+                                         token_pattern="[^ ]+")
+            count_vector_matrix = np.asarray(vectorizer.fit_transform(all_messages).toarray())
+            for log_id in messages_by_ids:
+                if weighted_log_similarity_calculator is not None:
+                    query_vector = weighted_log_similarity_calculator.weigh_data_rows(
+                        count_vector_matrix[0:query_message_index_finish + 1])
+                    log_vector = weighted_log_similarity_calculator.weigh_data_rows(
+                        count_vector_matrix[messages_by_ids[log_id][0]:messages_by_ids[log_id][1] + 1])
+                    similarity_percent =\
+                        round(1 - spatial.distance.cosine(query_vector, log_vector), 3)
+                else:
+                    similarity_percent = round(1 - spatial.distance.cosine(
+                        count_vector_matrix[0],
+                        count_vector_matrix[messages_by_ids[log_id]]), 3)
+                logger.debug("Log with id %s has %.3f similarity with the log '%s'",
+                             log_id, similarity_percent, cleaned_message)
+                if similarity_percent >= self.search_cfg["SearchLogsMinSimilarity"]:
+                    similar_log_ids.add(log_id)
+        return similar_log_ids
+
+    @staticmethod
+    def build_more_like_this_query(max_query_terms,
+                                   min_should_match, log_message,
+                                   field_name="message", boost=1.0,
+                                   override_min_should_match=None):
+        """Build more like this query"""
+        return {"more_like_this": {
+            "fields":               [field_name],
+            "like":                 log_message,
+            "min_doc_freq":         1,
+            "min_term_freq":        1,
+            "minimum_should_match":
+                ("5<" + min_should_match) if override_min_should_match is None else override_min_should_match,
+            "max_query_terms":      max_query_terms,
+            "boost": boost, }}
+
+    def build_analyze_query(self, launch, unique_id, log, size=10):
+        """Build analyze query"""
+        min_should_match = "{}%".format(launch.analyzerConfig.minShouldMatch)\
+            if launch.analyzerConfig.minShouldMatch \
+            else self.search_cfg["MinShouldMatch"]
+
+        query = {"size": size,
+                 "sort": ["_score",
+                          {"start_time": "desc"}, ],
+                 "query": {
+                     "bool": {
+                         "filter": [
+                             {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
+                             {"exists": {"field": "issue_type"}},
+                         ],
+                         "must_not": [
+                             {"wildcard": {"issue_type": "TI*"}},
+                             {"wildcard": {"issue_type": "ti*"}},
+                             {"wildcard": {"issue_type": "nd*"}},
+                             {"wildcard": {"issue_type": "ND*"}},
+                             {"term": {"test_item": log["_source"]["test_item"]}}
+                         ],
+                         "must": [],
+                         "should": [
+                             {"term": {"unique_id": {
+                                 "value": unique_id,
+                                 "boost": abs(self.search_cfg["BoostUniqueID"])}}},
+                             {"term": {"test_case_hash": {
+                                 "value": log["_source"]["test_case_hash"],
+                                 "boost": abs(self.search_cfg["BoostUniqueID"])}}},
+                             {"term": {"is_auto_analyzed": {
+                                 "value": str(self.search_cfg["BoostAA"] < 0).lower(),
+                                 "boost": abs(self.search_cfg["BoostAA"]), }}},
+                         ]}}}
+
+        if launch.analyzerConfig.analyzerMode in ["LAUNCH_NAME"]:
+            query["query"]["bool"]["must"].append(
+                {"term": {
+                    "launch_name": {
+                        "value": launch.launchName}}})
+        elif launch.analyzerConfig.analyzerMode in ["CURRENT_LAUNCH"]:
+            query["query"]["bool"]["must"].append(
+                {"term": {
+                    "launch_id": {
+                        "value": launch.launchId}}})
+        else:
+            query["query"]["bool"]["should"].append(
+                {"term": {
+                    "launch_name": {
+                        "value": launch.launchName,
+                        "boost": abs(self.search_cfg["BoostLaunch"])}}})
+        if log["_source"]["message"].strip():
+            log_lines = launch.analyzerConfig.numberOfLogLines
+            query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
+            if log_lines == -1:
+                query["query"]["bool"]["must"].append(
+                    self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                    min_should_match,
+                                                    log["_source"]["detected_message"],
+                                                    field_name="detected_message",
+                                                    boost=4.0))
+                if log["_source"]["stacktrace"].strip() != "":
+                    query["query"]["bool"]["must"].append(
+                        self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                        min_should_match,
+                                                        log["_source"]["stacktrace"],
+                                                        field_name="stacktrace",
+                                                        boost=2.0))
+                else:
+                    query["query"]["bool"]["must_not"].append({"wildcard": {"stacktrace": "*"}})
+            else:
+                query["query"]["bool"]["must"].append(
+                    self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                    min_should_match,
+                                                    log["_source"]["message"],
+                                                    field_name="message",
+                                                    boost=4.0))
+                query["query"]["bool"]["should"].append(
+                    self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                    "80%",
+                                                    log["_source"]["detected_message"],
+                                                    field_name="detected_message",
+                                                    boost=2.0))
+                query["query"]["bool"]["should"].append(
+                    self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                    "60%",
+                                                    log["_source"]["stacktrace"],
+                                                    field_name="stacktrace", boost=1.0))
+            query["query"]["bool"]["should"].append(
+                self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                "80%",
+                                                log["_source"]["merged_small_logs"],
+                                                field_name="merged_small_logs",
+                                                boost=0.5))
+            query["query"]["bool"]["should"].append(
+                self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                "1",
+                                                log["_source"]["only_numbers"],
+                                                field_name="only_numbers",
+                                                boost=4.0,
+                                                override_min_should_match="1"))
+        else:
+            query["query"]["bool"]["filter"].append({"term": {"is_merged": True}})
+            query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
+            query["query"]["bool"]["must"].append(
+                self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                min_should_match,
+                                                log["_source"]["merged_small_logs"],
+                                                field_name="merged_small_logs",
+                                                boost=2.0))
+        return query
+
+    def leave_only_unique_logs(self, logs):
+        unique_logs = set()
+        all_logs = []
+        for log in logs:
+            if log.message.strip() not in unique_logs:
+                all_logs.append(log)
+                unique_logs.add(log.message.strip())
+        return all_logs
+
+    def prepare_query_for_batches(self, launches):
+        all_queries = []
+        all_query_logs = []
+        launch_test_id_dict = {}
+        index_log_id = 0
+        for launch in launches:
+            if not self.index_exists(str(launch.project)):
+                continue
+            for test_item in launch.testItems:
+                unique_logs = self.leave_only_unique_logs(test_item.logs)
+                prepared_logs = [self._prepare_log(launch, test_item, log)
+                                 for log in unique_logs if log.logLevel >= ERROR_LOGGING_LEVEL]
+                results = self.decompose_logs_merged_and_without_duplicates(prepared_logs)
+
+                for log in results:
+                    message = log["_source"]["message"].strip()
+                    merged_logs = log["_source"]["merged_small_logs"].strip()
+                    if log["_source"]["log_level"] < ERROR_LOGGING_LEVEL or\
+                            (message == "" and merged_logs == ""):
+                        continue
+
+                    query = self.build_analyze_query(launch, test_item.uniqueId, log,
+                                                     launch.analyzerConfig.numberOfLogLines)
+                    full_query = "{}\n{}".format(json.dumps({"index": launch.project}), json.dumps(query))
+                    all_queries.append(full_query)
+                    all_query_logs.append(log)
+                    if (launch.launchId, test_item.testItemId) not in launch_test_id_dict:
+                        launch_test_id_dict[(launch.launchId, test_item.testItemId)] = []
+                    launch_test_id_dict[(launch.launchId, test_item.testItemId)].append(index_log_id)
+                    index_log_id += 1
+        return all_queries, all_query_logs, launch_test_id_dict
+
+    def query_elasticsearch_by_batches(self, all_queries, batch_size=50, max_workers=3):
+        partial_batches = []
+        for i in range(int(len(all_queries) / batch_size) + 1):
+            part_batch = all_queries[i * batch_size: (i + 1) * batch_size]
+            if not part_batch:
+                continue
+            partial_batches.append("\n".join(part_batch) + "\n")
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = executor.map(self.es_client.msearch, partial_batches)
+        results_all = []
+        for r in results:
+            results_all.extend(r["responses"])
+        return results_all
+
+    def get_bulk_search_results(self, launches):
+        all_queries, all_query_logs, launch_test_id_dict = self.prepare_query_for_batches(launches)
+        results_all = self.query_elasticsearch_by_batches(all_queries)
+        es_results = []
+        for launch in launches:
+            for test_item in launch.testItems:
+                if (launch.launchId, test_item.testItemId) not in launch_test_id_dict:
+                    continue
+                log_results_part = []
+                for idx in launch_test_id_dict[(launch.launchId, test_item.testItemId)]:
+                    log_results_part.append((all_query_logs[idx], results_all[idx]))
+                es_results.append((launch.analyzerConfig, test_item.testItemId, log_results_part))
+        return es_results
+
+    def prepare_features_for_analysis(self, es_results, batch_size=100):
+        num_chunks = int(len(es_results) / batch_size) + 1
+
+        es_results_to_process = []
+        for i in range(num_chunks):
+            partial_result = es_results[i * batch_size: (i + 1) * batch_size]
+            if not partial_result:
+                continue
+            es_results_to_process.append(partial_result)
+
+        config = {
+            "max_query_terms": self.search_cfg["MaxQueryTerms"],
+            "min_should_match": self.search_cfg["MinShouldMatch"],
+            "min_word_length": self.search_cfg["MinWordLength"],
+            "filter_min_should_match": self.search_cfg["FilterMinShouldMatch"],
+            "similarity_weights_folder": self.search_cfg["SimilarityWeightsFolder"]
+        }
+
+        process_results, map_with_process_results = [], {}
+        parallel_analysis = self.search_cfg["AllowParallelAnalysis"]\
+            if "AllowParallelAnalysis" in self.search_cfg else False
+        if parallel_analysis and len(es_results_to_process) >= 2:
+            process_results, map_with_process_results = self.run_features_calculation_parallel(
+                es_results_to_process, config)
+        process_results = self.run_features_calculation_sequentially(es_results_to_process, config,
+                                                                     process_results,
+                                                                     map_with_process_results)
+        return es_results_to_process, process_results
+
+    def run_features_calculation_parallel(self, es_results_to_process, config):
+        process_results = []
+        try:
+            with Pool(processes=2) as pool:
+                all_line_features = self.get_decision_maker(-1).get_feature_ids()
+                not_all_line_features = self.get_decision_maker(2).get_feature_ids()
+                process_results = pool.map(
+                    calculate_features,
+                    [(res, (all_line_features, not_all_line_features), i, config, True)
+                     for i, res in enumerate(es_results_to_process)])
+        except Exception as e:
+            logger.error("Couldn't process items in parallel. It will be processed sequentially.")
+            logger.error(e)
+        map_with_process_results = {}
+        if len(process_results) != len(es_results_to_process):
+            logger.error("Couldn't process items in parallel. It will be processed sequentially.")
+
+        for i, result in enumerate(process_results):
+            map_with_process_results[result[0]] = i
+        return process_results, map_with_process_results
+
+    def run_features_calculation_sequentially(self, es_results_to_process, config,
+                                              old_results, map_with_process_results):
+        process_results = []
+
+        for i, res in enumerate(es_results_to_process):
+            if i in map_with_process_results:
+                process_results.append(old_results[map_with_process_results[i]])
+            else:
+                all_line_features = self.get_decision_maker(-1).get_feature_ids()
+                not_all_line_features = self.get_decision_maker(2).get_feature_ids()
+                process_results.extend(
+                    calculate_features(
+                        (res, (all_line_features, not_all_line_features), i, config, False)))
+        return process_results
 
     def choose_issue_type(self, predicted_labels, predicted_labels_probability,
                           issue_type_names, boosting_data_gatherer):

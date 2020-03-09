@@ -800,6 +800,7 @@ class TestEsClient(unittest.TestCase):
                     es_client.es_client.msearch = MagicMock(
                         return_value={"responses": test["msearch_results"]})
                 es_client.boosting_decision_maker = _boosting_decision_maker
+
                 launches = [launch_objects.Launch(**launch)
                             for launch in json.loads(test["index_rq"])]
                 response = es_client.analyze_logs(launches)

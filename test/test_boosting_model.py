@@ -45,7 +45,6 @@ class TestBoostingModel(unittest.TestCase):
         self.suggest_boost_model_folder =\
             model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
         self.weights_folder = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
-
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings
@@ -90,9 +89,11 @@ class TestBoostingModel(unittest.TestCase):
 
     @utils.ignore_warnings
     def test_full_data_check(self):
-        print("Boost model folder: ", self.boost_model_folder)
+        print("Boost model folder all lines: ", self.boost_model_folder_all_lines)
+        print("Boost model folder not all lines: ", self.boost_model_folder_not_all_lines)
         print("Weights model folder: ", self.weights_folder)
-        decision_maker = BoostingDecisionMaker(self.boost_model_folder)
+        decision_maker_all_lines = BoostingDecisionMaker(self.boost_model_folder_all_lines)
+        decision_maker_not_all_lines = BoostingDecisionMaker(self.boost_model_folder_not_all_lines)
         boost_model_results = self.get_fixture(self.boost_model_results)
         tests = []
         for log_lines, filter_fields, _decision_maker in [
@@ -141,6 +142,7 @@ class TestBoostingModel(unittest.TestCase):
                                                       test["config"],
                                                       feature_ids,
                                                       weighted_log_similarity_calculator=weight_log_sim)
+
             with sure.ensure('Error in the test case number: {0}', idx):
                 gathered_data, issue_type_names = _boosting_featurizer.gather_features_info()
                 gathered_data.should.equal(boost_model_results[str(idx)][0],
@@ -226,6 +228,7 @@ class TestBoostingModel(unittest.TestCase):
                 predict_label, predict_probability = test["decision_maker"].predict(gathered_data)
                 gathered_data.should.equal(boost_model_results[str(idx)][0],
                                            epsilon=self.epsilon)
+
                 predict_label.tolist().should.equal(boost_model_results[str(idx)][1],
                                                     epsilon=self.epsilon)
                 predict_probability.tolist().should.equal(boost_model_results[str(idx)][2],

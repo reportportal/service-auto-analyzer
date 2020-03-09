@@ -91,7 +91,7 @@ class TestEsClient(unittest.TestCase):
 
     @staticmethod
     @utils.ignore_warnings
-    def get_default_search_config():
+    def get_default_search_config(filter_min_should_match=False):
         """Get default search config"""
         return {
             "MinShouldMatch": "80%",

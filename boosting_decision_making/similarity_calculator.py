@@ -86,6 +86,7 @@ class SimilarityCalculator:
             group_id = (obj["_id"], log["_id"])
             index_query_message = log_field_ids[log["_id"]]
             index_log_message = log_field_ids[obj["_id"]]
+
             if (type(index_query_message) == int and index_query_message < 0) and\
                     (type(index_log_message) == int and index_log_message < 0):
                 all_results_similarity[group_id] = {"similarity": 1.0, "both_empty": True}

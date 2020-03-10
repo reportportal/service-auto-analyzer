@@ -33,7 +33,7 @@ from boosting_decision_making import similarity_calculator
 from boosting_decision_making import boosting_decision_maker
 from commons.es_query_builder import EsQueryBuilder
 from commons.log_merger import LogMerger
-from queue import Queue
+from queue import Queue, Empty
 from threading import Thread
 
 ERROR_LOGGING_LEVEL = 40000
@@ -695,11 +695,44 @@ class EsClient:
                 unique_logs.add(log.message.strip())
         return all_logs
 
-    def prepare_query_for_batches(self, launches):
+    def choose_issue_type(self, predicted_labels, predicted_labels_probability,
+                          issue_type_names, boosting_data_gatherer):
+        predicted_issue_type = ""
+        max_val = 0.0
+        max_val_start_time = None
+        for i in range(len(predicted_labels)):
+            if predicted_labels[i] == 1:
+                issue_type = issue_type_names[i]
+                chosen_type =\
+                    boosting_data_gatherer.scores_by_issue_type[issue_type]
+                start_time = chosen_type["mrHit"]["_source"]["start_time"]
+                if (predicted_labels_probability[i][1] > max_val) or\
+                        ((predicted_labels_probability[i][1] == max_val) and # noqa
+                            (max_val_start_time is None or start_time > max_val_start_time)):
+                    max_val = predicted_labels_probability[i][1]
+                    predicted_issue_type = issue_type
+                    max_val_start_time = start_time
+        return predicted_issue_type
+
+    def get_decision_maker(self, number_of_log_lines):
+        if number_of_log_lines != -1 and self.boosting_decision_maker_not_all_lines is None:
+            return self.boosting_decision_maker_not_all_lines
+        return self.boosting_decision_maker_all_lines
+
+    def get_config_for_boosting(self, analyzer_config):
+        min_should_match = analyzer_config.minShouldMatch / 100 if analyzer_config.minShouldMatch > 0 else\
+            int(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0)) / 100
+        return {
+            "max_query_terms": self.search_cfg["MaxQueryTerms"],
+            "min_should_match": min_should_match,
+            "min_word_length": self.search_cfg["MinWordLength"],
+            "filter_min_should_match": utils.choose_fields_to_filter(analyzer_config.numberOfLogLines),
+            "number_of_log_lines": analyzer_config.numberOfLogLines
+        }
+
+    def _prepare_query_for_batches(self, launches):
         all_queries = []
         all_query_logs = []
-        launch_test_id_dict = {}
-        index_log_id = 0
         for launch in launches:
             if not self.index_exists(str(launch.project)):
                 continue
@@ -720,123 +753,26 @@ class EsClient:
                                                      launch.analyzerConfig.numberOfLogLines)
                     full_query = "{}\n{}".format(json.dumps({"index": launch.project}), json.dumps(query))
                     all_queries.append(full_query)
-                    all_query_logs.append(log)
-                    if (launch.launchId, test_item.testItemId) not in launch_test_id_dict:
-                        launch_test_id_dict[(launch.launchId, test_item.testItemId)] = []
-                    launch_test_id_dict[(launch.launchId, test_item.testItemId)].append(index_log_id)
-                    index_log_id += 1
-        return all_queries, all_query_logs, launch_test_id_dict
+                    all_query_logs.append((launch.analyzerConfig, test_item.testItemId, log))
 
-    def query_elasticsearch_by_batches(self, all_queries, batch_size=50, max_workers=3):
+        return all_queries, all_query_logs
+
+    def _query_elasticsearch(self, launches, batch_size=50):
+        t_start = time()
+        batches, batch_logs = self._prepare_query_for_batches(launches)
         partial_batches = []
-        for i in range(int(len(all_queries) / batch_size) + 1):
-            part_batch = all_queries[i * batch_size: (i + 1) * batch_size]
-            if not part_batch:
+
+        for i in range(int(len(batches) / batch_size) + 1):
+            part_batch = batches[i * batch_size: (i + 1) * batch_size]
+            if len(part_batch) == 0:
                 continue
             partial_batches.append("\n".join(part_batch) + "\n")
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            results = executor.map(self.es_client.msearch, partial_batches)
-        results_all = []
-        for r in results:
-            results_all.extend(r["responses"])
-        return results_all
-
-    def get_bulk_search_results(self, launches):
-        all_queries, all_query_logs, launch_test_id_dict = self.prepare_query_for_batches(launches)
-        results_all = self.query_elasticsearch_by_batches(all_queries)
-        es_results = []
-        for launch in launches:
-            for test_item in launch.testItems:
-                if (launch.launchId, test_item.testItemId) not in launch_test_id_dict:
-                    continue
-                log_results_part = []
-                for idx in launch_test_id_dict[(launch.launchId, test_item.testItemId)]:
-                    log_results_part.append((all_query_logs[idx], results_all[idx]))
-                es_results.append((launch.analyzerConfig, test_item.testItemId, log_results_part))
-        return es_results
-
-    def prepare_features_for_analysis(self, es_results, batch_size=100):
-        num_chunks = int(len(es_results) / batch_size) + 1
-
-        es_results_to_process = []
-        for i in range(num_chunks):
-            partial_result = es_results[i * batch_size: (i + 1) * batch_size]
-            if not partial_result:
-                continue
-            es_results_to_process.append(partial_result)
-
-        config = {
-            "max_query_terms": self.search_cfg["MaxQueryTerms"],
-            "min_should_match": self.search_cfg["MinShouldMatch"],
-            "min_word_length": self.search_cfg["MinWordLength"],
-            "filter_min_should_match": self.search_cfg["FilterMinShouldMatch"]
-        }
-
-        process_results, map_with_process_results = [], {}
-        parallel_analysis = self.search_cfg["AllowParallelAnalysis"]\
-            if "AllowParallelAnalysis" in self.search_cfg else False
-        if parallel_analysis and len(es_results_to_process) >= 2:
-            process_results, map_with_process_results = self.run_features_calculation_parallel(
-                es_results_to_process, config)
-        process_results = self.run_features_calculation_sequentially(es_results_to_process, config,
-                                                                     process_results,
-                                                                     map_with_process_results)
-        return es_results_to_process, process_results
-
-    def run_features_calculation_parallel(self, es_results_to_process, config):
-        process_results = []
-        try:
-            with Pool(processes=2) as pool:
-                all_line_features = self.get_decision_maker(-1).get_feature_ids()
-                not_all_line_features = self.get_decision_maker(2).get_feature_ids()
-                process_results = pool.map(
-                    calculate_features,
-                    [(res, (all_line_features, not_all_line_features), i, config, True)
-                     for i, res in enumerate(es_results_to_process)])
-        except Exception as e:
-            logger.error("Couldn't process items in parallel. It will be processed sequentially.")
-            logger.error(e)
-        map_with_process_results = {}
-        if len(process_results) != len(es_results_to_process):
-            logger.error("Couldn't process items in parallel. It will be processed sequentially.")
-
-        for i, result in enumerate(process_results):
-            map_with_process_results[result[0]] = i
-        return process_results, map_with_process_results
-
-    def run_features_calculation_sequentially(self, es_results_to_process, config,
-                                              old_results, map_with_process_results):
-        process_results = []
-
-        for i, res in enumerate(es_results_to_process):
-            if i in map_with_process_results:
-                process_results.append(old_results[map_with_process_results[i]])
-            else:
-                all_line_features = self.get_decision_maker(-1).get_feature_ids()
-                not_all_line_features = self.get_decision_maker(2).get_feature_ids()
-                process_results.extend(
-                    calculate_features(
-                        (res, (all_line_features, not_all_line_features), i, config, False)))
-        return process_results
-
-    def choose_issue_type(self, predicted_labels, predicted_labels_probability,
-                          issue_type_names, boosting_data_gatherer):
-        predicted_issue_type = ""
-        max_val = 0.0
-        max_val_start_time = None
-        for i in range(len(predicted_labels)):
-            if predicted_labels[i] == 1:
-                issue_type = issue_type_names[i]
-                chosen_type =\
-                    boosting_data_gatherer.scores_by_issue_type[issue_type]
-                start_time = chosen_type["mrHit"]["_source"]["start_time"]
-                if (predicted_labels_probability[i][1] > max_val) or\
-                        ((predicted_labels_probability[i][1] == max_val) and # noqa
-                            (max_val_start_time is None or start_time > max_val_start_time)):
-                    max_val = predicted_labels_probability[i][1]
-                    predicted_issue_type = issue_type
-                    max_val_start_time = start_time
-        return predicted_issue_type
+        for partial_batch_id in range(len(partial_batches)):
+            partial_res = self.es_client.msearch(partial_batches[partial_batch_id])["responses"]
+            for res_id in range(len(partial_res)):
+                idx = partial_batch_id * batch_size + res_id
+                all_info = batch_logs[idx]
+                self.queue.put((all_info[0], all_info[1], [(all_info[2], partial_res[res_id])]))
 
     def get_config_for_boosting(self, analyzer_config):
         min_should_match = analyzer_config.minShouldMatch / 100 if analyzer_config.minShouldMatch > 0 else\
@@ -921,27 +857,29 @@ class EsClient:
         es_query_thread.start()
         results = []
         t_start = time()
+
         cnt_items_to_process = 0
         while self.finished_queue.empty() or not self.queue.empty():
-            if self.queue.empty():
+            try:
+                item_to_process = self.queue.get(block=False)
+            except Empty:
                 sleep(0.1)
                 continue
-            else:
-                item_to_process = self.queue.get()
             analyzer_config, test_item_id, searched_res = item_to_process
             cnt_items_to_process += 1
+            boosting_decision_maker = self.get_decision_maker(analyzer_config.numberOfLogLines)
 
             boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
                 searched_res,
                 self.get_config_for_boosting(analyzer_config),
-                feature_ids=self.boosting_decision_maker.get_feature_ids(),
-                weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
+                feature_ids=boosting_decision_maker.get_feature_ids())
             feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
 
-            if feature_data:
+            if len(feature_data) > 0:
 
                 predicted_labels, predicted_labels_probability =\
-                    self.boosting_decision_maker.predict(feature_data)
+                    boosting_decision_maker.predict(feature_data)
+
                 scores_by_issue_type = boosting_data_gatherer.scores_by_issue_type
 
                 for i in range(len(issue_type_names)):

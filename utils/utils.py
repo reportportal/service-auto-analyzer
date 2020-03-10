@@ -238,10 +238,8 @@ def fix_big_encoded_urls(message):
     return message
 
 
-def choose_fields_to_filter(filter_min_should_match, log_lines):
-    if filter_min_should_match:
-        return ["detected_message", "stacktrace"] if log_lines == -1 else ["message"]
-    return []
+def choose_fields_to_filter(log_lines):
+    return ["detected_message", "stacktrace"] if log_lines == -1 else ["message"]
 
 
 def leave_only_unique_lines(message):

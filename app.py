@@ -56,8 +56,6 @@ SEARCH_CONFIG = {
     "SearchLogsMinShouldMatch":    os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "80%"),
     "SearchLogsMinSimilarity":     float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.9")),
     "MinWordLength":               int(os.getenv("ES_MIN_WORD_LENGTH", "0")),
-    "FilterMinShouldMatch":        get_bool_value(os.getenv("FILTER_MIN_SHOULD_MATCH", "true")),
-    "AllowParallelAnalysis":       json.loads(os.getenv("ALLOW_PARALLEL_ANALYSIS", "false").lower()),
     "BoostModelFolderAllLines":    os.getenv("BOOST_MODEL_FOLDER_ALL_LINES", ""),
     "BoostModelFolderNotAllLines": os.getenv("BOOST_MODEL_FOLDER_NOT_ALL_LINES", ""),
     "SimilarityWeightsFolder":     os.getenv("SIMILARITY_WEIGHTS_FOLDER", ""),

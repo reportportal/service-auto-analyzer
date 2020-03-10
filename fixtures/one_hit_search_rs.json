@@ -25,13 +25,13 @@
                     "log_level": 40000,
                     "original_message_lines": 1,
                     "original_message_words_number": 2,
-                    "message": "Message AB",
+                    "message": "Message",
                     "test_item": 1,
                     "start_time": "2020-01-15 10:57:43",
                     "unique_id": "unique1",
-                    "detected_message": "Message AB",
-                    "detected_message_with_numbers": "Message AB",
-                    "only_numbers": "",
+                    "detected_message": "Message",
+                    "detected_message_with_numbers": "Message 12",
+                    "only_numbers": "12",
                     "merged_small_logs": "",
                     "stacktrace": ""
                 }

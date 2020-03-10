@@ -757,7 +757,7 @@ class EsClient:
 
         return all_queries, all_query_logs
 
-    def _query_elasticsearch(self, launches, batch_size=50):
+    def _query_elasticsearch(self, launches, max_batch_size=50):
         t_start = time()
         batches, batch_logs = self._prepare_query_for_batches(launches)
         partial_batches = []
@@ -839,6 +839,7 @@ class EsClient:
                         index_in_batch = 0
             if len(batches) > 0:
                 self._send_result_to_queue(test_item_dict, batches, batch_logs)
+
         except Exception as err:
             logger.error("Error in ES query")
             logger.error(err)

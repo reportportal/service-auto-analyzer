@@ -534,6 +534,7 @@ class EsClient:
             res = self.es_client.search(index=str(search_req.projectId), body=query)
             for es_res in res["hits"]["hits"]:
                 test_item_info[es_res["_id"]] = es_res["_source"]["test_item"]
+
             _similarity_calculator = similarity_calculator.SimilarityCalculator(
                 {
                     "max_query_terms": self.search_cfg["MaxQueryTerms"],
@@ -556,74 +557,6 @@ class EsClient:
                     search_req.json(), len(similar_log_ids), time() - t_start)
         return [SearchLogInfo(logId=log_info[0],
                               testItemId=log_info[1]) for log_info in similar_log_ids]
-
-    def find_similar_logs_by_cosine_similarity(self, msg_words, cleaned_message, log_lines, res):
-        similar_log_ids = set()
-        messages_by_ids = {}
-
-        weighted_log_similarity_calculator = self.weighted_log_similarity_calculator
-        if log_lines != -1:
-            weighted_log_similarity_calculator = None
-
-        if weighted_log_similarity_calculator is not None:
-            detected_message, stacktrace = utils.detect_log_description_and_stacktrace(
-                cleaned_message,
-                default_log_number=1)
-
-            detected_message = utils.sanitize_text(detected_message)
-            stacktrace = utils.sanitize_text(stacktrace)
-            detected_message = utils.leave_only_unique_lines(detected_message)
-            stacktrace = utils.leave_only_unique_lines(stacktrace)
-            all_messages = weighted_log_similarity_calculator.message_to_array(
-                detected_message,
-                stacktrace)
-        else:
-            all_messages = [msg_words]
-        message_index_id = len(all_messages)
-        query_message_index_finish = len(all_messages) - 1
-
-        for result in res["hits"]["hits"]:
-            try:
-                log_id = (int(re.search(r"\d+", result["_id"]).group(0)), int(result["_source"]["test_item"]))
-                if log_id not in messages_by_ids:
-                    if weighted_log_similarity_calculator is not None:
-                        text = weighted_log_similarity_calculator.message_to_array(
-                            result["_source"]["detected_message"],
-                            result["_source"]["stacktrace"])
-                        all_messages.extend(text)
-                        messages_by_ids[log_id] = [message_index_id,
-                                                   len(all_messages) - 1]
-                        message_index_id += len(text)
-                    else:
-                        log_query_words = " ".join(utils.split_words(result["_source"]["message"]))
-                        all_messages.append(log_query_words)
-                        messages_by_ids[log_id] = message_index_id
-                        message_index_id += 1
-            except Exception as err:
-                logger.error("Id %s is not integer", result["_id"])
-                logger.error(err)
-        if all_messages:
-            vectorizer = CountVectorizer(binary=True,
-                                         analyzer="word",
-                                         token_pattern="[^ ]+")
-            count_vector_matrix = np.asarray(vectorizer.fit_transform(all_messages).toarray())
-            for log_id in messages_by_ids:
-                if weighted_log_similarity_calculator is not None:
-                    query_vector = weighted_log_similarity_calculator.weigh_data_rows(
-                        count_vector_matrix[0:query_message_index_finish + 1])
-                    log_vector = weighted_log_similarity_calculator.weigh_data_rows(
-                        count_vector_matrix[messages_by_ids[log_id][0]:messages_by_ids[log_id][1] + 1])
-                    similarity_percent =\
-                        round(1 - spatial.distance.cosine(query_vector, log_vector), 3)
-                else:
-                    similarity_percent = round(1 - spatial.distance.cosine(
-                        count_vector_matrix[0],
-                        count_vector_matrix[messages_by_ids[log_id]]), 3)
-                logger.debug("Log with id %s has %.3f similarity with the log '%s'",
-                             log_id, similarity_percent, cleaned_message)
-                if similarity_percent >= self.search_cfg["SearchLogsMinSimilarity"]:
-                    similar_log_ids.add(log_id)
-        return similar_log_ids
 
     @staticmethod
     def build_more_like_this_query(max_query_terms,
@@ -836,8 +769,7 @@ class EsClient:
             "max_query_terms": self.search_cfg["MaxQueryTerms"],
             "min_should_match": self.search_cfg["MinShouldMatch"],
             "min_word_length": self.search_cfg["MinWordLength"],
-            "filter_min_should_match": self.search_cfg["FilterMinShouldMatch"],
-            "similarity_weights_folder": self.search_cfg["SimilarityWeightsFolder"]
+            "filter_min_should_match": self.search_cfg["FilterMinShouldMatch"]
         }
 
         process_results, map_with_process_results = [], {}

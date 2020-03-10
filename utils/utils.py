@@ -200,11 +200,9 @@ def has_more_lines_pattern(line):
     return False
 
 
-def detect_log_description_and_stacktrace(message, default_log_number=1, max_log_lines=5):
+def detect_log_description_and_stacktrace(message, max_log_lines=5):
     """Split a log into a log message and stacktrace"""
     message = delete_empty_lines(message)
-    if default_log_number == -1:
-        return message, ""
     if calculate_line_number(message) > 2:
         split_lines = message.split("\n")
         detected_message_lines = []
@@ -220,10 +218,10 @@ def detect_log_description_and_stacktrace(message, default_log_number=1, max_log
             stacktrace_lines = detected_message_lines[max_log_lines:]
             detected_message_lines = detected_message_lines[:max_log_lines]
 
-        if len(detected_message_lines) < default_log_number:
+        if len(detected_message_lines) < 1:
             all_message = detected_message_lines + stacktrace_lines
-            detected_message_lines = all_message[:default_log_number]
-            stacktrace_lines = all_message[default_log_number:]
+            detected_message_lines = all_message[:1]
+            stacktrace_lines = all_message[1:]
 
         return "\n".join(detected_message_lines), "\n".join(stacktrace_lines)
     return message, ""

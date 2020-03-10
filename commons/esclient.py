@@ -32,7 +32,7 @@ from time import time
 from datetime import datetime
 from multiprocessing import Pool
 from concurrent.futures import ThreadPoolExecutor
-from boosting_decision_making import log_similarity_calculator
+from boosting_decision_making import weighted_similarity_calculator
 from boosting_decision_making import boosting_decision_maker
 
 ERROR_LOGGING_LEVEL = 40000
@@ -160,8 +160,8 @@ class EsClient:
             self.boosting_decision_maker_not_all_lines = boosting_decision_maker.BoostingDecisionMaker(
                 folder=self.search_cfg["BoostModelFolderNotAllLines"])
         if self.search_cfg["SimilarityWeightsFolder"].strip() != "":
-            self.weighted_log_similarity_calculator = log_similarity_calculator.\
-                LogSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
+            self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
+                WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
 
     def create_index(self, index_name):
         """Create index in elasticsearch"""

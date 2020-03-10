@@ -814,24 +814,31 @@ class EsClient:
 
         return all_queries, all_query_logs
 
-    def _query_elasticsearch(self, launches, batch_size=50):
+    def _query_elasticsearch(self, launches, max_batch_size=50):
         t_start = time()
-        batches, batch_logs = self._prepare_query_for_batches(launches)
-        partial_batches = []
-        for i in range(int(len(batches) / batch_size) + 1):
-            part_batch = batches[i * batch_size: (i + 1) * batch_size]
-            if len(part_batch) == 0:
-                continue
-            partial_batches.append("\n".join(part_batch) + "\n")
-        for partial_batch_id in range(len(partial_batches)):
-            partial_res = self.es_client.msearch(partial_batches[partial_batch_id])["responses"]
-            for res_id in range(len(partial_res)):
-                idx = partial_batch_id * batch_size + res_id
-                all_info = batch_logs[idx]
-                self.queue.put((all_info[0], all_info[1], [(all_info[2], partial_res[res_id])]))
-
+        try:
+            batches, batch_logs = self._prepare_query_for_batches(launches)
+            batch_size = 5
+            n_first_blocks = 3
+            cur_pos = 0
+            while cur_pos < len(batches):
+                if n_first_blocks <= 0:
+                    batch_size = max_batch_size
+                part_batch = batches[cur_pos: cur_pos + batch_size]
+                if len(part_batch) == 0:
+                    break
+                n_first_blocks -= 1
+                partial_res = self.es_client.msearch("\n".join(part_batch) + "\n")["responses"]
+                for res_id in range(len(partial_res)):
+                    idx = cur_pos + res_id
+                    all_info = batch_logs[idx]
+                    self.queue.put((all_info[0], all_info[1], [(all_info[2], partial_res[res_id])]))
+                cur_pos += len(part_batch)
+        except Exception as err:
+            logger.error("Error in ES query")
+            logger.error(err)
         self.finished_queue.put("Finished")
-        logger.debug("Es queries finished %.2f s.", time() - t_start)
+        logger.info("Es queries finished %.2f s.", time() - t_start)
 
     @utils.ignore_warnings
     def analyze_logs(self, launches):

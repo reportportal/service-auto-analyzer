@@ -787,53 +787,60 @@ class EsClient:
             "number_of_log_lines": analyzer_config.numberOfLogLines
         }
 
-    def _prepare_query_for_batches(self, launches):
-        all_queries = []
-        all_query_logs = []
-        for launch in launches:
-            if not self.index_exists(str(launch.project)):
-                continue
-            for test_item in launch.testItems:
-                unique_logs = self.leave_only_unique_logs(test_item.logs)
-                prepared_logs = [self._prepare_log(launch, test_item, log)
-                                 for log in unique_logs if log.logLevel >= ERROR_LOGGING_LEVEL]
-                results = self.decompose_logs_merged_and_without_duplicates(prepared_logs)
-
-                for log in results:
-                    message = log["_source"]["message"].strip()
-                    merged_logs = log["_source"]["merged_small_logs"].strip()
-                    if log["_source"]["log_level"] < ERROR_LOGGING_LEVEL or\
-                            (message == "" and merged_logs == ""):
-                        continue
-
-                    query = self.build_analyze_query(launch, test_item.uniqueId, log,
-                                                     launch.analyzerConfig.numberOfLogLines)
-                    full_query = "{}\n{}".format(json.dumps({"index": launch.project}), json.dumps(query))
-                    all_queries.append(full_query)
-                    all_query_logs.append((launch.analyzerConfig, test_item.testItemId, log))
-
-        return all_queries, all_query_logs
+    def _send_result_to_queue(self, test_item_dict, batches, batch_logs):
+        partial_res = self.es_client.msearch("\n".join(batches) + "\n")["responses"]
+        for test_item_id in test_item_dict:
+            new_result = []
+            for ind in test_item_dict[test_item_id]:
+                all_info = batch_logs[ind]
+                new_result.append((all_info[2], partial_res[ind]))
+            self.queue.put((all_info[0], all_info[1], new_result))
 
     def _query_elasticsearch(self, launches, max_batch_size=50):
         t_start = time()
+        batches = []
+        batch_logs = []
+        index_in_batch = 0
+        test_item_dict = {}
+        batch_size = 5
+        n_first_blocks = 3
         try:
-            batches, batch_logs = self._prepare_query_for_batches(launches)
-            batch_size = 5
-            n_first_blocks = 3
-            cur_pos = 0
-            while cur_pos < len(batches):
-                if n_first_blocks <= 0:
-                    batch_size = max_batch_size
-                part_batch = batches[cur_pos: cur_pos + batch_size]
-                if len(part_batch) == 0:
-                    break
-                n_first_blocks -= 1
-                partial_res = self.es_client.msearch("\n".join(part_batch) + "\n")["responses"]
-                for res_id in range(len(partial_res)):
-                    idx = cur_pos + res_id
-                    all_info = batch_logs[idx]
-                    self.queue.put((all_info[0], all_info[1], [(all_info[2], partial_res[res_id])]))
-                cur_pos += len(part_batch)
+            for launch in launches:
+                if not self.index_exists(str(launch.project)):
+                    continue
+                for test_item in launch.testItems:
+                    unique_logs = self.leave_only_unique_logs(test_item.logs)
+                    prepared_logs = [self._prepare_log(launch, test_item, log)
+                                     for log in unique_logs if log.logLevel >= ERROR_LOGGING_LEVEL]
+                    results = self.decompose_logs_merged_and_without_duplicates(prepared_logs)
+
+                    for log in results:
+                        message = log["_source"]["message"].strip()
+                        merged_logs = log["_source"]["merged_small_logs"].strip()
+                        if log["_source"]["log_level"] < ERROR_LOGGING_LEVEL or\
+                                (message == "" and merged_logs == ""):
+                            continue
+
+                        query = self.build_analyze_query(launch, test_item.uniqueId, log,
+                                                         launch.analyzerConfig.numberOfLogLines)
+                        full_query = "{}\n{}".format(json.dumps({"index": launch.project}), json.dumps(query))
+                        batches.append(full_query)
+                        batch_logs.append((launch.analyzerConfig, test_item.testItemId, log))
+                        if test_item.testItemId not in test_item_dict:
+                            test_item_dict[test_item.testItemId] = []
+                        test_item_dict[test_item.testItemId].append(index_in_batch)
+                        index_in_batch += 1
+                    if n_first_blocks <= 0:
+                        batch_size = max_batch_size
+                    if len(batches) >= batch_size:
+                        n_first_blocks -= 1
+                        self._send_result_to_queue(test_item_dict, batches, batch_logs)
+                        batches = []
+                        batch_logs = []
+                        test_item_dict = {}
+                        index_in_batch = 0
+            if len(batches) > 0:
+                self._send_result_to_queue(test_item_dict, batches, batch_logs)
         except Exception as err:
             logger.error("Error in ES query")
             logger.error(err)

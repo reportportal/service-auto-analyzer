@@ -861,11 +861,11 @@ class EsClient:
 
         cnt_items_to_process = 0
         while self.finished_queue.empty() or not self.queue.empty():
-            try:
-                item_to_process = self.queue.get(block=False)
-            except Empty:
+            if self.queue.empty():
                 sleep(0.1)
                 continue
+            else:
+                item_to_process = self.queue.get()
             analyzer_config, test_item_id, searched_res = item_to_process
             cnt_items_to_process += 1
             boosting_decision_maker = self.get_decision_maker(analyzer_config.numberOfLogLines)

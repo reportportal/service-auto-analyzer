@@ -11,7 +11,7 @@ podTemplate(
                 containerTemplate(name: 'docker', image: 'docker:dind', ttyEnabled: true, alwaysPullImage: true, privileged: true,
                         command: 'dockerd --host=unix:///var/run/docker.sock --host=tcp://0.0.0.0:2375 --storage-driver=overlay'),
                 containerTemplate(name: 'kubectl', image: 'lachlanevenson/k8s-kubectl:v1.8.8', command: 'cat', ttyEnabled: true),
-                containerTemplate(name: 'helm', image: 'lachlanevenson/k8s-helm:v3.0.2', command: 'cat', ttyEnabled: true,
+                containerTemplate(name: 'helm', image: 'lachlanevenson/k8s-helm:v3.1.1', command: 'cat', ttyEnabled: true,
                         resourceRequestCpu: '300m',
                         resourceLimitCpu: '500m',
                         resourceRequestMemory: '128Mi',

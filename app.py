@@ -55,7 +55,7 @@ SEARCH_CONFIG = {
     "MaxQueryTerms":               int(os.getenv("ES_MAX_QUERY_TERMS", "50")),
     "SearchLogsMinShouldMatch":    os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "80%"),
     "SearchLogsMinSimilarity":     float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.9")),
-    "MinWordLength":               int(os.getenv("ES_MIN_WORD_LENGTH", "0")),
+    "MinWordLength":               int(os.getenv("ES_MIN_WORD_LENGTH", "2")),
     "BoostModelFolderAllLines":    os.getenv("BOOST_MODEL_FOLDER_ALL_LINES", ""),
     "BoostModelFolderNotAllLines": os.getenv("BOOST_MODEL_FOLDER_NOT_ALL_LINES", ""),
     "SimilarityWeightsFolder":     os.getenv("SIMILARITY_WEIGHTS_FOLDER", ""),

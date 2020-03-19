@@ -1,0 +1,38 @@
+{
+    "size": 10000,
+    "query": {
+        "bool": {
+            "filter": [
+                {"range": {"log_level": {"gte": 40000}}},
+                {"exists": {"field": "issue_type"}},
+                {"term": {"is_merged": false}}
+            ],
+            "must_not": {
+                "term": {"test_item": {"value": 2, "boost": 1.0}}
+            },
+            "must": [
+                {
+                    "bool": {
+                        "should": [
+                            {"wildcard": {"issue_type": "TI*"}},
+                            {"wildcard": {"issue_type": "ti*"}}
+                        ]
+                    }
+                },
+                {"terms": {"launch_id": [1,2,3]}},
+                {"more_like_this": {
+                    "fields":               ["message"],
+                    "like":                 "log message 1",
+                    "min_doc_freq":         1,
+                    "min_term_freq":        1,
+                    "minimum_should_match": "5<90%",
+                    "max_query_terms":      50,
+                    "boost":                1.0
+                }}
+            ],
+            "should": [
+                {"term": {"is_auto_analyzed": {"value": "false", "boost": 1.0}}}
+            ]
+        }
+    }
+}

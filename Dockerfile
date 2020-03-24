@@ -15,9 +15,9 @@ RUN /venv/bin/python3 -m nltk.downloader stopwords
 
 ARG version
 ARG prod
-ENV BOOST_MODEL_FOLDER_ALL_LINES="/backend/model/all_lines_0.8"
+ENV BOOST_MODEL_FOLDER_ALL_LINES="/backend/model/all_lines_0.9"
 ENV BOOST_MODEL_FOLDER_NOT_ALL_LINES="/backend/model/not_all_lines_0.1"
-ENV SIMILARITY_WEIGHTS_FOLDER="/backend/model/weights_0.1"
+ENV SIMILARITY_WEIGHTS_FOLDER="/backend/model/weights_0.2"
 
 COPY ./ ./
 
@@ -45,9 +45,9 @@ EXPOSE 3031
 ENV FLASK_APP=app.py UWSGI_WSGI_FILE=app.py UWSGI_SOCKET=:3031 UWSGI_HTTP=:5000 UWSGI_VIRTUALENV=/venv UWSGI_MASTER=1 UWSGI_WORKERS=4 UWSGI_THREADS=8 UWSGI_LAZY_APPS=1 UWSGI_WSGI_ENV_BEHAVIOR=holy PYTHONDONTWRITEBYTECODE=1
 ENV PATH="/venv/bin:${PATH}"
 ENV PYTHONPATH="/backend"
-ENV BOOST_MODEL_FOLDER_ALL_LINES="/backend/model/all_lines_0.8"
+ENV BOOST_MODEL_FOLDER_ALL_LINES="/backend/model/all_lines_0.9"
 ENV BOOST_MODEL_FOLDER_NOT_ALL_LINES="/backend/model/not_all_lines_0.1"
-ENV SIMILARITY_WEIGHTS_FOLDER="/backend/model/weights_0.1"
+ENV SIMILARITY_WEIGHTS_FOLDER="/backend/model/weights_0.2"
 #ENV LOGGING_LEVEL="INFO"
 # Start uWSGI
 #CMD ["/venv/bin/uwsgi", "--http-auto-chunked", "--http-keepalive"]

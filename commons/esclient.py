@@ -313,11 +313,13 @@ class EsClient:
         log_template["_source"]["original_message_lines"] = utils.calculate_line_number(cleaned_message)
         log_template["_source"]["original_message_words_number"] = len(
             utils.split_words(cleaned_message, split_urls=False))
-        log_template["_source"]["message"] = message
-        log_template["_source"]["detected_message"] = detected_message
-        log_template["_source"]["detected_message_with_numbers"] = detected_message_with_numbers
-        log_template["_source"]["stacktrace"] = stacktrace
-        log_template["_source"]["only_numbers"] = detected_message_only_numbers
+        log_template["_source"]["message"] = utils.clean_colon_stacking(message)
+        log_template["_source"]["detected_message"] = utils.clean_colon_stacking(detected_message)
+        log_template["_source"]["detected_message_with_numbers"] = utils.clean_colon_stacking(
+            detected_message_with_numbers)
+        log_template["_source"]["stacktrace"] = utils.clean_colon_stacking(stacktrace)
+        log_template["_source"]["only_numbers"] = utils.clean_colon_stacking(
+            detected_message_only_numbers)
 
         return log_template
 

@@ -117,8 +117,9 @@ def remove_starting_datetime(text, remove_first_digits=False):
     idx_text_start = 0
     for idx, str_part in enumerate(text.split(" ")):
         try:
-            parse(log_date + " " + str_part)
-            log_date = log_date + " " + str_part
+            parsed_info = re.sub(r"[\[\]\{\},;!#\"$%&\'\(\)*<=>?@^_`|~]", "", log_date + " " + str_part)
+            parse(parsed_info)
+            log_date = parsed_info
             log_date = log_date.strip()
         except Exception as e: # noqa
             idx_text_start = idx

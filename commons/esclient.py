@@ -17,7 +17,6 @@
 import re
 import json
 import logging
-import copy
 import requests
 import elasticsearch
 import elasticsearch.helpers
@@ -30,86 +29,12 @@ from datetime import datetime
 from boosting_decision_making import weighted_similarity_calculator
 from boosting_decision_making import similarity_calculator
 from boosting_decision_making import boosting_decision_maker
+from commons.es_query_builder import EsQueryBuilder
+from commons.log_merger import LogMerger
 from queue import Queue
 from threading import Thread
 
 ERROR_LOGGING_LEVEL = 40000
-
-DEFAULT_INDEX_SETTINGS = {
-    'number_of_shards': 1,
-    'analysis': {
-        "analyzer": {
-            "standard_english_analyzer": {
-                "type": "standard",
-                "stopwords": "_english_",
-            }
-        }
-    }
-}
-
-DEFAULT_MAPPING_SETTINGS = {
-    "properties": {
-        "test_item": {
-            "type": "keyword",
-        },
-        "issue_type": {
-            "type": "keyword",
-        },
-        "message": {
-            "type":     "text",
-            "analyzer": "standard_english_analyzer"
-        },
-        "merged_small_logs": {
-            "type":     "text",
-            "analyzer": "standard_english_analyzer"
-        },
-        "detected_message": {
-            "type":     "text",
-            "analyzer": "standard_english_analyzer",
-        },
-        "detected_message_with_numbers": {
-            "type":     "text",
-            "index":    False,
-        },
-        "only_numbers": {
-            "type":     "text",
-            "analyzer": "standard_english_analyzer",
-        },
-        "stacktrace": {
-            "type":     "text",
-            "analyzer": "standard_english_analyzer",
-        },
-        "original_message_lines": {
-            "type": "integer",
-        },
-        "original_message_words_number": {
-            "type": "integer",
-        },
-        "log_level": {
-            "type": "integer",
-        },
-        "test_case_hash": {
-            "type": "integer",
-        },
-        "launch_name": {
-            "type": "keyword",
-        },
-        "unique_id": {
-            "type": "keyword",
-        },
-        "is_auto_analyzed": {
-            "type": "keyword",
-        },
-        "is_merged": {
-            "type": "boolean"
-        },
-        "start_time": {
-            "type":   "date",
-            "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
-        }
-    }
-}
-
 
 logger = logging.getLogger("analyzerApp.esclient")
 
@@ -124,6 +49,7 @@ class EsClient:
         self.boosting_decision_maker_all_lines = None
         self.boosting_decision_maker_not_all_lines = None
         self.weighted_log_similarity_calculator = None
+        self.es_query_builder = EsQueryBuilder(self.search_cfg, ERROR_LOGGING_LEVEL)
         self.initialize_decision_makers()
 
     def initialize_decision_makers(self):
@@ -143,8 +69,8 @@ class EsClient:
         logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
         try:
             response = self.es_client.indices.create(index=str(index_name), body={
-                'settings': DEFAULT_INDEX_SETTINGS,
-                'mappings': DEFAULT_MAPPING_SETTINGS,
+                'settings': utils.read_json_file("", "index_settings.json", to_json=True),
+                'mappings': utils.read_json_file("", "index_mapping_settings.json", to_json=True)
             })
             logger.debug("Created '%s' Elasticsearch index", str(index_name))
             return commons.launch_objects.Response(**response)
@@ -339,14 +265,15 @@ class EsClient:
                 continue
             test_items_dict = {}
             for r in elasticsearch.helpers.scan(self.es_client,
-                                                query=EsClient.get_test_item_query(test_items, False),
+                                                query=self.es_query_builder.get_test_item_query(
+                                                    test_items, False),
                                                 index=project):
                 test_item_id = r["_source"]["test_item"]
                 if test_item_id not in test_items_dict:
                     test_items_dict[test_item_id] = []
                 test_items_dict[test_item_id].append(r)
             for test_item_id in test_items_dict:
-                merged_logs = EsClient.decompose_logs_merged_and_without_duplicates(
+                merged_logs = LogMerger.decompose_logs_merged_and_without_duplicates(
                     test_items_dict[test_item_id])
                 for log in merged_logs:
                     if log["_source"]["is_merged"]:
@@ -369,7 +296,8 @@ class EsClient:
             if len(test_item_ids) == 0:
                 continue
             for log in elasticsearch.helpers.scan(self.es_client,
-                                                  query=EsClient.get_test_item_query(test_item_ids, True),
+                                                  query=self.es_query_builder.get_test_item_query(
+                                                      test_item_ids, True),
                                                   index=project):
                 bodies.append({
                     "_op_type": "delete",
@@ -378,95 +306,6 @@ class EsClient:
                 })
         if len(bodies) > 0:
             self._bulk_index(bodies)
-
-    @staticmethod
-    def get_test_item_query(test_item_ids, is_merged):
-        """Build test item query"""
-        return {"size": 10000,
-                "query": {
-                    "bool": {
-                        "filter": [
-                            {"terms": {"test_item": [str(_id) for _id in test_item_ids]}},
-                            {"term": {"is_merged": is_merged}}
-                        ]
-                    }
-                }}
-
-    @staticmethod
-    def merge_big_and_small_logs(logs, log_level_ids_to_add,
-                                 log_level_messages, log_level_ids_merged):
-        """Merge big message logs with small ones"""
-        new_logs = []
-        for log in logs:
-            if log["_source"]["message"].strip() == "":
-                continue
-            log_level = log["_source"]["log_level"]
-
-            if log["_id"] in log_level_ids_to_add[log_level]:
-                merged_small_logs = utils.compress(
-                    log_level_messages[log["_source"]["log_level"]])
-                new_logs.append(EsClient.prepare_new_log(
-                    log, log["_id"], False, merged_small_logs))
-
-        for log_level in log_level_messages:
-
-            if len(log_level_ids_to_add[log_level]) == 0 and\
-               log_level_messages[log_level].strip() != "":
-                log = log_level_ids_merged[log_level]
-                new_logs.append(EsClient.prepare_new_log(
-                    log, str(log["_id"]) + "_m", True,
-                    utils.compress(log_level_messages[log_level]),
-                    fields_to_clean=["message", "detected_message", "only_numbers",
-                                     "detected_message_with_numbers", "stacktrace"]))
-        return new_logs
-
-    @staticmethod
-    def decompose_logs_merged_and_without_duplicates(logs):
-        """Merge big logs with small ones without duplcates"""
-        log_level_messages = {}
-        log_level_ids_to_add = {}
-        log_level_ids_merged = {}
-        logs_unique_log_level = {}
-
-        for log in logs:
-            if log["_source"]["message"].strip() == "":
-                continue
-
-            log_level = log["_source"]["log_level"]
-
-            if log_level not in log_level_messages:
-                log_level_messages[log_level] = ""
-            if log_level not in log_level_ids_to_add:
-                log_level_ids_to_add[log_level] = []
-            if log_level not in logs_unique_log_level:
-                logs_unique_log_level[log_level] = set()
-
-            if log["_source"]["original_message_lines"] <= 2 and\
-                    log["_source"]["original_message_words_number"] <= 100:
-                if log_level not in log_level_ids_merged:
-                    log_level_ids_merged[log_level] = log
-                message = log["_source"]["message"]
-                normalized_msg = " ".join(message.strip().lower().split())
-                if normalized_msg not in logs_unique_log_level[log_level]:
-                    logs_unique_log_level[log_level].add(normalized_msg)
-                    log_level_messages[log_level] = log_level_messages[log_level]\
-                        + message + "\r\n"
-            else:
-                log_level_ids_to_add[log_level].append(log["_id"])
-
-        return EsClient.merge_big_and_small_logs(logs, log_level_ids_to_add,
-                                                 log_level_messages, log_level_ids_merged)
-
-    @staticmethod
-    def prepare_new_log(old_log, new_id, is_merged, merged_small_logs, fields_to_clean=[]):
-        """Prepare updated log"""
-        merged_log = copy.deepcopy(old_log)
-        merged_log["_source"]["is_merged"] = is_merged
-        merged_log["_id"] = new_id
-        merged_log["_source"]["merged_small_logs"] = merged_small_logs
-        for field in fields_to_clean:
-            merged_log["_source"][field] = ""
-        return merged_log
 
     def _bulk_index(self, bodies, refresh=True):
         if len(bodies) == 0:
@@ -499,9 +338,10 @@ class EsClient:
             return 0
         test_item_ids = set()
         try:
+            search_query = self.es_query_builder.build_search_test_item_ids_query(
+                clean_index.ids)
             for res in elasticsearch.helpers.scan(self.es_client,
-                                                  query=EsClient.build_search_test_item_ids_query(
-                                                      clean_index.ids),
+                                                  query=search_query,
                                                   index=clean_index.project,
                                                   scroll="5m"):
                 test_item_ids.add(res["_source"]["test_item"])
@@ -521,55 +361,6 @@ class EsClient:
         logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
                     clean_index.ids, clean_index.project, time() - t_start)
         return result.took
-
-    @staticmethod
-    def build_search_test_item_ids_query(log_ids):
-        """Build search test item ids query"""
-        return {"size": 10000,
-                "query": {
-                    "bool": {
-                        "filter": [
-                            {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
-                            {"exists": {"field": "issue_type"}},
-                            {"term": {"is_merged": False}},
-                            {"terms": {"_id": [str(log_id) for log_id in log_ids]}},
-                        ]
-                    }
-                }, }
-
-    def build_search_query(self, search_req, message):
-        """Build search query"""
-        return {
-            "size": 10000,
-            "query": {
-                "bool": {
-                    "filter": [
-                        {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
-                        {"exists": {"field": "issue_type"}},
-                        {"term": {"is_merged": False}},
-                    ],
-                    "must_not": {
-                        "term": {"test_item": {"value": search_req.itemId, "boost": 1.0}}
-                    },
-                    "must": [
-                        {
-                            "bool": {
-                                "should": [
-                                    {"wildcard": {"issue_type": "TI*"}},
-                                    {"wildcard": {"issue_type": "ti*"}},
-                                ]
-                            }
-                        },
-                        {"terms": {"launch_id": search_req.filteredLaunchIds}},
-                        EsClient.
-                        build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                   self.search_cfg["SearchLogsMinShouldMatch"],
-                                                   message,
-                                                   field_name="message"),
-                    ],
-                    "should": [
-                        {"term": {"is_auto_analyzed": {"value": "false", "boost": 1.0}}},
-                    ]}}}
 
     def search_logs(self, search_req):
         """Get all logs similar to given logs"""
@@ -593,7 +384,8 @@ class EsClient:
             if msg_words.strip() == "" or msg_words in searched_logs:
                 continue
             searched_logs.add(msg_words)
-            query = self.build_search_query(search_req, queried_log["_source"]["message"])
+            query = self.es_query_builder.build_search_query(
+                search_req, queried_log["_source"]["message"])
             res = self.es_client.search(index=str(search_req.projectId), body=query)
             _similarity_calculator = similarity_calculator.SimilarityCalculator(
                 {
@@ -616,143 +408,6 @@ class EsClient:
         logger.info("Finished searching by request %s with %d results. It took %.2f sec.",
                     search_req.json(), len(similar_log_ids), time() - t_start)
         return list(similar_log_ids)
-
-    @staticmethod
-    def build_more_like_this_query(max_query_terms,
-                                   min_should_match, log_message,
-                                   field_name="message", boost=1.0,
-                                   override_min_should_match=None):
-        """Build more like this query"""
-        return {"more_like_this": {
-            "fields":               [field_name],
-            "like":                 log_message,
-            "min_doc_freq":         1,
-            "min_term_freq":        1,
-            "minimum_should_match":
-                ("5<" + min_should_match) if override_min_should_match is None else override_min_should_match,
-            "max_query_terms":      max_query_terms,
-            "boost": boost, }}
-
-    def build_analyze_query(self, launch, unique_id, log, size=10):
-        """Build analyze query"""
-        min_should_match = "{}%".format(launch.analyzerConfig.minShouldMatch)\
-            if launch.analyzerConfig.minShouldMatch > 0\
-            else self.search_cfg["MinShouldMatch"]
-
-        query = {"size": size,
-                 "sort": ["_score",
-                          {"start_time": "desc"}, ],
-                 "query": {
-                     "bool": {
-                         "filter": [
-                             {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
-                             {"exists": {"field": "issue_type"}},
-                         ],
-                         "must_not": [
-                             {"wildcard": {"issue_type": "TI*"}},
-                             {"wildcard": {"issue_type": "ti*"}},
-                             {"wildcard": {"issue_type": "nd*"}},
-                             {"wildcard": {"issue_type": "ND*"}},
-                             {"term": {"test_item": log["_source"]["test_item"]}}
-                         ],
-                         "must": [],
-                         "should": [
-                             {"term": {"unique_id": {
-                                 "value": unique_id,
-                                 "boost": abs(self.search_cfg["BoostUniqueID"])}}},
-                             {"term": {"test_case_hash": {
-                                 "value": log["_source"]["test_case_hash"],
-                                 "boost": abs(self.search_cfg["BoostUniqueID"])}}},
-                             {"term": {"is_auto_analyzed": {
-                                 "value": str(self.search_cfg["BoostAA"] < 0).lower(),
-                                 "boost": abs(self.search_cfg["BoostAA"]), }}},
-                         ]}}}
-
-        if launch.analyzerConfig.analyzerMode in ["LAUNCH_NAME"]:
-            query["query"]["bool"]["must"].append(
-                {"term": {
-                    "launch_name": {
-                        "value": launch.launchName}}})
-        elif launch.analyzerConfig.analyzerMode in ["CURRENT_LAUNCH"]:
-            query["query"]["bool"]["must"].append(
-                {"term": {
-                    "launch_id": {
-                        "value": launch.launchId}}})
-        else:
-            query["query"]["bool"]["should"].append(
-                {"term": {
-                    "launch_name": {
-                        "value": launch.launchName,
-                        "boost": abs(self.search_cfg["BoostLaunch"])}}})
-        if log["_source"]["message"].strip() != "":
-            log_lines = launch.analyzerConfig.numberOfLogLines
-            query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
-            if log_lines == -1:
-                query["query"]["bool"]["must"].append(
-                    self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                    min_should_match,
-                                                    log["_source"]["detected_message"],
-                                                    field_name="detected_message",
-                                                    boost=4.0))
-                if log["_source"]["stacktrace"].strip() != "":
-                    query["query"]["bool"]["must"].append(
-                        self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                        min_should_match,
-                                                        log["_source"]["stacktrace"],
-                                                        field_name="stacktrace",
-                                                        boost=2.0))
-                else:
-                    query["query"]["bool"]["must_not"].append({"wildcard": {"stacktrace": "*"}})
-            else:
-                query["query"]["bool"]["must"].append(
-                    self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                    min_should_match,
-                                                    log["_source"]["message"],
-                                                    field_name="message",
-                                                    boost=4.0))
-                query["query"]["bool"]["should"].append(
-                    self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                    "80%",
-                                                    log["_source"]["detected_message"],
-                                                    field_name="detected_message",
-                                                    boost=2.0))
-                query["query"]["bool"]["should"].append(
-                    self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                    "60%",
-                                                    log["_source"]["stacktrace"],
-                                                    field_name="stacktrace", boost=1.0))
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                "80%",
-                                                log["_source"]["merged_small_logs"],
-                                                field_name="merged_small_logs",
-                                                boost=0.5))
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                "1",
-                                                log["_source"]["only_numbers"],
-                                                field_name="only_numbers",
-                                                boost=4.0,
-                                                override_min_should_match="1"))
-        else:
-            query["query"]["bool"]["filter"].append({"term": {"is_merged": True}})
-            query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
-            query["query"]["bool"]["must"].append(
-                self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
-                                                min_should_match,
-                                                log["_source"]["merged_small_logs"],
-                                                field_name="merged_small_logs",
-                                                boost=2.0))
-        return query
-
-    def leave_only_unique_logs(self, logs):
-        unique_logs = set()
-        all_logs = []
-        for log in logs:
-            if log.message.strip() not in unique_logs:
-                all_logs.append(log)
-                unique_logs.add(log.message.strip())
-        return all_logs
 
     def choose_issue_type(self, predicted_labels, predicted_labels_probability,
                           issue_type_names, boosting_data_gatherer):
@@ -811,10 +466,10 @@ class EsClient:
                 if not self.index_exists(str(launch.project)):
                     continue
                 for test_item in launch.testItems:
-                    unique_logs = self.leave_only_unique_logs(test_item.logs)
+                    unique_logs = utils.leave_only_unique_logs(test_item.logs)
                     prepared_logs = [self._prepare_log(launch, test_item, log)
                                      for log in unique_logs if log.logLevel >= ERROR_LOGGING_LEVEL]
-                    results = self.decompose_logs_merged_and_without_duplicates(prepared_logs)
+                    results = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
 
                     for log in results:
                         message = log["_source"]["message"].strip()
@@ -823,8 +478,8 @@ class EsClient:
                                 (message == "" and merged_logs == ""):
                             continue
 
-                        query = self.build_analyze_query(launch, test_item.uniqueId, log,
-                                                         launch.analyzerConfig.numberOfLogLines)
+                        query = self.es_query_builder.build_analyze_query(
+                            launch, log, launch.analyzerConfig.numberOfLogLines)
                         full_query = "{}\n{}".format(json.dumps({"index": launch.project}), json.dumps(query))
                         batches.append(full_query)
                         batch_logs.append((launch.analyzerConfig, test_item.testItemId, log))

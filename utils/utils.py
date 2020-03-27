@@ -22,6 +22,8 @@ from dateutil.parser import parse
 import urllib
 from urllib.parse import urlparse
 import warnings
+import os
+import json
 
 logger = logging.getLogger("analyzerApp.utils")
 file_extensions = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
@@ -343,3 +345,19 @@ def remove_credentials_from_url(url):
 
 def clean_colon_stacking(text):
     return text.replace(":", " : ")
+
+
+def leave_only_unique_logs(logs):
+    unique_logs = set()
+    all_logs = []
+    for log in logs:
+        if log.message.strip() not in unique_logs:
+            all_logs.append(log)
+            unique_logs.add(log.message.strip())
+    return all_logs
+
+
+def read_json_file(folder, filename, to_json=False):
+    """Read fixture from file"""
+    with open(os.path.join(folder, filename), "r") as file:
+        return file.read() if not to_json else json.loads(file.read())

@@ -19,7 +19,7 @@ import sure # noqa
 import logging
 
 import commons.launch_objects as launch_objects
-import commons.esclient as esclient
+from commons.es_query_builder import EsQueryBuilder
 from utils import utils
 import os
 import json
@@ -75,7 +75,6 @@ class TestEsQuery(unittest.TestCase):
         """Tests building analyze query"""
         search_cfg = TestEsQuery.get_default_search_config()
 
-        es_client = esclient.EsClient(search_cfg=search_cfg)
         launch = launch_objects.Launch(**{
             "analyzerConfig": {"analyzerMode": "ALL", "numberOfLogLines": -1},
             "launchId": 12,
@@ -94,7 +93,7 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_with_numbers": "hello world 1",
                 "stacktrace": "",
                 "only_numbers": "1"}}
-        query_from_esclient = es_client.build_analyze_query(launch, "unique", log)
+        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = TestEsQuery.get_fixture(self.query_all_logs_empty_stacktrace, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
@@ -104,7 +103,6 @@ class TestEsQuery(unittest.TestCase):
         """Tests building analyze query"""
         search_cfg = TestEsQuery.get_default_search_config()
 
-        es_client = esclient.EsClient(search_cfg=search_cfg)
         launch = launch_objects.Launch(**{
             "analyzerConfig": {"analyzerMode": "ALL", "numberOfLogLines": 2},
             "launchId": 12,
@@ -123,7 +121,7 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_with_numbers": "hello world 1",
                 "stacktrace": "",
                 "only_numbers": "1"}}
-        query_from_esclient = es_client.build_analyze_query(launch, "unique", log)
+        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = TestEsQuery.get_fixture(self.query_two_log_lines, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
@@ -133,7 +131,6 @@ class TestEsQuery(unittest.TestCase):
         """Tests building analyze query"""
         search_cfg = TestEsQuery.get_default_search_config()
 
-        es_client = esclient.EsClient(search_cfg=search_cfg)
         launch = launch_objects.Launch(**{
             "analyzerConfig": {"analyzerMode": "CURRENT_LAUNCH", "numberOfLogLines": 2},
             "launchId": 12,
@@ -152,7 +149,7 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_with_numbers": "hello world 1",
                 "stacktrace": "",
                 "only_numbers": "1"}}
-        query_from_esclient = es_client.build_analyze_query(launch, "unique", log)
+        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = TestEsQuery.get_fixture(
             self.query_two_log_lines_only_current_launch, to_json=True)
 
@@ -163,7 +160,6 @@ class TestEsQuery(unittest.TestCase):
         """Tests building analyze query"""
         search_cfg = TestEsQuery.get_default_search_config()
 
-        es_client = esclient.EsClient(search_cfg=search_cfg)
         launch = launch_objects.Launch(**{
             "analyzerConfig": {"analyzerMode": "ALL", "numberOfLogLines": -1},
             "launchId": 12,
@@ -182,7 +178,7 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_with_numbers": "hello world 1",
                 "stacktrace": "invoke.method(arg)",
                 "only_numbers": "1"}}
-        query_from_esclient = es_client.build_analyze_query(launch, "unique", log)
+        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = TestEsQuery.get_fixture(self.query_all_logs_nonempty_stacktrace, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
@@ -192,7 +188,6 @@ class TestEsQuery(unittest.TestCase):
         """Tests building analyze query"""
         search_cfg = TestEsQuery.get_default_search_config()
 
-        es_client = esclient.EsClient(search_cfg=search_cfg)
         launch = launch_objects.Launch(**{
             "analyzerConfig": {"analyzerMode": "LAUNCH_NAME", "numberOfLogLines": -1},
             "launchId": 12,
@@ -211,7 +206,7 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_with_numbers": "hello world 1",
                 "stacktrace": "invoke.method(arg)",
                 "only_numbers": "1"}}
-        query_from_esclient = es_client.build_analyze_query(launch, "unique", log)
+        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = TestEsQuery.get_fixture(
             self.query_all_logs_nonempty_stacktrace_launches_with_the_same_name, to_json=True)
 
@@ -222,7 +217,6 @@ class TestEsQuery(unittest.TestCase):
         """Tests building analyze query"""
         search_cfg = TestEsQuery.get_default_search_config()
 
-        es_client = esclient.EsClient(search_cfg=search_cfg)
         launch = launch_objects.Launch(**{
             "analyzerConfig": {"analyzerMode": "ALL", "numberOfLogLines": -1},
             "launchId": 12,
@@ -241,7 +235,7 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_with_numbers": "",
                 "stacktrace": "",
                 "only_numbers": ""}}
-        query_from_esclient = es_client.build_analyze_query(launch, "unique", log)
+        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = TestEsQuery.get_fixture(self.query_merged_small_logs_search, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
@@ -251,7 +245,6 @@ class TestEsQuery(unittest.TestCase):
         """Tests building analyze query"""
         search_cfg = TestEsQuery.get_default_search_config()
 
-        es_client = esclient.EsClient(search_cfg=search_cfg)
         search_req = launch_objects.SearchLogs(**{
             "launchId": 1,
             "launchName": "launch 1",
@@ -260,7 +253,8 @@ class TestEsQuery(unittest.TestCase):
             "filteredLaunchIds": [1, 2, 3],
             "logMessages": ["log message 1"],
             "logLines": -1})
-        query_from_esclient = es_client.build_search_query(search_req, "log message 1")
+        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_search_query(
+            search_req, "log message 1")
         demo_query = TestEsQuery.get_fixture(self.query_search_logs, to_json=True)
 
         query_from_esclient.should.equal(demo_query)

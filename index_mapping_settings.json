@@ -1,0 +1,62 @@
+{
+    "properties": {
+        "test_item": {
+            "type": "keyword"
+        },
+        "issue_type": {
+            "type": "keyword"
+        },
+        "message": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "merged_small_logs": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "detected_message": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "detected_message_with_numbers": {
+            "type":     "text",
+            "index":    false
+        },
+        "only_numbers": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "stacktrace": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "original_message_lines": {
+            "type": "integer"
+        },
+        "original_message_words_number": {
+            "type": "integer"
+        },
+        "log_level": {
+            "type": "integer"
+        },
+        "test_case_hash": {
+            "type": "integer"
+        },
+        "launch_name": {
+            "type": "keyword"
+        },
+        "unique_id": {
+            "type": "keyword"
+        },
+        "is_auto_analyzed": {
+            "type": "keyword"
+        },
+        "is_merged": {
+            "type": "boolean"
+        },
+        "start_time": {
+            "type":   "date",
+            "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        }
+    }
+}

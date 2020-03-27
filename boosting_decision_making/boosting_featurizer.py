@@ -29,6 +29,7 @@ class BoostingFeaturizer:
         self.similarity_calculator = similarity_calculator.SimilarityCalculator(
             self.config,
             weighted_similarity_calculator=weighted_log_similarity_calculator)
+        self.fields_to_replace_with_merged_logs = ["message", "detected_message"]
         if "filter_min_should_match" in self.config:
             self.similarity_calculator.find_similarity(
                 all_results,
@@ -76,7 +77,7 @@ class BoostingFeaturizer:
                 group_id = (elastic_res["_id"], log["_id"])
                 sim_obj = self.similarity_calculator.similarity_dict[field][group_id]
                 similarity = sim_obj["similarity"]
-                if sim_obj["both_empty"]:
+                if sim_obj["both_empty"] and field in self.fields_to_replace_with_merged_logs:
                     sim_obj = self.similarity_calculator.similarity_dict["merged_small_logs"]
                     similarity = sim_obj[group_id]["similarity"]
                 if similarity >= self.config["min_should_match"]:

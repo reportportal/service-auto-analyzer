@@ -132,6 +132,7 @@ class EsQueryBuilder:
                     "launch_name": {
                         "value": launch.launchName,
                         "boost": abs(self.search_cfg["BoostLaunch"])}}})
+
         if log["_source"]["message"].strip():
             log_lines = launch.analyzerConfig.numberOfLogLines
             query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
@@ -297,4 +298,5 @@ class EsQueryBuilder:
                                             field_name="found_exceptions_extended",
                                             boost=4.0,
                                             override_min_should_match="1"))
+
         return query

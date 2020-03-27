@@ -197,4 +197,5 @@ class EsQueryBuilder:
                                                 field_name="found_exceptions",
                                                 boost=4.0,
                                                 override_min_should_match="1"))
+
         return query

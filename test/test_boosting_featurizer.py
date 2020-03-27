@@ -30,6 +30,12 @@ class TestBoostingFeaturizer(unittest.TestCase):
         self.one_hit_search_rs_explained = "one_hit_search_rs_explained.json"
         self.two_hits_search_rs_explained = "two_hits_search_rs_explained.json"
         self.log_message = "log_message.json"
+        self.log_message_wo_stacktrace = "log_message_wo_stacktrace.json"
+        self.one_hit_search_rs_explained_wo_stacktrace =\
+            "one_hit_search_rs_explained_wo_stacktrace.json"
+        self.log_message_only_small_logs = "log_message_only_small_logs.json"
+        self.one_hit_search_rs_small_logs = "one_hit_search_rs_small_logs.json"
+        self.two_hits_search_rs_small_logs = "two_hits_search_rs_small_logs.json"
         self.epsilon = 0.0001
         logging.disable(logging.CRITICAL)
 
@@ -39,13 +45,13 @@ class TestBoostingFeaturizer(unittest.TestCase):
 
     @staticmethod
     @utils.ignore_warnings
-    def get_default_config():
+    def get_default_config(filter_fields=["detected_message", "stacktrace"]):
         """Get default config"""
         return {
             "max_query_terms":  50,
             "min_should_match": 0.8,
             "min_word_length":  0,
-            "filter_min_should_match": [],
+            "filter_min_should_match": filter_fields,
             "similarity_weights_folder": os.getenv("SIMILARITY_WEIGHTS_FOLDER", ""),
             "number_of_log_lines": -1
         }
@@ -165,3 +171,85 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                 result_field_dict = test["result"][issue_type][field][field_dict]
                                 elastic_res[field][field_dict].should.equal(result_field_dict,
                                                                             epsilon=self.epsilon)
+
+    @utils.ignore_warnings
+    def test_filter_by_min_should_match(self):
+        tests = [
+            {
+                "elastic_results": [],
+                "config":           TestBoostingFeaturizer.get_default_config(filter_fields=[]),
+                "result":          [],
+            },
+            {
+                "elastic_results": [],
+                "config":           TestBoostingFeaturizer.get_default_config(filter_fields=[
+                    "detected_message", "stacktrace"]),
+                "result":          [],
+            },
+            {
+                "elastic_results": [(self.get_fixture(self.log_message),
+                                     self.get_fixture(self.one_hit_search_rs_explained))],
+                "config":           TestBoostingFeaturizer.get_default_config(filter_fields=[
+                    "detected_message", "stacktrace"]),
+                "result":          [(self.get_fixture(self.log_message),
+                                     self.get_fixture(self.one_hit_search_rs_explained))],
+            },
+            {
+                "elastic_results": [(self.get_fixture(self.log_message),
+                                     self.get_fixture(self.one_hit_search_rs_explained))],
+                "config":           TestBoostingFeaturizer.get_default_config(filter_fields=[
+                    "message"]),
+                "result":          [(self.get_fixture(self.log_message),
+                                     self.get_fixture(self.one_hit_search_rs_explained))],
+            },
+            {
+                "elastic_results": [(self.get_fixture(self.log_message),
+                                     self.get_fixture(self.one_hit_search_rs_explained)),
+                                    (self.get_fixture(self.log_message_wo_stacktrace),
+                                     self.get_fixture(self.one_hit_search_rs_explained_wo_stacktrace))],
+                "config":           TestBoostingFeaturizer.get_default_config(filter_fields=[
+                    "message"]),
+                "result":          [(self.get_fixture(self.log_message),
+                                     self.get_fixture(self.one_hit_search_rs_explained)),
+                                    (self.get_fixture(self.log_message_wo_stacktrace),
+                                     self.get_fixture(self.one_hit_search_rs_explained_wo_stacktrace))]
+            },
+            {
+                "elastic_results": [(self.get_fixture(self.log_message),
+                                     self.get_fixture(self.one_hit_search_rs_explained)),
+                                    (self.get_fixture(self.log_message_wo_stacktrace),
+                                     self.get_fixture(self.one_hit_search_rs_explained_wo_stacktrace))],
+                "config":           TestBoostingFeaturizer.get_default_config(filter_fields=[
+                    "detected_message", "stacktrace"]),
+                "result":          [(self.get_fixture(self.log_message),
+                                     self.get_fixture(self.one_hit_search_rs_explained)),
+                                    (self.get_fixture(self.log_message_wo_stacktrace),
+                                     self.get_fixture(self.one_hit_search_rs_explained_wo_stacktrace))]
+            },
+            {
+                "elastic_results": [(self.get_fixture(self.log_message_only_small_logs),
+                                     self.get_fixture(self.one_hit_search_rs_small_logs))],
+                "config":           TestBoostingFeaturizer.get_default_config(filter_fields=[
+                    "detected_message", "stacktrace"]),
+                "result":          []
+            },
+            {
+                "elastic_results": [(self.get_fixture(self.log_message_only_small_logs),
+                                     self.get_fixture(self.two_hits_search_rs_small_logs))],
+                "config":           TestBoostingFeaturizer.get_default_config(filter_fields=[
+                    "detected_message", "stacktrace"]),
+                "result":          [(self.get_fixture(self.log_message_only_small_logs),
+                                     self.get_fixture(self.two_hits_search_rs_small_logs))]
+            },
+        ]
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                _boosting_featurizer = BoostingFeaturizer(test["elastic_results"], test["config"], [])
+                all_results = test["elastic_results"]
+                for field in test["config"]["filter_min_should_match"]:
+                    all_results = _boosting_featurizer.filter_by_min_should_match(all_results, field=field)
+                all_results.should.have.length_of(len(test["result"]))
+                for idx, (log, hits) in enumerate(all_results):
+                    log["_id"].should.equal(test["result"][idx][0]["_id"])
+                    for i, hit in enumerate(hits["hits"]["hits"]):
+                        hit["_id"].should.equal(test["result"][idx][1]["hits"]["hits"][i]["_id"])

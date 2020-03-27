@@ -1,0 +1,12 @@
+{
+	"_id": 1,
+	"_source": {
+		"log_level": 40000,
+		"merged_small_logs": "",
+		"detected_message": "java.lang.NullPointerException",
+		"detected_message_with_numbers": "java.lang.NullPointerException",
+		"only_numbers": "",
+		"stacktrace": "",
+		"message": "java.lang.NullPointerException"
+	}
+}

@@ -154,7 +154,7 @@ class EsClient:
     def create_index(self, index_name):
         """Create index in elasticsearch"""
         logger.debug("Creating '%s' Elasticsearch index", str(index_name))
-        logger.info("ES Url %s", self.host)
+        logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
         try:
             response = self.es_client.indices.create(index=str(index_name), body={
                 'settings': DEFAULT_INDEX_SETTINGS,
@@ -164,7 +164,7 @@ class EsClient:
             return commons.launch_objects.Response(**response)
         except Exception as err:
             logger.error("Couldn't create index")
-            logger.error("ES Url %s", self.host)
+            logger.error("ES Url %s", utils.remove_credentials_from_url(self.host))
             logger.error(err)
             return commons.launch_objects.Response()
 
@@ -213,12 +213,12 @@ class EsClient:
         """Delete the whole index"""
         try:
             self.es_client.indices.delete(index=str(index_name))
-            logger.info("ES Url %s", self.host)
+            logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
             logger.debug("Deleted index %s", str(index_name))
             return 1
         except Exception as err:
             logger.error("Not found %s for deleting", str(index_name))
-            logger.error("ES Url %s", self.host)
+            logger.error("ES Url %s", utils.remove_credentials_from_url(self.host))
             logger.error(err)
             return 0
 
@@ -231,7 +231,7 @@ class EsClient:
     def index_logs(self, launches):
         """Index launches to the index with project name"""
         logger.info("Indexing logs for %d launches", len(launches))
-        logger.info("ES Url %s", self.host)
+        logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
         t_start = time()
         bodies = []
         test_item_ids = []
@@ -252,24 +252,30 @@ class EsClient:
                 if logs_added:
                     test_item_ids.append(str(test_item.testItemId))
         result = self._bulk_index(bodies)
-        result = self._merge_logs(test_item_ids, project)
+        self._merge_logs(test_item_ids, project)
         logger.info("Finished indexing logs for %d launches. It took %.2f sec.",
                     len(launches), time() - t_start)
         return result
 
-    def _prepare_log(self, launch, test_item, log):
-        log.message = utils.delete_empty_lines(log.message)
-        cleaned_message = utils.fix_big_encoded_urls(log.message)
-        cleaned_message = utils.reverse_log_if_needed(cleaned_message)
+    def clean_message(self, message):
+        message = utils.replace_tabs_for_newlines(message)
+        message = utils.fix_big_encoded_urls(message)
+        message = utils.reverse_log_if_needed(message)
+        message = utils.remove_generated_parts(message)
+        message = utils.clean_html(message)
+        message = utils.delete_empty_lines(message)
+        return message
 
-        message = utils.sanitize_text(
+    def _prepare_log(self, launch, test_item, log):
+        cleaned_message = self.clean_message(log.message)
+
+        message = utils.leave_only_unique_lines(utils.sanitize_text(
             utils.first_lines(cleaned_message,
-                              launch.analyzerConfig.numberOfLogLines))
+                              launch.analyzerConfig.numberOfLogLines)))
 
         detected_message, stacktrace = utils.detect_log_description_and_stacktrace(
             cleaned_message,
-            default_log_number=1,
-            choose_by_algorythm=True)
+            default_log_number=1)
 
         detected_message_with_numbers = utils.remove_starting_datetime(detected_message)
         detected_message = utils.sanitize_text(detected_message)
@@ -280,9 +286,6 @@ class EsClient:
         detected_message_with_numbers = utils.leave_only_unique_lines(detected_message_with_numbers)
 
         detected_message_only_numbers = utils.find_only_numbers(detected_message_with_numbers)
-
-        if launch.analyzerConfig.numberOfLogLines == -1 and stacktrace.strip() != "":
-            message = utils.sanitize_text(detected_message + "\n" + stacktrace)
 
         return {
             "_id":    log.logId,
@@ -296,9 +299,9 @@ class EsClient:
                 "is_auto_analyzed": test_item.isAutoAnalyzed,
                 "issue_type":       test_item.issueType,
                 "log_level":        log.logLevel,
-                "original_message_lines": utils.calculate_line_number(log.message),
+                "original_message_lines": utils.calculate_line_number(cleaned_message),
                 "original_message_words_number": len(
-                    utils.split_words(log.message, split_urls=False)),
+                    utils.split_words(cleaned_message, split_urls=False)),
                 "message":          message,
                 "is_merged":        False,
                 "start_time":       datetime(*test_item.startTime[:6]).strftime("%Y-%m-%d %H:%M:%S"),
@@ -464,7 +467,7 @@ class EsClient:
             return commons.launch_objects.BulkResponse(took=success_count, errors=len(errors) > 0)
         except Exception as err:
             logger.error("Error in bulk")
-            logger.error("ES Url %s", self.host)
+            logger.error("ES Url %s", utils.remove_credentials_from_url(self.host))
             logger.error(err)
             return commons.launch_objects.BulkResponse(took=0, errors=True)
 
@@ -472,7 +475,7 @@ class EsClient:
         """Delete logs from elasticsearch"""
         logger.info("Delete logs %s for the project %s",
                     clean_index.ids, clean_index.project)
-        logger.info("ES Url %s", self.host)
+        logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
         t_start = time()
         if not self.index_exists(clean_index.project):
             return 0
@@ -553,7 +556,7 @@ class EsClient:
         """Get all logs similar to given logs"""
         similar_log_ids = set()
         logger.info("Started searching by request %s", search_req.json())
-        logger.info("ES Url %s", self.host)
+        logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
         t_start = time()
         if not self.index_exists(str(search_req.projectId)):
             return []
@@ -561,8 +564,10 @@ class EsClient:
         for message in search_req.logMessages:
             if message.strip() == "":
                 continue
-            message = utils.reverse_log_if_needed(message)
-            sanitized_msg = utils.sanitize_text(utils.first_lines(message, search_req.logLines))
+            cleaned_message = self.clean_message(message)
+            sanitized_msg = utils.leave_only_unique_lines(utils.sanitize_text(
+                utils.first_lines(cleaned_message, search_req.logLines)))
+
             msg_words = " ".join(utils.split_words(sanitized_msg))
             if msg_words in searched_logs:
                 continue
@@ -871,7 +876,7 @@ class EsClient:
     @utils.ignore_warnings
     def analyze_logs(self, launches):
         logger.info("Started analysis for %d launches", len(launches))
-        logger.info("ES Url %s", self.host)
+        logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
         results = []
 
         t_start = time()

@@ -38,33 +38,22 @@ class BoostingFeaturizer:
         self.feature_functions = {
             0: (self._calculate_score, {}),
             1: (self._calculate_place, {}),
-            2: (self._calculate_max_score_and_pos, {"return_val_name": "max_score"}),
             3: (self._calculate_max_score_and_pos, {"return_val_name": "max_score_pos"}),
-            4: (self._calculate_min_score_and_pos, {"return_val_name": "min_score"}),
             5: (self._calculate_min_score_and_pos, {"return_val_name": "min_score_pos"}),
-            6: (self._calculate_percent_count_items_and_mean, {"return_val_name": "mean_score"}),
             7: (self._calculate_percent_count_items_and_mean, {"return_val_name": "cnt_items_percent"}),
-            8: (self._calculate_max_score_and_pos, {"return_val_name": "max_score_global_percent"}),
             9: (self._calculate_percent_issue_types, {}),
-            10: (self._calculate_query_terms_percent, {"field_name": "message"}),
             11: (self._calculate_similarity_percent, {"field_name": "message"}),
             13: (self._calculate_similarity_percent, {"field_name": "merged_small_logs"}),
             14: (self._has_test_item_several_logs, {}),
             15: (self._has_query_several_logs, {}),
-            16: (self._calculate_query_terms_percent, {"field_name": "message"}),
-            17: (self._calculate_query_terms_percent, {"field_name": "merged_small_logs"}),
             18: (self._calculate_similarity_percent, {"field_name": "detected_message"}),
             19: (self._calculate_similarity_percent, {"field_name": "detected_message_with_numbers"}),
-            20: (self._calculate_query_terms_percent, {"field_name": "detected_message"}),
-            21: (self._calculate_query_terms_percent, {"field_name": "detected_message_with_numbers"}),
-            22: (self._calculate_query_terms_percent, {"field_name": "stacktrace"}),
             23: (self._calculate_similarity_percent, {"field_name": "stacktrace"}),
-            24: (self._calculate_query_terms_percent, {"field_name": "only_numbers"}),
             25: (self._calculate_similarity_percent, {"field_name": "only_numbers"}),
-            26: (self._calculate_max_score_and_pos, {"return_val_name": "max_score", "scaled": True}),
-            27: (self._calculate_min_score_and_pos, {"return_val_name": "min_score", "scaled": True}),
+            26: (self._calculate_max_score_and_pos, {"return_val_name": "max_score"}),
+            27: (self._calculate_min_score_and_pos, {"return_val_name": "min_score"}),
             28: (self._calculate_percent_count_items_and_mean,
-                 {"return_val_name": "mean_score", "scaled": True}),
+                 {"return_val_name": "mean_score"}),
         }
 
         if type(feature_ids) == str:
@@ -234,7 +223,7 @@ class BoostingFeaturizer:
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
                 self.scores_by_issue_type[issue_type]["score"] +=\
-                    (hit["normalized_score"] / len(self.all_results))
+                    (hit["normalized_score"] / self.total_normalized)
         return self.scores_by_issue_type
 
     def _calculate_score(self):
@@ -250,61 +239,42 @@ class BoostingFeaturizer:
             place_by_issue_type[issue_type_item[0]] = 1 / (1 + idx)
         return place_by_issue_type
 
-    def _calculate_max_score_and_pos(self, return_val_name="max_score", scaled=False):
+    def _calculate_max_score_and_pos(self, return_val_name="max_score"):
         max_scores_by_issue_type = {}
-        max_score_global = 0
         for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
-
-                if hit["normalized_score"] > max_score_global:
-                    max_score_global = hit["normalized_score"]
 
                 if issue_type not in max_scores_by_issue_type or\
                         hit["normalized_score"] > max_scores_by_issue_type[issue_type]["max_score"]:
                     max_scores_by_issue_type[issue_type] = {"max_score": hit["normalized_score"],
                                                             "max_score_pos": 1 / (1 + idx), }
-        for issue_type in max_scores_by_issue_type:
-            max_scores_by_issue_type[issue_type]["max_score_global_percent"] =\
-                max_scores_by_issue_type[issue_type]["max_score"] / max_score_global
-            if scaled:
-                max_scores_by_issue_type[issue_type]["max_score"] /= max_score_global
 
         return dict([(item, max_scores_by_issue_type[item][return_val_name])
                     for item in max_scores_by_issue_type])
 
-    def _calculate_min_score_and_pos(self, return_val_name="min_score", scaled=False):
+    def _calculate_min_score_and_pos(self, return_val_name="min_score"):
         min_scores_by_issue_type = {}
-        max_score_global = 0
         for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
-
-                if hit["normalized_score"] > max_score_global:
-                    max_score_global = hit["normalized_score"]
 
                 if issue_type not in min_scores_by_issue_type or\
                         hit["normalized_score"] < min_scores_by_issue_type[issue_type]["min_score"]:
                     min_scores_by_issue_type[issue_type] = {"min_score": hit["normalized_score"],
                                                             "min_score_pos": 1 / (1 + idx), }
-        for issue_type in min_scores_by_issue_type:
-            if scaled:
-                min_scores_by_issue_type[issue_type]["min_score"] /= max_score_global
+
         return dict([(item, min_scores_by_issue_type[item][return_val_name])
                     for item in min_scores_by_issue_type])
 
     def _calculate_percent_count_items_and_mean(self, return_val_name="mean_score", scaled=False):
         cnt_items_by_issue_type = {}
         cnt_items_glob = 0
-        max_score_global = 0
         for log, es_results in self.all_results:
             cnt_items_glob += len(es_results)
 
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
-
-                if hit["normalized_score"] > max_score_global:
-                    max_score_global = hit["normalized_score"]
 
                 if issue_type not in cnt_items_by_issue_type:
                     cnt_items_by_issue_type[issue_type] = {"mean_score": 0,
@@ -317,42 +287,25 @@ class BoostingFeaturizer:
             cnt_items_by_issue_type[issue_type]["mean_score"] /=\
                 cnt_items_by_issue_type[issue_type]["cnt_items_percent"]
             cnt_items_by_issue_type[issue_type]["cnt_items_percent"] /= cnt_items_glob
-            if scaled:
-                cnt_items_by_issue_type[issue_type]["mean_score"] /= max_score_global
         return dict([(item, cnt_items_by_issue_type[item][return_val_name])
                     for item in cnt_items_by_issue_type])
 
     def normalize_results(self, all_elastic_results):
         all_results = []
+        max_score = 0
+        self.total_normalized = 0
         for log, es_results in all_elastic_results:
-            total_score = 0
             for hit in es_results["hits"]["hits"]:
-                total_score += hit["_score"]
-
+                max_score = max(max_score, hit["_score"])
+        for log, es_results in all_elastic_results:
             for hit in es_results["hits"]["hits"]:
-                hit["normalized_score"] = hit["_score"] / total_score
+                hit["normalized_score"] = hit["_score"] / max_score
+                self.total_normalized += hit["normalized_score"]
+                for config_field in self.config:
+                    hit[config_field] = self.config[config_field]
 
             all_results.append((log, es_results["hits"]["hits"]))
         return all_results
-
-    def _calculate_query_terms_percent(self, field_name="message"):
-        scores_by_issue_type = self.find_most_relevant_by_type()
-        query_terms_percent_by_type = {}
-        for issue_type in scores_by_issue_type:
-            all_query_words = utils.find_query_words_count_from_explanation(
-                scores_by_issue_type[issue_type]["mrHit"], field_name=field_name)
-
-            all_log_words = utils.split_words(
-                scores_by_issue_type[issue_type]["compared_log"]["_source"][field_name])
-
-            if len(all_log_words) == 0:
-                query_terms_percent_by_type[issue_type] = 1.0
-            else:
-                terms_percent = min(len(all_query_words) / len(all_log_words), 1.0)
-                query_terms_percent_by_type[issue_type] = (
-                    terms_percent if len(all_log_words) <= self.config["max_query_terms"]
-                    else len(all_query_words) / self.config["max_query_terms"])
-        return query_terms_percent_by_type
 
     def _calculate_similarity_percent(self, field_name="message"):
         scores_by_issue_type = self.find_most_relevant_by_type()

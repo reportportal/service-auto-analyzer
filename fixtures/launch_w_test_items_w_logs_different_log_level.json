@@ -13,7 +13,7 @@
                 {
                   "logId": 1,
                     "logLevel": 40000,
-                    "message": "Message 1"
+                    "message": "<html>Message <b>1</b></html> \n java.lang.reflect.Method.invoke(Method.java:498) \n message error caused by exception\n ... 34 more"
                 },
                 {
                   "logId": 3,

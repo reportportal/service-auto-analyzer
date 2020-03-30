@@ -20,6 +20,7 @@ import nltk
 import logging
 from dateutil.parser import parse
 import urllib
+from urllib.parse import urlparse
 import warnings
 
 logger = logging.getLogger("analyzerApp.utils")
@@ -138,15 +139,20 @@ def delete_line_numbers(text):
                  " ", res, flags=re.I)
     res = re.sub("|".join([r"\.%s(?!\.)\b" % ext for ext in file_extensions]), " ", res, flags=re.I)
     res = re.sub(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})#(\d+)", r"\g<1>:\g<2>", res)
-    if re.search(r"^[\s]*at .*\(.*?\)[\s]*$", res):
+    result = re.search(r"^\s*at\s+.*\(.*?\)[\s]*$", res)
+    if result and result.group(0) == res:
         res = re.sub(r"\d", "", res)
         res = "# " + res
+    else:
+        result = re.search(r"^\s*\w+([\.\/]\s*\w+)+\s*\(.*?\)[\s]*$", res)
+        if result and result.group(0) == res:
+            res = "# " + res
     return res
 
 
 def find_only_numbers(detected_message_with_numbers):
     """Removes all non digit symbols and concatenates unique numbers"""
-    detected_message_only_numbers = re.sub(r"[^\d ]", "", detected_message_with_numbers)
+    detected_message_only_numbers = re.sub(r"[^\d \._]", "", detected_message_with_numbers)
     return " ".join(split_words(detected_message_only_numbers, only_unique=True))
 
 
@@ -167,30 +173,52 @@ def reverse_log_if_needed(message):
     return message
 
 
-def detect_log_description_and_stacktrace(message, default_log_number=1,
-                                          max_log_lines=5, choose_by_algorythm=True):
+def has_stacktrace_keywords(line):
+    normalized_line = line.lower()
+    for key_word in ["stacktrace", "stack trace", "stack-trace", "traceback"]:
+        if re.search(r"\s*%s\s*:\s*$" % key_word, normalized_line):
+            return True
+        if "end of " in normalized_line and key_word in normalized_line:
+            return True
+    return False
+
+
+def has_more_lines_pattern(line):
+    normalized_line = line.lower().strip()
+    result = re.search(r"^\s*\.+\s*\d+\s+more\s*$", normalized_line)
+    if result and result.group(0) == normalized_line:
+        return True
+    return False
+
+
+def detect_log_description_and_stacktrace(message, default_log_number=1, max_log_lines=5):
     """Split a log into a log message and stacktrace"""
     message = delete_empty_lines(message)
     if default_log_number == -1:
         return message, ""
     if calculate_line_number(message) > 2:
-        log_message_lines = -1
-        for idx, line in enumerate(message.split("\n")):
+        split_lines = message.split("\n")
+        detected_message_lines = []
+        stacktrace_lines = []
+        for idx, line in enumerate(split_lines):
             modified_line = delete_line_numbers(line)
+            if has_stacktrace_keywords(line) or has_more_lines_pattern(line):
+                continue
             if modified_line != line:
-                log_message_lines = idx
-                break
-        if log_message_lines == calculate_line_number(message) or\
-                log_message_lines == -1:
-            log_message_lines = max_log_lines
-        if log_message_lines < default_log_number:
-            log_message_lines = default_log_number
-        if not choose_by_algorythm:
-            if log_message_lines > max_log_lines:
-                log_message_lines = max_log_lines
-        log_message = first_lines(message, log_message_lines)
-        stacktrace = "\n".join(message.split("\n")[log_message_lines:])
-        return log_message, stacktrace
+                stacktrace_lines.append(line)
+            else:
+                detected_message_lines.append(line)
+
+        if len(detected_message_lines) == len(split_lines):
+            stacktrace_lines = detected_message_lines[max_log_lines:]
+            detected_message_lines = detected_message_lines[:max_log_lines]
+
+        if len(detected_message_lines) < default_log_number:
+            all_message = detected_message_lines + stacktrace_lines
+            detected_message_lines = all_message[:default_log_number]
+            stacktrace_lines = all_message[default_log_number:]
+
+        return "\n".join(detected_message_lines), "\n".join(stacktrace_lines)
     return message, ""
 
 
@@ -222,3 +250,88 @@ def leave_only_unique_lines(message):
             all_unique.add(line.strip())
             all_lines.append(line)
     return "\n".join(all_lines)
+
+
+def remove_generated_parts(message):
+    """Removes lines with '<generated>' keyword and removes parts, like $ab24b, @c321e from words"""
+    all_lines = []
+    for line in message.split("\n"):
+        if "<generated>" in line.lower():
+            continue
+        if has_stacktrace_keywords(line) or has_more_lines_pattern(line):
+            continue
+        for symbol in [r"\$", "@"]:
+            all_found_parts = set()
+            for m in re.finditer(r"%s+(.+?)\b" % symbol, line):
+                found_part = m.group(1).strip().strip(symbol).strip()
+                if found_part != "":
+                    all_found_parts.add((found_part, m.group(0).strip()))
+            sorted_parts = sorted(list(all_found_parts), key=lambda x: len(x[1]), reverse=True)
+            for found_part in sorted_parts:
+                whole_found_part = found_part[1].replace("$", r"\$")
+                found_part = found_part[0]
+                part_to_replace = ""
+                if re.search(r"\d", found_part):
+                    part_with_numbers_in_the_end = re.search(r"[a-zA-z]{5,}\d+", found_part)
+                    if part_with_numbers_in_the_end and part_with_numbers_in_the_end.group(0) == found_part:
+                        part_to_replace = " %s" % found_part
+                    else:
+                        part_to_replace = ""
+                else:
+                    part_to_replace = ".%s" % found_part
+                try:
+                    line = re.sub(whole_found_part, part_to_replace, line)
+                except: # noqa
+                    pass
+
+        line = re.sub(r"\.+", ".", line)
+        all_lines.append(line)
+    return "\n".join(all_lines)
+
+
+def clean_text_from_html_tags(message):
+    """Removes style and script tags together with inner text and removes html tags"""
+    regex_style_tag = re.compile('<style.*?>[\\s\\S]*?</style>')
+    message = re.sub(regex_style_tag, " ", message)
+    regex_script_tag = re.compile('<script.*?>[\\s\\S]*?</script>')
+    message = re.sub(regex_script_tag, " ", message)
+    regex_html_tags = re.compile('<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
+    message = re.sub(regex_html_tags, " ", message)
+    return message
+
+
+def clean_html(message):
+    """Removes html tags inside the parts with <.*?html.*?>...</html>"""
+    all_lines = []
+    started_html = False
+    finished_with_html_tag = False
+    html_part = []
+    for idx, line in enumerate(message.split("\n")):
+        if re.search(r"<.*?html.*?>", line):
+            started_html = True
+            html_part.append(line)
+        else:
+            if started_html:
+                html_part.append(line)
+            else:
+                all_lines.append(line)
+        if "</html>" in line:
+            finished_with_html_tag = True
+        if finished_with_html_tag:
+            all_lines.append(clean_text_from_html_tags("\n".join(html_part)))
+            html_part = []
+            finished_with_html_tag = False
+            started_html = False
+    if len(html_part) > 0:
+        all_lines.extend(html_part)
+    return delete_empty_lines("\n".join(all_lines))
+
+
+def replace_tabs_for_newlines(message):
+    return message.replace("\t", "\n")
+
+
+def remove_credentials_from_url(url):
+    parsed_url = urlparse(url)
+    new_netloc = re.sub("^.+?:.+?@", "", parsed_url.netloc)
+    return url.replace(parsed_url.netloc, new_netloc)

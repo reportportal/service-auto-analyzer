@@ -29,6 +29,7 @@ import amqp.amqp_handler as amqp_handler
 from amqp.amqp import AmqpClient
 from commons.esclient import EsClient
 from boosting_decision_making import boosting_decision_maker
+from utils import utils
 
 
 def get_bool_value(str):
@@ -78,7 +79,7 @@ def create_thread(func, args):
 def create_ampq_client():
     """Creates AMQP client"""
     amqp_full_url = APP_CONFIG["amqpUrl"].rstrip("\\").rstrip("/") + "/analyzer?heartbeat=600"
-    logger.info("Try connect to %s" % amqp_full_url)
+    logger.info("Try connect to %s" % utils.remove_credentials_from_url(amqp_full_url))
     return AmqpClient(pika.BlockingConnection(
         pika.connection.URLParameters(amqp_full_url)))
 

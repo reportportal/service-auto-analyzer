@@ -14,25 +14,20 @@
                 {"wildcard": {"issue_type": "ti*"}},
                 {"wildcard": {"issue_type": "nd*"}},
                 {"wildcard": {"issue_type": "ND*"}},
-                {"term": {"test_item": "123"}},
-                {"wildcard": {"stacktrace": "*"}}
+                {"term": {"test_item": "123"}}
             ],
             "must": [
+                {"term": {
+                    "launch_id": {
+                        "value": 12
+                    }
+                }},
                 {"more_like_this": {
-                    "fields":               ["detected_message"],
+                    "fields":               ["message"],
                     "like":                 "hello world",
                     "min_doc_freq":         1,
                     "min_term_freq":        1,
                     "minimum_should_match": "5<80%",
-                    "max_query_terms":      50,
-                    "boost":                4.0
-                }},
-                {"more_like_this": {
-                    "fields":               ["found_exceptions"],
-                    "like":                 "AssertionError",
-                    "min_doc_freq":         1,
-                    "min_term_freq":        1,
-                    "minimum_should_match": "1",
                     "max_query_terms":      50,
                     "boost":                4.0
                 }}
@@ -56,11 +51,23 @@
                         "boost": 10
                     }
                 }},
-                {"term": {
-                    "launch_name": {
-                        "value": "Launch name",
-                        "boost": 5
-                    }
+                {"more_like_this": {
+                    "fields":               ["detected_message"],
+                    "like":                 "hello world",
+                    "min_doc_freq":         1,
+                    "min_term_freq":        1,
+                    "minimum_should_match": "5<80%",
+                    "max_query_terms":      50,
+                    "boost":                2.0
+                }},
+                {"more_like_this": {
+                    "fields":               ["stacktrace"],
+                    "like":                 "",
+                    "min_doc_freq":         1,
+                    "min_term_freq":        1,
+                    "minimum_should_match": "5<60%",
+                    "max_query_terms":      50,
+                    "boost":                1.0
                 }},
                 {"more_like_this": {
                     "fields":               ["merged_small_logs"],

@@ -26,6 +26,10 @@
             "type":     "text",
             "analyzer": "standard_english_analyzer"
         },
+        "found_exceptions": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
         "stacktrace": {
             "type":     "text",
             "analyzer": "standard_english_analyzer"

@@ -189,4 +189,12 @@ class EsQueryBuilder:
                                                 log["_source"]["merged_small_logs"],
                                                 field_name="merged_small_logs",
                                                 boost=2.0))
+        if log["_source"]["found_exceptions"].strip() != "":
+            query["query"]["bool"]["must"].append(
+                self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
+                                                "1",
+                                                log["_source"]["found_exceptions"],
+                                                field_name="found_exceptions",
+                                                boost=4.0,
+                                                override_min_should_match="1"))
         return query

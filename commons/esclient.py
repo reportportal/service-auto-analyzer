@@ -200,7 +200,8 @@ class EsClient:
                 "detected_message": "",
                 "detected_message_with_numbers": "",
                 "stacktrace":                    "",
-                "only_numbers":                  ""}}
+                "only_numbers":                  "",
+                "found_exceptions":              ""}}
 
     def _fill_launch_test_item_fields(self, log_template, launch, test_item):
         log_template["_index"] = launch.project
@@ -246,6 +247,8 @@ class EsClient:
         log_template["_source"]["stacktrace"] = utils.clean_colon_stacking(stacktrace)
         log_template["_source"]["only_numbers"] = utils.clean_colon_stacking(
             detected_message_only_numbers)
+        log_template["_source"]["found_exceptions"] = utils.get_found_exceptions(
+            detected_message)
 
         return log_template
 

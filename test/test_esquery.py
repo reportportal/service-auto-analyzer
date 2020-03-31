@@ -35,6 +35,8 @@ class TestEsQuery(unittest.TestCase):
         self.query_merged_small_logs_search = "query_merged_small_logs_search.json"
         self.query_search_logs = "query_search_logs.json"
         self.query_two_log_lines_only_current_launch = "query_two_log_lines_only_current_launch.json"
+        self.query_two_log_lines_only_current_launch_wo_exceptions =\
+            "query_two_log_lines_only_current_launch_wo_exceptions.json"
         self.query_all_logs_nonempty_stacktrace_launches_with_the_same_name =\
             "query_all_logs_nonempty_stacktrace_launches_with_the_same_name.json"
         logging.disable(logging.CRITICAL)
@@ -92,7 +94,8 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message": "hello world",
                 "detected_message_with_numbers": "hello world 1",
                 "stacktrace": "",
-                "only_numbers": "1"}}
+                "only_numbers": "1",
+                "found_exceptions": "AssertionError"}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = TestEsQuery.get_fixture(self.query_all_logs_empty_stacktrace, to_json=True)
 
@@ -120,7 +123,8 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message": "hello world",
                 "detected_message_with_numbers": "hello world 1",
                 "stacktrace": "",
-                "only_numbers": "1"}}
+                "only_numbers": "1",
+                "found_exceptions": "AssertionError"}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = TestEsQuery.get_fixture(self.query_two_log_lines, to_json=True)
 
@@ -148,10 +152,41 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message": "hello world",
                 "detected_message_with_numbers": "hello world 1",
                 "stacktrace": "",
-                "only_numbers": "1"}}
+                "only_numbers": "1",
+                "found_exceptions": "AssertionError"}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = TestEsQuery.get_fixture(
             self.query_two_log_lines_only_current_launch, to_json=True)
+
+        query_from_esclient.should.equal(demo_query)
+
+    @utils.ignore_warnings
+    def test_build_analyze_query_two_log_lines_only_current_launch_wo_exceptions(self):
+        """Tests building analyze query"""
+        search_cfg = TestEsQuery.get_default_search_config()
+
+        launch = launch_objects.Launch(**{
+            "analyzerConfig": {"analyzerMode": "CURRENT_LAUNCH", "numberOfLogLines": 2},
+            "launchId": 12,
+            "launchName": "Launch name",
+            "project": 1})
+        log = {
+            "_id":    1,
+            "_index": 1,
+            "_source": {
+                "unique_id":        "unique",
+                "test_case_hash":   1,
+                "test_item":        "123",
+                "message":          "hello world",
+                "merged_small_logs":  "",
+                "detected_message": "hello world",
+                "detected_message_with_numbers": "hello world 1",
+                "stacktrace": "",
+                "only_numbers": "1",
+                "found_exceptions": ""}}
+        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
+        demo_query = TestEsQuery.get_fixture(
+            self.query_two_log_lines_only_current_launch_wo_exceptions, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
 
@@ -177,7 +212,8 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message": "hello world",
                 "detected_message_with_numbers": "hello world 1",
                 "stacktrace": "invoke.method(arg)",
-                "only_numbers": "1"}}
+                "only_numbers": "1",
+                "found_exceptions": "AssertionError"}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = TestEsQuery.get_fixture(self.query_all_logs_nonempty_stacktrace, to_json=True)
 
@@ -205,7 +241,8 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message": "hello world",
                 "detected_message_with_numbers": "hello world 1",
                 "stacktrace": "invoke.method(arg)",
-                "only_numbers": "1"}}
+                "only_numbers": "1",
+                "found_exceptions": "AssertionError"}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = TestEsQuery.get_fixture(
             self.query_all_logs_nonempty_stacktrace_launches_with_the_same_name, to_json=True)
@@ -234,7 +271,8 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message": "",
                 "detected_message_with_numbers": "",
                 "stacktrace": "",
-                "only_numbers": ""}}
+                "only_numbers": "",
+                "found_exceptions": "AssertionError"}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = TestEsQuery.get_fixture(self.query_merged_small_logs_search, to_json=True)
 

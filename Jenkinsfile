@@ -18,6 +18,15 @@ node {
         }
         stage('Deploy Container') {
             sh "docker-compose -f $COMPOSE_FILE_RP -p reportportal up -d --force-recreate analyzer"
+            stage('Push to ECR') {
+                sh 'docker tag reportportal-dev/service-auto-analyzer $AWS_URI/service-auto-analyzer'
+                def image = env.AWS_URI + '/service-auto-analyzer'
+                def url = 'https://' + env.AWS_URI
+                def credentials = 'ecr:' + env.AWS_REGION + ':aws_credentials'
+                docker.withRegistry(url, credentials) {
+                    docker.image(image).push('SNAPSHOT-${BUILD_NUMBER}')
+                }
+            }
         }
     }
 }

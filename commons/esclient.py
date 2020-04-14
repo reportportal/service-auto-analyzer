@@ -156,7 +156,7 @@ class EsClient:
                 logs_added = False
                 for log in test_item.logs:
 
-                    if log.logLevel < ERROR_LOGGING_LEVEL or log.message.strip() == "":
+                    if log.logLevel < ERROR_LOGGING_LEVEL or not log.message.strip():
                         continue
 
                     bodies.append(self._prepare_log(launch, test_item, log))
@@ -264,7 +264,7 @@ class EsClient:
         self._delete_merged_logs(test_item_ids, project)
         for i in range(int(len(test_item_ids) / batch_size) + 1):
             test_items = test_item_ids[i * batch_size: (i + 1) * batch_size]
-            if len(test_items) == 0:
+            if not test_items:
                 continue
             test_items_dict = {}
             for r in elasticsearch.helpers.scan(self.es_client,
@@ -296,7 +296,7 @@ class EsClient:
         batch_size = 1000
         for i in range(int(len(test_items_to_delete) / batch_size) + 1):
             test_item_ids = test_items_to_delete[i * batch_size: (i + 1) * batch_size]
-            if len(test_item_ids) == 0:
+            if not test_item_ids:
                 continue
             for log in elasticsearch.helpers.scan(self.es_client,
                                                   query=self.es_query_builder.get_test_item_query(
@@ -307,11 +307,11 @@ class EsClient:
                     "_id": log["_id"],
                     "_index": project
                 })
-        if len(bodies) > 0:
+        if bodies:
             self._bulk_index(bodies)
 
     def _bulk_index(self, bodies, refresh=True):
-        if len(bodies) == 0:
+        if not bodies:
             return commons.launch_objects.BulkResponse(took=0, errors=False)
         logger.debug("Indexing %d logs...", len(bodies))
         try:
@@ -322,7 +322,7 @@ class EsClient:
                                                                refresh=refresh)
 
             logger.debug("Processed %d logs", success_count)
-            if len(errors) > 0:
+            if errors:
                 logger.debug("Occured errors %s", errors)
             return commons.launch_objects.BulkResponse(took=success_count, errors=len(errors) > 0)
         except Exception as err:
@@ -375,7 +375,7 @@ class EsClient:
             return []
         searched_logs = set()
         for message in search_req.logMessages:
-            if message.strip() == "":
+            if not message.strip():
                 continue
 
             queried_log = self._create_log_template()

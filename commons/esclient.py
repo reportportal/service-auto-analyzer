@@ -244,7 +244,7 @@ class EsClient:
                 logs_added = False
                 for log in test_item.logs:
 
-                    if log.logLevel < ERROR_LOGGING_LEVEL or log.message.strip() == "":
+                    if log.logLevel < ERROR_LOGGING_LEVEL or not log.message.strip():
                         continue
 
                     bodies.append(self._prepare_log(launch, test_item, log))
@@ -317,7 +317,7 @@ class EsClient:
         self._delete_merged_logs(test_item_ids, project)
         for i in range(int(len(test_item_ids) / batch_size) + 1):
             test_items = test_item_ids[i * batch_size: (i + 1) * batch_size]
-            if len(test_items) == 0:
+            if not test_items:
                 continue
             test_items_dict = {}
             for r in elasticsearch.helpers.scan(self.es_client,
@@ -348,7 +348,7 @@ class EsClient:
         batch_size = 1000
         for i in range(int(len(test_items_to_delete) / batch_size) + 1):
             test_item_ids = test_items_to_delete[i * batch_size: (i + 1) * batch_size]
-            if len(test_item_ids) == 0:
+            if not test_item_ids:
                 continue
             for log in elasticsearch.helpers.scan(self.es_client,
                                                   query=EsClient.get_test_item_query(test_item_ids, True),
@@ -358,7 +358,7 @@ class EsClient:
                     "_id": log["_id"],
                     "_index": project
                 })
-        if len(bodies) > 0:
+        if bodies:
             self._bulk_index(bodies)
 
     @staticmethod
@@ -380,7 +380,7 @@ class EsClient:
         """Merge big message logs with small ones"""
         new_logs = []
         for log in logs:
-            if log["_source"]["message"].strip() == "":
+            if not log["_source"]["message"].strip():
                 continue
             log_level = log["_source"]["log_level"]
 
@@ -392,8 +392,8 @@ class EsClient:
 
         for log_level in log_level_messages:
 
-            if len(log_level_ids_to_add[log_level]) == 0 and\
-               log_level_messages[log_level].strip() != "":
+            if not log_level_ids_to_add[log_level] \
+                    and log_level_messages[log_level].strip():
                 log = log_level_ids_merged[log_level]
                 new_logs.append(EsClient.prepare_new_log(
                     log, str(log["_id"]) + "_m", True,
@@ -411,7 +411,7 @@ class EsClient:
         logs_unique_log_level = {}
 
         for log in logs:
-            if log["_source"]["message"].strip() == "":
+            if not log["_source"]["message"].strip():
                 continue
 
             log_level = log["_source"]["log_level"]
@@ -451,7 +451,7 @@ class EsClient:
         return merged_log
 
     def _bulk_index(self, bodies, refresh=True):
-        if len(bodies) == 0:
+        if not bodies:
             return commons.launch_objects.BulkResponse(took=0, errors=False)
         logger.debug("Indexing %d logs...", len(bodies))
         try:
@@ -462,7 +462,7 @@ class EsClient:
                                                                refresh=refresh)
 
             logger.debug("Processed %d logs", success_count)
-            if len(errors) > 0:
+            if errors:
                 logger.debug("Occured errors %s", errors)
             return commons.launch_objects.BulkResponse(took=success_count, errors=len(errors) > 0)
         except Exception as err:
@@ -562,7 +562,7 @@ class EsClient:
             return []
         searched_logs = set()
         for message in search_req.logMessages:
-            if message.strip() == "":
+            if not message.strip():
                 continue
             cleaned_message = self.clean_message(message)
             sanitized_msg = utils.leave_only_unique_lines(utils.sanitize_text(
@@ -598,7 +598,7 @@ class EsClient:
             except Exception as err:
                 logger.error("Id %s is not integer", result["_id"])
                 logger.error(err)
-        if len(all_messages) > 1:
+        if all_messages:
             vectorizer = CountVectorizer(binary=True,
                                          analyzer="word",
                                          token_pattern="[^ ]+")
@@ -632,7 +632,7 @@ class EsClient:
     def build_analyze_query(self, launch, unique_id, log, size=10):
         """Build analyze query"""
         min_should_match = "{}%".format(launch.analyzerConfig.minShouldMatch)\
-            if launch.analyzerConfig.minShouldMatch > 0\
+            if launch.analyzerConfig.minShouldMatch \
             else self.search_cfg["MinShouldMatch"]
 
         query = {"size": size,
@@ -680,7 +680,7 @@ class EsClient:
                     "launch_name": {
                         "value": launch.launchName,
                         "boost": abs(self.search_cfg["BoostLaunch"])}}})
-        if log["_source"]["message"].strip() != "":
+        if log["_source"]["message"].strip():
             log_lines = launch.analyzerConfig.numberOfLogLines
             query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
             query["query"]["bool"]["must"].append(
@@ -770,7 +770,7 @@ class EsClient:
         partial_batches = []
         for i in range(int(len(all_queries) / batch_size) + 1):
             part_batch = all_queries[i * batch_size: (i + 1) * batch_size]
-            if len(part_batch) == 0:
+            if not part_batch:
                 continue
             partial_batches.append("\n".join(part_batch) + "\n")
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -800,7 +800,7 @@ class EsClient:
         es_results_to_process = []
         for i in range(num_chunks):
             partial_result = es_results[i * batch_size: (i + 1) * batch_size]
-            if len(partial_result) == 0:
+            if not partial_result:
                 continue
             es_results_to_process.append(partial_result)
 
@@ -892,32 +892,32 @@ class EsClient:
                 analyzer_config, test_item_id, searched_res = es_results_to_process[idx][i]
                 feature_data, issue_type_names, boosting_data_gatherer = features_gathered[i]
 
-                if len(feature_data) > 0:
+                if feature_data:
 
                     predicted_labels, predicted_labels_probability =\
                         self.boosting_decision_maker.predict(feature_data)
 
-                    for i in range(len(issue_type_names)):
+                    for c in range(len(issue_type_names)):
                         logger.debug("Most relevant item with issue type %s has id %s",
-                                     issue_type_names[i],
+                                     issue_type_names[c],
                                      boosting_data_gatherer.
-                                     scores_by_issue_type[issue_type_names[i]]["mrHit"]["_id"])
+                                     scores_by_issue_type[issue_type_names[c]]["mrHit"]["_id"])
                         logger.debug("Most relevant item with issue type %s with info %s",
-                                     issue_type_names[i],
+                                     issue_type_names[c],
                                      boosting_data_gatherer.
-                                     scores_by_issue_type[issue_type_names[i]]["mrHit"]["_source"])
+                                     scores_by_issue_type[issue_type_names[c]]["mrHit"]["_source"])
                         logger.debug("Issue type %s has label %d and probability %.3f for features %s",
-                                     issue_type_names[i],
-                                     predicted_labels[i],
-                                     predicted_labels_probability[i][1],
-                                     feature_data[i])
+                                     issue_type_names[c],
+                                     predicted_labels[c],
+                                     predicted_labels_probability[c][1],
+                                     feature_data[c])
 
                     predicted_issue_type = self.choose_issue_type(predicted_labels,
                                                                   predicted_labels_probability,
                                                                   issue_type_names,
                                                                   boosting_data_gatherer)
 
-                    if predicted_issue_type != "":
+                    if predicted_issue_type:
                         chosen_type =\
                             boosting_data_gatherer.scores_by_issue_type[predicted_issue_type]
                         relevant_item = chosen_type["mrHit"]["_source"]["test_item"]

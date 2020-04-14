@@ -203,7 +203,7 @@ def has_more_lines_pattern(line):
     return False
 
 
-def detect_log_description_and_stacktrace(message, max_log_lines=5):
+def detect_log_description_and_stacktrace(message):
     """Split a log into a log message and stacktrace"""
     message = delete_empty_lines(message)
     if calculate_line_number(message) > 2:
@@ -216,10 +216,6 @@ def detect_log_description_and_stacktrace(message, max_log_lines=5):
                 stacktrace_lines.append(line)
             else:
                 detected_message_lines.append(line)
-
-        if len(detected_message_lines) == len(split_lines):
-            stacktrace_lines = detected_message_lines[max_log_lines:]
-            detected_message_lines = detected_message_lines[:max_log_lines]
 
         if len(detected_message_lines) < 1:
             all_message = detected_message_lines + stacktrace_lines

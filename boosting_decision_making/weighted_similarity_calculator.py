@@ -29,7 +29,7 @@ class WeightedSimilarityCalculator:
         self.folder = folder
         self.weights = None
         self.softmax_weights = None
-        if folder.strip() != "":
+        if folder.strip():
             self.load_model(folder)
 
     def load_model(self, folder):
@@ -76,7 +76,7 @@ class WeightedSimilarityCalculator:
         for block in range(blocks_num):
             all_lines.append("\n".join(
                 split_log_lines[block * data_in_block: (block + 1) * data_in_block]))
-        if len([line for line in all_lines if line.strip() != ""]) == 0:
+        if len([line for line in all_lines if line.strip()]) == 0:
             return []
         return all_lines
 

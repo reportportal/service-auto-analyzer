@@ -53,13 +53,13 @@ class EsClient:
         self.initialize_decision_makers()
 
     def initialize_decision_makers(self):
-        if self.search_cfg["BoostModelFolderAllLines"].strip() != "":
+        if self.search_cfg["BoostModelFolderAllLines"].strip():
             self.boosting_decision_maker_all_lines = boosting_decision_maker.BoostingDecisionMaker(
                 folder=self.search_cfg["BoostModelFolderAllLines"])
-        if self.search_cfg["BoostModelFolderNotAllLines"].strip() != "":
+        if self.search_cfg["BoostModelFolderNotAllLines"].strip():
             self.boosting_decision_maker_not_all_lines = boosting_decision_maker.BoostingDecisionMaker(
                 folder=self.search_cfg["BoostModelFolderNotAllLines"])
-        if self.search_cfg["SimilarityWeightsFolder"].strip() != "":
+        if self.search_cfg["SimilarityWeightsFolder"].strip():
             self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
                 WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
 
@@ -384,7 +384,7 @@ class EsClient:
                                                 search_req.logLines)
 
             msg_words = " ".join(utils.split_words(queried_log["_source"]["message"]))
-            if msg_words.strip() == "" or msg_words in searched_logs:
+            if not msg_words.strip() or msg_words in searched_logs:
                 continue
             searched_logs.add(msg_words)
             query = self.es_query_builder.build_search_query(
@@ -478,7 +478,7 @@ class EsClient:
                         message = log["_source"]["message"].strip()
                         merged_logs = log["_source"]["merged_small_logs"].strip()
                         if log["_source"]["log_level"] < ERROR_LOGGING_LEVEL or\
-                                (message == "" and merged_logs == ""):
+                                (not message and not merged_logs):
                             continue
 
                         query = self.es_query_builder.build_analyze_query(
@@ -537,7 +537,7 @@ class EsClient:
                 weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
             feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
 
-            if len(feature_data) > 0:
+            if feature_data:
 
                 predicted_labels, predicted_labels_probability =\
                     boosting_decision_maker.predict(feature_data)
@@ -563,7 +563,7 @@ class EsClient:
                                                               issue_type_names,
                                                               boosting_data_gatherer)
 
-                if predicted_issue_type != "":
+                if predicted_issue_type:
                     chosen_type = scores_by_issue_type[predicted_issue_type]
                     relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
                     analysis_result = AnalysisResult(testItem=test_item_id,

@@ -42,14 +42,14 @@ class SimilarityCalculator:
                         if self.weighted_similarity_calculator is None:
                             text = " ".join(utils.split_words(obj["_source"][field],
                                             min_word_length=self.config["min_word_length"]))
-                            if text.strip() == "":
+                            if not text.strip():
                                 log_field_ids[obj["_id"]] = -1
                             else:
                                 all_messages.append(text)
                                 log_field_ids[obj["_id"]] = index_in_message_array
                                 index_in_message_array += 1
                         else:
-                            if obj["_source"][field].strip() == "":
+                            if not obj["_source"][field].strip():
                                 log_field_ids[obj["_id"]] = -1
                             else:
                                 text = []
@@ -64,14 +64,14 @@ class SimilarityCalculator:
                                     text = utils.filter_empty_lines([" ".join(utils.split_words(
                                         obj["_source"][field],
                                         min_word_length=self.config["min_word_length"]))])
-                                if len(text) == 0:
+                                if not text:
                                     log_field_ids[obj["_id"]] = -1
                                 else:
                                     all_messages.extend(text)
                                     log_field_ids[obj["_id"]] = [index_in_message_array,
                                                                  len(all_messages) - 1]
                                     index_in_message_array += len(text)
-            if len(all_messages) > 0:
+            if all_messages:
                 vectorizer = CountVectorizer(binary=True, analyzer="word", token_pattern="[^ ]+")
                 count_vector_matrix = np.asarray(vectorizer.fit_transform(all_messages).toarray())
             for log, res in all_results:
@@ -86,12 +86,11 @@ class SimilarityCalculator:
             group_id = (obj["_id"], log["_id"])
             index_query_message = log_field_ids[log["_id"]]
             index_log_message = log_field_ids[obj["_id"]]
-
-            if (type(index_query_message) == int and index_query_message < 0) and\
-                    (type(index_log_message) == int and index_log_message < 0):
+            if (isinstance(index_query_message, int) and index_query_message < 0) and\
+                    (isinstance(index_log_message, int) and index_log_message < 0):
                 all_results_similarity[group_id] = {"similarity": 1.0, "both_empty": True}
-            elif (type(index_query_message) == int and index_query_message < 0) or\
-                    (type(index_log_message) == int and index_log_message < 0):
+            elif (isinstance(index_query_message, int) and index_query_message < 0) or\
+                    (isinstance(index_log_message, int) and index_log_message < 0):
                 all_results_similarity[group_id] = {"similarity": 0.0, "both_empty": False}
             else:
                 if self.weighted_similarity_calculator is None:

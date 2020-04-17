@@ -130,7 +130,7 @@ class EsQueryBuilder:
                     "launch_name": {
                         "value": launch.launchName,
                         "boost": abs(self.search_cfg["BoostLaunch"])}}})
-        if log["_source"]["message"].strip() != "":
+        if log["_source"]["message"].strip():
             log_lines = launch.analyzerConfig.numberOfLogLines
             query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
             if log_lines == -1:
@@ -140,7 +140,7 @@ class EsQueryBuilder:
                                                     log["_source"]["detected_message"],
                                                     field_name="detected_message",
                                                     boost=4.0))
-                if log["_source"]["stacktrace"].strip() != "":
+                if log["_source"]["stacktrace"].strip():
                     query["query"]["bool"]["must"].append(
                         self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
                                                         min_should_match,
@@ -189,7 +189,7 @@ class EsQueryBuilder:
                                                 log["_source"]["merged_small_logs"],
                                                 field_name="merged_small_logs",
                                                 boost=2.0))
-        if log["_source"]["found_exceptions"].strip() != "":
+        if log["_source"]["found_exceptions"].strip():
             query["query"]["bool"]["must"].append(
                 self.build_more_like_this_query(self.search_cfg["MaxQueryTerms"],
                                                 "1",

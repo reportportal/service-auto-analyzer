@@ -125,7 +125,7 @@ class TestBoostingModel(unittest.TestCase):
         for idx, test in enumerate(tests):
             feature_ids = test["decision_maker"].get_feature_ids()
             weight_log_sim = None
-            if self.weights_folder.strip() != "":
+            if self.weights_folder.strip():
                 weight_log_sim = weighted_similarity_calculator.\
                     WeightedSimilarityCalculator(folder=self.weights_folder)
             _boosting_featurizer = BoostingFeaturizer(test["elastic_results"],

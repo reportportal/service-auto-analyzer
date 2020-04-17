@@ -52,7 +52,7 @@ def sanitize_text(text):
 
 def calculate_line_number(text):
     """Calculate line numbers in the text"""
-    return len([line for line in text.split("\n") if line.strip() != ""])
+    return len([line for line in text.split("\n") if line.strip()])
 
 
 def first_lines(log_str, n_lines):
@@ -66,7 +66,7 @@ def build_url(main_url, url_params):
 
 
 def filter_empty_lines(log_lines):
-    return [line for line in log_lines if line.strip() != ""]
+    return [line for line in log_lines if line.strip()]
 
 
 def delete_empty_lines(log):
@@ -217,10 +217,9 @@ def detect_log_description_and_stacktrace(message):
             else:
                 detected_message_lines.append(line)
 
-        if len(detected_message_lines) < 1:
-            all_message = detected_message_lines + stacktrace_lines
-            detected_message_lines = all_message[:1]
-            stacktrace_lines = all_message[1:]
+        if not detected_message_lines:
+            detected_message_lines = stacktrace_lines[:1]
+            stacktrace_lines = stacktrace_lines[1:]
 
         return "\n".join(detected_message_lines), "\n".join(stacktrace_lines)
     return message, ""

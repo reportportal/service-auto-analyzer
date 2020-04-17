@@ -10,7 +10,7 @@ class LogMerger:
         """Merge big message logs with small ones"""
         new_logs = []
         for log in logs:
-            if log["_source"]["message"].strip() == "":
+            if not log["_source"]["message"].strip():
                 continue
             log_level = log["_source"]["log_level"]
 
@@ -21,8 +21,8 @@ class LogMerger:
 
         for log_level in log_level_messages["message"]:
 
-            if len(log_level_ids_to_add[log_level]) == 0 and\
-               log_level_messages["message"][log_level].strip() != "":
+            if not log_level_ids_to_add[log_level] and\
+               log_level_messages["message"][log_level].strip():
                 log = log_level_ids_merged[log_level]
                 new_log = LogMerger.prepare_new_log(
                     log, str(log["_id"]) + "_m", True,
@@ -44,7 +44,7 @@ class LogMerger:
         logs_unique_log_level = {}
 
         for log in logs:
-            if log["_source"]["message"].strip() == "":
+            if not log["_source"]["message"].strip():
                 continue
 
             log_level = log["_source"]["log_level"]

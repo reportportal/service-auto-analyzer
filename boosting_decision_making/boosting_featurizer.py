@@ -118,6 +118,16 @@ class BoostingFeaturizer:
             similarity_percent_by_type[issue_type] = int(sim_obj["both_empty"])
         return similarity_percent_by_type
 
+    def is_only_additional_info(self):
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        similarity_percent_by_type = {}
+        for issue_type in scores_by_issue_type:
+            group_id = (scores_by_issue_type[issue_type]["mrHit"]["_id"],
+                        scores_by_issue_type[issue_type]["compared_log"]["_id"])
+            sim_obj = self.similarity_calculator.similarity_dict["message"][group_id]
+            similarity_percent_by_type[issue_type] = int(sim_obj["both_empty"])
+        return similarity_percent_by_type
+
     def filter_by_min_should_match(self, all_results, field="message"):
         new_results = []
         for log, res in all_results:

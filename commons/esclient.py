@@ -176,6 +176,7 @@ class EsClient:
         message = utils.remove_generated_parts(message)
         message = utils.clean_html(message)
         message = utils.delete_empty_lines(message)
+        message = utils.leave_only_unique_lines(message)
         return message
 
     def _create_log_template(self):
@@ -219,37 +220,65 @@ class EsClient:
     def _fill_log_fields(self, log_template, log, number_of_lines):
         cleaned_message = self.clean_message(log.message)
 
-        message = utils.leave_only_unique_lines(utils.sanitize_text(
-            utils.first_lines(cleaned_message, number_of_lines)))
+        message = utils.first_lines(cleaned_message, number_of_lines)
+        message_without_params = message
+        message = utils.sanitize_text(message)
 
-        detected_message, stacktrace = utils.detect_log_description_and_stacktrace(
-            cleaned_message)
+        message_without_params = utils.clean_from_urls(message_without_params)
+        message_without_params = utils.clean_from_paths(message_without_params)
+        message_without_params = utils.clean_from_params(message_without_params)
+        message_without_params = utils.sanitize_text(message_without_params)
+
+        detected_message, stacktrace = utils.detect_log_description_and_stacktrace(cleaned_message)
+
+        detected_message_without_params = detected_message
+        urls = " ".join(utils.extract_urls(detected_message_without_params))
+        detected_message_without_params = utils.clean_from_urls(detected_message_without_params)
+        paths = " ".join(utils.extract_paths(detected_message_without_params))
+        detected_message_without_params = utils.clean_from_paths(detected_message_without_params)
+        message_params = " ".join(utils.extract_message_params(detected_message_without_params))
+        detected_message_without_params = utils.clean_from_params(detected_message_without_params)
+        detected_message_without_params = utils.sanitize_text(detected_message_without_params)
 
         detected_message_with_numbers = utils.remove_starting_datetime(detected_message)
+        detected_message_only_numbers = utils.find_only_numbers(detected_message_with_numbers)
         detected_message = utils.sanitize_text(detected_message)
         stacktrace = utils.sanitize_text(stacktrace)
-
-        stacktrace = utils.leave_only_unique_lines(stacktrace)
-        detected_message = utils.leave_only_unique_lines(detected_message)
-        detected_message_with_numbers = utils.leave_only_unique_lines(detected_message_with_numbers)
-
-        detected_message_only_numbers = utils.find_only_numbers(detected_message_with_numbers)
+        found_exceptions = utils.get_found_exceptions(detected_message)
+        found_exceptions_extended = utils.enrich_found_exceptions(found_exceptions)
 
         log_template["_id"] = log.logId
         log_template["_source"]["log_level"] = log.logLevel
         log_template["_source"]["original_message_lines"] = utils.calculate_line_number(cleaned_message)
         log_template["_source"]["original_message_words_number"] = len(
             utils.split_words(cleaned_message, split_urls=False))
-        log_template["_source"]["message"] = utils.clean_colon_stacking(message)
-        log_template["_source"]["detected_message"] = utils.clean_colon_stacking(detected_message)
-        log_template["_source"]["detected_message_with_numbers"] = utils.clean_colon_stacking(
-            detected_message_with_numbers)
-        log_template["_source"]["stacktrace"] = utils.clean_colon_stacking(stacktrace)
-        log_template["_source"]["only_numbers"] = utils.clean_colon_stacking(
-            detected_message_only_numbers)
-        log_template["_source"]["found_exceptions"] = utils.get_found_exceptions(
-            detected_message)
+        log_template["_source"]["message"] = message
+        log_template["_source"]["detected_message"] = detected_message
+        log_template["_source"]["detected_message_with_numbers"] = detected_message_with_numbers
+        log_template["_source"]["stacktrace"] = stacktrace
+        log_template["_source"]["only_numbers"] = detected_message_only_numbers
+        log_template["_source"]["urls"] = urls
+        log_template["_source"]["paths"] = paths
+        log_template["_source"]["message_params"] = message_params
+        log_template["_source"]["found_exceptions"] = found_exceptions
+        log_template["_source"]["found_exceptions_extended"] = found_exceptions_extended
+        log_template["_source"]["detected_message_extended"] =\
+            utils.enrich_text_with_method_and_classes(detected_message)
+        log_template["_source"]["detected_message_without_params_extended"] =\
+            utils.enrich_text_with_method_and_classes(detected_message_without_params)
+        log_template["_source"]["stacktrace_extended"] =\
+            utils.enrich_text_with_method_and_classes(stacktrace)
+        log_template["_source"]["message_extended"] =\
+            utils.enrich_text_with_method_and_classes(message)
+        log_template["_source"]["message_without_params_extended"] =\
+            utils.enrich_text_with_method_and_classes(message_without_params)
 
+        for field in ["message", "detected_message", "detected_message_with_numbers",
+                      "stacktrace", "only_numbers", "found_exceptions", "found_exceptions_extended",
+                      "detected_message_extended", "detected_message_without_params_extended",
+                      "stacktrace_extended", "message_extended", "message_without_params_extended"]:
+            log_template["_source"][field] = utils.leave_only_unique_lines(log_template["_source"][field])
+            log_template["_source"][field] = utils.clean_colon_stacking(log_template["_source"][field])
         return log_template
 
     def _prepare_log(self, launch, test_item, log):

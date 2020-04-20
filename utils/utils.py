@@ -79,7 +79,7 @@ def reverse_log(log):
     return "\n".join(log.split("\n")[::-1])
 
 
-def split_words(text, min_word_length=0, only_unique=True, split_urls=True):
+def split_words(text, min_word_length=0, only_unique=True, split_urls=True, to_lower=True):
     all_unique_words = set()
     all_words = []
     translate_map = {}
@@ -88,8 +88,10 @@ def split_words(text, min_word_length=0, only_unique=True, split_urls=True):
             translate_map[punct] = " "
     text = text.translate(text.maketrans(translate_map)).strip().strip(".")
     for word_part in text.split():
-        word_part = word_part.strip().strip(".").lower()
+        word_part = word_part.strip().strip(".")
         for w in word_part.split():
+            if to_lower:
+                w = w.lower()
             if w != "" and len(w) >= min_word_length:
                 if w in stopwords:
                     continue
@@ -370,3 +372,85 @@ def get_found_exceptions(text):
                     unique_exceptions.add(word)
                 break
     return " ".join(found_exceptions)
+
+
+def clean_from_params(text):
+    text = re.sub(r"(?<=[^\w])('.+?'|\".+?\")(?=[^\w]|$)|(?<=^)('.+?'|\".+?\")(?=[^\w]|$)", " ", text)
+    return re.sub(r" +", " ", text).strip()
+
+
+def clean_from_urls(text):
+    text = re.sub(r"(http|https|ftp):[^\s]+|\bwww\.[^\s]+", " ", text)
+    return re.sub(r" +", " ", text).strip()
+
+
+def clean_from_paths(text):
+    text = re.sub(r"(^|(?<=[^\w:\\\/]))(\w:)?([\w\d\.\-_]+)?([\\\/]+[\w\d\.\-_]+){2,}", " ", text)
+    return re.sub(r" +", " ", text).strip()
+
+
+def extract_urls(text):
+    all_unique = set()
+    all_urls = []
+    for param in re.findall(r"((http|https|ftp):[^\s]+|\bwww\.[^\s]+)", text):
+        url = param[0].strip()
+        if url not in all_unique:
+            all_unique.add(url)
+            all_urls.append(url)
+    return all_urls
+
+
+def extract_paths(text):
+    all_unique = set()
+    all_paths = []
+    for param in re.findall(r"((^|(?<=[^\w:\\\/]))(\w:)?([\w\d\.\-_]+)?([\\\/]+[\w\d\.\-_]+){2,})", text):
+        path = param[0].strip()
+        if path not in all_unique:
+            all_unique.add(path)
+            all_paths.append(path)
+    return all_paths
+
+
+def extract_message_params(text):
+    all_unique = set()
+    all_params = []
+    for param in re.findall(r"(^|[^\w])('.+?'|\".+?\")([^\w]|$|\n)", text):
+        param = re.search(r"[^\'\"]+", param[1].strip()).group(0).strip()
+        if param not in all_unique:
+            all_unique.add(param)
+            all_params.append(param)
+    return all_params
+
+
+def enrich_found_exceptions(text):
+    unique_words = set()
+    new_words = []
+    for word in text.split(" "):
+        word_parts = word.split(".")
+        for i in range(len(word_parts)):
+            new_word_part = ".".join(word_parts[i:])
+            if new_word_part not in unique_words:
+                new_words.append(new_word_part)
+                unique_words.add(new_word_part)
+    return " ".join(new_words)
+
+
+def enrich_text_with_method_and_classes(text):
+    new_lines = []
+    for line in text.split("\n"):
+        new_line = line
+        found_values = []
+        for w in split_words(line, min_word_length=0, only_unique=True, split_urls=True, to_lower=False):
+            if len(w.split(".")) > 2:
+                last_word = w.split(".")[-1]
+                if len(last_word) > 3:
+                    found_values.append(w)
+        for val in sorted(found_values, key=lambda x: len(x.split(".")), reverse=False):
+            words = val.split(".")
+            full_path = ""
+            for i in range(2, len(words)):
+                full_path = full_path + " " + ".".join(words[:i])
+            full_path = full_path + " " + ".".join(words[-2:]) + " " + words[-1] + " "
+            new_line = re.sub(r"\b(?<!\.)%s(?!\.)\b" % val, full_path, new_line)
+        new_lines.append(new_line)
+    return "\n".join(new_lines)

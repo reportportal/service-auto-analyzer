@@ -28,9 +28,16 @@ class LogMerger:
                     log, str(log["_id"]) + "_m", True,
                     utils.compress(log_level_messages["message"][log_level]),
                     fields_to_clean=["message", "detected_message", "only_numbers",
-                                     "detected_message_with_numbers", "stacktrace"])
+                                     "detected_message_with_numbers", "stacktrace",
+                                     "found_exceptions_extended", "detected_message_extended",
+                                     "detected_message_without_params_extended",
+                                     "stacktrace_extended", "message_extended",
+                                     "message_without_params_extended",
+                                     "urls", "paths", "message_params"])
                 new_log["_source"]["found_exceptions"] = utils.compress(
                     log_level_messages["found_exceptions"][log_level])
+                new_log["_source"]["found_exceptions_extended"] = utils.compress(
+                    utils.enrich_found_exceptions(log_level_messages["found_exceptions"][log_level]))
 
                 new_logs.append(new_log)
         return new_logs

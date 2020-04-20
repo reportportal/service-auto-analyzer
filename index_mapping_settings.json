@@ -22,6 +22,10 @@
             "type":     "text",
             "index":    false
         },
+        "stacktrace": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
         "only_numbers": {
             "type":     "text",
             "analyzer": "standard_english_analyzer"
@@ -30,9 +34,45 @@
             "type":     "text",
             "analyzer": "standard_english_analyzer"
         },
-        "stacktrace": {
+        "found_exceptions_extended": {
             "type":     "text",
             "analyzer": "standard_english_analyzer"
+        },
+        "message_params": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "message_without_params_extended": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "urls": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "paths": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "detected_message_extended": {
+            "type":     "text",
+            "analyzer": "standard",
+            "similarity" : "my_similarity"
+        },
+        "detected_message_without_params_extended": {
+            "type":     "text",
+            "analyzer": "standard",
+            "similarity" : "my_similarity"
+        },
+        "stacktrace_extended": {
+            "type":     "text",
+            "analyzer": "standard",
+            "similarity" : "my_similarity"
+        },
+        "message_extended": {
+            "type":     "text",
+            "analyzer": "standard",
+            "similarity" : "my_similarity"
         },
         "original_message_lines": {
             "type": "integer"

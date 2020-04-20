@@ -16,8 +16,8 @@ RUN /venv/bin/python3 -m nltk.downloader stopwords
 ARG version
 ARG prod
 
-ENV BOOST_MODEL_FOLDER_ALL_LINES="/backend/model/all_lines_0.9"
-ENV BOOST_MODEL_FOLDER_NOT_ALL_LINES="/backend/model/not_all_lines_0.1"
+ENV BOOST_MODEL_FOLDER_ALL_LINES="/backend/model/all_lines_0.10"
+ENV BOOST_MODEL_FOLDER_NOT_ALL_LINES="/backend/model/not_all_lines_0.2"
 ENV SIMILARITY_WEIGHTS_FOLDER="/backend/model/weights_0.2"
 
 COPY ./ ./
@@ -47,8 +47,8 @@ ENV FLASK_APP=app.py UWSGI_WSGI_FILE=app.py UWSGI_SOCKET=:3031 UWSGI_HTTP=:5000 
 ENV PATH="/venv/bin:${PATH}"
 ENV PYTHONPATH="/backend"
 
-ENV BOOST_MODEL_FOLDER_ALL_LINES="/backend/model/all_lines_0.9"
-ENV BOOST_MODEL_FOLDER_NOT_ALL_LINES="/backend/model/not_all_lines_0.1"
+ENV BOOST_MODEL_FOLDER_ALL_LINES="/backend/model/all_lines_0.10"
+ENV BOOST_MODEL_FOLDER_NOT_ALL_LINES="/backend/model/not_all_lines_0.2"
 ENV SIMILARITY_WEIGHTS_FOLDER="/backend/model/weights_0.2"
 
 #ENV LOGGING_LEVEL="INFO"

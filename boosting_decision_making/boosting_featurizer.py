@@ -51,6 +51,7 @@ class BoostingFeaturizer:
             7: (self._calculate_percent_count_items_and_mean, {"return_val_name": "cnt_items_percent"}),
             9: (self._calculate_percent_issue_types, {}),
             11: (self._calculate_similarity_percent, {"field_name": "message"}),
+            12: (self.is_only_additional_info, {}),
             13: (self._calculate_similarity_percent, {"field_name": "merged_small_logs"}),
             14: (self._has_test_item_several_logs, {}),
             15: (self._has_query_several_logs, {}),
@@ -68,6 +69,16 @@ class BoostingFeaturizer:
             self.feature_ids = utils.transform_string_feature_range_into_list(feature_ids)
         else:
             self.feature_ids = feature_ids
+
+    def is_only_additional_info(self):
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        similarity_percent_by_type = {}
+        for issue_type in scores_by_issue_type:
+            group_id = (scores_by_issue_type[issue_type]["mrHit"]["_id"],
+                        scores_by_issue_type[issue_type]["compared_log"]["_id"])
+            sim_obj = self.similarity_calculator.similarity_dict["message"][group_id]
+            similarity_percent_by_type[issue_type] = int(sim_obj["both_empty"])
+        return similarity_percent_by_type
 
     def filter_by_min_should_match(self, all_results, field="message"):
         new_results = []
@@ -242,7 +253,7 @@ class BoostingFeaturizer:
                 func, args = self.feature_functions[feature]
                 result = func(**args)
                 for issue_type in result:
-                    gathered_data[issue_type_by_index[issue_type]].append(round(result[issue_type], 3))
+                    gathered_data[issue_type_by_index[issue_type]].append(round(result[issue_type], 2))
         except Exception as err:
             logger.error("Errors in boosting features calculation")
             logger.error(err)

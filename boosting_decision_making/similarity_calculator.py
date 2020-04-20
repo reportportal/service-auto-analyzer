@@ -97,14 +97,14 @@ class SimilarityCalculator:
                     similarity =\
                         round(1 - spatial.distance.cosine(
                             count_vector_matrix[index_query_message],
-                            count_vector_matrix[index_log_message]), 3)
+                            count_vector_matrix[index_log_message]), 2)
                 else:
                     query_vector = self.weighted_similarity_calculator.weigh_data_rows(
                         count_vector_matrix[index_query_message[0]:index_query_message[1] + 1])
                     log_vector = self.weighted_similarity_calculator.weigh_data_rows(
                         count_vector_matrix[index_log_message[0]:index_log_message[1] + 1])
                     similarity =\
-                        round(1 - spatial.distance.cosine(query_vector, log_vector), 3)
+                        round(1 - spatial.distance.cosine(query_vector, log_vector), 2)
                 all_results_similarity[group_id] = {"similarity": similarity, "both_empty": False}
 
         return all_results_similarity

@@ -47,6 +47,18 @@ class TestItem(BaseModel):
     logs: List[Log] = []
 
 
+class TestItemInfo(BaseModel):
+    """Test item object"""
+    testItemId: int
+    uniqueId: str
+    startTime: List[int] = list(datetime.now().timetuple())[:7]
+    testCaseHash: int = 0
+    launchId: int
+    launchName: str = ""
+    project: int
+    analyzerConfig: AnalyzerConf = AnalyzerConf()
+
+
 class Launch(BaseModel):
     """Launch object"""
     launchId: int

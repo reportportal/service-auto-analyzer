@@ -61,6 +61,12 @@ class LogMerger:
                     log["_source"]["original_message_words_number"] <= 100:
                 if log_level not in log_level_ids_merged:
                     log_level_ids_merged[log_level] = log
+                log_level_representative = log_level_ids_merged[log_level]
+                current_log_word_num = log["_source"]["original_message_words_number"]
+                main_log_word_num = log_level_representative["_source"]["original_message_words_number"]
+                if current_log_word_num > main_log_word_num:
+                    log_level_ids_merged[log_level] = log
+
                 message = log["_source"]["message"]
                 normalized_msg = " ".join(message.strip().lower().split())
                 if normalized_msg not in logs_unique_log_level[log_level]:

@@ -20,6 +20,7 @@ import os
 import json
 import sure # noqa
 from boosting_decision_making.boosting_featurizer import BoostingFeaturizer
+from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from utils import utils
 
 
@@ -36,6 +37,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
         self.log_message_only_small_logs = "log_message_only_small_logs.json"
         self.one_hit_search_rs_small_logs = "one_hit_search_rs_small_logs.json"
         self.two_hits_search_rs_small_logs = "two_hits_search_rs_small_logs.json"
+        self.three_hits_search_rs_explained = "three_hits_search_rs_explained.json"
         self.epsilon = 0.0001
         logging.disable(logging.CRITICAL)
 
@@ -253,3 +255,76 @@ class TestBoostingFeaturizer(unittest.TestCase):
                     log["_id"].should.equal(test["result"][idx][0]["_id"])
                     for i, hit in enumerate(hits["hits"]["hits"]):
                         hit["_id"].should.equal(test["result"][idx][1]["hits"]["hits"][i]["_id"])
+
+    @utils.ignore_warnings
+    def test_find_most_relevant_by_type_for_suggests(self):
+        tests = [
+            {
+                "elastic_results": [],
+                "config":          TestBoostingFeaturizer.get_default_config(),
+                "result":          {},
+            },
+            {
+                "elastic_results": [(self.get_fixture(self.log_message),
+                                     self.get_fixture(self.one_hit_search_rs_explained))],
+                "config":          TestBoostingFeaturizer.get_default_config(),
+                "result":          {1: {"mrHit": {"_score": 158.08437,
+                                                  "_id": "1"},
+                                        "compared_log": self.get_fixture(self.log_message),
+                                        "score": 1.0, },
+                                    }
+            },
+            {
+                "elastic_results": [(self.get_fixture(self.log_message),
+                                     self.get_fixture(self.two_hits_search_rs_explained))],
+                "config":          TestBoostingFeaturizer.get_default_config(),
+                "result":          {1: {"mrHit": {"_score": 158.08437,
+                                                  "_id": "1"},
+                                        "compared_log": self.get_fixture(self.log_message),
+                                        "score": 1.0, },
+                                    2: {"mrHit": {"_score": 77.53298,
+                                                  "_id": "2"},
+                                        "compared_log": self.get_fixture(self.log_message),
+                                        "score": 0.4905, },
+                                    }
+            },
+            {
+                "elastic_results": [(self.get_fixture(self.log_message),
+                                     self.get_fixture(self.two_hits_search_rs_explained)),
+                                    (self.get_fixture(self.log_message),
+                                     self.get_fixture(self.three_hits_search_rs_explained))],
+                "config":          TestBoostingFeaturizer.get_default_config(),
+                "result":          {1: {"mrHit": {"_score": 158.08437,
+                                                  "_id": "1"},
+                                        "compared_log": self.get_fixture(self.log_message),
+                                        "score": 0.9392, },
+                                    2: {"mrHit": {"_score": 168.31,
+                                                  "_id": "2"},
+                                        "compared_log": self.get_fixture(self.log_message),
+                                        "score": 1.0, },
+                                    3: {"mrHit": {"_score": 85.345,
+                                                  "_id": "3"},
+                                        "compared_log": self.get_fixture(self.log_message),
+                                        "score": 0.507, },
+                                    }
+            },
+        ]
+        for idx, test in enumerate(tests[3:]):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                _boosting_featurizer = SuggestBoostingFeaturizer(test["elastic_results"],
+                                                                 test["config"],
+                                                                 [])
+                scores_by_issue_type = _boosting_featurizer.find_most_relevant_by_type()
+                scores_by_issue_type.should.have.length_of(len(test["result"]))
+                for issue_type in test["result"]:
+                    scores_by_issue_type.keys().should.contain(issue_type)
+                    elastic_res = scores_by_issue_type[issue_type]
+                    for field in test["result"][issue_type]:
+                        if type(test["result"][issue_type][field]) != dict:
+                            elastic_res[field].should.equal(test["result"][issue_type][field],
+                                                            epsilon=self.epsilon)
+                        else:
+                            for field_dict in test["result"][issue_type][field]:
+                                result_field_dict = test["result"][issue_type][field][field_dict]
+                                elastic_res[field][field_dict].should.equal(result_field_dict,
+                                                                            epsilon=self.epsilon)

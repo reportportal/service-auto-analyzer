@@ -48,15 +48,15 @@ class TestItem(BaseModel):
 
 
 class TestItemInfo(BaseModel):
-    """Test item object"""
+    """Test item info object"""
     testItemId: int
     uniqueId: str
-    startTime: List[int] = list(datetime.now().timetuple())[:7]
     testCaseHash: int = 0
     launchId: int
     launchName: str = ""
     project: int
     analyzerConfig: AnalyzerConf = AnalyzerConf()
+    logs: List[Log] = []
 
 
 class Launch(BaseModel):

@@ -208,7 +208,7 @@ class EsQueryBuilder:
                 {"term": {
                     "launch_name": {
                         "value": test_item_info.launchName}}})
-        if test_item_info.analyzerConfig.analyzerMode in ["CURRENT_LAUNCH"]:
+        elif test_item_info.analyzerConfig.analyzerMode in ["CURRENT_LAUNCH"]:
             query["query"]["bool"]["must"].append(
                 {"term": {
                     "launch_id": {

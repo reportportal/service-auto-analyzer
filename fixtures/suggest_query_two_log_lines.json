@@ -18,7 +18,7 @@
             ],
             "must": [
                 {"more_like_this": {
-                    "fields":               ["message"],
+                    "fields":               ["message_extended"],
                     "like":                 "hello world 'sdf'",
                     "min_doc_freq":         1,
                     "min_term_freq":        1,
@@ -53,7 +53,7 @@
                     }
                 }},
                 {"more_like_this": {
-                    "fields":               ["stacktrace"],
+                    "fields":               ["stacktrace_extended"],
                     "like":                 "",
                     "min_doc_freq":         1,
                     "min_term_freq":        1,

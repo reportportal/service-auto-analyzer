@@ -41,6 +41,11 @@ class TestEsQuery(unittest.TestCase):
             "query_all_logs_nonempty_stacktrace_launches_with_the_same_name.json"
         self.suggest_query_all_logs_empty_stacktrace = "suggest_query_all_logs_empty_stacktrace.json"
         self.suggest_query_two_log_lines = "suggest_query_two_log_lines.json"
+        self.suggest_query_all_logs_nonempty_stacktrace =\
+            "suggest_query_all_logs_nonempty_stacktrace.json"
+        self.suggest_query_all_logs_nonempty_stacktrace_launches_with_the_same_name =\
+            "suggest_query_all_logs_nonempty_stacktrace_launches_with_the_same_name.json"
+        self.suggest_query_merged_small_logs_search = "suggest_query_merged_small_logs_search.json"
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings
@@ -338,8 +343,8 @@ class TestEsQuery(unittest.TestCase):
             }}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_suggest_query(
             test_item_info, log,
-            message_field="message", det_mes_field="detected_message",
-            stacktrace_field="stacktrace")
+            message_field="message_extended", det_mes_field="detected_message_extended",
+            stacktrace_field="stacktrace_extended")
         demo_query = TestEsQuery.get_fixture(self.suggest_query_all_logs_empty_stacktrace, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
@@ -383,9 +388,145 @@ class TestEsQuery(unittest.TestCase):
             }}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_suggest_query(
             test_item_info, log,
-            message_field="message", det_mes_field="detected_message",
-            stacktrace_field="stacktrace")
+            message_field="message_extended", det_mes_field="detected_message_extended",
+            stacktrace_field="stacktrace_extended")
         demo_query = TestEsQuery.get_fixture(self.suggest_query_two_log_lines, to_json=True)
+
+        query_from_esclient.should.equal(demo_query)
+
+    @utils.ignore_warnings
+    def test_build_suggest_query_all_logs_nonempty_stacktrace(self):
+        """Tests building analyze query"""
+        search_cfg = TestEsQuery.get_default_search_config()
+
+        test_item_info = launch_objects.TestItemInfo(**{
+            "analyzerConfig": {"analyzerMode": "ALL", "numberOfLogLines": -1},
+            "launchId": 12,
+            "launchName": "Launch name",
+            "project": 1,
+            "testCaseHash": 1,
+            "uniqueId": "unique",
+            "testItemId": 2})
+        log = {
+            "_id":    1,
+            "_index": 1,
+            "_source": {
+                "unique_id":        "unique",
+                "test_case_hash":   1,
+                "test_item":        "123",
+                "message":          "hello world 'sdf'",
+                "merged_small_logs":  "",
+                "detected_message": "hello world 'sdf'",
+                "detected_message_with_numbers": "hello world 1 'sdf'",
+                "stacktrace": "invoke.method(arg)",
+                "only_numbers": "1",
+                "found_exceptions": "AssertionError",
+                "found_exceptions_extended": "AssertionError",
+                "message_params": "sdf",
+                "urls": "",
+                "paths": "",
+                "message_without_params_extended": "hello world",
+                "detected_message_without_params_extended": "hello world",
+                "stacktrace_extended": "invoke.method(arg)",
+                "message_extended": "hello world 'sdf'",
+                "detected_message_extended": "hello world 'sdf'"
+            }}
+        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_suggest_query(
+            test_item_info, log,
+            message_field="message_extended", det_mes_field="detected_message_extended",
+            stacktrace_field="stacktrace_extended")
+        demo_query = TestEsQuery.get_fixture(self.suggest_query_all_logs_nonempty_stacktrace, to_json=True)
+
+        query_from_esclient.should.equal(demo_query)
+
+    @utils.ignore_warnings
+    def test_build_suggest_query_all_logs_nonempty_stacktrace_launches_with_the_same_name(self):
+        """Tests building analyze query"""
+        search_cfg = TestEsQuery.get_default_search_config()
+
+        test_item_info = launch_objects.TestItemInfo(**{
+            "analyzerConfig": {"analyzerMode": "LAUNCH_NAME", "numberOfLogLines": -1},
+            "launchId": 12,
+            "launchName": "Launch name",
+            "project": 1,
+            "testCaseHash": 1,
+            "uniqueId": "unique",
+            "testItemId": 2})
+        log = {
+            "_id":    1,
+            "_index": 1,
+            "_source": {
+                "unique_id":        "unique",
+                "test_case_hash":   1,
+                "test_item":        "123",
+                "message":          "hello world 'sdf'",
+                "merged_small_logs":  "",
+                "detected_message": "hello world 'sdf'",
+                "detected_message_with_numbers": "hello world 1 'sdf'",
+                "stacktrace": "invoke.method(arg)",
+                "only_numbers": "1",
+                "found_exceptions": "AssertionError",
+                "found_exceptions_extended": "AssertionError",
+                "message_params": "sdf",
+                "urls": "",
+                "paths": "",
+                "message_without_params_extended": "hello world",
+                "detected_message_without_params_extended": "hello world",
+                "stacktrace_extended": "invoke.method(arg)",
+                "message_extended": "hello world 'sdf'",
+                "detected_message_extended": "hello world 'sdf'"
+            }}
+        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_suggest_query(
+            test_item_info, log,
+            message_field="message_without_params_extended",
+            det_mes_field="detected_message_without_params_extended",
+            stacktrace_field="stacktrace_extended")
+        demo_query = TestEsQuery.get_fixture(
+            self.suggest_query_all_logs_nonempty_stacktrace_launches_with_the_same_name, to_json=True)
+
+        query_from_esclient.should.equal(demo_query)
+
+    @utils.ignore_warnings
+    def test_build_suggest_query_merged_small_logs_search(self):
+        """Tests building analyze query"""
+        search_cfg = TestEsQuery.get_default_search_config()
+
+        test_item_info = launch_objects.TestItemInfo(**{
+            "analyzerConfig": {"analyzerMode": "ALL", "numberOfLogLines": -1},
+            "launchId": 12,
+            "launchName": "Launch name",
+            "project": 1,
+            "testCaseHash": 1,
+            "uniqueId": "unique",
+            "testItemId": 2})
+        log = {
+            "_id":    1,
+            "_index": 1,
+            "_source": {
+                "unique_id":        "unique",
+                "test_case_hash":   1,
+                "test_item":        "123",
+                "message":          "",
+                "merged_small_logs":  "hello world",
+                "detected_message": "",
+                "detected_message_with_numbers": "",
+                "stacktrace": "",
+                "only_numbers": "",
+                "found_exceptions": "AssertionError",
+                "found_exceptions_extended": "AssertionError",
+                "message_params": "",
+                "urls": "",
+                "paths": "",
+                "message_without_params_extended": "",
+                "detected_message_without_params_extended": "",
+                "stacktrace_extended": "",
+                "message_extended": "",
+                "detected_message_extended": ""}}
+        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_suggest_query(
+            test_item_info, log,
+            message_field="message_extended", det_mes_field="detected_message_extended",
+            stacktrace_field="stacktrace_extended")
+        demo_query = TestEsQuery.get_fixture(self.suggest_query_merged_small_logs_search, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
 

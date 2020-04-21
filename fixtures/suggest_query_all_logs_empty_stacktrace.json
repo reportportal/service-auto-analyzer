@@ -15,11 +15,11 @@
                 {"wildcard": {"issue_type": "nd*"}},
                 {"wildcard": {"issue_type": "ND*"}},
                 {"term": {"test_item": "123"}},
-                {"wildcard": {"stacktrace": "*"}}
+                {"wildcard": {"stacktrace_extended": "*"}}
             ],
             "must": [
                 {"more_like_this": {
-                    "fields":               ["detected_message"],
+                    "fields":               ["detected_message_extended"],
                     "like":                 "hello world 'sdf'",
                     "min_doc_freq":         1,
                     "min_term_freq":        1,

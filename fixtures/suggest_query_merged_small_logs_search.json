@@ -26,15 +26,6 @@
                     "minimum_should_match": "5<80%",
                     "max_query_terms":      50,
                     "boost":                2.0
-                }},
-                {"more_like_this": {
-                    "fields":               ["found_exceptions"],
-                    "like":                 "AssertionError",
-                    "min_doc_freq":         1,
-                    "min_term_freq":        1,
-                    "minimum_should_match": "1",
-                    "max_query_terms":      50,
-                    "boost":                4.0
                 }}
             ],
             "should": [
@@ -61,6 +52,15 @@
                         "value": "Launch name",
                         "boost": 5
                     }
+                }},
+                {"more_like_this": {
+                    "fields":               ["found_exceptions_extended"],
+                    "like":                 "AssertionError",
+                    "min_doc_freq":         1,
+                    "min_term_freq":        1,
+                    "minimum_should_match": "1",
+                    "max_query_terms":      50,
+                    "boost":                4.0
                 }}
             ]
         }

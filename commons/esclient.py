@@ -22,7 +22,7 @@ import elasticsearch
 import elasticsearch.helpers
 import commons.launch_objects
 from commons.launch_objects import SuggestAnalysisResult, SearchLogInfo
-from commons.launch_objects import AnalysisResult, SearchLogInfo
+from commons.launch_objects import AnalysisResult
 import utils.utils as utils
 from boosting_decision_making import boosting_featurizer
 from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer

@@ -31,10 +31,6 @@ from commons.esclient import EsClient
 from utils import utils
 
 
-def get_bool_value(str):
-    return True if str.lower() == "true" else False
-
-
 APP_CONFIG = {
     "esHost":            os.getenv("ES_HOSTS", "http://elasticsearch:9200"),
     # "esHost":            os.getenv("ES_HOSTS", "http://localhost:9200"),
@@ -53,8 +49,7 @@ SEARCH_CONFIG = {
     "BoostLaunch":                 float(os.getenv("ES_BOOST_LAUNCH", "4.0")),
     "BoostUniqueID":               float(os.getenv("ES_BOOST_UNIQUE_ID", "8.0")),
     "MaxQueryTerms":               int(os.getenv("ES_MAX_QUERY_TERMS", "50")),
-    "SearchLogsMinShouldMatch":    os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "80%"),
-    "SearchLogsMinSimilarity":     float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.9")),
+    "SearchLogsMinSimilarity":     float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.98")),
     "MinWordLength":               int(os.getenv("ES_MIN_WORD_LENGTH", "2")),
     "BoostModelFolderAllLines":    os.getenv("BOOST_MODEL_FOLDER_ALL_LINES", ""),
     "BoostModelFolderNotAllLines": os.getenv("BOOST_MODEL_FOLDER_NOT_ALL_LINES", ""),
@@ -110,12 +105,6 @@ def declare_exchange(channel, config):
 
 def init_amqp(_amqp_client, request_handler):
     """Initialize rabbitmq queues, exchange and stars threads for queue messages processing"""
-    index_queue = "index"
-    analyze_queue = "analyze"
-    delete_queue = "delete"
-    clean_queue = "clean"
-    search_queue = "search"
-
     with _amqp_client.connection.channel() as channel:
         try:
             declare_exchange(channel, APP_CONFIG)
@@ -126,21 +115,21 @@ def init_amqp(_amqp_client, request_handler):
     threads = []
 
     threads.append(create_thread(create_ampq_client().receive,
-                   (APP_CONFIG["exchangeName"], index_queue, True, False,
+                   (APP_CONFIG["exchangeName"], "index", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.index_logs,
                                                     prepare_response_data=amqp_handler.
                                                     prepare_index_response_data))))
     threads.append(create_thread(create_ampq_client().receive,
-                   (APP_CONFIG["exchangeName"], analyze_queue, True, False,
+                   (APP_CONFIG["exchangeName"], "analyze", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.analyze_logs,
                                                     prepare_response_data=amqp_handler.
                                                     prepare_analyze_response_data))))
     threads.append(create_thread(create_ampq_client().receive,
-                   (APP_CONFIG["exchangeName"], delete_queue, True, False,
+                   (APP_CONFIG["exchangeName"], "delete", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.delete_index,
@@ -149,7 +138,7 @@ def init_amqp(_amqp_client, request_handler):
                                                     prepare_response_data=amqp_handler.
                                                     output_result))))
     threads.append(create_thread(create_ampq_client().receive,
-                   (APP_CONFIG["exchangeName"], clean_queue, True, False,
+                   (APP_CONFIG["exchangeName"], "clean", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.delete_logs,
@@ -158,7 +147,7 @@ def init_amqp(_amqp_client, request_handler):
                                                     prepare_response_data=amqp_handler.
                                                     output_result))))
     threads.append(create_thread(create_ampq_client().receive,
-                   (APP_CONFIG["exchangeName"], search_queue, True, False,
+                   (APP_CONFIG["exchangeName"], "search", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.search_logs,
@@ -166,6 +155,15 @@ def init_amqp(_amqp_client, request_handler):
                                                     prepare_search_logs,
                                                     prepare_response_data=amqp_handler.
                                                     prepare_search_response_data))))
+    threads.append(create_thread(create_ampq_client().receive,
+                   (APP_CONFIG["exchangeName"], "suggest", True, False,
+                   lambda channel, method, props, body:
+                   amqp_handler.handle_amqp_request(channel, method, props, body,
+                                                    request_handler.suggest_items,
+                                                    prepare_data_func=amqp_handler.
+                                                    prepare_test_item_info,
+                                                    prepare_response_data=amqp_handler.
+                                                    prepare_analyze_response_data))))
     return threads
 
 

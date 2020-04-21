@@ -75,6 +75,15 @@ class AnalysisResult(BaseModel):
     relevantItem: int
 
 
+class SuggestAnalysisResult(BaseModel):
+    """Analysis result object"""
+    testItem: int
+    issueType: str
+    relevantItem: int
+    relevantLogId: int
+    matchScore: float
+
+
 class CleanIndex(BaseModel):
     """Clean index object"""
     ids: List[int]

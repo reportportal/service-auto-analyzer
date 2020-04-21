@@ -22,6 +22,7 @@ import elasticsearch
 import elasticsearch.helpers
 import commons.launch_objects
 from commons.launch_objects import AnalysisResult
+from commons.launch_objects import SuggestAnalysisResult
 import utils.utils as utils
 from boosting_decision_making import boosting_featurizer
 from time import time, sleep
@@ -423,7 +424,7 @@ class EsClient:
                 {
                     "max_query_terms": self.search_cfg["MaxQueryTerms"],
                     "min_word_length": self.search_cfg["MinWordLength"],
-                    "min_should_match": self.search_cfg["SearchLogsMinShouldMatch"],
+                    "min_should_match": "90%",
                     "number_of_log_lines": search_req.logLines
                 },
                 weighted_similarity_calculator=self.weighted_log_similarity_calculator)
@@ -607,3 +608,12 @@ class EsClient:
         logger.info("Processed %d test items. It took %.2f sec.", cnt_items_to_process, time() - t_start)
         logger.info("Finished analysis for %d launches with %d results.", len(launches), len(results))
         return results
+
+    @utils.ignore_warnings
+    def suggest_items(self, test_item_info):
+        return [SuggestAnalysisResult(**{
+            "testItem": 1,
+            "issueType": "PB",
+            "relevantItem": 2,
+            "relevantLogId": 34,
+            "matchScore": 87.6})]

@@ -630,6 +630,11 @@ class EsClient:
             return self.boosting_decision_maker_not_all_lines
         return self.boosting_decision_maker_all_lines
 
+    def get_suggest_decision_maker(self, number_of_log_lines):
+        if number_of_log_lines != -1 and self.suggest_decision_maker_not_all_lines is None:
+            return self.suggest_decision_maker_not_all_lines
+        return self.suggest_decision_maker_all_lines
+
     def get_config_for_boosting(self, analyzer_config):
         min_should_match = analyzer_config.minShouldMatch / 100 if analyzer_config.minShouldMatch > 0 else\
             int(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0)) / 100
@@ -893,6 +898,7 @@ class EsClient:
         _similarity_calculator.find_similarity(
             all_pairs_to_check,
             ["detected_message_with_numbers", "stacktrace", "merged_small_logs"])
+
         filtered_results = []
         deleted_indices = set()
         for i in range(len(gathered_results)):
@@ -935,6 +941,7 @@ class EsClient:
             logger.info("Project %d doesn't exist", test_item_info.project)
             logger.info("Finished suggesting for test item with 0 results.")
             return []
+
         t_start = time()
         results = []
         unique_logs = utils.leave_only_unique_logs(test_item_info.logs)
@@ -948,6 +955,7 @@ class EsClient:
             self.get_config_for_boosting_suggests(test_item_info.analyzerConfig),
             feature_ids=self.suggest_decision_maker.get_feature_ids(),
             weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
+
         feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
         scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
 

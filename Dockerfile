@@ -18,6 +18,8 @@ ARG prod
 
 ENV BOOST_MODEL_FOLDER_ALL_LINES="/backend/model/all_lines_0.10"
 ENV BOOST_MODEL_FOLDER_NOT_ALL_LINES="/backend/model/not_all_lines_0.2"
+ENV SUGGEST_BOOST_MODEL_FOLDER_ALL_LINES="/backend/model/suggest_all_lines_0.1"
+ENV SUGGEST_BOOST_MODEL_FOLDER_NOT_ALL_LINES="/backend/model/suggest_not_all_lines_0.1"
 ENV SIMILARITY_WEIGHTS_FOLDER="/backend/model/weights_0.2"
 
 COPY ./ ./
@@ -49,6 +51,8 @@ ENV PYTHONPATH="/backend"
 
 ENV BOOST_MODEL_FOLDER_ALL_LINES="/backend/model/all_lines_0.10"
 ENV BOOST_MODEL_FOLDER_NOT_ALL_LINES="/backend/model/not_all_lines_0.2"
+ENV SUGGEST_BOOST_MODEL_FOLDER_ALL_LINES="/backend/model/suggest_all_lines_0.1"
+ENV SUGGEST_BOOST_MODEL_FOLDER_NOT_ALL_LINES="/backend/model/suggest_not_all_lines_0.1"
 ENV SIMILARITY_WEIGHTS_FOLDER="/backend/model/weights_0.2"
 
 #ENV LOGGING_LEVEL="INFO"

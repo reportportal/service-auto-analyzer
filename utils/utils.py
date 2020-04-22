@@ -454,3 +454,10 @@ def enrich_text_with_method_and_classes(text):
             new_line = re.sub(r"\b(?<!\.)%s(?!\.)\b" % val, full_path, new_line)
         new_lines.append(new_line)
     return "\n".join(new_lines)
+
+
+def extract_real_id(elastic_id):
+    real_id = str(elastic_id)
+    if real_id[-2:] == "_m":
+        return int(real_id[:-2])
+    return int(real_id)

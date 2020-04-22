@@ -56,23 +56,19 @@
         },
         "detected_message_extended": {
             "type":     "text",
-            "analyzer": "standard",
-            "similarity" : "my_similarity"
+            "analyzer": "standard_english_analyzer"
         },
         "detected_message_without_params_extended": {
             "type":     "text",
-            "analyzer": "standard",
-            "similarity" : "my_similarity"
+            "analyzer": "standard_english_analyzer"
         },
         "stacktrace_extended": {
             "type":     "text",
-            "analyzer": "standard",
-            "similarity" : "my_similarity"
+            "analyzer": "standard_english_analyzer"
         },
         "message_extended": {
             "type":     "text",
-            "analyzer": "standard",
-            "similarity" : "my_similarity"
+            "analyzer": "standard_english_analyzer"
         },
         "original_message_lines": {
             "type": "integer"

@@ -26,7 +26,7 @@ class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
             all_results, config, feature_ids=feature_ids,
             weighted_log_similarity_calculator=weighted_log_similarity_calculator)
 
-    def calculate_percent_issue_types(self):
+    def _calculate_percent_issue_types(self):
         scores_by_issue_type = self.find_most_relevant_by_type()
         percent_by_issue_type = {}
         issue_types = set()
@@ -63,8 +63,8 @@ class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
                     hit["normalized_score"])
         return self.scores_by_issue_type
 
-    def calculate_max_score_and_pos(self, return_val_name="max_score"):
-        max_scores_results = super().calculate_max_score_and_pos(return_val_name=return_val_name)
+    def _calculate_max_score_and_pos(self, return_val_name="max_score"):
+        max_scores_results = super()._calculate_max_score_and_pos(return_val_name=return_val_name)
         max_scores_by_test_item = {}
         test_items = self.find_most_relevant_by_type()
         for test_item in test_items:
@@ -72,8 +72,8 @@ class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
             max_scores_by_test_item[test_item] = max_scores_results[issue_type]
         return max_scores_by_test_item
 
-    def calculate_min_score_and_pos(self, return_val_name="min_score"):
-        min_scores_results = super().calculate_min_score_and_pos(return_val_name=return_val_name)
+    def _calculate_min_score_and_pos(self, return_val_name="min_score"):
+        min_scores_results = super()._calculate_min_score_and_pos(return_val_name=return_val_name)
         min_scores_by_test_item = {}
         test_items = self.find_most_relevant_by_type()
         for test_item in test_items:
@@ -81,8 +81,8 @@ class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
             min_scores_by_test_item[test_item] = min_scores_results[issue_type]
         return min_scores_by_test_item
 
-    def calculate_percent_count_items_and_mean(self, return_val_name="mean_score"):
-        mean_scores_results = super().calculate_percent_count_items_and_mean(return_val_name=return_val_name)
+    def _calculate_percent_count_items_and_mean(self, return_val_name="mean_score"):
+        mean_scores_results = super()._calculate_percent_count_items_and_mean(return_val_name=return_val_name)
         mean_scores_by_test_item = {}
         test_items = self.find_most_relevant_by_type()
         for test_item in test_items:

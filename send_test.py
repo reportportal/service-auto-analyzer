@@ -113,6 +113,55 @@ index_data = [{
                         "logLevel": 40000,
                         "message": "error occured \r\n error found \r\n error mined"}, ]
                    }, ],
+}, {
+    "launchId": 1,
+    "project": 34,
+    "launchName": "dsfdsf",
+    "analyzerConfig": {
+        "minDocFreq": 1.0,
+        "minTermFreq": 1.0,
+        "minShouldMatch": 80,
+        "numberOfLogLines": -1,
+        "isAutoAnalyzerEnabled": True,
+        "analyzerMode": "ALL",
+        "indexingRunning": True,
+    },
+    "testItems": [{"testItemId": 5,
+                   "uniqueId": "df5",
+                   "isAutoAnalyzed": False,
+                   "issueType": "ab001",
+                   "originalIssueType": "PB001",
+                   "logs": [
+                       {"logId": 6,
+                        "logLevel": 40000,
+                        "message": "error occured"},
+                       {"logId": 8,
+                        "logLevel": 40000,
+                        "message": "error occured \r\n error found \r\n error mined"}, ]
+                   },
+                  {"testItemId": 78,
+                   "uniqueId": "df5",
+                   "isAutoAnalyzed": False,
+                   "issueType": "pb001",
+                   "originalIssueType": "PB001",
+                   "logs": [
+                       {"logId": 45,
+                        "logLevel": 40000,
+                        "message": "error occured"},
+                       {"logId": 81,
+                        "logLevel": 40000,
+                        "message": "error occured \r\n error found \r\n error mined"}, ]
+                   },
+                  {"testItemId": 10,
+                   "uniqueId": "df12",
+                   "isAutoAnalyzed": False,
+                   "issueType": "ab001",
+                   "originalIssueType": "ab001",
+                   "logs": [
+                       {"logId": 38,
+                        "logLevel": 40000,
+                        "message": "error occured \r\n error found \r\n error mined"}, ]
+                   }, ],
 }]
 
 search_data = {

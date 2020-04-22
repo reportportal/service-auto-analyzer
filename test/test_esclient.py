@@ -107,6 +107,8 @@ class TestEsClient(unittest.TestCase):
             "BoostModelFolderAllLines":    os.getenv("BOOST_MODEL_FOLDER_ALL_LINES", ""),
             "BoostModelFolderNotAllLines": os.getenv("BOOST_MODEL_FOLDER_NOT_ALL_LINES", ""),
             "SimilarityWeightsFolder":     os.getenv("SIMILARITY_WEIGHTS_FOLDER", ""),
+            "SuggestBoostModelFolderAllLines":    os.getenv("SUGGEST_BOOST_MODEL_FOLDER_ALL_LINES", ""),
+            "SuggestBoostModelFolderNotAllLines": os.getenv("SUGGEST_BOOST_MODEL_FOLDER_NOT_ALL_LINES", "")
         }
 
     @utils.ignore_warnings

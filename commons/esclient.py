@@ -25,6 +25,7 @@ from commons.launch_objects import AnalysisResult
 from commons.launch_objects import SuggestAnalysisResult
 import utils.utils as utils
 from boosting_decision_making import boosting_featurizer
+from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from time import time, sleep
 from datetime import datetime
 from boosting_decision_making import weighted_similarity_calculator
@@ -49,7 +50,10 @@ class EsClient:
                                                      max_retries=5, retry_on_timeout=True)
         self.boosting_decision_maker_all_lines = None
         self.boosting_decision_maker_not_all_lines = None
+        self.suggest_decision_maker_all_lines = None
+        self.suggest_decision_maker_not_all_lines = None
         self.weighted_log_similarity_calculator = None
+        self.suggest_threshold = 0.4
         self.es_query_builder = EsQueryBuilder(self.search_cfg, ERROR_LOGGING_LEVEL)
         self.initialize_decision_makers()
 
@@ -60,6 +64,12 @@ class EsClient:
         if self.search_cfg["BoostModelFolderNotAllLines"].strip():
             self.boosting_decision_maker_not_all_lines = boosting_decision_maker.BoostingDecisionMaker(
                 folder=self.search_cfg["BoostModelFolderNotAllLines"])
+        if self.search_cfg["SuggestBoostModelFolderAllLines"].strip():
+            self.suggest_decision_maker_all_lines = boosting_decision_maker.BoostingDecisionMaker(
+                folder=self.search_cfg["SuggestBoostModelFolderAllLines"])
+        if self.search_cfg["SuggestBoostModelFolderNotAllLines"].strip():
+            self.suggest_decision_maker_not_all_lines = boosting_decision_maker.BoostingDecisionMaker(
+                folder=self.search_cfg["SuggestBoostModelFolderNotAllLines"])
         if self.search_cfg["SimilarityWeightsFolder"].strip():
             self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
                 WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
@@ -288,6 +298,25 @@ class EsClient:
         log_template = self._fill_log_fields(log_template, log, launch.analyzerConfig.numberOfLogLines)
         return log_template
 
+    def _fill_test_item_info_fields(self, log_template, test_item_info):
+        log_template["_index"] = test_item_info.project
+        log_template["_source"]["launch_id"] = test_item_info.launchId
+        log_template["_source"]["launch_name"] = test_item_info.launchName
+        log_template["_source"]["test_item"] = test_item_info.testItemId
+        log_template["_source"]["unique_id"] = test_item_info.uniqueId
+        log_template["_source"]["test_case_hash"] = test_item_info.testCaseHash
+        log_template["_source"]["is_auto_analyzed"] = False
+        log_template["_source"]["issue_type"] = ""
+        log_template["_source"]["start_time"] = ""
+        return log_template
+
+    def _prepare_log_for_suggests(self, test_item_info, log):
+        log_template = self._create_log_template()
+        log_template = self._fill_test_item_info_fields(log_template, test_item_info)
+        log_template = self._fill_log_fields(
+            log_template, log, test_item_info.analyzerConfig.numberOfLogLines)
+        return log_template
+
     def _merge_logs(self, test_item_ids, project):
         bodies = []
         batch_size = 1000
@@ -436,7 +465,7 @@ class EsClient:
                 logger.debug("Log with id %s has %.3f similarity with the queried log '%s'",
                              log_id, similarity_percent, queried_log["_source"]["message"])
                 if similarity_percent >= self.search_cfg["SearchLogsMinSimilarity"]:
-                    similar_log_ids.add(log_id)
+                    similar_log_ids.add(utils.extract_real_id(log_id))
 
         logger.info("Finished searching by request %s with %d results. It took %.2f sec.",
                     search_req.json(), len(similar_log_ids), time() - t_start)
@@ -465,6 +494,11 @@ class EsClient:
         if number_of_log_lines != -1 and self.boosting_decision_maker_not_all_lines is None:
             return self.boosting_decision_maker_not_all_lines
         return self.boosting_decision_maker_all_lines
+
+    def get_suggest_decision_maker(self, number_of_log_lines):
+        if number_of_log_lines != -1 and self.suggest_decision_maker_not_all_lines is None:
+            return self.suggest_decision_maker_not_all_lines
+        return self.suggest_decision_maker_all_lines
 
     def get_config_for_boosting(self, analyzer_config):
         min_should_match = analyzer_config.minShouldMatch / 100 if analyzer_config.minShouldMatch > 0 else\
@@ -609,11 +643,145 @@ class EsClient:
         logger.info("Finished analysis for %d launches with %d results.", len(launches), len(results))
         return results
 
+    def get_config_for_boosting_suggests(self, analyzerConfig):
+        return {
+            "max_query_terms": self.search_cfg["MaxQueryTerms"],
+            "min_should_match": 0.4,
+            "min_word_length": self.search_cfg["MinWordLength"],
+            "filter_min_should_match": [],
+            "filter_min_should_match_any": [
+                "detected_message_extended",
+                "detected_message_without_params_extended"],
+            "number_of_log_lines": analyzerConfig.numberOfLogLines}
+
+    def query_es_for_suggested_items(self, test_item_info, logs):
+        full_results = []
+
+        for log in logs:
+            message = log["_source"]["message"].strip()
+            merged_small_logs = log["_source"]["merged_small_logs"].strip()
+            if log["_source"]["log_level"] < ERROR_LOGGING_LEVEL or\
+                    (not message and not merged_small_logs):
+                continue
+
+            query = self.es_query_builder.build_suggest_query(
+                test_item_info, log,
+                message_field="message_extended",
+                det_mes_field="detected_message_extended",
+                stacktrace_field="stacktrace_extended")
+            es_res = self.es_client.search(index=str(test_item_info.project), body=query)
+            full_results.append((log, es_res))
+
+            query = self.es_query_builder.build_suggest_query(
+                test_item_info, log,
+                message_field="message_without_params_extended",
+                det_mes_field="detected_message_without_params_extended",
+                stacktrace_field="stacktrace_extended")
+            es_res = self.es_client.search(index=str(test_item_info.project), body=query)
+            full_results.append((log, es_res))
+        return full_results
+
+    def deduplicate_results(self, gathered_results, scores_by_test_items, test_item_ids):
+        _similarity_calculator = similarity_calculator.SimilarityCalculator(
+            {
+                "max_query_terms": self.search_cfg["MaxQueryTerms"],
+                "min_word_length": self.search_cfg["MinWordLength"],
+                "min_should_match": "98%",
+                "number_of_log_lines": -1
+            },
+            weighted_similarity_calculator=self.weighted_log_similarity_calculator)
+        all_pairs_to_check = []
+        for i in range(len(gathered_results)):
+            for j in range(i + 1, len(gathered_results)):
+                test_item_id_first = test_item_ids[gathered_results[i][0]]
+                test_item_id_second = test_item_ids[gathered_results[j][0]]
+                issue_type1 = scores_by_test_items[test_item_id_first]["mrHit"]["_source"]["issue_type"]
+                issue_type2 = scores_by_test_items[test_item_id_second]["mrHit"]["_source"]["issue_type"]
+                if issue_type1 != issue_type2:
+                    continue
+                items_to_compare = {"hits": {"hits": [scores_by_test_items[test_item_id_first]["mrHit"]]}}
+                all_pairs_to_check.append((scores_by_test_items[test_item_id_second]["mrHit"],
+                                           items_to_compare))
+        _similarity_calculator.find_similarity(all_pairs_to_check, ["message", "merged_small_logs"])
+        filtered_results = []
+        deleted_indices = set()
+        for i in range(len(gathered_results)):
+            if i in deleted_indices:
+                continue
+            for j in range(i + 1, len(gathered_results)):
+                test_item_id_first = test_item_ids[gathered_results[i][0]]
+                test_item_id_second = test_item_ids[gathered_results[j][0]]
+                group_id = (scores_by_test_items[test_item_id_first]["mrHit"]["_id"],
+                            scores_by_test_items[test_item_id_second]["mrHit"]["_id"])
+                if group_id not in _similarity_calculator.similarity_dict["message"]:
+                    continue
+                message_sim = _similarity_calculator.similarity_dict["message"][group_id]
+                merged_logs_sim = _similarity_calculator.similarity_dict["merged_small_logs"][group_id]
+                if message_sim["similarity"] >= 0.98 and merged_logs_sim["similarity"] >= 0.98:
+                    deleted_indices.add(j)
+            filtered_results.append(gathered_results[i])
+        return filtered_results
+
+    def sort_results(self, scores_by_test_items, test_item_ids, predicted_labels_probability):
+        gathered_results = []
+        for idx, prob in enumerate(predicted_labels_probability):
+            test_item_id = test_item_ids[idx]
+            gathered_results.append(
+                (idx,
+                 round(prob[1], 2),
+                 scores_by_test_items[test_item_id]["mrHit"]["_source"]["start_time"]))
+
+        gathered_results = sorted(gathered_results, key=lambda x: (x[1], x[2]), reverse=True)
+        return self.deduplicate_results(gathered_results, scores_by_test_items, test_item_ids)
+
     @utils.ignore_warnings
-    def suggest_items(self, test_item_info):
-        return [SuggestAnalysisResult(**{
-            "testItem": 1,
-            "issueType": "PB",
-            "relevantItem": 2,
-            "relevantLogId": 34,
-            "matchScore": 87.6})]
+    def suggest_items(self, test_item_info, num_items=5):
+        logger.info("Started suggesting test items")
+        logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
+        t_start = time()
+        results = []
+        unique_logs = utils.leave_only_unique_logs(test_item_info.logs)
+        prepared_logs = [self._prepare_log_for_suggests(test_item_info, log)
+                         for log in unique_logs if log.logLevel >= ERROR_LOGGING_LEVEL]
+        logs = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+        searched_res = self.query_es_for_suggested_items(test_item_info, logs)
+
+        boosting_decision_maker = self.get_suggest_decision_maker(
+            test_item_info.analyzerConfig.numberOfLogLines)
+        _boosting_data_gatherer = SuggestBoostingFeaturizer(
+            searched_res,
+            self.get_config_for_boosting_suggests(test_item_info.analyzerConfig),
+            feature_ids=boosting_decision_maker.get_feature_ids())
+        feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
+        scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
+
+        if feature_data:
+            predicted_labels, predicted_labels_probability = boosting_decision_maker.predict(feature_data)
+            sorted_results = self.sort_results(
+                scores_by_test_items, test_item_ids, predicted_labels_probability)
+
+            logger.debug("Found %d results for test items ", len(sorted_results))
+            for idx, prob, _ in sorted_results:
+                test_item_id = test_item_ids[idx]
+                issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
+                logger.debug("Test item id %d with issue type %s has probability %.2f",
+                             test_item_id, issue_type, prob)
+
+            for idx, prob, _ in sorted_results[:num_items]:
+                if prob >= self.suggest_threshold:
+                    test_item_id = test_item_ids[idx]
+                    issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
+                    relevant_log_id = utils.extract_real_id(
+                        scores_by_test_items[test_item_id]["mrHit"]["_id"])
+                    analysis_result = SuggestAnalysisResult(testItem=test_item_info.testItemId,
+                                                            issueType=issue_type,
+                                                            relevantItem=test_item_id,
+                                                            relevantLogId=relevant_log_id,
+                                                            matchScore=round(prob * 100, 2))
+                    results.append(analysis_result)
+                    logger.debug(analysis_result)
+        else:
+            logger.debug("There are no results for test item %s", test_item_info.testItemId)
+        logger.info("Processed the test item. It took %.2f sec.", time() - t_start)
+        logger.info("Finished suggesting for test item with %d results.", len(results))
+        return results

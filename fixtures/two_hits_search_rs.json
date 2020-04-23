@@ -57,7 +57,7 @@
                     "original_message_lines": 1,
                     "original_message_words_number": 2,
                     "message": "Message",
-                    "test_item": 1,
+                    "test_item": 2,
                     "unique_id": "unique1",
                     "detected_message": "Message",
                     "detected_message_with_numbers": "Message 111",

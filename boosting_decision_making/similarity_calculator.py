@@ -26,6 +26,12 @@ class SimilarityCalculator:
         self.weighted_similarity_calculator = weighted_similarity_calculator
         self.config = config
         self.similarity_dict = {}
+        self.fields_mapping_for_weighting = {
+            "message": ["detected_message", "stacktrace"],
+            "message_without_params_extended": [
+                "detected_message_without_params_extended", "stacktrace_extended"],
+            "message_extended": ["detected_message_extended", "stacktrace_extended"]
+        }
 
     def find_similarity(self, all_results, fields):
         for field in fields:
@@ -53,13 +59,14 @@ class SimilarityCalculator:
                                 log_field_ids[obj["_id"]] = -1
                             else:
                                 text = []
-                                if field == "message" and self.config["number_of_log_lines"] == -1:
+                                if field.startswith("message") and self.config["number_of_log_lines"] == -1:
+                                    fields_to_use = self.fields_mapping_for_weighting[field]
                                     text = self.weighted_similarity_calculator.message_to_array(
-                                        obj["_source"]["detected_message"],
-                                        obj["_source"]["stacktrace"])
-                                elif field == "stacktrace":
+                                        obj["_source"][fields_to_use[0]],
+                                        obj["_source"][fields_to_use[1]])
+                                elif field.startswith("stacktrace"):
                                     text = self.weighted_similarity_calculator.message_to_array(
-                                        "", obj["_source"]["stacktrace"])
+                                        "", obj["_source"][field])
                                 else:
                                     text = utils.filter_empty_lines([" ".join(utils.split_words(
                                         obj["_source"][field],

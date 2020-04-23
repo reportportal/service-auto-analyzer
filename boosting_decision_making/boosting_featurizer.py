@@ -143,7 +143,6 @@ class BoostingFeaturizer:
                         similarity = sim_obj[group_id]["similarity"]
                         similarity_to_compare = max(0.8, self.config["min_should_match"])
                     max_similarity = max(max_similarity, similarity)
-
                 if max_similarity >= similarity_to_compare:
                     new_elastic_res.append(elastic_res)
             if len(new_elastic_res) > 0:

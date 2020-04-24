@@ -37,7 +37,7 @@ class BoostingFeaturizer:
             "message", "detected_message",
             "detected_message_without_params_extended",
             "message_without_params_extended",
-            "message_without_params",
+            "message_extended",
             "detected_message_extended"]
         self.feature_functions = {
             0: (self._calculate_score, {}),
@@ -60,6 +60,7 @@ class BoostingFeaturizer:
             28: (self._calculate_percent_count_items_and_mean,
                  {"return_val_name": "mean_score"}),
             29: (self._calculate_similarity_percent, {"field_name": "message_params"}),
+            34: (self._calculate_similarity_percent, {"field_name": "found_exceptions"}),
             36: (self._calculate_similarity_percent, {"field_name": "detected_message_extended"}),
             37: (self._calculate_similarity_percent,
                  {"field_name": "detected_message_without_params_extended"}),

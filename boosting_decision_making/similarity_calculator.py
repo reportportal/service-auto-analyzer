@@ -59,7 +59,8 @@ class SimilarityCalculator:
                                 log_field_ids[obj["_id"]] = -1
                             else:
                                 text = []
-                                if field.startswith("message") and self.config["number_of_log_lines"] == -1:
+                                if self.config["number_of_log_lines"] == -1 and\
+                                        field in self.fields_mapping_for_weighting:
                                     fields_to_use = self.fields_mapping_for_weighting[field]
                                     text = self.weighted_similarity_calculator.message_to_array(
                                         obj["_source"][fields_to_use[0]],

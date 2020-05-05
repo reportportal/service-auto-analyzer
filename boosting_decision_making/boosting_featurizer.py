@@ -81,13 +81,13 @@ class BoostingFeaturizer:
                         if obj["_id"] not in log_field_ids:
                             text = " ".join(utils.split_words(obj["_source"][field],
                                             min_word_length=self.min_word_length))
-                            if text.strip() == "":
+                            if not text.strip():
                                 log_field_ids[obj["_id"]] = -1
                             else:
                                 all_messages.append(text)
                                 log_field_ids[obj["_id"]] = index_in_message_array
                                 index_in_message_array += 1
-                if len(all_messages) > 0:
+                if all_messages:
                     vectorizer = CountVectorizer(binary=True, analyzer="word", token_pattern="[^ ]+")
                     count_vector_matrix = np.asarray(vectorizer.fit_transform(all_messages).toarray())
                 self.all_text_field_ids[field] = log_field_ids
@@ -104,9 +104,9 @@ class BoostingFeaturizer:
             thread = BoostingFeaturizer.CountVectorizerThread(fields, all_results, min_word_length)
             threads.append(thread)
             thread.start()
+
         for thread in threads:
             thread.join()
-        for thread in threads:
             for field in thread.fields:
                 self.all_text_field_ids[field] = thread.all_text_field_ids[field]
                 self.dict_count_vectorizer[field] = thread.dict_count_vectorizer[field]
@@ -121,7 +121,7 @@ class BoostingFeaturizer:
                     if "similarity_%s" % field in elastic_res else "similarity_merged_small_logs"
                 if elastic_res[sim_field] >= self.config["min_should_match"]:
                     new_elastic_res.append(elastic_res)
-            if len(new_elastic_res) > 0:
+            if new_elastic_res:
                 new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
 
@@ -180,7 +180,7 @@ class BoostingFeaturizer:
         percent_by_issue_type = {}
         for issue_type in scores_by_issue_type:
             percent_by_issue_type[issue_type] = 1 / len(scores_by_issue_type)\
-                if len(scores_by_issue_type) > 0 else 0
+                if len(scores_by_issue_type) else 0
         return percent_by_issue_type
 
     def _has_test_item_several_logs(self):
@@ -228,7 +228,7 @@ class BoostingFeaturizer:
 
     def _calculate_score(self):
         scores_by_issue_type = self.find_most_relevant_by_type()
-        return dict([(item, scores_by_issue_type[item]["score"]) for item in scores_by_issue_type])
+        return {item: scores_by_issue_type[item]["score"] for item in scores_by_issue_type}
 
     def _calculate_place(self):
         scores_by_issue_type = self._calculate_score()
@@ -250,8 +250,8 @@ class BoostingFeaturizer:
                     max_scores_by_issue_type[issue_type] = {"max_score": hit["normalized_score"],
                                                             "max_score_pos": 1 / (1 + idx), }
 
-        return dict([(item, max_scores_by_issue_type[item][return_val_name])
-                    for item in max_scores_by_issue_type])
+        return {item: max_scores_by_issue_type[item][return_val_name]
+                for item in max_scores_by_issue_type}
 
     def _calculate_min_score_and_pos(self, return_val_name="min_score"):
         min_scores_by_issue_type = {}
@@ -264,8 +264,8 @@ class BoostingFeaturizer:
                     min_scores_by_issue_type[issue_type] = {"min_score": hit["normalized_score"],
                                                             "min_score_pos": 1 / (1 + idx), }
 
-        return dict([(item, min_scores_by_issue_type[item][return_val_name])
-                    for item in min_scores_by_issue_type])
+        return {item: min_scores_by_issue_type[item][return_val_name]
+                for item in min_scores_by_issue_type}
 
     def _calculate_percent_count_items_and_mean(self, return_val_name="mean_score", scaled=False):
         cnt_items_by_issue_type = {}
@@ -287,8 +287,8 @@ class BoostingFeaturizer:
             cnt_items_by_issue_type[issue_type]["mean_score"] /=\
                 cnt_items_by_issue_type[issue_type]["cnt_items_percent"]
             cnt_items_by_issue_type[issue_type]["cnt_items_percent"] /= cnt_items_glob
-        return dict([(item, cnt_items_by_issue_type[item][return_val_name])
-                    for item in cnt_items_by_issue_type])
+        return {item: cnt_items_by_issue_type[item][return_val_name]
+                for item in cnt_items_by_issue_type}
 
     def normalize_results(self, all_elastic_results):
         all_results = []

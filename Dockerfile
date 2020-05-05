@@ -24,7 +24,7 @@ RUN if [ "$prod" = "true" ]; then make build-release v=$version; else if [ "$ver
 
 # Multistage
 FROM python:3.7.4-slim
-RUN apt-get update && apt-get install -y libxml2 curl libgomp1\
+RUN apt-get update && apt-get install -y libxml2 libgomp1\
     && rm -rf /var/lib/apt/lists/*
 COPY --from=0 /venv /venv
 RUN mkdir /root/nltk_data

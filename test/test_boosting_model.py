@@ -36,7 +36,7 @@ class TestBoostingModel(unittest.TestCase):
         self.log_message_only_small_logs = "log_message_only_small_logs.json"
         self.boost_model_results = "boost_model_results.json"
         self.epsilon = 0.0001
-        self.boost_model_folder = os.getenv("BOOST_MODEL_FOLDER")
+        self.boost_model_folder = os.getenv("BOOST_MODEL_FOLDER", "")
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings

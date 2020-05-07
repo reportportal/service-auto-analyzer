@@ -15,6 +15,7 @@ RUN /venv/bin/python3 -m nltk.downloader stopwords
 
 ARG version
 ARG prod
+ARG githubtoken
 
 ENV BOOST_MODEL_FOLDER_ALL_LINES="/backend/model/all_lines_0.10"
 ENV BOOST_MODEL_FOLDER_NOT_ALL_LINES="/backend/model/not_all_lines_0.2"
@@ -25,7 +26,8 @@ ENV SIMILARITY_WEIGHTS_FOLDER="/backend/model/weights_0.2"
 COPY ./ ./
 
 RUN make test-all
-RUN if [ "$prod" = "true" ]; then make build-release v=$version; else if [ "$version" != "" ]; then make build-release v=$version; fi ; fi
+# github token can be generated in the github profile under settings/Developer settings/Personal access tokens
+RUN if [ "$prod" = "true" ]; then make release v=$version githubtoken=$githubtoken; else if [ "$version" != "" ]; then make build-release v=$version; fi ; fi
 
 # Multistage
 FROM python:3.7.4-slim
@@ -39,6 +41,7 @@ WORKDIR /backend/
 
 COPY . .
 COPY --from=0 /backend/VERSION /backend/.bumpversion.cfg ./
+RUN rm -rf /backend/.git/
 
 # uWSGI will listen on this port
 EXPOSE 5000

@@ -38,6 +38,7 @@ COPY . .
 COPY --from=0 /backend/VERSION /backend/.bumpversion.cfg ./
 RUN rm -rf /backend/.git/
 
+
 # uWSGI configuration (customize as needed):
 ENV FLASK_APP=app.py UWSGI_WSGI_FILE=app.py UWSGI_SOCKET=:3031 UWSGI_HTTP=:5000 UWSGI_VIRTUALENV=/venv UWSGI_MASTER=1 UWSGI_WORKERS=4 UWSGI_THREADS=8 UWSGI_LAZY_APPS=1 UWSGI_WSGI_ENV_BEHAVIOR=holy PYTHONDONTWRITEBYTECODE=1
 ENV PATH="/venv/bin:${PATH}"

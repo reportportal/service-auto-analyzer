@@ -1,0 +1,7 @@
+{
+	"BOOST_MODEL_FOLDER_ALL_LINES": "model/all_lines_0.10",
+	"BOOST_MODEL_FOLDER_NOT_ALL_LINES": "model/not_all_lines_0.2",
+	"SUGGEST_BOOST_MODEL_FOLDER_ALL_LINES": "model/suggest_all_lines_0.1",
+	"SUGGEST_BOOST_MODEL_FOLDER_NOT_ALL_LINES": "model/suggest_not_all_lines_0.1",
+	"SIMILARITY_WEIGHTS_FOLDER": "model/weights_0.2"
+}

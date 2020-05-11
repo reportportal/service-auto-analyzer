@@ -51,11 +51,11 @@ SEARCH_CONFIG = {
     "MaxQueryTerms":               int(os.getenv("ES_MAX_QUERY_TERMS", "50")),
     "SearchLogsMinSimilarity":     float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.98")),
     "MinWordLength":               int(os.getenv("ES_MIN_WORD_LENGTH", "2")),
-    "BoostModelFolderAllLines":    os.getenv("BOOST_MODEL_FOLDER_ALL_LINES", ""),
-    "BoostModelFolderNotAllLines": os.getenv("BOOST_MODEL_FOLDER_NOT_ALL_LINES", ""),
-    "SuggestBoostModelFolderAllLines":    os.getenv("SUGGEST_BOOST_MODEL_FOLDER_ALL_LINES", ""),
-    "SuggestBoostModelFolderNotAllLines": os.getenv("SUGGEST_BOOST_MODEL_FOLDER_NOT_ALL_LINES", ""),
-    "SimilarityWeightsFolder":     os.getenv("SIMILARITY_WEIGHTS_FOLDER", ""),
+    "BoostModelFolderAllLines":    "",
+    "BoostModelFolderNotAllLines": "",
+    "SuggestBoostModelFolderAllLines":    "",
+    "SuggestBoostModelFolderNotAllLines": "",
+    "SimilarityWeightsFolder":     "",
 }
 
 
@@ -178,6 +178,18 @@ def read_version():
     return ""
 
 
+def read_model_settings():
+    """Reads paths to models"""
+    model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
+    SEARCH_CONFIG["BoostModelFolderAllLines"] = model_settings["BOOST_MODEL_FOLDER_ALL_LINES"]
+    SEARCH_CONFIG["BoostModelFolderNotAllLines"] = model_settings["BOOST_MODEL_FOLDER_NOT_ALL_LINES"]
+    SEARCH_CONFIG["SuggestBoostModelFolderAllLines"] =\
+        model_settings["SUGGEST_BOOST_MODEL_FOLDER_ALL_LINES"]
+    SEARCH_CONFIG["SuggestBoostModelFolderNotAllLines"] =\
+        model_settings["SUGGEST_BOOST_MODEL_FOLDER_NOT_ALL_LINES"]
+    SEARCH_CONFIG["SimilarityWeightsFolder"] = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
+
+
 log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.conf')
 logging.config.fileConfig(log_file_path)
 if APP_CONFIG["logLevel"].lower() == "debug":
@@ -188,6 +200,7 @@ else:
     logging.disable(logging.INFO)
 logger = logging.getLogger("analyzerApp")
 version = read_version()
+read_model_settings()
 
 application = create_application()
 CORS(application)

@@ -40,7 +40,6 @@ class TestBoostingFeaturizer(unittest.TestCase):
         self.three_hits_search_rs_explained = "three_hits_search_rs_explained.json"
         self.one_hit_search_rs_explained_wo_params = "one_hit_search_rs_explained_wo_params.json"
         self.epsilon = 0.0001
-        self.weights_folder = os.getenv("SIMILARITY_WEIGHTS_FOLDER", "")
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings

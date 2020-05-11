@@ -40,11 +40,15 @@ class TestBoostingModel(unittest.TestCase):
         self.boost_model_results = "boost_model_results.json"
         self.suggest_boost_model_results = "suggest_boost_model_results.json"
         self.epsilon = 0.0001
-        self.boost_model_folder_all_lines = os.getenv("BOOST_MODEL_FOLDER_ALL_LINES")
-        self.boost_model_folder_not_all_lines = os.getenv("BOOST_MODEL_FOLDER_NOT_ALL_LINES")
-        self.suggest_boost_model_folder_all_lines = os.getenv("SUGGEST_BOOST_MODEL_FOLDER_ALL_LINES")
-        self.suggest_boost_model_folder_not_all_lines = os.getenv("SUGGEST_BOOST_MODEL_FOLDER_NOT_ALL_LINES")
-        self.weights_folder = os.getenv("SIMILARITY_WEIGHTS_FOLDER", "")
+        model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
+        self.boost_model_folder_all_lines = model_settings["BOOST_MODEL_FOLDER_ALL_LINES"]
+        self.boost_model_folder_not_all_lines =\
+            model_settings["BOOST_MODEL_FOLDER_NOT_ALL_LINES"]
+        self.suggest_boost_model_folder_all_lines =\
+            model_settings["SUGGEST_BOOST_MODEL_FOLDER_ALL_LINES"]
+        self.suggest_boost_model_folder_not_all_lines =\
+            model_settings["SUGGEST_BOOST_MODEL_FOLDER_NOT_ALL_LINES"]
+        self.weights_folder = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings

@@ -84,6 +84,7 @@ class TestEsClient(unittest.TestCase):
         self.suggest_test_item_info_w_merged_logs = "suggest_test_item_info_w_merged_logs.json"
         self.one_hit_search_rs_merged_wrong = "one_hit_search_rs_merged_wrong.json"
         self.es_host = "http://localhost:9200"
+        self.model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings
@@ -97,9 +98,8 @@ class TestEsClient(unittest.TestCase):
         with open(os.path.join("fixtures", fixture_name), "r") as file:
             return file.read() if not to_json else json.loads(file.read())
 
-    @staticmethod
     @utils.ignore_warnings
-    def get_default_search_config():
+    def get_default_search_config(self):
         """Get default search config"""
         return {
             "MinShouldMatch": "80%",
@@ -112,11 +112,16 @@ class TestEsClient(unittest.TestCase):
             "SearchLogsMinShouldMatch": "98%",
             "SearchLogsMinSimilarity": 0.9,
             "MinWordLength":  0,
-            "BoostModelFolderAllLines":    os.getenv("BOOST_MODEL_FOLDER_ALL_LINES", ""),
-            "BoostModelFolderNotAllLines": os.getenv("BOOST_MODEL_FOLDER_NOT_ALL_LINES", ""),
-            "SimilarityWeightsFolder":     os.getenv("SIMILARITY_WEIGHTS_FOLDER", ""),
-            "SuggestBoostModelFolderAllLines":    os.getenv("SUGGEST_BOOST_MODEL_FOLDER_ALL_LINES", ""),
-            "SuggestBoostModelFolderNotAllLines": os.getenv("SUGGEST_BOOST_MODEL_FOLDER_NOT_ALL_LINES", "")
+            "BoostModelFolderAllLines":
+                self.model_settings["BOOST_MODEL_FOLDER_ALL_LINES"],
+            "BoostModelFolderNotAllLines":
+                self.model_settings["BOOST_MODEL_FOLDER_NOT_ALL_LINES"],
+            "SimilarityWeightsFolder":
+                self.model_settings["SIMILARITY_WEIGHTS_FOLDER"],
+            "SuggestBoostModelFolderAllLines":
+                self.model_settings["SUGGEST_BOOST_MODEL_FOLDER_ALL_LINES"],
+            "SuggestBoostModelFolderNotAllLines":
+                self.model_settings["SUGGEST_BOOST_MODEL_FOLDER_NOT_ALL_LINES"]
         }
 
     @utils.ignore_warnings
@@ -190,7 +195,7 @@ class TestEsClient(unittest.TestCase):
                 self._start_server(test["test_calls"])
 
                 es_client = esclient.EsClient(host=self.es_host,
-                                              search_cfg=TestEsClient.get_default_search_config())
+                                              search_cfg=self.get_default_search_config())
 
                 response = es_client.list_indices()
                 response.should.have.length_of(test["expected_count"])
@@ -228,7 +233,7 @@ class TestEsClient(unittest.TestCase):
                 self._start_server(test["test_calls"])
 
                 es_client = esclient.EsClient(host=self.es_host,
-                                              search_cfg=TestEsClient.get_default_search_config())
+                                              search_cfg=self.get_default_search_config())
 
                 response = es_client.create_index(test["index"])
                 response.acknowledged.should.equal(test["acknowledged"])
@@ -261,7 +266,7 @@ class TestEsClient(unittest.TestCase):
                 self._start_server(test["test_calls"])
 
                 es_client = esclient.EsClient(host=self.es_host,
-                                              search_cfg=TestEsClient.get_default_search_config())
+                                              search_cfg=self.get_default_search_config())
 
                 response = es_client.index_exists(test["index"])
                 response.should.equal(test["exists"])
@@ -298,7 +303,7 @@ class TestEsClient(unittest.TestCase):
                 self._start_server(test["test_calls"])
 
                 es_client = esclient.EsClient(host=self.es_host,
-                                              search_cfg=TestEsClient.get_default_search_config())
+                                              search_cfg=self.get_default_search_config())
 
                 response = es_client.delete_index(test["index"])
 
@@ -378,7 +383,7 @@ class TestEsClient(unittest.TestCase):
                 self._start_server(test["test_calls"])
 
                 es_client = esclient.EsClient(host=self.es_host,
-                                              search_cfg=TestEsClient.get_default_search_config())
+                                              search_cfg=self.get_default_search_config())
                 es_client.es_client.scroll = MagicMock(return_value=json.loads(
                     TestEsClient.get_fixture(self.no_hits_search_rs)))
 
@@ -480,7 +485,7 @@ class TestEsClient(unittest.TestCase):
                 self._start_server(test["test_calls"])
 
                 es_client = esclient.EsClient(host=self.es_host,
-                                              search_cfg=TestEsClient.get_default_search_config())
+                                              search_cfg=self.get_default_search_config())
 
                 response = es_client.search_logs(test["rq"])
                 response.should.have.length_of(test["expected_count"])
@@ -642,7 +647,7 @@ class TestEsClient(unittest.TestCase):
                 self._start_server(test["test_calls"])
 
                 es_client = esclient.EsClient(host=self.es_host,
-                                              search_cfg=TestEsClient.get_default_search_config())
+                                              search_cfg=self.get_default_search_config())
                 es_client.es_client.scroll = MagicMock(return_value=json.loads(
                     TestEsClient.get_fixture(self.no_hits_search_rs)))
                 launches = [launch_objects.Launch(**launch)
@@ -789,7 +794,7 @@ class TestEsClient(unittest.TestCase):
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
-                config = TestEsClient.get_default_search_config()
+                config = self.get_default_search_config()
                 es_client = esclient.EsClient(host=self.es_host,
                                               search_cfg=config)
                 _boosting_decision_maker = BoostingDecisionMaker()
@@ -1188,7 +1193,7 @@ class TestEsClient(unittest.TestCase):
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
-                config = TestEsClient.get_default_search_config()
+                config = self.get_default_search_config()
                 es_client = esclient.EsClient(host=self.es_host,
                                               search_cfg=config)
                 _boosting_decision_maker = BoostingDecisionMaker()

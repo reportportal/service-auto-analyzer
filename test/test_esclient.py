@@ -118,10 +118,8 @@ class TestEsClient(unittest.TestCase):
                 self.model_settings["BOOST_MODEL_FOLDER_NOT_ALL_LINES"],
             "SimilarityWeightsFolder":
                 self.model_settings["SIMILARITY_WEIGHTS_FOLDER"],
-            "SuggestBoostModelFolderAllLines":
-                self.model_settings["SUGGEST_BOOST_MODEL_FOLDER_ALL_LINES"],
-            "SuggestBoostModelFolderNotAllLines":
-                self.model_settings["SUGGEST_BOOST_MODEL_FOLDER_NOT_ALL_LINES"]
+            "SuggestBoostModelFolder":
+                self.model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
         }
 
     @utils.ignore_warnings
@@ -1199,7 +1197,7 @@ class TestEsClient(unittest.TestCase):
                 _boosting_decision_maker = BoostingDecisionMaker()
                 _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
                 _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])
-                es_client.suggest_decision_maker_all_lines = _boosting_decision_maker
+                es_client.suggest_decision_maker = _boosting_decision_maker
                 response = es_client.suggest_items(test["test_item_info"])
 
                 response.should.have.length_of(len(test["expected_result"]))

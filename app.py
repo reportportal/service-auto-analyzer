@@ -53,8 +53,7 @@ SEARCH_CONFIG = {
     "MinWordLength":               int(os.getenv("ES_MIN_WORD_LENGTH", "2")),
     "BoostModelFolderAllLines":    "",
     "BoostModelFolderNotAllLines": "",
-    "SuggestBoostModelFolderAllLines":    "",
-    "SuggestBoostModelFolderNotAllLines": "",
+    "SuggestBoostModelFolder":    "",
     "SimilarityWeightsFolder":     "",
 }
 
@@ -183,10 +182,7 @@ def read_model_settings():
     model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
     SEARCH_CONFIG["BoostModelFolderAllLines"] = model_settings["BOOST_MODEL_FOLDER_ALL_LINES"]
     SEARCH_CONFIG["BoostModelFolderNotAllLines"] = model_settings["BOOST_MODEL_FOLDER_NOT_ALL_LINES"]
-    SEARCH_CONFIG["SuggestBoostModelFolderAllLines"] =\
-        model_settings["SUGGEST_BOOST_MODEL_FOLDER_ALL_LINES"]
-    SEARCH_CONFIG["SuggestBoostModelFolderNotAllLines"] =\
-        model_settings["SUGGEST_BOOST_MODEL_FOLDER_NOT_ALL_LINES"]
+    SEARCH_CONFIG["SuggestBoostModelFolder"] = model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
     SEARCH_CONFIG["SimilarityWeightsFolder"] = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
 
 

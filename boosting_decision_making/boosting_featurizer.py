@@ -61,6 +61,7 @@ class BoostingFeaturizer:
                  {"return_val_name": "mean_score"}),
             29: (self._calculate_similarity_percent, {"field_name": "message_params"}),
             34: (self._calculate_similarity_percent, {"field_name": "found_exceptions"}),
+            35: (self._is_all_log_lines, {}),
             36: (self._calculate_similarity_percent, {"field_name": "detected_message_extended"}),
             37: (self._calculate_similarity_percent,
                  {"field_name": "detected_message_without_params_extended"}),
@@ -98,6 +99,13 @@ class BoostingFeaturizer:
             if "field_name" in method_params[1]:
                 fields_to_calc_similarity.add(method_params[1]["field_name"])
         return list(fields_to_calc_similarity)
+
+    def _is_all_log_lines(self):
+        scores_by_issue_type = self._calculate_score()
+        num_of_logs_issue_type = {}
+        for issue_type in scores_by_issue_type:
+            num_of_logs_issue_type[issue_type] = int(self.config["number_of_log_lines"] == -1)
+        return num_of_logs_issue_type
 
     def is_only_merged_small_logs(self):
         scores_by_issue_type = self.find_most_relevant_by_type()

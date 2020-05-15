@@ -44,10 +44,8 @@ class TestBoostingModel(unittest.TestCase):
         self.boost_model_folder_all_lines = model_settings["BOOST_MODEL_FOLDER_ALL_LINES"]
         self.boost_model_folder_not_all_lines =\
             model_settings["BOOST_MODEL_FOLDER_NOT_ALL_LINES"]
-        self.suggest_boost_model_folder_all_lines =\
-            model_settings["SUGGEST_BOOST_MODEL_FOLDER_ALL_LINES"]
-        self.suggest_boost_model_folder_not_all_lines =\
-            model_settings["SUGGEST_BOOST_MODEL_FOLDER_NOT_ALL_LINES"]
+        self.suggest_boost_model_folder =\
+            model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
         self.weights_folder = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
         logging.disable(logging.CRITICAL)
 
@@ -82,8 +80,7 @@ class TestBoostingModel(unittest.TestCase):
     def test_random_run(self):
         print("Weights model folder: ", self.weights_folder)
         for folder in [self.boost_model_folder_all_lines, self.boost_model_folder_not_all_lines,
-                       self.suggest_boost_model_folder_all_lines,
-                       self.suggest_boost_model_folder_not_all_lines]:
+                       self.suggest_boost_model_folder]:
             print("Boost model folder ", folder)
             decision_maker = BoostingDecisionMaker(folder)
             test_data_size = 5
@@ -159,19 +156,18 @@ class TestBoostingModel(unittest.TestCase):
 
     @utils.ignore_warnings
     def test_full_data_check_suggests(self):
-        print("Boost model folder all lines: ", self.suggest_boost_model_folder_all_lines)
-        print("Boost model folder not all lines: ", self.suggest_boost_model_folder_not_all_lines)
-        decision_maker_all_lines = BoostingDecisionMaker(self.suggest_boost_model_folder_all_lines)
-        decision_maker_not_all_lines = BoostingDecisionMaker(self.suggest_boost_model_folder_not_all_lines)
+        print("Boost model folder suggests: ", self.suggest_boost_model_folder)
+        print("Weights model folder suggests: ", self.weights_folder)
+        decision_maker = BoostingDecisionMaker(folder=self.suggest_boost_model_folder)
         boost_model_results = self.get_fixture(self.suggest_boost_model_results)
         tests = []
         all_configs = [(-1,
                         ["detected_message_extended", "detected_message_without_params_extended"],
-                        decision_maker_all_lines),
+                        decision_maker),
                        (2,
                         ["message_extended", "message_without_params_extended"],
-                        decision_maker_not_all_lines)]
-        for log_lines, filter_fields_any, decision_maker in all_configs:
+                        decision_maker)]
+        for log_lines, filter_fields_any, _decision_maker in all_configs:
             tests.extend([
                 {
                     "elastic_results": [(self.get_fixture(self.log_message_suggest),
@@ -181,7 +177,7 @@ class TestBoostingModel(unittest.TestCase):
                         filter_fields=[],
                         filter_fields_any=filter_fields_any,
                         min_should_match=0.4),
-                    "decision_maker":  decision_maker
+                    "decision_maker":  _decision_maker
                 },
                 {
                     "elastic_results": [(self.get_fixture(self.log_message_suggest),
@@ -191,7 +187,7 @@ class TestBoostingModel(unittest.TestCase):
                         filter_fields=[],
                         filter_fields_any=filter_fields_any,
                         min_should_match=0.4),
-                    "decision_maker":  decision_maker
+                    "decision_maker":  _decision_maker
                 },
                 {
                     "elastic_results": [(self.get_fixture(self.log_message_suggest),
@@ -203,7 +199,7 @@ class TestBoostingModel(unittest.TestCase):
                         filter_fields=[],
                         filter_fields_any=filter_fields_any,
                         min_should_match=0.4),
-                    "decision_maker":  decision_maker
+                    "decision_maker":  _decision_maker
                 },
                 {
                     "elastic_results": [(self.get_fixture(self.log_message_only_small_logs),
@@ -213,7 +209,7 @@ class TestBoostingModel(unittest.TestCase):
                         filter_fields=[],
                         filter_fields_any=filter_fields_any,
                         min_should_match=0.4),
-                    "decision_maker":  decision_maker
+                    "decision_maker":  _decision_maker
                 },
             ])
         for idx, test in enumerate(tests):

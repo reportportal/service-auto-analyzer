@@ -55,7 +55,7 @@ class EsQueryBuilder:
                         },
                         {"terms": {"launch_id": search_req.filteredLaunchIds}},
                         self.
-                        build_more_like_this_query(self.search_cfg["SearchLogsMinShouldMatch"],
+                        build_more_like_this_query("90%",
                                                    message,
                                                    field_name="message"),
                     ],

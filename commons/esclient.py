@@ -48,8 +48,7 @@ class EsClient:
         self.search_cfg = search_cfg
         self.es_client = elasticsearch.Elasticsearch([host], timeout=30,
                                                      max_retries=5, retry_on_timeout=True)
-        self.boosting_decision_maker_all_lines = None
-        self.boosting_decision_maker_not_all_lines = None
+        self.boosting_decision_maker = None
         self.suggest_decision_maker = None
         self.weighted_log_similarity_calculator = None
         self.suggest_threshold = 0.4
@@ -57,12 +56,9 @@ class EsClient:
         self.initialize_decision_makers()
 
     def initialize_decision_makers(self):
-        if self.search_cfg["BoostModelFolderAllLines"].strip():
-            self.boosting_decision_maker_all_lines = boosting_decision_maker.BoostingDecisionMaker(
-                folder=self.search_cfg["BoostModelFolderAllLines"])
-        if self.search_cfg["BoostModelFolderNotAllLines"].strip():
-            self.boosting_decision_maker_not_all_lines = boosting_decision_maker.BoostingDecisionMaker(
-                folder=self.search_cfg["BoostModelFolderNotAllLines"])
+        if self.search_cfg["BoostModelFolder"].strip():
+            self.boosting_decision_maker = boosting_decision_maker.BoostingDecisionMaker(
+                folder=self.search_cfg["BoostModelFolder"])
         if self.search_cfg["SuggestBoostModelFolder"].strip():
             self.suggest_decision_maker = boosting_decision_maker.BoostingDecisionMaker(
                 folder=self.search_cfg["SuggestBoostModelFolder"])
@@ -486,11 +482,6 @@ class EsClient:
                     max_val_start_time = start_time
         return predicted_issue_type
 
-    def get_decision_maker(self, number_of_log_lines):
-        if number_of_log_lines != -1 and self.boosting_decision_maker_not_all_lines is None:
-            return self.boosting_decision_maker_not_all_lines
-        return self.boosting_decision_maker_all_lines
-
     def get_config_for_boosting(self, analyzer_config):
         min_should_match = analyzer_config.minShouldMatch / 100 if analyzer_config.minShouldMatch > 0 else\
             int(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0)) / 100
@@ -583,19 +574,18 @@ class EsClient:
                 item_to_process = self.queue.get()
             analyzer_config, test_item_id, searched_res = item_to_process
             cnt_items_to_process += 1
-            boosting_decision_maker = self.get_decision_maker(analyzer_config.numberOfLogLines)
 
             boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
                 searched_res,
                 self.get_config_for_boosting(analyzer_config),
-                feature_ids=boosting_decision_maker.get_feature_ids(),
+                feature_ids=self.boosting_decision_maker.get_feature_ids(),
                 weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
             feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
 
             if feature_data:
 
                 predicted_labels, predicted_labels_probability =\
-                    boosting_decision_maker.predict(feature_data)
+                    self.boosting_decision_maker.predict(feature_data)
                 scores_by_issue_type = boosting_data_gatherer.scores_by_issue_type
 
                 for i in range(len(issue_type_names)):

@@ -180,8 +180,7 @@ def read_version():
 def read_model_settings():
     """Reads paths to models"""
     model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
-    SEARCH_CONFIG["BoostModelFolderAllLines"] = model_settings["BOOST_MODEL_FOLDER_ALL_LINES"]
-    SEARCH_CONFIG["BoostModelFolderNotAllLines"] = model_settings["BOOST_MODEL_FOLDER_NOT_ALL_LINES"]
+    SEARCH_CONFIG["BoostModelFolder"] = model_settings["BOOST_MODEL_FOLDER"]
     SEARCH_CONFIG["SuggestBoostModelFolder"] = model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
     SEARCH_CONFIG["SimilarityWeightsFolder"] = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
 

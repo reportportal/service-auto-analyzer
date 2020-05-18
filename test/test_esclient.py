@@ -112,10 +112,8 @@ class TestEsClient(unittest.TestCase):
             "SearchLogsMinShouldMatch": "98%",
             "SearchLogsMinSimilarity": 0.9,
             "MinWordLength":  0,
-            "BoostModelFolderAllLines":
-                self.model_settings["BOOST_MODEL_FOLDER_ALL_LINES"],
-            "BoostModelFolderNotAllLines":
-                self.model_settings["BOOST_MODEL_FOLDER_NOT_ALL_LINES"],
+            "BoostModelFolder":
+                self.model_settings["BOOST_MODEL_FOLDER"],
             "SimilarityWeightsFolder":
                 self.model_settings["SIMILARITY_WEIGHTS_FOLDER"],
             "SuggestBoostModelFolder":
@@ -801,7 +799,7 @@ class TestEsClient(unittest.TestCase):
                 if "msearch_results" in test:
                     es_client.es_client.msearch = MagicMock(
                         return_value={"responses": test["msearch_results"]})
-                es_client.boosting_decision_maker_all_lines = _boosting_decision_maker
+                es_client.boosting_decision_maker = _boosting_decision_maker
                 launches = [launch_objects.Launch(**launch)
                             for launch in json.loads(test["index_rq"])]
                 response = es_client.analyze_logs(launches)

@@ -13,10 +13,10 @@ node {
         }
 
         stage('Build') {
-            withEnv(["RELEASE_VERSION=${RELEASE_VERSION}", "DOCKER_BUILDKIT=1"]) {
+            withEnv(["RELEASE_VERSION=${RELEASE_VERSION}", "GITHUB_TOKEN=${GITHUB_TOKEN}", "DOCKER_BUILDKIT=1"]) {
                 docker.withServer("$DOCKER_HOST") {
                     stage('Build Docker Image') {
-                        sh 'make build-image v=${RELEASE_VERSION}'
+                        sh 'make build-image v=${RELEASE_VERSION} githubtoken=${GITHUB_TOKEN}'
                     }
                 }
             }

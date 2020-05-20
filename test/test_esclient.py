@@ -44,15 +44,14 @@ class TestEsClient(unittest.TestCase):
         self.launch_wo_test_items = "launch_wo_test_items.json"
         self.launch_w_test_items_wo_logs = "launch_w_test_items_wo_logs.json"
         self.launch_w_test_items_w_logs = "launch_w_test_items_w_logs.json"
-        self.launch_w_test_items_w_logs_filtered =\
-            "launch_w_test_items_w_logs_filtered.json"
         self.launch_w_test_items_w_empty_logs = "launch_w_test_items_w_empty_logs.json"
         self.launch_w_test_items_w_logs_to_be_merged =\
             "launch_w_test_items_w_logs_to_be_merged.json"
         self.index_logs_rq = "index_logs_rq.json"
         self.index_logs_rq_big_messages = "index_logs_rq_big_messages.json"
         self.index_logs_rs = "index_logs_rs.json"
-        self.search_rq = "search_rq.json"
+        self.search_rq_first = "search_rq_first.json"
+        self.search_rq_second = "search_rq_second.json"
         self.search_rq_filtered = "search_rq_filtered.json"
         self.search_rq_another_log = "search_rq_another_log.json"
         self.search_rq_different_logs = "search_rq_different_logs.json"
@@ -77,7 +76,15 @@ class TestEsClient(unittest.TestCase):
         self.search_logs_rq = "search_logs_rq.json"
         self.search_logs_rq_not_found = "search_logs_rq_not_found.json"
         self.index_logs_rq_merged_logs = "index_logs_rq_merged_logs.json"
+        self.suggest_test_item_info_w_logs = "suggest_test_item_info_w_logs.json"
+        self.three_hits_search_rs_with_duplicate = "three_hits_search_rs_with_duplicate.json"
+        self.one_hit_search_rs_merged = "one_hit_search_rs_merged.json"
+        self.search_rq_merged_first = "search_rq_merged_first.json"
+        self.search_rq_merged_second = "search_rq_merged_second.json"
+        self.suggest_test_item_info_w_merged_logs = "suggest_test_item_info_w_merged_logs.json"
+        self.one_hit_search_rs_merged_wrong = "one_hit_search_rs_merged_wrong.json"
         self.es_host = "http://localhost:9200"
+        self.model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings
@@ -91,9 +98,8 @@ class TestEsClient(unittest.TestCase):
         with open(os.path.join("fixtures", fixture_name), "r") as file:
             return file.read() if not to_json else json.loads(file.read())
 
-    @staticmethod
     @utils.ignore_warnings
-    def get_default_search_config():
+    def get_default_search_config(self):
         """Get default search config"""
         return {
             "MinShouldMatch": "80%",
@@ -106,7 +112,12 @@ class TestEsClient(unittest.TestCase):
             "SearchLogsMinShouldMatch": "98%",
             "SearchLogsMinSimilarity": 0.9,
             "MinWordLength":  0,
-            "FilterMinShouldMatch": False
+            "BoostModelFolder":
+                self.model_settings["BOOST_MODEL_FOLDER"],
+            "SimilarityWeightsFolder":
+                self.model_settings["SIMILARITY_WEIGHTS_FOLDER"],
+            "SuggestBoostModelFolder":
+                self.model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
         }
 
     @utils.ignore_warnings
@@ -180,7 +191,7 @@ class TestEsClient(unittest.TestCase):
                 self._start_server(test["test_calls"])
 
                 es_client = esclient.EsClient(host=self.es_host,
-                                              search_cfg=TestEsClient.get_default_search_config())
+                                              search_cfg=self.get_default_search_config())
 
                 response = es_client.list_indices()
                 response.should.have.length_of(test["expected_count"])
@@ -218,7 +229,7 @@ class TestEsClient(unittest.TestCase):
                 self._start_server(test["test_calls"])
 
                 es_client = esclient.EsClient(host=self.es_host,
-                                              search_cfg=TestEsClient.get_default_search_config())
+                                              search_cfg=self.get_default_search_config())
 
                 response = es_client.create_index(test["index"])
                 response.acknowledged.should.equal(test["acknowledged"])
@@ -251,7 +262,7 @@ class TestEsClient(unittest.TestCase):
                 self._start_server(test["test_calls"])
 
                 es_client = esclient.EsClient(host=self.es_host,
-                                              search_cfg=TestEsClient.get_default_search_config())
+                                              search_cfg=self.get_default_search_config())
 
                 response = es_client.index_exists(test["index"])
                 response.should.equal(test["exists"])
@@ -288,7 +299,7 @@ class TestEsClient(unittest.TestCase):
                 self._start_server(test["test_calls"])
 
                 es_client = esclient.EsClient(host=self.es_host,
-                                              search_cfg=TestEsClient.get_default_search_config())
+                                              search_cfg=self.get_default_search_config())
 
                 response = es_client.delete_index(test["index"])
 
@@ -368,7 +379,7 @@ class TestEsClient(unittest.TestCase):
                 self._start_server(test["test_calls"])
 
                 es_client = esclient.EsClient(host=self.es_host,
-                                              search_cfg=TestEsClient.get_default_search_config())
+                                              search_cfg=self.get_default_search_config())
                 es_client.es_client.scroll = MagicMock(return_value=json.loads(
                     TestEsClient.get_fixture(self.no_hits_search_rs)))
 
@@ -470,7 +481,7 @@ class TestEsClient(unittest.TestCase):
                 self._start_server(test["test_calls"])
 
                 es_client = esclient.EsClient(host=self.es_host,
-                                              search_cfg=TestEsClient.get_default_search_config())
+                                              search_cfg=self.get_default_search_config())
 
                 response = es_client.search_logs(test["rq"])
                 response.should.have.length_of(test["expected_count"])
@@ -632,7 +643,7 @@ class TestEsClient(unittest.TestCase):
                 self._start_server(test["test_calls"])
 
                 es_client = esclient.EsClient(host=self.es_host,
-                                              search_cfg=TestEsClient.get_default_search_config())
+                                              search_cfg=self.get_default_search_config())
                 es_client.es_client.scroll = MagicMock(return_value=json.loads(
                     TestEsClient.get_fixture(self.no_hits_search_rs)))
                 launches = [launch_objects.Launch(**launch)
@@ -755,9 +766,9 @@ class TestEsClient(unittest.TestCase):
                                     "uri":            "/2",
                                     "status":         HTTPStatus.OK,
                                     }],
-                "msearch_results": [TestEsClient.get_fixture(self.two_hits_search_rs, to_json=True)],
-                "index_rq":       TestEsClient.get_fixture(
-                    self.launch_w_test_items_w_logs_different_log_level),
+                "msearch_results": [TestEsClient.get_fixture(self.no_hits_search_rs, to_json=True),
+                                    TestEsClient.get_fixture(self.three_hits_search_rs, to_json=True)],
+                "index_rq":       TestEsClient.get_fixture(self.launch_w_test_items_w_logs),
                 "expected_count": 1,
                 "expected_issue_type": "AB001",
                 "boost_predict":       ([1, 0], [[0.2, 0.8], [0.7, 0.3]])
@@ -770,67 +781,16 @@ class TestEsClient(unittest.TestCase):
                 "msearch_results": [TestEsClient.get_fixture(self.two_hits_search_rs, to_json=True)],
                 "index_rq":       TestEsClient.get_fixture(
                     self.launch_w_test_items_w_logs_to_be_merged),
-                "expected_count": 1,
-                "expected_issue_type": "AB001",
-                "boost_predict":       ([1, 0], [[0.2, 0.8], [0.7, 0.3]])
-            },
-            {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/2",
-                                    "status":         HTTPStatus.OK,
-                                    }],
-                "msearch_results": [TestEsClient.get_fixture(self.two_hits_search_rs, to_json=True)],
-                "index_rq":       TestEsClient.get_fixture(
-                    self.launch_w_test_items_w_logs_to_be_merged),
-                "config": {
-                    "MinShouldMatch": "80%",
-                    "MinTermFreq":    1,
-                    "MinDocFreq":     1,
-                    "BoostAA":        2,
-                    "BoostLaunch":    2,
-                    "BoostUniqueID":  2,
-                    "MaxQueryTerms":  50,
-                    "SearchLogsMinShouldMatch": "98%",
-                    "SearchLogsMinSimilarity": 0.9,
-                    "MinWordLength":  0,
-                    "FilterMinShouldMatch": True
-                },
                 "expected_count": 0,
                 "expected_issue_type": "",
                 "boost_predict":       ([], [])
-            },
-            {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/2",
-                                    "status":         HTTPStatus.OK,
-                                    }],
-                "msearch_results": [TestEsClient.get_fixture(self.two_hits_search_rs, to_json=True)],
-                "index_rq":       TestEsClient.get_fixture(
-                    self.launch_w_test_items_w_logs_filtered),
-                "config": {
-                    "MinShouldMatch": "80%",
-                    "MinTermFreq":    1,
-                    "MinDocFreq":     1,
-                    "BoostAA":        2,
-                    "BoostLaunch":    2,
-                    "BoostUniqueID":  2,
-                    "MaxQueryTerms":  50,
-                    "SearchLogsMinShouldMatch": "98%",
-                    "SearchLogsMinSimilarity": 0.9,
-                    "MinWordLength":  0,
-                    "FilterMinShouldMatch": True
-                },
-                "expected_count": 1,
-                "expected_issue_type": "AB001",
-                "boost_predict":       ([1], [[0.2, 0.8]])
-            },
+            }
         ]
 
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
-                config = TestEsClient.get_default_search_config()\
-                    if "config" not in test else test["config"]
+                config = self.get_default_search_config()
                 es_client = esclient.EsClient(host=self.es_host,
                                               search_cfg=config)
                 _boosting_decision_maker = BoostingDecisionMaker()
@@ -839,7 +799,7 @@ class TestEsClient(unittest.TestCase):
                 if "msearch_results" in test:
                     es_client.es_client.msearch = MagicMock(
                         return_value={"responses": test["msearch_results"]})
-                es_client.set_boosting_decision_maker(_boosting_decision_maker)
+                es_client.boosting_decision_maker = _boosting_decision_maker
                 launches = [launch_objects.Launch(**launch)
                             for launch in json.loads(test["index_rq"])]
                 response = es_client.analyze_logs(launches)
@@ -851,6 +811,396 @@ class TestEsClient(unittest.TestCase):
 
                 if "expected_id" in test:
                     test["expected_id"].should.equal(response[0].relevantItem)
+
+                TestEsClient.shutdown_server(test["test_calls"])
+
+    @utils.ignore_warnings
+    def test_suggest_items(self):
+        """Test suggesting test items"""
+        tests = [
+            {
+                "test_calls":          [{"method":         httpretty.GET,
+                                         "uri":            "/1",
+                                         "status":         HTTPStatus.OK,
+                                         }, ],
+                "test_item_info":      launch_objects.TestItemInfo(testItemId=1,
+                                                                   uniqueId="341",
+                                                                   testCaseHash=123,
+                                                                   launchId=1,
+                                                                   launchName="Launch",
+                                                                   project=1,
+                                                                   logs=[]),
+                "expected_result":     [],
+                "boost_predict":       ([], [])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.NOT_FOUND,
+                                    }, ],
+                "test_item_info": launch_objects.TestItemInfo(testItemId=1,
+                                                              uniqueId="341",
+                                                              testCaseHash=123,
+                                                              launchId=1,
+                                                              launchName="Launch",
+                                                              project=2,
+                                                              logs=[launch_objects.Log(
+                                                                    logId=1,
+                                                                    message="error found",
+                                                                    logLevel=40000)]),
+                "expected_result":     [],
+                "boost_predict":       ([], [])
+            },
+            {
+                "test_calls":          [{"method":         httpretty.GET,
+                                         "uri":            "/1",
+                                         "status":         HTTPStatus.OK,
+                                         }, ],
+                "test_item_info":      launch_objects.TestItemInfo(testItemId=1,
+                                                                   uniqueId="341",
+                                                                   testCaseHash=123,
+                                                                   launchId=1,
+                                                                   launchName="Launch",
+                                                                   project=1,
+                                                                   logs=[launch_objects.Log(
+                                                                         logId=1,
+                                                                         message=" ",
+                                                                         logLevel=40000)]),
+                "expected_result":     [],
+                "boost_predict":       ([], [])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_first),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.no_hits_search_rs),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_second),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.no_hits_search_rs),
+                                    }, ],
+                "test_item_info":      launch_objects.TestItemInfo(
+                    **TestEsClient.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
+                "expected_result":     [],
+                "boost_predict":       ([], [])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_first),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.no_hits_search_rs),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_second),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.no_hits_search_rs),
+                                    }, ],
+                "test_item_info":      launch_objects.TestItemInfo(
+                    **TestEsClient.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
+                "expected_result":     [],
+                "boost_predict":       ([], [])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_first),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.no_hits_search_rs),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_second),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.one_hit_search_rs),
+                                    }, ],
+                "test_item_info":      launch_objects.TestItemInfo(
+                    **TestEsClient.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
+                "expected_result":     [
+                    launch_objects.SuggestAnalysisResult(testItem=123,
+                                                         issueType='AB001',
+                                                         relevantItem=1,
+                                                         relevantLogId=1,
+                                                         matchScore=80.0)],
+                "boost_predict":       ([1], [[0.2, 0.8]])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_first),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.one_hit_search_rs),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_second),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.one_hit_search_rs),
+                                    }, ],
+                "test_item_info":      launch_objects.TestItemInfo(
+                    **TestEsClient.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
+                "expected_result":     [
+                    launch_objects.SuggestAnalysisResult(testItem=123,
+                                                         issueType='AB001',
+                                                         relevantItem=1,
+                                                         relevantLogId=1,
+                                                         matchScore=70.0)],
+                "boost_predict":       ([1], [[0.3, 0.7]])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_first),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.one_hit_search_rs),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_second),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.two_hits_search_rs),
+                                    }, ],
+                "test_item_info":      launch_objects.TestItemInfo(
+                    **TestEsClient.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
+                "expected_result":     [
+                    launch_objects.SuggestAnalysisResult(testItem=123,
+                                                         issueType='AB001',
+                                                         relevantItem=1,
+                                                         relevantLogId=1,
+                                                         matchScore=70.0)],
+                "boost_predict":       ([1, 0], [[0.3, 0.7], [0.9, 0.1]])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_first),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.one_hit_search_rs),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_second),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.two_hits_search_rs),
+                                    }, ],
+                "test_item_info":      launch_objects.TestItemInfo(
+                    **TestEsClient.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
+                "expected_result":     [
+                    launch_objects.SuggestAnalysisResult(testItem=123,
+                                                         issueType='AB001',
+                                                         relevantItem=1,
+                                                         relevantLogId=1,
+                                                         matchScore=70.0),
+                    launch_objects.SuggestAnalysisResult(testItem=123,
+                                                         issueType='PB001',
+                                                         relevantItem=2,
+                                                         relevantLogId=2,
+                                                         matchScore=45.0)],
+                "boost_predict":       ([1, 0], [[0.3, 0.7], [0.55, 0.45]])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_first),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.two_hits_search_rs),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_second),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.three_hits_search_rs),
+                                    }, ],
+                "test_item_info":      launch_objects.TestItemInfo(
+                    **TestEsClient.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
+                "expected_result":     [
+                    launch_objects.SuggestAnalysisResult(testItem=123,
+                                                         issueType='PB001',
+                                                         relevantItem=3,
+                                                         relevantLogId=3,
+                                                         matchScore=80.0),
+                    launch_objects.SuggestAnalysisResult(testItem=123,
+                                                         issueType='AB001',
+                                                         relevantItem=1,
+                                                         relevantLogId=1,
+                                                         matchScore=70.0),
+                    launch_objects.SuggestAnalysisResult(testItem=123,
+                                                         issueType='PB001',
+                                                         relevantItem=2,
+                                                         relevantLogId=2,
+                                                         matchScore=45.0)],
+                "boost_predict":       ([1, 0, 1], [[0.3, 0.7], [0.55, 0.45], [0.2, 0.8]])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_first),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.two_hits_search_rs),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_second),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.three_hits_search_rs_with_duplicate),
+                                    }, ],
+                "test_item_info":      launch_objects.TestItemInfo(
+                    **TestEsClient.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
+                "expected_result":     [
+                    launch_objects.SuggestAnalysisResult(testItem=123,
+                                                         issueType='PB001',
+                                                         relevantItem=3,
+                                                         relevantLogId=3,
+                                                         matchScore=70.0),
+                    launch_objects.SuggestAnalysisResult(testItem=123,
+                                                         issueType='AB001',
+                                                         relevantItem=1,
+                                                         relevantLogId=1,
+                                                         matchScore=70.0)],
+                "boost_predict":       ([1, 1, 1], [[0.3, 0.7], [0.3, 0.7], [0.3, 0.7]])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_merged_first),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.one_hit_search_rs_merged),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_merged_second),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.one_hit_search_rs_merged),
+                                    }, ],
+                "test_item_info":      launch_objects.TestItemInfo(
+                    **TestEsClient.get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
+                "expected_result":     [
+                    launch_objects.SuggestAnalysisResult(testItem=123,
+                                                         issueType='AB001',
+                                                         relevantItem=1,
+                                                         relevantLogId=1,
+                                                         matchScore=90.0)],
+                "boost_predict":       ([1], [[0.1, 0.9]])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_merged_first),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.one_hit_search_rs_merged_wrong),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           TestEsClient.get_fixture(self.search_rq_merged_second),
+                                    "rs":           TestEsClient.get_fixture(
+                                        self.one_hit_search_rs_merged_wrong),
+                                    }, ],
+                "test_item_info":      launch_objects.TestItemInfo(
+                    **TestEsClient.get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
+                "expected_result":     [],
+                "boost_predict":       ([], [])
+            },
+        ]
+
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
+                config = self.get_default_search_config()
+                es_client = esclient.EsClient(host=self.es_host,
+                                              search_cfg=config)
+                _boosting_decision_maker = BoostingDecisionMaker()
+                _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
+                _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])
+                es_client.suggest_decision_maker = _boosting_decision_maker
+                response = es_client.suggest_items(test["test_item_info"])
+
+                response.should.have.length_of(len(test["expected_result"]))
+                for real_resp, expected_resp in zip(response, test["expected_result"]):
+                    real_resp.should.equal(expected_resp)
 
                 TestEsClient.shutdown_server(test["test_calls"])
 

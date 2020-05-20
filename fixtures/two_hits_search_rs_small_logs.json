@@ -31,7 +31,17 @@
                     "detected_message": "",
                     "stacktrace": "",
                     "detected_message_with_numbers": "",
-                    "only_numbers": ""
+                    "only_numbers": "",
+                    "detected_message_without_params_extended": "",
+                    "detected_message_extended": "",
+                    "found_exceptions": "",
+                    "found_exceptions_extended": "",
+                    "message_params": "",
+                    "urls": "",
+                    "paths": "",
+                    "stacktrace_extended": "",
+                    "message_without_params_extended": "",
+                    "message_extended": ""
                 }
             },
             {
@@ -52,7 +62,17 @@
                     "detected_message": "",
                     "detected_message_with_numbers": "",
                     "only_numbers": "",
-                    "stacktrace": ""                
+                    "stacktrace": "",
+                    "detected_message_without_params_extended": "",
+                    "detected_message_extended": "",
+                    "found_exceptions": "AssertionError",
+                    "found_exceptions_extended": "AssertionError",
+                    "message_params": "",
+                    "urls": "",
+                    "paths": "",
+                    "stacktrace_extended": "",
+                    "message_without_params_extended": "",
+                    "message_extended": ""                
               }
             }
         ]

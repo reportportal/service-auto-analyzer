@@ -1,0 +1,49 @@
+{
+    "took": 13,
+    "timed_out": false,
+    "_shards": {
+        "total": 1,
+        "successful": 1,
+        "failed": 0
+    },
+    "hits": {
+        "total": {
+            "value": 2,
+            "relation": "eq"
+        },
+        "max_score": 158.08437,
+        "hits": [
+            {
+                "_index": "idx2",
+                "_type": "log",
+                "_id": "1",
+                "_score": 158.08437,
+                "_source": {
+                    "issue_type": "AB001",
+                    "launch_name": "Launch 1",
+                    "log_level": 40000,
+                    "original_message_lines": 2,
+                    "original_message_words_number": 6,
+                    "message": "",
+                    "test_item": 1,
+                    "unique_id": "unique1",
+                    "merged_small_logs": "report portal",
+                    "detected_message": "",
+                    "stacktrace": "",
+                    "detected_message_with_numbers": "",
+                    "only_numbers": "",
+                    "detected_message_without_params_extended": "",
+                    "detected_message_extended": "",
+                    "found_exceptions": "",
+                    "found_exceptions_extended": "",
+                    "message_params": "",
+                    "urls": "",
+                    "paths": "",
+                    "stacktrace_extended": "",
+                    "message_without_params_extended": "",
+                    "message_extended": ""
+                }
+            }
+        ]
+    }
+}

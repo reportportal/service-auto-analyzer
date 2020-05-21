@@ -502,7 +502,7 @@ class EsClient:
                 new_result.append((all_info[2], partial_res[ind]))
             self.queue.put((all_info[0], all_info[1], new_result))
 
-    def _query_elasticsearch(self, launches, max_batch_size=50):
+    def _query_elasticsearch(self, launches, max_batch_size=30):
         t_start = time()
         batches = []
         batch_logs = []

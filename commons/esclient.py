@@ -25,7 +25,7 @@ from scipy import spatial
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 import commons.launch_objects
-from commons.launch_objects import AnalysisResult
+from commons.launch_objects import AnalysisResult, SearchLogInfo
 import utils.utils as utils
 from boosting_decision_making import boosting_featurizer
 from time import time
@@ -579,7 +579,9 @@ class EsClient:
 
         logger.info("Finished searching by request %s with %d results. It took %.2f sec.",
                     search_req.json(), len(similar_log_ids), time() - t_start)
-        return list(similar_log_ids)
+
+        return [SearchLogInfo(logId=log_info[0],
+                              testItemId=log_info[1]) for log_info in similar_log_ids]
 
     def find_similar_logs_by_cosine_similarity(self, msg_words, message, res):
         similar_log_ids = set()
@@ -589,7 +591,7 @@ class EsClient:
 
         for result in res["hits"]["hits"]:
             try:
-                log_id = int(re.search(r"\d+", result["_id"]).group(0))
+                log_id = (int(re.search(r"\d+", result["_id"]).group(0)), int(result["_source"]["test_item"]))
                 if log_id not in messages_by_ids:
                     log_query_words = " ".join(utils.split_words(result["_source"]["message"]))
                     all_messages.append(log_query_words)

@@ -28,6 +28,12 @@ class AnalyzerConf(BaseModel):
     indexingRunning: bool = True
 
 
+class SearchLogInfo(BaseModel):
+    """Search log info"""
+    logId: int
+    testItemId: int
+
+
 class Log(BaseModel):
     """Log object"""
     logId: int

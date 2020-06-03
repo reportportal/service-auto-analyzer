@@ -22,7 +22,7 @@ import elasticsearch
 import elasticsearch.helpers
 import commons.launch_objects
 from commons.launch_objects import AnalysisResult
-from commons.launch_objects import SuggestAnalysisResult
+from commons.launch_objects import SuggestAnalysisResult, SearchLogInfo
 import utils.utils as utils
 from boosting_decision_making import boosting_featurizer
 from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
@@ -425,6 +425,8 @@ class EsClient:
         if not self.index_exists(str(search_req.projectId)):
             return []
         searched_logs = set()
+        test_item_info = {}
+
         for message in search_req.logMessages:
             if not message.strip():
                 continue
@@ -441,6 +443,8 @@ class EsClient:
             query = self.es_query_builder.build_search_query(
                 search_req, queried_log["_source"]["message"])
             res = self.es_client.search(index=str(search_req.projectId), body=query)
+            for es_res in res["hits"]["hits"]:
+                test_item_info[es_res["_id"]] = es_res["_source"]["test_item"]
             _similarity_calculator = similarity_calculator.SimilarityCalculator(
                 {
                     "max_query_terms": self.search_cfg["MaxQueryTerms"],
@@ -457,11 +461,12 @@ class EsClient:
                 logger.debug("Log with id %s has %.3f similarity with the queried log '%s'",
                              log_id, similarity_percent, queried_log["_source"]["message"])
                 if similarity_percent >= self.search_cfg["SearchLogsMinSimilarity"]:
-                    similar_log_ids.add(utils.extract_real_id(log_id))
+                    similar_log_ids.add((utils.extract_real_id(log_id), int(test_item_info[log_id])))
 
         logger.info("Finished searching by request %s with %d results. It took %.2f sec.",
                     search_req.json(), len(similar_log_ids), time() - t_start)
-        return list(similar_log_ids)
+        return [SearchLogInfo(logId=log_info[0],
+                              testItemId=log_info[1]) for log_info in similar_log_ids]
 
     def choose_issue_type(self, predicted_labels, predicted_labels_probability,
                           issue_type_names, boosting_data_gatherer):

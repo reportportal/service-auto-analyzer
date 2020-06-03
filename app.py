@@ -155,7 +155,7 @@ def init_amqp(_amqp_client, request_handler):
                                                     prepare_data_func=amqp_handler.
                                                     prepare_search_logs,
                                                     prepare_response_data=amqp_handler.
-                                                    prepare_search_response_data))))
+                                                    prepare_analyze_response_data))))
     threads.append(create_thread(create_ampq_client().receive,
                    (APP_CONFIG["exchangeName"], "suggest", True, False,
                    lambda channel, method, props, body:

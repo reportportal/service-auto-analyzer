@@ -22,9 +22,12 @@ checkstyle: venv
 	${PYTHON} -m flake8
 
 release: install-dependencies
-	${PYTHON} -m bumpversion --new-version ${v} build --tag --tag-name "v${v}"
-	${PYTHON} -m bumpversion patch --no-tag
-	git push origin master "v${v}"
+	git config --global user.email "Jenkins"                                                                    
+	git config --global user.name "Jenkins"
+	${PYTHON} -m bumpversion --new-version ${v} build --tag --tag-name ${v} --allow-dirty
+	${PYTHON} -m bumpversion patch --no-tag --allow-dirty
+	git remote set-url origin https://${githubtoken}@github.com/reportportal/service-auto-analyzer
+	git push origin master ${v}
 
 build-release: venv
 	${PYTHON} -m bumpversion --new-version ${v} build --no-commit --no-tag --allow-dirty
@@ -33,7 +36,7 @@ build-image-dev:
 	docker build -t "$(IMAGE_NAME_DEV)" --build-arg version=${v} --build-arg prod="false" -f Dockerfile .
 
 build-image:
-	docker build -t "$(IMAGE_NAME)" --build-arg version=${v} --build-arg prod="true" -f Dockerfile .
+	docker build -t "$(IMAGE_NAME)" --build-arg version=${v} --build-arg prod="true" --build-arg githubtoken=${githubtoken} -f Dockerfile .
 
 test-all: checkstyle test
 

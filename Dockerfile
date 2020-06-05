@@ -43,7 +43,6 @@ ENV FLASK_APP=app.py UWSGI_WSGI_FILE=app.py UWSGI_SOCKET=:3031 UWSGI_HTTP=:5000 
 ENV PATH="/venv/bin:${PATH}"
 ENV PYTHONPATH="/backend"
 
-#ENV LOGGING_LEVEL="INFO"
 # Start uWSGI
 #CMD ["/venv/bin/uwsgi", "--http-auto-chunked", "--http-keepalive"]
 CMD ["/venv/bin/uwsgi"]

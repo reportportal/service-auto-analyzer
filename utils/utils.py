@@ -22,6 +22,8 @@ from dateutil.parser import parse
 import urllib
 from urllib.parse import urlparse
 import warnings
+import os
+import json
 
 logger = logging.getLogger("analyzerApp.utils")
 file_extensions = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
@@ -38,6 +40,11 @@ def ignore_warnings(method):
     return _inner
 
 
+def compress(text):
+    """compress sentence to consist of only unique words"""
+    return " ".join(split_words(text, only_unique=True))
+
+
 def sanitize_text(text):
     """Sanitize text by deleting all numbers"""
     return re.sub(r"\d+", "", text)
@@ -45,7 +52,7 @@ def sanitize_text(text):
 
 def calculate_line_number(text):
     """Calculate line numbers in the text"""
-    return len([line for line in text.split("\n") if line.strip() != ""])
+    return len([line for line in text.split("\n") if line.strip()])
 
 
 def first_lines(log_str, n_lines):
@@ -58,9 +65,13 @@ def build_url(main_url, url_params):
     return main_url + "/" + "/".join(url_params)
 
 
+def filter_empty_lines(log_lines):
+    return [line for line in log_lines if line.strip()]
+
+
 def delete_empty_lines(log):
     """Delete empty lines"""
-    return "\n".join([line for line in log.split("\n") if line.strip() != ""])
+    return "\n".join(filter_empty_lines(log.split("\n")))
 
 
 def reverse_log(log):
@@ -68,7 +79,7 @@ def reverse_log(log):
     return "\n".join(log.split("\n")[::-1])
 
 
-def split_words(text, min_word_length=0, only_unique=True, split_urls=True):
+def split_words(text, min_word_length=0, only_unique=True, split_urls=True, to_lower=True):
     all_unique_words = set()
     all_words = []
     translate_map = {}
@@ -77,8 +88,10 @@ def split_words(text, min_word_length=0, only_unique=True, split_urls=True):
             translate_map[punct] = " "
     text = text.translate(text.maketrans(translate_map)).strip().strip(".")
     for word_part in text.split():
-        word_part = word_part.strip().strip(".").lower()
+        word_part = word_part.strip().strip(".")
         for w in word_part.split():
+            if to_lower:
+                w = w.lower()
             if w != "" and len(w) >= min_word_length:
                 if w in stopwords:
                     continue
@@ -108,8 +121,9 @@ def remove_starting_datetime(text, remove_first_digits=False):
     idx_text_start = 0
     for idx, str_part in enumerate(text.split(" ")):
         try:
-            parse(log_date + " " + str_part)
-            log_date = log_date + " " + str_part
+            parsed_info = re.sub(r"[\[\]\{\},;!#\"$%&\'\(\)*<=>?@^_`|~]", "", log_date + " " + str_part)
+            parse(parsed_info)
+            log_date = parsed_info
             log_date = log_date.strip()
         except Exception as e: # noqa
             idx_text_start = idx
@@ -191,32 +205,23 @@ def has_more_lines_pattern(line):
     return False
 
 
-def detect_log_description_and_stacktrace(message, default_log_number=1, max_log_lines=5):
+def detect_log_description_and_stacktrace(message):
     """Split a log into a log message and stacktrace"""
     message = delete_empty_lines(message)
-    if default_log_number == -1:
-        return message, ""
     if calculate_line_number(message) > 2:
         split_lines = message.split("\n")
         detected_message_lines = []
         stacktrace_lines = []
         for idx, line in enumerate(split_lines):
             modified_line = delete_line_numbers(line)
-            if has_stacktrace_keywords(line) or has_more_lines_pattern(line):
-                continue
             if modified_line != line:
                 stacktrace_lines.append(line)
             else:
                 detected_message_lines.append(line)
 
-        if len(detected_message_lines) == len(split_lines):
-            stacktrace_lines = detected_message_lines[max_log_lines:]
-            detected_message_lines = detected_message_lines[:max_log_lines]
-
-        if len(detected_message_lines) < default_log_number:
-            all_message = detected_message_lines + stacktrace_lines
-            detected_message_lines = all_message[:default_log_number]
-            stacktrace_lines = all_message[default_log_number:]
+        if not detected_message_lines:
+            detected_message_lines = stacktrace_lines[:1]
+            stacktrace_lines = stacktrace_lines[1:]
 
         return "\n".join(detected_message_lines), "\n".join(stacktrace_lines)
     return message, ""
@@ -233,10 +238,8 @@ def fix_big_encoded_urls(message):
     return message
 
 
-def choose_fields_to_filter(filter_min_should_match, log_lines):
-    if filter_min_should_match:
-        return ["detected_message", "message"] if log_lines == -1 else ["message"]
-    return []
+def choose_fields_to_filter(log_lines):
+    return ["detected_message", "stacktrace"] if log_lines == -1 else ["message"]
 
 
 def leave_only_unique_lines(message):
@@ -335,3 +338,126 @@ def remove_credentials_from_url(url):
     parsed_url = urlparse(url)
     new_netloc = re.sub("^.+?:.+?@", "", parsed_url.netloc)
     return url.replace(parsed_url.netloc, new_netloc)
+
+
+def clean_colon_stacking(text):
+    return text.replace(":", " : ")
+
+
+def leave_only_unique_logs(logs):
+    unique_logs = set()
+    all_logs = []
+    for log in logs:
+        if log.message.strip() not in unique_logs:
+            all_logs.append(log)
+            unique_logs.add(log.message.strip())
+    return all_logs
+
+
+def read_json_file(folder, filename, to_json=False):
+    """Read fixture from file"""
+    with open(os.path.join(folder, filename), "r") as file:
+        return file.read() if not to_json else json.loads(file.read())
+
+
+def get_found_exceptions(text):
+    """Extract exception and errors from logs"""
+    unique_exceptions = set()
+    found_exceptions = []
+    for word in split_words(text):
+        for key_word in ["error", "exception", "failure"]:
+            if re.search(r"[^\s]{3,}%s(\s|$)" % key_word, word.lower()) is not None:
+                if word not in unique_exceptions:
+                    found_exceptions.append(word)
+                    unique_exceptions.add(word)
+                break
+    return " ".join(found_exceptions)
+
+
+def clean_from_params(text):
+    text = re.sub(r"(?<=[^\w])('.+?'|\".+?\")(?=[^\w]|$)|(?<=^)('.+?'|\".+?\")(?=[^\w]|$)", " ", text)
+    return re.sub(r" +", " ", text).strip()
+
+
+def clean_from_urls(text):
+    text = re.sub(r"(http|https|ftp):[^\s]+|\bwww\.[^\s]+", " ", text)
+    return re.sub(r" +", " ", text).strip()
+
+
+def clean_from_paths(text):
+    text = re.sub(r"(^|(?<=[^\w:\\\/]))(\w:)?([\w\d\.\-_]+)?([\\\/]+[\w\d\.\-_]+){2,}", " ", text)
+    return re.sub(r" +", " ", text).strip()
+
+
+def extract_urls(text):
+    all_unique = set()
+    all_urls = []
+    for param in re.findall(r"((http|https|ftp):[^\s]+|\bwww\.[^\s]+)", text):
+        url = param[0].strip()
+        if url not in all_unique:
+            all_unique.add(url)
+            all_urls.append(url)
+    return all_urls
+
+
+def extract_paths(text):
+    all_unique = set()
+    all_paths = []
+    for param in re.findall(r"((^|(?<=[^\w:\\\/]))(\w:)?([\w\d\.\-_]+)?([\\\/]+[\w\d\.\-_]+){2,})", text):
+        path = param[0].strip()
+        if path not in all_unique:
+            all_unique.add(path)
+            all_paths.append(path)
+    return all_paths
+
+
+def extract_message_params(text):
+    all_unique = set()
+    all_params = []
+    for param in re.findall(r"(^|[^\w])('.+?'|\".+?\")([^\w]|$|\n)", text):
+        param = re.search(r"[^\'\"]+", param[1].strip()).group(0).strip()
+        if param not in all_unique:
+            all_unique.add(param)
+            all_params.append(param)
+    return all_params
+
+
+def enrich_found_exceptions(text):
+    unique_words = set()
+    new_words = []
+    for word in text.split(" "):
+        word_parts = word.split(".")
+        for i in range(len(word_parts)):
+            new_word_part = ".".join(word_parts[i:])
+            if new_word_part not in unique_words:
+                new_words.append(new_word_part)
+                unique_words.add(new_word_part)
+    return " ".join(new_words)
+
+
+def enrich_text_with_method_and_classes(text):
+    new_lines = []
+    for line in text.split("\n"):
+        new_line = line
+        found_values = []
+        for w in split_words(line, min_word_length=0, only_unique=True, split_urls=True, to_lower=False):
+            if len(w.split(".")) > 2:
+                last_word = w.split(".")[-1]
+                if len(last_word) > 3:
+                    found_values.append(w)
+        for val in sorted(found_values, key=lambda x: len(x.split(".")), reverse=False):
+            words = val.split(".")
+            full_path = ""
+            for i in range(2, len(words)):
+                full_path = full_path + " " + ".".join(words[:i])
+            full_path = full_path + " " + ".".join(words[-2:]) + " " + words[-1] + " "
+            new_line = re.sub(r"\b(?<!\.)%s(?!\.)\b" % val, full_path, new_line)
+        new_lines.append(new_line)
+    return "\n".join(new_lines)
+
+
+def extract_real_id(elastic_id):
+    real_id = str(elastic_id)
+    if real_id[-2:] == "_m":
+        return int(real_id[:-2])
+    return int(real_id)

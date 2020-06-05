@@ -89,11 +89,9 @@ class TestBoostingModel(unittest.TestCase):
 
     @utils.ignore_warnings
     def test_full_data_check(self):
-        print("Boost model folder all lines: ", self.boost_model_folder_all_lines)
-        print("Boost model folder not all lines: ", self.boost_model_folder_not_all_lines)
-        print("Weights model folder: ", self.weights_folder)
-        decision_maker_all_lines = BoostingDecisionMaker(self.boost_model_folder_all_lines)
-        decision_maker_not_all_lines = BoostingDecisionMaker(self.boost_model_folder_not_all_lines)
+        print("Boost model folder : ", self.boost_model_folder)
+        print("Weights model folder : ", self.weights_folder)
+        decision_maker = BoostingDecisionMaker(folder=self.boost_model_folder)
         boost_model_results = self.get_fixture(self.boost_model_results)
         tests = []
         for log_lines, filter_fields, _decision_maker in [

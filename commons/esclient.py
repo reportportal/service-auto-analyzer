@@ -33,7 +33,7 @@ from boosting_decision_making import similarity_calculator
 from boosting_decision_making import boosting_decision_maker
 from commons.es_query_builder import EsQueryBuilder
 from commons.log_merger import LogMerger
-from queue import Queue, Empty
+from queue import Queue
 from threading import Thread
 
 ERROR_LOGGING_LEVEL = 40000
@@ -489,27 +489,6 @@ class EsClient:
                     max_val_start_time = start_time
         return predicted_issue_type
 
-    def get_decision_maker(self, number_of_log_lines):
-        if number_of_log_lines != -1 and self.boosting_decision_maker_not_all_lines is None:
-            return self.boosting_decision_maker_not_all_lines
-        return self.boosting_decision_maker_all_lines
-
-    def get_suggest_decision_maker(self, number_of_log_lines):
-        if number_of_log_lines != -1 and self.suggest_decision_maker_not_all_lines is None:
-            return self.suggest_decision_maker_not_all_lines
-        return self.suggest_decision_maker_all_lines
-
-    def get_config_for_boosting(self, analyzer_config):
-        min_should_match = analyzer_config.minShouldMatch / 100 if analyzer_config.minShouldMatch > 0 else\
-            int(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0)) / 100
-        return {
-            "max_query_terms": self.search_cfg["MaxQueryTerms"],
-            "min_should_match": min_should_match,
-            "min_word_length": self.search_cfg["MinWordLength"],
-            "filter_min_should_match": utils.choose_fields_to_filter(analyzer_config.numberOfLogLines),
-            "number_of_log_lines": analyzer_config.numberOfLogLines
-        }
-
     def _prepare_query_for_batches(self, launches):
         all_queries = []
         all_query_logs = []
@@ -536,23 +515,6 @@ class EsClient:
                     all_query_logs.append((launch.analyzerConfig, test_item.testItemId, log))
 
         return all_queries, all_query_logs
-
-    def _query_elasticsearch(self, launches, max_batch_size=50):
-        t_start = time()
-        batches, batch_logs = self._prepare_query_for_batches(launches)
-        partial_batches = []
-
-        for i in range(int(len(batches) / batch_size) + 1):
-            part_batch = batches[i * batch_size: (i + 1) * batch_size]
-            if len(part_batch) == 0:
-                continue
-            partial_batches.append("\n".join(part_batch) + "\n")
-        for partial_batch_id in range(len(partial_batches)):
-            partial_res = self.es_client.msearch(partial_batches[partial_batch_id])["responses"]
-            for res_id in range(len(partial_res)):
-                idx = partial_batch_id * batch_size + res_id
-                all_info = batch_logs[idx]
-                self.queue.put((all_info[0], all_info[1], [(all_info[2], partial_res[res_id])]))
 
     def get_config_for_boosting(self, analyzer_config):
         min_should_match = analyzer_config.minShouldMatch / 100 if analyzer_config.minShouldMatch > 0 else\
@@ -648,18 +610,17 @@ class EsClient:
                 item_to_process = self.queue.get()
             analyzer_config, test_item_id, searched_res = item_to_process
             cnt_items_to_process += 1
-            boosting_decision_maker = self.get_decision_maker(analyzer_config.numberOfLogLines)
 
             boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
                 searched_res,
                 self.get_config_for_boosting(analyzer_config),
-                feature_ids=boosting_decision_maker.get_feature_ids())
+                feature_ids=self.boosting_decision_maker.get_feature_ids())
             feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
 
             if len(feature_data) > 0:
 
                 predicted_labels, predicted_labels_probability =\
-                    boosting_decision_maker.predict(feature_data)
+                    self.boosting_decision_maker.predict(feature_data)
 
                 scores_by_issue_type = boosting_data_gatherer.scores_by_issue_type
 

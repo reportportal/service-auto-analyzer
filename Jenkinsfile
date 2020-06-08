@@ -21,8 +21,8 @@ node {
             stage('Push to ECR') {
                 withEnv(["AWS_URI=${AWS_URI}", "AWS_REGION=${AWS_REGION}"]) {
                     sh 'docker tag reportportal-dev/service-auto-analyzer ${AWS_URI}/service-auto-analyzer'
-                    sh 'docker tag reportportal-dev/service-api ${LOCAL_REGISTRY}/service-api'
-                    sh 'docker push ${LOCAL_REGISTRY}/service-api'
+                    sh 'docker tag reportportal-dev/service-auto-analyzer ${LOCAL_REGISTRY}/service-auto-analyzer'
+                    sh 'docker push ${LOCAL_REGISTRY}/service-auto-analyzer'
                     def image = env.AWS_URI + '/service-auto-analyzer'
                     def url = 'https://' + env.AWS_URI
                     def credentials = 'ecr:' + env.AWS_REGION + ':aws_credentials'
@@ -38,6 +38,7 @@ node {
                 withEnv(["AWS_URI=${AWS_URI}", "LOCAL_REGISTRY=${LOCAL_REGISTRY}"]) {
                     sh 'docker rmi ${AWS_URI}/service-auto-analyzer:SNAPSHOT-${BUILD_NUMBER}'
                     sh 'docker rmi ${AWS_URI}/service-auto-analyzer:latest'
+                    sh 'docker rmi ${LOCAL_REGISTRY}/service-auto-analyzer:latest'
                 }
             }
         }

@@ -38,7 +38,7 @@ node {
                 withEnv(["AWS_URI=${AWS_URI}", "LOCAL_REGISTRY=${LOCAL_REGISTRY}"]) {
                     sh 'docker rmi ${AWS_URI}/service-auto-analyzer:SNAPSHOT-${BUILD_NUMBER}'
                     sh 'docker rmi ${AWS_URI}/service-auto-analyzer:latest'
-                    sh 'docker rmi ${LOCAL_REGISTRY}/service-auto-analyzer:latest'
+                    sh 'docker rmi ${LOCAL_REGISTRY}/service-auto-analyzer'
                 }
             }
         }

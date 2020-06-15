@@ -144,8 +144,19 @@ def remove_starting_datetime(text, remove_first_digits=False):
     return " ".join(text_split[idx_text_start:])
 
 
+def is_starting_message_pattern(text):
+    processed_text = remove_starting_datetime(text).strip()
+    for ext in file_extensions:
+        res = re.search(r"\w*\s*\(\s*.*\.%s:\d+\s*\)" % ext, processed_text)
+        if res and processed_text.startswith(res.group(0)):
+            return True
+    return False
+
+
 def delete_line_numbers(text):
     """Deletes line numbers in the stacktrace"""
+    if is_starting_message_pattern(text):
+        return text
     text = re.sub(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)", r"\g<1>#\g<2>", text)
 
     res = re.sub(r"(?<=:)\d+(?=\)?\]?(\n|\r\n|$))", " ", text)

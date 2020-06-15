@@ -181,12 +181,6 @@ def is_python_log(log):
     return False
 
 
-def reverse_log_if_needed(message):
-    if is_python_log(message):
-        return reverse_log(message)
-    return message
-
-
 def has_stacktrace_keywords(line):
     normalized_line = line.lower()
     for key_word in ["stacktrace", "stack trace", "stack-trace", "traceback"]:
@@ -205,10 +199,40 @@ def has_more_lines_pattern(line):
     return False
 
 
+def detect_log_parts_python(message, default_log_number=1):
+    detected_message_lines = []
+    stacktrace_lines = []
+    traceback_begin = False
+    detected_message_begin = True
+    skip_exceptions_finding = False
+    for idx, line in enumerate(message.split("\n")):
+        for key_word in ["stacktrace", "stack trace", "stack-trace", "traceback", "trace back"]:
+            if key_word in line.lower():
+                traceback_begin = True
+                detected_message_begin = False
+                skip_exceptions_finding = True
+                break
+
+        if not skip_exceptions_finding and get_found_exceptions(line):
+            detected_message_begin = True
+            traceback_begin = False
+        if traceback_begin:
+            stacktrace_lines.append(line)
+        elif detected_message_begin:
+            detected_message_lines.append(line)
+        skip_exceptions_finding = False
+    if len(detected_message_lines) == 0:
+        detected_message_lines = stacktrace_lines[-default_log_number:]
+        stacktrace_lines = stacktrace_lines[:-default_log_number]
+    return "\n".join(detected_message_lines), "\n".join(stacktrace_lines)
+
+
 def detect_log_description_and_stacktrace(message):
     """Split a log into a log message and stacktrace"""
     message = delete_empty_lines(message)
     if calculate_line_number(message) > 2:
+        if is_python_log(message):
+            return detect_log_parts_python(message)
         split_lines = message.split("\n")
         detected_message_lines = []
         stacktrace_lines = []

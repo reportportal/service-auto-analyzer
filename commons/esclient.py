@@ -175,7 +175,6 @@ class EsClient:
     def clean_message(self, message):
         message = utils.replace_tabs_for_newlines(message)
         message = utils.fix_big_encoded_urls(message)
-        message = utils.reverse_log_if_needed(message)
         message = utils.remove_generated_parts(message)
         message = utils.clean_html(message)
         message = utils.delete_empty_lines(message)

@@ -83,6 +83,7 @@ class TestEsClient(unittest.TestCase):
         self.search_rq_merged_second = "search_rq_merged_second.json"
         self.suggest_test_item_info_w_merged_logs = "suggest_test_item_info_w_merged_logs.json"
         self.one_hit_search_rs_merged_wrong = "one_hit_search_rs_merged_wrong.json"
+        self.three_hits_search_rs_with_one_unique_id = "three_hits_search_rs_with_one_unique_id.json"
         self.es_host = "http://localhost:9200"
         self.model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
         logging.disable(logging.CRITICAL)
@@ -784,6 +785,20 @@ class TestEsClient(unittest.TestCase):
                 "expected_count": 0,
                 "expected_issue_type": "",
                 "boost_predict":       ([], [])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.OK,
+                                    }],
+                "msearch_results": [
+                    TestEsClient.get_fixture(self.no_hits_search_rs, to_json=True),
+                    TestEsClient.get_fixture(self.three_hits_search_rs_with_one_unique_id, to_json=True)],
+                "index_rq":       TestEsClient.get_fixture(
+                    self.launch_w_test_items_w_logs),
+                "expected_count": 1,
+                "expected_issue_type": "AB001",
+                "boost_predict":       ([1], [[0.2, 0.8]])
             }
         ]
 

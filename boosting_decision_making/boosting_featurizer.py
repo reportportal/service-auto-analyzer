@@ -68,7 +68,8 @@ class BoostingFeaturizer:
                  {"field_name": "detected_message_without_params_extended"}),
             38: (self._calculate_similarity_percent, {"field_name": "stacktrace_extended"}),
             40: (self._calculate_similarity_percent, {"field_name": "message_without_params_extended"}),
-            41: (self._calculate_similarity_percent, {"field_name": "message_extended"})
+            41: (self._calculate_similarity_percent, {"field_name": "message_extended"}),
+            42: (self.is_the_same_test_case, {})
         }
 
         fields_to_calc_similarity = self.find_columns_to_find_similarities_for()
@@ -87,11 +88,35 @@ class BoostingFeaturizer:
             all_results = self.filter_by_min_should_match_any(
                 all_results,
                 fields=self.config["filter_min_should_match_any"])
+        if "filter_by_unique_id" in self.config and self.config["filter_by_unique_id"]:
+            all_results = self.filter_by_unique_id(all_results)
         self.similarity_calculator.find_similarity(
             all_results,
             fields_to_calc_similarity)
         self.all_results = self.normalize_results(all_results)
         self.scores_by_issue_type = None
+
+    def filter_by_unique_id(self, all_results):
+        new_results = []
+        for log, res in all_results:
+            new_elastic_res = []
+            unique_ids = set()
+            for elastic_res in res["hits"]["hits"]:
+                if elastic_res["_source"]["unique_id"] not in unique_ids:
+                    unique_ids.add(elastic_res["_source"]["unique_id"])
+                    new_elastic_res.append(elastic_res)
+            if new_elastic_res:
+                new_results.append((log, {"hits": {"hits": new_elastic_res}}))
+        return new_results
+
+    def is_the_same_test_case(self):
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        num_of_logs_issue_type = {}
+        for issue_type in scores_by_issue_type:
+            rel_item_unique_id = scores_by_issue_type[issue_type]["mrHit"]["_source"]["unique_id"]
+            queiried_item_unique_id = scores_by_issue_type[issue_type]["compared_log"]["_source"]["unique_id"]
+            num_of_logs_issue_type[issue_type] = int(rel_item_unique_id == queiried_item_unique_id)
+        return num_of_logs_issue_type
 
     def find_columns_to_find_similarities_for(self):
         fields_to_calc_similarity = set()

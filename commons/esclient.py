@@ -523,7 +523,8 @@ class EsClient:
             "min_should_match": min_should_match,
             "min_word_length": self.search_cfg["MinWordLength"],
             "filter_min_should_match": utils.choose_fields_to_filter(analyzer_config.numberOfLogLines),
-            "number_of_log_lines": analyzer_config.numberOfLogLines
+            "number_of_log_lines": analyzer_config.numberOfLogLines,
+            "filter_by_unique_id": True
         }
 
     def _send_result_to_queue(self, test_item_dict, batches, batch_logs):
@@ -669,7 +670,8 @@ class EsClient:
                 "detected_message_extended",
                 "detected_message_without_params_extended"] if analyzerConfig.numberOfLogLines == -1 else [
                 "message_extended", "message_without_params_extended"],
-            "number_of_log_lines": analyzerConfig.numberOfLogLines}
+            "number_of_log_lines": analyzerConfig.numberOfLogLines,
+            "filter_by_unique_id": False}
 
     def query_es_for_suggested_items(self, test_item_info, logs):
         full_results = []

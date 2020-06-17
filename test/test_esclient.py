@@ -106,7 +106,7 @@ class TestEsClient(unittest.TestCase):
             "MinShouldMatch": "80%",
             "MinTermFreq":    1,
             "MinDocFreq":     1,
-            "BoostAA":        2,
+            "BoostAA": -2,
             "BoostLaunch":    2,
             "BoostUniqueID":  2,
             "MaxQueryTerms":  50,

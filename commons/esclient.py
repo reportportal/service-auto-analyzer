@@ -629,10 +629,6 @@ class EsClient:
                                  issue_type_names[i],
                                  boosting_data_gatherer.
                                  scores_by_issue_type[issue_type_names[i]]["mrHit"]["_id"])
-                    logger.debug("Most relevant item with issue type %s with info %s",
-                                 issue_type_names[i],
-                                 boosting_data_gatherer.
-                                 scores_by_issue_type[issue_type_names[i]]["mrHit"]["_source"])
                     logger.debug("Issue type %s has label %d and probability %.3f for features %s",
                                  issue_type_names[i],
                                  predicted_labels[i],

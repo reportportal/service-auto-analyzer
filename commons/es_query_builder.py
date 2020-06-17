@@ -104,7 +104,7 @@ class EsQueryBuilder:
                                 "value": log["_source"]["test_case_hash"],
                                 "boost": abs(self.search_cfg["BoostUniqueID"])}}},
                             {"term": {"is_auto_analyzed": {
-                                "value": str(self.search_cfg["BoostAA"] < 0).lower(),
+                                "value": str(self.search_cfg["BoostAA"] > 0).lower(),
                                 "boost": abs(self.search_cfg["BoostAA"]), }}},
                         ]}}}
 

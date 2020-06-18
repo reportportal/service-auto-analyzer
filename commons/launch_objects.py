@@ -39,6 +39,7 @@ class Log(BaseModel):
     logId: int
     logLevel: int = 0
     message: str
+    clusterId: str = ""
 
 
 class TestItem(BaseModel):
@@ -74,11 +75,23 @@ class Launch(BaseModel):
     testItems: List[TestItem] = []
 
 
+class LaunchInfoForClustering(BaseModel):
+    launch: Launch
+    for_update: bool
+
+
 class AnalysisResult(BaseModel):
     """Analysis result object"""
     testItem: int
     issueType: str
     relevantItem: int
+
+
+class ClusterResult(BaseModel):
+    """Analysis result object"""
+    logId: int
+    testItemId: int
+    clusterId: str
 
 
 class SuggestAnalysisResult(BaseModel):

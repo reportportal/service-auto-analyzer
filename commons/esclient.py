@@ -22,7 +22,7 @@ import elasticsearch
 import elasticsearch.helpers
 import commons.launch_objects
 from commons.launch_objects import SuggestAnalysisResult, SearchLogInfo
-from commons.launch_objects import AnalysisResult
+from commons.launch_objects import AnalysisResult, ClusterResult
 import utils.utils as utils
 from boosting_decision_making import boosting_featurizer
 from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
@@ -36,6 +36,7 @@ from commons.log_merger import LogMerger
 from queue import Queue
 from threading import Thread
 from commons import clusterizer
+import uuid
 
 ERROR_LOGGING_LEVEL = 40000
 
@@ -252,6 +253,7 @@ class EsClient:
         found_exceptions_extended = utils.enrich_found_exceptions(found_exceptions)
 
         log_template["_id"] = log.logId
+        log_template["_source"]["cluster_id"] = log.clusterId
         log_template["_source"]["log_level"] = log.logLevel
         log_template["_source"]["original_message_lines"] = utils.calculate_line_number(cleaned_message)
         log_template["_source"]["original_message_words_number"] = len(
@@ -838,13 +840,45 @@ class EsClient:
                     continue
                 log_message = " ".join(words)
                 log_messages.append(log_message)
-                log_dict[ind] = log["_id"]
+                log_dict[ind] = log
                 ind += 1
         return log_messages, log_dict
 
     @utils.ignore_warnings
-    def find_clusters(self, launch):
+    def find_clusters(self, launch_info):
         logger.info("Started clusterizing logs")
+        t_start = time()
         _clusterizer = clusterizer.Clusterizer()
-        log_messages, log_dict = self.prepare_logs_for_clustering(launch)
-        return _clusterizer.find_clusters(log_messages)
+        log_messages, log_dict = self.prepare_logs_for_clustering(launch_info.launch)
+        groups = _clusterizer.find_clusters(log_messages)
+        results_to_return = []
+        if not launch_info.for_update:
+            bodies = []
+            for group in groups:
+                if len(groups[group]) > 1:
+                    cluster_id = str(uuid.uuid1())
+                    for ind in groups[group]:
+                        bodies.append({
+                            "_op_type": "update",
+                            "_id": log_dict[ind]["_id"],
+                            "_index": log_dict[ind]["_index"],
+                            "doc": {"cluster_id": cluster_id}})
+                        results_to_return.append(ClusterResult(
+                            logId=log_dict[ind]["_id"],
+                            testItemId=log_dict[ind]["_source"]["test_item"],
+                            clusterId=cluster_id))
+            if bodies:
+                self._bulk_index(bodies)
+        else:
+            for group in groups:
+                first_item_ind = groups[group][0]
+                query = self.es_query_builder.build_search_similar_items_query(
+                    log_dict[first_item_ind]["_source"]["launch_id"],
+                    log_dict[first_item_ind]["_source"]["test_item"],
+                    log_messages[first_item_ind])
+            results_to_return = self.es_client.search(
+                index=str(log_dict[first_item_ind]["_index"]),
+                body=query)
+        logger.info("Processed the launch. It took %.2f sec.", time() - t_start)
+        logger.info("Finished clustering for the launch with %d clusters.", len(groups))
+        return results_to_return

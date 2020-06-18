@@ -212,6 +212,8 @@ elif used_method.strip() in ["search"]:
     response = rpc.call(json.dumps(search_data), used_method)
 elif used_method.strip() in ["suggest"]:
     response = rpc.call(json.dumps(test_item_info), used_method)
+elif used_method.strip() in ["cluster"]:
+    response = rpc.call(json.dumps({"launch": index_data[0], "for_update": "false"}), used_method)
 else:
     response = rpc.call(json.dumps(index_data), used_method)
 print(" [.] Got %r" % response)

@@ -32,11 +32,11 @@ from utils import utils
 
 
 APP_CONFIG = {
-    "esHost":            os.getenv("ES_HOSTS", "http://elasticsearch:9200"),
-    # "esHost":            os.getenv("ES_HOSTS", "http://localhost:9200"),
+    # "esHost":            os.getenv("ES_HOSTS", "http://elasticsearch:9200"),
+    "esHost":            os.getenv("ES_HOSTS", "http://localhost:9200"),
     "logLevel":          os.getenv("LOGGING_LEVEL", "DEBUG"),
-    "amqpUrl":           os.getenv("AMQP_URL", "amqp://rabbitmq:rabbitmq@rabbitmq:5672"),
-    # "amqpUrl":           os.getenv("AMQP_URL", "amqp://rabbitmq:rabbitmq@localhost:5672"),
+    # "amqpUrl":           os.getenv("AMQP_URL", "amqp://rabbitmq:rabbitmq@rabbitmq:5672"),
+    "amqpUrl":           os.getenv("AMQP_URL", "amqp://rabbitmq:rabbitmq@localhost:5672"),
     "exchangeName":      os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
     "analyzerPriority":  int(os.getenv("ANALYZER_PRIORITY", "1")),
     "analyzerIndex":     json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),
@@ -171,9 +171,9 @@ def init_amqp(_amqp_client, request_handler):
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.find_clusters,
                                                     prepare_data_func=amqp_handler.
-                                                    prepare_launches,
+                                                    prepare_launch_info,
                                                     prepare_response_data=amqp_handler.
-                                                    prepare_search_response_data))))
+                                                    prepare_analyze_response_data))))
 
     return threads
 

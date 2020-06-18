@@ -35,6 +35,7 @@ from commons.es_query_builder import EsQueryBuilder
 from commons.log_merger import LogMerger
 from queue import Queue
 from threading import Thread
+from commons import clusterizer
 
 ERROR_LOGGING_LEVEL = 40000
 
@@ -190,6 +191,7 @@ class EsClient:
                 "launch_name":      "",
                 "test_item":        "",
                 "unique_id":        "",
+                "cluster_id":       "",
                 "test_case_hash":   0,
                 "is_auto_analyzed": False,
                 "issue_type":       "",
@@ -811,3 +813,38 @@ class EsClient:
         logger.info("Processed the test item. It took %.2f sec.", time() - t_start)
         logger.info("Finished suggesting for test item with %d results.", len(results))
         return results
+
+    def prepare_logs_for_clustering(self, launch):
+        log_messages = []
+        log_dict = {}
+        ind = 0
+        for test_item in launch.testItems:
+            prepared_logs = [self._prepare_log(
+                launch, test_item, log) for log in test_item.logs if log.logLevel >= ERROR_LOGGING_LEVEL]
+            merged_logs = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+            new_merged_logs = []
+            for log in merged_logs:
+                if log["_source"]["stacktrace"].strip() == "":
+                    continue
+                new_merged_logs.append(log)
+            if len(new_merged_logs) > 0:
+                merged_logs = new_merged_logs
+            for log in merged_logs:
+                if log["_source"]["message"].strip() == "":
+                    continue
+                words = utils.split_words(
+                    log["_source"]["message"], min_word_length=2, only_unique=False)
+                if len(words) < 2:
+                    continue
+                log_message = " ".join(words)
+                log_messages.append(log_message)
+                log_dict[ind] = log["_id"]
+                ind += 1
+        return log_messages, log_dict
+
+    @utils.ignore_warnings
+    def find_clusters(self, launch):
+        logger.info("Started clusterizing logs")
+        _clusterizer = clusterizer.Clusterizer()
+        log_messages, log_dict = self.prepare_logs_for_clustering(launch)
+        return _clusterizer.find_clusters(log_messages)

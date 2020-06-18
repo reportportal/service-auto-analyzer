@@ -165,6 +165,15 @@ def init_amqp(_amqp_client, request_handler):
                                                     prepare_test_item_info,
                                                     prepare_response_data=amqp_handler.
                                                     prepare_analyze_response_data))))
+    threads.append(create_thread(create_ampq_client().receive,
+                   (APP_CONFIG["exchangeName"], "cluster", True, False,
+                   lambda channel, method, props, body:
+                   amqp_handler.handle_amqp_request(channel, method, props, body,
+                                                    request_handler.find_clusters,
+                                                    prepare_data_func=amqp_handler.
+                                                    prepare_launches,
+                                                    prepare_response_data=amqp_handler.
+                                                    prepare_search_response_data))))
 
     return threads
 

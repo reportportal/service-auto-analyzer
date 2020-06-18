@@ -97,6 +97,9 @@
         "start_time": {
             "type":   "date",
             "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        },
+        "cluster_id": {
+            "type": "keyword"
         }
     }
 }

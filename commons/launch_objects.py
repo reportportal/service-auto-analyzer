@@ -92,6 +92,7 @@ class ClusterResult(BaseModel):
     logId: int
     testItemId: int
     clusterId: str
+    project: int
 
 
 class SuggestAnalysisResult(BaseModel):

@@ -844,41 +844,98 @@ class EsClient:
                 ind += 1
         return log_messages, log_dict
 
+    def find_similar_items_from_es(self, groups, log_dict, log_messages, log_ids):
+        new_clusters = {}
+        _clusterizer = clusterizer.Clusterizer()
+        for global_group in groups:
+            first_item_ind = groups[global_group][0]
+            query = self.es_query_builder.build_search_similar_items_query(
+                log_dict[first_item_ind]["_source"]["launch_id"],
+                log_dict[first_item_ind]["_source"]["test_item"],
+                log_messages[first_item_ind])
+            search_results = self.es_client.search(
+                index=log_dict[first_item_ind]["_index"],
+                body=query)
+            log_messages_part = [log_messages[first_item_ind]]
+            log_dict_part = {0: log_dict[first_item_ind]}
+            ind = 1
+            for res in search_results["hits"]["hits"]:
+                if res["_id"] in log_ids:
+                    continue
+                log_dict_part[ind] = res
+                log_messages_part.append(res["_source"]["message"])
+                ind += 1
+            groups_part = _clusterizer.find_clusters(log_messages_part)
+            new_group = []
+            for group in groups_part:
+                if 0 in groups_part[group] and len(groups_part[group]) > 1:
+                    cluster_id = ""
+                    for ind in groups_part[group]:
+                        if log_dict_part[ind]["_source"]["cluster_id"].strip():
+                            cluster_id = log_dict_part[ind]["_source"]["cluster_id"].strip()
+                    if not cluster_id.strip():
+                        cluster_id = str(uuid.uuid1())
+                    for ind in groups_part[group]:
+                        if ind == 0:
+                            continue
+                        log_ids.add(log_dict_part[ind]["_id"])
+                        new_group.append(ClusterResult(
+                            logId=log_dict_part[ind]["_id"],
+                            testItemId=log_dict_part[ind]["_source"]["test_item"],
+                            project=log_dict_part[ind]["_index"],
+                            clusterId=cluster_id))
+                    break
+            new_clusters[global_group] = new_group
+        return new_clusters
+
+    def gather_cluster_results(self, groups, additional_results, log_dict):
+        results_to_return = []
+        cluster_num = 0
+        for group in groups:
+            cnt_items = len(groups[group])
+            cluster_id = ""
+            if group in additional_results:
+                cnt_items += len(additional_results[group])
+                for item in additional_results[group]:
+                    cluster_id = item.clusterId
+                    break
+            if cnt_items > 1:
+                cluster_num += 1
+                if not cluster_id:
+                    cluster_id = str(uuid.uuid1())
+                for ind in groups[group]:
+                    results_to_return.append(ClusterResult(
+                        logId=log_dict[ind]["_id"],
+                        testItemId=log_dict[ind]["_source"]["test_item"],
+                        project=log_dict[ind]["_index"],
+                        clusterId=cluster_id))
+                if group in additional_results:
+                    results_to_return.extend(additional_results[group])
+        return results_to_return, cluster_num
+
     @utils.ignore_warnings
     def find_clusters(self, launch_info):
         logger.info("Started clusterizing logs")
         t_start = time()
         _clusterizer = clusterizer.Clusterizer()
         log_messages, log_dict = self.prepare_logs_for_clustering(launch_info.launch)
+        log_ids = set([log["_id"] for log in log_dict.items()])
+        launch_info.launch = {}
         groups = _clusterizer.find_clusters(log_messages)
-        results_to_return = []
-        if not launch_info.for_update:
+        additional_results = {}
+        if launch_info.for_update:
+            additional_results = self.find_similar_items_from_es(groups, log_dict, log_messages, log_ids)
+
+        results_to_return, cluster_num = self.gather_cluster_results(groups, additional_results, log_dict)
+        if results_to_return:
             bodies = []
-            for group in groups:
-                if len(groups[group]) > 1:
-                    cluster_id = str(uuid.uuid1())
-                    for ind in groups[group]:
-                        bodies.append({
-                            "_op_type": "update",
-                            "_id": log_dict[ind]["_id"],
-                            "_index": log_dict[ind]["_index"],
-                            "doc": {"cluster_id": cluster_id}})
-                        results_to_return.append(ClusterResult(
-                            logId=log_dict[ind]["_id"],
-                            testItemId=log_dict[ind]["_source"]["test_item"],
-                            clusterId=cluster_id))
-            if bodies:
-                self._bulk_index(bodies)
-        else:
-            for group in groups:
-                first_item_ind = groups[group][0]
-                query = self.es_query_builder.build_search_similar_items_query(
-                    log_dict[first_item_ind]["_source"]["launch_id"],
-                    log_dict[first_item_ind]["_source"]["test_item"],
-                    log_messages[first_item_ind])
-            results_to_return = self.es_client.search(
-                index=str(log_dict[first_item_ind]["_index"]),
-                body=query)
+            for result in results_to_return:
+                bodies.append({
+                    "_op_type": "update",
+                    "_id": result.logId,
+                    "_index": result.project,
+                    "doc": {"cluster_id": result.clusterId}})
+            self._bulk_index(bodies)
         logger.info("Processed the launch. It took %.2f sec.", time() - t_start)
-        logger.info("Finished clustering for the launch with %d clusters.", len(groups))
+        logger.info("Finished clustering for the launch with %d clusters.", cluster_num)
         return results_to_return

@@ -18,6 +18,7 @@ import sys
 import uuid
 import json
 import pika
+import os
 
 # This file can be used for checking app functionality locally
 
@@ -27,7 +28,7 @@ class RpcClient():
     def __init__(self):
         self.connection = pika.BlockingConnection(
             pika.connection.
-            URLParameters("amqp://rabbitmq:rabbitmq@localhost:5672/analyzer?heartbeat=600"))
+            URLParameters(os.getenv("AMQP_URL") + "/analyzer?heartbeat=600"))
         self.response = None
         self.corr_id = None
 

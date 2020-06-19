@@ -97,7 +97,7 @@ class EsQueryBuilder:
                     "must": [
                         {"term": {"launch_id": launch_id}},
                         self.
-                        build_more_like_this_query("90%",
+                        build_more_like_this_query("98%",
                                                    message,
                                                    field_name="message"),
                     ]}}}

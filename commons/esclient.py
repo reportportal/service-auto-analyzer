@@ -207,7 +207,8 @@ class EsClient:
                 "detected_message_with_numbers": "",
                 "stacktrace":                    "",
                 "only_numbers":                  "",
-                "found_exceptions":              ""}}
+                "found_exceptions":              "",
+                "whole_message":                 ""}}
 
     def _fill_launch_test_item_fields(self, log_template, launch, test_item):
         log_template["_index"] = launch.project
@@ -278,6 +279,7 @@ class EsClient:
             utils.enrich_text_with_method_and_classes(message)
         log_template["_source"]["message_without_params_extended"] =\
             utils.enrich_text_with_method_and_classes(message_without_params)
+        log_template["_source"]["whole_message"] = detected_message_with_numbers + " \n " + stacktrace
 
         for field in ["message", "detected_message", "detected_message_with_numbers",
                       "stacktrace", "only_numbers", "found_exceptions", "found_exceptions_extended",
@@ -833,16 +835,16 @@ class EsClient:
             merged_logs = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
             new_merged_logs = []
             for log in merged_logs:
-                if log["_source"]["stacktrace"].strip() == "":
+                if not log["_source"]["stacktrace"].strip():
                     continue
                 new_merged_logs.append(log)
             if len(new_merged_logs) > 0:
                 merged_logs = new_merged_logs
             for log in merged_logs:
-                if not log["_source"]["message"].strip():
+                if log["_source"]["is_merged"]:
                     continue
                 log_message = self.prepare_message_for_clustering(
-                    log["_source"]["message"], number_of_lines)
+                    log["_source"]["whole_message"], number_of_lines)
                 if not log_message.strip():
                     continue
                 log_messages.append(log_message)
@@ -867,20 +869,16 @@ class EsClient:
             log_dict_part = {0: log_dict[first_item_ind]}
             ind = 1
             for res in search_results["hits"]["hits"]:
-                if res["_id"] in log_ids:
+                if int(res["_id"]) in log_ids:
                     continue
                 log_dict_part[ind] = res
                 log_message = self.prepare_message_for_clustering(
-                    res["_source"]["message"], number_of_lines)
+                    res["_source"]["whole_message"], number_of_lines)
                 if not log_message.strip():
                     continue
                 log_messages_part.append(log_message)
                 ind += 1
-            print(log_ids)
-            print(log_dict_part)
-            print(log_messages_part)
             groups_part = _clusterizer.find_clusters(log_messages_part)
-            print(groups_part)
             new_group = []
             for group in groups_part:
                 if 0 in groups_part[group] and len(groups_part[group]) > 1:
@@ -893,7 +891,7 @@ class EsClient:
                     for ind in groups_part[group]:
                         if ind == 0:
                             continue
-                        log_ids.add(log_dict_part[ind]["_id"])
+                        log_ids.add(int(log_dict_part[ind]["_id"]))
                         new_group.append(ClusterResult(
                             logId=log_dict_part[ind]["_id"],
                             testItemId=log_dict_part[ind]["_source"]["test_item"],
@@ -906,7 +904,6 @@ class EsClient:
     def gather_cluster_results(self, groups, additional_results, log_dict):
         results_to_return = []
         cluster_num = 0
-        print(groups)
         for group in groups:
             cnt_items = len(groups[group])
             cluster_id = ""
@@ -919,21 +916,14 @@ class EsClient:
                 cluster_num += 1
                 if not cluster_id:
                     cluster_id = str(uuid.uuid1())
-                for ind in groups[group]:
-                    results_to_return.append(ClusterResult(
-                        logId=log_dict[ind]["_id"],
-                        testItemId=log_dict[ind]["_source"]["test_item"],
-                        project=log_dict[ind]["_index"],
-                        clusterId=cluster_id))
-                if group in additional_results:
-                    results_to_return.extend(additional_results[group])
-            else:
-                for ind in groups[group]:
-                    results_to_return.append(ClusterResult(
-                            logId=log_dict[ind]["_id"],
-                            testItemId=log_dict[ind]["_source"]["test_item"],
-                            project=log_dict[ind]["_index"],
-                            clusterId=""))
+            for ind in groups[group]:
+                results_to_return.append(ClusterResult(
+                    logId=log_dict[ind]["_id"],
+                    testItemId=log_dict[ind]["_source"]["test_item"],
+                    project=log_dict[ind]["_index"],
+                    clusterId=cluster_id))
+            if cnt_items > 1 and group in additional_results:
+                results_to_return.extend(additional_results[group])
         return results_to_return, cluster_num
 
     @utils.ignore_warnings
@@ -943,17 +933,16 @@ class EsClient:
         _clusterizer = clusterizer.Clusterizer()
         log_messages, log_dict = self.prepare_logs_for_clustering(
             launch_info.launch, launch_info.numberOfLogLines)
-        log_ids = set([log["_id"] for log in log_dict.values()])
+        log_ids = set([int(log["_id"]) for log in log_dict.values()])
         launch_info.launch = {}
         groups = _clusterizer.find_clusters(log_messages)
-        print(groups)
         additional_results = {}
         if launch_info.for_update:
             additional_results = self.find_similar_items_from_es(
                 groups, log_dict, log_messages, log_ids, launch_info.numberOfLogLines)
-        print(additional_results)
 
-        results_to_return, cluster_num = self.gather_cluster_results(groups, additional_results, log_dict)
+        results_to_return, cluster_num = self.gather_cluster_results(
+            groups, additional_results, log_dict)
         if results_to_return:
             bodies = []
             for result in results_to_return:

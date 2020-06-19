@@ -197,7 +197,7 @@ index_data = [{
                    "logs": [
                        {"logId": 78,
                         "logLevel": 40000,
-                        "message": "assertionerror found \r\n assertionerror occured \r\n assertionerror"}]
+                        "message": "error occured \r\n error found \r\n assertionerror mined"}]
                    }]}]
 
 search_data = {

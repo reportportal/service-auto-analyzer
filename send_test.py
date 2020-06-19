@@ -113,55 +113,6 @@ index_data = [{
                         "logLevel": 40000,
                         "message": "error occured \r\n error found \r\n error mined"}, ]
                    }, ],
-}, {
-    "launchId": 1,
-    "project": 34,
-    "launchName": "dsfdsf",
-    "analyzerConfig": {
-        "minDocFreq": 1.0,
-        "minTermFreq": 1.0,
-        "minShouldMatch": 80,
-        "numberOfLogLines": -1,
-        "isAutoAnalyzerEnabled": True,
-        "analyzerMode": "ALL",
-        "indexingRunning": True,
-    },
-    "testItems": [{"testItemId": 5,
-                   "uniqueId": "df5",
-                   "isAutoAnalyzed": False,
-                   "issueType": "ab001",
-                   "originalIssueType": "PB001",
-                   "logs": [
-                       {"logId": 6,
-                        "logLevel": 40000,
-                        "message": "error occured"},
-                       {"logId": 8,
-                        "logLevel": 40000,
-                        "message": "error occured \r\n error found \r\n error mined"}, ]
-                   },
-                  {"testItemId": 78,
-                   "uniqueId": "df5",
-                   "isAutoAnalyzed": False,
-                   "issueType": "pb001",
-                   "originalIssueType": "PB001",
-                   "logs": [
-                       {"logId": 45,
-                        "logLevel": 40000,
-                        "message": "error occured"},
-                       {"logId": 81,
-                        "logLevel": 40000,
-                        "message": "error occured \r\n error found \r\n error mined"}, ]
-                   },
-                  {"testItemId": 10,
-                   "uniqueId": "df12",
-                   "isAutoAnalyzed": False,
-                   "issueType": "ab001",
-                   "originalIssueType": "ab001",
-                   "logs": [
-                       {"logId": 38,
-                        "logLevel": 40000,
-                        "message": "error occured \r\n error found \r\n error mined"}, ]
-                   }, ],
 }]
 
 search_data = {
@@ -178,40 +129,17 @@ clean_index_data = {
     "project": 34,
 }
 
-test_item_info = {
-    "testItemId": 4,
-    "uniqueId": "unique",
-    "testCaseHash": 111,
-    "launchId": 3,
-    "launchName": "Launch name",
-    "project": 34,
-    "analyzerConfig": {
-        "minDocFreq": 1.0,
-        "minTermFreq": 1.0,
-        "minShouldMatch": 80,
-        "numberOfLogLines": -1,
-        "isAutoAnalyzerEnabled": True,
-        "analyzerMode": "ALL",
-        "indexingRunning": True,
-    },
-    "logs": [{"logId": 3,
-              "logLevel": 40000,
-              "message": "error occured"},
-             {"logId": 4,
-              "logLevel": 40000,
-              "message": "error occured \r\n error found \r\n error mined"}]
-}
-
 used_method = sys.argv[1] if len(sys.argv) > 1 else "index"
 print(" [x] calling method %s" % used_method)
 if used_method.strip() in ["delete"]:
     response = rpc.call("34", used_method)
+    print(" [.] Got %r" % response)
 elif used_method.strip() in ["clean"]:
     response = rpc.call(json.dumps(clean_index_data), used_method)
+    print(" [.] Got %r" % response)
 elif used_method.strip() in ["search"]:
     response = rpc.call(json.dumps(search_data), used_method)
-elif used_method.strip() in ["suggest"]:
-    response = rpc.call(json.dumps(test_item_info), used_method)
+    print(" [.] Got %r" % response)
 else:
     response = rpc.call(json.dumps(index_data), used_method)
-print(" [.] Got %r" % response)
+    print(" [.] Got %r" % response)

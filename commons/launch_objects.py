@@ -53,18 +53,6 @@ class TestItem(BaseModel):
     logs: List[Log] = []
 
 
-class TestItemInfo(BaseModel):
-    """Test item info object"""
-    testItemId: int
-    uniqueId: str
-    testCaseHash: int = 0
-    launchId: int
-    launchName: str = ""
-    project: int
-    analyzerConfig: AnalyzerConf = AnalyzerConf()
-    logs: List[Log] = []
-
-
 class Launch(BaseModel):
     """Launch object"""
     launchId: int
@@ -79,15 +67,6 @@ class AnalysisResult(BaseModel):
     testItem: int
     issueType: str
     relevantItem: int
-
-
-class SuggestAnalysisResult(BaseModel):
-    """Analysis result object"""
-    testItem: int
-    issueType: str
-    relevantItem: int
-    relevantLogId: int
-    matchScore: float
 
 
 class CleanIndex(BaseModel):

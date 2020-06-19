@@ -78,6 +78,7 @@ class Launch(BaseModel):
 class LaunchInfoForClustering(BaseModel):
     launch: Launch
     for_update: bool
+    numberOfLogLines: int
 
 
 class AnalysisResult(BaseModel):

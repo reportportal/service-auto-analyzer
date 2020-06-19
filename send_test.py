@@ -115,7 +115,7 @@ index_data = [{
                         "message": "error occured \r\n error found \r\n error mined"}, ]
                    }, ],
 }, {
-    "launchId": 1,
+    "launchId": 2,
     "project": 34,
     "launchName": "dsfdsf",
     "analyzerConfig": {
@@ -163,7 +163,42 @@ index_data = [{
                         "logLevel": 40000,
                         "message": "error occured \r\n error found \r\n error mined"}, ]
                    }, ],
-}]
+}, {
+    "launchId": 1,
+    "project": 34,
+    "launchName": "dsfdsf",
+    "analyzerConfig": {
+        "minDocFreq": 1.0,
+        "minTermFreq": 1.0,
+        "minShouldMatch": 80,
+        "numberOfLogLines": -1,
+        "isAutoAnalyzerEnabled": True,
+        "analyzerMode": "ALL",
+        "indexingRunning": True,
+    },
+    "testItems": [{"testItemId": 23,
+                   "uniqueId": "df",
+                   "isAutoAnalyzed": False,
+                   "issueType": "pb001",
+                   "originalIssueType": "PB001",
+                   "logs": [
+                       {"logId": 32,
+                        "logLevel": 40000,
+                        "message": "error occured"},
+                       {"logId": 46,
+                        "logLevel": 40000,
+                        "message": "error occured \r\n error found \r\n error mined"}, ]
+                   },
+                  {"testItemId": 13,
+                   "uniqueId": "df",
+                   "isAutoAnalyzed": False,
+                   "issueType": "pb001",
+                   "originalIssueType": "PB001",
+                   "logs": [
+                       {"logId": 78,
+                        "logLevel": 40000,
+                        "message": "assertionerror found \r\n assertionerror occured \r\n assertionerror"}]
+                   }]}]
 
 search_data = {
     "launchId": 4,
@@ -204,6 +239,12 @@ test_item_info = {
 }
 
 used_method = sys.argv[1] if len(sys.argv) > 1 else "index"
+for_update = False
+if len(sys.argv) > 2:
+    for_update = True if sys.argv[2].lower() == "true" else False
+number_lines = -1
+if len(sys.argv) > 3:
+    number_lines = int(sys.argv[3])
 print(" [x] calling method %s" % used_method)
 if used_method.strip() in ["delete"]:
     response = rpc.call("34", used_method)
@@ -214,7 +255,14 @@ elif used_method.strip() in ["search"]:
 elif used_method.strip() in ["suggest"]:
     response = rpc.call(json.dumps(test_item_info), used_method)
 elif used_method.strip() in ["cluster"]:
-    response = rpc.call(json.dumps({"launch": index_data[0], "for_update": "false"}), used_method)
+    if not for_update:
+        response = rpc.call(json.dumps({"launch": index_data[0],
+                                        "for_update": for_update,
+                                        "numberOfLogLines": number_lines}), used_method)
+    else:
+        response = rpc.call(json.dumps({"launch": index_data[2],
+                                        "for_update": for_update,
+                                        "numberOfLogLines": number_lines}), used_method)
 else:
     response = rpc.call(json.dumps(index_data), used_method)
 print(" [.] Got %r" % response)

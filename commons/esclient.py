@@ -816,7 +816,14 @@ class EsClient:
         logger.info("Finished suggesting for test item with %d results.", len(results))
         return results
 
-    def prepare_logs_for_clustering(self, launch):
+    def prepare_message_for_clustering(self, message, number_of_log_lines):
+        message = utils.first_lines(message, number_of_log_lines)
+        words = utils.split_words(message, min_word_length=2, only_unique=False)
+        if len(words) < 2:
+            return ""
+        return " ".join(words)
+
+    def prepare_logs_for_clustering(self, launch, number_of_lines):
         log_messages = []
         log_dict = {}
         ind = 0
@@ -832,19 +839,19 @@ class EsClient:
             if len(new_merged_logs) > 0:
                 merged_logs = new_merged_logs
             for log in merged_logs:
-                if log["_source"]["message"].strip() == "":
+                if not log["_source"]["message"].strip():
                     continue
-                words = utils.split_words(
-                    log["_source"]["message"], min_word_length=2, only_unique=False)
-                if len(words) < 2:
+                log_message = self.prepare_message_for_clustering(
+                    log["_source"]["message"], number_of_lines)
+                if not log_message.strip():
                     continue
-                log_message = " ".join(words)
                 log_messages.append(log_message)
                 log_dict[ind] = log
                 ind += 1
         return log_messages, log_dict
 
-    def find_similar_items_from_es(self, groups, log_dict, log_messages, log_ids):
+    def find_similar_items_from_es(
+            self, groups, log_dict, log_messages, log_ids, number_of_lines):
         new_clusters = {}
         _clusterizer = clusterizer.Clusterizer()
         for global_group in groups:
@@ -863,9 +870,17 @@ class EsClient:
                 if res["_id"] in log_ids:
                     continue
                 log_dict_part[ind] = res
-                log_messages_part.append(res["_source"]["message"])
+                log_message = self.prepare_message_for_clustering(
+                    res["_source"]["message"], number_of_lines)
+                if not log_message.strip():
+                    continue
+                log_messages_part.append(log_message)
                 ind += 1
+            print(log_ids)
+            print(log_dict_part)
+            print(log_messages_part)
             groups_part = _clusterizer.find_clusters(log_messages_part)
+            print(groups_part)
             new_group = []
             for group in groups_part:
                 if 0 in groups_part[group] and len(groups_part[group]) > 1:
@@ -891,6 +906,7 @@ class EsClient:
     def gather_cluster_results(self, groups, additional_results, log_dict):
         results_to_return = []
         cluster_num = 0
+        print(groups)
         for group in groups:
             cnt_items = len(groups[group])
             cluster_id = ""
@@ -911,6 +927,13 @@ class EsClient:
                         clusterId=cluster_id))
                 if group in additional_results:
                     results_to_return.extend(additional_results[group])
+            else:
+                for ind in groups[group]:
+                    results_to_return.append(ClusterResult(
+                            logId=log_dict[ind]["_id"],
+                            testItemId=log_dict[ind]["_source"]["test_item"],
+                            project=log_dict[ind]["_index"],
+                            clusterId=""))
         return results_to_return, cluster_num
 
     @utils.ignore_warnings
@@ -918,13 +941,17 @@ class EsClient:
         logger.info("Started clusterizing logs")
         t_start = time()
         _clusterizer = clusterizer.Clusterizer()
-        log_messages, log_dict = self.prepare_logs_for_clustering(launch_info.launch)
-        log_ids = set([log["_id"] for log in log_dict.items()])
+        log_messages, log_dict = self.prepare_logs_for_clustering(
+            launch_info.launch, launch_info.numberOfLogLines)
+        log_ids = set([log["_id"] for log in log_dict.values()])
         launch_info.launch = {}
         groups = _clusterizer.find_clusters(log_messages)
+        print(groups)
         additional_results = {}
         if launch_info.for_update:
-            additional_results = self.find_similar_items_from_es(groups, log_dict, log_messages, log_ids)
+            additional_results = self.find_similar_items_from_es(
+                groups, log_dict, log_messages, log_ids, launch_info.numberOfLogLines)
+        print(additional_results)
 
         results_to_return, cluster_num = self.gather_cluster_results(groups, additional_results, log_dict)
         if results_to_return:

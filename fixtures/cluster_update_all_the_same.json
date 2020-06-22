@@ -1,0 +1,6 @@
+{"update":{"_index":2,"_id":4}}
+{"doc":{"cluster_id":"1"}}
+{"update":{"_index":2,"_id":5}}
+{"doc":{"cluster_id":"1"}}
+{"update":{"_index":2,"_id":9}}
+{"doc":{"cluster_id":"1"}}

@@ -84,6 +84,15 @@ class TestEsClient(unittest.TestCase):
         self.suggest_test_item_info_w_merged_logs = "suggest_test_item_info_w_merged_logs.json"
         self.one_hit_search_rs_merged_wrong = "one_hit_search_rs_merged_wrong.json"
         self.three_hits_search_rs_with_one_unique_id = "three_hits_search_rs_with_one_unique_id.json"
+        self.launch_w_items_clustering = "launch_w_items_clustering.json"
+        self.cluster_update_all_the_same = "cluster_update_all_the_same.json"
+        self.search_logs_rq_first_group = "search_logs_rq_first_group.json"
+        self.search_logs_rq_second_group = "search_logs_rq_second_group.json"
+        self.one_hit_search_rs_clustering = "one_hit_search_rs_clustering.json"
+        self.search_logs_rq_first_group_2lines = "search_logs_rq_first_group_2lines.json"
+        self.cluster_update_es_update = "cluster_update_es_update.json"
+        self.cluster_update_all_the_same_es_update = "cluster_update_all_the_same_es_update.json"
+        self.cluster_update = "cluster_update.json"
         self.es_host = "http://localhost:9200"
         self.model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
         logging.disable(logging.CRITICAL)
@@ -1217,6 +1226,320 @@ class TestEsClient(unittest.TestCase):
                 response.should.have.length_of(len(test["expected_result"]))
                 for real_resp, expected_resp in zip(response, test["expected_result"]):
                     real_resp.should.equal(expected_resp)
+
+                TestEsClient.shutdown_server(test["test_calls"])
+
+    @utils.ignore_warnings
+    def test_find_clusters(self):
+        """Test finding clusters"""
+        tests = [
+            {
+                "test_calls":          [{"method":         httpretty.GET,
+                                         "uri":            "/1",
+                                         "status":         HTTPStatus.OK,
+                                         }, ],
+                "launch_info":         launch_objects.LaunchInfoForClustering(
+                    launch=launch_objects.Launch(
+                        **(TestEsClient.get_fixture(
+                            self.launch_wo_test_items, to_json=True))[0]),
+                    for_update=False,
+                    numberOfLogLines=-1),
+                "expected_result":     []
+            },
+            {
+                "test_calls":          [{"method":         httpretty.GET,
+                                         "uri":            "/1",
+                                         "status":         HTTPStatus.OK,
+                                         }, ],
+                "launch_info":            launch_objects.LaunchInfoForClustering(
+                    launch=launch_objects.Launch(
+                        **(TestEsClient.get_fixture(
+                            self.launch_w_test_items_wo_logs, to_json=True))[0]),
+                    for_update=False,
+                    numberOfLogLines=-1),
+                "expected_result":     []
+            },
+            {
+                "test_calls":          [{"method":         httpretty.GET,
+                                         "uri":            "/2",
+                                         "status":         HTTPStatus.OK,
+                                         }, ],
+                "launch_info":            launch_objects.LaunchInfoForClustering(
+                    launch=launch_objects.Launch(
+                        **(TestEsClient.get_fixture(
+                            self.launch_w_test_items_w_empty_logs, to_json=True)[0])),
+                    for_update=False,
+                    numberOfLogLines=-1),
+                "expected_result":     []
+            },
+            {
+                "test_calls":          [{"method":         httpretty.GET,
+                                         "uri":            "/2",
+                                         "status":         HTTPStatus.OK,
+                                         },
+                                        {"method":         httpretty.POST,
+                                         "uri":            "/_bulk?refresh=true",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             TestEsClient.get_fixture(
+                                             self.cluster_update),
+                                         "rs":             TestEsClient.get_fixture(
+                                             self.index_logs_rs),
+                                         }],
+                "launch_info":            launch_objects.LaunchInfoForClustering(
+                    launch=launch_objects.Launch(
+                        **TestEsClient.get_fixture(
+                            self.launch_w_items_clustering, to_json=True)),
+                    for_update=False,
+                    numberOfLogLines=-1),
+                "expected_result":     [
+                    launch_objects.ClusterResult(
+                        logId=4,
+                        testItemId=2,
+                        project=2,
+                        clusterId="1"),
+                    launch_objects.ClusterResult(
+                        logId=5,
+                        testItemId=5,
+                        project=2,
+                        clusterId="1"),
+                    launch_objects.ClusterResult(
+                        logId=9,
+                        testItemId=6,
+                        project=2,
+                        clusterId="")]
+            },
+            {
+                "test_calls":          [{"method":         httpretty.GET,
+                                         "uri":            "/2",
+                                         "status":         HTTPStatus.OK,
+                                         },
+                                        {"method":         httpretty.POST,
+                                         "uri":            "/_bulk?refresh=true",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             TestEsClient.get_fixture(
+                                             self.cluster_update_all_the_same),
+                                         "rs":             TestEsClient.get_fixture(
+                                             self.index_logs_rs),
+                                         }],
+                "launch_info":            launch_objects.LaunchInfoForClustering(
+                    launch=launch_objects.Launch(
+                        **TestEsClient.get_fixture(
+                            self.launch_w_items_clustering, to_json=True)),
+                    for_update=False,
+                    numberOfLogLines=2),
+                "expected_result":     [
+                    launch_objects.ClusterResult(
+                        logId=4,
+                        testItemId=2,
+                        project=2,
+                        clusterId="1"),
+                    launch_objects.ClusterResult(
+                        logId=5,
+                        testItemId=5,
+                        project=2,
+                        clusterId="1"),
+                    launch_objects.ClusterResult(
+                        logId=9,
+                        testItemId=6,
+                        project=2,
+                        clusterId="1")]
+            },
+            {
+                "test_calls":          [{"method":         httpretty.GET,
+                                         "uri":            "/2",
+                                         "status":         HTTPStatus.OK,
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/2/_search",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             TestEsClient.get_fixture(
+                                             self.search_logs_rq_first_group),
+                                         "rs":             TestEsClient.get_fixture(
+                                             self.no_hits_search_rs),
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/2/_search",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             TestEsClient.get_fixture(
+                                             self.search_logs_rq_second_group),
+                                         "rs":             TestEsClient.get_fixture(
+                                             self.no_hits_search_rs),
+                                         },
+                                        {"method":         httpretty.POST,
+                                         "uri":            "/_bulk?refresh=true",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             TestEsClient.get_fixture(
+                                             self.cluster_update),
+                                         "rs":             TestEsClient.get_fixture(
+                                             self.index_logs_rs),
+                                         }],
+                "launch_info":            launch_objects.LaunchInfoForClustering(
+                    launch=launch_objects.Launch(
+                        **TestEsClient.get_fixture(
+                            self.launch_w_items_clustering, to_json=True)),
+                    for_update=True,
+                    numberOfLogLines=-1),
+                "expected_result":     [
+                    launch_objects.ClusterResult(
+                        logId=4,
+                        testItemId=2,
+                        project=2,
+                        clusterId="1"),
+                    launch_objects.ClusterResult(
+                        logId=5,
+                        testItemId=5,
+                        project=2,
+                        clusterId="1"),
+                    launch_objects.ClusterResult(
+                        logId=9,
+                        testItemId=6,
+                        project=2,
+                        clusterId="")]
+            },
+            {
+                "test_calls":          [{"method":         httpretty.GET,
+                                         "uri":            "/2",
+                                         "status":         HTTPStatus.OK,
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/2/_search",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             TestEsClient.get_fixture(
+                                             self.search_logs_rq_first_group),
+                                         "rs":             TestEsClient.get_fixture(
+                                             self.one_hit_search_rs_clustering),
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/2/_search",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             TestEsClient.get_fixture(
+                                             self.search_logs_rq_second_group),
+                                         "rs":             TestEsClient.get_fixture(
+                                             self.one_hit_search_rs_clustering),
+                                         },
+                                        {"method":         httpretty.POST,
+                                         "uri":            "/_bulk?refresh=true",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             TestEsClient.get_fixture(
+                                             self.cluster_update_es_update),
+                                         "rs":             TestEsClient.get_fixture(
+                                             self.index_logs_rs),
+                                         }],
+                "launch_info":            launch_objects.LaunchInfoForClustering(
+                    launch=launch_objects.Launch(
+                        **TestEsClient.get_fixture(
+                            self.launch_w_items_clustering, to_json=True)),
+                    for_update=True,
+                    numberOfLogLines=-1),
+                "expected_result":     [
+                    launch_objects.ClusterResult(
+                        logId=4,
+                        testItemId=2,
+                        project=2,
+                        clusterId="1"),
+                    launch_objects.ClusterResult(
+                        logId=5,
+                        testItemId=5,
+                        project=2,
+                        clusterId="1"),
+                    launch_objects.ClusterResult(
+                        logId=111,
+                        testItemId=12,
+                        project=2,
+                        clusterId="1"),
+                    launch_objects.ClusterResult(
+                        logId=9,
+                        testItemId=6,
+                        project=2,
+                        clusterId="")]
+            },
+            {
+                "test_calls":          [{"method":         httpretty.GET,
+                                         "uri":            "/2",
+                                         "status":         HTTPStatus.OK,
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/2/_search",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             TestEsClient.get_fixture(
+                                             self.search_logs_rq_first_group_2lines),
+                                         "rs":             TestEsClient.get_fixture(
+                                             self.one_hit_search_rs_clustering),
+                                         },
+                                        {"method":         httpretty.POST,
+                                         "uri":            "/_bulk?refresh=true",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             TestEsClient.get_fixture(
+                                             self.cluster_update_all_the_same_es_update),
+                                         "rs":             TestEsClient.get_fixture(
+                                             self.index_logs_rs),
+                                         }],
+                "launch_info":            launch_objects.LaunchInfoForClustering(
+                    launch=launch_objects.Launch(
+                        **TestEsClient.get_fixture(
+                            self.launch_w_items_clustering, to_json=True)),
+                    for_update=True,
+                    numberOfLogLines=2),
+                "expected_result":     [
+                    launch_objects.ClusterResult(
+                        logId=4,
+                        testItemId=2,
+                        project=2,
+                        clusterId="1"),
+                    launch_objects.ClusterResult(
+                        logId=5,
+                        testItemId=5,
+                        project=2,
+                        clusterId="1"),
+                    launch_objects.ClusterResult(
+                        logId=9,
+                        testItemId=6,
+                        project=2,
+                        clusterId="1"),
+                    launch_objects.ClusterResult(
+                        logId=111,
+                        testItemId=12,
+                        project=2,
+                        clusterId="1")]
+            },
+        ]
+
+        for idx, test in enumerate(tests[6:]):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
+                config = self.get_default_search_config()
+                es_client = esclient.EsClient(host=self.es_host,
+                                              search_cfg=config)
+
+                response = es_client.find_clusters(test["launch_info"])
+
+                response.should.have.length_of(len(test["expected_result"]))
+
+                cluster_ids_dict = {}
+                for i in range(len(response)):
+                    test["expected_result"][i].logId.should.equal(response[i].logId)
+                    if test["expected_result"][i].clusterId == "":
+                        test["expected_result"][i].clusterId.should.equal(response[i].clusterId)
+                    elif test["expected_result"][i].clusterId not in cluster_ids_dict:
+                        cluster_ids_dict[test["expected_result"][i].clusterId] = response[i].clusterId
+                    elif test["expected_result"][i].clusterId in cluster_ids_dict:
+                        expected_cluster_id = cluster_ids_dict[test["expected_result"][i].clusterId]
+                        expected_cluster_id.should.equal(response[i].clusterId)
+
+                for cluster_id in cluster_ids_dict:
+                    test["test_calls"][-1]["rq"] = test["test_calls"][-1]["rq"].replace(
+                        "\"cluster_id\":\"%s\"" % cluster_id,
+                        "\"cluster_id\":\"%s\"" % cluster_ids_dict[cluster_id])
 
                 TestEsClient.shutdown_server(test["test_calls"])
 

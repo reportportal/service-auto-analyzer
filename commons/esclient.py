@@ -929,6 +929,10 @@ class EsClient:
     @utils.ignore_warnings
     def find_clusters(self, launch_info):
         logger.info("Started clusterizing logs")
+        if not self.index_exists(str(launch_info.launch.project)):
+            logger.info("Project %d doesn't exist", launch_info.launch.project)
+            logger.info("Finished clustering log with 0 clusters.")
+            return []
         t_start = time()
         _clusterizer = clusterizer.Clusterizer()
         log_messages, log_dict = self.prepare_logs_for_clustering(

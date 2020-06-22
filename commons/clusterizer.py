@@ -42,6 +42,8 @@ class Clusterizer:
         return hashes
 
     def find_groups_by_similarity(self, messages, groups_to_check, threshold=0.98):
+        if len(messages) == 0:
+            return {}
         global_group_map = {}
         group_id = 0
         start_time = time()

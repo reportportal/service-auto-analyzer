@@ -99,7 +99,7 @@ class EsQueryBuilder:
                         self.
                         build_more_like_this_query("98%",
                                                    message,
-                                                   field_name="message"),
+                                                   field_name="whole_message"),
                     ]}}}
 
     def build_more_like_this_query(self,

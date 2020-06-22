@@ -22,7 +22,6 @@ import commons.launch_objects as launch_objects
 from commons.es_query_builder import EsQueryBuilder
 from utils import utils
 import os
-import json
 
 
 class TestEsQuery(unittest.TestCase):
@@ -51,13 +50,6 @@ class TestEsQuery(unittest.TestCase):
     @utils.ignore_warnings
     def tearDown(self):
         logging.disable(logging.DEBUG)
-
-    @staticmethod
-    @utils.ignore_warnings
-    def get_fixture(fixture_name, to_json=False):
-        """Read fixture from file"""
-        with open(os.path.join("fixtures", fixture_name), "r") as file:
-            return file.read() if not to_json else json.loads(file.read())
 
     @staticmethod
     @utils.ignore_warnings
@@ -104,7 +96,7 @@ class TestEsQuery(unittest.TestCase):
                 "only_numbers": "1",
                 "found_exceptions": "AssertionError"}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
-        demo_query = TestEsQuery.get_fixture(self.query_all_logs_empty_stacktrace, to_json=True)
+        demo_query = utils.get_fixture(self.query_all_logs_empty_stacktrace, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
 
@@ -133,7 +125,7 @@ class TestEsQuery(unittest.TestCase):
                 "only_numbers": "1",
                 "found_exceptions": "AssertionError"}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
-        demo_query = TestEsQuery.get_fixture(self.query_two_log_lines, to_json=True)
+        demo_query = utils.get_fixture(self.query_two_log_lines, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
 
@@ -162,7 +154,7 @@ class TestEsQuery(unittest.TestCase):
                 "only_numbers": "1",
                 "found_exceptions": "AssertionError"}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
-        demo_query = TestEsQuery.get_fixture(
+        demo_query = utils.get_fixture(
             self.query_two_log_lines_only_current_launch, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
@@ -192,7 +184,7 @@ class TestEsQuery(unittest.TestCase):
                 "only_numbers": "1",
                 "found_exceptions": ""}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
-        demo_query = TestEsQuery.get_fixture(
+        demo_query = utils.get_fixture(
             self.query_two_log_lines_only_current_launch_wo_exceptions, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
@@ -222,7 +214,7 @@ class TestEsQuery(unittest.TestCase):
                 "only_numbers": "1",
                 "found_exceptions": "AssertionError"}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
-        demo_query = TestEsQuery.get_fixture(self.query_all_logs_nonempty_stacktrace, to_json=True)
+        demo_query = utils.get_fixture(self.query_all_logs_nonempty_stacktrace, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
 
@@ -251,7 +243,7 @@ class TestEsQuery(unittest.TestCase):
                 "only_numbers": "1",
                 "found_exceptions": "AssertionError"}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
-        demo_query = TestEsQuery.get_fixture(
+        demo_query = utils.get_fixture(
             self.query_all_logs_nonempty_stacktrace_launches_with_the_same_name, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
@@ -281,7 +273,7 @@ class TestEsQuery(unittest.TestCase):
                 "only_numbers": "",
                 "found_exceptions": "AssertionError"}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
-        demo_query = TestEsQuery.get_fixture(self.query_merged_small_logs_search, to_json=True)
+        demo_query = utils.get_fixture(self.query_merged_small_logs_search, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
 
@@ -389,7 +381,7 @@ class TestEsQuery(unittest.TestCase):
             "logLines": -1})
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_search_query(
             search_req, "log message 1")
-        demo_query = TestEsQuery.get_fixture(self.query_search_logs, to_json=True)
+        demo_query = utils.get_fixture(self.query_search_logs, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
 
@@ -434,7 +426,7 @@ class TestEsQuery(unittest.TestCase):
             test_item_info, log,
             message_field="message_extended", det_mes_field="detected_message_extended",
             stacktrace_field="stacktrace_extended")
-        demo_query = TestEsQuery.get_fixture(self.suggest_query_all_logs_empty_stacktrace, to_json=True)
+        demo_query = utils.get_fixture(self.suggest_query_all_logs_empty_stacktrace, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
 
@@ -479,7 +471,7 @@ class TestEsQuery(unittest.TestCase):
             test_item_info, log,
             message_field="message_extended", det_mes_field="detected_message_extended",
             stacktrace_field="stacktrace_extended")
-        demo_query = TestEsQuery.get_fixture(self.suggest_query_two_log_lines, to_json=True)
+        demo_query = utils.get_fixture(self.suggest_query_two_log_lines, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
 
@@ -524,7 +516,7 @@ class TestEsQuery(unittest.TestCase):
             test_item_info, log,
             message_field="message_extended", det_mes_field="detected_message_extended",
             stacktrace_field="stacktrace_extended")
-        demo_query = TestEsQuery.get_fixture(self.suggest_query_all_logs_nonempty_stacktrace, to_json=True)
+        demo_query = utils.get_fixture(self.suggest_query_all_logs_nonempty_stacktrace, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
 
@@ -570,7 +562,7 @@ class TestEsQuery(unittest.TestCase):
             message_field="message_without_params_extended",
             det_mes_field="detected_message_without_params_extended",
             stacktrace_field="stacktrace_extended")
-        demo_query = TestEsQuery.get_fixture(
+        demo_query = utils.get_fixture(
             self.suggest_query_all_logs_nonempty_stacktrace_launches_with_the_same_name, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
@@ -615,7 +607,7 @@ class TestEsQuery(unittest.TestCase):
             test_item_info, log,
             message_field="message_extended", det_mes_field="detected_message_extended",
             stacktrace_field="stacktrace_extended")
-        demo_query = TestEsQuery.get_fixture(self.suggest_query_merged_small_logs_search, to_json=True)
+        demo_query = utils.get_fixture(self.suggest_query_merged_small_logs_search, to_json=True)
 
         query_from_esclient.should.equal(demo_query)
 

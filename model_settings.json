@@ -1,5 +1,5 @@
 {
-	"BOOST_MODEL_FOLDER": "model/auto_0.8",
+	"BOOST_MODEL_FOLDER": "model/auto_0.9",
 	"SUGGEST_BOOST_MODEL_FOLDER": "model/suggest_0.1",
 	"SIMILARITY_WEIGHTS_FOLDER": "model/weights_0.2"
 }

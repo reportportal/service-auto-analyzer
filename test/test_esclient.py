@@ -1289,16 +1289,19 @@ class TestEsClient(unittest.TestCase):
                         logId=4,
                         testItemId=2,
                         project=2,
+                        launchId=1,
                         clusterId="1"),
                     launch_objects.ClusterResult(
                         logId=5,
                         testItemId=5,
                         project=2,
+                        launchId=1,
                         clusterId="1"),
                     launch_objects.ClusterResult(
                         logId=9,
                         testItemId=6,
                         project=2,
+                        launchId=1,
                         clusterId="")]
             },
             {
@@ -1326,16 +1329,19 @@ class TestEsClient(unittest.TestCase):
                         logId=4,
                         testItemId=2,
                         project=2,
+                        launchId=1,
                         clusterId="1"),
                     launch_objects.ClusterResult(
                         logId=5,
                         testItemId=5,
                         project=2,
+                        launchId=1,
                         clusterId="1"),
                     launch_objects.ClusterResult(
                         logId=9,
                         testItemId=6,
                         project=2,
+                        launchId=1,
                         clusterId="1")]
             },
             {
@@ -1381,16 +1387,19 @@ class TestEsClient(unittest.TestCase):
                         logId=4,
                         testItemId=2,
                         project=2,
+                        launchId=1,
                         clusterId="1"),
                     launch_objects.ClusterResult(
                         logId=5,
                         testItemId=5,
                         project=2,
+                        launchId=1,
                         clusterId="1"),
                     launch_objects.ClusterResult(
                         logId=9,
                         testItemId=6,
                         project=2,
+                        launchId=1,
                         clusterId="")]
             },
             {
@@ -1436,21 +1445,25 @@ class TestEsClient(unittest.TestCase):
                         logId=4,
                         testItemId=2,
                         project=2,
+                        launchId=1,
                         clusterId="1"),
                     launch_objects.ClusterResult(
                         logId=5,
                         testItemId=5,
                         project=2,
+                        launchId=1,
                         clusterId="1"),
                     launch_objects.ClusterResult(
                         logId=111,
                         testItemId=12,
                         project=2,
+                        launchId=1,
                         clusterId="1"),
                     launch_objects.ClusterResult(
                         logId=9,
                         testItemId=6,
                         project=2,
+                        launchId=1,
                         clusterId="")]
             },
             {
@@ -1487,21 +1500,25 @@ class TestEsClient(unittest.TestCase):
                         logId=4,
                         testItemId=2,
                         project=2,
+                        launchId=1,
                         clusterId="1"),
                     launch_objects.ClusterResult(
                         logId=5,
                         testItemId=5,
                         project=2,
+                        launchId=1,
                         clusterId="1"),
                     launch_objects.ClusterResult(
                         logId=9,
                         testItemId=6,
                         project=2,
+                        launchId=1,
                         clusterId="1"),
                     launch_objects.ClusterResult(
                         logId=111,
                         testItemId=12,
                         project=2,
+                        launchId=1,
                         clusterId="1")]
             },
         ]

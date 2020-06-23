@@ -94,6 +94,7 @@ class ClusterResult(BaseModel):
     testItemId: int
     clusterId: str
     project: int
+    launchId: int
 
 
 class SuggestAnalysisResult(BaseModel):

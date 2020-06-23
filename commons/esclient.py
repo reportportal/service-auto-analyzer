@@ -896,6 +896,7 @@ class EsClient:
                             logId=log_dict_part[ind]["_id"],
                             testItemId=log_dict_part[ind]["_source"]["test_item"],
                             project=log_dict_part[ind]["_index"],
+                            launchId=log_dict_part[ind]["_source"]["launch_id"],
                             clusterId=cluster_id))
                     break
             new_clusters[global_group] = new_group
@@ -921,6 +922,7 @@ class EsClient:
                     logId=log_dict[ind]["_id"],
                     testItemId=log_dict[ind]["_source"]["test_item"],
                     project=log_dict[ind]["_index"],
+                    launchId=log_dict[ind]["_source"]["launch_id"],
                     clusterId=cluster_id))
             if cnt_items > 1 and group in additional_results:
                 results_to_return.extend(additional_results[group])

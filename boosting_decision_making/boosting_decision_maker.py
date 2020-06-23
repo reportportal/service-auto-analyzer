@@ -26,10 +26,13 @@ logger = logging.getLogger("analyzerApp.boosting_decision_maker")
 
 class BoostingDecisionMaker:
 
-    def __init__(self, folder="", n_estimators=50, max_depth=5):
+    def __init__(self, folder="", n_estimators=50, max_depth=5,
+                 monotonous_features=""):
         self.n_estimators = n_estimators
         self.max_depth = max_depth
         self.folder = folder
+        self.monotonous_features = utils.transform_string_feature_range_into_list(
+            monotonous_features)
         if not folder.strip():
             self.xg_boost = XGBClassifier(n_estimators=n_estimators,
                                           max_depth=max_depth,
@@ -50,7 +53,7 @@ class BoostingDecisionMaker:
         with open(os.path.join(folder, "boost_model.pickle"), "rb") as f:
             self.n_estimators, self.max_depth, self.xg_boost = pickle.load(f)
         with open(os.path.join(folder, "data_features_config.pickle"), "rb") as f:
-            self.full_config, self.feature_ids = pickle.load(f)
+            self.full_config, self.feature_ids, self.monotonous_features = pickle.load(f)
 
     def save_model(self, folder):
         if not os.path.exists(folder):
@@ -58,9 +61,15 @@ class BoostingDecisionMaker:
         with open(os.path.join(folder, "boost_model.pickle"), "wb") as f:
             pickle.dump([self.n_estimators, self.max_depth, self.xg_boost], f)
         with open(os.path.join(folder, "data_features_config.pickle"), "wb") as f:
-            pickle.dump([self.full_config, self.feature_ids], f)
+            pickle.dump([self.full_config, self.feature_ids, self.monotonous_features], f)
 
     def train_model(self, train_data, labels):
+        mon_features = [
+            (1 if feature in self.monotonous_features else 0) for feature in self.get_feature_ids()]
+        mon_features_prepared = "(" + ",".join([str(f) for f in mon_features]) + ")"
+        self.xg_boost = XGBClassifier(n_estimators=self.n_estimators,
+                                      max_depth=self.max_depth, random_state=43,
+                                      monotone_constraints=mon_features_prepared)
         self.xg_boost.fit(train_data, labels)
         logger.info("Train score: ", self.xg_boost.score(train_data, labels))
         logger.info("Feature importances: ", self.xg_boost.feature_importances_)

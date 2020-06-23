@@ -85,6 +85,9 @@
         "launch_name": {
             "type": "keyword"
         },
+        "launch_id": {
+            "type": "keyword"
+        },
         "unique_id": {
             "type": "keyword"
         },
@@ -97,6 +100,13 @@
         "start_time": {
             "type":   "date",
             "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        },
+        "cluster_id": {
+            "type": "keyword"
+        },
+        "whole_message": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
         }
     }
 }

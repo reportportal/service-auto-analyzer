@@ -496,3 +496,12 @@ def extract_real_id(elastic_id):
     if real_id[-2:] == "_m":
         return int(real_id[:-2])
     return int(real_id)
+
+
+def jaccard_similarity(s1, s2):
+    return len(s1.intersection(s2)) / len(s1.union(s2)) if len(s1.union(s2)) > 0 else 0
+
+
+def get_fixture(fixture_name, to_json=False):
+    with open(os.path.join("fixtures", fixture_name), "r") as file:
+        return json.loads(file.read()) if to_json else file.read()

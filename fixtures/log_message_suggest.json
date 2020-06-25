@@ -2,6 +2,7 @@
 	"_id": 1,
 	"_source": {
 		"log_level": 40000,
+		"unique_id": "unique1",
 		"merged_small_logs": "",
 		"detected_message": "java.lang.NullPointerException 'sdf'",
 		"detected_message_with_numbers": "java.lang.NullPointerException 'sdf'",

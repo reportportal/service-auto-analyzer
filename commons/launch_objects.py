@@ -56,8 +56,8 @@ class TestItem(BaseModel):
 
 class TestItemInfo(BaseModel):
     """Test item info object"""
-    testItemId: int
-    uniqueId: str
+    testItemId: int = 0
+    uniqueId: str = ""
     testCaseHash: int = 0
     launchId: int
     launchName: str = ""

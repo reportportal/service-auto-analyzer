@@ -116,7 +116,10 @@ class BoostingFeaturizer:
         for issue_type in scores_by_issue_type:
             rel_item_unique_id = scores_by_issue_type[issue_type]["mrHit"]["_source"]["unique_id"]
             queiried_item_unique_id = scores_by_issue_type[issue_type]["compared_log"]["_source"]["unique_id"]
-            num_of_logs_issue_type[issue_type] = int(rel_item_unique_id == queiried_item_unique_id)
+            if not rel_item_unique_id.strip() and not queiried_item_unique_id.strip():
+                num_of_logs_issue_type[issue_type] = 0
+            else:
+                num_of_logs_issue_type[issue_type] = int(rel_item_unique_id == queiried_item_unique_id)
         return num_of_logs_issue_type
 
     def has_the_same_test_case_in_all_results(self):
@@ -126,6 +129,8 @@ class BoostingFeaturizer:
         for issue_type in scores_by_issue_type:
             rel_item_unique_id = scores_by_issue_type[issue_type]["mrHit"]["_source"]["unique_id"]
             queiried_item_unique_id = scores_by_issue_type[issue_type]["compared_log"]["_source"]["unique_id"]
+            if not rel_item_unique_id.strip():
+                continue
             if rel_item_unique_id == queiried_item_unique_id:
                 has_the_same_test_case = 1
                 break

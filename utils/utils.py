@@ -438,7 +438,7 @@ def extract_urls(text):
 def extract_paths(text):
     all_unique = set()
     all_paths = []
-    for param in re.findall(r"((^|(?<=[^\w:\\\/]))(\w:)?([\w\d\.\-_]+)?([\\\/]+[\w\d\.\-_]+){2,})", text):
+    for param in re.findall(r"((^|(?<=[^\w:\\\/]))(\w:)?([\w\d\.\-_ ]+)?([\\\/]+[\w\d\.\-_ ]+){2,})", text):
         path = param[0].strip()
         if path not in all_unique:
             all_unique.add(path)

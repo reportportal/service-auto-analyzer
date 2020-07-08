@@ -503,6 +503,7 @@ class TestEsClient(unittest.TestCase):
                 "index_rq":       utils.get_fixture(self.launch_wo_test_items),
                 "has_errors":     False,
                 "expected_count": 0,
+                "expected_log_exceptions": []
             },
             {
                 "test_calls":     [{"method":         httpretty.GET,
@@ -513,6 +514,7 @@ class TestEsClient(unittest.TestCase):
                 "index_rq":       utils.get_fixture(self.launch_w_test_items_wo_logs),
                 "has_errors":     False,
                 "expected_count": 0,
+                "expected_log_exceptions": []
             },
             {
                 "test_calls":     [{"method":         httpretty.GET,
@@ -523,6 +525,7 @@ class TestEsClient(unittest.TestCase):
                 "index_rq":       utils.get_fixture(self.launch_w_test_items_w_empty_logs),
                 "has_errors":     False,
                 "expected_count": 0,
+                "expected_log_exceptions": []
             },
             {
                 "test_calls":     [{"method":         httpretty.GET,
@@ -581,6 +584,11 @@ class TestEsClient(unittest.TestCase):
                 "index_rq":       utils.get_fixture(self.launch_w_test_items_w_logs),
                 "has_errors":     False,
                 "expected_count": 2,
+                "expected_log_exceptions":  [
+                    launch_objects.LogExceptionResult(
+                        logId=1, foundExceptions=['java.lang.NoClassDefFoundError']),
+                    launch_objects.LogExceptionResult(
+                        logId=2, foundExceptions=['java.lang.NoClassDefFoundError'])]
             },
             {
                 "test_calls":     [{"method":         httpretty.GET,
@@ -637,6 +645,7 @@ class TestEsClient(unittest.TestCase):
                     self.launch_w_test_items_w_logs_different_log_level),
                 "has_errors":     False,
                 "expected_count": 1,
+                "expected_log_exceptions": [launch_objects.LogExceptionResult(logId=1, foundExceptions=[])]
             },
         ]
 
@@ -654,6 +663,7 @@ class TestEsClient(unittest.TestCase):
 
                 test["has_errors"].should.equal(response.errors)
                 test["expected_count"].should.equal(response.took)
+                test["expected_log_exceptions"].should.equal(response.logResults)
 
                 TestEsClient.shutdown_server(test["test_calls"])
 

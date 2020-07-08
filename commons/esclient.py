@@ -168,11 +168,23 @@ class EsClient:
                     logs_added = True
                 if logs_added:
                     test_item_ids.append(str(test_item.testItemId))
+        logs_with_exceptions = self.extract_all_exceptions(bodies)
         result = self._bulk_index(bodies)
+        result.logResults = logs_with_exceptions
         self._merge_logs(test_item_ids, project)
         logger.info("Finished indexing logs for %d launches. It took %.2f sec.",
                     len(launches), time() - t_start)
         return result
+
+    def extract_all_exceptions(self, bodies):
+        logs_with_exceptions = []
+        for log_body in bodies:
+            exceptions = [exc.strip() for exc in log_body["_source"]["found_exceptions"].split()]
+            logs_with_exceptions.append(
+                commons.launch_objects.LogExceptionResult(
+                    logId=int(log_body["_id"]),
+                    foundExceptions=exceptions))
+        return logs_with_exceptions
 
     def clean_message(self, message):
         message = utils.replace_tabs_for_newlines(message)

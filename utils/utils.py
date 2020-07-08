@@ -395,11 +395,11 @@ def read_json_file(folder, filename, to_json=False):
         return file.read() if not to_json else json.loads(file.read())
 
 
-def get_found_exceptions(text):
+def get_found_exceptions(text, to_lower=False):
     """Extract exception and errors from logs"""
     unique_exceptions = set()
     found_exceptions = []
-    for word in split_words(text):
+    for word in split_words(text, to_lower=to_lower):
         for key_word in ["error", "exception", "failure"]:
             if re.search(r"[^\s]{3,}%s(\s|$)" % key_word, word.lower()) is not None:
                 if word not in unique_exceptions:

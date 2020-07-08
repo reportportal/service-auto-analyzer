@@ -130,25 +130,16 @@ class Response(BaseModel):
     status: int = 0
 
 
-class IndexResult(BaseModel):
-    """Index result object"""
-    _index: str
-    _type: str
-    _id: str
-    _version: int
-    result: str
-    created: bool
-    status: int
-
-
-class Item(BaseModel):
-    """Index item object"""
-    index: IndexResult
+class LogExceptionResult(BaseModel):
+    """Log object with exceptions"""
+    logId: int
+    foundExceptions: List[str] = []
 
 
 class BulkResponse(BaseModel):
     """Bulk response object"""
     took: int
     errors: bool
-    items: List[Item] = []
+    items: List[str] = []
+    logResults: List[LogExceptionResult] = []
     status: int = 0

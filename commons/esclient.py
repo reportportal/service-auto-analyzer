@@ -115,15 +115,16 @@ class EsClient:
         res = EsClient.send_request(url, "GET")
         return res
 
-    def index_exists(self, index_name):
+    def index_exists(self, index_name, print_error=True):
         """Checks whether index exists"""
         try:
             index = self.es_client.indices.get(index=str(index_name))
             return index is not None
         except Exception as err:
-            logger.error("Index %s was not found", str(index_name))
-            logger.error("ES Url %s", self.host)
-            logger.error(err)
+            if print_error:
+                logger.error("Index %s was not found", str(index_name))
+                logger.error("ES Url %s", self.host)
+                logger.error(err)
             return False
 
     def delete_index(self, index_name):
@@ -141,7 +142,7 @@ class EsClient:
 
     def create_index_if_not_exists(self, index_name):
         """Creates index if it doesn't not exist"""
-        if not self.index_exists(index_name):
+        if not self.index_exists(index_name, print_error=False):
             return self.create_index(index_name)
         return True
 

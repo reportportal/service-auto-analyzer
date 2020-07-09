@@ -23,13 +23,9 @@ Perform next steps inside source directory of the analyzer.
 ```
   /venv/bin/python3 -m nltk.downloader -d /usr/share/nltk_data stopwords
 ```
-5. Set the environmental variable for the model
+5. Start the uwsgi server, you can change properties, such as the workers quantity for running the analyzer in the several processes
 ```
-  EXPORT BOOST_MODEL_FOLDER="model/0.6"
-```
-6. Start the uwsgi server, you can change properties, such as the workers quantity for running the analyzer in the several processes
-```
-  /venv/bin/uwsgi --workers 4 --socket :3031 --wsgi-file app.py --master --http :5000 --threads 8 --lazy-apps 1 --wsgi-env-behavior holy --virtualenv /venv
+  /venv/bin/uwsgi --ini app.ini
   ```
  
 ## For Windows:
@@ -49,11 +45,7 @@ python -m pip install -r requirements_windows.txt
 ```
 python -m nltk.downloader stopwords
 ```
-5. Set the environmental variable for the model
-```
-setx BOOST_MODEL_FOLDER "model/0.6"
-```
-6. Start the program.
+5. Start the program.
 ```
 python app.py
 ```

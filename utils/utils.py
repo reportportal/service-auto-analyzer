@@ -462,8 +462,10 @@ def enrich_found_exceptions(text):
     new_words = []
     for word in text.split(" "):
         word_parts = word.split(".")
-        for i in range(len(word_parts)):
-            new_word_part = ".".join(word_parts[i:])
+        new_words.append(word)
+        unique_words.add(word)
+        for i in [2, 1]:
+            new_word_part = ".".join(word_parts[-i:])
             if new_word_part not in unique_words:
                 new_words.append(new_word_part)
                 unique_words.add(new_word_part)
@@ -482,10 +484,10 @@ def enrich_text_with_method_and_classes(text):
                     found_values.append(w)
         for val in sorted(found_values, key=lambda x: len(x.split(".")), reverse=False):
             words = val.split(".")
-            full_path = ""
-            for i in range(2, len(words)):
-                full_path = full_path + " " + ".".join(words[:i])
-            full_path = full_path + " " + ".".join(words[-2:]) + " " + words[-1] + " "
+            full_path = val
+            for i in [2, 1]:
+                full_path = full_path + " " + ".".join(words[-i:])
+            full_path = full_path + " "
             new_line = re.sub(r"\b(?<!\.)%s(?!\.)\b" % val, full_path, new_line)
         new_lines.append(new_line)
     return "\n".join(new_lines)

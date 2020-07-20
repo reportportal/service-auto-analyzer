@@ -28,12 +28,7 @@ from flask_cors import CORS
 import amqp.amqp_handler as amqp_handler
 from amqp.amqp import AmqpClient
 from commons.esclient import EsClient
-from boosting_decision_making import boosting_decision_maker
 from utils import utils
-
-
-def get_bool_value(str):
-    return True if str.lower() == "true" else False
 
 
 APP_CONFIG = {
@@ -43,21 +38,21 @@ APP_CONFIG = {
     "exchangeName":      os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
     "analyzerPriority":  int(os.getenv("ANALYZER_PRIORITY", "1")),
     "analyzerIndex":     json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),
-    "analyzerLogSearch": json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower()),
-    "boostModelFolder":  os.getenv("BOOST_MODEL_FOLDER"),
+    "analyzerLogSearch": json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower())
 }
 
 SEARCH_CONFIG = {
-    "MinShouldMatch":           os.getenv("ES_MIN_SHOULD_MATCH", "80%"),
-    "BoostAA":                  float(os.getenv("ES_BOOST_AA", "-8.0")),
-    "BoostLaunch":              float(os.getenv("ES_BOOST_LAUNCH", "4.0")),
-    "BoostUniqueID":            float(os.getenv("ES_BOOST_UNIQUE_ID", "8.0")),
-    "MaxQueryTerms":            int(os.getenv("ES_MAX_QUERY_TERMS", "50")),
-    "SearchLogsMinShouldMatch": os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "80%"),
-    "SearchLogsMinSimilarity":  float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.9")),
-    "MinWordLength":            int(os.getenv("ES_MIN_WORD_LENGTH", "0")),
-    "FilterMinShouldMatch":     get_bool_value(os.getenv("FILTER_MIN_SHOULD_MATCH", "true")),
-    "AllowParallelAnalysis": json.loads(os.getenv("ALLOW_PARALLEL_ANALYSIS", "false").lower())
+    "MinShouldMatch":              os.getenv("ES_MIN_SHOULD_MATCH", "80%"),
+    "BoostAA":                     float(os.getenv("ES_BOOST_AA", "-8.0")),
+    "BoostLaunch":                 float(os.getenv("ES_BOOST_LAUNCH", "4.0")),
+    "BoostUniqueID":               float(os.getenv("ES_BOOST_UNIQUE_ID", "8.0")),
+    "MaxQueryTerms":               int(os.getenv("ES_MAX_QUERY_TERMS", "50")),
+    "SearchLogsMinSimilarity":     float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.98")),
+    "MinWordLength":               int(os.getenv("ES_MIN_WORD_LENGTH", "2")),
+    "BoostModelFolderAllLines":    "",
+    "BoostModelFolderNotAllLines": "",
+    "SuggestBoostModelFolder":    "",
+    "SimilarityWeightsFolder":     ""
 }
 
 
@@ -84,10 +79,7 @@ def create_ampq_client():
 
 def create_es_client():
     """Creates Elasticsearch client"""
-    _es_client = EsClient(APP_CONFIG["esHost"], SEARCH_CONFIG)
-    decision_maker = boosting_decision_maker.BoostingDecisionMaker(APP_CONFIG["boostModelFolder"])
-    _es_client.set_boosting_decision_maker(decision_maker)
-    return _es_client
+    return EsClient(APP_CONFIG["esHost"], SEARCH_CONFIG)
 
 
 def declare_exchange(channel, config):
@@ -112,12 +104,6 @@ def declare_exchange(channel, config):
 
 def init_amqp(_amqp_client, request_handler):
     """Initialize rabbitmq queues, exchange and stars threads for queue messages processing"""
-    index_queue = "index"
-    analyze_queue = "analyze"
-    delete_queue = "delete"
-    clean_queue = "clean"
-    search_queue = "search"
-
     with _amqp_client.connection.channel() as channel:
         try:
             declare_exchange(channel, APP_CONFIG)
@@ -128,21 +114,21 @@ def init_amqp(_amqp_client, request_handler):
     threads = []
 
     threads.append(create_thread(create_ampq_client().receive,
-                   (APP_CONFIG["exchangeName"], index_queue, True, False,
+                   (APP_CONFIG["exchangeName"], "index", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.index_logs,
                                                     prepare_response_data=amqp_handler.
                                                     prepare_index_response_data))))
     threads.append(create_thread(create_ampq_client().receive,
-                   (APP_CONFIG["exchangeName"], analyze_queue, True, False,
+                   (APP_CONFIG["exchangeName"], "analyze", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.analyze_logs,
                                                     prepare_response_data=amqp_handler.
                                                     prepare_analyze_response_data))))
     threads.append(create_thread(create_ampq_client().receive,
-                   (APP_CONFIG["exchangeName"], delete_queue, True, False,
+                   (APP_CONFIG["exchangeName"], "delete", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.delete_index,
@@ -151,7 +137,7 @@ def init_amqp(_amqp_client, request_handler):
                                                     prepare_response_data=amqp_handler.
                                                     output_result))))
     threads.append(create_thread(create_ampq_client().receive,
-                   (APP_CONFIG["exchangeName"], clean_queue, True, False,
+                   (APP_CONFIG["exchangeName"], "clean", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.delete_logs,
@@ -160,7 +146,7 @@ def init_amqp(_amqp_client, request_handler):
                                                     prepare_response_data=amqp_handler.
                                                     output_result))))
     threads.append(create_thread(create_ampq_client().receive,
-                   (APP_CONFIG["exchangeName"], search_queue, True, False,
+                   (APP_CONFIG["exchangeName"], "search", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.search_logs,
@@ -199,6 +185,14 @@ def read_version():
     return ""
 
 
+def read_model_settings():
+    """Reads paths to models"""
+    model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
+    SEARCH_CONFIG["BoostModelFolder"] = model_settings["BOOST_MODEL_FOLDER"]
+    SEARCH_CONFIG["SuggestBoostModelFolder"] = model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
+    SEARCH_CONFIG["SimilarityWeightsFolder"] = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
+
+
 log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.conf')
 logging.config.fileConfig(log_file_path)
 if APP_CONFIG["logLevel"].lower() == "debug":
@@ -209,6 +203,7 @@ else:
     logging.disable(logging.INFO)
 logger = logging.getLogger("analyzerApp")
 version = read_version()
+read_model_settings()
 
 application = create_application()
 CORS(application)

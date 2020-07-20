@@ -27,8 +27,7 @@ class RpcClient():
     """RpcClient helps to use RPC type of communication with rabbitmq"""
     def __init__(self):
         self.connection = pika.BlockingConnection(
-            pika.connection.
-            URLParameters(os.getenv("AMQP_URL") + "/analyzer?heartbeat=600"))
+            pika.connection.URLParameters(os.getenv("AMQP_URL", "") + "/analyzer?heartbeat=600"))
         self.response = None
         self.corr_id = None
 
@@ -114,7 +113,91 @@ index_data = [{
                         "logLevel": 40000,
                         "message": "error occured \r\n error found \r\n error mined"}, ]
                    }, ],
-}]
+}, {
+    "launchId": 2,
+    "project": 34,
+    "launchName": "dsfdsf",
+    "analyzerConfig": {
+        "minDocFreq": 1.0,
+        "minTermFreq": 1.0,
+        "minShouldMatch": 80,
+        "numberOfLogLines": -1,
+        "isAutoAnalyzerEnabled": True,
+        "analyzerMode": "ALL",
+        "indexingRunning": True,
+    },
+    "testItems": [{"testItemId": 5,
+                   "uniqueId": "df5",
+                   "isAutoAnalyzed": False,
+                   "issueType": "ab001",
+                   "originalIssueType": "PB001",
+                   "logs": [
+                       {"logId": 6,
+                        "logLevel": 40000,
+                        "message": "error occured"},
+                       {"logId": 8,
+                        "logLevel": 40000,
+                        "message": "error occured \r\n error found \r\n error mined"}, ]
+                   },
+                  {"testItemId": 78,
+                   "uniqueId": "df5",
+                   "isAutoAnalyzed": False,
+                   "issueType": "pb001",
+                   "originalIssueType": "PB001",
+                   "logs": [
+                       {"logId": 45,
+                        "logLevel": 40000,
+                        "message": "error occured"},
+                       {"logId": 81,
+                        "logLevel": 40000,
+                        "message": "error occured \r\n error found \r\n error mined"}, ]
+                   },
+                  {"testItemId": 10,
+                   "uniqueId": "df12",
+                   "isAutoAnalyzed": False,
+                   "issueType": "ab001",
+                   "originalIssueType": "ab001",
+                   "logs": [
+                       {"logId": 38,
+                        "logLevel": 40000,
+                        "message": "error occured \r\n error found \r\n error mined"}, ]
+                   }, ],
+}, {
+    "launchId": 1,
+    "project": 34,
+    "launchName": "dsfdsf",
+    "analyzerConfig": {
+        "minDocFreq": 1.0,
+        "minTermFreq": 1.0,
+        "minShouldMatch": 80,
+        "numberOfLogLines": -1,
+        "isAutoAnalyzerEnabled": True,
+        "analyzerMode": "ALL",
+        "indexingRunning": True,
+    },
+    "testItems": [{"testItemId": 23,
+                   "uniqueId": "df",
+                   "isAutoAnalyzed": False,
+                   "issueType": "pb001",
+                   "originalIssueType": "PB001",
+                   "logs": [
+                       {"logId": 32,
+                        "logLevel": 40000,
+                        "message": "error occured"},
+                       {"logId": 46,
+                        "logLevel": 40000,
+                        "message": "error occured \r\n error found \r\n error mined"}, ]
+                   },
+                  {"testItemId": 13,
+                   "uniqueId": "df",
+                   "isAutoAnalyzed": False,
+                   "issueType": "pb001",
+                   "originalIssueType": "PB001",
+                   "logs": [
+                       {"logId": 78,
+                        "logLevel": 40000,
+                        "message": "error occured \r\n error found \r\n assertionerror mined"}]
+                   }]}]
 
 search_data = {
     "launchId": 4,
@@ -131,6 +214,12 @@ clean_index_data = {
 }
 
 used_method = sys.argv[1] if len(sys.argv) > 1 else "index"
+for_update = False
+if len(sys.argv) > 2:
+    for_update = True if sys.argv[2].lower() == "true" else False
+number_lines = -1
+if len(sys.argv) > 3:
+    number_lines = int(sys.argv[3])
 print(" [x] calling method %s" % used_method)
 if used_method.strip() in ["delete"]:
     response = rpc.call("34", used_method)
@@ -140,7 +229,17 @@ elif used_method.strip() in ["clean"]:
     print(" [.] Got %r" % response)
 elif used_method.strip() in ["search"]:
     response = rpc.call(json.dumps(search_data), used_method)
-    print(" [.] Got %r" % response)
+elif used_method.strip() in ["suggest"]:
+    response = rpc.call(json.dumps(test_item_info), used_method)
+elif used_method.strip() in ["cluster"]:
+    if not for_update:
+        response = rpc.call(json.dumps({"launch": index_data[0],
+                                        "for_update": for_update,
+                                        "numberOfLogLines": number_lines}), used_method)
+    else:
+        response = rpc.call(json.dumps({"launch": index_data[2],
+                                        "for_update": for_update,
+                                        "numberOfLogLines": number_lines}), used_method)
 else:
     response = rpc.call(json.dumps(index_data), used_method)
     print(" [.] Got %r" % response)

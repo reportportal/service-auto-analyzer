@@ -39,6 +39,7 @@ class Log(BaseModel):
     logId: int
     logLevel: int = 0
     message: str
+    clusterId: str = ""
 
 
 class TestItem(BaseModel):
@@ -53,6 +54,18 @@ class TestItem(BaseModel):
     logs: List[Log] = []
 
 
+class TestItemInfo(BaseModel):
+    """Test item info object"""
+    testItemId: int = 0
+    uniqueId: str = ""
+    testCaseHash: int = 0
+    launchId: int
+    launchName: str = ""
+    project: int
+    analyzerConfig: AnalyzerConf = AnalyzerConf()
+    logs: List[Log] = []
+
+
 class Launch(BaseModel):
     """Launch object"""
     launchId: int
@@ -62,11 +75,35 @@ class Launch(BaseModel):
     testItems: List[TestItem] = []
 
 
+class LaunchInfoForClustering(BaseModel):
+    launch: Launch
+    for_update: bool
+    numberOfLogLines: int
+
+
 class AnalysisResult(BaseModel):
     """Analysis result object"""
     testItem: int
     issueType: str
     relevantItem: int
+
+
+class ClusterResult(BaseModel):
+    """Analysis result object"""
+    logId: int
+    testItemId: int
+    clusterId: str
+    project: int
+    launchId: int
+
+
+class SuggestAnalysisResult(BaseModel):
+    """Analysis result object"""
+    testItem: int
+    issueType: str
+    relevantItem: int
+    relevantLogId: int
+    matchScore: float
 
 
 class CleanIndex(BaseModel):
@@ -93,25 +130,16 @@ class Response(BaseModel):
     status: int = 0
 
 
-class IndexResult(BaseModel):
-    """Index result object"""
-    _index: str
-    _type: str
-    _id: str
-    _version: int
-    result: str
-    created: bool
-    status: int
-
-
-class Item(BaseModel):
-    """Index item object"""
-    index: IndexResult
+class LogExceptionResult(BaseModel):
+    """Log object with exceptions"""
+    logId: int
+    foundExceptions: List[str] = []
 
 
 class BulkResponse(BaseModel):
     """Bulk response object"""
     took: int
     errors: bool
-    items: List[Item] = []
+    items: List[str] = []
+    logResults: List[LogExceptionResult] = []
     status: int = 0

@@ -32,6 +32,11 @@ def prepare_search_logs(search_data):
     return launch_objects.SearchLogs(**search_data)
 
 
+def prepare_launch_info(launch_info):
+    """Function for deserializing search logs object"""
+    return launch_objects.LaunchInfoForClustering(**launch_info)
+
+
 def prepare_clean_index(clean_index):
     """Function for deserializing clean index object"""
     return launch_objects.CleanIndex(**clean_index)

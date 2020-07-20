@@ -130,8 +130,19 @@ def remove_starting_datetime(text, remove_first_digits=False):
     return " ".join(text_split[idx_text_start:])
 
 
+def is_starting_message_pattern(text):
+    processed_text = remove_starting_datetime(text).strip()
+    for ext in file_extensions:
+        res = re.search(r"\w*\s*\(\s*.*\.%s:\d+\s*\)" % ext, processed_text)
+        if res and processed_text.startswith(res.group(0)):
+            return True
+    return False
+
+
 def delete_line_numbers(text):
     """Deletes line numbers in the stacktrace"""
+    if is_starting_message_pattern(text):
+        return text
     text = re.sub(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)", r"\g<1>#\g<2>", text)
 
     res = re.sub(r"(?<=:)\d+(?=\)?\]?(\n|\r\n|$))", " ", text)
@@ -167,12 +178,6 @@ def is_python_log(log):
     return False
 
 
-def reverse_log_if_needed(message):
-    if is_python_log(message):
-        return reverse_log(message)
-    return message
-
-
 def has_stacktrace_keywords(line):
     normalized_line = line.lower()
     for key_word in ["stacktrace", "stack trace", "stack-trace", "traceback"]:
@@ -191,12 +196,42 @@ def has_more_lines_pattern(line):
     return False
 
 
-def detect_log_description_and_stacktrace(message, default_log_number=1, max_log_lines=5):
+def detect_log_parts_python(message, default_log_number=1):
+    detected_message_lines = []
+    stacktrace_lines = []
+    traceback_begin = False
+    detected_message_begin = True
+    skip_exceptions_finding = False
+    for idx, line in enumerate(message.split("\n")):
+        for key_word in ["stacktrace", "stack trace", "stack-trace", "traceback", "trace back"]:
+            if key_word in line.lower():
+                traceback_begin = True
+                detected_message_begin = False
+                skip_exceptions_finding = True
+                break
+
+        if not skip_exceptions_finding and get_found_exceptions(line):
+            detected_message_begin = True
+            traceback_begin = False
+        if traceback_begin:
+            stacktrace_lines.append(line)
+        elif detected_message_begin:
+            detected_message_lines.append(line)
+        skip_exceptions_finding = False
+    if len(detected_message_lines) == 0:
+        detected_message_lines = stacktrace_lines[-default_log_number:]
+        stacktrace_lines = stacktrace_lines[:-default_log_number]
+    return "\n".join(detected_message_lines), "\n".join(stacktrace_lines)
+
+
+def detect_log_description_and_stacktrace(message):
     """Split a log into a log message and stacktrace"""
     message = delete_empty_lines(message)
     if default_log_number == -1:
         return message, ""
     if calculate_line_number(message) > 2:
+        if is_python_log(message):
+            return detect_log_parts_python(message)
         split_lines = message.split("\n")
         detected_message_lines = []
         stacktrace_lines = []
@@ -335,3 +370,137 @@ def remove_credentials_from_url(url):
     parsed_url = urlparse(url)
     new_netloc = re.sub("^.+?:.+?@", "", parsed_url.netloc)
     return url.replace(parsed_url.netloc, new_netloc)
+
+
+def clean_colon_stacking(text):
+    return text.replace(":", " : ")
+
+
+def leave_only_unique_logs(logs):
+    unique_logs = set()
+    all_logs = []
+    for log in logs:
+        if log.message.strip() not in unique_logs:
+            all_logs.append(log)
+            unique_logs.add(log.message.strip())
+    return all_logs
+
+
+def read_json_file(folder, filename, to_json=False):
+    """Read fixture from file"""
+    with open(os.path.join(folder, filename), "r") as file:
+        return file.read() if not to_json else json.loads(file.read())
+
+
+def get_found_exceptions(text, to_lower=False):
+    """Extract exception and errors from logs"""
+    unique_exceptions = set()
+    found_exceptions = []
+    for word in split_words(text, to_lower=to_lower):
+        for key_word in ["error", "exception", "failure"]:
+            if re.search(r"[^\s]{3,}%s(\s|$)" % key_word, word.lower()) is not None:
+                if word not in unique_exceptions:
+                    found_exceptions.append(word)
+                    unique_exceptions.add(word)
+                break
+    return " ".join(found_exceptions)
+
+
+def clean_from_params(text):
+    text = re.sub(r"(?<=[^\w])('.+?'|\".+?\")(?=[^\w]|$)|(?<=^)('.+?'|\".+?\")(?=[^\w]|$)", " ", text)
+    return re.sub(r" +", " ", text).strip()
+
+
+def clean_from_urls(text):
+    text = re.sub(r"(http|https|ftp):[^\s]+|\bwww\.[^\s]+", " ", text)
+    return re.sub(r" +", " ", text).strip()
+
+
+def clean_from_paths(text):
+    text = re.sub(r"(^|(?<=[^\w:\\\/]))(\w:)?([\w\d\.\-_]+)?([\\\/]+[\w\d\.\-_]+){2,}", " ", text)
+    return re.sub(r" +", " ", text).strip()
+
+
+def extract_urls(text):
+    all_unique = set()
+    all_urls = []
+    for param in re.findall(r"((http|https|ftp):[^\s]+|\bwww\.[^\s]+)", text):
+        url = param[0].strip()
+        if url not in all_unique:
+            all_unique.add(url)
+            all_urls.append(url)
+    return all_urls
+
+
+def extract_paths(text):
+    all_unique = set()
+    all_paths = []
+    for param in re.findall(r"((^|(?<=[^\w:\\\/]))(\w:)?([\w\d\.\-_ ]+)?([\\\/]+[\w\d\.\-_ ]+){2,})", text):
+        path = param[0].strip()
+        if path not in all_unique:
+            all_unique.add(path)
+            all_paths.append(path)
+    return all_paths
+
+
+def extract_message_params(text):
+    all_unique = set()
+    all_params = []
+    for param in re.findall(r"(^|[^\w])('.+?'|\".+?\")([^\w]|$|\n)", text):
+        param = re.search(r"[^\'\"]+", param[1].strip()).group(0).strip()
+        if param not in all_unique:
+            all_unique.add(param)
+            all_params.append(param)
+    return all_params
+
+
+def enrich_found_exceptions(text):
+    unique_words = set()
+    new_words = []
+    for word in text.split(" "):
+        word_parts = word.split(".")
+        new_words.append(word)
+        unique_words.add(word)
+        for i in [2, 1]:
+            new_word_part = ".".join(word_parts[-i:])
+            if new_word_part not in unique_words:
+                new_words.append(new_word_part)
+                unique_words.add(new_word_part)
+    return " ".join(new_words)
+
+
+def enrich_text_with_method_and_classes(text):
+    new_lines = []
+    for line in text.split("\n"):
+        new_line = line
+        found_values = []
+        for w in split_words(line, min_word_length=0, only_unique=True, split_urls=True, to_lower=False):
+            if len(w.split(".")) > 2:
+                last_word = w.split(".")[-1]
+                if len(last_word) > 3:
+                    found_values.append(w)
+        for val in sorted(found_values, key=lambda x: len(x.split(".")), reverse=False):
+            words = val.split(".")
+            full_path = val
+            for i in [2, 1]:
+                full_path = full_path + " " + ".".join(words[-i:])
+            full_path = full_path + " "
+            new_line = re.sub(r"\b(?<!\.)%s(?!\.)\b" % val, full_path, new_line)
+        new_lines.append(new_line)
+    return "\n".join(new_lines)
+
+
+def extract_real_id(elastic_id):
+    real_id = str(elastic_id)
+    if real_id[-2:] == "_m":
+        return int(real_id[:-2])
+    return int(real_id)
+
+
+def jaccard_similarity(s1, s2):
+    return len(s1.intersection(s2)) / len(s1.union(s2)) if len(s1.union(s2)) > 0 else 0
+
+
+def get_fixture(fixture_name, to_json=False):
+    with open(os.path.join("fixtures", fixture_name), "r") as file:
+        return json.loads(file.read()) if to_json else file.read()

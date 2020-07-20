@@ -47,6 +47,11 @@ def prepare_delete_index(body):
     return int(body)
 
 
+def prepare_test_item_info(test_item_info):
+    """Function for deserializing test item info for suggestions"""
+    return launch_objects.TestItemInfo(**test_item_info)
+
+
 def prepare_search_response_data(response):
     """Function for serializing response from search request"""
     return json.dumps(response)

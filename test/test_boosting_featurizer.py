@@ -18,6 +18,7 @@ import unittest
 import logging
 import sure # noqa
 from boosting_decision_making.boosting_featurizer import BoostingFeaturizer
+from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from utils import utils
 
 
@@ -28,6 +29,14 @@ class TestBoostingFeaturizer(unittest.TestCase):
         self.one_hit_search_rs_explained = "one_hit_search_rs_explained.json"
         self.two_hits_search_rs_explained = "two_hits_search_rs_explained.json"
         self.log_message = "log_message.json"
+        self.log_message_wo_stacktrace = "log_message_wo_stacktrace.json"
+        self.one_hit_search_rs_explained_wo_stacktrace =\
+            "one_hit_search_rs_explained_wo_stacktrace.json"
+        self.log_message_only_small_logs = "log_message_only_small_logs.json"
+        self.one_hit_search_rs_small_logs = "one_hit_search_rs_small_logs.json"
+        self.two_hits_search_rs_small_logs = "two_hits_search_rs_small_logs.json"
+        self.three_hits_search_rs_explained = "three_hits_search_rs_explained.json"
+        self.one_hit_search_rs_explained_wo_params = "one_hit_search_rs_explained_wo_params.json"
         self.epsilon = 0.0001
         logging.disable(logging.CRITICAL)
 
@@ -37,12 +46,17 @@ class TestBoostingFeaturizer(unittest.TestCase):
 
     @staticmethod
     @utils.ignore_warnings
-    def get_default_config():
+    def get_default_config(
+            filter_fields=["detected_message", "stacktrace"],
+            filter_fields_any=[]):
         """Get default config"""
         return {
             "max_query_terms":  50,
             "min_should_match": 0.8,
             "min_word_length":  0,
+            "filter_min_should_match": filter_fields,
+            "filter_min_should_match_any": filter_fields_any,
+            "number_of_log_lines": -1
         }
 
     @utils.ignore_warnings

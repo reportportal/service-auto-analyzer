@@ -19,7 +19,7 @@ import sure # noqa
 import logging
 
 import commons.launch_objects as launch_objects
-import commons.esclient as esclient
+from commons.es_query_builder import EsQueryBuilder
 from utils import utils
 import os
 
@@ -28,6 +28,23 @@ class TestEsQuery(unittest.TestCase):
     """Tests building analyze query"""
     @utils.ignore_warnings
     def setUp(self):
+        self.query_all_logs_empty_stacktrace = "query_all_logs_empty_stacktrace.json"
+        self.query_two_log_lines = "query_two_log_lines.json"
+        self.query_all_logs_nonempty_stacktrace = "query_all_logs_nonempty_stacktrace.json"
+        self.query_merged_small_logs_search = "query_merged_small_logs_search.json"
+        self.query_search_logs = "query_search_logs.json"
+        self.query_two_log_lines_only_current_launch = "query_two_log_lines_only_current_launch.json"
+        self.query_two_log_lines_only_current_launch_wo_exceptions =\
+            "query_two_log_lines_only_current_launch_wo_exceptions.json"
+        self.query_all_logs_nonempty_stacktrace_launches_with_the_same_name =\
+            "query_all_logs_nonempty_stacktrace_launches_with_the_same_name.json"
+        self.suggest_query_all_logs_empty_stacktrace = "suggest_query_all_logs_empty_stacktrace.json"
+        self.suggest_query_two_log_lines = "suggest_query_two_log_lines.json"
+        self.suggest_query_all_logs_nonempty_stacktrace =\
+            "suggest_query_all_logs_nonempty_stacktrace.json"
+        self.suggest_query_all_logs_nonempty_stacktrace_launches_with_the_same_name =\
+            "suggest_query_all_logs_nonempty_stacktrace_launches_with_the_same_name.json"
+        self.suggest_query_merged_small_logs_search = "suggest_query_merged_small_logs_search.json"
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings
@@ -46,8 +63,13 @@ class TestEsQuery(unittest.TestCase):
             "BoostLaunch":    5,
             "BoostUniqueID":  3,
             "MaxQueryTerms":  50,
+            "SearchLogsMinShouldMatch": "90%",
+            "SearchLogsMinSimilarity": 0.9,
+            "MinWordLength":  0,
+            "BoostModelFolderAllLines":    os.getenv("BOOST_MODEL_FOLDER_ALL_LINES", ""),
+            "BoostModelFolderNotAllLines": os.getenv("BOOST_MODEL_FOLDER_NOT_ALL_LINES", ""),
+            "SimilarityWeightsFolder":     os.getenv("SIMILARITY_WEIGHTS_FOLDER", "")
         }
-        error_logging_level = 40000
 
     @utils.ignore_warnings
     def test_build_analyze_query_all_logs_empty_stacktrace(self):
@@ -141,9 +163,10 @@ class TestEsQuery(unittest.TestCase):
     def test_build_analyze_query_two_log_lines_only_current_launch_wo_exceptions(self):
         """Tests building analyze query"""
         search_cfg = TestEsQuery.get_default_search_config()
+
         launch = launch_objects.Launch(**{
-            "analyzerConfig": {"analyzerMode": "SearchModeAll"},
-            "launchId": 123,
+            "analyzerConfig": {"analyzerMode": "CURRENT_LAUNCH", "numberOfLogLines": 2},
+            "launchId": 12,
             "launchName": "Launch name",
             "project": 1})
         log = {
@@ -152,7 +175,7 @@ class TestEsQuery(unittest.TestCase):
             "_source": {
                 "unique_id":        "unique",
                 "test_case_hash":   1,
-                "test_item":        123,
+                "test_item":        "123",
                 "message":          "hello world",
                 "merged_small_logs":  "",
                 "detected_message": "hello world",
@@ -225,7 +248,6 @@ class TestEsQuery(unittest.TestCase):
 
         query_from_esclient.should.equal(demo_query)
 
-    @staticmethod
     @utils.ignore_warnings
     def test_build_analyze_query_merged_small_logs_search(self):
         """Tests building analyze query"""
@@ -278,8 +300,17 @@ class TestEsQuery(unittest.TestCase):
                     ],
                     "must": [
                         {"more_like_this": {
-                            "fields":               ["message"],
-                            "like":                 log["_source"]["message"],
+                            "fields":               ["detected_message"],
+                            "like":                 log["_source"]["detected_message"],
+                            "min_doc_freq":         1,
+                            "min_term_freq":        1,
+                            "minimum_should_match": "5<" + search_cfg["MinShouldMatch"],
+                            "max_query_terms":      search_cfg["MaxQueryTerms"],
+                            "boost":                4.0,
+                        }, },
+                        {"more_like_this": {
+                            "fields":               ["stacktrace"],
+                            "like":                 log["_source"]["stacktrace"],
                             "min_doc_freq":         1,
                             "min_term_freq":        1,
                             "minimum_should_match": "5<" + search_cfg["MinShouldMatch"],
@@ -322,15 +353,6 @@ class TestEsQuery(unittest.TestCase):
                             "boost":                0.5,
                         }},
                         {"more_like_this": {
-                            "fields":               ["detected_message"],
-                            "like":                 log["_source"]["detected_message"],
-                            "min_doc_freq":         1,
-                            "min_term_freq":        1,
-                            "minimum_should_match": "5<80%",
-                            "max_query_terms":      search_cfg["MaxQueryTerms"],
-                            "boost":                4.0,
-                        }},
-                        {"more_like_this": {
                             "fields":               ["only_numbers"],
                             "like":                 log["_source"]["only_numbers"],
                             "min_doc_freq":         1,
@@ -347,18 +369,8 @@ class TestEsQuery(unittest.TestCase):
     @utils.ignore_warnings
     def test_build_search_query(self):
         """Tests building analyze query"""
-        search_cfg = {
-            "MinShouldMatch": "80%",
-            "BoostAA":        10,
-            "BoostLaunch":    5,
-            "BoostUniqueID":  3,
-            "MaxQueryTerms":  50,
-            "SearchLogsMinShouldMatch": "90%",
-            "SearchLogsMinSimilarity":  0.9,
-        }
-        error_logging_level = 40000
+        search_cfg = TestEsQuery.get_default_search_config()
 
-        es_client = esclient.EsClient(search_cfg=search_cfg)
         search_req = launch_objects.SearchLogs(**{
             "launchId": 1,
             "launchName": "launch 1",
@@ -367,7 +379,6 @@ class TestEsQuery(unittest.TestCase):
             "filteredLaunchIds": [1, 2, 3],
             "logMessages": ["log message 1"],
             "logLines": -1})
-
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_search_query(
             search_req, "log message 1")
         demo_query = utils.get_fixture(self.query_search_logs, to_json=True)
@@ -556,46 +567,7 @@ class TestEsQuery(unittest.TestCase):
 
         query_from_esclient.should.equal(demo_query)
 
-    @staticmethod
     @utils.ignore_warnings
-    def build_demo_search_query(search_cfg, search_req, message, error_logging_level):
-        """Build search query"""
-        return {
-            "size": 10000,
-            "query": {
-                "bool": {
-                    "filter": [
-                        {"range": {"log_level": {"gte": error_logging_level}}},
-                        {"exists": {"field": "issue_type"}},
-                        {"term": {"is_merged": False}},
-                    ],
-                    "must_not": {
-                        "term": {"test_item": {"value": search_req.itemId, "boost": 1.0}}
-                    },
-                    "must": [
-                        {
-                            "bool": {
-                                "should": [
-                                    {"wildcard": {"issue_type": "TI*"}},
-                                    {"wildcard": {"issue_type": "ti*"}},
-                                ]
-                            }
-                        },
-                        {"terms": {"launch_id": search_req.filteredLaunchIds}},
-                        {"more_like_this": {
-                            "fields":               ["message"],
-                            "like":                 message,
-                            "min_doc_freq":         1,
-                            "min_term_freq":        1,
-                            "minimum_should_match": "5<" + search_cfg["SearchLogsMinShouldMatch"],
-                            "max_query_terms":      search_cfg["MaxQueryTerms"],
-                            "boost":                1.0,
-                        }},
-                    ],
-                    "should": [
-                        {"term": {"is_auto_analyzed": {"value": "false", "boost": 1.0}}},
-                    ]}}}
-
     def test_build_suggest_query_merged_small_logs_search(self):
         """Tests building analyze query"""
         search_cfg = TestEsQuery.get_default_search_config()

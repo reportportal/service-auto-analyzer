@@ -22,6 +22,8 @@ from dateutil.parser import parse
 import urllib
 from urllib.parse import urlparse
 import warnings
+import os
+import json
 
 logger = logging.getLogger("analyzerApp.utils")
 file_extensions = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
@@ -38,6 +40,11 @@ def ignore_warnings(method):
     return _inner
 
 
+def compress(text):
+    """compress sentence to consist of only unique words"""
+    return " ".join(split_words(text, only_unique=True))
+
+
 def sanitize_text(text):
     """Sanitize text by deleting all numbers"""
     return re.sub(r"\d+", "", text)
@@ -45,7 +52,7 @@ def sanitize_text(text):
 
 def calculate_line_number(text):
     """Calculate line numbers in the text"""
-    return len([line for line in text.split("\n") if line.strip() != ""])
+    return len([line for line in text.split("\n") if line.strip()])
 
 
 def first_lines(log_str, n_lines):
@@ -58,9 +65,13 @@ def build_url(main_url, url_params):
     return main_url + "/" + "/".join(url_params)
 
 
+def filter_empty_lines(log_lines):
+    return [line for line in log_lines if line.strip()]
+
+
 def delete_empty_lines(log):
     """Delete empty lines"""
-    return "\n".join([line for line in log.split("\n") if line.strip() != ""])
+    return "\n".join(filter_empty_lines(log.split("\n")))
 
 
 def reverse_log(log):
@@ -68,7 +79,7 @@ def reverse_log(log):
     return "\n".join(log.split("\n")[::-1])
 
 
-def split_words(text, min_word_length=0, only_unique=True, split_urls=True):
+def split_words(text, min_word_length=0, only_unique=True, split_urls=True, to_lower=True):
     all_unique_words = set()
     all_words = []
     translate_map = {}
@@ -77,8 +88,10 @@ def split_words(text, min_word_length=0, only_unique=True, split_urls=True):
             translate_map[punct] = " "
     text = text.translate(text.maketrans(translate_map)).strip().strip(".")
     for word_part in text.split():
-        word_part = word_part.strip().strip(".").lower()
+        word_part = word_part.strip().strip(".")
         for w in word_part.split():
+            if to_lower:
+                w = w.lower()
             if w != "" and len(w) >= min_word_length:
                 if w in stopwords:
                     continue
@@ -108,8 +121,9 @@ def remove_starting_datetime(text, remove_first_digits=False):
     idx_text_start = 0
     for idx, str_part in enumerate(text.split(" ")):
         try:
-            parse(log_date + " " + str_part)
-            log_date = log_date + " " + str_part
+            parsed_info = re.sub(r"[\[\]\{\},;!#\"$%&\'\(\)*<=>?@^_`|~]", "", log_date + " " + str_part)
+            parse(parsed_info)
+            log_date = parsed_info
             log_date = log_date.strip()
         except Exception as e: # noqa
             idx_text_start = idx
@@ -227,8 +241,6 @@ def detect_log_parts_python(message, default_log_number=1):
 def detect_log_description_and_stacktrace(message):
     """Split a log into a log message and stacktrace"""
     message = delete_empty_lines(message)
-    if default_log_number == -1:
-        return message, ""
     if calculate_line_number(message) > 2:
         if is_python_log(message):
             return detect_log_parts_python(message)
@@ -237,21 +249,14 @@ def detect_log_description_and_stacktrace(message):
         stacktrace_lines = []
         for idx, line in enumerate(split_lines):
             modified_line = delete_line_numbers(line)
-            if has_stacktrace_keywords(line) or has_more_lines_pattern(line):
-                continue
             if modified_line != line:
                 stacktrace_lines.append(line)
             else:
                 detected_message_lines.append(line)
 
-        if len(detected_message_lines) == len(split_lines):
-            stacktrace_lines = detected_message_lines[max_log_lines:]
-            detected_message_lines = detected_message_lines[:max_log_lines]
-
-        if len(detected_message_lines) < default_log_number:
-            all_message = detected_message_lines + stacktrace_lines
-            detected_message_lines = all_message[:default_log_number]
-            stacktrace_lines = all_message[default_log_number:]
+        if not detected_message_lines:
+            detected_message_lines = stacktrace_lines[:1]
+            stacktrace_lines = stacktrace_lines[1:]
 
         return "\n".join(detected_message_lines), "\n".join(stacktrace_lines)
     return message, ""
@@ -268,10 +273,8 @@ def fix_big_encoded_urls(message):
     return message
 
 
-def choose_fields_to_filter(filter_min_should_match, log_lines):
-    if filter_min_should_match:
-        return ["detected_message", "message"] if log_lines == -1 else ["message"]
-    return []
+def choose_fields_to_filter(log_lines):
+    return ["detected_message", "stacktrace"] if log_lines == -1 else ["message"]
 
 
 def leave_only_unique_lines(message):

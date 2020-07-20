@@ -27,7 +27,7 @@
                     "message": "",
                     "test_item": 1,
                     "unique_id": "unique1",
-                    "merged_small_logs": "report portal returned error found screenshot",
+                    "merged_small_logs": "report portal",
                     "detected_message": "",
                     "stacktrace": "",
                     "detected_message_with_numbers": "",
@@ -43,37 +43,6 @@
                     "message_without_params_extended": "",
                     "message_extended": ""
                 }
-            },
-            {
-                "_index": "idx2",
-                "_type": "log",
-                "_id": "2",
-                "_score": 77.53298,
-                "_source": {
-                    "issue_type": "PB001",
-                    "launch_name": "Launch 1",
-                    "log_level": 40000,
-                    "original_message_lines": 2,
-                    "original_message_words_number": 7,
-                    "message": "",
-                    "test_item": 2,
-                    "unique_id": "unique2",
-                    "merged_small_logs": "report portal returned first assertionerror found screenshot",
-                    "detected_message": "",
-                    "detected_message_with_numbers": "",
-                    "only_numbers": "",
-                    "stacktrace": "",
-                    "detected_message_without_params_extended": "",
-                    "detected_message_extended": "",
-                    "found_exceptions": "AssertionError",
-                    "found_exceptions_extended": "AssertionError",
-                    "message_params": "",
-                    "urls": "",
-                    "paths": "",
-                    "stacktrace_extended": "",
-                    "message_without_params_extended": "",
-                    "message_extended": ""                
-              }
             }
         ]
     }

@@ -22,10 +22,13 @@
                     "issue_type": "AB001",
                     "launch_name": "Launch 1",
                     "log_level": 40000,
-                    "original_message": "error occured once",
                     "message": "error occured once",
                     "test_item": 1,
-                    "unique_id": "unique1"
+                    "unique_id": "unique1",
+                    "stacktrace": "",
+                    "detected_message": "error occured once",
+                    "detected_message_with_numbers": "error occured once",
+                    "only_numbers": ""
                 }
             },
             {
@@ -37,10 +40,13 @@
                     "issue_type": "PB001",
                     "launch_name": "Launch 1",
                     "log_level": 40000,
-                    "original_message": "error occured twice",
                     "message": "error occured twice",
                     "test_item": 1,
-                    "unique_id": "unique1"
+                    "unique_id": "unique1",
+                    "stacktrace": "",
+                    "detected_message": "error occured twice",
+                    "detected_message_with_numbers": "error occured twice",
+                    "only_numbers": ""
                 }
             }
         ]

@@ -1143,7 +1143,7 @@ class TestEsClient(unittest.TestCase):
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
                     launch_objects.SuggestAnalysisResult(testItem=123,
-                                                         issueType='PB001',
+                                                         issueType='AB001',
                                                          relevantItem=3,
                                                          relevantLogId=3,
                                                          matchScore=70.0),
@@ -1151,6 +1151,11 @@ class TestEsClient(unittest.TestCase):
                                                          issueType='AB001',
                                                          relevantItem=1,
                                                          relevantLogId=1,
+                                                         matchScore=70.0),
+                    launch_objects.SuggestAnalysisResult(testItem=123,
+                                                         issueType='PB001',
+                                                         relevantItem=2,
+                                                         relevantLogId=2,
                                                          matchScore=70.0)],
                 "boost_predict":       ([1, 1, 1], [[0.3, 0.7], [0.3, 0.7], [0.3, 0.7]])
             },

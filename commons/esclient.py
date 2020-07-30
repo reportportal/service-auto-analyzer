@@ -686,7 +686,7 @@ class EsClient:
                 "detected_message_without_params_extended"] if analyzerConfig.numberOfLogLines == -1 else [
                 "message_extended", "message_without_params_extended"],
             "number_of_log_lines": analyzerConfig.numberOfLogLines,
-            "filter_by_unique_id": False}
+            "filter_by_unique_id": True}
 
     def query_es_for_suggested_items(self, test_item_info, logs):
         full_results = []

@@ -16,14 +16,23 @@
 
 import logging
 import os
+import pika
+from utils import utils
 
 logger = logging.getLogger("analyzerApp.amqp")
 
 
 class AmqpClient:
     """AmqpClient handles communication with rabbitmq"""
-    def __init__(self, connection):
-        self.connection = connection
+    def __init__(self, amqpUrl):
+        self.connection = AmqpClient.create_ampq_connection(amqpUrl)
+
+    @staticmethod
+    def create_ampq_connection(amqpUrl):
+        """Creates AMQP client"""
+        amqp_full_url = amqpUrl.rstrip("\\").rstrip("/") + "/analyzer?heartbeat=600"
+        logger.info("Try connect to %s" % utils.remove_credentials_from_url(amqp_full_url))
+        return pika.BlockingConnection(pika.connection.URLParameters(amqp_full_url))
 
     @staticmethod
     def bind_queue(channel, name, exchange_name):
@@ -74,3 +83,14 @@ class AmqpClient:
             logger.error("Failed to consume messages pid(%d) in queue %s", os.getpid(), queue)
             logger.error(err)
             raise
+
+    def send_to_inner_queue(self, exchange_name, queue, data):
+        try:
+            channel = self.connection.channel()
+            channel.basic_publish(
+                exchange=exchange_name,
+                routing_key=queue,
+                body=data)
+        except Exception as err:
+            logger.error("Failed to publish messages in queue %s", queue)
+            logger.error(err)

@@ -1,0 +1,29 @@
+{
+    "properties": {
+        "not_found": {
+            "type": "integer"
+        },
+        "items_to_process": {
+            "type": "integer"
+        },
+        "processed_time": {
+            "type": "float"
+        },
+        "launch_id": {
+            "type": "integer"
+        },
+        "launch_name": {
+            "type": "keyword"
+        },
+        "project_id": {
+            "type": "keyword"
+        },
+        "method": {
+            "type": "keyword"
+        },
+        "gather_date": {
+            "type":   "date",
+            "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        }
+    }
+}

@@ -92,7 +92,7 @@ class TestEsClient(unittest.TestCase):
         self.cluster_update_es_update = "cluster_update_es_update.json"
         self.cluster_update_all_the_same_es_update = "cluster_update_all_the_same_es_update.json"
         self.cluster_update = "cluster_update.json"
-        self.es_host = "http://localhost:9200"
+        self.app_config = {"esHost": "http://localhost:9200"}
         self.model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
         logging.disable(logging.CRITICAL)
 
@@ -130,7 +130,7 @@ class TestEsClient(unittest.TestCase):
             if "content_type" in test_info:
                 httpretty.register_uri(
                     test_info["method"],
-                    self.es_host + test_info["uri"],
+                    self.app_config["esHost"] + test_info["uri"],
                     body=test_info["rs"] if "rs" in test_info else "",
                     status=test_info["status"],
                     content_type=test_info["content_type"],
@@ -138,7 +138,7 @@ class TestEsClient(unittest.TestCase):
             else:
                 httpretty.register_uri(
                     test_info["method"],
-                    self.es_host + test_info["uri"],
+                    self.app_config["esHost"] + test_info["uri"],
                     body=test_info["rs"] if "rs" in test_info else "",
                     status=test_info["status"],
                 )
@@ -192,7 +192,7 @@ class TestEsClient(unittest.TestCase):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
 
-                es_client = esclient.EsClient(host=self.es_host,
+                es_client = esclient.EsClient(app_config=self.app_config,
                                               search_cfg=self.get_default_search_config())
 
                 response = es_client.list_indices()
@@ -230,7 +230,7 @@ class TestEsClient(unittest.TestCase):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
 
-                es_client = esclient.EsClient(host=self.es_host,
+                es_client = esclient.EsClient(app_config=self.app_config,
                                               search_cfg=self.get_default_search_config())
 
                 response = es_client.create_index(test["index"])
@@ -263,7 +263,7 @@ class TestEsClient(unittest.TestCase):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
 
-                es_client = esclient.EsClient(host=self.es_host,
+                es_client = esclient.EsClient(app_config=self.app_config,
                                               search_cfg=self.get_default_search_config())
 
                 response = es_client.index_exists(test["index"])
@@ -300,7 +300,7 @@ class TestEsClient(unittest.TestCase):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
 
-                es_client = esclient.EsClient(host=self.es_host,
+                es_client = esclient.EsClient(app_config=self.app_config,
                                               search_cfg=self.get_default_search_config())
 
                 response = es_client.delete_index(test["index"])
@@ -380,7 +380,7 @@ class TestEsClient(unittest.TestCase):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
 
-                es_client = esclient.EsClient(host=self.es_host,
+                es_client = esclient.EsClient(app_config=self.app_config,
                                               search_cfg=self.get_default_search_config())
                 es_client.es_client.scroll = MagicMock(return_value=json.loads(
                     utils.get_fixture(self.no_hits_search_rs)))
@@ -482,7 +482,7 @@ class TestEsClient(unittest.TestCase):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
 
-                es_client = esclient.EsClient(host=self.es_host,
+                es_client = esclient.EsClient(app_config=self.app_config,
                                               search_cfg=self.get_default_search_config())
 
                 response = es_client.search_logs(test["rq"])
@@ -653,7 +653,7 @@ class TestEsClient(unittest.TestCase):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
 
-                es_client = esclient.EsClient(host=self.es_host,
+                es_client = esclient.EsClient(app_config=self.app_config,
                                               search_cfg=self.get_default_search_config())
                 es_client.es_client.scroll = MagicMock(return_value=json.loads(
                     utils.get_fixture(self.no_hits_search_rs)))
@@ -817,7 +817,7 @@ class TestEsClient(unittest.TestCase):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
                 config = self.get_default_search_config()
-                es_client = esclient.EsClient(host=self.es_host,
+                es_client = esclient.EsClient(app_config=self.app_config,
                                               search_cfg=config)
                 _boosting_decision_maker = BoostingDecisionMaker()
                 _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
@@ -1222,7 +1222,7 @@ class TestEsClient(unittest.TestCase):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
                 config = self.get_default_search_config()
-                es_client = esclient.EsClient(host=self.es_host,
+                es_client = esclient.EsClient(app_config=self.app_config,
                                               search_cfg=config)
                 _boosting_decision_maker = BoostingDecisionMaker()
                 _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
@@ -1542,7 +1542,7 @@ class TestEsClient(unittest.TestCase):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
                 config = self.get_default_search_config()
-                es_client = esclient.EsClient(host=self.es_host,
+                es_client = esclient.EsClient(app_config=self.app_config,
                                               search_cfg=config)
 
                 response = es_client.find_clusters(test["launch_info"])

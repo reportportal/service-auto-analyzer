@@ -858,6 +858,17 @@ class EsClient:
                     logger.debug(analysis_result)
         else:
             logger.debug("There are no results for test item %s", test_item_info.testItemId)
+        results_to_share = {test_item_info.launchId: {
+            "not_found": int(len(results) == 0), "items_to_process": 1,
+            "processed_time": time() - t_start, "found_items": len(results),
+            "launch_id": test_item_info.launchId, "launch_name": test_item_info.launchName,
+            "project_id": test_item_info.project, "method": "suggest",
+            "gather_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}}
+        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+            AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
+
+        logger.debug("Stats info %s", results_to_share)
         logger.info("Processed the test item. It took %.2f sec.", time() - t_start)
         logger.info("Finished suggesting for test item with %d results.", len(results))
         return results
@@ -984,7 +995,6 @@ class EsClient:
         log_messages, log_dict = self.prepare_logs_for_clustering(
             launch_info.launch, launch_info.numberOfLogLines)
         log_ids = set([int(log["_id"]) for log in log_dict.values()])
-        launch_info.launch = {}
         groups = _clusterizer.find_clusters(log_messages)
         additional_results = {}
         if launch_info.for_update:
@@ -1002,9 +1012,34 @@ class EsClient:
                     "_index": result.project,
                     "doc": {"cluster_id": result.clusterId}})
             self._bulk_index(bodies)
+
+        results_to_share = {launch_info.launch.launchId: {
+            "not_found": int(cluster_num == 0), "items_to_process": len(log_ids),
+            "processed_time": time() - t_start, "found_clusters": cluster_num,
+            "launch_id": launch_info.launch.launchId, "launch_name": launch_info.launch.launchName,
+            "project_id": launch_info.launch.project, "method": "find_clusters",
+            "gather_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}}
+        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+            AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
+
+        logger.debug("Stats info %s", results_to_share)
         logger.info("Processed the launch. It took %.2f sec.", time() - t_start)
         logger.info("Finished clustering for the launch with %d clusters.", cluster_num)
         return results_to_return
+
+    def create_index_for_stats_info(self, es_client, rp_aa_stats_index):
+        index = None
+        try:
+            index = es_client.indices.get(index=rp_aa_stats_index)
+        except Exception:
+            pass
+        if index is None:
+            es_client.indices.create(index=rp_aa_stats_index, body={
+                'settings': utils.read_json_file("", "index_settings.json", to_json=True),
+                'mappings': {"default": utils.read_json_file(
+                    "", "rp_aa_stats_mappings.json", to_json=True)}
+            })
 
     @utils.ignore_warnings
     def send_stats_info(self, stats_info):
@@ -1013,17 +1048,7 @@ class EsClient:
             es_client = elasticsearch.Elasticsearch([self.app_config["statsEsHost"]], timeout=30,
                                                     max_retries=5, retry_on_timeout=True)
             logger.info("Started sending stats about analysis")
-            index = None
-            try:
-                index = es_client.indices.get(index=rp_aa_stats_index)
-            except Exception:
-                pass
-            if index is None:
-                es_client.indices.create(index=rp_aa_stats_index, body={
-                    'settings': utils.read_json_file("", "index_settings.json", to_json=True),
-                    'mappings': {"default": utils.read_json_file(
-                        "", "rp_aa_stats_mappings.json", to_json=True)}
-                })
+            self.create_index_for_stats_info(es_client, rp_aa_stats_index)
 
             stat_info_array = []
             for launch_id in stats_info:

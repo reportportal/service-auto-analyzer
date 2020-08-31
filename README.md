@@ -1,5 +1,29 @@
 # service-auto-analyzer
 
+# Environment variables for configuration
+
+**ES_HOSTS** - Elasticsearch host (can be either like this "http://elasticsearch:9200", or with login and password "http://login:password@elasticsearch:9200")
+
+**LOGGING_LEVEL** - logging level for the whole module, can be DEBUG, INFO, ERROR, CRITICAL
+
+**AMQP_URL** - an url to the rabbitmq instance
+
+**AMQP_EXCHANGE_NAME** - Exchange name for the module communication for this module, by default "analyzer"
+
+**ANALYZER_PRIORITY** - priority for this analyzer, by default 1
+
+**ES_VERIFY_CERTS** - turn on SSL certificates verification, by default "false"
+
+**ES_USE_SSL** - turn on SSL, by default "false"
+
+**ES_SSL_SHOW_WARN** - show warning on SSL certificates verification, by default "false"
+
+**ES_CA_CERT** - provide a path to CA certs on disk, by default ""
+
+**ES_CLIENT_CERT** - PEM formatted SSL client certificate, by default ""
+
+**ES_CLIENT_KEY** - PEM formatted SSL client key, by default ""
+
 # Instructions for analyzer setup without Docker
 
 Install python with the version 3.7.4. (it is the version on which the service was developed, but it should work on the versions starting from 3.6).

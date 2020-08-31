@@ -38,7 +38,13 @@ APP_CONFIG = {
     "analyzerPriority":  int(os.getenv("ANALYZER_PRIORITY", "1")),
     "analyzerIndex":     json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),
     "analyzerLogSearch": json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower()),
-    "statsEsHost":       os.getenv("STATS_ES_HOST", "")
+    "statsEsHost":       os.getenv("STATS_ES_HOST", ""),
+    "esVerifyCerts":     json.loads(os.getenv("ES_VERIFY_CERTS", "false").lower()),
+    "esUseSsl":          json.loads(os.getenv("ES_USE_SSL", "false").lower()),
+    "esSslShowWarn":     json.loads(os.getenv("ES_SSL_SHOW_WARN", "false").lower()),
+    "esCAcert":          os.getenv("ES_CA_CERT", ""),
+    "esClientCert":      os.getenv("ES_CLIENT_CERT", ""),
+    "esClientKey":       os.getenv("ES_CLIENT_KEY", "")
 }
 
 SEARCH_CONFIG = {

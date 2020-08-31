@@ -92,7 +92,15 @@ class TestEsClient(unittest.TestCase):
         self.cluster_update_es_update = "cluster_update_es_update.json"
         self.cluster_update_all_the_same_es_update = "cluster_update_all_the_same_es_update.json"
         self.cluster_update = "cluster_update.json"
-        self.app_config = {"esHost": "http://localhost:9200"}
+        self.app_config = {
+            "esHost": "http://localhost:9200",
+            "esVerifyCerts":     False,
+            "esUseSsl":          False,
+            "esSslShowWarn":     False,
+            "esCAcert":          "",
+            "esClientCert":      "",
+            "esClientKey":       ""
+        }
         self.model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
         logging.disable(logging.CRITICAL)
 

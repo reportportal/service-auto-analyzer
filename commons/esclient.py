@@ -51,7 +51,13 @@ class EsClient:
         self.host = app_config["esHost"]
         self.search_cfg = search_cfg
         self.es_client = elasticsearch.Elasticsearch([self.host], timeout=30,
-                                                     max_retries=5, retry_on_timeout=True)
+                                                     max_retries=5, retry_on_timeout=True,
+                                                     use_ssl=app_config["esUseSsl"],
+                                                     verify_certs=app_config["esVerifyCerts"],
+                                                     ssl_show_warn=app_config["esSslShowWarn"],
+                                                     ca_certs=app_config["esCAcert"],
+                                                     client_cert=app_config["esClientCert"],
+                                                     client_key=app_config["esClientKey"])
         self.boosting_decision_maker = None
         self.suggest_decision_maker = None
         self.weighted_log_similarity_calculator = None

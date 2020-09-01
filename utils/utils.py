@@ -129,7 +129,8 @@ def remove_starting_datetime(text, remove_first_digits=False):
             idx_text_start = idx
             break
     log_date = log_date.replace("'", "").replace("\"", "")
-    if re.search(r"\d{1,7}", log_date) and re.search(r"\d{1,7}", log_date).group(0) == log_date:
+    found_regex_log_date = re.search(r"\d{1,7}", log_date)
+    if found_regex_log_date and found_regex_log_date.group(0) == log_date:
         idx_text_start = 0
 
     text_split = text.split(" ")
@@ -301,9 +302,12 @@ def remove_generated_parts(message):
         for symbol in [r"\$", "@"]:
             all_found_parts = set()
             for m in re.finditer(r"%s+(.+?)\b" % symbol, line):
-                found_part = m.group(1).strip().strip(symbol).strip()
-                if found_part != "":
-                    all_found_parts.add((found_part, m.group(0).strip()))
+                try:
+                    found_part = m.group(1).strip().strip(symbol).strip()
+                    if found_part != "":
+                        all_found_parts.add((found_part, m.group(0).strip()))
+                except Exception as err:
+                    logger.error(err)
             sorted_parts = sorted(list(all_found_parts), key=lambda x: len(x[1]), reverse=True)
             for found_part in sorted_parts:
                 whole_found_part = found_part[1].replace("$", r"\$")
@@ -450,10 +454,12 @@ def extract_message_params(text):
     all_unique = set()
     all_params = []
     for param in re.findall(r"(^|[^\w])('.+?'|\".+?\")([^\w]|$|\n)", text):
-        param = re.search(r"[^\'\"]+", param[1].strip()).group(0).strip()
-        if param not in all_unique:
-            all_unique.add(param)
-            all_params.append(param)
+        param = re.search(r"[^\'\"]+", param[1].strip())
+        if param is not None:
+            param = param.group(0).strip()
+            if param not in all_unique:
+                all_unique.add(param)
+                all_params.append(param)
     return all_params
 
 

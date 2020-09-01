@@ -22,7 +22,6 @@ import os
 import threading
 import time
 import json
-import pika
 from flask import Flask
 from flask_cors import CORS
 import amqp.amqp_handler as amqp_handler
@@ -38,7 +37,14 @@ APP_CONFIG = {
     "exchangeName":      os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
     "analyzerPriority":  int(os.getenv("ANALYZER_PRIORITY", "1")),
     "analyzerIndex":     json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),
-    "analyzerLogSearch": json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower())
+    "analyzerLogSearch": json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower()),
+    "statsEsHost":       os.getenv("STATS_ES_HOST", ""),
+    "esVerifyCerts":     json.loads(os.getenv("ES_VERIFY_CERTS", "false").lower()),
+    "esUseSsl":          json.loads(os.getenv("ES_USE_SSL", "false").lower()),
+    "esSslShowWarn":     json.loads(os.getenv("ES_SSL_SHOW_WARN", "false").lower()),
+    "esCAcert":          os.getenv("ES_CA_CERT", ""),
+    "esClientCert":      os.getenv("ES_CLIENT_CERT", ""),
+    "esClientKey":       os.getenv("ES_CLIENT_KEY", "")
 }
 
 SEARCH_CONFIG = {
@@ -69,17 +75,9 @@ def create_thread(func, args):
     return thread
 
 
-def create_ampq_client():
-    """Creates AMQP client"""
-    amqp_full_url = APP_CONFIG["amqpUrl"].rstrip("\\").rstrip("/") + "/analyzer?heartbeat=600"
-    logger.info("Try connect to %s" % utils.remove_credentials_from_url(amqp_full_url))
-    return AmqpClient(pika.BlockingConnection(
-        pika.connection.URLParameters(amqp_full_url)))
-
-
 def create_es_client():
     """Creates Elasticsearch client"""
-    return EsClient(APP_CONFIG["esHost"], SEARCH_CONFIG)
+    return EsClient(APP_CONFIG, SEARCH_CONFIG)
 
 
 def declare_exchange(channel, config):
@@ -113,21 +111,21 @@ def init_amqp(_amqp_client, request_handler):
             return
     threads = []
 
-    threads.append(create_thread(create_ampq_client().receive,
+    threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                    (APP_CONFIG["exchangeName"], "index", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.index_logs,
                                                     prepare_response_data=amqp_handler.
                                                     prepare_index_response_data))))
-    threads.append(create_thread(create_ampq_client().receive,
+    threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                    (APP_CONFIG["exchangeName"], "analyze", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.analyze_logs,
                                                     prepare_response_data=amqp_handler.
                                                     prepare_analyze_response_data))))
-    threads.append(create_thread(create_ampq_client().receive,
+    threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                    (APP_CONFIG["exchangeName"], "delete", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
@@ -136,7 +134,7 @@ def init_amqp(_amqp_client, request_handler):
                                                     prepare_delete_index,
                                                     prepare_response_data=amqp_handler.
                                                     output_result))))
-    threads.append(create_thread(create_ampq_client().receive,
+    threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                    (APP_CONFIG["exchangeName"], "clean", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
@@ -145,7 +143,7 @@ def init_amqp(_amqp_client, request_handler):
                                                     prepare_clean_index,
                                                     prepare_response_data=amqp_handler.
                                                     output_result))))
-    threads.append(create_thread(create_ampq_client().receive,
+    threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                    (APP_CONFIG["exchangeName"], "search", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
@@ -154,7 +152,7 @@ def init_amqp(_amqp_client, request_handler):
                                                     prepare_search_logs,
                                                     prepare_response_data=amqp_handler.
                                                     prepare_analyze_response_data))))
-    threads.append(create_thread(create_ampq_client().receive,
+    threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                    (APP_CONFIG["exchangeName"], "suggest", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
@@ -163,7 +161,7 @@ def init_amqp(_amqp_client, request_handler):
                                                     prepare_test_item_info,
                                                     prepare_response_data=amqp_handler.
                                                     prepare_analyze_response_data))))
-    threads.append(create_thread(create_ampq_client().receive,
+    threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                    (APP_CONFIG["exchangeName"], "cluster", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
@@ -172,6 +170,11 @@ def init_amqp(_amqp_client, request_handler):
                                                     prepare_launch_info,
                                                     prepare_response_data=amqp_handler.
                                                     prepare_analyze_response_data))))
+    threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
+                   (APP_CONFIG["exchangeName"], "stats_info", True, False,
+                   lambda channel, method, props, body:
+                   amqp_handler.handle_inner_amqp_request(channel, method, props, body,
+                                                          request_handler.send_stats_info))))
 
     return threads
 
@@ -220,7 +223,7 @@ while True:
     try:
         logger.info("Starting waiting for AMQP connection")
         try:
-            amqp_client = create_ampq_client()
+            amqp_client = AmqpClient(APP_CONFIG["amqpUrl"])
         except Exception as err:
             logger.error("Amqp connection was not established")
             logger.error(err)

@@ -117,3 +117,23 @@ def handle_amqp_request(channel, method, props, body,
         logger.error(err)
     logger.debug("Finished processing %s method", method)
     return True
+
+
+def handle_inner_amqp_request(channel, method, props, body, request_handler):
+    """Function for handling inner amqp reuqests"""
+    logger.debug("Started processing %s method %s props", method, props)
+    logger.debug("Started processing data %s", body)
+    try:
+        stats_info = json.loads(body, strict=False)
+    except Exception as err:
+        logger.error("Failed to load json from body")
+        logger.error(err)
+        return False
+    try:
+        request_handler(stats_info)
+    except Exception as err:
+        logger.error("Failed to process stats info")
+        logger.error(err)
+        return False
+    logger.debug("Finished processing %s method", method)
+    return True

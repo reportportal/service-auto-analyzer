@@ -37,6 +37,7 @@ from queue import Queue
 from threading import Thread
 from commons import clusterizer
 import uuid
+from amqp.amqp import AmqpClient
 
 ERROR_LOGGING_LEVEL = 40000
 
@@ -45,11 +46,18 @@ logger = logging.getLogger("analyzerApp.esclient")
 
 class EsClient:
     """Elasticsearch client implementation"""
-    def __init__(self, host="http://localhost:9200", search_cfg={}):
-        self.host = host
+    def __init__(self, app_config={}, search_cfg={}):
+        self.app_config = app_config
+        self.host = app_config["esHost"]
         self.search_cfg = search_cfg
-        self.es_client = elasticsearch.Elasticsearch([host], timeout=30,
-                                                     max_retries=5, retry_on_timeout=True)
+        self.es_client = elasticsearch.Elasticsearch([self.host], timeout=30,
+                                                     max_retries=5, retry_on_timeout=True,
+                                                     use_ssl=app_config["esUseSsl"],
+                                                     verify_certs=app_config["esVerifyCerts"],
+                                                     ssl_show_warn=app_config["esSslShowWarn"],
+                                                     ca_certs=app_config["esCAcert"],
+                                                     client_cert=app_config["esClientCert"],
+                                                     client_key=app_config["esClientKey"])
         self.boosting_decision_maker = None
         self.suggest_decision_maker = None
         self.weighted_log_similarity_calculator = None
@@ -379,12 +387,16 @@ class EsClient:
         if bodies:
             self._bulk_index(bodies)
 
-    def _bulk_index(self, bodies, refresh=True):
+    def _bulk_index(self, bodies, host=None, es_client=None, refresh=True):
+        if host is None:
+            host = self.host
+        if es_client is None:
+            es_client = self.es_client
         if not bodies:
             return commons.launch_objects.BulkResponse(took=0, errors=False)
         logger.debug("Indexing %d logs...", len(bodies))
         try:
-            success_count, errors = elasticsearch.helpers.bulk(self.es_client,
+            success_count, errors = elasticsearch.helpers.bulk(es_client,
                                                                bodies,
                                                                chunk_size=1000,
                                                                request_timeout=30,
@@ -396,7 +408,7 @@ class EsClient:
             return commons.launch_objects.BulkResponse(took=success_count, errors=len(errors) > 0)
         except Exception as err:
             logger.error("Error in bulk")
-            logger.error("ES Url %s", utils.remove_credentials_from_url(self.host))
+            logger.error("ES Url %s", utils.remove_credentials_from_url(host))
             logger.error(err)
             return commons.launch_objects.BulkResponse(took=0, errors=True)
 
@@ -547,13 +559,17 @@ class EsClient:
         }
 
     def _send_result_to_queue(self, test_item_dict, batches, batch_logs):
+        t_start = time()
         partial_res = self.es_client.msearch("\n".join(batches) + "\n")["responses"]
+        avg_time_processed = (time() - t_start) / (len(partial_res) if partial_res else 1)
         for test_item_id in test_item_dict:
             new_result = []
+            time_processed = 0.0
             for ind in test_item_dict[test_item_id]:
                 all_info = batch_logs[ind]
                 new_result.append((all_info[2], partial_res[ind]))
-            self.queue.put((all_info[0], all_info[1], new_result))
+                time_processed += avg_time_processed
+            self.queue.put((all_info[0], all_info[1], new_result, time_processed))
 
     def _query_elasticsearch(self, launches, max_batch_size=30):
         t_start = time()
@@ -621,14 +637,28 @@ class EsClient:
         t_start = time()
 
         cnt_items_to_process = 0
+        results_to_share = {}
         while self.finished_queue.empty() or not self.queue.empty():
             if self.queue.empty():
                 sleep(0.1)
                 continue
             else:
                 item_to_process = self.queue.get()
-            analyzer_config, test_item_id, searched_res = item_to_process
+            analyzer_config, test_item_id, searched_res, time_processed = item_to_process
+            launch_id = searched_res[0][0]["_source"]["launch_id"]
+            launch_name = searched_res[0][0]["_source"]["launch_name"]
+            project_id = searched_res[0][0]["_index"]
+            if launch_id not in results_to_share:
+                results_to_share[launch_id] = {
+                    "not_found": 0, "items_to_process": 0, "processed_time": 0,
+                    "launch_id": launch_id, "launch_name": launch_name, "project_id": project_id,
+                    "method": "auto_analysis",
+                    "gather_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+            t_start_item = time()
             cnt_items_to_process += 1
+            results_to_share[launch_id]["items_to_process"] += 1
+            results_to_share[launch_id]["processed_time"] += time_processed
 
             boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
                 searched_res,
@@ -668,9 +698,16 @@ class EsClient:
                     results.append(analysis_result)
                     logger.debug(analysis_result)
                 else:
+                    results_to_share[launch_id]["not_found"] += 1
                     logger.debug("Test item %s has no relevant items", test_item_id)
             else:
+                results_to_share[launch_id]["not_found"] += 1
                 logger.debug("There are no results for test item %s", test_item_id)
+            results_to_share[launch_id]["processed_time"] += (time() - t_start_item)
+        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+            AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
+        logger.debug("Stats info %s", results_to_share)
         logger.info("Processed %d test items. It took %.2f sec.", cnt_items_to_process, time() - t_start)
         logger.info("Finished analysis for %d launches with %d results.", len(launches), len(results))
         return results
@@ -686,7 +723,7 @@ class EsClient:
                 "detected_message_without_params_extended"] if analyzerConfig.numberOfLogLines == -1 else [
                 "message_extended", "message_without_params_extended"],
             "number_of_log_lines": analyzerConfig.numberOfLogLines,
-            "filter_by_unique_id": False}
+            "filter_by_unique_id": True}
 
     def query_es_for_suggested_items(self, test_item_info, logs):
         full_results = []
@@ -827,6 +864,17 @@ class EsClient:
                     logger.debug(analysis_result)
         else:
             logger.debug("There are no results for test item %s", test_item_info.testItemId)
+        results_to_share = {test_item_info.launchId: {
+            "not_found": int(len(results) == 0), "items_to_process": 1,
+            "processed_time": time() - t_start, "found_items": len(results),
+            "launch_id": test_item_info.launchId, "launch_name": test_item_info.launchName,
+            "project_id": test_item_info.project, "method": "suggest",
+            "gather_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}}
+        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+            AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
+
+        logger.debug("Stats info %s", results_to_share)
         logger.info("Processed the test item. It took %.2f sec.", time() - t_start)
         logger.info("Finished suggesting for test item with %d results.", len(results))
         return results
@@ -953,7 +1001,6 @@ class EsClient:
         log_messages, log_dict = self.prepare_logs_for_clustering(
             launch_info.launch, launch_info.numberOfLogLines)
         log_ids = set([int(log["_id"]) for log in log_dict.values()])
-        launch_info.launch = {}
         groups = _clusterizer.find_clusters(log_messages)
         additional_results = {}
         if launch_info.for_update:
@@ -971,6 +1018,52 @@ class EsClient:
                     "_index": result.project,
                     "doc": {"cluster_id": result.clusterId}})
             self._bulk_index(bodies)
+
+        results_to_share = {launch_info.launch.launchId: {
+            "not_found": int(cluster_num == 0), "items_to_process": len(log_ids),
+            "processed_time": time() - t_start, "found_clusters": cluster_num,
+            "launch_id": launch_info.launch.launchId, "launch_name": launch_info.launch.launchName,
+            "project_id": launch_info.launch.project, "method": "find_clusters",
+            "gather_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}}
+        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+            AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
+
+        logger.debug("Stats info %s", results_to_share)
         logger.info("Processed the launch. It took %.2f sec.", time() - t_start)
         logger.info("Finished clustering for the launch with %d clusters.", cluster_num)
         return results_to_return
+
+    def create_index_for_stats_info(self, es_client, rp_aa_stats_index):
+        index = None
+        try:
+            index = es_client.indices.get(index=rp_aa_stats_index)
+        except Exception:
+            pass
+        if index is None:
+            es_client.indices.create(index=rp_aa_stats_index, body={
+                'settings': utils.read_json_file("", "index_settings.json", to_json=True),
+                'mappings': {"default": utils.read_json_file(
+                    "", "rp_aa_stats_mappings.json", to_json=True)}
+            })
+
+    @utils.ignore_warnings
+    def send_stats_info(self, stats_info):
+        if self.app_config["statsEsHost"].strip():
+            rp_aa_stats_index = "rp_aa_stats"
+            es_client = elasticsearch.Elasticsearch([self.app_config["statsEsHost"]], timeout=30,
+                                                    max_retries=5, retry_on_timeout=True)
+            logger.info("Started sending stats about analysis")
+            self.create_index_for_stats_info(es_client, rp_aa_stats_index)
+
+            stat_info_array = []
+            for launch_id in stats_info:
+                stat_info_array.append({
+                    "_index": rp_aa_stats_index,
+                    "_type": "default",
+                    "_source": stats_info[launch_id]
+                })
+            self._bulk_index(
+                stat_info_array, host=self.app_config["statsEsHost"],
+                es_client=es_client)
+            logger.info("Finished sending stats about analysis")

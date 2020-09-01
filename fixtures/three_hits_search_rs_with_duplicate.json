@@ -16,7 +16,7 @@
             {
                 "_index": "idx4",
                 "_type": "log",
-                "_id": "1",
+                "_id": "3",
                 "_score": 15,
                 "_source": {
                     "issue_type": "AB001",
@@ -25,8 +25,8 @@
                     "original_message_lines": 1,
                     "original_message_words_number": 2,
                     "message": "Message http : localhost/admin \r\n java.lang.NoClassDefFoundError\r",
-                    "test_item": 1,
-                    "start_time": "2020-01-15 10:57:43",
+                    "test_item": 3,
+                    "start_time": "2020-01-17 10:57:43",
                     "unique_id": "unique1",
                     "detected_message": "Message http : localhost/admin \r\n java.lang.NoClassDefFoundError\r",
                     "detected_message_with_numbers": "Message 211 http : localhost/admin \r\n java.lang.NoClassDefFoundError\r",
@@ -48,7 +48,7 @@
             {
                 "_index": "idx4",
                 "_type": "log",
-                "_id": "2",
+                "_id": "4",
                 "_score": 10,
                 "_source": {
                     "issue_type": "PB001",
@@ -80,7 +80,7 @@
             {
                 "_index": "idx4",
                 "_type": "log",
-                "_id": "3",
+                "_id": "5",
                 "_score": 10,
                 "_source": {
                     "issue_type": "PB001",
@@ -89,8 +89,8 @@
                     "original_message_lines": 1,
                     "original_message_words_number": 2,
                     "message": "Message http : localhost/admin \r\n java.lang.NoClassDefFoundError\r",
-                    "test_item": 3,
-                    "start_time": "2020-01-17 10:57:43",
+                    "test_item": 1,
+                    "start_time": "2020-01-15 10:57:43",
                     "unique_id": "unique1",
                     "detected_message": "Message http : localhost/admin \r\n java.lang.NoClassDefFoundError\r",
                     "detected_message_with_numbers": "Message 234 http : localhost/admin \r\n java.lang.NoClassDefFoundError\r",

@@ -1043,8 +1043,8 @@ class EsClient:
         if index is None:
             es_client.indices.create(index=rp_aa_stats_index, body={
                 'settings': utils.read_json_file("", "index_settings.json", to_json=True),
-                'mappings': {"default": utils.read_json_file(
-                    "", "rp_aa_stats_mappings.json", to_json=True)}
+                'mappings': utils.read_json_file(
+                    "", "rp_aa_stats_mappings.json", to_json=True)
             })
 
     @utils.ignore_warnings
@@ -1060,7 +1060,6 @@ class EsClient:
             for launch_id in stats_info:
                 stat_info_array.append({
                     "_index": rp_aa_stats_index,
-                    "_type": "default",
                     "_source": stats_info[launch_id]
                 })
             self._bulk_index(

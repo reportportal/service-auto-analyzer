@@ -154,6 +154,16 @@ def is_starting_message_pattern(text):
     return False
 
 
+def does_stacktrace_need_words_reweighting(log):
+    found_file_extensions = []
+    for file_extension in ["py", "java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "scala"]:
+        if re.search(r"\.%s(?!\.)\b" % file_extension, log):
+            found_file_extensions.append(file_extension)
+    if len(found_file_extensions) == 1 and found_file_extensions[0] in ["js", "c", "h", "rb", "cpp"]:
+        return True
+    return False
+
+
 def delete_line_numbers(text):
     """Deletes line numbers in the stacktrace"""
     if is_starting_message_pattern(text):

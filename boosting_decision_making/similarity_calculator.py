@@ -140,18 +140,16 @@ class SimilarityCalculator:
                             count_vector_matrix[index_query_message],
                             count_vector_matrix[index_log_message]), 2)
                 else:
+                    query_vector = count_vector_matrix[index_query_message[0]:index_query_message[1] + 1]
+                    log_vector = count_vector_matrix[index_log_message[0]:index_log_message[1] + 1]
                     if needs_reweighting_wc:
-                        query_vector = self.weighted_similarity_calculator.weigh_data_rows(
-                            self.reweight_words_weights_by_summing(
-                                count_vector_matrix[index_query_message[0]:index_query_message[1] + 1]))
-                        log_vector = self.weighted_similarity_calculator.weigh_data_rows(
-                            self.reweight_words_weights_by_summing(
-                                count_vector_matrix[index_log_message[0]:index_log_message[1] + 1]))
-                    else:
-                        query_vector = self.weighted_similarity_calculator.weigh_data_rows(
-                            count_vector_matrix[index_query_message[0]:index_query_message[1] + 1])
-                        log_vector = self.weighted_similarity_calculator.weigh_data_rows(
-                            count_vector_matrix[index_log_message[0]:index_log_message[1] + 1])
+                        query_vector = self.reweight_words_weights_by_summing(query_vector)
+                        log_vector = self.reweight_words_weights_by_summing(log_vector)
+                    query_vector = self.weighted_similarity_calculator.weigh_data_rows(query_vector)
+                    log_vector = self.weighted_similarity_calculator.weigh_data_rows(log_vector)
+                    if needs_reweighting_wc:
+                        query_vector *= 2
+                        log_vector *= 2
                     similarity =\
                         round(1 - spatial.distance.cosine(query_vector, log_vector), 2)
                 all_results_similarity[group_id] = {"similarity": similarity, "both_empty": False}

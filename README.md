@@ -2,7 +2,7 @@
 
 # Environment variables for configuration
 
-**ES_HOSTS** - Elasticsearch host (can be either like this "http://elasticsearch:9200", or with login and password "http://login:password@elasticsearch:9200")
+**ES_HOSTS** - Elasticsearch host (can be either like this "http://elasticsearch:9200", or with login and password "http://placeholder:placeholder@elasticsearch:9200")
 
 **LOGGING_LEVEL** - logging level for the whole module, can be DEBUG, INFO, ERROR, CRITICAL
 

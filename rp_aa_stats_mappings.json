@@ -24,6 +24,12 @@
         "gather_date": {
             "type":   "date",
             "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        },
+        "number_of_log_lines": {
+            "type": "keyword"
+        },
+        "min_should_match": {
+            "type": "keyword"
         }
     }
 }

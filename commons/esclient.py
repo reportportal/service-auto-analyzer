@@ -35,7 +35,7 @@ from commons.es_query_builder import EsQueryBuilder
 from commons.log_merger import LogMerger
 from queue import Queue
 from threading import Thread
-from commons import clusterizer
+from commons import clusterizer, namespace_finder
 import uuid
 from amqp.amqp import AmqpClient
 
@@ -62,6 +62,7 @@ class EsClient:
         self.suggest_decision_maker = None
         self.weighted_log_similarity_calculator = None
         self.suggest_threshold = 0.4
+        self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.es_query_builder = EsQueryBuilder(self.search_cfg, ERROR_LOGGING_LEVEL)
         self.initialize_decision_makers()
 
@@ -138,6 +139,7 @@ class EsClient:
     def delete_index(self, index_name):
         """Delete the whole index"""
         try:
+            self.namespace_finder.remove_namespaces(index_name)
             self.es_client.indices.delete(index=str(index_name))
             logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
             logger.debug("Deleted index %s", str(index_name))
@@ -180,10 +182,24 @@ class EsClient:
         logs_with_exceptions = self.extract_all_exceptions(bodies)
         result = self._bulk_index(bodies)
         result.logResults = logs_with_exceptions
+        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+            AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                self.app_config["exchangeName"], "namespace_finder", json.dumps({
+                    "project_id": project,
+                    "log_words": self.prepare_log_words(bodies)
+                }))
         self._merge_logs(test_item_ids, project)
         logger.info("Finished indexing logs for %d launches. It took %.2f sec.",
                     len(launches), time() - t_start)
         return result
+
+    def prepare_log_words(self, bodies):
+        log_words = {}
+        for log in bodies:
+            for word in utils.split_words(log["_source"]["stacktrace"]):
+                if "." in word and len(word.split(".")) > 2:
+                    log_words[word] = 1
+        return log_words
 
     def extract_all_exceptions(self, bodies):
         logs_with_exceptions = []
@@ -546,9 +562,12 @@ class EsClient:
 
         return all_queries, all_query_logs
 
+    def find_min_should_match_threshold(self, analyzer_config):
+        return analyzer_config.minShouldMatch if analyzer_config.minShouldMatch > 0 else\
+            int(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0))
+
     def get_config_for_boosting(self, analyzer_config):
-        min_should_match = analyzer_config.minShouldMatch / 100 if analyzer_config.minShouldMatch > 0 else\
-            int(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0)) / 100
+        min_should_match = self.find_min_should_match_threshold(analyzer_config) / 100
         return {
             "max_query_terms": self.search_cfg["MaxQueryTerms"],
             "min_should_match": min_should_match,
@@ -638,6 +657,7 @@ class EsClient:
 
         cnt_items_to_process = 0
         results_to_share = {}
+        chosen_namespaces = {}
         while self.finished_queue.empty() or not self.queue.empty():
             if self.queue.empty():
                 sleep(0.1)
@@ -653,16 +673,24 @@ class EsClient:
                     "not_found": 0, "items_to_process": 0, "processed_time": 0,
                     "launch_id": launch_id, "launch_name": launch_name, "project_id": project_id,
                     "method": "auto_analysis",
-                    "gather_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                    "gather_date": datetime.now().strftime("%Y-%m-%d"),
+                    "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "number_of_log_lines": analyzer_config.numberOfLogLines,
+                    "min_should_match": self.find_min_should_match_threshold(analyzer_config)}
 
             t_start_item = time()
             cnt_items_to_process += 1
             results_to_share[launch_id]["items_to_process"] += 1
             results_to_share[launch_id]["processed_time"] += time_processed
 
+            boosting_config = self.get_config_for_boosting(analyzer_config)
+            if project_id not in chosen_namespaces:
+                chosen_namespaces[project_id] = self.namespace_finder.get_chosen_namespaces(project_id)
+            boosting_config["chosen_namespaces"] = chosen_namespaces[project_id]
+
             boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
                 searched_res,
-                self.get_config_for_boosting(analyzer_config),
+                boosting_config,
                 feature_ids=self.boosting_decision_maker.get_feature_ids())
             feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
 
@@ -828,9 +856,13 @@ class EsClient:
         logs = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
         searched_res = self.query_es_for_suggested_items(test_item_info, logs)
 
+        boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
+        boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(
+            test_item_info.project)
+
         _boosting_data_gatherer = SuggestBoostingFeaturizer(
             searched_res,
-            self.get_config_for_boosting_suggests(test_item_info.analyzerConfig),
+            boosting_config,
             feature_ids=self.suggest_decision_maker.get_feature_ids(),
             weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
 
@@ -869,7 +901,11 @@ class EsClient:
             "processed_time": time() - t_start, "found_items": len(results),
             "launch_id": test_item_info.launchId, "launch_name": test_item_info.launchName,
             "project_id": test_item_info.project, "method": "suggest",
-            "gather_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}}
+            "gather_date": datetime.now().strftime("%Y-%m-%d"),
+            "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "number_of_log_lines": test_item_info.analyzerConfig.numberOfLogLines,
+            "min_should_match": self.find_min_should_match_threshold(
+                test_item_info.analyzerConfig)}}
         if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
             AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
                 self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
@@ -1024,7 +1060,8 @@ class EsClient:
             "processed_time": time() - t_start, "found_clusters": cluster_num,
             "launch_id": launch_info.launch.launchId, "launch_name": launch_info.launch.launchName,
             "project_id": launch_info.launch.project, "method": "find_clusters",
-            "gather_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}}
+            "gather_date": datetime.now().strftime("%Y-%m-%d"),
+            "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}}
         if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
             AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
                 self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
@@ -1046,6 +1083,10 @@ class EsClient:
                 'mappings': utils.read_json_file(
                     "", "rp_aa_stats_mappings.json", to_json=True)
             })
+        else:
+            es_client.indices.put_mapping(
+                index=rp_aa_stats_index,
+                body=utils.read_json_file("", "rp_aa_stats_mappings.json", to_json=True))
 
     @utils.ignore_warnings
     def send_stats_info(self, stats_info):
@@ -1066,3 +1107,11 @@ class EsClient:
                 stat_info_array, host=self.app_config["statsEsHost"],
                 es_client=es_client)
             logger.info("Finished sending stats about analysis")
+
+    @utils.ignore_warnings
+    def update_chosen_namespaces(self, project_log_info):
+        logger.debug("Started updating chosen namespaces")
+        t_start = time()
+        self.namespace_finder.update_namespaces(
+            project_log_info["project_id"], project_log_info["log_words"])
+        logger.debug("Finished updating chosen namespaces %.2f s", time() - t_start)

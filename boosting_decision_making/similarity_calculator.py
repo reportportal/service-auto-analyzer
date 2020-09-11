@@ -26,18 +26,22 @@ class SimilarityCalculator:
         self.weighted_similarity_calculator = weighted_similarity_calculator
         self.config = config
         self.similarity_dict = {}
+        self.object_id_weights = {}
         self.fields_mapping_for_weighting = {
             "message": ["detected_message", "stacktrace"],
             "message_without_params_extended": [
                 "detected_message_without_params_extended", "stacktrace_extended"],
             "message_extended": ["detected_message_extended", "stacktrace_extended"]
         }
+        self.artificial_columns = ["namespaces_stacktrace"]
 
     def find_similarity(self, all_results, fields):
+        reset_namespace_stacktrace_similarity = {}
         for field in fields:
             if field in self.similarity_dict:
                 continue
             self.similarity_dict[field] = {}
+            reset_namespace_stacktrace_similarity[field] = False
             log_field_ids = {}
             index_in_message_array = 0
             count_vector_matrix = None
@@ -57,7 +61,7 @@ class SimilarityCalculator:
                                 log_field_ids[obj["_id"]] = index_in_message_array
                                 index_in_message_array += 1
                         else:
-                            if not obj["_source"][field].strip():
+                            if field not in self.artificial_columns and not obj["_source"][field].strip():
                                 log_field_ids[obj["_id"]] = -1
                             else:
                                 text = []
@@ -68,6 +72,24 @@ class SimilarityCalculator:
                                     text = self.weighted_similarity_calculator.message_to_array(
                                         obj["_source"][fields_to_use[0]],
                                         obj["_source"][fields_to_use[1]])
+                                elif field == "namespaces_stacktrace":
+                                    gathered_lines = []
+                                    weights = []
+                                    for line in obj["_source"]["stacktrace"].split("\n"):
+                                        line_words = utils.split_words(
+                                            line,
+                                            min_word_length=self.config["min_word_length"])
+                                        for word in line_words:
+                                            part_of_namespace = ".".join(word.split(".")[:2])
+                                            if part_of_namespace in self.config["chosen_namespaces"]:
+                                                gathered_lines.append(" ".join(line_words))
+                                                weights.append(
+                                                    self.config["chosen_namespaces"][part_of_namespace])
+                                    if obj["_id"] == log["_id"] and not len(gathered_lines):
+                                        reset_namespace_stacktrace_similarity[field] = True
+                                    if not reset_namespace_stacktrace_similarity[field]:
+                                        text = gathered_lines
+                                        self.object_id_weights[obj["_id"]] = weights
                                 elif field.startswith("stacktrace"):
                                     if utils.does_stacktrace_need_words_reweighting(obj["_source"][field]):
                                         needs_reweighting = 1
@@ -94,7 +116,7 @@ class SimilarityCalculator:
                 count_vector_matrix = np.asarray(vectorizer.fit_transform(all_messages).toarray())
             for log, res in all_results:
                 sim_dict = self._calculate_field_similarity(
-                    log, res, log_field_ids, count_vector_matrix, needs_reweighting_wc)
+                    log, res, log_field_ids, count_vector_matrix, needs_reweighting_wc, field)
                 for key in sim_dict:
                     self.similarity_dict[field][key] = sim_dict[key]
 
@@ -119,7 +141,15 @@ class SimilarityCalculator:
                     count_vector_matrix_weighted[i][j] = count_vector_matrix[i][j]
         return count_vector_matrix_weighted
 
-    def _calculate_field_similarity(self, log, res, log_field_ids, count_vector_matrix, needs_reweighting_wc):
+    def multiply_vectors_by_weight(self, rows, weights):
+        return np.dot(np.reshape(weights, [-1]), rows)
+
+    def normalize_weights(self, weights):
+        normalized_weights = np.asarray(weights) / np.min(weights)
+        return np.clip(normalized_weights, a_min=1.0, a_max=3.0)
+
+    def _calculate_field_similarity(
+            self, log, res, log_field_ids, count_vector_matrix, needs_reweighting_wc, field):
         all_results_similarity = {}
         if self.weighted_similarity_calculator is None and needs_reweighting_wc:
             count_vector_matrix = self.reweight_words_weights(count_vector_matrix)
@@ -142,14 +172,20 @@ class SimilarityCalculator:
                 else:
                     query_vector = count_vector_matrix[index_query_message[0]:index_query_message[1] + 1]
                     log_vector = count_vector_matrix[index_log_message[0]:index_log_message[1] + 1]
-                    if needs_reweighting_wc:
-                        query_vector = self.reweight_words_weights_by_summing(query_vector)
-                        log_vector = self.reweight_words_weights_by_summing(log_vector)
-                    query_vector = self.weighted_similarity_calculator.weigh_data_rows(query_vector)
-                    log_vector = self.weighted_similarity_calculator.weigh_data_rows(log_vector)
-                    if needs_reweighting_wc:
-                        query_vector *= 2
-                        log_vector *= 2
+                    if field == "namespaces_stacktrace":
+                        query_vector = self.multiply_vectors_by_weight(
+                            query_vector, self.normalize_weights(self.object_id_weights[log["_id"]]))
+                        log_vector = self.multiply_vectors_by_weight(
+                            log_vector, self.normalize_weights(self.object_id_weights[obj["_id"]]))
+                    else:
+                        if needs_reweighting_wc:
+                            query_vector = self.reweight_words_weights_by_summing(query_vector)
+                            log_vector = self.reweight_words_weights_by_summing(log_vector)
+                        query_vector = self.weighted_similarity_calculator.weigh_data_rows(query_vector)
+                        log_vector = self.weighted_similarity_calculator.weigh_data_rows(log_vector)
+                        if needs_reweighting_wc:
+                            query_vector *= 2
+                            log_vector *= 2
                     similarity =\
                         round(1 - spatial.distance.cosine(query_vector, log_vector), 2)
                 all_results_similarity[group_id] = {"similarity": similarity, "both_empty": False}

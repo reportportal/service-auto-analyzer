@@ -70,7 +70,8 @@ class BoostingFeaturizer:
             40: (self._calculate_similarity_percent, {"field_name": "message_without_params_extended"}),
             41: (self._calculate_similarity_percent, {"field_name": "message_extended"}),
             42: (self.is_the_same_test_case, {}),
-            43: (self.has_the_same_test_case_in_all_results, {})
+            43: (self.has_the_same_test_case_in_all_results, {}),
+            52: (self._calculate_similarity_percent, {"field_name": "namespaces_stacktrace"})
         }
 
         fields_to_calc_similarity = self.find_columns_to_find_similarities_for()

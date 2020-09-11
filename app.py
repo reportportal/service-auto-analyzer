@@ -44,7 +44,10 @@ APP_CONFIG = {
     "esSslShowWarn":     json.loads(os.getenv("ES_SSL_SHOW_WARN", "false").lower()),
     "esCAcert":          os.getenv("ES_CA_CERT", ""),
     "esClientCert":      os.getenv("ES_CLIENT_CERT", ""),
-    "esClientKey":       os.getenv("ES_CLIENT_KEY", "")
+    "esClientKey":       os.getenv("ES_CLIENT_KEY", ""),
+    "minioHost":         os.getenv("MINIO_SHORT_HOST", "minio:9000"),
+    "minioAccessKey":    os.getenv("MINIO_ACCESS_KEY", "minio"),
+    "minioSecretKey":    os.getenv("MINIO_SECRET_KEY", "minio123")
 }
 
 SEARCH_CONFIG = {
@@ -175,6 +178,11 @@ def init_amqp(_amqp_client, request_handler):
                    lambda channel, method, props, body:
                    amqp_handler.handle_inner_amqp_request(channel, method, props, body,
                                                           request_handler.send_stats_info))))
+    threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
+                   (APP_CONFIG["exchangeName"], "namespace_finder", True, False,
+                   lambda channel, method, props, body:
+                   amqp_handler.handle_inner_amqp_request(channel, method, props, body,
+                                                          request_handler.update_chosen_namespaces))))
 
     return threads
 

@@ -691,7 +691,8 @@ class EsClient:
             boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
                 searched_res,
                 boosting_config,
-                feature_ids=self.boosting_decision_maker.get_feature_ids())
+                feature_ids=self.boosting_decision_maker.get_feature_ids(),
+                weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
             feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
 
             if len(feature_data) > 0:

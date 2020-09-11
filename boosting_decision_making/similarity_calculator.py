@@ -119,6 +119,11 @@ class SimilarityCalculator:
                     log, res, log_field_ids, count_vector_matrix, needs_reweighting_wc, field)
                 for key in sim_dict:
                     self.similarity_dict[field][key] = sim_dict[key]
+        if "namespaces_stacktrace" in reset_namespace_stacktrace_similarity and\
+                reset_namespace_stacktrace_similarity["namespaces_stacktrace"]\
+                and "stacktrace" in self.similarity_dict:
+            for key in self.similarity_dict["stacktrace"]:
+                self.similarity_dict["namespaces_stacktrace"][key] = self.similarity_dict["stacktrace"][key]
 
     def reweight_words_weights(self, count_vector_matrix):
         count_vector_matrix_weighted = np.zeros_like(count_vector_matrix, dtype=float)

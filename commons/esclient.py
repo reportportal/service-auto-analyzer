@@ -77,6 +77,19 @@ class EsClient:
             self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
                 WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
 
+    def update_settings_after_read_only(self, es_host):
+        try:
+            requests.put(
+                "{}/_all/_settings".format(
+                    es_host
+                ),
+                headers={"Content-Type": "application/json"},
+                data="{\"index.blocks.read_only_allow_delete\": null}"
+            ).raise_for_status()
+        except Exception as err:
+            logger.error(err)
+            logger.error("Can't reset read only mode for elastic indices")
+
     def create_index(self, index_name):
         """Create index in elasticsearch"""
         logger.debug("Creating '%s' Elasticsearch index", str(index_name))
@@ -412,12 +425,20 @@ class EsClient:
             return commons.launch_objects.BulkResponse(took=0, errors=False)
         logger.debug("Indexing %d logs...", len(bodies))
         try:
-            success_count, errors = elasticsearch.helpers.bulk(es_client,
-                                                               bodies,
-                                                               chunk_size=1000,
-                                                               request_timeout=30,
-                                                               refresh=refresh)
-
+            try:
+                success_count, errors = elasticsearch.helpers.bulk(es_client,
+                                                                   bodies,
+                                                                   chunk_size=1000,
+                                                                   request_timeout=30,
+                                                                   refresh=refresh)
+            except Exception as err:
+                logger.error(err)
+                self.update_settings_after_read_only(host)
+                success_count, errors = elasticsearch.helpers.bulk(es_client,
+                                                                   bodies,
+                                                                   chunk_size=1000,
+                                                                   request_timeout=30,
+                                                                   refresh=refresh)
             logger.debug("Processed %d logs", success_count)
             if errors:
                 logger.debug("Occured errors %s", errors)

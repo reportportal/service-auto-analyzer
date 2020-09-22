@@ -51,6 +51,7 @@ class TestEsClient(unittest.TestCase):
         self.index_logs_rs = "index_logs_rs.json"
         self.search_rq_first = "search_rq_first.json"
         self.search_rq_second = "search_rq_second.json"
+        self.search_rq_third = "search_rq_third.json"
         self.search_rq_filtered = "search_rq_filtered.json"
         self.search_rq_another_log = "search_rq_another_log.json"
         self.search_rq_different_logs = "search_rq_different_logs.json"
@@ -80,6 +81,7 @@ class TestEsClient(unittest.TestCase):
         self.one_hit_search_rs_merged = "one_hit_search_rs_merged.json"
         self.search_rq_merged_first = "search_rq_merged_first.json"
         self.search_rq_merged_second = "search_rq_merged_second.json"
+        self.search_rq_merged_third = "search_rq_merged_third.json"
         self.suggest_test_item_info_w_merged_logs = "suggest_test_item_info_w_merged_logs.json"
         self.one_hit_search_rs_merged_wrong = "one_hit_search_rs_merged_wrong.json"
         self.three_hits_search_rs_with_one_unique_id = "three_hits_search_rs_with_one_unique_id.json"
@@ -924,7 +926,15 @@ class TestEsClient(unittest.TestCase):
                                     "rq":           utils.get_fixture(self.search_rq_second),
                                     "rs":           utils.get_fixture(
                                         self.no_hits_search_rs),
-                                    }, ],
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           utils.get_fixture(self.search_rq_third),
+                                    "rs":           utils.get_fixture(
+                                        self.no_hits_search_rs),
+                                    }],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [],
@@ -950,7 +960,15 @@ class TestEsClient(unittest.TestCase):
                                     "rq":           utils.get_fixture(self.search_rq_second),
                                     "rs":           utils.get_fixture(
                                         self.no_hits_search_rs),
-                                    }, ],
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           utils.get_fixture(self.search_rq_third),
+                                    "rs":           utils.get_fixture(
+                                        self.no_hits_search_rs),
+                                    }],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [],
@@ -974,6 +992,14 @@ class TestEsClient(unittest.TestCase):
                                     "status":       HTTPStatus.OK,
                                     "content_type": "application/json",
                                     "rq":           utils.get_fixture(self.search_rq_second),
+                                    "rs":           utils.get_fixture(
+                                        self.one_hit_search_rs),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           utils.get_fixture(self.search_rq_third),
                                     "rs":           utils.get_fixture(
                                         self.one_hit_search_rs),
                                     }, ],
@@ -1007,6 +1033,14 @@ class TestEsClient(unittest.TestCase):
                                     "rq":           utils.get_fixture(self.search_rq_second),
                                     "rs":           utils.get_fixture(
                                         self.one_hit_search_rs),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           utils.get_fixture(self.search_rq_third),
+                                    "rs":           utils.get_fixture(
+                                        self.one_hit_search_rs),
                                     }, ],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
@@ -1036,6 +1070,14 @@ class TestEsClient(unittest.TestCase):
                                     "status":       HTTPStatus.OK,
                                     "content_type": "application/json",
                                     "rq":           utils.get_fixture(self.search_rq_second),
+                                    "rs":           utils.get_fixture(
+                                        self.two_hits_search_rs),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           utils.get_fixture(self.search_rq_third),
                                     "rs":           utils.get_fixture(
                                         self.two_hits_search_rs),
                                     }, ],
@@ -1069,6 +1111,14 @@ class TestEsClient(unittest.TestCase):
                                     "rq":           utils.get_fixture(self.search_rq_second),
                                     "rs":           utils.get_fixture(
                                         self.two_hits_search_rs),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           utils.get_fixture(self.search_rq_third),
+                                    "rs":           utils.get_fixture(
+                                        self.no_hits_search_rs),
                                     }, ],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
@@ -1105,6 +1155,14 @@ class TestEsClient(unittest.TestCase):
                                     "rq":           utils.get_fixture(self.search_rq_second),
                                     "rs":           utils.get_fixture(
                                         self.three_hits_search_rs),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           utils.get_fixture(self.search_rq_third),
+                                    "rs":           utils.get_fixture(
+                                        self.no_hits_search_rs),
                                     }, ],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
@@ -1146,6 +1204,14 @@ class TestEsClient(unittest.TestCase):
                                     "rq":           utils.get_fixture(self.search_rq_second),
                                     "rs":           utils.get_fixture(
                                         self.three_hits_search_rs_with_duplicate),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           utils.get_fixture(self.search_rq_third),
+                                    "rs":           utils.get_fixture(
+                                        self.no_hits_search_rs),
                                     }, ],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
@@ -1187,6 +1253,14 @@ class TestEsClient(unittest.TestCase):
                                     "rq":           utils.get_fixture(self.search_rq_merged_second),
                                     "rs":           utils.get_fixture(
                                         self.one_hit_search_rs_merged),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           utils.get_fixture(self.search_rq_merged_third),
+                                    "rs":           utils.get_fixture(
+                                        self.one_hit_search_rs_merged),
                                     }, ],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
@@ -1216,6 +1290,14 @@ class TestEsClient(unittest.TestCase):
                                     "status":       HTTPStatus.OK,
                                     "content_type": "application/json",
                                     "rq":           utils.get_fixture(self.search_rq_merged_second),
+                                    "rs":           utils.get_fixture(
+                                        self.one_hit_search_rs_merged_wrong),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           utils.get_fixture(self.search_rq_merged_third),
                                     "rs":           utils.get_fixture(
                                         self.one_hit_search_rs_merged_wrong),
                                     }, ],

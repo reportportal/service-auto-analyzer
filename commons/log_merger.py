@@ -49,7 +49,9 @@ class LogMerger:
                                      "detected_message_without_params_extended",
                                      "stacktrace_extended", "message_extended",
                                      "message_without_params_extended",
-                                     "urls", "paths", "message_params"])
+                                     "urls", "paths", "message_params",
+                                     "message_without_params_and_brackets",
+                                     "detected_message_without_params_and_brackets"])
                 new_log["_source"]["found_exceptions"] = utils.compress(
                     log_level_messages["found_exceptions"][log_level])
                 new_log["_source"]["found_exceptions_extended"] = utils.compress(

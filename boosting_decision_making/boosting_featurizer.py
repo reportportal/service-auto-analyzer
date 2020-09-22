@@ -38,7 +38,9 @@ class BoostingFeaturizer:
             "detected_message_without_params_extended",
             "message_without_params_extended",
             "message_extended",
-            "detected_message_extended"]
+            "detected_message_extended",
+            "message_without_params_and_brackets",
+            "detected_message_without_params_and_brackets"]
 
         self.feature_functions = {
             0: (self._calculate_score, {}),
@@ -71,7 +73,9 @@ class BoostingFeaturizer:
             41: (self._calculate_similarity_percent, {"field_name": "message_extended"}),
             42: (self.is_the_same_test_case, {}),
             43: (self.has_the_same_test_case_in_all_results, {}),
-            52: (self._calculate_similarity_percent, {"field_name": "namespaces_stacktrace"})
+            52: (self._calculate_similarity_percent, {"field_name": "namespaces_stacktrace"}),
+            53: (self._calculate_similarity_percent,
+                 {"field_name": "detected_message_without_params_and_brackets"})
         }
 
         fields_to_calc_similarity = self.find_columns_to_find_similarities_for()

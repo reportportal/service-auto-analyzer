@@ -523,3 +523,9 @@ def jaccard_similarity(s1, s2):
 def get_fixture(fixture_name, to_json=False):
     with open(os.path.join("fixtures", fixture_name), "r") as file:
         return json.loads(file.read()) if to_json else file.read()
+
+
+def clean_from_brackets(text):
+    for pattern in [r"\[[\s\S]+\]", r"\{[\s\S]+?\}", r"\([\s\S]+?\)"]:
+        text = re.sub(pattern, "", text)
+    return text

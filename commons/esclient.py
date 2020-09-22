@@ -283,6 +283,8 @@ class EsClient:
         message_without_params = utils.clean_from_urls(message_without_params)
         message_without_params = utils.clean_from_paths(message_without_params)
         message_without_params = utils.clean_from_params(message_without_params)
+        message_without_params_and_brackets = utils.clean_from_brackets(
+            message_without_params)
         message_without_params = utils.sanitize_text(message_without_params)
 
         detected_message, stacktrace = utils.detect_log_description_and_stacktrace(cleaned_message)
@@ -294,6 +296,8 @@ class EsClient:
         detected_message_without_params = utils.clean_from_paths(detected_message_without_params)
         message_params = " ".join(utils.extract_message_params(detected_message_without_params))
         detected_message_without_params = utils.clean_from_params(detected_message_without_params)
+        detected_message_without_params_and_brackets = utils.clean_from_brackets(
+            detected_message_without_params)
         detected_message_without_params = utils.sanitize_text(detected_message_without_params)
 
         detected_message_with_numbers = utils.remove_starting_datetime(detected_message)
@@ -330,11 +334,17 @@ class EsClient:
         log_template["_source"]["message_without_params_extended"] =\
             utils.enrich_text_with_method_and_classes(message_without_params)
         log_template["_source"]["whole_message"] = detected_message_with_numbers + " \n " + stacktrace
+        log_template["_source"]["detected_message_without_params_and_brackets"] =\
+            detected_message_without_params_and_brackets
+        log_template["_source"]["message_without_params_and_brackets"] =\
+            message_without_params_and_brackets
 
         for field in ["message", "detected_message", "detected_message_with_numbers",
                       "stacktrace", "only_numbers", "found_exceptions", "found_exceptions_extended",
                       "detected_message_extended", "detected_message_without_params_extended",
-                      "stacktrace_extended", "message_extended", "message_without_params_extended"]:
+                      "stacktrace_extended", "message_extended", "message_without_params_extended",
+                      "detected_message_without_params_and_brackets",
+                      "message_without_params_and_brackets"]:
             log_template["_source"][field] = utils.leave_only_unique_lines(log_template["_source"][field])
             log_template["_source"][field] = utils.clean_colon_stacking(log_template["_source"][field])
         return log_template
@@ -762,16 +772,23 @@ class EsClient:
         logger.info("Finished analysis for %d launches with %d results.", len(launches), len(results))
         return results
 
+    def choose_fields_to_filter(self, log_lines_num):
+        if log_lines_num == -1:
+            return [
+                "detected_message_extended",
+                "detected_message_without_params_extended",
+                "detected_message_without_params_and_brackets"]
+        return ["message_extended", "message_without_params_extended",
+                "message_without_params_and_brackets"]
+
     def get_config_for_boosting_suggests(self, analyzerConfig):
         return {
             "max_query_terms": self.search_cfg["MaxQueryTerms"],
             "min_should_match": 0.4,
             "min_word_length": self.search_cfg["MinWordLength"],
             "filter_min_should_match": [],
-            "filter_min_should_match_any": [
-                "detected_message_extended",
-                "detected_message_without_params_extended"] if analyzerConfig.numberOfLogLines == -1 else [
-                "message_extended", "message_without_params_extended"],
+            "filter_min_should_match_any": self.choose_fields_to_filter(
+                analyzerConfig.numberOfLogLines),
             "number_of_log_lines": analyzerConfig.numberOfLogLines,
             "filter_by_unique_id": True}
 
@@ -797,6 +814,14 @@ class EsClient:
                 test_item_info, log,
                 message_field="message_without_params_extended",
                 det_mes_field="detected_message_without_params_extended",
+                stacktrace_field="stacktrace_extended")
+            es_res = self.es_client.search(index=str(test_item_info.project), body=query)
+            full_results.append((log, es_res))
+
+            query = self.es_query_builder.build_suggest_query(
+                test_item_info, log,
+                message_field="message_without_params_and_brackets",
+                det_mes_field="detected_message_without_params_and_brackets",
                 stacktrace_field="stacktrace_extended")
             es_res = self.es_client.search(index=str(test_item_info.project), body=query)
             full_results.append((log, es_res))

@@ -42,7 +42,9 @@
                     "message_extended": "Message http : localhost/admin \r\n java.lang lang.NoClassDefFoundError NoClassDefFoundError\r",
                     "detected_message_extended": "Message http : localhost/admin \r\n java.lang lang.NoClassDefFoundError NoClassDefFoundError\r",
                     "detected_message_without_params_extended": "Message  \r\n  java.lang lang.NoClassDefFoundError NoClassDefFoundError ",
-                    "message_without_params_extended": "Message  \r\n  java.lang lang.NoClassDefFoundError NoClassDefFoundError "
+                    "message_without_params_extended": "Message  \r\n  java.lang lang.NoClassDefFoundError NoClassDefFoundError ",
+                    "detected_message_without_params_and_brackets": "Message  211\r\n  java.lang lang.NoClassDefFoundError",
+                    "message_without_params_and_brackets": "Message  211\r\n  java.lang lang.NoClassDefFoundError"
                 }
             },
             {
@@ -74,7 +76,9 @@
                     "message_extended": "Message http : localhost/admin \r\n java.lang lang.NoClassDefFoundError NoClassDefFoundError\r",
                     "detected_message_extended": "Message http : localhost/admin \r\n java.lang lang.NoClassDefFoundError NoClassDefFoundError\r",
                     "detected_message_without_params_extended": "Message  \r\n  java.lang lang.NoClassDefFoundError NoClassDefFoundError ",
-                    "message_without_params_extended": "Message  \r\n  java.lang lang.NoClassDefFoundError NoClassDefFoundError "
+                    "message_without_params_extended": "Message  \r\n  java.lang lang.NoClassDefFoundError NoClassDefFoundError ",
+                    "detected_message_without_params_and_brackets": "Message  234\r\n  java.lang lang.NoClassDefFoundError",
+                    "message_without_params_and_brackets": "Message  234\r\n  java.lang lang.NoClassDefFoundError"
                 }
             },
             {
@@ -106,7 +110,9 @@
                     "message_extended": "Message http : localhost/admin \r\n java.lang lang.NoClassDefFoundError NoClassDefFoundError\r",
                     "detected_message_extended": "Message http : localhost/admin \r\n java.lang lang.NoClassDefFoundError NoClassDefFoundError\r",
                     "detected_message_without_params_extended": "Message  \r\n  java.lang lang.NoClassDefFoundError NoClassDefFoundError ",
-                    "message_without_params_extended": "Message  \r\n  java.lang lang.NoClassDefFoundError NoClassDefFoundError "
+                    "message_without_params_extended": "Message  \r\n  java.lang lang.NoClassDefFoundError NoClassDefFoundError ",
+                    "detected_message_without_params_and_brackets": "Message  234\r\n  java.lang lang.NoClassDefFoundError",
+                    "message_without_params_and_brackets": "Message  234\r\n  java.lang lang.NoClassDefFoundError"
                 }
             }
         ]

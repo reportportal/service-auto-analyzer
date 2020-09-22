@@ -157,10 +157,12 @@ class TestBoostingModel(unittest.TestCase):
         boost_model_results = utils.get_fixture(self.suggest_boost_model_results, to_json=True)
         tests = []
         all_configs = [(-1,
-                        ["detected_message_extended", "detected_message_without_params_extended"],
+                        ["detected_message_extended", "detected_message_without_params_extended",
+                         "detected_message_without_params_and_brackets"],
                         decision_maker),
                        (2,
-                        ["message_extended", "message_without_params_extended"],
+                        ["message_extended", "message_without_params_extended",
+                         "message_without_params_and_brackets"],
                         decision_maker)]
         for log_lines, filter_fields_any, _decision_maker in all_configs:
             tests.extend([

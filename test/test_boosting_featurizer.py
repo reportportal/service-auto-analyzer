@@ -19,6 +19,7 @@ import logging
 import sure # noqa
 from boosting_decision_making.boosting_featurizer import BoostingFeaturizer
 from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
+from boosting_decision_making import weighted_similarity_calculator
 from utils import utils
 
 
@@ -38,6 +39,8 @@ class TestBoostingFeaturizer(unittest.TestCase):
         self.three_hits_search_rs_explained = "three_hits_search_rs_explained.json"
         self.one_hit_search_rs_explained_wo_params = "one_hit_search_rs_explained_wo_params.json"
         self.epsilon = 0.0001
+        model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
+        self.weights_folder = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings
@@ -86,11 +89,15 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                       }, ]],
             },
         ]
+        weight_log_sim = weighted_similarity_calculator.\
+            WeightedSimilarityCalculator(folder=self.weights_folder)
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
-                _boosting_featurizer = BoostingFeaturizer(test["elastic_results"],
-                                                          test["config"],
-                                                          [])
+                _boosting_featurizer = BoostingFeaturizer(
+                    test["elastic_results"],
+                    test["config"],
+                    [],
+                    weighted_log_similarity_calculator=weight_log_sim)
                 _boosting_featurizer.all_results.should.have.length_of(len(test["result"]))
                 for i in range(len(test["result"])):
                     for j in range(len(test["result"][i])):
@@ -154,11 +161,15 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                     }
             },
         ]
+        weight_log_sim = weighted_similarity_calculator.\
+            WeightedSimilarityCalculator(folder=self.weights_folder)
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
-                _boosting_featurizer = BoostingFeaturizer(test["elastic_results"],
-                                                          test["config"],
-                                                          [])
+                _boosting_featurizer = BoostingFeaturizer(
+                    test["elastic_results"],
+                    test["config"],
+                    [],
+                    weighted_log_similarity_calculator=weight_log_sim)
                 scores_by_issue_type = _boosting_featurizer.find_most_relevant_by_type()
                 scores_by_issue_type.should.have.length_of(len(test["result"]))
                 for issue_type in test["result"]:
@@ -248,9 +259,15 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                      utils.get_fixture(self.two_hits_search_rs_small_logs, to_json=True))]
             },
         ]
+        weight_log_sim = weighted_similarity_calculator.\
+            WeightedSimilarityCalculator(folder=self.weights_folder)
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
-                _boosting_featurizer = BoostingFeaturizer(test["elastic_results"], test["config"], [])
+                _boosting_featurizer = BoostingFeaturizer(
+                    test["elastic_results"],
+                    test["config"],
+                    [],
+                    weighted_log_similarity_calculator=weight_log_sim)
                 all_results = test["elastic_results"]
                 for field in test["config"]["filter_min_should_match"]:
                     all_results = _boosting_featurizer.filter_by_min_should_match(all_results, field=field)
@@ -313,11 +330,15 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                     }
             },
         ]
-        for idx, test in enumerate(tests[3:]):
+        weight_log_sim = weighted_similarity_calculator.\
+            WeightedSimilarityCalculator(folder=self.weights_folder)
+        for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
-                _boosting_featurizer = SuggestBoostingFeaturizer(test["elastic_results"],
-                                                                 test["config"],
-                                                                 [])
+                _boosting_featurizer = SuggestBoostingFeaturizer(
+                    test["elastic_results"],
+                    test["config"],
+                    [],
+                    weighted_log_similarity_calculator=weight_log_sim)
                 scores_by_issue_type = _boosting_featurizer.find_most_relevant_by_type()
                 scores_by_issue_type.should.have.length_of(len(test["result"]))
                 for issue_type in test["result"]:
@@ -407,9 +428,15 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                      utils.get_fixture(self.two_hits_search_rs_small_logs, to_json=True))]
             },
         ]
+        weight_log_sim = weighted_similarity_calculator.\
+            WeightedSimilarityCalculator(folder=self.weights_folder)
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
-                _boosting_featurizer = SuggestBoostingFeaturizer(test["elastic_results"], test["config"], [])
+                _boosting_featurizer = SuggestBoostingFeaturizer(
+                    test["elastic_results"],
+                    test["config"],
+                    [],
+                    weighted_log_similarity_calculator=weight_log_sim)
                 all_results = test["elastic_results"]
                 all_results = _boosting_featurizer.filter_by_min_should_match_any(
                     all_results,

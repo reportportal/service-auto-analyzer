@@ -102,7 +102,7 @@ index_data = [{
                         "message": "error occured"},
                        {"logId": 4,
                         "logLevel": 40000,
-                        "message": "error occured \r\n error found \r\n error mined"}, ]
+                        "message": "error occured \r\n error found \r\n error mined \r\n"}, ]
                    },
                   {"testItemId": 5,
                    "uniqueId": "df1",
@@ -265,4 +265,5 @@ elif used_method.strip() in ["cluster"]:
                                         "numberOfLogLines": number_lines}), used_method)
 else:
     response = rpc.call(json.dumps(index_data), used_method)
+    rpc.call(json.dumps(index_data), "namespace_finder")
 print(" [.] Got %r" % response)

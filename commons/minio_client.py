@@ -66,6 +66,8 @@ class MinioClient:
             self.minioClient.put_object(
                 bucket_name=bucket_name, object_name=object_name,
                 data=data_stream, length=len(data))
+            logger.debug(
+                "Saved into bucket '%s' with name '%s'", bucket_name, object_name)
         except Exception as err:
             logger.error(err)
 

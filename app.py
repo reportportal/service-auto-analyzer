@@ -181,8 +181,8 @@ def init_amqp(_amqp_client, request_handler):
     threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                    (APP_CONFIG["exchangeName"], "namespace_finder", True, False,
                    lambda channel, method, props, body:
-                   amqp_handler.handle_inner_amqp_request(channel, method, props, body,
-                                                          request_handler.update_chosen_namespaces))))
+                   amqp_handler.handle_amqp_request(channel, method, props, body,
+                                                    request_handler.update_chosen_namespaces))))
 
     return threads
 

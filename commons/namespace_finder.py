@@ -52,5 +52,6 @@ class NamespaceFinder:
         for item, cnt in potential_project_namespaces.items():
             if cnt > 10:
                 chosen_namespaces[item.replace("_", ".")] = cnt
+        logger.debug("Chosen namespaces %s", chosen_namespaces)
         self.minio_client.put_project_object(
             chosen_namespaces, project_id, "chosen_namespaces")

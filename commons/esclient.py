@@ -195,24 +195,30 @@ class EsClient:
         logs_with_exceptions = self.extract_all_exceptions(bodies)
         result = self._bulk_index(bodies)
         result.logResults = logs_with_exceptions
-        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
-            AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
-                self.app_config["exchangeName"], "namespace_finder", json.dumps({
-                    "project_id": project,
-                    "log_words": self.prepare_log_words(bodies)
-                }))
         self._merge_logs(test_item_ids, project)
         logger.info("Finished indexing logs for %d launches. It took %.2f sec.",
                     len(launches), time() - t_start)
         return result
 
-    def prepare_log_words(self, bodies):
+    def prepare_log_words(self, launches):
         log_words = {}
-        for log in bodies:
-            for word in utils.split_words(log["_source"]["stacktrace"]):
-                if "." in word and len(word.split(".")) > 2:
-                    log_words[word] = 1
-        return log_words
+        project = None
+        for launch in launches:
+            self.create_index_if_not_exists(str(launch.project))
+            project = str(launch.project)
+
+            for test_item in launch.testItems:
+                for log in test_item.logs:
+
+                    if log.logLevel < ERROR_LOGGING_LEVEL or not log.message.strip():
+                        continue
+                    clean_message = self.clean_message(log.message)
+                    det_message, stacktrace = utils.detect_log_description_and_stacktrace(
+                        clean_message)
+                    for word in utils.split_words(stacktrace):
+                        if "." in word and len(word.split(".")) > 2:
+                            log_words[word] = 1
+        return log_words, project
 
     def extract_all_exceptions(self, bodies):
         logs_with_exceptions = []
@@ -1160,9 +1166,12 @@ class EsClient:
             logger.info("Finished sending stats about analysis")
 
     @utils.ignore_warnings
-    def update_chosen_namespaces(self, project_log_info):
+    def update_chosen_namespaces(self, launches):
         logger.debug("Started updating chosen namespaces")
         t_start = time()
+        log_words, project_id = self.prepare_log_words(launches)
+        logger.debug("Project id %s", project_id)
+        logger.debug("Found namespaces %s", log_words)
         self.namespace_finder.update_namespaces(
-            project_log_info["project_id"], project_log_info["log_words"])
+            project_id, log_words)
         logger.debug("Finished updating chosen namespaces %.2f s", time() - t_start)

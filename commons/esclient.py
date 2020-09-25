@@ -1147,23 +1147,18 @@ class EsClient:
 
     @utils.ignore_warnings
     def send_stats_info(self, stats_info):
-        if self.app_config["statsEsHost"].strip():
-            rp_aa_stats_index = "rp_aa_stats"
-            es_client = elasticsearch.Elasticsearch([self.app_config["statsEsHost"]], timeout=30,
-                                                    max_retries=5, retry_on_timeout=True)
-            logger.info("Started sending stats about analysis")
-            self.create_index_for_stats_info(es_client, rp_aa_stats_index)
+        rp_aa_stats_index = "rp_aa_stats"
+        logger.info("Started sending stats about analysis")
+        self.create_index_for_stats_info(self.es_client, rp_aa_stats_index)
 
-            stat_info_array = []
-            for launch_id in stats_info:
-                stat_info_array.append({
-                    "_index": rp_aa_stats_index,
-                    "_source": stats_info[launch_id]
-                })
-            self._bulk_index(
-                stat_info_array, host=self.app_config["statsEsHost"],
-                es_client=es_client)
-            logger.info("Finished sending stats about analysis")
+        stat_info_array = []
+        for launch_id in stats_info:
+            stat_info_array.append({
+                "_index": rp_aa_stats_index,
+                "_source": stats_info[launch_id]
+            })
+        self._bulk_index(stat_info_array)
+        logger.info("Finished sending stats about analysis")
 
     @utils.ignore_warnings
     def update_chosen_namespaces(self, launches):

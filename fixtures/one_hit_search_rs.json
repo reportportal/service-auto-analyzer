@@ -37,6 +37,7 @@
                     "urls": "http:localhost/admin",
                     "paths": "",
                     "message_params": "",
+                    "potential_status_codes": "",
                     "found_exceptions": "java.lang.noclassdeffounderror",
                     "found_exceptions_extended": "java.lang.noclassdeffounderror lang.noclassdeffounderror noclassdeffounderror",
                     "stacktrace_extended": "",

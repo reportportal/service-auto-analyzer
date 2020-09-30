@@ -302,6 +302,7 @@ class EsClient:
         detected_message_without_params = utils.clean_from_urls(detected_message_without_params)
         paths = " ".join(utils.extract_paths(detected_message_without_params))
         detected_message_without_params = utils.clean_from_paths(detected_message_without_params)
+        potential_status_codes = " ".join(utils.get_potential_status_codes(detected_message_without_params))
         message_params = " ".join(utils.extract_message_params(detected_message_without_params))
         detected_message_without_params = utils.clean_from_params(detected_message_without_params)
         detected_message_without_params_and_brackets = utils.remove_starting_datetime(
@@ -348,6 +349,8 @@ class EsClient:
             detected_message_without_params_and_brackets
         log_template["_source"]["message_without_params_and_brackets"] =\
             message_without_params_and_brackets
+        log_template["_source"]["potential_status_codes"] =\
+            potential_status_codes
 
         for field in ["message", "detected_message", "detected_message_with_numbers",
                       "stacktrace", "only_numbers", "found_exceptions", "found_exceptions_extended",

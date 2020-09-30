@@ -322,11 +322,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                     2: {"mrHit": {"_score": 168.31,
                                                   "_id": "2"},
                                         "compared_log": utils.get_fixture(self.log_message, to_json=True),
-                                        "score": 1.0, },
-                                    3: {"mrHit": {"_score": 85.345,
-                                                  "_id": "3"},
-                                        "compared_log": utils.get_fixture(self.log_message, to_json=True),
-                                        "score": 0.507, },
+                                        "score": 1.0, }
                                     }
             },
         ]

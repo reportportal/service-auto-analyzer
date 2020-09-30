@@ -75,7 +75,9 @@ class BoostingFeaturizer:
             43: (self.has_the_same_test_case_in_all_results, {}),
             52: (self._calculate_similarity_percent, {"field_name": "namespaces_stacktrace"}),
             53: (self._calculate_similarity_percent,
-                 {"field_name": "detected_message_without_params_and_brackets"})
+                 {"field_name": "detected_message_without_params_and_brackets"}),
+            55: (self._calculate_similarity_percent,
+                 {"field_name": "potential_status_codes"})
         }
 
         fields_to_calc_similarity = self.find_columns_to_find_similarities_for()

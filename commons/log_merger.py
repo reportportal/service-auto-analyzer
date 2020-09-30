@@ -52,8 +52,11 @@ class LogMerger:
                                      "urls", "paths", "message_params",
                                      "message_without_params_and_brackets",
                                      "detected_message_without_params_and_brackets"])
-                new_log["_source"]["found_exceptions"] = utils.compress(
-                    log_level_messages["found_exceptions"][log_level])
+                for field in log_level_messages:
+                    if field in ["message"]:
+                        continue
+                    new_log["_source"][field] = utils.compress(
+                        log_level_messages[field][log_level])
                 new_log["_source"]["found_exceptions_extended"] = utils.compress(
                     utils.enrich_found_exceptions(log_level_messages["found_exceptions"][log_level]))
 
@@ -63,7 +66,7 @@ class LogMerger:
     @staticmethod
     def decompose_logs_merged_and_without_duplicates(logs):
         """Merge big logs with small ones without duplcates"""
-        log_level_messages = {"message": {}, "found_exceptions": {}}
+        log_level_messages = {"message": {}, "found_exceptions": {}, "potential_status_codes": {}}
         log_level_ids_to_add = {}
         log_level_ids_merged = {}
         logs_unique_log_level = {}
@@ -74,7 +77,7 @@ class LogMerger:
 
             log_level = log["_source"]["log_level"]
 
-            for field in ["message", "found_exceptions"]:
+            for field in log_level_messages:
                 if log_level not in log_level_messages[field]:
                     log_level_messages[field][log_level] = ""
             if log_level not in log_level_ids_to_add:
@@ -93,12 +96,11 @@ class LogMerger:
                 if current_log_word_num > main_log_word_num:
                     log_level_ids_merged[log_level] = log
 
-                message = log["_source"]["message"]
-                normalized_msg = " ".join(message.strip().lower().split())
+                normalized_msg = " ".join(log["_source"]["message"].strip().lower().split())
                 if normalized_msg not in logs_unique_log_level[log_level]:
                     logs_unique_log_level[log_level].add(normalized_msg)
 
-                    for field in ["message", "found_exceptions"]:
+                    for field in log_level_messages:
                         splitter = "\r\n" if field == "message" else " "
                         log_level_messages[field][log_level] =\
                             log_level_messages[field][log_level] + log["_source"][field] + splitter

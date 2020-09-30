@@ -41,7 +41,10 @@
                     "paths": "",
                     "stacktrace_extended": "",
                     "message_without_params_extended": "",
-                    "message_extended": ""
+                    "message_extended": "",
+                    "message_without_params_and_brackets": "",
+                    "detected_message_without_params_and_brackets": "",
+                    "potential_status_codes": ""
                 }
             }
         ]

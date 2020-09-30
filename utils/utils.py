@@ -529,3 +529,21 @@ def clean_from_brackets(text):
     for pattern in [r"\[[\s\S]+\]", r"\{[\s\S]+?\}", r"\([\s\S]+?\)"]:
         text = re.sub(pattern, "", text)
     return text
+
+
+def get_potential_status_codes(text):
+    potential_codes = set()
+    for line in text.split("\n"):
+        line = clean_from_brackets(line)
+        patterns_to_check = [r"\bcode[^\w\d\.]+(\d+)[^\d;\.]*(\d*)|\bcode[^\w\d\.]+(\d+?)$",
+                             r"\w+_code[^\w\d\.]+(\d+)[^\d;\.]*(\d*)|\w+_code[^\w\d\.]+(\d+?)$"]
+        for pattern in patterns_to_check:
+            result = re.search(pattern, line, flags=re.IGNORECASE)
+            for i in range(1, 4):
+                try:
+                    found_code = result.group(i)
+                    if found_code and found_code.strip():
+                        potential_codes.add(found_code)
+                except: # noqa
+                    pass
+    return list(potential_codes)

@@ -94,7 +94,8 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_with_numbers": "hello world 1",
                 "stacktrace": "",
                 "only_numbers": "1",
-                "found_exceptions": "AssertionError"}}
+                "found_exceptions": "AssertionError",
+                "potential_status_codes": ""}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(self.query_all_logs_empty_stacktrace, to_json=True)
 
@@ -123,7 +124,8 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_with_numbers": "hello world 1",
                 "stacktrace": "",
                 "only_numbers": "1",
-                "found_exceptions": "AssertionError"}}
+                "found_exceptions": "AssertionError",
+                "potential_status_codes": ""}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(self.query_two_log_lines, to_json=True)
 
@@ -152,7 +154,8 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_with_numbers": "hello world 1",
                 "stacktrace": "",
                 "only_numbers": "1",
-                "found_exceptions": "AssertionError"}}
+                "found_exceptions": "AssertionError",
+                "potential_status_codes": ""}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(
             self.query_two_log_lines_only_current_launch, to_json=True)
@@ -182,7 +185,8 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_with_numbers": "hello world 1",
                 "stacktrace": "",
                 "only_numbers": "1",
-                "found_exceptions": ""}}
+                "found_exceptions": "",
+                "potential_status_codes": ""}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(
             self.query_two_log_lines_only_current_launch_wo_exceptions, to_json=True)
@@ -212,7 +216,8 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_with_numbers": "hello world 1",
                 "stacktrace": "invoke.method(arg)",
                 "only_numbers": "1",
-                "found_exceptions": "AssertionError"}}
+                "found_exceptions": "AssertionError",
+                "potential_status_codes": ""}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(self.query_all_logs_nonempty_stacktrace, to_json=True)
 
@@ -241,7 +246,8 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_with_numbers": "hello world 1",
                 "stacktrace": "invoke.method(arg)",
                 "only_numbers": "1",
-                "found_exceptions": "AssertionError"}}
+                "found_exceptions": "AssertionError",
+                "potential_status_codes": "300 401"}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(
             self.query_all_logs_nonempty_stacktrace_launches_with_the_same_name, to_json=True)
@@ -271,7 +277,8 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_with_numbers": "",
                 "stacktrace": "",
                 "only_numbers": "",
-                "found_exceptions": "AssertionError"}}
+                "found_exceptions": "AssertionError",
+                "potential_status_codes": ""}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(self.query_merged_small_logs_search, to_json=True)
 
@@ -361,6 +368,15 @@ class TestEsQuery(unittest.TestCase):
                             "max_query_terms":      search_cfg["MaxQueryTerms"],
                             "boost":                4.0,
                         }},
+                        {"more_like_this": {
+                            "fields":               ["potential_status_codes"],
+                            "like":                 log["_source"]["potential_status_codes"],
+                            "min_doc_freq":         1,
+                            "min_term_freq":        1,
+                            "minimum_should_match": "1",
+                            "max_query_terms":      search_cfg["MaxQueryTerms"],
+                            "boost":                4.0,
+                        }},
                     ],
                 },
             },
@@ -420,7 +436,8 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_without_params_extended": "hello world",
                 "stacktrace_extended": "",
                 "message_extended": "hello world 'sdf'",
-                "detected_message_extended": "hello world 'sdf'"
+                "detected_message_extended": "hello world 'sdf'",
+                "potential_status_codes": ""
             }}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_suggest_query(
             test_item_info, log,
@@ -465,7 +482,8 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_without_params_extended": "hello world",
                 "stacktrace_extended": "",
                 "message_extended": "hello world 'sdf'",
-                "detected_message_extended": "hello world 'sdf'"
+                "detected_message_extended": "hello world 'sdf'",
+                "potential_status_codes": "400 200"
             }}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_suggest_query(
             test_item_info, log,
@@ -510,7 +528,8 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_without_params_extended": "hello world",
                 "stacktrace_extended": "invoke.method(arg)",
                 "message_extended": "hello world 'sdf'",
-                "detected_message_extended": "hello world 'sdf'"
+                "detected_message_extended": "hello world 'sdf'",
+                "potential_status_codes": ""
             }}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_suggest_query(
             test_item_info, log,
@@ -555,7 +574,8 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_without_params_extended": "hello world",
                 "stacktrace_extended": "invoke.method(arg)",
                 "message_extended": "hello world 'sdf'",
-                "detected_message_extended": "hello world 'sdf'"
+                "detected_message_extended": "hello world 'sdf'",
+                "potential_status_codes": "200 401"
             }}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_suggest_query(
             test_item_info, log,
@@ -602,7 +622,8 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_without_params_extended": "",
                 "stacktrace_extended": "",
                 "message_extended": "",
-                "detected_message_extended": ""}}
+                "detected_message_extended": "",
+                "potential_status_codes": "200 400"}}
         query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_suggest_query(
             test_item_info, log,
             message_field="message_extended", det_mes_field="detected_message_extended",

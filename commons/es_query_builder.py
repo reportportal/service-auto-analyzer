@@ -230,6 +230,13 @@ class EsQueryBuilder:
                                                 field_name="found_exceptions",
                                                 boost=4.0,
                                                 override_min_should_match="1"))
+        if log["_source"]["potential_status_codes"].strip():
+            query["query"]["bool"]["should"].append(
+                self.build_more_like_this_query("1",
+                                                log["_source"]["potential_status_codes"],
+                                                field_name="potential_status_codes",
+                                                boost=4.0,
+                                                override_min_should_match="1"))
 
         return query
 
@@ -335,6 +342,12 @@ class EsQueryBuilder:
             self.build_more_like_this_query("1",
                                             log["_source"]["found_exceptions_extended"],
                                             field_name="found_exceptions_extended",
+                                            boost=4.0,
+                                            override_min_should_match="1"))
+        query["query"]["bool"]["should"].append(
+            self.build_more_like_this_query("1",
+                                            log["_source"]["potential_status_codes"],
+                                            field_name="potential_status_codes",
                                             boost=4.0,
                                             override_min_should_match="1"))
 

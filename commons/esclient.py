@@ -178,26 +178,26 @@ class EsClient:
         bodies = []
         test_item_ids = []
         project = None
-        launches_queue = Queue()
+        test_item_queue = Queue()
         for launch in launches:
-            launches_queue.put(launch)
-        launches = []
-        while not launches_queue.empty():
-            launch = launches_queue.get()
-            self.create_index_if_not_exists(str(launch.project))
             project = str(launch.project)
+            test_items = launch.testItems
+            launch.testItems = []
+            self.create_index_if_not_exists(str(launch.project))
+            for test_item in test_items:
+                test_item_queue.put((launch, test_item))
+        launches = []
+        while not test_item_queue.empty():
+            launch, test_item = test_item_queue.get()
+            logs_added = False
+            for log in test_item.logs:
+                if log.logLevel < ERROR_LOGGING_LEVEL or not log.message.strip():
+                    continue
 
-            for test_item in launch.testItems:
-                logs_added = False
-                for log in test_item.logs:
-
-                    if log.logLevel < ERROR_LOGGING_LEVEL or not log.message.strip():
-                        continue
-
-                    bodies.append(self._prepare_log(launch, test_item, log))
-                    logs_added = True
-                if logs_added:
-                    test_item_ids.append(str(test_item.testItemId))
+                bodies.append(self._prepare_log(launch, test_item, log))
+                logs_added = True
+            if logs_added:
+                test_item_ids.append(str(test_item.testItemId))
 
         logs_with_exceptions = self.extract_all_exceptions(bodies)
         result = self._bulk_index(bodies)

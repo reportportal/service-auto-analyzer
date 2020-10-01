@@ -695,7 +695,8 @@ class EsClient:
 
     @utils.ignore_warnings
     def analyze_logs(self, launches):
-        logger.info("Started analysis for %d launches", len(launches))
+        cnt_launches = len(launches)
+        logger.info("Started analysis for %d launches", cnt_launches)
         logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
         self.queue = Queue()
         self.finished_queue = Queue()
@@ -705,6 +706,7 @@ class EsClient:
         es_query_thread.start()
         results = []
         t_start = time()
+        launches = []
 
         cnt_items_to_process = 0
         results_to_share = {}
@@ -789,7 +791,7 @@ class EsClient:
                 self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
         logger.debug("Stats info %s", results_to_share)
         logger.info("Processed %d test items. It took %.2f sec.", cnt_items_to_process, time() - t_start)
-        logger.info("Finished analysis for %d launches with %d results.", len(launches), len(results))
+        logger.info("Finished analysis for %d launches with %d results.", cnt_launches, len(results))
         return results
 
     def choose_fields_to_filter(self, log_lines_num):

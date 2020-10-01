@@ -171,13 +171,19 @@ class EsClient:
 
     def index_logs(self, launches):
         """Index launches to the index with project name"""
-        logger.info("Indexing logs for %d launches", len(launches))
+        cnt_launches = len(launches)
+        logger.info("Indexing logs for %d launches", cnt_launches)
         logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
         t_start = time()
         bodies = []
         test_item_ids = []
         project = None
+        launches_queue = Queue()
         for launch in launches:
+            launches_queue.put(launch)
+        launches = []
+        while not launches_queue.empty():
+            launch = launches_queue.get()
             self.create_index_if_not_exists(str(launch.project))
             project = str(launch.project)
 
@@ -192,12 +198,13 @@ class EsClient:
                     logs_added = True
                 if logs_added:
                     test_item_ids.append(str(test_item.testItemId))
+
         logs_with_exceptions = self.extract_all_exceptions(bodies)
         result = self._bulk_index(bodies)
         result.logResults = logs_with_exceptions
         self._merge_logs(test_item_ids, project)
         logger.info("Finished indexing logs for %d launches. It took %.2f sec.",
-                    len(launches), time() - t_start)
+                    cnt_launches, time() - t_start)
         return result
 
     def prepare_log_words(self, launches):

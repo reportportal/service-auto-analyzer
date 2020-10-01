@@ -38,6 +38,7 @@ APP_CONFIG = {
     "analyzerPriority":  int(os.getenv("ANALYZER_PRIORITY", "1")),
     "analyzerIndex":     json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),
     "analyzerLogSearch": json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower()),
+    "turnOffSslVerification": json.loads(os.getenv("ES_TURN_OFF_SSL_VERIFICATION", "false").lower()),
     "esVerifyCerts":     json.loads(os.getenv("ES_VERIFY_CERTS", "false").lower()),
     "esUseSsl":          json.loads(os.getenv("ES_USE_SSL", "false").lower()),
     "esSslShowWarn":     json.loads(os.getenv("ES_SSL_SHOW_WARN", "false").lower()),

@@ -21,6 +21,7 @@ import requests
 import elasticsearch
 import elasticsearch.helpers
 import commons.launch_objects
+from elasticsearch import RequestsHttpConnection
 from commons.launch_objects import SuggestAnalysisResult, SearchLogInfo
 from commons.launch_objects import AnalysisResult, ClusterResult
 import utils.utils as utils
@@ -65,6 +66,28 @@ class EsClient:
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.es_query_builder = EsQueryBuilder(self.search_cfg, ERROR_LOGGING_LEVEL)
         self.initialize_decision_makers()
+
+    def create_es_client(self, app_config):
+        if app_config["turnOffSslVerification"]:
+            return elasticsearch.Elasticsearch(
+                [self.host], timeout=30,
+                max_retries=5, retry_on_timeout=True,
+                use_ssl=app_config["esUseSsl"],
+                verify_certs=app_config["esVerifyCerts"],
+                ssl_show_warn=app_config["esSslShowWarn"],
+                ca_certs=app_config["esCAcert"],
+                client_cert=app_config["esClientCert"],
+                client_key=app_config["esClientKey"],
+                connection_class=RequestsHttpConnection)
+        return elasticsearch.Elasticsearch(
+            [self.host], timeout=30,
+            max_retries=5, retry_on_timeout=True,
+            use_ssl=app_config["esUseSsl"],
+            verify_certs=app_config["esVerifyCerts"],
+            ssl_show_warn=app_config["esSslShowWarn"],
+            ca_certs=app_config["esCAcert"],
+            client_cert=app_config["esClientCert"],
+            client_key=app_config["esClientKey"])
 
     def initialize_decision_makers(self):
         if self.search_cfg["BoostModelFolder"].strip():

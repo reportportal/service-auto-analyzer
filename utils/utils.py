@@ -284,10 +284,6 @@ def fix_big_encoded_urls(message):
     return message
 
 
-def choose_fields_to_filter(log_lines):
-    return ["detected_message", "stacktrace"] if log_lines == -1 else ["message"]
-
-
 def leave_only_unique_lines(message):
     all_unique = set()
     all_lines = []
@@ -547,3 +543,44 @@ def get_potential_status_codes(text):
                 except: # noqa
                     pass
     return list(potential_codes)
+
+
+def choose_issue_type(predicted_labels, predicted_labels_probability,
+                      issue_type_names, scores_by_issue_type):
+    predicted_issue_type = ""
+    max_val = 0.0
+    max_val_start_time = None
+    for i in range(len(predicted_labels)):
+        if predicted_labels[i] == 1:
+            issue_type = issue_type_names[i]
+            chosen_type = scores_by_issue_type[issue_type]
+            start_time = chosen_type["mrHit"]["_source"]["start_time"]
+            if (predicted_labels_probability[i][1] > max_val) or\
+                    ((predicted_labels_probability[i][1] == max_val) and # noqa
+                        (max_val_start_time is None or start_time > max_val_start_time)):
+                max_val = predicted_labels_probability[i][1]
+                predicted_issue_type = issue_type
+                max_val_start_time = start_time
+    return predicted_issue_type
+
+
+def choose_fields_to_filter_suggests(log_lines_num):
+    if log_lines_num == -1:
+        return [
+            "detected_message_extended",
+            "detected_message_without_params_extended",
+            "detected_message_without_params_and_brackets"]
+    return ["message_extended", "message_without_params_extended",
+            "message_without_params_and_brackets"]
+
+
+def choose_fields_to_filter(log_lines):
+    return ["detected_message", "stacktrace"] if log_lines == -1 else ["message"]
+
+
+def prepare_message_for_clustering(message, number_of_log_lines):
+    message = first_lines(message, number_of_log_lines)
+    words = split_words(message, min_word_length=2, only_unique=False)
+    if len(words) < 2:
+        return ""
+    return " ".join(words)

@@ -24,6 +24,8 @@
 
 **ES_CLIENT_KEY** - PEM formatted SSL client key, by default ""
 
+**ES_TURN_OFF_SSL_VERIFICATION** - by default "false". Turn off ssl verification via using RequestsHttpConnection class instead of Urllib3HttpConnection class.
+
 # Instructions for analyzer setup without Docker
 
 Install python with the version 3.7.4. (it is the version on which the service was developed, but it should work on the versions starting from 3.6).

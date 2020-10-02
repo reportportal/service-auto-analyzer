@@ -209,7 +209,7 @@ class EsClient:
             self.create_index_if_not_exists(str(launch.project))
             for test_item in test_items:
                 test_item_queue.put((launch, test_item))
-        launches = []
+        del launches
         while not test_item_queue.empty():
             launch, test_item = test_item_queue.get()
             logs_added = False
@@ -729,7 +729,7 @@ class EsClient:
         es_query_thread.start()
         results = []
         t_start = time()
-        launches = []
+        del launches
 
         cnt_items_to_process = 0
         results_to_share = {}

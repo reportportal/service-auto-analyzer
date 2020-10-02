@@ -621,6 +621,8 @@ class EsClient:
         if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
             AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
                 self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
+        self.queue = Queue()
+        self.finished_queue = Queue()
         logger.debug("Stats info %s", results_to_share)
         logger.info("Processed %d test items. It took %.2f sec.", cnt_items_to_process, time() - t_start)
         logger.info("Finished analysis for %d launches with %d results.", cnt_launches, len(results))

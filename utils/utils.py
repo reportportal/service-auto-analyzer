@@ -575,7 +575,9 @@ def choose_fields_to_filter_suggests(log_lines_num):
 
 
 def choose_fields_to_filter(log_lines):
-    return ["detected_message", "stacktrace"] if log_lines == -1 else ["message"]
+    return [
+        "detected_message", "stacktrace", "potential_status_codes"]\
+        if log_lines == -1 else ["message", "potential_status_codes"]
 
 
 def prepare_message_for_clustering(message, number_of_log_lines):

@@ -44,14 +44,14 @@ class AmqpClient:
         except Exception as err:
             logger.error("Failed to open a channel pid(%d)", os.getpid())
             logger.error(err)
-            raise
+            os.kill(os.getpid(), 9)
         logger.info("Queue '%s' has been declared pid(%d)", result.method.queue, os.getpid())
         try:
             channel.queue_bind(exchange=exchange_name, queue=result.method.queue, routing_key=name)
         except Exception as err:
             logger.error("Failed to open a channel pid(%d)", os.getpid())
             logger.error(err)
-            raise
+            os.kill(os.getpid(), 9)
         return True
 
     @staticmethod
@@ -62,14 +62,14 @@ class AmqpClient:
         except Exception as err:
             logger.error("Failed to configure Qos pid(%d)", os.getpid())
             logger.error(err)
-            raise
+            os.kill(os.getpid(), 9)
         try:
             channel.basic_consume(queue=queue, auto_ack=auto_ack, exclusive=exclusive,
                                   on_message_callback=msg_callback)
         except Exception as err:
             logger.error("Failed to register a consumer pid(%d)", os.getpid())
             logger.error(err)
-            raise
+            os.kill(os.getpid(), 9)
 
     def receive(self, exchange_name, queue, auto_ack, exclusive, msg_callback):
         """AmqpClient starts consuming messages from a specific queue"""
@@ -82,7 +82,7 @@ class AmqpClient:
         except Exception as err:
             logger.error("Failed to consume messages pid(%d) in queue %s", os.getpid(), queue)
             logger.error(err)
-            raise
+            os.kill(os.getpid(), 9)
 
     def send_to_inner_queue(self, exchange_name, queue, data):
         try:

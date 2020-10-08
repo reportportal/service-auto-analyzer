@@ -132,34 +132,10 @@ class EsClient:
             logger.error(err)
             return commons.launch_objects.Response()
 
-    @staticmethod
-    def send_request(url, method):
-        """Send request with specified url and http method"""
-        try:
-            response = requests.get(url) if method == "GET" else {}
-            data = response._content.decode("utf-8")
-            content = json.loads(data, strict=False)
-            return content
-        except Exception as err:
-            logger.error("Error with loading url: %s", url)
-            logger.error(err)
-        return []
-
-    def is_healthy(self):
-        """Check whether elasticsearch is healthy"""
-        try:
-            url = utils.build_url(self.host, ["_cluster/health"])
-            res = EsClient.send_request(url, "GET")
-            return res["status"] in ["green", "yellow"]
-        except Exception as err:
-            logger.error("Elasticsearch is not healthy")
-            logger.error(err)
-            return False
-
     def list_indices(self):
         """Get all indices from elasticsearch"""
         url = utils.build_url(self.host, ["_cat", "indices?format=json"])
-        res = EsClient.send_request(url, "GET")
+        res = utils.send_request(url, "GET")
         return res
 
     def index_exists(self, index_name, print_error=True):

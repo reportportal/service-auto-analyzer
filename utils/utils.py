@@ -24,6 +24,7 @@ from urllib.parse import urlparse
 import warnings
 import os
 import json
+import requests
 
 logger = logging.getLogger("analyzerApp.utils")
 file_extensions = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
@@ -586,3 +587,29 @@ def prepare_message_for_clustering(message, number_of_log_lines):
     if len(words) < 2:
         return ""
     return " ".join(words)
+
+
+def send_request(url, method):
+    """Send request with specified url and http method"""
+    try:
+        response = requests.get(url) if method == "GET" else {}
+        data = response._content.decode("utf-8")
+        content = json.loads(data, strict=False)
+        return content
+    except Exception as err:
+        logger.error("Error with loading url: %s",
+                     remove_credentials_from_url(url))
+        logger.error(err)
+    return []
+
+
+def is_healthy(es_host_name):
+    """Check whether elasticsearch is healthy"""
+    try:
+        url = build_url(es_host_name, ["_cluster/health"])
+        res = send_request(url, "GET")
+        return res["status"] in ["green", "yellow"]
+    except Exception as err:
+        logger.error("Elasticsearch is not healthy")
+        logger.error(err)
+        return False

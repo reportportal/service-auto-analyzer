@@ -457,11 +457,18 @@ class EsClient:
         test_item_dict = {}
         batch_size = 5
         n_first_blocks = 3
+        test_items_number_to_process = 0
         try:
             for launch in launches:
                 if not self.index_exists(str(launch.project)):
                     continue
+                if test_items_number_to_process >= 4000:
+                    logger.info("Only first 4000 test items were taken")
+                    break
                 for test_item in launch.testItems:
+                    if test_items_number_to_process >= 4000:
+                        logger.info("Only first 4000 test items were taken")
+                        break
                     unique_logs = utils.leave_only_unique_logs(test_item.logs)
                     prepared_logs = [self.log_preparation._prepare_log(launch, test_item, log)
                                      for log in unique_logs if log.logLevel >= ERROR_LOGGING_LEVEL]
@@ -492,6 +499,7 @@ class EsClient:
                         batch_logs = []
                         test_item_dict = {}
                         index_in_batch = 0
+                    test_items_number_to_process += 1
             if len(batches) > 0:
                 self._send_result_to_queue(test_item_dict, batches, batch_logs)
 

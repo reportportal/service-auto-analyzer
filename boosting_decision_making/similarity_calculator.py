@@ -36,12 +36,10 @@ class SimilarityCalculator:
         self.artificial_columns = ["namespaces_stacktrace"]
 
     def find_similarity(self, all_results, fields):
-        reset_namespace_stacktrace_similarity = {}
         for field in fields:
             if field in self.similarity_dict:
                 continue
             self.similarity_dict[field] = {}
-            reset_namespace_stacktrace_similarity[field] = False
             log_field_ids = {}
             index_in_message_array = 0
             count_vector_matrix = None
@@ -75,11 +73,17 @@ class SimilarityCalculator:
                                             gathered_lines.append(" ".join(line_words))
                                             weights.append(
                                                 self.config["chosen_namespaces"][part_of_namespace])
-                                if obj["_id"] == log["_id"] and not len(gathered_lines):
-                                    reset_namespace_stacktrace_similarity[field] = True
-                                if not reset_namespace_stacktrace_similarity[field]:
+                                if obj["_id"] == log["_id"] and len(gathered_lines):
                                     text = gathered_lines
                                     self.object_id_weights[obj["_id"]] = weights
+                                else:
+                                    text = []
+                                    for line in obj["_source"]["stacktrace"].split("\n"):
+                                        text.append(" ".join(utils.split_words(
+                                            utils.clean_from_brackets(line),
+                                            min_word_length=self.config["min_word_length"])))
+                                    text = utils.filter_empty_lines(text)
+                                    self.object_id_weights[obj["_id"]] = [1] * len(text)
                             elif field.startswith("stacktrace"):
                                 if utils.does_stacktrace_need_words_reweighting(obj["_source"][field]):
                                     needs_reweighting = 1
@@ -109,11 +113,6 @@ class SimilarityCalculator:
                     log, res, log_field_ids, count_vector_matrix, needs_reweighting_wc, field)
                 for key in sim_dict:
                     self.similarity_dict[field][key] = sim_dict[key]
-        if "namespaces_stacktrace" in reset_namespace_stacktrace_similarity and\
-                reset_namespace_stacktrace_similarity["namespaces_stacktrace"]\
-                and "stacktrace" in self.similarity_dict:
-            for key in self.similarity_dict["stacktrace"]:
-                self.similarity_dict["namespaces_stacktrace"][key] = self.similarity_dict["stacktrace"][key]
 
     def reweight_words_weights_by_summing(self, count_vector_matrix):
         count_vector_matrix_weighted = np.zeros_like(count_vector_matrix, dtype=float)

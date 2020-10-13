@@ -45,6 +45,8 @@ ERROR_LOGGING_LEVEL = 40000
 
 logger = logging.getLogger("analyzerApp.esclient")
 
+EARLY_FINISH = False
+
 
 class EsClient:
     """Elasticsearch client implementation"""
@@ -465,9 +467,15 @@ class EsClient:
                 if test_items_number_to_process >= 4000:
                     logger.info("Only first 4000 test items were taken")
                     break
+                if EARLY_FINISH:
+                    logger.info("Early finish from analyzer before timeout")
+                    break
                 for test_item in launch.testItems:
                     if test_items_number_to_process >= 4000:
                         logger.info("Only first 4000 test items were taken")
+                        break
+                    if EARLY_FINISH:
+                        logger.info("Early finish from analyzer before timeout")
                         break
                     unique_logs = utils.leave_only_unique_logs(test_item.logs)
                     prepared_logs = [self.log_preparation._prepare_log(launch, test_item, log)
@@ -510,16 +518,17 @@ class EsClient:
         logger.info("Es queries finished %.2f s.", time() - t_start)
 
     @utils.ignore_warnings
-    def analyze_logs(self, launches):
+    def analyze_logs(self, launches, timeout=300):
+        global EARLY_FINISH
         cnt_launches = len(launches)
         logger.info("Started analysis for %d launches", cnt_launches)
         logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
         self.queue = Queue()
         self.finished_queue = Queue()
+        es_query_thread = Thread(target=self._query_elasticsearch, args=(launches, ))
+        es_query_thread.daemon = True
+        es_query_thread.start()
         try:
-            es_query_thread = Thread(target=self._query_elasticsearch, args=(launches, ))
-            es_query_thread.daemon = True
-            es_query_thread.start()
             results = []
             t_start = time()
             del launches
@@ -528,6 +537,9 @@ class EsClient:
             results_to_share = {}
             chosen_namespaces = {}
             while self.finished_queue.empty() or not self.queue.empty():
+                if (timeout - (time() - t_start)) <= 5:  # check whether we are running out of time
+                    EARLY_FINISH = True
+                    break
                 if self.queue.empty():
                     sleep(0.1)
                     continue
@@ -608,8 +620,10 @@ class EsClient:
                     self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
         except Exception as err:
             logger.error(err)
-            self.queue = Queue()
-            self.finished_queue = Queue()
+        es_query_thread.join()
+        EARLY_FINISH = False
+        self.queue = Queue()
+        self.finished_queue = Queue()
         logger.debug("Stats info %s", results_to_share)
         logger.info("Processed %d test items. It took %.2f sec.", cnt_items_to_process, time() - t_start)
         logger.info("Finished analysis for %d launches with %d results.", cnt_launches, len(results))

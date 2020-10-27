@@ -59,12 +59,10 @@ class MinioClient:
             return
         try:
             bucket_name = self.get_bucket_name(project_id)
-            logger.debug("Checking existance minio bucket %s" % bucket_name)
             if not self.minioClient.bucket_exists(bucket_name):
                 logger.debug("Creating minio bucket %s" % bucket_name)
                 self.minioClient.make_bucket(bucket_name)
                 logger.debug("Created minio bucket %s" % bucket_name)
-            logger.debug("Saving minio object")
             data = json.dumps(data).encode("utf-8")
             data_stream = io.BytesIO(data)
             data_stream.seek(0)

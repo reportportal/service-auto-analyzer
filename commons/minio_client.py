@@ -34,6 +34,7 @@ class MinioClient:
                 secret_key=app_config["minioSecretKey"],
                 secure=False,
             )
+            logger.info("Minio intialized %s" % app_config["minioHost"])
         except Exception as err:
             logger.error(err)
 

@@ -45,7 +45,7 @@ APP_CONFIG = {
     "esCAcert":          os.getenv("ES_CA_CERT", ""),
     "esClientCert":      os.getenv("ES_CLIENT_CERT", ""),
     "esClientKey":       os.getenv("ES_CLIENT_KEY", ""),
-    "minioHost":         os.getenv("MINIO_SHORT_HOST", ""),
+    "minioHost":         os.getenv("MINIO_SHORT_HOST", "minio:9000"),
     "minioAccessKey":    os.getenv("MINIO_ACCESS_KEY", "minio"),
     "minioSecretKey":    os.getenv("MINIO_SECRET_KEY", "minio123")
 }

@@ -26,6 +26,12 @@
 
 **ES_TURN_OFF_SSL_VERIFICATION** - by default "false". Turn off ssl verification via using RequestsHttpConnection class instead of Urllib3HttpConnection class.
 
+**MINIO_SHORT_HOST** - by default "minio:9000", you need to set short host and port to the minio service
+
+**MINIO_ACCESS_KEY** - by default "minio", you need to set a minio access key here
+
+**MINIO_SECRET_KEY** - by default "minio123", you need to set a minio secret key here
+
 # Instructions for analyzer setup without Docker
 
 Install python with the version 3.7.4. (it is the version on which the service was developed, but it should work on the versions starting from 3.6).

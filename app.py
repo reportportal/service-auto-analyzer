@@ -22,7 +22,7 @@ import os
 import threading
 import time
 import json
-from flask import Flask
+from flask import Flask, Response, jsonify
 from flask_cors import CORS
 import amqp.amqp_handler as amqp_handler
 from amqp.amqp import AmqpClient
@@ -31,9 +31,9 @@ from utils import utils
 
 
 APP_CONFIG = {
-    "esHost":            os.getenv("ES_HOSTS", "http://elasticsearch:9200"),
+    "esHost":            os.getenv("ES_HOSTS", "http://elasticsearch:9200").strip("/").strip("\\"),
     "logLevel":          os.getenv("LOGGING_LEVEL", "DEBUG"),
-    "amqpUrl":           os.getenv("AMQP_URL", ""),
+    "amqpUrl":           os.getenv("AMQP_URL", "").strip("/").strip("\\"),
     "exchangeName":      os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
     "analyzerPriority":  int(os.getenv("ANALYZER_PRIORITY", "1")),
     "analyzerIndex":     json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),
@@ -221,12 +221,32 @@ CORS(application)
 threads = []
 
 
+@application.route('/', methods=['GET'])
+def get_health_status():
+    global threads
+    status = ""
+    if not utils.is_healthy(APP_CONFIG["esHost"]):
+        status += "Elasticsearch is not healthy;"
+    if status:
+        logger.error("Analyzer health check status failed: %s", status)
+        return Response(json.dumps({"status": status}), status=503, mimetype='application/json')
+    return jsonify({"status": "healthy"})
+
+
 def handler(signal_received, frame):
     print('The analyzer has stopped')
     exit(0)
 
 
+def start_http_server():
+    application.logger.setLevel(logging.INFO)
+    logger.info("Started http server")
+    application.run(host='0.0.0.0', port=5001, use_reloader=False)
+
+
 signal(SIGINT, handler)
+threads = []
+logger.info("The analyzer has started")
 while True:
     try:
         logger.info("Starting waiting for AMQP connection")
@@ -237,7 +257,8 @@ while True:
             logger.error(err)
             time.sleep(10)
             continue
-        threads = init_amqp(amqp_client, create_es_client())
+        es_client = create_es_client()
+        threads = init_amqp(amqp_client, es_client)
         logger.info("Analyzer has started")
         break
     except Exception as err:
@@ -245,7 +266,10 @@ while True:
         logger.error(err)
 
 
-for th in threads:
-    th.join()
-logger.info("The analyzer has finished")
-exit(0)
+if __name__ == '__main__':
+    logger.info("Program started")
+
+    start_http_server()
+
+    logger.info("The analyzer has finished")
+    exit(0)

@@ -45,6 +45,8 @@ ERROR_LOGGING_LEVEL = 40000
 
 logger = logging.getLogger("analyzerApp.esclient")
 
+EARLY_FINISH = False
+
 
 class EsClient:
     """Elasticsearch client implementation"""
@@ -132,34 +134,10 @@ class EsClient:
             logger.error(err)
             return commons.launch_objects.Response()
 
-    @staticmethod
-    def send_request(url, method):
-        """Send request with specified url and http method"""
-        try:
-            response = requests.get(url) if method == "GET" else {}
-            data = response._content.decode("utf-8")
-            content = json.loads(data, strict=False)
-            return content
-        except Exception as err:
-            logger.error("Error with loading url: %s", url)
-            logger.error(err)
-        return []
-
-    def is_healthy(self):
-        """Check whether elasticsearch is healthy"""
-        try:
-            url = utils.build_url(self.host, ["_cluster/health"])
-            res = EsClient.send_request(url, "GET")
-            return res["status"] in ["green", "yellow"]
-        except Exception as err:
-            logger.error("Elasticsearch is not healthy")
-            logger.error(err)
-            return False
-
     def list_indices(self):
         """Get all indices from elasticsearch"""
         url = utils.build_url(self.host, ["_cat", "indices?format=json"])
-        res = EsClient.send_request(url, "GET")
+        res = utils.send_request(url, "GET")
         return res
 
     def index_exists(self, index_name, print_error=True):
@@ -481,11 +459,24 @@ class EsClient:
         test_item_dict = {}
         batch_size = 5
         n_first_blocks = 3
+        test_items_number_to_process = 0
         try:
             for launch in launches:
                 if not self.index_exists(str(launch.project)):
                     continue
+                if test_items_number_to_process >= 4000:
+                    logger.info("Only first 4000 test items were taken")
+                    break
+                if EARLY_FINISH:
+                    logger.info("Early finish from analyzer before timeout")
+                    break
                 for test_item in launch.testItems:
+                    if test_items_number_to_process >= 4000:
+                        logger.info("Only first 4000 test items were taken")
+                        break
+                    if EARLY_FINISH:
+                        logger.info("Early finish from analyzer before timeout")
+                        break
                     unique_logs = utils.leave_only_unique_logs(test_item.logs)
                     prepared_logs = [self.log_preparation._prepare_log(launch, test_item, log)
                                      for log in unique_logs if log.logLevel >= ERROR_LOGGING_LEVEL]
@@ -516,6 +507,7 @@ class EsClient:
                         batch_logs = []
                         test_item_dict = {}
                         index_in_batch = 0
+                    test_items_number_to_process += 1
             if len(batches) > 0:
                 self._send_result_to_queue(test_item_dict, batches, batch_logs)
 
@@ -526,101 +518,112 @@ class EsClient:
         logger.info("Es queries finished %.2f s.", time() - t_start)
 
     @utils.ignore_warnings
-    def analyze_logs(self, launches):
+    def analyze_logs(self, launches, timeout=300):
+        global EARLY_FINISH
         cnt_launches = len(launches)
         logger.info("Started analysis for %d launches", cnt_launches)
         logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
         self.queue = Queue()
         self.finished_queue = Queue()
-
         es_query_thread = Thread(target=self._query_elasticsearch, args=(launches, ))
         es_query_thread.daemon = True
         es_query_thread.start()
-        results = []
-        t_start = time()
-        del launches
+        try:
+            results = []
+            t_start = time()
+            del launches
 
-        cnt_items_to_process = 0
-        results_to_share = {}
-        chosen_namespaces = {}
-        while self.finished_queue.empty() or not self.queue.empty():
-            if self.queue.empty():
-                sleep(0.1)
-                continue
-            else:
-                item_to_process = self.queue.get()
-            analyzer_config, test_item_id, searched_res, time_processed = item_to_process
-            launch_id = searched_res[0][0]["_source"]["launch_id"]
-            launch_name = searched_res[0][0]["_source"]["launch_name"]
-            project_id = searched_res[0][0]["_index"]
-            if launch_id not in results_to_share:
-                results_to_share[launch_id] = {
-                    "not_found": 0, "items_to_process": 0, "processed_time": 0,
-                    "launch_id": launch_id, "launch_name": launch_name, "project_id": project_id,
-                    "method": "auto_analysis",
-                    "gather_date": datetime.now().strftime("%Y-%m-%d"),
-                    "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "number_of_log_lines": analyzer_config.numberOfLogLines,
-                    "min_should_match": self.find_min_should_match_threshold(analyzer_config)}
+            cnt_items_to_process = 0
+            results_to_share = {}
+            chosen_namespaces = {}
+            while self.finished_queue.empty() or not self.queue.empty():
+                if (timeout - (time() - t_start)) <= 5:  # check whether we are running out of time
+                    EARLY_FINISH = True
+                    break
+                if self.queue.empty():
+                    sleep(0.1)
+                    continue
+                else:
+                    item_to_process = self.queue.get()
+                analyzer_config, test_item_id, searched_res, time_processed = item_to_process
+                launch_id = searched_res[0][0]["_source"]["launch_id"]
+                launch_name = searched_res[0][0]["_source"]["launch_name"]
+                project_id = searched_res[0][0]["_index"]
+                if launch_id not in results_to_share:
+                    results_to_share[launch_id] = {
+                        "not_found": 0, "items_to_process": 0, "processed_time": 0,
+                        "launch_id": launch_id, "launch_name": launch_name, "project_id": project_id,
+                        "method": "auto_analysis",
+                        "gather_date": datetime.now().strftime("%Y-%m-%d"),
+                        "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "number_of_log_lines": analyzer_config.numberOfLogLines,
+                        "min_should_match": self.find_min_should_match_threshold(analyzer_config)}
 
-            t_start_item = time()
-            cnt_items_to_process += 1
-            results_to_share[launch_id]["items_to_process"] += 1
-            results_to_share[launch_id]["processed_time"] += time_processed
+                t_start_item = time()
+                cnt_items_to_process += 1
+                results_to_share[launch_id]["items_to_process"] += 1
+                results_to_share[launch_id]["processed_time"] += time_processed
 
-            boosting_config = self.get_config_for_boosting(analyzer_config)
-            if project_id not in chosen_namespaces:
-                chosen_namespaces[project_id] = self.namespace_finder.get_chosen_namespaces(project_id)
-            boosting_config["chosen_namespaces"] = chosen_namespaces[project_id]
+                boosting_config = self.get_config_for_boosting(analyzer_config)
+                if project_id not in chosen_namespaces:
+                    chosen_namespaces[project_id] = self.namespace_finder.get_chosen_namespaces(project_id)
+                boosting_config["chosen_namespaces"] = chosen_namespaces[project_id]
 
-            boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
-                searched_res,
-                boosting_config,
-                feature_ids=self.boosting_decision_maker.get_feature_ids(),
-                weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
-            feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
+                boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
+                    searched_res,
+                    boosting_config,
+                    feature_ids=self.boosting_decision_maker.get_feature_ids(),
+                    weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
+                feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
 
-            if len(feature_data) > 0:
+                if len(feature_data) > 0:
 
-                predicted_labels, predicted_labels_probability =\
-                    self.boosting_decision_maker.predict(feature_data)
+                    predicted_labels, predicted_labels_probability =\
+                        self.boosting_decision_maker.predict(feature_data)
 
-                scores_by_issue_type = boosting_data_gatherer.scores_by_issue_type
+                    scores_by_issue_type = boosting_data_gatherer.scores_by_issue_type
 
-                for i in range(len(issue_type_names)):
-                    logger.debug("Most relevant item with issue type %s has id %s",
-                                 issue_type_names[i],
-                                 boosting_data_gatherer.
-                                 scores_by_issue_type[issue_type_names[i]]["mrHit"]["_id"])
-                    logger.debug("Issue type %s has label %d and probability %.3f for features %s",
-                                 issue_type_names[i],
-                                 predicted_labels[i],
-                                 predicted_labels_probability[i][1],
-                                 feature_data[i])
+                    for i in range(len(issue_type_names)):
+                        logger.debug("Most relevant item with issue type %s has id %s",
+                                     issue_type_names[i],
+                                     boosting_data_gatherer.
+                                     scores_by_issue_type[issue_type_names[i]]["mrHit"]["_id"])
+                        logger.debug("Issue type %s has label %d and probability %.3f for features %s",
+                                     issue_type_names[i],
+                                     predicted_labels[i],
+                                     predicted_labels_probability[i][1],
+                                     feature_data[i])
 
-                predicted_issue_type = utils.choose_issue_type(predicted_labels,
-                                                               predicted_labels_probability,
-                                                               issue_type_names,
-                                                               boosting_data_gatherer.scores_by_issue_type)
+                    predicted_issue_type = utils.choose_issue_type(
+                        predicted_labels,
+                        predicted_labels_probability,
+                        issue_type_names,
+                        boosting_data_gatherer.scores_by_issue_type)
 
-                if predicted_issue_type:
-                    chosen_type = scores_by_issue_type[predicted_issue_type]
-                    relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
-                    analysis_result = AnalysisResult(testItem=test_item_id,
-                                                     issueType=predicted_issue_type,
-                                                     relevantItem=relevant_item)
-                    results.append(analysis_result)
-                    logger.debug(analysis_result)
+                    if predicted_issue_type:
+                        chosen_type = scores_by_issue_type[predicted_issue_type]
+                        relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
+                        analysis_result = AnalysisResult(testItem=test_item_id,
+                                                         issueType=predicted_issue_type,
+                                                         relevantItem=relevant_item)
+                        results.append(analysis_result)
+                        logger.debug(analysis_result)
+                    else:
+                        results_to_share[launch_id]["not_found"] += 1
+                        logger.debug("Test item %s has no relevant items", test_item_id)
                 else:
                     results_to_share[launch_id]["not_found"] += 1
-                    logger.debug("Test item %s has no relevant items", test_item_id)
-            else:
-                results_to_share[launch_id]["not_found"] += 1
-                logger.debug("There are no results for test item %s", test_item_id)
-            results_to_share[launch_id]["processed_time"] += (time() - t_start_item)
-        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
-            AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
-                self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
+                    logger.debug("There are no results for test item %s", test_item_id)
+                results_to_share[launch_id]["processed_time"] += (time() - t_start_item)
+            if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+                AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                    self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
+        except Exception as err:
+            logger.error(err)
+        es_query_thread.join()
+        EARLY_FINISH = False
+        self.queue = Queue()
+        self.finished_queue = Queue()
         logger.debug("Stats info %s", results_to_share)
         logger.info("Processed %d test items. It took %.2f sec.", cnt_items_to_process, time() - t_start)
         logger.info("Finished analysis for %d launches with %d results.", cnt_launches, len(results))
@@ -968,6 +971,7 @@ class EsClient:
         log_words, project_id = self.log_preparation.prepare_log_words(launches)
         logger.debug("Project id %s", project_id)
         logger.debug("Found namespaces %s", log_words)
-        self.namespace_finder.update_namespaces(
-            project_id, log_words)
+        if project_id is not None:
+            self.namespace_finder.update_namespaces(
+                project_id, log_words)
         logger.debug("Finished updating chosen namespaces %.2f s", time() - t_start)

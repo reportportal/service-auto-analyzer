@@ -32,7 +32,7 @@ from utils import utils
 
 APP_CONFIG = {
     "esHost":            os.getenv("ES_HOSTS", "http://elasticsearch:9200").strip("/").strip("\\"),
-    "logLevel":          os.getenv("LOGGING_LEVEL", "DEBUG"),
+    "logLevel":          os.getenv("LOGGING_LEVEL", "DEBUG").strip(),
     "amqpUrl":           os.getenv("AMQP_URL", "").strip("/").strip("\\"),
     "exchangeName":      os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
     "analyzerPriority":  int(os.getenv("ANALYZER_PRIORITY", "1")),

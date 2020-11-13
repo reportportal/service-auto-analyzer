@@ -252,8 +252,9 @@ class BoostingFeaturizer:
             return self.scores_by_issue_type
         self.scores_by_issue_type = {}
         for log, es_results in self.all_results:
-            for hit in es_results:
+            for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
+                hit["es_pos"] = idx
 
                 if issue_type not in self.scores_by_issue_type:
                     self.scores_by_issue_type[issue_type] = {

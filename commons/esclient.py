@@ -782,11 +782,23 @@ class EsClient:
                     issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
                     relevant_log_id = utils.extract_real_id(
                         scores_by_test_items[test_item_id]["mrHit"]["_id"])
-                    analysis_result = SuggestAnalysisResult(testItem=test_item_info.testItemId,
-                                                            issueType=issue_type,
-                                                            relevantItem=test_item_id,
-                                                            relevantLogId=relevant_log_id,
-                                                            matchScore=round(prob * 100, 2))
+                    test_item_log_id = utils.extract_real_id(
+                        scores_by_test_items[test_item_id]["compared_log"]["_id"])
+                    analysis_result = SuggestAnalysisResult(
+                        testItem=test_item_info.testItemId,
+                        testItemLogId=test_item_log_id,
+                        issueType=issue_type,
+                        relevantItem=test_item_id,
+                        relevantLogId=relevant_log_id,
+                        matchScore=round(prob * 100, 2),
+                        esScore=round(scores_by_test_items[test_item_id]["mrHit"]["_score"], 2),
+                        esPosition=scores_by_test_items[test_item_id]["mrHit"]["es_pos"],
+                        modelFeatureNames=";".join(
+                            [str(feature) for feature in self.suggest_decision_maker.get_feature_ids()]),
+                        modelFeatureValues=";".join(
+                            [str(feature) for feature in feature_data[idx]]),
+                        usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
+                        minShouldMatch=self.find_min_should_match_threshold(test_item_info.analyzerConfig))
                     results.append(analysis_result)
                     logger.debug(analysis_result)
         else:

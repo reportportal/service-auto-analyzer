@@ -183,6 +183,11 @@ def init_amqp(_amqp_client, request_handler):
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
                                                     request_handler.update_chosen_namespaces))))
+    threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
+                   (APP_CONFIG["exchangeName"], "train_models", True, False,
+                   lambda channel, method, props, body:
+                   amqp_handler.handle_inner_amqp_request(channel, method, props, body,
+                                                          request_handler.train_models))))
 
     return threads
 

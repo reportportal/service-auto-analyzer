@@ -37,6 +37,7 @@ from commons.log_merger import LogMerger
 from queue import Queue
 from threading import Thread
 from commons import clusterizer, namespace_finder
+from commons.triggering_training.retraining_defect_type_triggering import RetrainingDefectTypeTriggering
 from commons.log_preparation import LogPreparation
 import uuid
 from amqp.amqp import AmqpClient
@@ -69,6 +70,9 @@ class EsClient:
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.es_query_builder = EsQueryBuilder(self.search_cfg, ERROR_LOGGING_LEVEL)
         self.log_preparation = LogPreparation()
+        self.model_training_triggering = {
+            "defect_type": RetrainingDefectTypeTriggering(self.app_config)
+        }
         self.initialize_decision_makers()
 
     def create_es_client(self, app_config):
@@ -156,6 +160,9 @@ class EsClient:
         """Delete the whole index"""
         try:
             self.namespace_finder.remove_namespaces(index_name)
+            for model_type in self.model_training_triggering:
+                self.model_training_triggering[model_type].remove_triggering_info(
+                    {"project_id": index_name})
             self.es_client.indices.delete(index=str(index_name))
             logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
             logger.debug("Deleted index %s", str(index_name))
@@ -205,7 +212,17 @@ class EsClient:
         logs_with_exceptions = self.extract_all_exceptions(bodies)
         result = self._bulk_index(bodies)
         result.logResults = logs_with_exceptions
-        self._merge_logs(test_item_ids, project)
+        _, num_logs_with_defect_types = self._merge_logs(test_item_ids, project)
+        try:
+            if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+                AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                    self.app_config["exchangeName"], "train_models", json.dumps({
+                        "model_type": "defect_type",
+                        "project_id": project,
+                        "num_logs_with_defect_types": num_logs_with_defect_types
+                    }))
+        except Exception as err:
+            logger.error(err)
         logger.info("Finished indexing logs for %d launches. It took %.2f sec.",
                     cnt_launches, time() - t_start)
         return result
@@ -225,6 +242,7 @@ class EsClient:
         bodies = []
         batch_size = 1000
         self._delete_merged_logs(test_item_ids, project)
+        num_logs_with_defect_types = 0
         for i in range(int(len(test_item_ids) / batch_size) + 1):
             test_items = test_item_ids[i * batch_size: (i + 1) * batch_size]
             if not test_items:
@@ -251,7 +269,10 @@ class EsClient:
                             "_index": log["_index"],
                             "doc": {"merged_small_logs": log["_source"]["merged_small_logs"]}
                         })
-        return self._bulk_index(bodies)
+                    log_issue_type = log["_source"]["issue_type"]
+                    if log_issue_type.strip() and not log_issue_type.lower().startswith("ti"):
+                        num_logs_with_defect_types += 1
+        return self._bulk_index(bodies), num_logs_with_defect_types
 
     def _delete_merged_logs(self, test_items_to_delete, project):
         logger.debug("Delete merged logs for %d test items", len(test_items_to_delete))
@@ -987,3 +1008,14 @@ class EsClient:
             self.namespace_finder.update_namespaces(
                 project_id, log_words)
         logger.debug("Finished updating chosen namespaces %.2f s", time() - t_start)
+
+    @utils.ignore_warnings
+    def train_models(self, train_info):
+        logger.debug("Started training")
+        t_start = time()
+        assert train_info["model_type"] in self.model_training_triggering
+
+        _retraining_defect_type_triggering = self.model_training_triggering[train_info["model_type"]]
+        if _retraining_defect_type_triggering.should_model_training_be_triggered(train_info):
+            print("Should be trained ", train_info)
+        logger.debug("Finished training %.2f s", time() - t_start)

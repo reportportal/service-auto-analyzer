@@ -797,6 +797,7 @@ class EsClient:
                 logger.debug("Test item id %d with issue type %s has probability %.2f",
                              test_item_id, issue_type, prob)
 
+            global_idx = 0
             for idx, prob, _ in sorted_results[:num_items]:
                 if prob >= self.suggest_threshold:
                     test_item_id = test_item_ids[idx]
@@ -819,10 +820,12 @@ class EsClient:
                         modelFeatureValues=";".join(
                             [str(feature) for feature in feature_data[idx]]),
                         modelInfo="",
+                        resultPosition=global_idx,
                         usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
                         minShouldMatch=self.find_min_should_match_threshold(test_item_info.analyzerConfig))
                     results.append(analysis_result)
                     logger.debug(analysis_result)
+                global_idx += 1
         else:
             logger.debug("There are no results for test item %s", test_item_info.testItemId)
         results_to_share = {test_item_info.launchId: {

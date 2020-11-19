@@ -105,6 +105,7 @@ class SuggestAnalysisResult(BaseModel):
     relevantItem: int
     relevantLogId: int
     matchScore: float
+    resultPosition: int
     esScore: float
     esPosition: int
     modelFeatureNames: str

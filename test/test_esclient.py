@@ -1017,6 +1017,7 @@ class TestEsClient(unittest.TestCase):
                                                          modelFeatureNames='0',
                                                          modelFeatureValues='1.0',
                                                          modelInfo='',
+                                                         resultPosition=0,
                                                          usedLogLines=-1,
                                                          minShouldMatch=80)],
                 "boost_predict":       ([1], [[0.2, 0.8]])
@@ -1064,6 +1065,7 @@ class TestEsClient(unittest.TestCase):
                                                          modelFeatureNames='0',
                                                          modelFeatureValues='1.0',
                                                          modelInfo='',
+                                                         resultPosition=0,
                                                          usedLogLines=-1,
                                                          minShouldMatch=80)],
                 "boost_predict":       ([1], [[0.3, 0.7]])
@@ -1111,6 +1113,7 @@ class TestEsClient(unittest.TestCase):
                                                          modelFeatureNames='0',
                                                          modelFeatureValues='1.0',
                                                          modelInfo='',
+                                                         resultPosition=0,
                                                          usedLogLines=-1,
                                                          minShouldMatch=80)],
                 "boost_predict":       ([1, 0], [[0.3, 0.7], [0.9, 0.1]])
@@ -1158,6 +1161,7 @@ class TestEsClient(unittest.TestCase):
                                                          modelFeatureNames='0',
                                                          modelFeatureValues='1.0',
                                                          modelInfo='',
+                                                         resultPosition=0,
                                                          usedLogLines=-1,
                                                          minShouldMatch=80),
                     launch_objects.SuggestAnalysisResult(testItem=123,
@@ -1171,6 +1175,7 @@ class TestEsClient(unittest.TestCase):
                                                          modelFeatureNames='0',
                                                          modelFeatureValues='0.67',
                                                          modelInfo='',
+                                                         resultPosition=1,
                                                          usedLogLines=-1,
                                                          minShouldMatch=80)],
                 "boost_predict":       ([1, 0], [[0.3, 0.7], [0.55, 0.45]])
@@ -1218,6 +1223,7 @@ class TestEsClient(unittest.TestCase):
                                                          modelFeatureNames='0',
                                                          modelFeatureValues='0.67',
                                                          modelInfo='',
+                                                         resultPosition=0,
                                                          usedLogLines=-1,
                                                          minShouldMatch=80),
                     launch_objects.SuggestAnalysisResult(testItem=123,
@@ -1231,6 +1237,7 @@ class TestEsClient(unittest.TestCase):
                                                          modelFeatureNames='0',
                                                          modelFeatureValues='1.0',
                                                          modelInfo='',
+                                                         resultPosition=1,
                                                          usedLogLines=-1,
                                                          minShouldMatch=80),
                     launch_objects.SuggestAnalysisResult(testItem=123,
@@ -1244,6 +1251,7 @@ class TestEsClient(unittest.TestCase):
                                                          modelFeatureNames='0',
                                                          modelFeatureValues='0.67',
                                                          modelInfo='',
+                                                         resultPosition=2,
                                                          usedLogLines=-1,
                                                          minShouldMatch=80)],
                 "boost_predict":       ([1, 0, 1], [[0.3, 0.7], [0.55, 0.45], [0.2, 0.8]])
@@ -1291,6 +1299,7 @@ class TestEsClient(unittest.TestCase):
                                                          modelFeatureNames='0',
                                                          modelFeatureValues='1.0',
                                                          modelInfo='',
+                                                         resultPosition=0,
                                                          usedLogLines=-1,
                                                          minShouldMatch=80),
                     launch_objects.SuggestAnalysisResult(testItem=123,
@@ -1304,6 +1313,7 @@ class TestEsClient(unittest.TestCase):
                                                          modelFeatureNames='0',
                                                          modelFeatureValues='1.0',
                                                          modelInfo='',
+                                                         resultPosition=1,
                                                          usedLogLines=-1,
                                                          minShouldMatch=80),
                     launch_objects.SuggestAnalysisResult(testItem=123,
@@ -1317,6 +1327,7 @@ class TestEsClient(unittest.TestCase):
                                                          modelFeatureNames='0',
                                                          modelFeatureValues='0.67',
                                                          modelInfo='',
+                                                         resultPosition=2,
                                                          usedLogLines=-1,
                                                          minShouldMatch=80)],
                 "boost_predict":       ([1, 1, 1], [[0.3, 0.7], [0.3, 0.7], [0.3, 0.7]])
@@ -1364,6 +1375,7 @@ class TestEsClient(unittest.TestCase):
                                                          modelFeatureNames='0',
                                                          modelFeatureValues='1.0',
                                                          modelInfo='',
+                                                         resultPosition=0,
                                                          usedLogLines=-1,
                                                          minShouldMatch=80)],
                 "boost_predict":       ([1], [[0.1, 0.9]])

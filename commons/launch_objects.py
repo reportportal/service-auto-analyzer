@@ -109,6 +109,7 @@ class SuggestAnalysisResult(BaseModel):
     esPosition: int
     modelFeatureNames: str
     modelFeatureValues: str
+    modelInfo: str
     usedLogLines: int
     minShouldMatch: int
 

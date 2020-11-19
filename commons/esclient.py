@@ -818,6 +818,7 @@ class EsClient:
                             [str(feature) for feature in self.suggest_decision_maker.get_feature_ids()]),
                         modelFeatureValues=";".join(
                             [str(feature) for feature in feature_data[idx]]),
+                        modelInfo="",
                         usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
                         minShouldMatch=self.find_min_should_match_threshold(test_item_info.analyzerConfig))
                     results.append(analysis_result)

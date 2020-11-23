@@ -73,6 +73,10 @@ class BoostingFeaturizer:
             41: (self._calculate_similarity_percent, {"field_name": "message_extended"}),
             42: (self.is_the_same_test_case, {}),
             43: (self.has_the_same_test_case_in_all_results, {}),
+            48: (self.is_text_of_particular_defect_type, {"label_type": "ab"}),
+            49: (self.is_text_of_particular_defect_type, {"label_type": "pb"}),
+            50: (self.is_text_of_particular_defect_type, {"label_type": "si"}),
+            51: (self.predict_particular_defect_type, {}),
             52: (self._calculate_similarity_percent, {"field_name": "namespaces_stacktrace"}),
             53: (self._calculate_similarity_percent,
                  {"field_name": "detected_message_without_params_and_brackets"}),
@@ -103,6 +107,37 @@ class BoostingFeaturizer:
             fields_to_calc_similarity)
         self.all_results = self.normalize_results(all_results)
         self.scores_by_issue_type = None
+        self.defect_type_predict_model = None
+
+    def set_defect_type_model(self, defect_type_model):
+        self.defect_type_predict_model = defect_type_model
+
+    def predict_particular_defect_type(self):
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        result = {}
+        for issue_type in scores_by_issue_type:
+            compared_log = scores_by_issue_type[issue_type]["compared_log"]
+            det_message = compared_log["_source"]["detected_message_without_params_extended"]
+            mr_hit = scores_by_issue_type[issue_type]["mrHit"]
+            issue_type_to_compare = mr_hit["_source"]["issue_type"]
+            det_message = utils.clean_from_brackets(det_message)
+            result[issue_type] = 0.0
+            try:
+                res, res_prob = self.defect_type_predict_model.predict(
+                    [det_message], issue_type_to_compare.lower()[:2])
+                result[issue_type] = res_prob[0][1] if len(res_prob[0]) == 2 else 0.0
+            except Exception as err:
+                print(err)
+        return result
+
+    def is_text_of_particular_defect_type(self, label_type):
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        issue_type_stats = {}
+        for issue_type in scores_by_issue_type:
+            mr_hit = scores_by_issue_type[issue_type]["mrHit"]
+            rel_item_issue_type = mr_hit["_source"]["issue_type"]
+            issue_type_stats[issue_type] = int(label_type == rel_item_issue_type.lower()[:2])
+        return issue_type_stats
 
     def filter_by_unique_id(self, all_results):
         new_results = []

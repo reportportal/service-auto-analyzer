@@ -58,9 +58,10 @@ SEARCH_CONFIG = {
     "MaxQueryTerms":               int(os.getenv("ES_MAX_QUERY_TERMS", "50")),
     "SearchLogsMinSimilarity":     float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.98")),
     "MinWordLength":               int(os.getenv("ES_MIN_WORD_LENGTH", "2")),
-    "BoostModelFolder":    "",
-    "SuggestBoostModelFolder":    "",
-    "SimilarityWeightsFolder":     ""
+    "BoostModelFolder":            "",
+    "SuggestBoostModelFolder":     "",
+    "SimilarityWeightsFolder":     "",
+    "GlobalDefectTypeFolder":      ""
 }
 
 
@@ -206,6 +207,7 @@ def read_model_settings():
     SEARCH_CONFIG["BoostModelFolder"] = model_settings["BOOST_MODEL_FOLDER"]
     SEARCH_CONFIG["SuggestBoostModelFolder"] = model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
     SEARCH_CONFIG["SimilarityWeightsFolder"] = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
+    SEARCH_CONFIG["GlobalDefectTypeModelFolder"] = model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]
 
 
 log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.conf')

@@ -129,7 +129,9 @@ class TestEsClient(unittest.TestCase):
             "SimilarityWeightsFolder":
                 self.model_settings["SIMILARITY_WEIGHTS_FOLDER"],
             "SuggestBoostModelFolder":
-                self.model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
+                self.model_settings["SUGGEST_BOOST_MODEL_FOLDER"],
+            "GlobalDefectTypeModelFolder":
+                self.model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]
         }
 
     @utils.ignore_warnings

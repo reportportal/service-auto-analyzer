@@ -32,6 +32,7 @@ from datetime import datetime
 from boosting_decision_making import weighted_similarity_calculator
 from boosting_decision_making import similarity_calculator
 from boosting_decision_making import boosting_decision_maker
+from boosting_decision_making import defect_type_model
 from commons.es_query_builder import EsQueryBuilder
 from commons.log_merger import LogMerger
 from queue import Queue
@@ -66,6 +67,7 @@ class EsClient:
         self.boosting_decision_maker = None
         self.suggest_decision_maker = None
         self.weighted_log_similarity_calculator = None
+        self.global_defect_type_model = None
         self.suggest_threshold = 0.4
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.es_query_builder = EsQueryBuilder(self.search_cfg, ERROR_LOGGING_LEVEL)
@@ -107,6 +109,9 @@ class EsClient:
         if self.search_cfg["SimilarityWeightsFolder"].strip():
             self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
                 WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
+        if self.search_cfg["GlobalDefectTypeModelFolder"].strip():
+            self.global_defect_type_model = defect_type_model.\
+                DefectTypeModel(folder=self.search_cfg["GlobalDefectTypeModelFolder"])
 
     def update_settings_after_read_only(self, es_host):
         try:
@@ -594,6 +599,7 @@ class EsClient:
                     boosting_config,
                     feature_ids=self.boosting_decision_maker.get_feature_ids(),
                     weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
+                boosting_data_gatherer.set_defect_type_model(self.global_defect_type_model)
                 feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
 
                 if len(feature_data) > 0:
@@ -780,7 +786,7 @@ class EsClient:
             boosting_config,
             feature_ids=self.suggest_decision_maker.get_feature_ids(),
             weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
-
+        _boosting_data_gatherer.set_defect_type_model(self.global_defect_type_model)
         feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
         scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
 

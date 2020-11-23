@@ -31,10 +31,12 @@ class NamespaceFinder:
             project_id, ["project_log_unique_words", "chosen_namespaces"])
 
     def get_chosen_namespaces(self, project_id):
-        return self.minio_client.get_project_object(project_id, "chosen_namespaces")
+        return self.minio_client.get_project_object(
+            project_id, "chosen_namespaces")
 
     def update_namespaces(self, project_id, log_words):
-        all_words = self.minio_client.get_project_object(project_id, "project_log_unique_words")
+        all_words = self.minio_client.get_project_object(
+            project_id, "project_log_unique_words")
         for word in log_words:
             all_words[word] = 1
         self.minio_client.put_project_object(

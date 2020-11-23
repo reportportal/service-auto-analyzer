@@ -50,6 +50,7 @@ class EsQueryBuilder:
     def build_search_query(self, search_req, message):
         """Build search query"""
         return {
+            "_source": ["message", "test_item"],
             "size": 10000,
             "query": {
                 "bool": {

@@ -412,7 +412,6 @@ class EsClient:
 
         logger.info("Finished searching by request %s with %d results. It took %.2f sec.",
                     search_req.json(), len(similar_log_ids), time() - t_start)
-
         return [SearchLogInfo(logId=log_info[0],
                               testItemId=log_info[1]) for log_info in similar_log_ids]
 
@@ -1003,7 +1002,7 @@ class EsClient:
 
     @utils.ignore_warnings
     def update_chosen_namespaces(self, launches):
-        logger.debug("Started updating chosen namespaces")
+        logger.info("Started updating chosen namespaces")
         t_start = time()
         log_words, project_id = self.log_preparation.prepare_log_words(launches)
         logger.debug("Project id %s", project_id)
@@ -1011,15 +1010,15 @@ class EsClient:
         if project_id is not None:
             self.namespace_finder.update_namespaces(
                 project_id, log_words)
-        logger.debug("Finished updating chosen namespaces %.2f s", time() - t_start)
+        logger.info("Finished updating chosen namespaces %.2f s", time() - t_start)
 
     @utils.ignore_warnings
     def train_models(self, train_info):
-        logger.debug("Started training")
+        logger.info("Started training")
         t_start = time()
         assert train_info["model_type"] in self.model_training_triggering
 
         _retraining_defect_type_triggering = self.model_training_triggering[train_info["model_type"]]
         if _retraining_defect_type_triggering.should_model_training_be_triggered(train_info):
             print("Should be trained ", train_info)
-        logger.debug("Finished training %.2f s", time() - t_start)
+        logger.info("Finished training %.2f s", time() - t_start)

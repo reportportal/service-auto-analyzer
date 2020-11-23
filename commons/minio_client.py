@@ -63,23 +63,23 @@ class MinioClient:
                 logger.debug("Creating minio bucket %s" % bucket_name)
                 self.minioClient.make_bucket(bucket_name)
                 logger.debug("Created minio bucket %s" % bucket_name)
-            data = json.dumps(data).encode("utf-8")
-            data_stream = io.BytesIO(data)
+            data_to_save = json.dumps(data).encode("utf-8")
+            data_stream = io.BytesIO(data_to_save)
             data_stream.seek(0)
             self.minioClient.put_object(
                 bucket_name=bucket_name, object_name=object_name,
-                data=data_stream, length=len(data))
+                data=data_stream, length=len(data_to_save))
             logger.debug(
-                "Saved into bucket '%s' with name '%s'", bucket_name, object_name)
+                "Saved into bucket '%s' with name '%s': %s", bucket_name, object_name, data)
         except Exception as err:
             logger.error(err)
 
-    def get_project_object(self, project_id, object_name, defalt_obj={}):
+    def get_project_object(self, project_id, object_name):
         if self.minioClient is None:
-            return defalt_obj
+            return {}
         try:
             obj = self.minioClient.get_object(
                 bucket_name=self.get_bucket_name(project_id), object_name=object_name)
             return json.loads(obj.data)
         except Exception:
-            return defalt_obj
+            return {}

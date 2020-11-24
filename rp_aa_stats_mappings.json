@@ -30,6 +30,12 @@
         },
         "min_should_match": {
             "type": "keyword"
+        },
+        "module_version": {
+            "type": "keyword"
+        },
+        "model_info": {
+            "type": "keyword"
         }
     }
 }

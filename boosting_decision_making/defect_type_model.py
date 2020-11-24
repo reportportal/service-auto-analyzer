@@ -10,10 +10,11 @@ import re
 
 class DefectTypeModel:
 
-    def __init__(self, folder=""):
+    def __init__(self, folder="", is_global=True):
         self.folder = folder
         self.count_vectorizer_models = {}
         self.models = {}
+        self.is_global = is_global
         if self.folder:
             self.load_model(folder)
 
@@ -41,6 +42,15 @@ class DefectTypeModel:
                                 split_words.append("".join(split_parts[idx:idx + 2]).lower())
                 all_words.extend(split_words)
         return all_words
+
+    def get_model_info(self):
+        folder_name = os.path.basename(self.folder).strip()
+        if folder_name:
+            tags = [folder_name]
+            if not self.is_global:
+                return tags + ["custom defect type model"]
+            return tags + ["global defect type model"]
+        return []
 
     def load_model(self, folder):
         self.count_vectorizer_models = pickle.load(

@@ -582,7 +582,9 @@ class EsClient:
                         "gather_date": datetime.now().strftime("%Y-%m-%d"),
                         "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         "number_of_log_lines": analyzer_config.numberOfLogLines,
-                        "min_should_match": self.find_min_should_match_threshold(analyzer_config)}
+                        "min_should_match": self.find_min_should_match_threshold(analyzer_config),
+                        "model_info": [],
+                        "module_version": self.app_config["appVersion"]}
 
                 t_start_item = time()
                 cnt_items_to_process += 1
@@ -601,6 +603,9 @@ class EsClient:
                     weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
                 boosting_data_gatherer.set_defect_type_model(self.global_defect_type_model)
                 feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
+                model_info_tags = boosting_data_gatherer.get_used_model_info() +\
+                    self.boosting_decision_maker.get_model_info()
+                results_to_share[launch_id]["model_info"] = model_info_tags
 
                 if len(feature_data) > 0:
 
@@ -789,6 +794,8 @@ class EsClient:
         _boosting_data_gatherer.set_defect_type_model(self.global_defect_type_model)
         feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
         scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
+        model_info_tags = _boosting_data_gatherer.get_used_model_info() +\
+            self.suggest_decision_maker.get_model_info()
 
         if feature_data:
             predicted_labels, predicted_labels_probability = self.suggest_decision_maker.predict(feature_data)
@@ -824,7 +831,7 @@ class EsClient:
                             [str(feature) for feature in self.suggest_decision_maker.get_feature_ids()]),
                         modelFeatureValues=";".join(
                             [str(feature) for feature in feature_data[idx]]),
-                        modelInfo="",
+                        modelInfo=";".join(model_info_tags),
                         resultPosition=global_idx,
                         usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
                         minShouldMatch=self.find_min_should_match_threshold(test_item_info.analyzerConfig))
@@ -841,6 +848,8 @@ class EsClient:
             "gather_date": datetime.now().strftime("%Y-%m-%d"),
             "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "number_of_log_lines": test_item_info.analyzerConfig.numberOfLogLines,
+            "model_info": model_info_tags,
+            "module_version": self.app_config["appVersion"],
             "min_should_match": self.find_min_should_match_threshold(
                 test_item_info.analyzerConfig)}}
         if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
@@ -964,7 +973,9 @@ class EsClient:
             "launch_id": launch_info.launch.launchId, "launch_name": launch_info.launch.launchName,
             "project_id": launch_info.launch.project, "method": "find_clusters",
             "gather_date": datetime.now().strftime("%Y-%m-%d"),
-            "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}}
+            "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "module_version": self.app_config["appVersion"],
+            "model_info": []}}
         if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
             AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
                 self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))

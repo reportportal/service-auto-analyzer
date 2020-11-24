@@ -101,7 +101,8 @@ class TestEsClient(unittest.TestCase):
             "esSslShowWarn":     False,
             "esCAcert":          "",
             "esClientCert":      "",
-            "esClientKey":       ""
+            "esClientKey":       "",
+            "appVersion":        ""
         }
         self.model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
         logging.disable(logging.CRITICAL)

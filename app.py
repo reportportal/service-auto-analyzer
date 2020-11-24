@@ -47,7 +47,8 @@ APP_CONFIG = {
     "esClientKey":       os.getenv("ES_CLIENT_KEY", ""),
     "minioHost":         os.getenv("MINIO_SHORT_HOST", "minio:9000"),
     "minioAccessKey":    os.getenv("MINIO_ACCESS_KEY", "minio"),
-    "minioSecretKey":    os.getenv("MINIO_SECRET_KEY", "minio123")
+    "minioSecretKey":    os.getenv("MINIO_SECRET_KEY", "minio123"),
+    "appVersion":        ""
 }
 
 SEARCH_CONFIG = {
@@ -94,7 +95,7 @@ def declare_exchange(channel, config):
                                      "analyzer_index":      config["analyzerIndex"],
                                      "analyzer_priority":   config["analyzerPriority"],
                                      "analyzer_log_search": config["analyzerLogSearch"],
-                                     "version":             version, })
+                                     "version":             APP_CONFIG["appVersion"], })
     except Exception as err:
         logger.error("Failed to declare exchange")
         logger.error(err)
@@ -219,7 +220,7 @@ elif APP_CONFIG["logLevel"].lower() == "info":
 else:
     logging.disable(logging.INFO)
 logger = logging.getLogger("analyzerApp")
-version = read_version()
+APP_CONFIG["appVersion"] = read_version()
 read_model_settings()
 
 application = create_application()

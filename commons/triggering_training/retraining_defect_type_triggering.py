@@ -34,11 +34,12 @@ class RetrainingDefectTypeTriggering(abstract_triggering_training.AbstractTraini
 
     def get_triggering_info(self, train_info):
         return self.minio_client.get_project_object(
-            train_info["project_id"], "defect_type_trigger_info")
+            train_info["project_id"], "defect_type_trigger_info", using_json=True)
 
     def save_triggering_info(self, trigger_info, train_info):
         self.minio_client.put_project_object(
-            trigger_info, train_info["project_id"], "defect_type_trigger_info")
+            trigger_info, train_info["project_id"],
+            "defect_type_trigger_info", using_json=True)
 
     def clean_defect_type_triggering_info(self, train_info):
         trigger_info = self.get_triggering_info(train_info)

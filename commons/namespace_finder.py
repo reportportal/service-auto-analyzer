@@ -32,15 +32,15 @@ class NamespaceFinder:
 
     def get_chosen_namespaces(self, project_id):
         return self.minio_client.get_project_object(
-            project_id, "chosen_namespaces")
+            project_id, "chosen_namespaces", using_json=True)
 
     def update_namespaces(self, project_id, log_words):
         all_words = self.minio_client.get_project_object(
-            project_id, "project_log_unique_words")
+            project_id, "project_log_unique_words", using_json=True)
         for word in log_words:
             all_words[word] = 1
         self.minio_client.put_project_object(
-            all_words, project_id, "project_log_unique_words")
+            all_words, project_id, "project_log_unique_words", using_json=True)
         phrases = Phrases([w.split(".") for w in all_words], min_count=1, threshold=1)
         potential_project_namespaces = {}
         for word in all_words:
@@ -56,4 +56,4 @@ class NamespaceFinder:
                 chosen_namespaces[item.replace("_", ".")] = cnt
         logger.debug("Chosen namespaces %s", chosen_namespaces)
         self.minio_client.put_project_object(
-            chosen_namespaces, project_id, "chosen_namespaces")
+            chosen_namespaces, project_id, "chosen_namespaces", using_json=True)

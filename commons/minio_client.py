@@ -18,6 +18,7 @@ from minio import Minio
 import json
 import io
 import logging
+import pickle
 
 
 logger = logging.getLogger("analyzerApp.minioClient")
@@ -54,7 +55,7 @@ class MinioClient:
         except Exception as err:
             logger.error(err)
 
-    def put_project_object(self, data, project_id, object_name):
+    def put_project_object(self, data, project_id, object_name, using_json=False):
         if self.minioClient is None:
             return
         try:
@@ -63,7 +64,10 @@ class MinioClient:
                 logger.debug("Creating minio bucket %s" % bucket_name)
                 self.minioClient.make_bucket(bucket_name)
                 logger.debug("Created minio bucket %s" % bucket_name)
-            data_to_save = json.dumps(data).encode("utf-8")
+            if using_json:
+                data_to_save = json.dumps(data).encode("utf-8")
+            else:
+                data_to_save = pickle.dumps(data)
             data_stream = io.BytesIO(data_to_save)
             data_stream.seek(0)
             self.minioClient.put_object(
@@ -74,12 +78,26 @@ class MinioClient:
         except Exception as err:
             logger.error(err)
 
-    def get_project_object(self, project_id, object_name):
+    def get_project_object(self, project_id, object_name, using_json=False):
         if self.minioClient is None:
             return {}
         try:
             obj = self.minioClient.get_object(
                 bucket_name=self.get_bucket_name(project_id), object_name=object_name)
-            return json.loads(obj.data)
+            return json.loads(obj.data) if using_json else pickle.loads(obj.data)
         except Exception:
             return {}
+
+    def does_object_exists(self, project_id, object_name):
+        try:
+            self.minioClient.get_object(
+                bucket_name=self.get_bucket_name(project_id), object_name=object_name)
+            return True
+        except Exception:
+            return False
+
+    def get_folder_objects(self, project_id, folder):
+        object_names = []
+        for obj in self.minioClient.list_objects("prj-1", prefix=folder):
+            object_names.append(obj.object_name)
+        return object_names

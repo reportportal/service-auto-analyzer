@@ -98,6 +98,13 @@ class MinioClient:
 
     def get_folder_objects(self, project_id, folder):
         object_names = []
-        for obj in self.minioClient.list_objects("prj-1", prefix=folder):
+        for obj in self.minioClient.list_objects(
+                self.get_bucket_name(project_id), prefix=folder):
             object_names.append(obj.object_name)
         return object_names
+
+    def remove_folder_objects(self, project_id, folder):
+        for obj in self.minioClient.list_objects(
+                self.get_bucket_name(project_id), prefix=folder):
+            self.minioClient.remove_object(
+                bucket_name=self.get_bucket_name(project_id), object_name=obj.object_name)

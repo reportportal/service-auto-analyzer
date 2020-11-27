@@ -10,11 +10,11 @@ import re
 
 class DefectTypeModel:
 
-    def __init__(self, folder="", is_global=True):
+    def __init__(self, folder=""):
         self.folder = folder
         self.count_vectorizer_models = {}
         self.models = {}
-        self.is_global = is_global
+        self.is_global = True
         if self.folder:
             self.load_model(folder)
 
@@ -44,7 +44,7 @@ class DefectTypeModel:
         return all_words
 
     def get_model_info(self):
-        folder_name = os.path.basename(self.folder).strip()
+        folder_name = os.path.basename(self.folder.strip("/").strip("\\")).strip()
         if folder_name:
             tags = [folder_name]
             if not self.is_global:

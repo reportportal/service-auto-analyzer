@@ -32,8 +32,9 @@ from datetime import datetime
 from boosting_decision_making import weighted_similarity_calculator
 from boosting_decision_making import similarity_calculator
 from boosting_decision_making import boosting_decision_maker
-from boosting_decision_making import defect_type_model
+from boosting_decision_making import defect_type_model, custom_defect_type_model
 from commons.es_query_builder import EsQueryBuilder
+from commons import minio_client
 from commons.log_merger import LogMerger
 from queue import Queue
 from threading import Thread
@@ -70,6 +71,7 @@ class EsClient:
         self.global_defect_type_model = None
         self.suggest_threshold = 0.4
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
+        self.minio_client = minio_client.MinioClient(self.app_config)
         self.es_query_builder = EsQueryBuilder(self.search_cfg, ERROR_LOGGING_LEVEL)
         self.log_preparation = LogPreparation()
         self.model_training_triggering = {
@@ -214,7 +216,7 @@ class EsClient:
             if logs_added:
                 test_item_ids.append(str(test_item.testItemId))
 
-        logs_with_exceptions = self.extract_all_exceptions(bodies)
+        logs_with_exceptions = utils.extract_all_exceptions(bodies)
         result = self._bulk_index(bodies)
         result.logResults = logs_with_exceptions
         _, num_logs_with_defect_types = self._merge_logs(test_item_ids, project)
@@ -231,17 +233,6 @@ class EsClient:
         logger.info("Finished indexing logs for %d launches. It took %.2f sec.",
                     cnt_launches, time() - t_start)
         return result
-
-    def extract_all_exceptions(self, bodies):
-        logs_with_exceptions = []
-        for log_body in bodies:
-            exceptions = [
-                exc.strip() for exc in log_body["_source"]["found_exceptions"].split()]
-            logs_with_exceptions.append(
-                commons.launch_objects.LogExceptionResult(
-                    logId=int(log_body["_id"]),
-                    foundExceptions=exceptions))
-        return logs_with_exceptions
 
     def _merge_logs(self, test_item_ids, project):
         bodies = []
@@ -542,6 +533,18 @@ class EsClient:
         self.finished_queue.put("Finished")
         logger.info("Es queries finished %.2f s.", time() - t_start)
 
+    def choose_model(self, project_id, model_name_folder):
+        model = None
+        if self.minio_client.does_object_exists(project_id, model_name_folder):
+            folders = self.minio_client.get_folder_objects(project_id, model_name_folder)
+            if len(folders):
+                try:
+                    model = custom_defect_type_model.CustomDefectTypeModel(
+                        self.app_config, project_id, folder=folders[0])
+                except Exception as err:
+                    logger.error(err)
+        return model
+
     @utils.ignore_warnings
     def analyze_logs(self, launches, timeout=300):
         global EARLY_FINISH
@@ -550,6 +553,7 @@ class EsClient:
         logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
         self.queue = Queue()
         self.finished_queue = Queue()
+        defect_type_model_to_use = {}
         es_query_thread = Thread(target=self._query_elasticsearch, args=(launches, ))
         es_query_thread.daemon = True
         es_query_thread.start()
@@ -601,7 +605,14 @@ class EsClient:
                     boosting_config,
                     feature_ids=self.boosting_decision_maker.get_feature_ids(),
                     weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
-                boosting_data_gatherer.set_defect_type_model(self.global_defect_type_model)
+                if project_id not in defect_type_model_to_use:
+                    defect_type_model_to_use[project_id] = self.choose_model(
+                        project_id, "defect_type_model/")
+                if defect_type_model_to_use[project_id] is None:
+                    boosting_data_gatherer.set_defect_type_model(self.global_defect_type_model)
+                else:
+                    boosting_data_gatherer.set_defect_type_model(
+                        defect_type_model_to_use[project_id])
                 feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
                 model_info_tags = boosting_data_gatherer.get_used_model_info() +\
                     self.boosting_decision_maker.get_model_info()
@@ -791,7 +802,12 @@ class EsClient:
             boosting_config,
             feature_ids=self.suggest_decision_maker.get_feature_ids(),
             weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
-        _boosting_data_gatherer.set_defect_type_model(self.global_defect_type_model)
+        defect_type_model_to_use = self.choose_model(
+            test_item_info.project, "defect_type_model/")
+        if defect_type_model_to_use is None:
+            _boosting_data_gatherer.set_defect_type_model(self.global_defect_type_model)
+        else:
+            _boosting_data_gatherer.set_defect_type_model(defect_type_model_to_use)
         feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
         scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
         model_info_tags = _boosting_data_gatherer.get_used_model_info() +\

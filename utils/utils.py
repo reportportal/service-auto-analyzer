@@ -25,6 +25,7 @@ import warnings
 import os
 import json
 import requests
+import commons
 
 logger = logging.getLogger("analyzerApp.utils")
 file_extensions = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
@@ -613,3 +614,15 @@ def is_healthy(es_host_name):
         logger.error("Elasticsearch is not healthy")
         logger.error(err)
         return False
+
+
+def extract_all_exceptions(bodies):
+    logs_with_exceptions = []
+    for log_body in bodies:
+        exceptions = [
+            exc.strip() for exc in log_body["_source"]["found_exceptions"].split()]
+        logs_with_exceptions.append(
+            commons.launch_objects.LogExceptionResult(
+                logId=int(log_body["_id"]),
+                foundExceptions=exceptions))
+    return logs_with_exceptions

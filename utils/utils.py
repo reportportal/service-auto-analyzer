@@ -30,6 +30,7 @@ import commons
 logger = logging.getLogger("analyzerApp.utils")
 file_extensions = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
 stopwords = set(nltk.corpus.stopwords.words("english"))
+ERROR_LOGGING_LEVEL = 40000
 
 
 def ignore_warnings(method):

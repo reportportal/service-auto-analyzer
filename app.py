@@ -28,6 +28,7 @@ import amqp.amqp_handler as amqp_handler
 from amqp.amqp import AmqpClient
 from commons.esclient import EsClient
 from utils import utils
+from commons.cluster_service import ClusterService
 
 
 APP_CONFIG = {
@@ -169,7 +170,7 @@ def init_amqp(_amqp_client, request_handler):
                    (APP_CONFIG["exchangeName"], "cluster", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                    request_handler.find_clusters,
+                                                    ClusterService(APP_CONFIG, SEARCH_CONFIG).find_clusters,
                                                     prepare_data_func=amqp_handler.
                                                     prepare_launch_info,
                                                     prepare_response_data=amqp_handler.

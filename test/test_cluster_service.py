@@ -15,116 +15,17 @@
 """
 
 import unittest
-import json
 from http import HTTPStatus
-import logging
 import sure # noqa
 import httpretty
 
 import commons.launch_objects as launch_objects
 from utils import utils
 from service.cluster_service import ClusterService
+from test.test_service import TestService
 
 
-class TestClusterService(unittest.TestCase):
-    """Tests cluster service functionality"""
-
-    ERROR_LOGGING_LEVEL = 40000
-
-    @utils.ignore_warnings
-    def setUp(self):
-        self.launch_wo_test_items = "launch_wo_test_items.json"
-        self.launch_w_test_items_wo_logs = "launch_w_test_items_wo_logs.json"
-        self.launch_w_test_items_w_empty_logs = "launch_w_test_items_w_empty_logs.json"
-        self.index_logs_rs = "index_logs_rs.json"
-        self.no_hits_search_rs = "no_hits_search_rs.json"
-        self.launch_w_items_clustering = "launch_w_items_clustering.json"
-        self.cluster_update_all_the_same = "cluster_update_all_the_same.json"
-        self.search_logs_rq_first_group = "search_logs_rq_first_group.json"
-        self.search_logs_rq_second_group = "search_logs_rq_second_group.json"
-        self.one_hit_search_rs_clustering = "one_hit_search_rs_clustering.json"
-        self.search_logs_rq_first_group_2lines = "search_logs_rq_first_group_2lines.json"
-        self.cluster_update_es_update = "cluster_update_es_update.json"
-        self.cluster_update_all_the_same_es_update = "cluster_update_all_the_same_es_update.json"
-        self.cluster_update = "cluster_update.json"
-        self.app_config = {
-            "esHost": "http://localhost:9200",
-            "esVerifyCerts":     False,
-            "esUseSsl":          False,
-            "esSslShowWarn":     False,
-            "esCAcert":          "",
-            "esClientCert":      "",
-            "esClientKey":       "",
-            "appVersion":        ""
-        }
-        self.model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
-        logging.disable(logging.CRITICAL)
-
-    @utils.ignore_warnings
-    def tearDown(self):
-        logging.disable(logging.DEBUG)
-
-    @utils.ignore_warnings
-    def get_default_search_config(self):
-        """Get default search config"""
-        return {
-            "MinShouldMatch": "80%",
-            "MinTermFreq":    1,
-            "MinDocFreq":     1,
-            "BoostAA": -2,
-            "BoostLaunch":    2,
-            "BoostUniqueID":  2,
-            "MaxQueryTerms":  50,
-            "SearchLogsMinShouldMatch": "98%",
-            "SearchLogsMinSimilarity": 0.9,
-            "MinWordLength":  0,
-            "BoostModelFolder":
-                self.model_settings["BOOST_MODEL_FOLDER"],
-            "SimilarityWeightsFolder":
-                self.model_settings["SIMILARITY_WEIGHTS_FOLDER"],
-            "SuggestBoostModelFolder":
-                self.model_settings["SUGGEST_BOOST_MODEL_FOLDER"],
-            "GlobalDefectTypeModelFolder":
-                self.model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]
-        }
-
-    @utils.ignore_warnings
-    def _start_server(self, test_calls):
-        httpretty.reset()
-        httpretty.enable(allow_net_connect=False)
-        for test_info in test_calls:
-            if "content_type" in test_info:
-                httpretty.register_uri(
-                    test_info["method"],
-                    self.app_config["esHost"] + test_info["uri"],
-                    body=test_info["rs"] if "rs" in test_info else "",
-                    status=test_info["status"],
-                    content_type=test_info["content_type"],
-                )
-            else:
-                httpretty.register_uri(
-                    test_info["method"],
-                    self.app_config["esHost"] + test_info["uri"],
-                    body=test_info["rs"] if "rs" in test_info else "",
-                    status=test_info["status"],
-                )
-
-    @staticmethod
-    @utils.ignore_warnings
-    def shutdown_server(test_calls):
-        """Shutdown server and test request calls"""
-        httpretty.latest_requests().should.have.length_of(len(test_calls))
-        for expected_test_call, test_call in zip(test_calls, httpretty.latest_requests()):
-            expected_test_call["method"].should.equal(test_call.method)
-            expected_test_call["uri"].should.equal(test_call.path)
-            if "rq" in expected_test_call:
-                expected_body = expected_test_call["rq"]
-                real_body = test_call.parse_request_body(test_call.body)
-                if type(expected_body) == str and type(real_body) != str:
-                    expected_body = json.loads(expected_body)
-                expected_body.should.equal(real_body)
-        httpretty.disable()
-        httpretty.reset()
+class TestClusterService(TestService):
 
     @utils.ignore_warnings
     def test_find_clusters(self):

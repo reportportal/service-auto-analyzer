@@ -30,6 +30,7 @@ from commons.esclient import EsClient
 from utils import utils
 from service.cluster_service import ClusterService
 from service.analyzer_service import AnalyzerService
+from service.suggest_service import SuggestService
 
 
 APP_CONFIG = {
@@ -162,7 +163,7 @@ def init_amqp(_amqp_client):
                    (APP_CONFIG["exchangeName"], "suggest", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                    es_client.suggest_items,
+                                                    SuggestService(APP_CONFIG, SEARCH_CONFIG).suggest_items,
                                                     prepare_data_func=amqp_handler.
                                                     prepare_test_item_info,
                                                     prepare_response_data=amqp_handler.

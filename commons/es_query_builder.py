@@ -21,32 +21,6 @@ class EsQueryBuilder:
         self.search_cfg = search_cfg
         self.error_logging_level = error_logging_level
 
-    def get_test_item_query(self, test_item_ids, is_merged):
-        """Build test item query"""
-        return {"size": 10000,
-                "query": {
-                    "bool": {
-                        "filter": [
-                            {"terms": {"test_item": [str(_id) for _id in test_item_ids]}},
-                            {"term": {"is_merged": is_merged}}
-                        ]
-                    }
-                }}
-
-    def build_search_test_item_ids_query(self, log_ids):
-        """Build search test item ids query"""
-        return {"size": 10000,
-                "query": {
-                    "bool": {
-                        "filter": [
-                            {"range": {"log_level": {"gte": self.error_logging_level}}},
-                            {"exists": {"field": "issue_type"}},
-                            {"term": {"is_merged": False}},
-                            {"terms": {"_id": [str(log_id) for log_id in log_ids]}},
-                        ]
-                    }
-                }, }
-
     def build_search_query(self, search_req, message):
         """Build search query"""
         return {

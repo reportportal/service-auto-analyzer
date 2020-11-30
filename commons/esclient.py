@@ -23,7 +23,6 @@ import commons.launch_objects
 from elasticsearch import RequestsHttpConnection
 import utils.utils as utils
 from time import time
-from commons.es_query_builder import EsQueryBuilder
 from commons.log_merger import LogMerger
 from queue import Queue
 from commons.log_preparation import LogPreparation
@@ -46,7 +45,6 @@ class EsClient:
                                                      ca_certs=app_config["esCAcert"],
                                                      client_cert=app_config["esClientCert"],
                                                      client_key=app_config["esClientKey"])
-        self.es_query_builder = EsQueryBuilder(self.search_cfg, utils.ERROR_LOGGING_LEVEL)
         self.log_preparation = LogPreparation()
 
     def create_es_client(self, app_config):
@@ -70,6 +68,47 @@ class EsClient:
             ca_certs=app_config["esCAcert"],
             client_cert=app_config["esClientCert"],
             client_key=app_config["esClientKey"])
+
+    def get_test_item_query(self, test_item_ids, is_merged, full_log):
+        """Build test item query"""
+        if full_log:
+            return {"size": 10000,
+                    "query": {
+                        "bool": {
+                            "filter": [
+                                {"terms": {"test_item": [str(_id) for _id in test_item_ids]}},
+                                {"term": {"is_merged": is_merged}}
+                            ]
+                        }
+                    }}
+        else:
+            return {
+                "_source": ["test_item"],
+                "size": 10000,
+                "query": {
+                    "bool": {
+                        "filter": [
+                            {"terms": {"test_item": [str(_id) for _id in test_item_ids]}},
+                            {"term": {"is_merged": is_merged}}
+                        ]
+                    }
+                }}
+
+    def build_search_test_item_ids_query(self, log_ids):
+        """Build search test item ids query"""
+        return {
+            "_source": ["test_item"],
+            "size": 10000,
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
+                        {"exists": {"field": "issue_type"}},
+                        {"term": {"is_merged": False}},
+                        {"terms": {"_id": [str(log_id) for log_id in log_ids]}},
+                    ]
+                }
+            }}
 
     def update_settings_after_read_only(self, es_host):
         try:
@@ -197,8 +236,8 @@ class EsClient:
                 continue
             test_items_dict = {}
             for r in elasticsearch.helpers.scan(self.es_client,
-                                                query=self.es_query_builder.get_test_item_query(
-                                                    test_items, False),
+                                                query=self.get_test_item_query(
+                                                    test_items, False, True),
                                                 index=project):
                 test_item_id = r["_source"]["test_item"]
                 if test_item_id not in test_items_dict:
@@ -231,8 +270,8 @@ class EsClient:
             if not test_item_ids:
                 continue
             for log in elasticsearch.helpers.scan(self.es_client,
-                                                  query=self.es_query_builder.get_test_item_query(
-                                                      test_item_ids, True),
+                                                  query=self.get_test_item_query(
+                                                      test_item_ids, True, False),
                                                   index=project):
                 bodies.append({
                     "_op_type": "delete",
@@ -285,7 +324,7 @@ class EsClient:
             return 0
         test_item_ids = set()
         try:
-            search_query = self.es_query_builder.build_search_test_item_ids_query(
+            search_query = self.build_search_test_item_ids_query(
                 clean_index.ids)
             for res in elasticsearch.helpers.scan(self.es_client,
                                                   query=search_query,

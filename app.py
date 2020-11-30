@@ -32,6 +32,7 @@ from service.cluster_service import ClusterService
 from service.analyzer_service import AnalyzerService
 from service.suggest_service import SuggestService
 from service.search_service import SearchService
+from service.namespace_finder_service import NamespaceFinderService
 
 
 APP_CONFIG = {
@@ -183,11 +184,12 @@ def init_amqp(_amqp_client):
                    lambda channel, method, props, body:
                    amqp_handler.handle_inner_amqp_request(channel, method, props, body,
                                                           es_client.send_stats_info))))
+    _namespace_finder = NamespaceFinderService(APP_CONFIG, SEARCH_CONFIG)
     threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                    (APP_CONFIG["exchangeName"], "namespace_finder", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                    es_client.update_chosen_namespaces))))
+                                                    _namespace_finder.update_chosen_namespaces))))
     threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                    (APP_CONFIG["exchangeName"], "train_models", True, False,
                    lambda channel, method, props, body:

@@ -352,18 +352,6 @@ class EsClient:
         logger.info("Finished sending stats about analysis")
 
     @utils.ignore_warnings
-    def update_chosen_namespaces(self, launches):
-        logger.info("Started updating chosen namespaces")
-        t_start = time()
-        log_words, project_id = self.log_preparation.prepare_log_words(launches)
-        logger.debug("Project id %s", project_id)
-        logger.debug("Found namespaces %s", log_words)
-        if project_id is not None:
-            self.namespace_finder.update_namespaces(
-                project_id, log_words)
-        logger.info("Finished updating chosen namespaces %.2f s", time() - t_start)
-
-    @utils.ignore_warnings
     def train_models(self, train_info):
         logger.info("Started training")
         t_start = time()

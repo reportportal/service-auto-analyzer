@@ -44,10 +44,19 @@ class SuggestService(AnalyzerService):
             "min_should_match": 0.4,
             "min_word_length": self.search_cfg["MinWordLength"],
             "filter_min_should_match": [],
-            "filter_min_should_match_any": utils.choose_fields_to_filter_suggests(
+            "filter_min_should_match_any": self.choose_fields_to_filter_suggests(
                 analyzerConfig.numberOfLogLines),
             "number_of_log_lines": analyzerConfig.numberOfLogLines,
             "filter_by_unique_id": True}
+
+    def choose_fields_to_filter_suggests(self, log_lines_num):
+        if log_lines_num == -1:
+            return [
+                "detected_message_extended",
+                "detected_message_without_params_extended",
+                "detected_message_without_params_and_brackets"]
+        return ["message_extended", "message_without_params_extended",
+                "message_without_params_and_brackets"]
 
     def build_suggest_query(self, test_item_info, log, size=10,
                             message_field="message", det_mes_field="detected_message",

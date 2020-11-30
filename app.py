@@ -86,11 +86,6 @@ def create_thread(func, args):
     return thread
 
 
-def create_es_client():
-    """Creates Elasticsearch client"""
-    return EsClient(APP_CONFIG, SEARCH_CONFIG)
-
-
 def declare_exchange(channel, config):
     """Declares exchange for rabbitmq"""
     logger.info("ExchangeName: %s", config["exchangeName"])
@@ -121,7 +116,7 @@ def init_amqp(_amqp_client):
             logger.error(err)
             return
     threads = []
-    es_client = create_es_client()
+    es_client = EsClient(APP_CONFIG, SEARCH_CONFIG)
     threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                    (APP_CONFIG["exchangeName"], "index", True, False,
                    lambda channel, method, props, body:
@@ -235,6 +230,7 @@ else:
     logging.disable(logging.INFO)
 logger = logging.getLogger("analyzerApp")
 APP_CONFIG["appVersion"] = read_version()
+es_client = EsClient(APP_CONFIG, SEARCH_CONFIG)
 read_model_settings()
 
 application = create_application()
@@ -244,9 +240,8 @@ threads = []
 
 @application.route('/', methods=['GET'])
 def get_health_status():
-    global threads
     status = ""
-    if not utils.is_healthy(APP_CONFIG["esHost"]):
+    if not es_client.is_healthy(APP_CONFIG["esHost"]):
         status += "Elasticsearch is not healthy;"
     if status:
         logger.error("Analyzer health check status failed: %s", status)

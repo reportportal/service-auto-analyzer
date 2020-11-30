@@ -44,11 +44,16 @@ class AutoAnalyzerService(AnalyzerService):
             "max_query_terms": self.search_cfg["MaxQueryTerms"],
             "min_should_match": min_should_match,
             "min_word_length": self.search_cfg["MinWordLength"],
-            "filter_min_should_match": utils.choose_fields_to_filter(
+            "filter_min_should_match": self.choose_fields_to_filter(
                 analyzer_config.numberOfLogLines),
             "number_of_log_lines": analyzer_config.numberOfLogLines,
             "filter_by_unique_id": True
         }
+
+    def choose_fields_to_filter(self, log_lines):
+        return [
+            "detected_message", "stacktrace", "potential_status_codes"]\
+            if log_lines == -1 else ["message", "potential_status_codes"]
 
     def build_analyze_query(self, launch, log, size=10):
         """Build analyze query"""

@@ -567,22 +567,6 @@ def choose_issue_type(predicted_labels, predicted_labels_probability,
     return predicted_issue_type
 
 
-def choose_fields_to_filter_suggests(log_lines_num):
-    if log_lines_num == -1:
-        return [
-            "detected_message_extended",
-            "detected_message_without_params_extended",
-            "detected_message_without_params_and_brackets"]
-    return ["message_extended", "message_without_params_extended",
-            "message_without_params_and_brackets"]
-
-
-def choose_fields_to_filter(log_lines):
-    return [
-        "detected_message", "stacktrace", "potential_status_codes"]\
-        if log_lines == -1 else ["message", "potential_status_codes"]
-
-
 def prepare_message_for_clustering(message, number_of_log_lines):
     message = first_lines(message, number_of_log_lines)
     words = split_words(message, min_word_length=2, only_unique=False)
@@ -603,18 +587,6 @@ def send_request(url, method):
                      remove_credentials_from_url(url))
         logger.error(err)
     return []
-
-
-def is_healthy(es_host_name):
-    """Check whether elasticsearch is healthy"""
-    try:
-        url = build_url(es_host_name, ["_cluster/health"])
-        res = send_request(url, "GET")
-        return res["status"] in ["green", "yellow"]
-    except Exception as err:
-        logger.error("Elasticsearch is not healthy")
-        logger.error(err)
-        return False
 
 
 def extract_all_exceptions(bodies):

@@ -110,6 +110,17 @@ class EsClient:
                 }
             }}
 
+    def is_healthy(self, es_host_name):
+        """Check whether elasticsearch is healthy"""
+        try:
+            url = utils.build_url(self.host, ["_cluster/health"])
+            res = utils.send_request(url, "GET")
+            return res["status"] in ["green", "yellow"]
+        except Exception as err:
+            logger.error("Elasticsearch is not healthy")
+            logger.error(err)
+            return False
+
     def update_settings_after_read_only(self, es_host):
         try:
             requests.put(

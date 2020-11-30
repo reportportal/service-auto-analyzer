@@ -26,7 +26,7 @@
 
 **ES_TURN_OFF_SSL_VERIFICATION** - by default "false". Turn off ssl verification via using RequestsHttpConnection class instead of Urllib3HttpConnection class.
 
-**MINIO_SHORT_HOST** - by default "minio:9000", you need to set short host and port to the minio service
+**MINIO_SHORT_HOST** - by default "minio:9000", you need to set short host and port to the minio service. **NOTE**: if you don't use Minio, please set this variable with the value "", so analyzer won;t try to connect to the Minio instance
 
 **MINIO_ACCESS_KEY** - by default "minio", you need to set a minio access key here
 

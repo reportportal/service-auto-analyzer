@@ -20,6 +20,7 @@ import logging
 
 import commons.launch_objects as launch_objects
 from commons.es_query_builder import EsQueryBuilder
+from service.search_service import SearchService
 from utils import utils
 import os
 
@@ -45,6 +46,16 @@ class TestEsQuery(unittest.TestCase):
         self.suggest_query_all_logs_nonempty_stacktrace_launches_with_the_same_name =\
             "suggest_query_all_logs_nonempty_stacktrace_launches_with_the_same_name.json"
         self.suggest_query_merged_small_logs_search = "suggest_query_merged_small_logs_search.json"
+        self.app_config = {
+            "esHost": "http://localhost:9200",
+            "esVerifyCerts":     False,
+            "esUseSsl":          False,
+            "esSslShowWarn":     False,
+            "esCAcert":          "",
+            "esClientCert":      "",
+            "esClientKey":       "",
+            "appVersion":        ""
+        }
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings
@@ -395,11 +406,11 @@ class TestEsQuery(unittest.TestCase):
             "filteredLaunchIds": [1, 2, 3],
             "logMessages": ["log message 1"],
             "logLines": -1})
-        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_search_query(
+        query_from_service = SearchService(self.app_config, search_cfg).build_search_query(
             search_req, "log message 1")
         demo_query = utils.get_fixture(self.query_search_logs, to_json=True)
 
-        query_from_esclient.should.equal(demo_query)
+        query_from_service.should.equal(demo_query)
 
     @utils.ignore_warnings
     def test_build_suggest_query_all_logs_empty_stacktrace(self):

@@ -15,7 +15,6 @@
 """
 
 from commons.esclient import EsClient
-from commons.es_query_builder import EsQueryBuilder
 from utils import utils
 from commons.launch_objects import SearchLogInfo, Log
 from commons.log_preparation import LogPreparation
@@ -32,12 +31,50 @@ class SearchService:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
-        self.es_query_builder = EsQueryBuilder(search_cfg, utils.ERROR_LOGGING_LEVEL)
         self.log_preparation = LogPreparation()
         self.weighted_log_similarity_calculator = None
         if self.search_cfg["SimilarityWeightsFolder"].strip():
             self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
                 WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
+
+    def build_search_query(self, search_req, message):
+        """Build search query"""
+        return {
+            "_source": ["message", "test_item", "detected_message", "stacktrace"],
+            "size": 10000,
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
+                        {"exists": {"field": "issue_type"}},
+                        {"term": {"is_merged": False}},
+                    ],
+                    "must_not": {
+                        "term": {"test_item": {"value": search_req.itemId, "boost": 1.0}}
+                    },
+                    "must": [
+                        {
+                            "bool": {
+                                "should": [
+                                    {"wildcard": {"issue_type": "TI*"}},
+                                    {"wildcard": {"issue_type": "ti*"}},
+                                ]
+                            }
+                        },
+                        {"terms": {"launch_id": search_req.filteredLaunchIds}},
+                        {"more_like_this": {
+                            "fields":               ["message"],
+                            "like":                 message,
+                            "min_doc_freq":         1,
+                            "min_term_freq":        1,
+                            "minimum_should_match": "5<90%",
+                            "max_query_terms":      self.search_cfg["MaxQueryTerms"],
+                            "boost": 1.0
+                        }}
+                    ],
+                    "should": [
+                        {"term": {"is_auto_analyzed": {"value": "false", "boost": 1.0}}},
+                    ]}}}
 
     def search_logs(self, search_req):
         """Get all logs similar to given logs"""
@@ -64,8 +101,7 @@ class SearchService:
             if not msg_words.strip() or msg_words in searched_logs:
                 continue
             searched_logs.add(msg_words)
-            query = self.es_query_builder.build_search_query(
-                search_req, queried_log["_source"]["message"])
+            query = self.build_search_query(search_req, queried_log["_source"]["message"])
             res = self.es_client.es_client.search(index=str(search_req.projectId), body=query)
             for es_res in res["hits"]["hits"]:
                 test_item_info[es_res["_id"]] = es_res["_source"]["test_item"]

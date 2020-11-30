@@ -21,40 +21,6 @@ class EsQueryBuilder:
         self.search_cfg = search_cfg
         self.error_logging_level = error_logging_level
 
-    def build_search_query(self, search_req, message):
-        """Build search query"""
-        return {
-            "_source": ["message", "test_item", "detected_message", "stacktrace"],
-            "size": 10000,
-            "query": {
-                "bool": {
-                    "filter": [
-                        {"range": {"log_level": {"gte": self.error_logging_level}}},
-                        {"exists": {"field": "issue_type"}},
-                        {"term": {"is_merged": False}},
-                    ],
-                    "must_not": {
-                        "term": {"test_item": {"value": search_req.itemId, "boost": 1.0}}
-                    },
-                    "must": [
-                        {
-                            "bool": {
-                                "should": [
-                                    {"wildcard": {"issue_type": "TI*"}},
-                                    {"wildcard": {"issue_type": "ti*"}},
-                                ]
-                            }
-                        },
-                        {"terms": {"launch_id": search_req.filteredLaunchIds}},
-                        self.
-                        build_more_like_this_query("90%",
-                                                   message,
-                                                   field_name="message"),
-                    ],
-                    "should": [
-                        {"term": {"is_auto_analyzed": {"value": "false", "boost": 1.0}}},
-                    ]}}}
-
     def build_search_similar_items_query(self, launch_id, test_item, message):
         """Build search query"""
         return {

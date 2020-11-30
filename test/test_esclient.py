@@ -295,7 +295,7 @@ class TestEsClient(unittest.TestCase):
                                 "rs":             utils.get_fixture(self.index_deleted_rs),
                                 }, ],
                 "index":      1,
-                "result":     1,
+                "result":     True,
             },
             {
                 "test_calls": [{"method":         httpretty.DELETE,
@@ -305,7 +305,7 @@ class TestEsClient(unittest.TestCase):
                                 "rs":             utils.get_fixture(self.index_not_found_rs),
                                 }, ],
                 "index":      2,
-                "result":     0,
+                "result":     False,
             },
         ]
         for idx, test in enumerate(tests):

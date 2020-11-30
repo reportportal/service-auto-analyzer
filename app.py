@@ -33,6 +33,7 @@ from service.analyzer_service import AnalyzerService
 from service.suggest_service import SuggestService
 from service.search_service import SearchService
 from service.namespace_finder_service import NamespaceFinderService
+from service.delete_index_service import DeleteIndexService
 
 
 APP_CONFIG = {
@@ -138,7 +139,8 @@ def init_amqp(_amqp_client):
                    (APP_CONFIG["exchangeName"], "delete", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                    es_client.delete_index,
+                                                    DeleteIndexService(
+                                                        APP_CONFIG, SEARCH_CONFIG).delete_index,
                                                     prepare_data_func=amqp_handler.
                                                     prepare_delete_index,
                                                     prepare_response_data=amqp_handler.
@@ -184,12 +186,13 @@ def init_amqp(_amqp_client):
                    lambda channel, method, props, body:
                    amqp_handler.handle_inner_amqp_request(channel, method, props, body,
                                                           es_client.send_stats_info))))
-    _namespace_finder = NamespaceFinderService(APP_CONFIG, SEARCH_CONFIG)
     threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                    (APP_CONFIG["exchangeName"], "namespace_finder", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                    _namespace_finder.update_chosen_namespaces))))
+                                                    NamespaceFinderService(
+                                                        APP_CONFIG,
+                                                        SEARCH_CONFIG).update_chosen_namespaces))))
     threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                    (APP_CONFIG["exchangeName"], "train_models", True, False,
                    lambda channel, method, props, body:

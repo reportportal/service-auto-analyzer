@@ -26,7 +26,6 @@ from time import time
 from commons.es_query_builder import EsQueryBuilder
 from commons.log_merger import LogMerger
 from queue import Queue
-from commons import namespace_finder
 from commons.triggering_training.retraining_defect_type_triggering import RetrainingDefectTypeTriggering
 from commons.log_preparation import LogPreparation
 from amqp.amqp import AmqpClient
@@ -48,7 +47,6 @@ class EsClient:
                                                      ca_certs=app_config["esCAcert"],
                                                      client_cert=app_config["esClientCert"],
                                                      client_key=app_config["esClientKey"])
-        self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.es_query_builder = EsQueryBuilder(self.search_cfg, utils.ERROR_LOGGING_LEVEL)
         self.log_preparation = LogPreparation()
         self.model_training_triggering = {
@@ -128,19 +126,15 @@ class EsClient:
     def delete_index(self, index_name):
         """Delete the whole index"""
         try:
-            self.namespace_finder.remove_namespaces(index_name)
-            for model_type in self.model_training_triggering:
-                self.model_training_triggering[model_type].remove_triggering_info(
-                    {"project_id": index_name})
             self.es_client.indices.delete(index=str(index_name))
             logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
             logger.debug("Deleted index %s", str(index_name))
-            return 1
+            return True
         except Exception as err:
             logger.error("Not found %s for deleting", str(index_name))
             logger.error("ES Url %s", utils.remove_credentials_from_url(self.host))
             logger.error(err)
-            return 0
+            return False
 
     def create_index_if_not_exists(self, index_name):
         """Creates index if it doesn't not exist"""

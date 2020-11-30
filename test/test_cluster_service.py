@@ -428,7 +428,7 @@ class TestClusterService(unittest.TestCase):
             },
         ]
 
-        for idx, test in enumerate(tests[6:]):
+        for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
                 config = self.get_default_search_config()

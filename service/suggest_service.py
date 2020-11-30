@@ -32,7 +32,6 @@ from time import time
 from datetime import datetime
 
 logger = logging.getLogger("analyzerApp.suggestService")
-EARLY_FINISH = False
 
 
 class SuggestService:

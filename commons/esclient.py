@@ -21,11 +21,8 @@ import elasticsearch
 import elasticsearch.helpers
 import commons.launch_objects
 from elasticsearch import RequestsHttpConnection
-from commons.launch_objects import SearchLogInfo
 import utils.utils as utils
 from time import time
-from boosting_decision_making import weighted_similarity_calculator
-from boosting_decision_making import similarity_calculator
 from commons.es_query_builder import EsQueryBuilder
 from commons.log_merger import LogMerger
 from queue import Queue
@@ -51,16 +48,12 @@ class EsClient:
                                                      ca_certs=app_config["esCAcert"],
                                                      client_cert=app_config["esClientCert"],
                                                      client_key=app_config["esClientKey"])
-        self.weighted_log_similarity_calculator = None
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.es_query_builder = EsQueryBuilder(self.search_cfg, utils.ERROR_LOGGING_LEVEL)
         self.log_preparation = LogPreparation()
         self.model_training_triggering = {
             "defect_type": RetrainingDefectTypeTriggering(self.app_config)
         }
-        if self.search_cfg["SimilarityWeightsFolder"].strip():
-            self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
-                WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
 
     def create_es_client(self, app_config):
         if app_config["turnOffSslVerification"]:
@@ -325,60 +318,6 @@ class EsClient:
         logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
                     clean_index.ids, clean_index.project, time() - t_start)
         return result.took
-
-    def search_logs(self, search_req):
-        """Get all logs similar to given logs"""
-        similar_log_ids = set()
-        logger.info("Started searching by request %s", search_req.json())
-        logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
-        t_start = time()
-        if not self.index_exists(str(search_req.projectId)):
-            return []
-        searched_logs = set()
-        test_item_info = {}
-
-        for message in search_req.logMessages:
-            if not message.strip():
-                continue
-
-            queried_log = self.log_preparation._create_log_template()
-            queried_log = self.log_preparation._fill_log_fields(
-                queried_log,
-                commons.launch_objects.Log(logId=0, message=message),
-                search_req.logLines)
-
-            msg_words = " ".join(utils.split_words(queried_log["_source"]["message"]))
-            if not msg_words.strip() or msg_words in searched_logs:
-                continue
-            searched_logs.add(msg_words)
-            query = self.es_query_builder.build_search_query(
-                search_req, queried_log["_source"]["message"])
-            res = self.es_client.search(index=str(search_req.projectId), body=query)
-            for es_res in res["hits"]["hits"]:
-                test_item_info[es_res["_id"]] = es_res["_source"]["test_item"]
-
-            _similarity_calculator = similarity_calculator.SimilarityCalculator(
-                {
-                    "max_query_terms": self.search_cfg["MaxQueryTerms"],
-                    "min_word_length": self.search_cfg["MinWordLength"],
-                    "min_should_match": "90%",
-                    "number_of_log_lines": search_req.logLines
-                },
-                weighted_similarity_calculator=self.weighted_log_similarity_calculator)
-            _similarity_calculator.find_similarity([(queried_log, res)], ["message"])
-
-            for group_id, similarity_obj in _similarity_calculator.similarity_dict["message"].items():
-                log_id, _ = group_id
-                similarity_percent = similarity_obj["similarity"]
-                logger.debug("Log with id %s has %.3f similarity with the queried log '%s'",
-                             log_id, similarity_percent, queried_log["_source"]["message"])
-                if similarity_percent >= self.search_cfg["SearchLogsMinSimilarity"]:
-                    similar_log_ids.add((utils.extract_real_id(log_id), int(test_item_info[log_id])))
-
-        logger.info("Finished searching by request %s with %d results. It took %.2f sec.",
-                    search_req.json(), len(similar_log_ids), time() - t_start)
-        return [SearchLogInfo(logId=log_info[0],
-                              testItemId=log_info[1]) for log_info in similar_log_ids]
 
     def create_index_for_stats_info(self, es_client, rp_aa_stats_index):
         index = None

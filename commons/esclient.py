@@ -26,7 +26,6 @@ from time import time
 from commons.es_query_builder import EsQueryBuilder
 from commons.log_merger import LogMerger
 from queue import Queue
-from commons.triggering_training.retraining_defect_type_triggering import RetrainingDefectTypeTriggering
 from commons.log_preparation import LogPreparation
 from amqp.amqp import AmqpClient
 
@@ -49,9 +48,6 @@ class EsClient:
                                                      client_key=app_config["esClientKey"])
         self.es_query_builder = EsQueryBuilder(self.search_cfg, utils.ERROR_LOGGING_LEVEL)
         self.log_preparation = LogPreparation()
-        self.model_training_triggering = {
-            "defect_type": RetrainingDefectTypeTriggering(self.app_config)
-        }
 
     def create_es_client(self, app_config):
         if app_config["turnOffSslVerification"]:
@@ -344,14 +340,3 @@ class EsClient:
             })
         self._bulk_index(stat_info_array)
         logger.info("Finished sending stats about analysis")
-
-    @utils.ignore_warnings
-    def train_models(self, train_info):
-        logger.info("Started training")
-        t_start = time()
-        assert train_info["model_type"] in self.model_training_triggering
-
-        _retraining_defect_type_triggering = self.model_training_triggering[train_info["model_type"]]
-        if _retraining_defect_type_triggering.should_model_training_be_triggered(train_info):
-            print("Should be trained ", train_info)
-        logger.info("Finished training %.2f s", time() - t_start)

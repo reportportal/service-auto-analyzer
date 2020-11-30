@@ -34,6 +34,7 @@ from service.suggest_service import SuggestService
 from service.search_service import SearchService
 from service.namespace_finder_service import NamespaceFinderService
 from service.delete_index_service import DeleteIndexService
+from service.retraining_service import RetrainingService
 
 
 APP_CONFIG = {
@@ -197,7 +198,9 @@ def init_amqp(_amqp_client):
                    (APP_CONFIG["exchangeName"], "train_models", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_inner_amqp_request(channel, method, props, body,
-                                                          es_client.train_models))))
+                                                          RetrainingService(
+                                                              APP_CONFIG,
+                                                              SEARCH_CONFIG).train_models))))
 
     return threads
 

@@ -24,12 +24,12 @@ import httpretty
 
 import commons.launch_objects as launch_objects
 from boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
-from service.analyzer_service import AnalyzerService
+from service.auto_analyzer_service import AutoAnalyzerService
 from utils import utils
 
 
-class TestAnalyzerService(unittest.TestCase):
-    """Tests analyzer service functionality"""
+class TestAutoAnalyzerService(unittest.TestCase):
+    """Tests auto analyzer service functionality"""
 
     ERROR_LOGGING_LEVEL = 40000
 
@@ -323,8 +323,8 @@ class TestAnalyzerService(unittest.TestCase):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
                 config = self.get_default_search_config()
-                analyzer_service = AnalyzerService(app_config=self.app_config,
-                                                   search_cfg=config)
+                analyzer_service = AutoAnalyzerService(app_config=self.app_config,
+                                                       search_cfg=config)
                 _boosting_decision_maker = BoostingDecisionMaker()
                 _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
                 _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])
@@ -345,7 +345,7 @@ class TestAnalyzerService(unittest.TestCase):
                 if "expected_id" in test:
                     test["expected_id"].should.equal(response[0].relevantItem)
 
-                TestAnalyzerService.shutdown_server(test["test_calls"])
+                TestAutoAnalyzerService.shutdown_server(test["test_calls"])
 
 
 if __name__ == '__main__':

@@ -15,7 +15,7 @@
 """
 
 from utils import utils
-from boosting_decision_making import similarity_calculator
+from commons import similarity_calculator
 import logging
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")

@@ -18,7 +18,8 @@ from commons.esclient import EsClient
 from utils import utils
 from commons.launch_objects import SearchLogInfo, Log
 from commons.log_preparation import LogPreparation
-from boosting_decision_making import weighted_similarity_calculator, similarity_calculator
+from boosting_decision_making import weighted_similarity_calculator
+from commons import similarity_calculator
 import logging
 from time import time
 

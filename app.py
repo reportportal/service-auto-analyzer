@@ -29,7 +29,7 @@ from amqp.amqp import AmqpClient
 from commons.esclient import EsClient
 from utils import utils
 from service.cluster_service import ClusterService
-from service.analyzer_service import AnalyzerService
+from service.auto_analyzer_service import AutoAnalyzerService
 from service.suggest_service import SuggestService
 from service.search_service import SearchService
 from service.namespace_finder_service import NamespaceFinderService
@@ -133,7 +133,9 @@ def init_amqp(_amqp_client):
                    (APP_CONFIG["exchangeName"], "analyze", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                    AnalyzerService(APP_CONFIG, SEARCH_CONFIG).analyze_logs,
+                                                    AutoAnalyzerService(
+                                                        APP_CONFIG,
+                                                        SEARCH_CONFIG).analyze_logs,
                                                     prepare_response_data=amqp_handler.
                                                     prepare_analyze_response_data))))
     threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,

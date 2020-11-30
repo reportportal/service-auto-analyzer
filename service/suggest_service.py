@@ -13,69 +13,30 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 """
-from commons.esclient import EsClient
-from commons.es_query_builder import EsQueryBuilder
 from utils import utils
 from commons.launch_objects import SuggestAnalysisResult
-from commons.log_preparation import LogPreparation
-from boosting_decision_making import defect_type_model, custom_defect_type_model
-from boosting_decision_making import weighted_similarity_calculator, similarity_calculator
 from boosting_decision_making import boosting_decision_maker
 from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
-from commons import minio_client, namespace_finder
 from amqp.amqp import AmqpClient
 from commons.log_merger import LogMerger
+from service.analyzer_service import AnalyzerService
+from commons import similarity_calculator
 import json
 import logging
-import re
 from time import time
 from datetime import datetime
 
 logger = logging.getLogger("analyzerApp.suggestService")
 
 
-class SuggestService:
+class SuggestService(AnalyzerService):
 
     def __init__(self, app_config={}, search_cfg={}):
-        self.app_config = app_config
-        self.search_cfg = search_cfg
-        self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
-        self.es_query_builder = EsQueryBuilder(search_cfg, utils.ERROR_LOGGING_LEVEL)
-        self.log_preparation = LogPreparation()
-        self.suggest_decision_maker = None
-        self.weighted_log_similarity_calculator = None
-        self.global_defect_type_model = None
+        super(SuggestService, self).__init__(app_config=app_config, search_cfg=search_cfg)
         self.suggest_threshold = 0.4
-        self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
-        self.minio_client = minio_client.MinioClient(self.app_config)
-        self.initialize_decision_makers()
-
-    def initialize_decision_makers(self):
         if self.search_cfg["SuggestBoostModelFolder"].strip():
             self.suggest_decision_maker = boosting_decision_maker.BoostingDecisionMaker(
                 folder=self.search_cfg["SuggestBoostModelFolder"])
-        if self.search_cfg["SimilarityWeightsFolder"].strip():
-            self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
-                WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
-        if self.search_cfg["GlobalDefectTypeModelFolder"].strip():
-            self.global_defect_type_model = defect_type_model.\
-                DefectTypeModel(folder=self.search_cfg["GlobalDefectTypeModelFolder"])
-
-    def find_min_should_match_threshold(self, analyzer_config):
-        return analyzer_config.minShouldMatch if analyzer_config.minShouldMatch > 0 else\
-            int(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0))
-
-    def choose_model(self, project_id, model_name_folder):
-        model = None
-        if self.minio_client.does_object_exists(project_id, model_name_folder):
-            folders = self.minio_client.get_folder_objects(project_id, model_name_folder)
-            if len(folders):
-                try:
-                    model = custom_defect_type_model.CustomDefectTypeModel(
-                        self.app_config, project_id, folder=folders[0])
-                except Exception as err:
-                    logger.error(err)
-        return model
 
     def get_config_for_boosting_suggests(self, analyzerConfig):
         return {
@@ -88,6 +49,119 @@ class SuggestService:
             "number_of_log_lines": analyzerConfig.numberOfLogLines,
             "filter_by_unique_id": True}
 
+    def build_suggest_query(self, test_item_info, log, size=10,
+                            message_field="message", det_mes_field="detected_message",
+                            stacktrace_field="stacktrace"):
+        min_should_match = "{}%".format(test_item_info.analyzerConfig.minShouldMatch)\
+            if test_item_info.analyzerConfig.minShouldMatch > 0\
+            else self.search_cfg["MinShouldMatch"]
+        log_lines = test_item_info.analyzerConfig.numberOfLogLines
+
+        query = self.build_common_query(log, size=size)
+
+        if test_item_info.analyzerConfig.analyzerMode in ["LAUNCH_NAME"]:
+            query["query"]["bool"]["must"].append(
+                {"term": {
+                    "launch_name": {
+                        "value": test_item_info.launchName}}})
+        elif test_item_info.analyzerConfig.analyzerMode in ["CURRENT_LAUNCH"]:
+            query["query"]["bool"]["must"].append(
+                {"term": {
+                    "launch_id": {
+                        "value": test_item_info.launchId}}})
+        else:
+            query["query"]["bool"]["should"].append(
+                {"term": {
+                    "launch_name": {
+                        "value": test_item_info.launchName,
+                        "boost": abs(self.search_cfg["BoostLaunch"])}}})
+
+        if log["_source"]["message"].strip():
+            query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
+            if log_lines == -1:
+                query["query"]["bool"]["must"].append(
+                    self.build_more_like_this_query("60%",
+                                                    log["_source"][det_mes_field],
+                                                    field_name=det_mes_field,
+                                                    boost=4.0))
+                if log["_source"][stacktrace_field].strip():
+                    query["query"]["bool"]["must"].append(
+                        self.build_more_like_this_query("60%",
+                                                        log["_source"][stacktrace_field],
+                                                        field_name=stacktrace_field,
+                                                        boost=2.0))
+                else:
+                    query["query"]["bool"]["must_not"].append({"wildcard": {stacktrace_field: "*"}})
+            else:
+                query["query"]["bool"]["must"].append(
+                    self.build_more_like_this_query("60%",
+                                                    log["_source"][message_field],
+                                                    field_name=message_field,
+                                                    boost=4.0))
+                query["query"]["bool"]["should"].append(
+                    self.build_more_like_this_query("60%",
+                                                    log["_source"][stacktrace_field],
+                                                    field_name=stacktrace_field,
+                                                    boost=1.0))
+                query["query"]["bool"]["should"].append(
+                    self.build_more_like_this_query(
+                        "60%",
+                        log["_source"]["detected_message_without_params_extended"],
+                        field_name="detected_message_without_params_extended",
+                        boost=1.0))
+            query["query"]["bool"]["should"].append(
+                self.build_more_like_this_query("80%",
+                                                log["_source"]["merged_small_logs"],
+                                                field_name="merged_small_logs",
+                                                boost=0.5))
+            query["query"]["bool"]["should"].append(
+                self.build_more_like_this_query("1",
+                                                log["_source"]["only_numbers"],
+                                                field_name="only_numbers",
+                                                boost=4.0,
+                                                override_min_should_match="1"))
+            query["query"]["bool"]["should"].append(
+                self.build_more_like_this_query("1",
+                                                log["_source"]["message_params"],
+                                                field_name="message_params",
+                                                boost=4.0,
+                                                override_min_should_match="1"))
+            query["query"]["bool"]["should"].append(
+                self.build_more_like_this_query("1",
+                                                log["_source"]["urls"],
+                                                field_name="urls",
+                                                boost=4.0,
+                                                override_min_should_match="1"))
+            query["query"]["bool"]["should"].append(
+                self.build_more_like_this_query("1",
+                                                log["_source"]["paths"],
+                                                field_name="paths",
+                                                boost=4.0,
+                                                override_min_should_match="1"))
+        else:
+            query["query"]["bool"]["filter"].append({"term": {"is_merged": True}})
+            query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
+            query["query"]["bool"]["must"].append(
+                self.build_more_like_this_query(min_should_match,
+                                                log["_source"]["merged_small_logs"],
+                                                field_name="merged_small_logs",
+                                                boost=2.0))
+
+        query["query"]["bool"]["should"].append(
+            self.build_more_like_this_query("1",
+                                            log["_source"]["found_exceptions_extended"],
+                                            field_name="found_exceptions_extended",
+                                            boost=4.0,
+                                            override_min_should_match="1"))
+        query["query"]["bool"]["should"].append(
+            self.build_more_like_this_query("1",
+                                            log["_source"]["potential_status_codes"],
+                                            field_name="potential_status_codes",
+                                            boost=4.0,
+                                            override_min_should_match="1"))
+
+        return query
+
     def query_es_for_suggested_items(self, test_item_info, logs):
         full_results = []
 
@@ -98,7 +172,7 @@ class SuggestService:
                     (not message and not merged_small_logs):
                 continue
 
-            query = self.es_query_builder.build_suggest_query(
+            query = self.build_suggest_query(
                 test_item_info, log,
                 message_field="message_extended",
                 det_mes_field="detected_message_extended",
@@ -106,7 +180,7 @@ class SuggestService:
             es_res = self.es_client.es_client.search(index=str(test_item_info.project), body=query)
             full_results.append((log, es_res))
 
-            query = self.es_query_builder.build_suggest_query(
+            query = self.build_suggest_query(
                 test_item_info, log,
                 message_field="message_without_params_extended",
                 det_mes_field="detected_message_without_params_extended",
@@ -114,7 +188,7 @@ class SuggestService:
             es_res = self.es_client.es_client.search(index=str(test_item_info.project), body=query)
             full_results.append((log, es_res))
 
-            query = self.es_query_builder.build_suggest_query(
+            query = self.build_suggest_query(
                 test_item_info, log,
                 message_field="message_without_params_and_brackets",
                 det_mes_field="detected_message_without_params_and_brackets",

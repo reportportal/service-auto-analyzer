@@ -1,1 +1,3 @@
-{"query": {"bool": {"filter": [{"terms": {"test_item": ["1"]}}, {"term": {"is_merged": false}}]}}, "size": 10000, "sort":"_doc"}
+{"_source": ["message", "test_item", "log_level", "found_exceptions",
+             "potential_status_codes", "original_message_lines",
+             "original_message_words_number", "issue_type"], "query": {"bool": {"filter": [{"terms": {"test_item": ["1"]}}, {"term": {"is_merged": false}}]}}, "size": 10000, "sort":"_doc"}

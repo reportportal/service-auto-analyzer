@@ -72,15 +72,19 @@ class EsClient:
     def get_test_item_query(self, test_item_ids, is_merged, full_log):
         """Build test item query"""
         if full_log:
-            return {"size": 10000,
-                    "query": {
-                        "bool": {
-                            "filter": [
-                                {"terms": {"test_item": [str(_id) for _id in test_item_ids]}},
-                                {"term": {"is_merged": is_merged}}
-                            ]
-                        }
-                    }}
+            return {
+                "_source": ["message", "test_item", "log_level", "found_exceptions",
+                            "potential_status_codes", "original_message_lines",
+                            "original_message_words_number", "issue_type"],
+                "size": 10000,
+                "query": {
+                    "bool": {
+                        "filter": [
+                            {"terms": {"test_item": [str(_id) for _id in test_item_ids]}},
+                            {"term": {"is_merged": is_merged}}
+                        ]
+                    }
+                }}
         else:
             return {
                 "_source": ["test_item"],

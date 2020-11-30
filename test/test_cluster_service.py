@@ -23,7 +23,7 @@ import httpretty
 
 import commons.launch_objects as launch_objects
 from utils import utils
-from commons.cluster_service import ClusterService
+from service.cluster_service import ClusterService
 
 
 class TestClusterService(unittest.TestCase):

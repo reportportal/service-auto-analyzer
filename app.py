@@ -28,7 +28,8 @@ import amqp.amqp_handler as amqp_handler
 from amqp.amqp import AmqpClient
 from commons.esclient import EsClient
 from utils import utils
-from commons.cluster_service import ClusterService
+from service.cluster_service import ClusterService
+from service.analyzer_service import AnalyzerService
 
 
 APP_CONFIG = {
@@ -105,7 +106,7 @@ def declare_exchange(channel, config):
     return True
 
 
-def init_amqp(_amqp_client, request_handler):
+def init_amqp(_amqp_client):
     """Initialize rabbitmq queues, exchange and stars threads for queue messages processing"""
     with _amqp_client.connection.channel() as channel:
         try:
@@ -115,26 +116,26 @@ def init_amqp(_amqp_client, request_handler):
             logger.error(err)
             return
     threads = []
-
+    es_client = create_es_client()
     threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                    (APP_CONFIG["exchangeName"], "index", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                    request_handler.index_logs,
+                                                    es_client.index_logs,
                                                     prepare_response_data=amqp_handler.
                                                     prepare_index_response_data))))
     threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                    (APP_CONFIG["exchangeName"], "analyze", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                    request_handler.analyze_logs,
+                                                    AnalyzerService(APP_CONFIG, SEARCH_CONFIG).analyze_logs,
                                                     prepare_response_data=amqp_handler.
                                                     prepare_analyze_response_data))))
     threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                    (APP_CONFIG["exchangeName"], "delete", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                    request_handler.delete_index,
+                                                    es_client.delete_index,
                                                     prepare_data_func=amqp_handler.
                                                     prepare_delete_index,
                                                     prepare_response_data=amqp_handler.
@@ -143,7 +144,7 @@ def init_amqp(_amqp_client, request_handler):
                    (APP_CONFIG["exchangeName"], "clean", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                    request_handler.delete_logs,
+                                                    es_client.delete_logs,
                                                     prepare_data_func=amqp_handler.
                                                     prepare_clean_index,
                                                     prepare_response_data=amqp_handler.
@@ -152,7 +153,7 @@ def init_amqp(_amqp_client, request_handler):
                    (APP_CONFIG["exchangeName"], "search", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                    request_handler.search_logs,
+                                                    es_client.search_logs,
                                                     prepare_data_func=amqp_handler.
                                                     prepare_search_logs,
                                                     prepare_response_data=amqp_handler.
@@ -161,7 +162,7 @@ def init_amqp(_amqp_client, request_handler):
                    (APP_CONFIG["exchangeName"], "suggest", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                    request_handler.suggest_items,
+                                                    es_client.suggest_items,
                                                     prepare_data_func=amqp_handler.
                                                     prepare_test_item_info,
                                                     prepare_response_data=amqp_handler.
@@ -179,17 +180,17 @@ def init_amqp(_amqp_client, request_handler):
                    (APP_CONFIG["exchangeName"], "stats_info", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_inner_amqp_request(channel, method, props, body,
-                                                          request_handler.send_stats_info))))
+                                                          es_client.send_stats_info))))
     threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                    (APP_CONFIG["exchangeName"], "namespace_finder", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                    request_handler.update_chosen_namespaces))))
+                                                    es_client.update_chosen_namespaces))))
     threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                    (APP_CONFIG["exchangeName"], "train_models", True, False,
                    lambda channel, method, props, body:
                    amqp_handler.handle_inner_amqp_request(channel, method, props, body,
-                                                          request_handler.train_models))))
+                                                          es_client.train_models))))
 
     return threads
 
@@ -265,8 +266,7 @@ while True:
             logger.error(err)
             time.sleep(10)
             continue
-        es_client = create_es_client()
-        threads = init_amqp(amqp_client, es_client)
+        threads = init_amqp(amqp_client)
         logger.info("Analyzer has started")
         break
     except Exception as err:

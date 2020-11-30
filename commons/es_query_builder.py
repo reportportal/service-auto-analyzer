@@ -84,6 +84,7 @@ class EsQueryBuilder:
     def build_search_similar_items_query(self, launch_id, test_item, message):
         """Build search query"""
         return {
+            "_source": ["whole_message", "test_item", "stacktrace", "launch_id", "cluster_id"],
             "size": 10000,
             "query": {
                 "bool": {

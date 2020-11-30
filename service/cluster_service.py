@@ -15,7 +15,6 @@
 """
 from commons.esclient import EsClient
 from commons import clusterizer
-from commons.es_query_builder import EsQueryBuilder
 from utils import utils
 from commons.launch_objects import ClusterResult
 from commons.log_preparation import LogPreparation
@@ -35,8 +34,36 @@ class ClusterService:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
-        self.es_query_builder = EsQueryBuilder(search_cfg, utils.ERROR_LOGGING_LEVEL)
         self.log_preparation = LogPreparation()
+
+    def build_search_similar_items_query(self, launch_id, test_item, message):
+        """Build search query"""
+        return {
+            "_source": ["whole_message", "test_item",
+                        "detected_message", "stacktrace", "launch_id", "cluster_id"],
+            "size": 10000,
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
+                        {"exists": {"field": "issue_type"}},
+                        {"term": {"is_merged": False}},
+                    ],
+                    "must_not": {
+                        "term": {"test_item": {"value": test_item, "boost": 1.0}}
+                    },
+                    "must": [
+                        {"term": {"launch_id": launch_id}},
+                        {"more_like_this": {
+                            "fields":               ["whole_message"],
+                            "like":                 message,
+                            "min_doc_freq":         1,
+                            "min_term_freq":        1,
+                            "minimum_should_match": "5<98%",
+                            "max_query_terms":      self.search_cfg["MaxQueryTerms"],
+                            "boost": 1.0
+                        }}
+                    ]}}}
 
     def find_similar_items_from_es(
             self, groups, log_dict, log_messages, log_ids, number_of_lines):
@@ -44,7 +71,7 @@ class ClusterService:
         _clusterizer = clusterizer.Clusterizer()
         for global_group in groups:
             first_item_ind = groups[global_group][0]
-            query = self.es_query_builder.build_search_similar_items_query(
+            query = self.build_search_similar_items_query(
                 log_dict[first_item_ind]["_source"]["launch_id"],
                 log_dict[first_item_ind]["_source"]["test_item"],
                 log_messages[first_item_ind])

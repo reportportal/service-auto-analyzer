@@ -69,7 +69,7 @@ SEARCH_CONFIG = {
     "BoostModelFolder":            "",
     "SuggestBoostModelFolder":     "",
     "SimilarityWeightsFolder":     "",
-    "GlobalDefectTypeFolder":      ""
+    "GlobalDefectTypeModelFolder":      ""
 }
 
 

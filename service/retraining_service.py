@@ -20,6 +20,7 @@ from time import time
 from commons import namespace_finder
 from commons.esclient import EsClient
 from commons.triggering_training.retraining_defect_type_triggering import RetrainingDefectTypeTriggering
+from boosting_decision_making.training_models import training_defect_type_model
 
 logger = logging.getLogger("analyzerApp.retrainingService")
 
@@ -31,7 +32,9 @@ class RetrainingService:
         self.search_cfg = search_cfg
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.model_training_triggering = {
-            "defect_type": RetrainingDefectTypeTriggering(self.app_config)
+            "defect_type": (RetrainingDefectTypeTriggering(app_config),
+                            training_defect_type_model.DefectTypeModelTraining(
+                                app_config, search_cfg))
         }
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
 
@@ -41,7 +44,8 @@ class RetrainingService:
         t_start = time()
         assert train_info["model_type"] in self.model_training_triggering
 
-        _retraining_defect_type_triggering = self.model_training_triggering[train_info["model_type"]]
-        if _retraining_defect_type_triggering.should_model_training_be_triggered(train_info):
+        _retraining_triggering, _retraining = self.model_training_triggering[train_info["model_type"]]
+        if _retraining_triggering.should_model_training_be_triggered(train_info):
             print("Should be trained ", train_info)
+            _retraining.train(train_info)
         logger.info("Finished training %.2f s", time() - t_start)

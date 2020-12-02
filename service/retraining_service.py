@@ -49,6 +49,7 @@ class RetrainingService:
             print("Should be trained ", train_info)
             try:
                 _retraining.train(train_info)
+                _retraining_triggering.clean_defect_type_triggering_info(train_info)
             except Exception as err:
                 logger.error("Training finished with errors")
                 logger.error(err)

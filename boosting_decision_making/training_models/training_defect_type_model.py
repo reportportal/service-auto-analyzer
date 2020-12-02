@@ -23,6 +23,7 @@ import scipy.stats as stats
 import numpy as np
 import logging
 from datetime import datetime
+import pickle
 
 logger = logging.getLogger("analyzerApp.trainingDefectTypeModel")
 
@@ -161,6 +162,7 @@ class DefectTypeModelTraining:
         if len(custom_models):
             logger.debug("The custom model should be saved")
             self.new_model.delete_old_model()
+            pickle.dump(self.new_model.count_vectorizer_models, open("custom_model/cnt_models.pickle", "wb"))
             self.new_model.save_model(
                 "defect_type_model/defect_type_model_%s/" % datetime.now().strftime("%d.%m.%y"))
 

@@ -18,10 +18,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score, accuracy_score
 from sklearn.metrics import classification_report, confusion_matrix
+from utils import utils
 import pandas as pd
 import os
 import pickle
-import re
 from collections import Counter
 
 
@@ -34,31 +34,6 @@ class DefectTypeModel:
         self.is_global = True
         if self.folder:
             self.load_model(folder)
-
-    def preprocess_words(self, text):
-        all_words = []
-        for w in re.finditer(r"[\w\._]+", text):
-            word_normalized = re.sub(r"^[\w]\.", "", w.group(0))
-            word = word_normalized.replace("_", "")
-            if len(word) >= 3:
-                all_words.append(word.lower())
-            split_parts = word_normalized.split("_")
-            split_words = []
-            if len(split_parts) > 2:
-                for idx in range(len(split_parts)):
-                    if idx != len(split_parts) - 1:
-                        split_words.append("".join(split_parts[idx:idx + 2]).lower())
-                all_words.extend(split_words)
-            if "." not in word_normalized:
-                split_words = []
-                split_parts = [s.strip() for s in re.split("([A-Z][^A-Z]+)", word) if s.strip()]
-                if len(split_parts) > 2:
-                    for idx in range(len(split_parts)):
-                        if idx != len(split_parts) - 1:
-                            if len("".join(split_parts[idx:idx + 2]).lower()) > 3:
-                                split_words.append("".join(split_parts[idx:idx + 2]).lower())
-                all_words.extend(split_words)
-        return all_words
 
     def get_model_info(self):
         folder_name = os.path.basename(self.folder.strip("/").strip("\\")).strip()
@@ -83,7 +58,7 @@ class DefectTypeModel:
     def train_model(self, name, train_data_x, labels):
         self.count_vectorizer_models[name] = TfidfVectorizer(
             binary=True, stop_words="english", min_df=5,
-            token_pattern=r"[\w\._]+", analyzer=self.preprocess_words)
+            token_pattern=r"[\w\._]+", analyzer=utils.preprocess_words)
         transformed_values = self.count_vectorizer_models[name].fit_transform(train_data_x)
         print("Length of train data: ", len(labels))
         print("Label distribution:", Counter(labels))

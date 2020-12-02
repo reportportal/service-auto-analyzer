@@ -269,7 +269,7 @@ class AutoAnalyzerService(AnalyzerService):
                         "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         "number_of_log_lines": analyzer_config.numberOfLogLines,
                         "min_should_match": self.find_min_should_match_threshold(analyzer_config),
-                        "model_info": [],
+                        "model_info": set(),
                         "module_version": self.app_config["appVersion"]}
 
                 t_start_item = time()
@@ -297,7 +297,7 @@ class AutoAnalyzerService(AnalyzerService):
                 feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
                 model_info_tags = boosting_data_gatherer.get_used_model_info() +\
                     self.boosting_decision_maker.get_model_info()
-                results_to_share[launch_id]["model_info"] = model_info_tags
+                results_to_share[launch_id]["model_info"].update(model_info_tags)
 
                 if len(feature_data) > 0:
 
@@ -339,6 +339,9 @@ class AutoAnalyzerService(AnalyzerService):
                     logger.debug("There are no results for test item %s", test_item_id)
                 results_to_share[launch_id]["processed_time"] += (time() - t_start_item)
             if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+                for launch_id in results_to_share:
+                    results_to_share[launch_id]["model_info"] = list(
+                        results_to_share[launch_id]["model_info"])
                 AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
                     self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
         except Exception as err:

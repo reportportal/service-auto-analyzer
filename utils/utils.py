@@ -610,3 +610,29 @@ def calculate_proportions_for_labels(labels):
         if max_val > 0:
             return min_val / max_val
     return 0.0
+
+
+def preprocess_words(text):
+    all_words = []
+    for w in re.finditer(r"[\w\._]+", text):
+        word_normalized = re.sub(r"^[\w]\.", "", w.group(0))
+        word = word_normalized.replace("_", "")
+        if len(word) >= 3:
+            all_words.append(word.lower())
+        split_parts = word_normalized.split("_")
+        split_words = []
+        if len(split_parts) > 2:
+            for idx in range(len(split_parts)):
+                if idx != len(split_parts) - 1:
+                    split_words.append("".join(split_parts[idx:idx + 2]).lower())
+            all_words.extend(split_words)
+        if "." not in word_normalized:
+            split_words = []
+            split_parts = [s.strip() for s in re.split("([A-Z][^A-Z]+)", word) if s.strip()]
+            if len(split_parts) > 2:
+                for idx in range(len(split_parts)):
+                    if idx != len(split_parts) - 1:
+                        if len("".join(split_parts[idx:idx + 2]).lower()) > 3:
+                            split_words.append("".join(split_parts[idx:idx + 2]).lower())
+            all_words.extend(split_words)
+    return all_words

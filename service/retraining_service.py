@@ -47,5 +47,9 @@ class RetrainingService:
         _retraining_triggering, _retraining = self.model_training_triggering[train_info["model_type"]]
         if _retraining_triggering.should_model_training_be_triggered(train_info):
             print("Should be trained ", train_info)
-            _retraining.train(train_info)
+            try:
+                _retraining.train(train_info)
+            except Exception as err:
+                logger.error("Training finished with errors")
+                logger.error(err)
         logger.info("Finished training %.2f s", time() - t_start)

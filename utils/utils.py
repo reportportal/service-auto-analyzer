@@ -26,6 +26,7 @@ import os
 import json
 import requests
 import commons
+from collections import Counter
 
 logger = logging.getLogger("analyzerApp.utils")
 file_extensions = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
@@ -599,3 +600,13 @@ def extract_all_exceptions(bodies):
                 logId=int(log_body["_id"]),
                 foundExceptions=exceptions))
     return logs_with_exceptions
+
+
+def calculate_proportions_for_labels(labels):
+    counted_labels = Counter(labels)
+    if len(counted_labels.keys()) >= 2:
+        min_val = min(counted_labels.values())
+        max_val = max(counted_labels.values())
+        if max_val > 0:
+            return min_val / max_val
+    return 0.0

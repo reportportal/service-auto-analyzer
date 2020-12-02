@@ -16,6 +16,7 @@
 
 from boosting_decision_making.defect_type_model import DefectTypeModel
 from commons import minio_client
+import os
 
 
 class CustomDefectTypeModel(DefectTypeModel):
@@ -39,3 +40,14 @@ class CustomDefectTypeModel(DefectTypeModel):
         self.minio_client.put_project_object(
             self.models,
             self.project_id, folder + "models", using_json=False)
+
+    def delete_old_model(self):
+        all_folders = self.minio_client.get_folder_objects(
+            self.project_id, "defect_type_model/")
+        old_model_folder = None
+        for folder in all_folders:
+            if os.path.basename(
+                    folder.strip("/").strip("\\")).startswith("defect_type_model"):
+                old_model_folder = folder
+        if old_model_folder is not None:
+            self.minio_client.remove_folder_objects(self.project_id, old_model_folder)

@@ -100,6 +100,7 @@ class DefectTypeModel:
 
     def validate_model(self, name, test_data_x, labels):
         assert name in self.models
+        print("Label distribution:", Counter(labels))
         print("Model name: %s" % name)
         res, res_prob = self.predict(test_data_x, name)
         print("Valid dataset F1 score: ", f1_score(y_pred=res, y_true=labels))

@@ -22,6 +22,7 @@ from time import time
 import scipy.stats as stats
 import numpy as np
 import logging
+from datetime import datetime
 
 logger = logging.getLogger("analyzerApp.trainingDefectTypeModel")
 
@@ -35,7 +36,6 @@ class DefectTypeModelTraining:
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
         self.baseline_model = defect_type_model.DefectTypeModel(
             folder=search_cfg["GlobalDefectTypeModelFolder"])
-        self.new_model = custom_defect_type_model.DefectTypeModel()
 
     def split_train_test(
             self, logs_to_train_idx, data,
@@ -96,6 +96,8 @@ class DefectTypeModelTraining:
 
     def train(self, project_info):
         start_time = time()
+        self.new_model = custom_defect_type_model.CustomDefectTypeModel(
+            self.app_config, project_info["project_id"])
         data = []
         for label in self.label2inds:
             logger.debug("Label to gather data %s", label)
@@ -116,13 +118,21 @@ class DefectTypeModelTraining:
             else:
                 additional_logs[text_messages_set[text_message_normalized]].append(idx)
 
+        custom_models = []
         for label in self.label2inds:
             logger.debug("Label to train the model %s", label)
             new_model_results = []
             baseline_model_results = []
-            for random_state in [1257, 1873, 1917]:
+            random_states = [1257, 1873, 1917]
+            bad_data = False
+            for random_state in random_states:
                 x_train, x_test, y_train, y_test = self.split_train_test(
                     logs_to_train_idx, data, additional_logs, label, random_state=random_state)
+                proportion_binary_labels = utils.calculate_proportions_for_labels(y_train)
+                if proportion_binary_labels <= 0.1:
+                    logger.debug("Train data has a bad proportion: %s", proportion_binary_labels)
+                    bad_data = True
+                    break
                 self.new_model.train_model(label, x_train, y_train)
                 logger.debug("New model results")
                 f1, accuracy = self.new_model.validate_model(label, x_test, y_test)
@@ -131,14 +141,27 @@ class DefectTypeModelTraining:
                 f1, accuracy = self.baseline_model.validate_model(label, x_test, y_test)
                 baseline_model_results.append(f1)
 
-            logger.debug("Baseline test results %s", baseline_model_results)
-            logger.debug("New model test results %s", new_model_results)
-            pvalue = stats.f_oneway(baseline_model_results, new_model_results).pvalue
-            if pvalue < 0.05 and np.mean(new_model_results) > np.mean(baseline_model_results):
-                logger.info(
-                    "Model should be used: p-value=%.3f mean baseline=%.3f mean new model=%.3f",
-                    pvalue, np.mean(baseline_model_results), np.mean(new_model_results))
-                self.new_model.train_model(
-                    label, [d[0] for d in data], [1 if d[1] == label else 0 for d in data])
+            if not bad_data:
+                logger.debug("Baseline test results %s", baseline_model_results)
+                logger.debug("New model test results %s", new_model_results)
+                pvalue = stats.f_oneway(baseline_model_results, new_model_results).pvalue
+                if pvalue < 0.05 and np.mean(new_model_results) > np.mean(baseline_model_results):
+                    logger.info(
+                        "Model should be used: p-value=%.3f mean baseline=%.3f mean new model=%.3f",
+                        pvalue, np.mean(baseline_model_results), np.mean(new_model_results))
+                    self.new_model.train_model(
+                        label, [d[0] for d in data], [1 if d[1] == label else 0 for d in data])
+                    custom_models.append(label)
+                else:
+                    self.new_model.models[label] = self.baseline_model.models[label]
+                    _count_vectorizer = self.baseline_model.count_vectorizer_models[label]
+                    self.new_model.count_vectorizer_models[label] = _count_vectorizer
+
+        logger.debug("Custom models were for labels: %s" % custom_models)
+        if len(custom_models):
+            logger.debug("The custom model should be saved")
+            self.new_model.delete_old_model()
+            self.new_model.save_model(
+                "defect_type_model/defect_type_model_%s/" % datetime.now().strftime("%d.%m.%y"))
 
         logger.info("Finished for %d s", (time() - start_time))

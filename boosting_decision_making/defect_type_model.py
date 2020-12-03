@@ -62,7 +62,7 @@ class DefectTypeModel:
         transformed_values = self.count_vectorizer_models[name].fit_transform(train_data_x)
         print("Length of train data: ", len(labels))
         print("Label distribution:", Counter(labels))
-        model = RandomForestClassifier()
+        model = RandomForestClassifier(class_weight="balanced")
         x_train_values = pd.DataFrame(
             transformed_values.toarray(),
             columns=self.count_vectorizer_models[name].get_feature_names())

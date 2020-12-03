@@ -104,6 +104,7 @@ class DefectTypeModelTraining:
             logger.debug("Label to gather data %s", label)
             data.extend(self.query_data(project_info["project_id"], label))
             logger.debug("Finished quering for %d s", (time() - start_time))
+        logger.debug("Data gathered: %d" % len(data))
 
         text_messages_set = {}
         logs_to_train_idx = []
@@ -167,3 +168,4 @@ class DefectTypeModelTraining:
                 "defect_type_model/defect_type_model_%s/" % datetime.now().strftime("%d.%m.%y"))
 
         logger.info("Finished for %d s", (time() - start_time))
+        return len(data)

@@ -41,9 +41,10 @@ class RetrainingDefectTypeTriggering(abstract_triggering_training.AbstractTraini
             trigger_info, train_info["project_id"],
             "defect_type_trigger_info", using_json=True)
 
-    def clean_defect_type_triggering_info(self, train_info):
+    def clean_defect_type_triggering_info(self, train_info, num_logs_with_defect_types):
         trigger_info = self.get_triggering_info(train_info)
         trigger_info["num_logs_with_defect_types_since_training"] = 0
+        trigger_info["num_logs_with_defect_types"] = num_logs_with_defect_types
         self.save_triggering_info(trigger_info, train_info)
 
     def should_model_training_be_triggered(self, train_info):

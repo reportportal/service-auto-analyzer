@@ -48,8 +48,9 @@ class RetrainingService:
         if _retraining_triggering.should_model_training_be_triggered(train_info):
             print("Should be trained ", train_info)
             try:
-                _retraining.train(train_info)
-                _retraining_triggering.clean_defect_type_triggering_info(train_info)
+                gathered_data = _retraining.train(train_info)
+                _retraining_triggering.clean_defect_type_triggering_info(
+                    train_info, gathered_data)
             except Exception as err:
                 logger.error("Training finished with errors")
                 logger.error(err)

@@ -42,6 +42,10 @@ class DefectTypeModelTraining:
             self, logs_to_train_idx, data,
             additional_logs, label, random_state=1257):
         labels_filtered = [1 if data[ind][1] == label else 0 for ind in logs_to_train_idx]
+        proportion_binary_labels = utils.calculate_proportions_for_labels(labels_filtered)
+        if proportion_binary_labels <= 0.1 and proportion_binary_labels > 0.001:
+            logs_to_train_idx, labels_filtered, proportion_binary_labels = utils.rebalance_data(
+                logs_to_train_idx, labels_filtered)
         x_train_ind, x_test_ind, y_train, y_test = train_test_split(
             logs_to_train_idx, labels_filtered,
             test_size=0.1, random_state=random_state, stratify=labels_filtered)
@@ -61,7 +65,7 @@ class DefectTypeModelTraining:
             x_test.append(data[ind][0])
         x_train.extend(x_train_add)
         y_train.extend(y_train_add)
-        return x_train, x_test, y_train, y_test
+        return x_train, x_test, y_train, y_test, proportion_binary_labels
 
     def query_data(self, project, label):
         label_data = self.es_client.es_client.search(
@@ -128,9 +132,8 @@ class DefectTypeModelTraining:
             random_states = [1257, 1873, 1917]
             bad_data = False
             for random_state in random_states:
-                x_train, x_test, y_train, y_test = self.split_train_test(
+                x_train, x_test, y_train, y_test, proportion_binary_labels = self.split_train_test(
                     logs_to_train_idx, data, additional_logs, label, random_state=random_state)
-                proportion_binary_labels = utils.calculate_proportions_for_labels(y_train)
                 if proportion_binary_labels <= 0.1:
                     logger.debug("Train data has a bad proportion: %s", proportion_binary_labels)
                     bad_data = True

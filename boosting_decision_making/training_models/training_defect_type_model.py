@@ -23,7 +23,6 @@ import scipy.stats as stats
 import numpy as np
 import logging
 from datetime import datetime
-import pickle
 
 logger = logging.getLogger("analyzerApp.trainingDefectTypeModel")
 
@@ -146,27 +145,30 @@ class DefectTypeModelTraining:
                 f1, accuracy = self.baseline_model.validate_model(label, x_test, y_test)
                 baseline_model_results.append(f1)
 
+            use_custom_model = False
             if not bad_data:
                 logger.debug("Baseline test results %s", baseline_model_results)
                 logger.debug("New model test results %s", new_model_results)
                 pvalue = stats.f_oneway(baseline_model_results, new_model_results).pvalue
                 if pvalue < 0.05 and np.mean(new_model_results) > np.mean(baseline_model_results):
-                    logger.info(
-                        "Model should be used: p-value=%.3f mean baseline=%.3f mean new model=%.3f",
-                        pvalue, np.mean(baseline_model_results), np.mean(new_model_results))
-                    self.new_model.train_model(
-                        label, [d[0] for d in data], [1 if d[1] == label else 0 for d in data])
-                    custom_models.append(label)
-                else:
-                    self.new_model.models[label] = self.baseline_model.models[label]
-                    _count_vectorizer = self.baseline_model.count_vectorizer_models[label]
-                    self.new_model.count_vectorizer_models[label] = _count_vectorizer
+                    use_custom_model = True
+
+            if use_custom_model:
+                logger.info(
+                    "Model should be used: p-value=%.3f mean baseline=%.3f mean new model=%.3f",
+                    pvalue, np.mean(baseline_model_results), np.mean(new_model_results))
+                self.new_model.train_model(
+                    label, [d[0] for d in data], [1 if d[1] == label else 0 for d in data])
+                custom_models.append(label)
+            else:
+                self.new_model.models[label] = self.baseline_model.models[label]
+                _count_vectorizer = self.baseline_model.count_vectorizer_models[label]
+                self.new_model.count_vectorizer_models[label] = _count_vectorizer
 
         logger.debug("Custom models were for labels: %s" % custom_models)
         if len(custom_models):
             logger.debug("The custom model should be saved")
             self.new_model.delete_old_model()
-            pickle.dump(self.new_model.count_vectorizer_models, open("custom_model/cnt_models.pickle", "wb"))
             self.new_model.save_model(
                 "defect_type_model/defect_type_model_%s/" % datetime.now().strftime("%d.%m.%y"))
 

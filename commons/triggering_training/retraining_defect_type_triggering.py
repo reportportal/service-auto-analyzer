@@ -15,7 +15,7 @@
 """
 
 import logging
-from commons import minio_client
+from commons.object_saving.object_saver import ObjectSaver
 from commons.triggering_training import abstract_triggering_training
 
 logger = logging.getLogger("analyzerApp.retraining_defect_type_triggering")
@@ -24,20 +24,20 @@ logger = logging.getLogger("analyzerApp.retraining_defect_type_triggering")
 class RetrainingDefectTypeTriggering(abstract_triggering_training.AbstractTrainingTrigger):
 
     def __init__(self, app_config, start_number=100, accumulated_difference=100):
-        self.minio_client = minio_client.MinioClient(app_config)
+        self.object_saver = ObjectSaver(app_config)
         self.start_number = start_number
         self.accumulated_difference = accumulated_difference
 
     def remove_triggering_info(self, train_info):
-        self.minio_client.remove_project_objects(
+        self.object_saver.remove_project_objects(
             train_info["project_id"], ["defect_type_trigger_info"])
 
     def get_triggering_info(self, train_info):
-        return self.minio_client.get_project_object(
+        return self.object_saver.get_project_object(
             train_info["project_id"], "defect_type_trigger_info", using_json=True)
 
     def save_triggering_info(self, trigger_info, train_info):
-        self.minio_client.put_project_object(
+        self.object_saver.put_project_object(
             trigger_info, train_info["project_id"],
             "defect_type_trigger_info", using_json=True)
 

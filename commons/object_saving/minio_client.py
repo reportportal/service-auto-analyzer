@@ -39,19 +39,16 @@ class MinioClient:
         except Exception as err:
             logger.error(err)
 
-    def get_bucket_name(self, project_id):
-        return "prj-%s" % project_id
-
     def remove_project_objects(self, project_id, object_names):
         if self.minioClient is None:
             return
         try:
-            bucket_name = self.get_bucket_name(project_id)
+            bucket_name = project_id
             if not self.minioClient.bucket_exists(bucket_name):
                 return
             for object_name in object_names:
                 self.minioClient.remove_object(
-                    bucket_name=self.get_bucket_name(project_id), object_name=object_name)
+                    bucket_name=bucket_name, object_name=object_name)
         except Exception as err:
             logger.error(err)
 
@@ -59,7 +56,7 @@ class MinioClient:
         if self.minioClient is None:
             return
         try:
-            bucket_name = self.get_bucket_name(project_id)
+            bucket_name = project_id
             if not self.minioClient.bucket_exists(bucket_name):
                 logger.debug("Creating minio bucket %s" % bucket_name)
                 self.minioClient.make_bucket(bucket_name)
@@ -83,7 +80,7 @@ class MinioClient:
             return {}
         try:
             obj = self.minioClient.get_object(
-                bucket_name=self.get_bucket_name(project_id), object_name=object_name)
+                bucket_name=project_id, object_name=object_name)
             return json.loads(obj.data) if using_json else pickle.loads(obj.data)
         except Exception:
             return {}
@@ -91,20 +88,18 @@ class MinioClient:
     def does_object_exists(self, project_id, object_name):
         try:
             self.minioClient.get_object(
-                bucket_name=self.get_bucket_name(project_id), object_name=object_name)
+                bucket_name=project_id, object_name=object_name)
             return True
         except Exception:
             return False
 
     def get_folder_objects(self, project_id, folder):
         object_names = []
-        for obj in self.minioClient.list_objects(
-                self.get_bucket_name(project_id), prefix=folder):
+        for obj in self.minioClient.list_objects(project_id, prefix=folder):
             object_names.append(obj.object_name)
         return object_names
 
     def remove_folder_objects(self, project_id, folder):
-        for obj in self.minioClient.list_objects(
-                self.get_bucket_name(project_id), prefix=folder):
+        for obj in self.minioClient.list_objects(project_id, prefix=folder):
             self.minioClient.remove_object(
-                bucket_name=self.get_bucket_name(project_id), object_name=obj.object_name)
+                bucket_name=project_id, object_name=obj.object_name)

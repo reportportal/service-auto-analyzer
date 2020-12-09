@@ -18,7 +18,8 @@ from utils import utils
 from commons.log_preparation import LogPreparation
 from boosting_decision_making import defect_type_model, custom_defect_type_model
 from boosting_decision_making import weighted_similarity_calculator
-from commons import minio_client, namespace_finder
+from commons import namespace_finder
+from commons.object_saving.object_saver import ObjectSaver
 import logging
 import re
 
@@ -35,7 +36,7 @@ class AnalyzerService:
         self.weighted_log_similarity_calculator = None
         self.global_defect_type_model = None
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
-        self.minio_client = minio_client.MinioClient(self.app_config)
+        self.object_saver = ObjectSaver(self.app_config)
         self.initialize_common_models()
 
     def initialize_common_models(self):
@@ -52,8 +53,8 @@ class AnalyzerService:
 
     def choose_model(self, project_id, model_name_folder):
         model = None
-        if self.minio_client.does_object_exists(project_id, model_name_folder):
-            folders = self.minio_client.get_folder_objects(project_id, model_name_folder)
+        if self.object_saver.does_object_exists(project_id, model_name_folder):
+            folders = self.object_saver.get_folder_objects(project_id, model_name_folder)
             if len(folders):
                 try:
                     model = custom_defect_type_model.CustomDefectTypeModel(

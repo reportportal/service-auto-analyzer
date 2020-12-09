@@ -55,7 +55,8 @@ APP_CONFIG = {
     "minioHost":         os.getenv("MINIO_SHORT_HOST", "minio:9000"),
     "minioAccessKey":    os.getenv("MINIO_ACCESS_KEY", "minio"),
     "minioSecretKey":    os.getenv("MINIO_SECRET_KEY", "minio123"),
-    "appVersion":        ""
+    "appVersion":        "",
+    "binaryStoreType":   os.getenv("ANALYZER_BINARYSTORE_TYPE", "minio")
 }
 
 SEARCH_CONFIG = {

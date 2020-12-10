@@ -80,8 +80,9 @@ class FilesystemSaver:
 
     def remove_folder_objects(self, project_id, folder):
         try:
-            shutil.rmtree(
-                os.path.join(self.folder_storage,
-                             project_id, folder).replace("\\", "/"), ignore_errors=True)
+            folder_name = os.path.join(self.folder_storage,
+                                       project_id, folder).replace("\\", "/")
+            if os.path.exists(folder_name):
+                shutil.rmtree(folder_name, ignore_errors=True)
         except Exception as err:
             logger.error(err)

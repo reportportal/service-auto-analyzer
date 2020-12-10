@@ -28,35 +28,42 @@ class ObjectSaver:
         self.binarystore_type = "fs"
         if "binaryStoreType" in self.app_config:
             self.binarystore_type = self.app_config["binaryStoreType"]
+
         self.saving_strategy = {
-            "minio": MinioClient(app_config),
-            "fs": FilesystemSaver(app_config)
+            "minio": self.create_minio,
+            "fs": self.create_fs
         }
+
+    def create_minio(self):
+        return MinioClient(self.app_config)
+
+    def create_fs(self):
+        return FilesystemSaver(self.app_config)
 
     def get_bucket_name(self, project_id):
         return "prj-%s" % project_id
 
     def remove_project_objects(self, project_id, object_names):
-        self.saving_strategy[self.binarystore_type].remove_project_objects(
+        self.saving_strategy[self.binarystore_type]().remove_project_objects(
             self.get_bucket_name(project_id), object_names)
 
     def put_project_object(self, data, project_id, object_name, using_json=False):
-        self.saving_strategy[self.binarystore_type].put_project_object(
+        self.saving_strategy[self.binarystore_type]().put_project_object(
             data, self.get_bucket_name(project_id),
             object_name, using_json=using_json)
 
     def get_project_object(self, project_id, object_name, using_json=False):
-        return self.saving_strategy[self.binarystore_type].get_project_object(
+        return self.saving_strategy[self.binarystore_type]().get_project_object(
             self.get_bucket_name(project_id), object_name, using_json=using_json)
 
     def does_object_exists(self, project_id, object_name):
-        return self.saving_strategy[self.binarystore_type].does_object_exists(
+        return self.saving_strategy[self.binarystore_type]().does_object_exists(
             self.get_bucket_name(project_id), object_name)
 
     def get_folder_objects(self, project_id, folder):
-        return self.saving_strategy[self.binarystore_type].get_folder_objects(
+        return self.saving_strategy[self.binarystore_type]().get_folder_objects(
             self.get_bucket_name(project_id), folder)
 
     def remove_folder_objects(self, project_id, folder):
-        self.saving_strategy[self.binarystore_type].remove_folder_objects(
+        self.saving_strategy[self.binarystore_type]().remove_folder_objects(
             self.get_bucket_name(project_id), folder)

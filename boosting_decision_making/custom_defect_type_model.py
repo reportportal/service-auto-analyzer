@@ -31,9 +31,11 @@ class CustomDefectTypeModel(DefectTypeModel):
         self.count_vectorizer_models = self.object_saver.get_project_object(
             self.project_id, os.path.join(folder, "count_vectorizer_models"),
             using_json=False)
+        assert len(self.count_vectorizer_models) > 0
         self.models = self.object_saver.get_project_object(
             self.project_id, os.path.join(folder, "models"),
             using_json=False)
+        assert len(self.models) > 0
 
     def save_model(self, folder):
         self.object_saver.put_project_object(

@@ -270,7 +270,7 @@ class AutoAnalyzerService(AnalyzerService):
                         "number_of_log_lines": analyzer_config.numberOfLogLines,
                         "min_should_match": self.find_min_should_match_threshold(analyzer_config),
                         "model_info": set(),
-                        "module_version": self.app_config["appVersion"]}
+                        "module_version": [self.app_config["appVersion"]]}
 
                 t_start_item = time()
                 cnt_items_to_process += 1

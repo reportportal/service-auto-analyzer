@@ -82,7 +82,11 @@ class DefectTypeModel:
         print(confusion_matrix(y_pred=res, y_true=labels))
         print(classification_report(y_pred=res, y_true=labels))
         f1 = f1_score(y_pred=res, y_true=labels)
+        if f1 != f1:
+            f1 = 0.0
         accuracy = accuracy_score(y_pred=res, y_true=labels)
+        if accuracy != accuracy:
+            accuracy = 0.0
         return f1, accuracy
 
     def validate_models(self, test_data):

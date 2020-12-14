@@ -15,12 +15,14 @@
 """
 
 import logging
+import json
 import utils.utils as utils
 from time import time
 from commons import namespace_finder
 from commons.esclient import EsClient
 from commons.triggering_training.retraining_defect_type_triggering import RetrainingDefectTypeTriggering
 from boosting_decision_making.training_models import training_defect_type_model
+from amqp.amqp import AmqpClient
 
 logger = logging.getLogger("analyzerApp.retrainingService")
 
@@ -48,9 +50,12 @@ class RetrainingService:
         if _retraining_triggering.should_model_training_be_triggered(train_info):
             print("Should be trained ", train_info)
             try:
-                gathered_data = _retraining.train(train_info)
+                gathered_data, training_log_info = _retraining.train(train_info)
                 _retraining_triggering.clean_defect_type_triggering_info(
                     train_info, gathered_data)
+                if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+                    AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                        self.app_config["exchangeName"], "stats_info", json.dumps(training_log_info))
             except Exception as err:
                 logger.error("Training finished with errors")
                 logger.error(err)

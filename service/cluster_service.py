@@ -178,7 +178,7 @@ class ClusterService:
             "project_id": launch_info.launch.project, "method": "find_clusters",
             "gather_date": datetime.now().strftime("%Y-%m-%d"),
             "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "module_version": self.app_config["appVersion"],
+            "module_version": [self.app_config["appVersion"]],
             "model_info": []}}
         if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
             AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(

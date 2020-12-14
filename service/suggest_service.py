@@ -354,7 +354,7 @@ class SuggestService(AnalyzerService):
             "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "number_of_log_lines": test_item_info.analyzerConfig.numberOfLogLines,
             "model_info": model_info_tags,
-            "module_version": self.app_config["appVersion"],
+            "module_version": [self.app_config["appVersion"]],
             "min_should_match": self.find_min_should_match_threshold(
                 test_item_info.analyzerConfig)}}
         if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():

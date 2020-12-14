@@ -40,6 +40,9 @@
         "data_proportion": {
             "type": "float"
         },
+        "bad_data_proportion": {
+            "type": "integer"
+        },
         "module_version": {
             "type": "keyword"
         },

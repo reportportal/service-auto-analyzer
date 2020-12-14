@@ -137,7 +137,8 @@ class DefectTypeModelTraining:
                 "method": "training", "sub_model_type": label, "model_type": project_info["model_type"],
                 "baseline_model": [baseline_model], "new_model": [model_name],
                 "project_id": project_info["project_id"], "model_saved": 0, "p_value": 1.0,
-                "data_proportion": 0.0, "baseline_mean_f1": 0.0, "new_model_mean_f1": 0.0}
+                "data_proportion": 0.0, "baseline_mean_f1": 0.0, "new_model_mean_f1": 0.0,
+                "bad_data_proportion": 0}
         self.new_model = custom_defect_type_model.CustomDefectTypeModel(
             self.app_config, project_info["project_id"])
         data = []
@@ -161,6 +162,7 @@ class DefectTypeModelTraining:
 
         data_proportion_min = 1.0
         p_value_max = 0.0
+        all_bad_data = 1
         custom_models = []
         f1_chosen_models = []
         f1_baseline_models = []
@@ -198,9 +200,11 @@ class DefectTypeModelTraining:
                 if pvalue < 0.05 and mean_f1 > np.mean(baseline_model_results) and mean_f1 >= 0.4:
                     p_value_max = max(p_value_max, pvalue)
                     use_custom_model = True
+                all_bad_data = 0
                 logger.debug(
                     "Model training validation results: p-value=%.3f mean baseline=%.3f mean new model=%.3f",
                     pvalue, np.mean(baseline_model_results), np.mean(new_model_results))
+            train_log_info[label]["bad_data_proportion"] = int(bad_data)
 
             if use_custom_model:
                 logger.debug("Custom model '%s' should be saved" % label)
@@ -239,6 +243,7 @@ class DefectTypeModelTraining:
         train_log_info["all"]["data_proportion"] = data_proportion_min
         train_log_info["all"]["baseline_mean_f1"] = np.mean(f1_baseline_models)
         train_log_info["all"]["new_model_mean_f1"] = np.mean(f1_chosen_models)
+        train_log_info["all"]["bad_data_proportion"] = all_bad_data
         for label in train_log_info:
             train_log_info[label]["gather_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             train_log_info[label]["module_version"] = [self.app_config["appVersion"]]

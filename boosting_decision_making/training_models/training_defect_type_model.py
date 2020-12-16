@@ -62,12 +62,12 @@ class DefectTypeModelTraining:
 
     def split_train_test(
             self, logs_to_train_idx, data,
-            additional_logs, label, random_state=1257):
+            additional_logs, label, random_state=1257, due_proportion=0.1):
         labels_filtered = [1 if data[ind][1] == label else 0 for ind in logs_to_train_idx]
         proportion_binary_labels = utils.calculate_proportions_for_labels(labels_filtered)
-        if proportion_binary_labels <= 0.1 and proportion_binary_labels > 0.001:
+        if proportion_binary_labels < due_proportion and proportion_binary_labels > 0.001:
             logs_to_train_idx, labels_filtered, proportion_binary_labels = utils.rebalance_data(
-                logs_to_train_idx, labels_filtered)
+                logs_to_train_idx, labels_filtered, due_proportion)
         x_train_ind, x_test_ind, y_train, y_test = train_test_split(
             logs_to_train_idx, labels_filtered,
             test_size=0.1, random_state=random_state, stratify=labels_filtered)
@@ -163,6 +163,7 @@ class DefectTypeModelTraining:
         data_proportion_min = 1.0
         p_value_max = 0.0
         all_bad_data = 1
+        due_proportion = 0.1
         custom_models = []
         f1_chosen_models = []
         f1_baseline_models = []
@@ -175,8 +176,9 @@ class DefectTypeModelTraining:
             bad_data = False
             for random_state in random_states:
                 x_train, x_test, y_train, y_test, proportion_binary_labels = self.split_train_test(
-                    logs_to_train_idx, data, additional_logs, label, random_state=random_state)
-                if proportion_binary_labels <= 0.1:
+                    logs_to_train_idx, data, additional_logs, label, random_state=random_state,
+                    due_proportion=due_proportion)
+                if proportion_binary_labels < due_proportion:
                     logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
                     bad_data = True
                     break

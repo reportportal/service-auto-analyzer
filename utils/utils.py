@@ -614,28 +614,29 @@ def calculate_proportions_for_labels(labels):
     return 0.0
 
 
-def rebalance_data(train_data, train_labels):
+def rebalance_data(train_data, train_labels, due_proportion):
     one_data = [train_data[i] for i in range(len(train_data)) if train_labels[i] == 1]
     zero_data = [train_data[i] for i in range(len(train_data)) if train_labels[i] == 0]
     zero_count = len(zero_data)
     one_count = len(one_data)
     all_data = []
     all_data_labels = []
-    if zero_count > 0 and one_count / zero_count < 0.1:
+    real_proportion = 0.0 if zero_count < 0.001 else np.round(one_count / zero_count, 3)
+    if zero_count > 0 and real_proportion < due_proportion:
         all_data.extend(one_data)
         all_data_labels.extend([1] * len(one_data))
         random.seed(1763)
         random.shuffle(zero_data)
-        zero_size = one_count * 10 - 1
+        zero_size = int(one_count * (1 / due_proportion) - 1)
         all_data.extend(zero_data[:zero_size])
         all_data_labels.extend([0] * zero_size)
+        real_proportion = due_proportion
 
     random.seed(1257)
     random.shuffle(all_data)
     random.seed(1257)
     random.shuffle(all_data_labels)
-    return all_data, all_data_labels, calculate_proportions_for_labels(
-        all_data_labels)
+    return all_data, all_data_labels, real_proportion
 
 
 def preprocess_words(text):

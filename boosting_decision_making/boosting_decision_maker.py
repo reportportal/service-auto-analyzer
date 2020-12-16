@@ -27,18 +27,28 @@ logger = logging.getLogger("analyzerApp.boosting_decision_maker")
 class BoostingDecisionMaker:
 
     def __init__(self, folder="", n_estimators=50, max_depth=5,
-                 monotonous_features=""):
+                 monotonous_features="", is_global=True):
         self.n_estimators = n_estimators
         self.max_depth = max_depth
         self.folder = folder
         self.monotonous_features = utils.transform_string_feature_range_into_list(
             monotonous_features)
+        self.is_global = is_global
         if not folder.strip():
             self.xg_boost = XGBClassifier(n_estimators=n_estimators,
                                           max_depth=max_depth,
                                           random_state=43)
         else:
             self.load_model(folder)
+
+    def get_model_info(self):
+        folder_name = os.path.basename(self.folder).strip()
+        if folder_name:
+            tags = [folder_name]
+            if not self.is_global:
+                return tags + ["custom boosting model"]
+            return tags + ["global boosting model"]
+        return []
 
     def get_feature_ids(self):
         return utils.transform_string_feature_range_into_list(self.feature_ids)\

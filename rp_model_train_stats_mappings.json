@@ -1,0 +1,53 @@
+{
+    "properties": {
+        "time_spent": {
+            "type": "float"
+        },
+        "method": {
+            "type": "keyword"
+        },
+        "model_type": {
+            "type": "keyword"
+        },
+        "sub_model_type": {
+            "type": "keyword"
+        },
+        "data_size": {
+            "type": "integer"
+        },
+        "baseline_model": {
+            "type": "keyword"
+        },
+        "baseline_mean_f1": {
+            "type": "float"
+        },
+        "new_model": {
+            "type": "keyword"
+        },
+        "new_model_mean_f1": {
+            "type": "float"
+        },
+        "gather_date": {
+            "type":   "date",
+            "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        },
+        "p_value": {
+            "type": "float"
+        },
+        "model_saved": {
+            "type": "integer"
+        },
+        "data_proportion": {
+            "type": "float"
+        },
+        "bad_data_proportion": {
+            "type": "integer"
+        },
+        "module_version": {
+            "type": "keyword"
+        },
+        "project_id": {
+            "type": "keyword"
+        }
+    }
+}

@@ -22,6 +22,7 @@ from boosting_decision_making.boosting_featurizer import BoostingFeaturizer
 from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
 from boosting_decision_making import weighted_similarity_calculator
+from boosting_decision_making import defect_type_model
 from utils import utils
 
 
@@ -43,6 +44,7 @@ class TestBoostingModel(unittest.TestCase):
         self.suggest_boost_model_folder =\
             model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
         self.weights_folder = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
+        self.global_defect_type_model_folder = model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings
@@ -83,6 +85,7 @@ class TestBoostingModel(unittest.TestCase):
     def test_full_data_check(self):
         print("Boost model folder : ", self.boost_model_folder)
         print("Weights model folder : ", self.weights_folder)
+        print("Global defect type model folder : ", self.global_defect_type_model_folder)
         decision_maker = BoostingDecisionMaker(folder=self.boost_model_folder)
         boost_model_results = utils.get_fixture(self.boost_model_results, to_json=True)
         tests = []
@@ -137,7 +140,9 @@ class TestBoostingModel(unittest.TestCase):
                                                       test["config"],
                                                       feature_ids,
                                                       weighted_log_similarity_calculator=weight_log_sim)
-
+            if self.global_defect_type_model_folder.strip():
+                _boosting_featurizer.set_defect_type_model(
+                    defect_type_model.DefectTypeModel(folder=self.global_defect_type_model_folder))
             with sure.ensure('Error in the test case number: {0}', idx):
                 gathered_data, issue_type_names = _boosting_featurizer.gather_features_info()
                 gathered_data.should.equal(boost_model_results[str(idx)][0],
@@ -153,6 +158,7 @@ class TestBoostingModel(unittest.TestCase):
     def test_full_data_check_suggests(self):
         print("Boost model folder suggests: ", self.suggest_boost_model_folder)
         print("Weights model folder suggests: ", self.weights_folder)
+        print("Global defect type model folder : ", self.global_defect_type_model_folder)
         decision_maker = BoostingDecisionMaker(folder=self.suggest_boost_model_folder)
         boost_model_results = utils.get_fixture(self.suggest_boost_model_results, to_json=True)
         tests = []
@@ -225,6 +231,9 @@ class TestBoostingModel(unittest.TestCase):
                 test["config"],
                 feature_ids,
                 weighted_log_similarity_calculator=weight_log_sim)
+            if self.global_defect_type_model_folder.strip():
+                _boosting_featurizer.set_defect_type_model(
+                    defect_type_model.DefectTypeModel(folder=self.global_defect_type_model_folder))
             with sure.ensure('Error in the test case number: {0}', idx):
                 gathered_data, test_item_ids = _boosting_featurizer.gather_features_info()
                 predict_label, predict_probability = test["decision_maker"].predict(gathered_data)

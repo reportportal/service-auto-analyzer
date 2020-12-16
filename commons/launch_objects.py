@@ -100,10 +100,19 @@ class ClusterResult(BaseModel):
 class SuggestAnalysisResult(BaseModel):
     """Analysis result object"""
     testItem: int
+    testItemLogId: int
     issueType: str
     relevantItem: int
     relevantLogId: int
     matchScore: float
+    resultPosition: int
+    esScore: float
+    esPosition: int
+    modelFeatureNames: str
+    modelFeatureValues: str
+    modelInfo: str
+    usedLogLines: int
+    minShouldMatch: int
 
 
 class CleanIndex(BaseModel):

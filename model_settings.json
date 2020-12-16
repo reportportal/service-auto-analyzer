@@ -1,5 +1,6 @@
 {
-	"BOOST_MODEL_FOLDER": "model/auto_1.3",
-	"SUGGEST_BOOST_MODEL_FOLDER": "model/suggest_0.7",
-	"SIMILARITY_WEIGHTS_FOLDER": "model/weights_0.2"
+	"BOOST_MODEL_FOLDER": "model/auto_24.11.20",
+	"SUGGEST_BOOST_MODEL_FOLDER": "model/suggest_25.11.20",
+	"SIMILARITY_WEIGHTS_FOLDER": "model/weights_24.11.20",
+	"GLOBAL_DEFECT_TYPE_MODEL_FOLDER": "model/global_defect_type_model_24.11.20"
 }

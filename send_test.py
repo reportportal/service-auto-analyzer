@@ -265,5 +265,7 @@ elif used_method.strip() in ["cluster"]:
                                         "numberOfLogLines": number_lines}), used_method)
 else:
     response = rpc.call(json.dumps(index_data), used_method)
+    print(" [.] Got %r" % response)
     rpc.call(json.dumps(index_data), "namespace_finder")
+    print("Namespace_finder info was processed")
 print(" [.] Got %r" % response)

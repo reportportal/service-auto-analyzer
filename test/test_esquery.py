@@ -19,9 +19,10 @@ import sure # noqa
 import logging
 
 import commons.launch_objects as launch_objects
-from commons.es_query_builder import EsQueryBuilder
+from service.search_service import SearchService
+from service.suggest_service import SuggestService
+from service.auto_analyzer_service import AutoAnalyzerService
 from utils import utils
-import os
 
 
 class TestEsQuery(unittest.TestCase):
@@ -45,6 +46,16 @@ class TestEsQuery(unittest.TestCase):
         self.suggest_query_all_logs_nonempty_stacktrace_launches_with_the_same_name =\
             "suggest_query_all_logs_nonempty_stacktrace_launches_with_the_same_name.json"
         self.suggest_query_merged_small_logs_search = "suggest_query_merged_small_logs_search.json"
+        self.app_config = {
+            "esHost": "http://localhost:9200",
+            "esVerifyCerts":     False,
+            "esUseSsl":          False,
+            "esSslShowWarn":     False,
+            "esCAcert":          "",
+            "esClientCert":      "",
+            "esClientKey":       "",
+            "appVersion":        ""
+        }
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings
@@ -66,9 +77,10 @@ class TestEsQuery(unittest.TestCase):
             "SearchLogsMinShouldMatch": "90%",
             "SearchLogsMinSimilarity": 0.9,
             "MinWordLength":  0,
-            "BoostModelFolderAllLines":    os.getenv("BOOST_MODEL_FOLDER_ALL_LINES", ""),
-            "BoostModelFolderNotAllLines": os.getenv("BOOST_MODEL_FOLDER_NOT_ALL_LINES", ""),
-            "SimilarityWeightsFolder":     os.getenv("SIMILARITY_WEIGHTS_FOLDER", "")
+            "BoostModelFolder":    "",
+            "SimilarityWeightsFolder":     "",
+            "GlobalDefectTypeModelFolder": "",
+            "SuggestBoostModelFolder":     ""
         }
 
     @utils.ignore_warnings
@@ -96,10 +108,11 @@ class TestEsQuery(unittest.TestCase):
                 "only_numbers": "1",
                 "found_exceptions": "AssertionError",
                 "potential_status_codes": ""}}
-        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
+        query_from_service = AutoAnalyzerService(
+            self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(self.query_all_logs_empty_stacktrace, to_json=True)
 
-        query_from_esclient.should.equal(demo_query)
+        query_from_service.should.equal(demo_query)
 
     @utils.ignore_warnings
     def test_build_analyze_query_two_log_lines(self):
@@ -126,10 +139,11 @@ class TestEsQuery(unittest.TestCase):
                 "only_numbers": "1",
                 "found_exceptions": "AssertionError",
                 "potential_status_codes": ""}}
-        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
+        query_from_service = AutoAnalyzerService(
+            self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(self.query_two_log_lines, to_json=True)
 
-        query_from_esclient.should.equal(demo_query)
+        query_from_service.should.equal(demo_query)
 
     @utils.ignore_warnings
     def test_build_analyze_query_two_log_lines_only_current_launch(self):
@@ -156,11 +170,12 @@ class TestEsQuery(unittest.TestCase):
                 "only_numbers": "1",
                 "found_exceptions": "AssertionError",
                 "potential_status_codes": ""}}
-        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
+        query_from_service = AutoAnalyzerService(
+            self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(
             self.query_two_log_lines_only_current_launch, to_json=True)
 
-        query_from_esclient.should.equal(demo_query)
+        query_from_service.should.equal(demo_query)
 
     @utils.ignore_warnings
     def test_build_analyze_query_two_log_lines_only_current_launch_wo_exceptions(self):
@@ -187,11 +202,12 @@ class TestEsQuery(unittest.TestCase):
                 "only_numbers": "1",
                 "found_exceptions": "",
                 "potential_status_codes": ""}}
-        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
+        query_from_service = AutoAnalyzerService(
+            self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(
             self.query_two_log_lines_only_current_launch_wo_exceptions, to_json=True)
 
-        query_from_esclient.should.equal(demo_query)
+        query_from_service.should.equal(demo_query)
 
     @utils.ignore_warnings
     def test_build_analyze_query_all_logs_nonempty_stacktrace(self):
@@ -218,10 +234,11 @@ class TestEsQuery(unittest.TestCase):
                 "only_numbers": "1",
                 "found_exceptions": "AssertionError",
                 "potential_status_codes": ""}}
-        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
+        query_from_service = AutoAnalyzerService(
+            self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(self.query_all_logs_nonempty_stacktrace, to_json=True)
 
-        query_from_esclient.should.equal(demo_query)
+        query_from_service.should.equal(demo_query)
 
     @utils.ignore_warnings
     def test_build_analyze_query_all_logs_nonempty_stacktrace_launches_with_the_same_name(self):
@@ -248,11 +265,12 @@ class TestEsQuery(unittest.TestCase):
                 "only_numbers": "1",
                 "found_exceptions": "AssertionError",
                 "potential_status_codes": "300 401"}}
-        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
+        query_from_service = AutoAnalyzerService(
+            self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(
             self.query_all_logs_nonempty_stacktrace_launches_with_the_same_name, to_json=True)
 
-        query_from_esclient.should.equal(demo_query)
+        query_from_service.should.equal(demo_query)
 
     @utils.ignore_warnings
     def test_build_analyze_query_merged_small_logs_search(self):
@@ -279,10 +297,11 @@ class TestEsQuery(unittest.TestCase):
                 "only_numbers": "",
                 "found_exceptions": "AssertionError",
                 "potential_status_codes": ""}}
-        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_analyze_query(launch, log)
+        query_from_service = AutoAnalyzerService(
+            self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(self.query_merged_small_logs_search, to_json=True)
 
-        query_from_esclient.should.equal(demo_query)
+        query_from_service.should.equal(demo_query)
 
     def build_demo_query(search_cfg, launch_name,
                          unique_id, log, error_logging_level):
@@ -395,11 +414,11 @@ class TestEsQuery(unittest.TestCase):
             "filteredLaunchIds": [1, 2, 3],
             "logMessages": ["log message 1"],
             "logLines": -1})
-        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_search_query(
+        query_from_service = SearchService(self.app_config, search_cfg).build_search_query(
             search_req, "log message 1")
         demo_query = utils.get_fixture(self.query_search_logs, to_json=True)
 
-        query_from_esclient.should.equal(demo_query)
+        query_from_service.should.equal(demo_query)
 
     @utils.ignore_warnings
     def test_build_suggest_query_all_logs_empty_stacktrace(self):
@@ -439,13 +458,13 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_extended": "hello world 'sdf'",
                 "potential_status_codes": ""
             }}
-        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_suggest_query(
+        query_from_service = SuggestService(self.app_config, search_cfg).build_suggest_query(
             test_item_info, log,
             message_field="message_extended", det_mes_field="detected_message_extended",
             stacktrace_field="stacktrace_extended")
         demo_query = utils.get_fixture(self.suggest_query_all_logs_empty_stacktrace, to_json=True)
 
-        query_from_esclient.should.equal(demo_query)
+        query_from_service.should.equal(demo_query)
 
     @utils.ignore_warnings
     def test_build_suggest_query_two_log_lines(self):
@@ -485,13 +504,13 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_extended": "hello world 'sdf'",
                 "potential_status_codes": "400 200"
             }}
-        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_suggest_query(
+        query_from_service = SuggestService(self.app_config, search_cfg).build_suggest_query(
             test_item_info, log,
             message_field="message_extended", det_mes_field="detected_message_extended",
             stacktrace_field="stacktrace_extended")
         demo_query = utils.get_fixture(self.suggest_query_two_log_lines, to_json=True)
 
-        query_from_esclient.should.equal(demo_query)
+        query_from_service.should.equal(demo_query)
 
     @utils.ignore_warnings
     def test_build_suggest_query_all_logs_nonempty_stacktrace(self):
@@ -531,13 +550,13 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_extended": "hello world 'sdf'",
                 "potential_status_codes": ""
             }}
-        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_suggest_query(
+        query_from_service = SuggestService(self.app_config, search_cfg).build_suggest_query(
             test_item_info, log,
             message_field="message_extended", det_mes_field="detected_message_extended",
             stacktrace_field="stacktrace_extended")
         demo_query = utils.get_fixture(self.suggest_query_all_logs_nonempty_stacktrace, to_json=True)
 
-        query_from_esclient.should.equal(demo_query)
+        query_from_service.should.equal(demo_query)
 
     @utils.ignore_warnings
     def test_build_suggest_query_all_logs_nonempty_stacktrace_launches_with_the_same_name(self):
@@ -577,7 +596,7 @@ class TestEsQuery(unittest.TestCase):
                 "detected_message_extended": "hello world 'sdf'",
                 "potential_status_codes": "200 401"
             }}
-        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_suggest_query(
+        query_from_service = SuggestService(self.app_config, search_cfg).build_suggest_query(
             test_item_info, log,
             message_field="message_without_params_extended",
             det_mes_field="detected_message_without_params_extended",
@@ -585,7 +604,7 @@ class TestEsQuery(unittest.TestCase):
         demo_query = utils.get_fixture(
             self.suggest_query_all_logs_nonempty_stacktrace_launches_with_the_same_name, to_json=True)
 
-        query_from_esclient.should.equal(demo_query)
+        query_from_service.should.equal(demo_query)
 
     @utils.ignore_warnings
     def test_build_suggest_query_merged_small_logs_search(self):
@@ -624,13 +643,13 @@ class TestEsQuery(unittest.TestCase):
                 "message_extended": "",
                 "detected_message_extended": "",
                 "potential_status_codes": "200 400"}}
-        query_from_esclient = EsQueryBuilder(search_cfg, 40000).build_suggest_query(
+        query_from_service = SuggestService(self.app_config, search_cfg).build_suggest_query(
             test_item_info, log,
             message_field="message_extended", det_mes_field="detected_message_extended",
             stacktrace_field="stacktrace_extended")
         demo_query = utils.get_fixture(self.suggest_query_merged_small_logs_search, to_json=True)
 
-        query_from_esclient.should.equal(demo_query)
+        query_from_service.should.equal(demo_query)
 
 
 if __name__ == '__main__':

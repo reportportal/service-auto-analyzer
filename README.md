@@ -26,11 +26,23 @@
 
 **ES_TURN_OFF_SSL_VERIFICATION** - by default "false". Turn off ssl verification via using RequestsHttpConnection class instead of Urllib3HttpConnection class.
 
-**MINIO_SHORT_HOST** - by default "minio:9000", you need to set short host and port to the minio service
+**ANALYZER_BINARYSTORE_TYPE** - you can set either "minio" or "filesystem" here, and this will be used as a strategy where to store information, connected with the analyzer, by default "minio"
+
+**MINIO_SHORT_HOST** - by default "minio:9000", you need to set short host and port to the minio service. **NOTE**: if you don't use Minio, please set this variable with the value "", so analyzer won't try to connect to the Minio instance
 
 **MINIO_ACCESS_KEY** - by default "minio", you need to set a minio access key here
 
 **MINIO_SECRET_KEY** - by default "minio123", you need to set a minio secret key here
+
+**ANALYZER_BINARYSTORE_BUCKETPREFIX** - by default "prj-", the prefix for buckets which are added to each project filepath.
+
+**ANALYZER_BINARYSTORE_MINIO_REGION** - by default None, the region which you can specify for saving in AWS S3.
+
+**FILESYSTEM_DEFAULT_PATH** - by default "storage", the path where will be stored all the information connected with analyzer, if ANALYZER_BINARYSTORE_TYPE = "filesystem". If you want to mount this folder to some folder on your machine, you can use this instruction in the docker compose:
+```
+volumes:
+  - ./data/analyzer:/backend/storage
+```
 
 # Instructions for analyzer setup without Docker
 

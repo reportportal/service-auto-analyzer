@@ -25,10 +25,15 @@ import warnings
 import os
 import json
 import requests
+import commons
+from collections import Counter
+import random
+import numpy as np
 
 logger = logging.getLogger("analyzerApp.utils")
 file_extensions = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
 stopwords = set(nltk.corpus.stopwords.words("english"))
+ERROR_LOGGING_LEVEL = 40000
 
 
 def ignore_warnings(method):
@@ -509,7 +514,7 @@ def enrich_text_with_method_and_classes(text):
 def extract_real_id(elastic_id):
     real_id = str(elastic_id)
     if real_id[-2:] == "_m":
-        return int(real_id[:-2])
+        return -1
     return int(real_id)
 
 
@@ -565,22 +570,6 @@ def choose_issue_type(predicted_labels, predicted_labels_probability,
     return predicted_issue_type
 
 
-def choose_fields_to_filter_suggests(log_lines_num):
-    if log_lines_num == -1:
-        return [
-            "detected_message_extended",
-            "detected_message_without_params_extended",
-            "detected_message_without_params_and_brackets"]
-    return ["message_extended", "message_without_params_extended",
-            "message_without_params_and_brackets"]
-
-
-def choose_fields_to_filter(log_lines):
-    return [
-        "detected_message", "stacktrace", "potential_status_codes"]\
-        if log_lines == -1 else ["message", "potential_status_codes"]
-
-
 def prepare_message_for_clustering(message, number_of_log_lines):
     message = first_lines(message, number_of_log_lines)
     words = split_words(message, min_word_length=2, only_unique=False)
@@ -603,13 +592,73 @@ def send_request(url, method):
     return []
 
 
-def is_healthy(es_host_name):
-    """Check whether elasticsearch is healthy"""
-    try:
-        url = build_url(es_host_name, ["_cluster/health"])
-        res = send_request(url, "GET")
-        return res["status"] in ["green", "yellow"]
-    except Exception as err:
-        logger.error("Elasticsearch is not healthy")
-        logger.error(err)
-        return False
+def extract_all_exceptions(bodies):
+    logs_with_exceptions = []
+    for log_body in bodies:
+        exceptions = [
+            exc.strip() for exc in log_body["_source"]["found_exceptions"].split()]
+        logs_with_exceptions.append(
+            commons.launch_objects.LogExceptionResult(
+                logId=int(log_body["_id"]),
+                foundExceptions=exceptions))
+    return logs_with_exceptions
+
+
+def calculate_proportions_for_labels(labels):
+    counted_labels = Counter(labels)
+    if len(counted_labels.keys()) >= 2:
+        min_val = min(counted_labels.values())
+        max_val = max(counted_labels.values())
+        if max_val > 0:
+            return np.round(min_val / max_val, 3)
+    return 0.0
+
+
+def rebalance_data(train_data, train_labels):
+    one_data = [train_data[i] for i in range(len(train_data)) if train_labels[i] == 1]
+    zero_data = [train_data[i] for i in range(len(train_data)) if train_labels[i] == 0]
+    zero_count = len(zero_data)
+    one_count = len(one_data)
+    all_data = []
+    all_data_labels = []
+    if zero_count > 0 and one_count / zero_count < 0.1:
+        all_data.extend(one_data)
+        all_data_labels.extend([1] * len(one_data))
+        random.seed(1763)
+        random.shuffle(zero_data)
+        zero_size = one_count * 10 - 1
+        all_data.extend(zero_data[:zero_size])
+        all_data_labels.extend([0] * zero_size)
+
+    random.seed(1257)
+    random.shuffle(all_data)
+    random.seed(1257)
+    random.shuffle(all_data_labels)
+    return all_data, all_data_labels, calculate_proportions_for_labels(
+        all_data_labels)
+
+
+def preprocess_words(text):
+    all_words = []
+    for w in re.finditer(r"[\w\._]+", text):
+        word_normalized = re.sub(r"^[\w]\.", "", w.group(0))
+        word = word_normalized.replace("_", "")
+        if len(word) >= 3:
+            all_words.append(word.lower())
+        split_parts = word_normalized.split("_")
+        split_words = []
+        if len(split_parts) > 2:
+            for idx in range(len(split_parts)):
+                if idx != len(split_parts) - 1:
+                    split_words.append("".join(split_parts[idx:idx + 2]).lower())
+            all_words.extend(split_words)
+        if "." not in word_normalized:
+            split_words = []
+            split_parts = [s.strip() for s in re.split("([A-Z][^A-Z]+)", word) if s.strip()]
+            if len(split_parts) > 2:
+                for idx in range(len(split_parts)):
+                    if idx != len(split_parts) - 1:
+                        if len("".join(split_parts[idx:idx + 2]).lower()) > 3:
+                            split_words.append("".join(split_parts[idx:idx + 2]).lower())
+            all_words.extend(split_words)
+    return all_words

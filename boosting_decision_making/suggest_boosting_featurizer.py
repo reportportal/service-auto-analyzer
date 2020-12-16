@@ -42,8 +42,9 @@ class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
             return self.scores_by_issue_type
         self.scores_by_issue_type = {}
         for log, es_results in self.all_results:
-            for hit in es_results:
+            for idx, hit in enumerate(es_results):
                 test_item = hit["_source"]["test_item"]
+                hit["es_pos"] = idx
 
                 if test_item not in self.scores_by_issue_type:
                     self.scores_by_issue_type[test_item] = {

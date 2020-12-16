@@ -15,7 +15,7 @@
 """
 
 import logging
-from commons import minio_client
+from commons.object_saving.object_saver import ObjectSaver
 from gensim.models.phrases import Phrases
 
 logger = logging.getLogger("analyzerApp.namespace_finder")
@@ -24,21 +24,23 @@ logger = logging.getLogger("analyzerApp.namespace_finder")
 class NamespaceFinder:
 
     def __init__(self, app_config):
-        self.minio_client = minio_client.MinioClient(app_config)
+        self.object_saver = ObjectSaver(app_config)
 
     def remove_namespaces(self, project_id):
-        self.minio_client.remove_project_objects(
+        self.object_saver.remove_project_objects(
             project_id, ["project_log_unique_words", "chosen_namespaces"])
 
     def get_chosen_namespaces(self, project_id):
-        return self.minio_client.get_project_object(project_id, "chosen_namespaces")
+        return self.object_saver.get_project_object(
+            project_id, "chosen_namespaces", using_json=True)
 
     def update_namespaces(self, project_id, log_words):
-        all_words = self.minio_client.get_project_object(project_id, "project_log_unique_words")
+        all_words = self.object_saver.get_project_object(
+            project_id, "project_log_unique_words", using_json=True)
         for word in log_words:
             all_words[word] = 1
-        self.minio_client.put_project_object(
-            all_words, project_id, "project_log_unique_words")
+        self.object_saver.put_project_object(
+            all_words, project_id, "project_log_unique_words", using_json=True)
         phrases = Phrases([w.split(".") for w in all_words], min_count=1, threshold=1)
         potential_project_namespaces = {}
         for word in all_words:
@@ -53,5 +55,5 @@ class NamespaceFinder:
             if cnt > 10:
                 chosen_namespaces[item.replace("_", ".")] = cnt
         logger.debug("Chosen namespaces %s", chosen_namespaces)
-        self.minio_client.put_project_object(
-            chosen_namespaces, project_id, "chosen_namespaces")
+        self.object_saver.put_project_object(
+            chosen_namespaces, project_id, "chosen_namespaces", using_json=True)

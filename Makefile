@@ -25,9 +25,10 @@ release: install-dependencies
 	git config --global user.email "Jenkins"                                                                    
 	git config --global user.name "Jenkins"
 	${PYTHON} -m bumpversion --new-version ${v} build --tag --tag-name ${v} --allow-dirty
-	${PYTHON} -m bumpversion patch --no-tag --allow-dirty
+	${PYTHON} -m bumpversion --new-version ${v}-SNAPSHOT build --no-tag --allow-dirty
 	git remote set-url origin https://${githubtoken}@github.com/reportportal/service-auto-analyzer
 	git push origin master ${v}
+	${PYTHON} -m bumpversion --new-version ${v} build --no-commit --no-tag --allow-dirty
 
 build-release: venv
 	${PYTHON} -m bumpversion --new-version ${v} build --no-commit --no-tag --allow-dirty

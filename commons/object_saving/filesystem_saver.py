@@ -26,7 +26,7 @@ class FilesystemSaver:
 
     def __init__(self, app_config):
         self.app_config = app_config
-        self.folder_storage = "storage"
+        self.folder_storage = self.app_config["filesystemDefaultPath"]
 
     def remove_project_objects(self, project_id, object_names):
         try:

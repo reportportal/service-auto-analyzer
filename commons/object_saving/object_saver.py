@@ -25,14 +25,14 @@ class ObjectSaver:
 
     def __init__(self, app_config):
         self.app_config = app_config
-        self.binarystore_type = "fs"
-        if "binaryStoreType" in self.app_config:
-            self.binarystore_type = self.app_config["binaryStoreType"]
-
         self.saving_strategy = {
             "minio": self.create_minio,
-            "fs": self.create_fs
+            "filesystem": self.create_fs
         }
+        self.binarystore_type = "filesystem"
+        if "binaryStoreType" in self.app_config and\
+                self.app_config["binaryStoreType"] in self.saving_strategy:
+            self.binarystore_type = self.app_config["binaryStoreType"]
 
     def create_minio(self):
         return MinioClient(self.app_config)
@@ -41,7 +41,7 @@ class ObjectSaver:
         return FilesystemSaver(self.app_config)
 
     def get_bucket_name(self, project_id):
-        return "prj-%s" % project_id
+        return self.app_config["minioBucketPrefix"] + str(project_id)
 
     def remove_project_objects(self, project_id, object_names):
         self.saving_strategy[self.binarystore_type]().remove_project_objects(

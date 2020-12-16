@@ -34,6 +34,7 @@ class MinioClient:
                 access_key=app_config["minioAccessKey"],
                 secret_key=app_config["minioSecretKey"],
                 secure=False,
+                region=app_config["minioRegion"]
             )
             logger.info("Minio intialized %s" % app_config["minioHost"])
         except Exception as err:

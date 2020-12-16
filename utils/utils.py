@@ -28,6 +28,7 @@ import requests
 import commons
 from collections import Counter
 import random
+import numpy as np
 
 logger = logging.getLogger("analyzerApp.utils")
 file_extensions = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
@@ -609,7 +610,7 @@ def calculate_proportions_for_labels(labels):
         min_val = min(counted_labels.values())
         max_val = max(counted_labels.values())
         if max_val > 0:
-            return min_val / max_val
+            return np.round(min_val / max_val, 3)
     return 0.0
 
 
@@ -625,9 +626,9 @@ def rebalance_data(train_data, train_labels):
         all_data_labels.extend([1] * len(one_data))
         random.seed(1763)
         random.shuffle(zero_data)
-        zero_size = one_count * 10
+        zero_size = one_count * 10 - 1
         all_data.extend(zero_data[:zero_size])
-        all_data_labels.extend([1] * zero_size)
+        all_data_labels.extend([0] * zero_size)
 
     random.seed(1257)
     random.shuffle(all_data)

@@ -95,7 +95,10 @@ class TestService(unittest.TestCase):
             "esCAcert":          "",
             "esClientCert":      "",
             "esClientKey":       "",
-            "appVersion":        ""
+            "appVersion":        "",
+            "minioRegion":       "",
+            "minioBucketPrefix": "",
+            "filesystemDefaultPath": ""
         }
         self.model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
         logging.disable(logging.CRITICAL)

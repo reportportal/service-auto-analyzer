@@ -24,6 +24,8 @@ import numpy as np
 import logging
 from datetime import datetime
 import os
+import re
+from queue import Queue
 
 logger = logging.getLogger("analyzerApp.trainingDefectTypeModel")
 
@@ -48,7 +50,7 @@ class DefectTypeModelTraining:
             label_to_use = y_train[idx]
             if ind in additional_logs and label_to_use != 1:
                 for idx_ in additional_logs[ind]:
-                    log_res, label_res = data[idx_]
+                    log_res, label_res, real_label = data[idx_]
                     if label_res == label:
                         label_to_use = 1
                         break
@@ -63,11 +65,14 @@ class DefectTypeModelTraining:
     def split_train_test(
             self, logs_to_train_idx, data,
             additional_logs, label, random_state=1257, due_proportion=0.1):
-        labels_filtered = [1 if data[ind][1] == label else 0 for ind in logs_to_train_idx]
+        labels_filtered = [
+            1 if (data[ind][1] == label or data[ind][2] == label) else 0 for ind in logs_to_train_idx]
         proportion_binary_labels = utils.calculate_proportions_for_labels(labels_filtered)
-        if proportion_binary_labels < due_proportion and proportion_binary_labels > 0.001:
+        if proportion_binary_labels < due_proportion:
+            print(proportion_binary_labels)
             logs_to_train_idx, labels_filtered, proportion_binary_labels = utils.rebalance_data(
                 logs_to_train_idx, labels_filtered, due_proportion)
+            print(proportion_binary_labels)
         x_train_ind, x_test_ind, y_train, y_test = train_test_split(
             logs_to_train_idx, labels_filtered,
             test_size=0.1, random_state=random_state, stratify=labels_filtered)
@@ -93,6 +98,7 @@ class DefectTypeModelTraining:
                                     "should": [
                                         {"wildcard": {"issue_type": "{}*".format(label.upper())}},
                                         {"wildcard": {"issue_type": "{}*".format(label.lower())}},
+                                        {"wildcard": {"issue_type": "{}*".format(label)}},
                                     ]
                                 }
                             }
@@ -107,7 +113,7 @@ class DefectTypeModelTraining:
         for d in label_data["hits"]["hits"]:
             text_message = utils.enrich_text_with_method_and_classes(
                 d["_source"]["detected_message_without_params_and_brackets"])
-            data.append((text_message, label))
+            data.append((text_message, label, d["_source"]["issue_type"]))
         return data
 
     def perform_light_deduplication(self, data):
@@ -126,39 +132,50 @@ class DefectTypeModelTraining:
                 additional_logs[text_messages_set[text_message_normalized]].append(idx)
         return additional_logs, logs_to_train_idx
 
+    def get_info_template(self, project_info, label, baseline_model, model_name):
+        return {"method": "training", "sub_model_type": label, "model_type": project_info["model_type"],
+                "baseline_model": [baseline_model], "new_model": [model_name],
+                "project_id": project_info["project_id"], "model_saved": 0, "p_value": 1.0,
+                "data_proportion": 0.0, "baseline_mean_f1": 0.0, "new_model_mean_f1": 0.0,
+                "bad_data_proportion": 0}
+
     def train(self, project_info):
         start_time = time()
         model_name = "defect_type_model_%s" % datetime.now().strftime("%d.%m.%y")
         baseline_model = os.path.basename(
             self.search_cfg["GlobalDefectTypeModelFolder"].strip("/").strip("\\"))
         train_log_info = {}
-        for label in list(self.label2inds.keys()) + ["all"]:
-            train_log_info[label] = {
-                "method": "training", "sub_model_type": label, "model_type": project_info["model_type"],
-                "baseline_model": [baseline_model], "new_model": [model_name],
-                "project_id": project_info["project_id"], "model_saved": 0, "p_value": 1.0,
-                "data_proportion": 0.0, "baseline_mean_f1": 0.0, "new_model_mean_f1": 0.0,
-                "bad_data_proportion": 0}
         self.new_model = custom_defect_type_model.CustomDefectTypeModel(
             self.app_config, project_info["project_id"])
         data = []
+        found_sub_categories = {}
+        labels_to_find_queue = Queue()
         for label in self.label2inds:
+            labels_to_find_queue.put(label)
+        while not labels_to_find_queue.empty():
+            label = labels_to_find_queue.get()
+            train_log_info[label] = self.get_info_template(
+                project_info, label, baseline_model, model_name)
             time_querying = time()
             logger.debug("Label to gather data %s", label)
             found_data = self.query_data(project_info["project_id"], label)
-            data.extend(found_data)
+            for _, _, _issue_type in found_data:
+                if re.search(r"\w{2}_\w+", _issue_type) and _issue_type not in found_sub_categories:
+                    found_sub_categories[_issue_type] = []
+                    labels_to_find_queue.put(_issue_type)
+            if label in self.label2inds:
+                data.extend(found_data)
+            else:
+                found_sub_categories[label] = found_data
             time_spent = time() - time_querying
             logger.debug("Finished quering for %d s", time_spent)
             train_log_info[label]["time_spent"] = time_spent
             train_log_info[label]["data_size"] = len(found_data)
+            labels_to_find_queue.task_done()
         logger.debug("Data gathered: %d" % len(data))
+        train_log_info["all"] = self.get_info_template(
+            project_info, "all", baseline_model, model_name)
         train_log_info["all"]["data_size"] = len(data)
-
-        time_processing = time()
-        additional_logs, logs_to_train_idx = self.perform_light_deduplication(data)
-        time_spent = time() - time_processing
-        for label in self.label2inds:
-            train_log_info[label]["time_spent"] += (time_spent / 3)
 
         data_proportion_min = 1.0
         p_value_max = 0.0
@@ -167,13 +184,18 @@ class DefectTypeModelTraining:
         custom_models = []
         f1_chosen_models = []
         f1_baseline_models = []
-        for label in self.label2inds:
+        for label in list(self.label2inds.keys()) + list(found_sub_categories.keys()):
             time_training = time()
             logger.debug("Label to train the model %s", label)
             new_model_results = []
             baseline_model_results = []
             random_states = [1257, 1873, 1917]
             bad_data = False
+            data_to_train = data
+            if label in found_sub_categories:
+                data_to_train = [d for d in data if d[2] != label] + found_sub_categories[label]
+            additional_logs, logs_to_train_idx = self.perform_light_deduplication(data_to_train)
+
             for random_state in random_states:
                 x_train, x_test, y_train, y_test, proportion_binary_labels = self.split_train_test(
                     logs_to_train_idx, data, additional_logs, label, random_state=random_state,
@@ -186,9 +208,12 @@ class DefectTypeModelTraining:
                 logger.debug("New model results")
                 f1, accuracy = self.new_model.validate_model(label, x_test, y_test)
                 new_model_results.append(f1)
-                logger.debug("Baseline results")
-                f1, accuracy = self.baseline_model.validate_model(label, x_test, y_test)
-                baseline_model_results.append(f1)
+                if label in found_sub_categories:
+                    baseline_model_results.append(0.001)
+                else:
+                    logger.debug("Baseline results")
+                    f1, accuracy = self.baseline_model.validate_model(label, x_test, y_test)
+                    baseline_model_results.append(f1)
 
             use_custom_model = False
             if not bad_data:
@@ -219,9 +244,12 @@ class DefectTypeModelTraining:
                 data_proportion_min = min(train_log_info[label]["data_proportion"], data_proportion_min)
                 self.new_model.train_model(label, x_train, y_train)
                 custom_models.append(label)
-                f1_baseline_models.append(train_log_info[label]["baseline_mean_f1"])
-                f1_chosen_models.append(train_log_info[label]["new_model_mean_f1"])
+                if label not in found_sub_categories:
+                    f1_baseline_models.append(train_log_info[label]["baseline_mean_f1"])
+                    f1_chosen_models.append(train_log_info[label]["new_model_mean_f1"])
             else:
+                if label not in self.baseline_model.models:
+                    continue
                 self.new_model.models[label] = self.baseline_model.models[label]
                 _count_vectorizer = self.baseline_model.count_vectorizer_models[label]
                 self.new_model.count_vectorizer_models[label] = _count_vectorizer

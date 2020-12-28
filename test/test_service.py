@@ -121,6 +121,9 @@ class TestService(unittest.TestCase):
             "SearchLogsMinShouldMatch": "98%",
             "SearchLogsMinSimilarity": 0.9,
             "MinWordLength":  0,
+            "PatternLabelMinPercentToSuggest": 0.5,
+            "PatternLabelMinCountToSuggest":   5,
+            "PatternMinCountToSuggest":        10,
             "BoostModelFolder":
                 self.model_settings["BOOST_MODEL_FOLDER"],
             "SimilarityWeightsFolder":

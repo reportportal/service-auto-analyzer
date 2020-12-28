@@ -99,10 +99,10 @@ index_data = [{
                    "logs": [
                        {"logId": 3,
                         "logLevel": 40000,
-                        "message": "error occured"},
+                        "message": "assertionError occured"},
                        {"logId": 4,
                         "logLevel": 40000,
-                        "message": "error occured \r\n error found \r\n error mined \r\n"}, ]
+                        "message": "assertionError occured \r\n error found \r\n error mined \r\n"}, ]
                    },
                   {"testItemId": 5,
                    "uniqueId": "df1",
@@ -112,7 +112,7 @@ index_data = [{
                    "logs": [
                        {"logId": 5,
                         "logLevel": 40000,
-                        "message": "error occured \r\n error found \r\n error mined"}, ]
+                        "message": "assertionError occured \r\n error found \r\n error mined"}, ]
                    }, ],
 }, {
     "launchId": 2,
@@ -135,10 +135,10 @@ index_data = [{
                    "logs": [
                        {"logId": 6,
                         "logLevel": 40000,
-                        "message": "error occured"},
+                        "message": "assertionError occured"},
                        {"logId": 8,
                         "logLevel": 40000,
-                        "message": "error occured \r\n error found \r\n error mined"}, ]
+                        "message": "assertionError occured \r\n error found \r\n error mined"}, ]
                    },
                   {"testItemId": 78,
                    "uniqueId": "df5",
@@ -148,10 +148,10 @@ index_data = [{
                    "logs": [
                        {"logId": 45,
                         "logLevel": 40000,
-                        "message": "error occured"},
+                        "message": "assertionError occured"},
                        {"logId": 81,
                         "logLevel": 40000,
-                        "message": "error occured \r\n error found \r\n error mined"}, ]
+                        "message": "assertionError occured \r\n error found \r\n error mined"}, ]
                    },
                   {"testItemId": 10,
                    "uniqueId": "df12",
@@ -161,7 +161,7 @@ index_data = [{
                    "logs": [
                        {"logId": 38,
                         "logLevel": 40000,
-                        "message": "error occured \r\n error found \r\n error mined"}, ]
+                        "message": "assertionError occured \r\n error found \r\n error mined"}, ]
                    }, ],
 }, {
     "launchId": 1,
@@ -184,10 +184,10 @@ index_data = [{
                    "logs": [
                        {"logId": 32,
                         "logLevel": 40000,
-                        "message": "error occured"},
+                        "message": "assertionError occured"},
                        {"logId": 46,
                         "logLevel": 40000,
-                        "message": "error occured \r\n error found \r\n error mined"}, ]
+                        "message": "assertionError occured \r\n error found \r\n error mined"}, ]
                    },
                   {"testItemId": 13,
                    "uniqueId": "df",
@@ -197,7 +197,7 @@ index_data = [{
                    "logs": [
                        {"logId": 78,
                         "logLevel": 40000,
-                        "message": "error occured \r\n error found \r\n assertionerror mined"}]
+                        "message": "assertionError occured \r\n error found \r\n error mined"}]
                    }]}]
 
 search_data = {
@@ -206,7 +206,7 @@ search_data = {
     "itemId": 3,
     "projectId": 34,
     "filteredLaunchIds": [1],
-    "logMessages": ["error occured found mined", ],
+    "logMessages": ["assertionError error occured found mined", ],
     "logLines": -1, }
 
 clean_index_data = {
@@ -232,10 +232,10 @@ test_item_info = {
     },
     "logs": [{"logId": 3,
               "logLevel": 40000,
-              "message": "error occured"},
+              "message": "assertionError occured"},
              {"logId": 4,
               "logLevel": 40000,
-              "message": "error occured \r\n error found \r\n error mined"}]
+              "message": "assertionError occured \r\n error found \r\n error mined"}]
 }
 
 used_method = sys.argv[1] if len(sys.argv) > 1 else "index"
@@ -254,6 +254,8 @@ elif used_method.strip() in ["search"]:
     response = rpc.call(json.dumps(search_data), used_method)
 elif used_method.strip() in ["suggest"]:
     response = rpc.call(json.dumps(test_item_info), used_method)
+elif used_method.strip() in ["suggest_patterns"]:
+    response = rpc.call("34", used_method)
 elif used_method.strip() in ["cluster"]:
     if not for_update:
         response = rpc.call(json.dumps({"launch": index_data[0],

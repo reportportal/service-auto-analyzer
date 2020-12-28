@@ -152,3 +152,17 @@ class BulkResponse(BaseModel):
     items: List[str] = []
     logResults: List[LogExceptionResult] = []
     status: int = 0
+
+
+class SuggestPatternLabel(BaseModel):
+    """Suggested pattern with labels"""
+    pattern: str
+    totalCount: int
+    percentTestItemsWithLabel: float = 0.0
+    label: str = ""
+
+
+class SuggestPattern(BaseModel):
+    """Suggest pattern object with 2 lists of suggestions"""
+    suggestions_with_labels: List[SuggestPatternLabel] = []
+    suggestions_without_labels: List[SuggestPatternLabel] = []

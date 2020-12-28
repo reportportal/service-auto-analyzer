@@ -17,6 +17,7 @@
 import json
 import logging
 import requests
+import urllib3
 import elasticsearch
 import elasticsearch.helpers
 import commons.launch_objects
@@ -37,17 +38,12 @@ class EsClient:
         self.app_config = app_config
         self.host = app_config["esHost"]
         self.search_cfg = search_cfg
-        self.es_client = elasticsearch.Elasticsearch([self.host], timeout=30,
-                                                     max_retries=5, retry_on_timeout=True,
-                                                     use_ssl=app_config["esUseSsl"],
-                                                     verify_certs=app_config["esVerifyCerts"],
-                                                     ssl_show_warn=app_config["esSslShowWarn"],
-                                                     ca_certs=app_config["esCAcert"],
-                                                     client_cert=app_config["esClientCert"],
-                                                     client_key=app_config["esClientKey"])
+        self.es_client = self.create_es_client(app_config)
         self.log_preparation = LogPreparation()
 
     def create_es_client(self, app_config):
+        if not app_config["esVerifyCerts"]:
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         if app_config["turnOffSslVerification"]:
             return elasticsearch.Elasticsearch(
                 [self.host], timeout=30,

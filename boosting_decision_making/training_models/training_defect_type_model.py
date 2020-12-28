@@ -63,16 +63,8 @@ class DefectTypeModelTraining:
         return x_train, y_train
 
     def split_train_test(
-            self, logs_to_train_idx, data,
+            self, logs_to_train_idx, data, labels_filtered,
             additional_logs, label, random_state=1257, due_proportion=0.1):
-        labels_filtered = [
-            1 if (data[ind][1] == label or data[ind][2] == label) else 0 for ind in logs_to_train_idx]
-        proportion_binary_labels = utils.calculate_proportions_for_labels(labels_filtered)
-        if proportion_binary_labels < due_proportion:
-            print(proportion_binary_labels)
-            logs_to_train_idx, labels_filtered, proportion_binary_labels = utils.rebalance_data(
-                logs_to_train_idx, labels_filtered, due_proportion)
-            print(proportion_binary_labels)
         x_train_ind, x_test_ind, y_train, y_test = train_test_split(
             logs_to_train_idx, labels_filtered,
             test_size=0.1, random_state=random_state, stratify=labels_filtered)
@@ -81,7 +73,7 @@ class DefectTypeModelTraining:
         x_test = []
         for ind in x_test_ind:
             x_test.append(data[ind][0])
-        return x_train, x_test, y_train, y_test, proportion_binary_labels
+        return x_train, x_test, y_train, y_test
 
     def query_data(self, project, label):
         label_data = self.es_client.es_client.search(
@@ -139,14 +131,8 @@ class DefectTypeModelTraining:
                 "data_proportion": 0.0, "baseline_mean_f1": 0.0, "new_model_mean_f1": 0.0,
                 "bad_data_proportion": 0}
 
-    def train(self, project_info):
-        start_time = time()
-        model_name = "defect_type_model_%s" % datetime.now().strftime("%d.%m.%y")
-        baseline_model = os.path.basename(
-            self.search_cfg["GlobalDefectTypeModelFolder"].strip("/").strip("\\"))
+    def load_data_for_training(self, project_info, baseline_model, model_name):
         train_log_info = {}
-        self.new_model = custom_defect_type_model.CustomDefectTypeModel(
-            self.app_config, project_info["project_id"])
         data = []
         found_sub_categories = {}
         labels_to_find_queue = Queue()
@@ -176,44 +162,80 @@ class DefectTypeModelTraining:
         train_log_info["all"] = self.get_info_template(
             project_info, "all", baseline_model, model_name)
         train_log_info["all"]["data_size"] = len(data)
+        return data, found_sub_categories, train_log_info
+
+    def creating_binary_target_data(self, label, data, found_sub_categories, due_proportion=0.1):
+        data_to_train = data
+        if label in found_sub_categories:
+            data_to_train = [d for d in data if d[2] != label] + found_sub_categories[label]
+        additional_logs, logs_to_train_idx = self.perform_light_deduplication(data_to_train)
+        labels_filtered = []
+        for ind in logs_to_train_idx:
+            if (data_to_train[ind][1] == label or data_to_train[ind][2] == label):
+                labels_filtered.append(1)
+            else:
+                labels_filtered.append(0)
+        proportion_binary_labels = utils.calculate_proportions_for_labels(labels_filtered)
+        if proportion_binary_labels < due_proportion:
+            logs_to_train_idx, labels_filtered, proportion_binary_labels = utils.rebalance_data(
+                logs_to_train_idx, labels_filtered, due_proportion)
+        return logs_to_train_idx, labels_filtered, data_to_train, additional_logs, proportion_binary_labels
+
+    def train_several_times(self, label, data, found_sub_categories, due_proportion=0.1):
+        new_model_results = []
+        baseline_model_results = []
+        random_states = [1257, 1873, 1917]
+        bad_data = False
+
+        logs_to_train_idx, labels_filtered, data_to_train,\
+            additional_logs, proportion_binary_labels = self.creating_binary_target_data(
+                label, data, found_sub_categories, due_proportion=due_proportion)
+
+        for random_state in random_states:
+            x_train, x_test, y_train, y_test = self.split_train_test(
+                logs_to_train_idx, data_to_train, labels_filtered,
+                additional_logs, label,
+                random_state=random_state,
+                due_proportion=due_proportion)
+            if proportion_binary_labels < due_proportion:
+                logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
+                bad_data = True
+                break
+            self.new_model.train_model(label, x_train, y_train)
+            logger.debug("New model results")
+            f1, accuracy = self.new_model.validate_model(label, x_test, y_test)
+            new_model_results.append(f1)
+            if label in found_sub_categories:
+                baseline_model_results.append(0.001)
+            else:
+                logger.debug("Baseline results")
+                f1, accuracy = self.baseline_model.validate_model(label, x_test, y_test)
+                baseline_model_results.append(f1)
+        return baseline_model_results, new_model_results, bad_data
+
+    def train(self, project_info):
+        start_time = time()
+        model_name = "defect_type_model_%s" % datetime.now().strftime("%d.%m.%y")
+        baseline_model = os.path.basename(
+            self.search_cfg["GlobalDefectTypeModelFolder"].strip("/").strip("\\"))
+        self.new_model = custom_defect_type_model.CustomDefectTypeModel(
+            self.app_config, project_info["project_id"])
+
+        data, found_sub_categories, train_log_info = self.load_data_for_training(
+            project_info, baseline_model, model_name)
 
         data_proportion_min = 1.0
         p_value_max = 0.0
         all_bad_data = 1
-        due_proportion = 0.1
         custom_models = []
         f1_chosen_models = []
         f1_baseline_models = []
         for label in list(self.label2inds.keys()) + list(found_sub_categories.keys()):
             time_training = time()
             logger.debug("Label to train the model %s", label)
-            new_model_results = []
-            baseline_model_results = []
-            random_states = [1257, 1873, 1917]
-            bad_data = False
-            data_to_train = data
-            if label in found_sub_categories:
-                data_to_train = [d for d in data if d[2] != label] + found_sub_categories[label]
-            additional_logs, logs_to_train_idx = self.perform_light_deduplication(data_to_train)
 
-            for random_state in random_states:
-                x_train, x_test, y_train, y_test, proportion_binary_labels = self.split_train_test(
-                    logs_to_train_idx, data, additional_logs, label, random_state=random_state,
-                    due_proportion=due_proportion)
-                if proportion_binary_labels < due_proportion:
-                    logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
-                    bad_data = True
-                    break
-                self.new_model.train_model(label, x_train, y_train)
-                logger.debug("New model results")
-                f1, accuracy = self.new_model.validate_model(label, x_test, y_test)
-                new_model_results.append(f1)
-                if label in found_sub_categories:
-                    baseline_model_results.append(0.001)
-                else:
-                    logger.debug("Baseline results")
-                    f1, accuracy = self.baseline_model.validate_model(label, x_test, y_test)
-                    baseline_model_results.append(f1)
+            baseline_model_results, new_model_results, bad_data = self.train_several_times(
+                label, data, found_sub_categories)
 
             use_custom_model = False
             if not bad_data:
@@ -235,11 +257,14 @@ class DefectTypeModelTraining:
 
             if use_custom_model:
                 logger.debug("Custom model '%s' should be saved" % label)
-                labels_filtered = [1 if data[ind][1] == label else 0 for ind in logs_to_train_idx]
+
+                logs_to_train_idx, labels_filtered, data_to_train,\
+                    additional_logs, proportion_binary_labels = self.creating_binary_target_data(
+                        label, data, found_sub_categories, due_proportion=0.1)
                 x_train, y_train = self.return_similar_objects_into_sample(
-                    logs_to_train_idx, labels_filtered, data, additional_logs, label)
-                train_log_info[label]["data_proportion"] = utils.calculate_proportions_for_labels(
-                    labels_filtered)
+                    logs_to_train_idx, labels_filtered, data_to_train, additional_logs, label)
+
+                train_log_info[label]["data_proportion"] = proportion_binary_labels
                 train_log_info[label]["model_saved"] = 1
                 data_proportion_min = min(train_log_info[label]["data_proportion"], data_proportion_min)
                 self.new_model.train_model(label, x_train, y_train)
@@ -249,6 +274,10 @@ class DefectTypeModelTraining:
                     f1_chosen_models.append(train_log_info[label]["new_model_mean_f1"])
             else:
                 if label not in self.baseline_model.models:
+                    if label in self.new_model.models:
+                        del self.new_model.models[label]
+                    if label in self.new_model.count_vectorizer_models:
+                        del self.new_model.count_vectorizer_models[label]
                     continue
                 self.new_model.models[label] = self.baseline_model.models[label]
                 _count_vectorizer = self.baseline_model.count_vectorizer_models[label]

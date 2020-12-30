@@ -48,8 +48,11 @@ class Clusterizer:
         group_id = 0
         start_time = time()
         count_vectorizer = HashingVectorizer(binary=True, analyzer="word", token_pattern="[^ ]+")
+        t1 = time()
         transformed_logs = count_vectorizer.fit_transform(messages)
+        print("Transformed messages ", time() - t1)
         for key_word in groups_to_check:
+            t1 = time()
             groups_map_average = {}
             groups_map = {}
             for i in groups_to_check[key_word]:
@@ -74,12 +77,16 @@ class Clusterizer:
                     group_id += 1
             for gr_id in groups_map:
                 global_group_map[gr_id] = groups_map[gr_id]
+            if len(groups_to_check[key_word]) >= 100:
+                print(key_word, len(groups_to_check[key_word]))
+                print(time() - t1)
         logger.debug("Time for finding groups: %.2f s", time() - start_time)
         return global_group_map
 
     def unite_groups_by_hashes(self, messages, min_jaccard_sim=0.98):
         start_time = time()
         hash_prints = self.calculate_hashes(messages)
+        print("Calculated hashes ", time() - start_time)
         hash_groups = {}
         global_ind = 0
         for i in range(len(hash_prints)):
@@ -100,6 +107,8 @@ class Clusterizer:
         return rearranged_groups
 
     def find_clusters(self, messages):
+        t1 = time()
         hash_groups = self.unite_groups_by_hashes(messages)
+        print("Found hash groups ", time() - t1)
         groups = self.find_groups_by_similarity(messages, hash_groups)
         return groups

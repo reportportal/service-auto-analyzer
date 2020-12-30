@@ -150,10 +150,15 @@ class ClusterService:
             return []
         t_start = time()
         _clusterizer = clusterizer.Clusterizer()
+        t1 = time()
+        print("Started processing")
         log_messages, log_dict = self.log_preparation.prepare_logs_for_clustering(
             launch_info.launch, launch_info.numberOfLogLines)
+        print("Prepared logs ", time() - t1)
         log_ids = set([int(log["_id"]) for log in log_dict.values()])
+        t1 = time()
         groups = _clusterizer.find_clusters(log_messages)
+        print("Found clusters ", time() - t1)
         additional_results = {}
         if launch_info.for_update:
             additional_results = self.find_similar_items_from_es(

@@ -59,7 +59,8 @@ class LogPreparation:
                 "stacktrace":                    "",
                 "only_numbers":                  "",
                 "found_exceptions":              "",
-                "whole_message":                 ""}}
+                "whole_message":                 "",
+                "potential_status_codes":        ""}}
 
     def _fill_launch_test_item_fields(self, log_template, launch, test_item):
         log_template["_index"] = launch.project
@@ -200,13 +201,40 @@ class LogPreparation:
                             log_words[word] = 1
         return log_words, project
 
+    def prepare_log_clustering_light(self, launch, test_item, log):
+        log_template = self._create_log_template()
+        log_template = self._fill_launch_test_item_fields(log_template, launch, test_item)
+        cleaned_message = self.clean_message(log.message)
+        detected_message, stacktrace = utils.detect_log_description_and_stacktrace(
+            cleaned_message)
+        message = utils.first_lines(cleaned_message, -1)
+        message = utils.sanitize_text(message)
+        log_template["_id"] = log.logId
+        log_template["_source"]["cluster_id"] = log.clusterId
+        log_template["_source"]["log_level"] = log.logLevel
+        log_template["_source"]["original_message_lines"] = utils.calculate_line_number(
+            cleaned_message)
+        log_template["_source"]["original_message_words_number"] = len(
+            utils.split_words(cleaned_message, split_urls=False))
+        detected_message_with_numbers = utils.remove_starting_datetime(detected_message)
+        detected_message = utils.sanitize_text(detected_message)
+        log_template["_source"]["message"] = message
+        log_template["_source"]["detected_message"] = detected_message
+        log_template["_source"]["detected_message_with_numbers"] = detected_message_with_numbers
+        log_template["_source"]["stacktrace"] = stacktrace
+        log_template["_source"]["whole_message"] = detected_message_with_numbers + " \n " + stacktrace
+        return log_template
+
     def prepare_logs_for_clustering(self, launch, number_of_lines):
         log_messages = []
         log_dict = {}
         ind = 0
         for test_item in launch.testItems:
-            prepared_logs = [self._prepare_log(
-                launch, test_item, log) for log in test_item.logs if log.logLevel >= ERROR_LOGGING_LEVEL]
+            prepared_logs = []
+            for log in test_item.logs:
+                if log.logLevel < ERROR_LOGGING_LEVEL:
+                    continue
+                prepared_logs.append(self.prepare_log_clustering_light(launch, test_item, log))
             merged_logs = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
             new_merged_logs = []
             for log in merged_logs:

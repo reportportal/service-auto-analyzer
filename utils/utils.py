@@ -152,44 +152,48 @@ def remove_starting_datetime(text, remove_first_digits=False):
 
 
 def is_starting_message_pattern(text):
-    processed_text = remove_starting_datetime(text).strip()
-    for ext in file_extensions:
-        res = re.search(r"\w*\s*\(\s*.*\.%s:\d+\s*\)" % ext, processed_text)
-        if res and processed_text.startswith(res.group(0)):
-            return True
+    processed_text = text
+    res = re.search(r"\w*\s*\(\s*.*\.%s:\d+\s*\)" % "|".join(file_extensions), processed_text)
+    if res and processed_text.startswith(res.group(0)):
+        return True
     return False
 
 
 def does_stacktrace_need_words_reweighting(log):
     found_file_extensions = []
-    for file_extension in ["py", "java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "scala"]:
-        if re.search(r"\.%s(?!\.)\b" % file_extension, log):
-            found_file_extensions.append(file_extension)
+    all_extensions_to_find = "|".join(
+        ["py", "java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "scala"])
+    for m in re.findall(r"\.(%s)(?!\.)\b" % all_extensions_to_find, log):
+        found_file_extensions.append(m)
     if len(found_file_extensions) == 1 and found_file_extensions[0] in ["js", "c", "h", "rb", "cpp"]:
         return True
     return False
 
 
-def delete_line_numbers(text):
+def is_line_from_stacktrace(text):
     """Deletes line numbers in the stacktrace"""
     if is_starting_message_pattern(text):
-        return text
-    text = re.sub(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)", r"\g<1>#\g<2>", text)
+        return False
 
+    text = re.sub(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)", "", text)
     res = re.sub(r"(?<=:)\d+(?=\)?\]?(\n|\r\n|$))", " ", text)
+    if res != text:
+        return True
     res = re.sub(r"((?<=line )|(?<=line))\s*\d+\s*((?=, in)|(?=,in)|(?=\n)|(?=\r\n)|(?=$))",
                  " ", res, flags=re.I)
+    if res != text:
+        return True
     res = re.sub("|".join([r"\.%s(?!\.)\b" % ext for ext in file_extensions]), " ", res, flags=re.I)
-    res = re.sub(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})#(\d+)", r"\g<1>:\g<2>", res)
+    if res != text:
+        return True
     result = re.search(r"^\s*at\s+.*\(.*?\)[\s]*$", res)
     if result and result.group(0) == res:
-        res = re.sub(r"\d", "", res)
-        res = "# " + res
+        return True
     else:
         result = re.search(r"^\s*\w+([\.\/]\s*\w+)+\s*\(.*?\)[\s]*$", res)
         if result and result.group(0) == res:
-            res = "# " + res
-    return res
+            return True
+    return False
 
 
 def find_only_numbers(detected_message_with_numbers):
@@ -201,9 +205,9 @@ def find_only_numbers(detected_message_with_numbers):
 def is_python_log(log):
     """Tries to find whether a log was for the python language"""
     found_file_extensions = []
-    for file_extension in file_extensions:
-        if re.search(r"\.%s(?!\.)\b" % file_extension, log):
-            found_file_extensions.append(file_extension)
+    for m in re.findall(r"\.(%s)(?!\.)\b" % "|".join(file_extensions), log):
+        found_file_extensions.append(m)
+    found_file_extensions = list(set(found_file_extensions))
     if len(found_file_extensions) == 1 and found_file_extensions[0] == "py":
         return True
     return False
@@ -257,6 +261,7 @@ def detect_log_parts_python(message, default_log_number=1):
 
 def detect_log_description_and_stacktrace(message):
     """Split a log into a log message and stacktrace"""
+    message = remove_starting_datetime(message)
     message = delete_empty_lines(message)
     if calculate_line_number(message) > 2:
         if is_python_log(message):
@@ -265,8 +270,7 @@ def detect_log_description_and_stacktrace(message):
         detected_message_lines = []
         stacktrace_lines = []
         for idx, line in enumerate(split_lines):
-            modified_line = delete_line_numbers(line)
-            if modified_line != line:
+            if is_line_from_stacktrace(line):
                 stacktrace_lines.append(line)
             else:
                 detected_message_lines.append(line)

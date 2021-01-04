@@ -17,10 +17,9 @@ import logging
 import hashlib
 import heapq
 import numpy as np
-from sklearn.feature_extraction.text import HashingVectorizer
-from scipy import spatial
+import sklearn
+from sklearn.feature_extraction.text import CountVectorizer
 from time import time
-from utils import utils
 
 logger = logging.getLogger("analyzerApp.clusterizer")
 
@@ -37,66 +36,77 @@ class Clusterizer:
             hash_print = set()
             for i in range(len(words) - n_gram):
                 hash_print.add(hashlib.md5(" ".join(words[i:i + n_gram]).encode("utf-8")).hexdigest())
-            hash_print = set(heapq.nlargest(n_permutations, hash_print))
+            hash_print = list(heapq.nlargest(n_permutations, hash_print))
             hashes.append(hash_print)
         return hashes
 
     def find_groups_by_similarity(self, messages, groups_to_check, threshold=0.98):
         if len(messages) == 0:
             return {}
-        global_group_map = {}
+        rearranged_groups = {}
         group_id = 0
         start_time = time()
-        count_vectorizer = HashingVectorizer(binary=True, analyzer="word", token_pattern="[^ ]+")
-        t1 = time()
-        transformed_logs = count_vectorizer.fit_transform(messages)
-        print("Transformed messages ", time() - t1)
         for key_word in groups_to_check:
-            t1 = time()
-            groups_map_average = {}
-            groups_map = {}
+            hash_prints = []
             for i in groups_to_check[key_word]:
-                max_sim_group = 0
-                max_similarity = 0
-                transformed_vec = np.asarray(transformed_logs[i].toarray())[0]
-                for group in groups_map_average:
-                    cos_distance = round(
-                        1 - spatial.distance.cosine(transformed_vec, groups_map_average[group]), 2)
-                    if cos_distance > max_similarity:
-                        max_sim_group = group
-                        max_similarity = cos_distance
-
-                if max_similarity >= threshold:
-                    groups_map_average[max_sim_group] *= len(groups_map[max_sim_group])
-                    groups_map_average[max_sim_group] += transformed_vec
-                    groups_map_average[max_sim_group] /= (len(groups_map[max_sim_group]) + 1)
-                    groups_map[max_sim_group].append(i)
-                else:
-                    groups_map[group_id] = [i]
-                    groups_map_average[group_id] = transformed_vec
-                    group_id += 1
-            for gr_id in groups_map:
-                global_group_map[gr_id] = groups_map[gr_id]
-            if len(groups_to_check[key_word]) >= 100:
-                print(key_word, len(groups_to_check[key_word]))
-                print(time() - t1)
+                hash_prints.append(messages[i])
+            hash_groups = self.similarity_groupping(hash_prints, for_text=True, threshold=threshold)
+            new_group_id = group_id
+            for key in hash_groups:
+                cluster = hash_groups[key] + group_id
+                new_group_id = max(group_id, cluster)
+                real_id = groups_to_check[key_word][key]
+                if cluster not in rearranged_groups:
+                    rearranged_groups[cluster] = []
+                rearranged_groups[cluster].append(real_id)
+            new_group_id += 1
+            group_id = new_group_id
         logger.debug("Time for finding groups: %.2f s", time() - start_time)
-        return global_group_map
+        return rearranged_groups
+
+    def similarity_groupping(self, hash_prints, block_size=1000, for_text=True, threshold=0.98):
+        num_of_blocks = int(np.ceil(len(hash_prints) / block_size))
+        hash_groups = {}
+        global_ind = 0
+        for idx in range(num_of_blocks):
+            for jdx in range((idx + 1 if num_of_blocks > 1 else idx), num_of_blocks):
+                if for_text:
+                    _count_vector = CountVectorizer(binary=True, analyzer="word", token_pattern="[^ ]+")
+                else:
+                    _count_vector = CountVectorizer(binary=True, analyzer=lambda x: x)
+
+                block_i = hash_prints[idx * block_size: (idx + 1) * block_size]
+                block_j = hash_prints[jdx * block_size: (jdx + 1) * block_size] if num_of_blocks > 1 else []
+
+                transformed_hashes = _count_vector.fit_transform(block_i + block_j).astype(np.int8)
+                similarities = sklearn.metrics.pairwise.cosine_similarity(transformed_hashes)
+
+                indices_looked = list(range(idx * block_size, idx * block_size + len(block_i))) + list(
+                    range(jdx * block_size, jdx * block_size + len(block_j)))
+
+                for seq_num_i in range(len(indices_looked)):
+                    i = indices_looked[seq_num_i]
+                    if i not in hash_groups:
+                        hash_groups[i] = global_ind
+                        global_ind += 1
+                    for seq_num_j in range(seq_num_i + 1, len(indices_looked)):
+                        j = indices_looked[seq_num_j]
+                        if j not in hash_groups:
+                            if similarities[seq_num_i][seq_num_j] >= threshold:
+                                hash_groups[j] = hash_groups[i]
+        return hash_groups
 
     def unite_groups_by_hashes(self, messages, min_jaccard_sim=0.98):
         start_time = time()
         hash_prints = self.calculate_hashes(messages)
-        print("Calculated hashes ", time() - start_time)
-        hash_groups = {}
-        global_ind = 0
-        for i in range(len(hash_prints)):
-            if i not in hash_groups:
-                hash_groups[i] = global_ind
-                global_ind += 1
-            for j in range(i + 1, len(hash_prints)):
-                if j not in hash_groups:
-                    if utils.jaccard_similarity(hash_prints[i], hash_prints[j]) > min_jaccard_sim:
-                        hash_groups[j] = hash_groups[i]
+        has_no_empty = False
+        for hash_print in hash_prints:
+            if len(hash_print):
+                has_no_empty = True
+                break
+        if not has_no_empty:
+            return {}
+        hash_groups = self.similarity_groupping(hash_prints, for_text=False, threshold=min_jaccard_sim)
         rearranged_groups = {}
         for key in hash_groups:
             cluster = hash_groups[key]
@@ -107,8 +117,6 @@ class Clusterizer:
         return rearranged_groups
 
     def find_clusters(self, messages):
-        t1 = time()
         hash_groups = self.unite_groups_by_hashes(messages)
-        print("Found hash groups ", time() - t1)
         groups = self.find_groups_by_similarity(messages, hash_groups)
         return groups

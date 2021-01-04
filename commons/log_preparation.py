@@ -201,12 +201,13 @@ class LogPreparation:
                             log_words[word] = 1
         return log_words, project
 
-    def prepare_log_clustering_light(self, launch, test_item, log):
+    def prepare_log_clustering_light(self, launch, test_item, log, clean_numbers):
         log_template = self._create_log_template()
         log_template = self._fill_launch_test_item_fields(log_template, launch, test_item)
         cleaned_message = self.clean_message(log.message)
         detected_message, stacktrace = utils.detect_log_description_and_stacktrace(
             cleaned_message)
+        stacktrace = utils.sanitize_text(stacktrace)
         message = utils.first_lines(cleaned_message, -1)
         message = utils.sanitize_text(message)
         log_template["_id"] = log.logId
@@ -222,10 +223,17 @@ class LogPreparation:
         log_template["_source"]["detected_message"] = detected_message
         log_template["_source"]["detected_message_with_numbers"] = detected_message_with_numbers
         log_template["_source"]["stacktrace"] = stacktrace
-        log_template["_source"]["whole_message"] = detected_message_with_numbers + " \n " + stacktrace
+        potential_status_codes = " ".join(utils.get_potential_status_codes(detected_message_with_numbers))
+        log_template["_source"]["potential_status_codes"] = potential_status_codes
+        if clean_numbers:
+            detected_message = detected_message + " " + potential_status_codes
+            log_template["_source"]["whole_message"] = detected_message + " \n " + stacktrace
+        else:
+            detected_message_with_numbers = detected_message_with_numbers + " " + potential_status_codes
+            log_template["_source"]["whole_message"] = detected_message_with_numbers + " \n " + stacktrace
         return log_template
 
-    def prepare_logs_for_clustering(self, launch, number_of_lines):
+    def prepare_logs_for_clustering(self, launch, number_of_lines, clean_numbers):
         log_messages = []
         log_dict = {}
         ind = 0
@@ -234,7 +242,7 @@ class LogPreparation:
             for log in test_item.logs:
                 if log.logLevel < ERROR_LOGGING_LEVEL:
                     continue
-                prepared_logs.append(self.prepare_log_clustering_light(launch, test_item, log))
+                prepared_logs.append(self.prepare_log_clustering_light(launch, test_item, log, clean_numbers))
             merged_logs = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
             new_merged_logs = []
             for log in merged_logs:

@@ -77,8 +77,9 @@ class Launch(BaseModel):
 
 class LaunchInfoForClustering(BaseModel):
     launch: Launch
-    for_update: bool
+    forUpdate: bool
     numberOfLogLines: int
+    cleanNumbers: bool = True
 
 
 class AnalysisResult(BaseModel):
@@ -164,5 +165,5 @@ class SuggestPatternLabel(BaseModel):
 
 class SuggestPattern(BaseModel):
     """Suggest pattern object with 2 lists of suggestions"""
-    suggestions_with_labels: List[SuggestPatternLabel] = []
-    suggestions_without_labels: List[SuggestPatternLabel] = []
+    suggestionsWithLabels: List[SuggestPatternLabel] = []
+    suggestionsWithoutLabels: List[SuggestPatternLabel] = []

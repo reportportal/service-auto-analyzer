@@ -91,18 +91,18 @@ class TestSearchService(TestService):
                 search_service.query_data = MagicMock(return_value=test["query_data"])
 
                 response = search_service.suggest_patterns(test["rq"])
-                response.suggestions_with_labels.should.have.length_of(
+                response.suggestionsWithLabels.should.have.length_of(
                     len(test["expected_count_with_labels"]))
 
                 for real_resp, expected_resp in zip(
-                        response.suggestions_with_labels, test["expected_count_with_labels"]):
+                        response.suggestionsWithLabels, test["expected_count_with_labels"]):
                     real_resp.should.equal(expected_resp)
 
-                response.suggestions_without_labels.should.have.length_of(
+                response.suggestionsWithoutLabels.should.have.length_of(
                     len(test["expected_count_without_labels"]))
 
                 for real_resp, expected_resp in zip(
-                        response.suggestions_without_labels, test["expected_count_without_labels"]):
+                        response.suggestionsWithoutLabels, test["expected_count_without_labels"]):
                     real_resp.should.equal(expected_resp)
 
                 TestSearchService.shutdown_server(test["test_calls"])

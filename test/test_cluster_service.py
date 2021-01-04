@@ -40,7 +40,7 @@ class TestClusterService(TestService):
                     launch=launch_objects.Launch(
                         **(utils.get_fixture(
                             self.launch_wo_test_items, to_json=True))[0]),
-                    for_update=False,
+                    forUpdate=False,
                     numberOfLogLines=-1),
                 "expected_result":     []
             },
@@ -53,7 +53,7 @@ class TestClusterService(TestService):
                     launch=launch_objects.Launch(
                         **(utils.get_fixture(
                             self.launch_w_test_items_wo_logs, to_json=True))[0]),
-                    for_update=False,
+                    forUpdate=False,
                     numberOfLogLines=-1),
                 "expected_result":     []
             },
@@ -66,7 +66,7 @@ class TestClusterService(TestService):
                     launch=launch_objects.Launch(
                         **(utils.get_fixture(
                             self.launch_w_test_items_w_empty_logs, to_json=True)[0])),
-                    for_update=False,
+                    forUpdate=False,
                     numberOfLogLines=-1),
                 "expected_result":     []
             },
@@ -88,7 +88,7 @@ class TestClusterService(TestService):
                     launch=launch_objects.Launch(
                         **utils.get_fixture(
                             self.launch_w_items_clustering, to_json=True)),
-                    for_update=False,
+                    forUpdate=False,
                     numberOfLogLines=-1),
                 "expected_result":     [
                     launch_objects.ClusterResult(
@@ -128,7 +128,7 @@ class TestClusterService(TestService):
                     launch=launch_objects.Launch(
                         **utils.get_fixture(
                             self.launch_w_items_clustering, to_json=True)),
-                    for_update=False,
+                    forUpdate=False,
                     numberOfLogLines=2),
                 "expected_result":     [
                     launch_objects.ClusterResult(
@@ -186,7 +186,7 @@ class TestClusterService(TestService):
                     launch=launch_objects.Launch(
                         **utils.get_fixture(
                             self.launch_w_items_clustering, to_json=True)),
-                    for_update=True,
+                    forUpdate=True,
                     numberOfLogLines=-1),
                 "expected_result":     [
                     launch_objects.ClusterResult(
@@ -244,7 +244,7 @@ class TestClusterService(TestService):
                     launch=launch_objects.Launch(
                         **utils.get_fixture(
                             self.launch_w_items_clustering, to_json=True)),
-                    for_update=True,
+                    forUpdate=True,
                     numberOfLogLines=-1),
                 "expected_result":     [
                     launch_objects.ClusterResult(
@@ -299,7 +299,7 @@ class TestClusterService(TestService):
                     launch=launch_objects.Launch(
                         **utils.get_fixture(
                             self.launch_w_items_clustering, to_json=True)),
-                    for_update=True,
+                    forUpdate=True,
                     numberOfLogLines=2),
                 "expected_result":     [
                     launch_objects.ClusterResult(

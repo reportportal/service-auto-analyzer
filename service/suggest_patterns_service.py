@@ -96,8 +96,8 @@ class SuggestPatternsService:
         all_exceptions = {}
         if not self.es_client.index_exists(project_id):
             return SuggestPattern(
-                suggestions_with_labels=[],
-                suggestions_without_labels=[])
+                suggestionsWithLabels=[],
+                suggestionsWithoutLabels=[])
         for label in ["ab", "pb", "si", "ti"]:
             found_data.extend(self.query_data(project_id, label))
         for log, label in found_data:
@@ -117,5 +117,5 @@ class SuggestPatternsService:
         suggestedPatternsWithoutLabels = self.get_patterns_without_labels(all_exceptions)
         logger.info("Finished suggesting patterns %.2f s", time() - t_start)
         return SuggestPattern(
-            suggestions_with_labels=suggestedPatternsWithLabels,
-            suggestions_without_labels=suggestedPatternsWithoutLabels)
+            suggestionsWithLabels=suggestedPatternsWithLabels,
+            suggestionsWithoutLabels=suggestedPatternsWithoutLabels)

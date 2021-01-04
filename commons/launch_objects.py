@@ -79,7 +79,7 @@ class LaunchInfoForClustering(BaseModel):
     launch: Launch
     forUpdate: bool
     numberOfLogLines: int
-    cleanNumbers: bool = True
+    cleanNumbers: bool = False
 
 
 class AnalysisResult(BaseModel):

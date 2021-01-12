@@ -360,6 +360,13 @@ class SuggestService(AnalyzerService):
         if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
             AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
                 self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
+            if results:
+                AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                    self.app_config["exchangeName"], "train_models", json.dumps({
+                        "model_type": "suggestions",
+                        "project_id": test_item_info.project,
+                        "gathered_metric_total": len(results)
+                    }))
 
         logger.debug("Stats info %s", results_to_share)
         logger.info("Processed the test item. It took %.2f sec.", time() - t_start)

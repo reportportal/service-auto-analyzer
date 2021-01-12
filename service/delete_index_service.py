@@ -19,7 +19,8 @@ import utils.utils as utils
 from time import time
 from commons import namespace_finder
 from commons.esclient import EsClient
-from commons.triggering_training.retraining_defect_type_triggering import RetrainingDefectTypeTriggering
+from commons.triggering_training.retraining_triggering import RetrainingTriggering
+from boosting_decision_making import custom_defect_type_model
 
 logger = logging.getLogger("analyzerApp.deleteIndexService")
 
@@ -31,7 +32,10 @@ class DeleteIndexService:
         self.search_cfg = search_cfg
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.model_training_triggering = {
-            "defect_type": RetrainingDefectTypeTriggering(self.app_config)
+            "defect_type": RetrainingTriggering(app_config, "defect_type_trigger_info",
+                                                start_number=100, accumulated_difference=100),
+            "suggestions": RetrainingTriggering(app_config, "suggestions_trigger_info",
+                                                start_number=100, accumulated_difference=50)
         }
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
 
@@ -44,5 +48,8 @@ class DeleteIndexService:
         for model_type in self.model_training_triggering:
             self.model_training_triggering[model_type].remove_triggering_info(
                 {"project_id": index_name})
+        self.custom_defect_type_model = custom_defect_type_model.CustomDefectTypeModel(
+            self.app_config, index_name)
+        self.custom_defect_type_model.delete_old_model()
         logger.info("Finished deleting index %.2f s", time() - t_start)
         return int(is_index_deleted)

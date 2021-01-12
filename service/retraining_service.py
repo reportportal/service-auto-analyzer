@@ -20,7 +20,7 @@ import utils.utils as utils
 from time import time
 from commons import namespace_finder
 from commons.esclient import EsClient
-from commons.triggering_training.retraining_defect_type_triggering import RetrainingDefectTypeTriggering
+from commons.triggering_training.retraining_triggering import RetrainingTriggering
 from boosting_decision_making.training_models import training_defect_type_model
 from amqp.amqp import AmqpClient
 
@@ -34,7 +34,12 @@ class RetrainingService:
         self.search_cfg = search_cfg
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.model_training_triggering = {
-            "defect_type": (RetrainingDefectTypeTriggering(app_config),
+            "defect_type": (RetrainingTriggering(app_config, "defect_type_trigger_info",
+                                                 start_number=100, accumulated_difference=100),
+                            training_defect_type_model.DefectTypeModelTraining(
+                                app_config, search_cfg)),
+            "suggestions": (RetrainingTriggering(app_config, "suggestions_trigger_info",
+                                                 start_number=100, accumulated_difference=50),
                             training_defect_type_model.DefectTypeModelTraining(
                                 app_config, search_cfg))
         }
@@ -48,7 +53,7 @@ class RetrainingService:
 
         _retraining_triggering, _retraining = self.model_training_triggering[train_info["model_type"]]
         if _retraining_triggering.should_model_training_be_triggered(train_info):
-            print("Should be trained ", train_info)
+            logger.debug("Should be trained ", train_info)
             try:
                 gathered_data, training_log_info = _retraining.train(train_info)
                 _retraining_triggering.clean_defect_type_triggering_info(

@@ -228,7 +228,7 @@ class EsClient:
                     self.app_config["exchangeName"], "train_models", json.dumps({
                         "model_type": "defect_type",
                         "project_id": project,
-                        "num_logs_with_defect_types": num_logs_with_defect_types
+                        "gathered_metric_total": num_logs_with_defect_types
                     }))
         except Exception as err:
             logger.error(err)

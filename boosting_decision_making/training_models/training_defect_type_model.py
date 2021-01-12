@@ -165,7 +165,7 @@ class DefectTypeModelTraining:
         train_log_info["all"]["data_size"] = len(data)
         return data, found_sub_categories, train_log_info
 
-    def creating_binary_target_data(self, label, data, found_sub_categories):
+    def creating_binary_target_data(self, label, data, found_sub_categories, fix_proportion=False):
         data_to_train = data
         if label in found_sub_categories:
             data_to_train = [d for d in data if d[2] != label] + found_sub_categories[label]
@@ -177,7 +177,7 @@ class DefectTypeModelTraining:
             else:
                 labels_filtered.append(0)
         proportion_binary_labels = utils.calculate_proportions_for_labels(labels_filtered)
-        if proportion_binary_labels < self.due_proportion:
+        if fix_proportion and proportion_binary_labels < self.due_proportion:
             logs_to_train_idx, labels_filtered, proportion_binary_labels = utils.rebalance_data(
                 logs_to_train_idx, labels_filtered, self.due_proportion)
         return logs_to_train_idx, labels_filtered, data_to_train, additional_logs, proportion_binary_labels
@@ -242,6 +242,8 @@ class DefectTypeModelTraining:
                 logger.debug("Baseline test results %s", baseline_model_results)
                 logger.debug("New model test results %s", new_model_results)
                 pvalue = stats.f_oneway(baseline_model_results, new_model_results).pvalue
+                if pvalue != pvalue:
+                    pvalue = 1.0
                 train_log_info[label]["p_value"] = pvalue
                 mean_f1 = np.mean(new_model_results)
                 train_log_info[label]["baseline_mean_f1"] = np.mean(baseline_model_results)
@@ -260,7 +262,7 @@ class DefectTypeModelTraining:
 
                 logs_to_train_idx, labels_filtered, data_to_train,\
                     additional_logs, proportion_binary_labels = self.creating_binary_target_data(
-                        label, data, found_sub_categories)
+                        label, data, found_sub_categories, fix_proportion=True)
                 x_train, y_train = self.return_similar_objects_into_sample(
                     logs_to_train_idx, labels_filtered, data_to_train, additional_logs, label)
 
@@ -300,8 +302,8 @@ class DefectTypeModelTraining:
         logger.info("Finished for %d s", time_spent)
         train_log_info["all"]["time_spent"] = time_spent
         train_log_info["all"]["data_proportion"] = data_proportion_min
-        train_log_info["all"]["baseline_mean_f1"] = np.mean(f1_baseline_models)
-        train_log_info["all"]["new_model_mean_f1"] = np.mean(f1_chosen_models)
+        train_log_info["all"]["baseline_mean_f1"] = np.mean(f1_baseline_models) if f1_baseline_models else 0.0
+        train_log_info["all"]["new_model_mean_f1"] = np.mean(f1_chosen_models) if f1_chosen_models else 0.0
         train_log_info["all"]["bad_data_proportion"] = all_bad_data
         for label in train_log_info:
             train_log_info[label]["gather_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

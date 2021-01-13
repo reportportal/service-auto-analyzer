@@ -26,6 +26,7 @@ from datetime import datetime
 import os
 import re
 from queue import Queue
+import elasticsearch.helpers
 
 logger = logging.getLogger("analyzerApp.trainingDefectTypeModel")
 
@@ -76,37 +77,52 @@ class DefectTypeModelTraining:
             x_test.append(data[ind][0])
         return x_train, x_test, y_train, y_test
 
-    def query_data(self, project, label):
-        label_data = self.es_client.es_client.search(
-            project,
-            {
-                "_source": ["detected_message_without_params_and_brackets", "issue_type"],
-                "sort": {"start_time": "desc"},
-                "size": 10000,
-                "query": {
-                    "bool": {
-                        "must": [
-                            {
-                                "bool": {
-                                    "should": [
-                                        {"wildcard": {"issue_type": "{}*".format(label.upper())}},
-                                        {"wildcard": {"issue_type": "{}*".format(label.lower())}},
-                                        {"wildcard": {"issue_type": "{}*".format(label)}},
-                                    ]
-                                }
+    def get_message_query_by_label(self, label):
+        return {
+            "_source": ["detected_message_without_params_and_brackets", "issue_type", "launch_id"],
+            "sort": {"start_time": "desc"},
+            "size": 10000,
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
+                        {"exists": {"field": "issue_type"}}
+                    ],
+                    "must": [
+                        {
+                            "bool": {
+                                "should": [
+                                    {"wildcard": {"issue_type": "{}*".format(label.upper())}},
+                                    {"wildcard": {"issue_type": "{}*".format(label.lower())}},
+                                    {"wildcard": {"issue_type": "{}*".format(label)}},
+                                ]
                             }
-                        ],
-                        "should": [
-                            {"term": {"is_auto_analyzed": {"value": "false", "boost": 1.0}}},
-                        ]
-                    }
+                        }
+                    ],
+                    "should": [
+                        {"term": {"is_auto_analyzed": {"value": "false", "boost": 1.0}}},
+                    ]
                 }
-            })
+            }
+        }
+
+    def query_data(self, project, label):
+        message_launch_dict = set()
         data = []
-        for d in label_data["hits"]["hits"]:
-            text_message = utils.enrich_text_with_method_and_classes(
-                d["_source"]["detected_message_without_params_and_brackets"])
-            data.append((text_message, label, d["_source"]["issue_type"]))
+        for r in elasticsearch.helpers.scan(self.es_client.es_client,
+                                            query=self.get_message_query_by_label(
+                                                label),
+                                            index=project):
+            detected_message = r["_source"]["detected_message_without_params_and_brackets"]
+            text_message_normalized = " ".join(sorted(
+                utils.split_words(detected_message, to_lower=True)))
+            if (text_message_normalized, r["_source"]["launch_id"]) not in message_launch_dict:
+                text_message = utils.enrich_text_with_method_and_classes(
+                    r["_source"]["detected_message_without_params_and_brackets"])
+                data.append((text_message, label, r["_source"]["issue_type"]))
+                message_launch_dict.add((text_message_normalized, r["_source"]["launch_id"]))
+            if len(data) >= self.search_cfg["MaxLogsForDefectTypeModel"]:
+                break
         return data
 
     def perform_light_deduplication(self, data):
@@ -165,7 +181,7 @@ class DefectTypeModelTraining:
         train_log_info["all"]["data_size"] = len(data)
         return data, found_sub_categories, train_log_info
 
-    def creating_binary_target_data(self, label, data, found_sub_categories, fix_proportion=False):
+    def creating_binary_target_data(self, label, data, found_sub_categories):
         data_to_train = data
         if label in found_sub_categories:
             data_to_train = [d for d in data if d[2] != label] + found_sub_categories[label]
@@ -177,7 +193,7 @@ class DefectTypeModelTraining:
             else:
                 labels_filtered.append(0)
         proportion_binary_labels = utils.calculate_proportions_for_labels(labels_filtered)
-        if fix_proportion and proportion_binary_labels < self.due_proportion:
+        if proportion_binary_labels < self.due_proportion:
             logs_to_train_idx, labels_filtered, proportion_binary_labels = utils.rebalance_data(
                 logs_to_train_idx, labels_filtered, self.due_proportion)
         return logs_to_train_idx, labels_filtered, data_to_train, additional_logs, proportion_binary_labels
@@ -192,25 +208,26 @@ class DefectTypeModelTraining:
             additional_logs, proportion_binary_labels = self.creating_binary_target_data(
                 label, data, found_sub_categories)
 
-        for random_state in random_states:
-            x_train, x_test, y_train, y_test = self.split_train_test(
-                logs_to_train_idx, data_to_train, labels_filtered,
-                additional_logs, label,
-                random_state=random_state)
-            if proportion_binary_labels < self.due_proportion:
-                logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
-                bad_data = True
-                break
-            self.new_model.train_model(label, x_train, y_train)
-            logger.debug("New model results")
-            f1, accuracy = self.new_model.validate_model(label, x_test, y_test)
-            new_model_results.append(f1)
-            if label in found_sub_categories:
-                baseline_model_results.append(0.001)
-            else:
-                logger.debug("Baseline results")
-                f1, accuracy = self.baseline_model.validate_model(label, x_test, y_test)
-                baseline_model_results.append(f1)
+        if proportion_binary_labels < self.due_proportion:
+            logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
+            bad_data = True
+
+        if not bad_data:
+            for random_state in random_states:
+                x_train, x_test, y_train, y_test = self.split_train_test(
+                    logs_to_train_idx, data_to_train, labels_filtered,
+                    additional_logs, label,
+                    random_state=random_state)
+                self.new_model.train_model(label, x_train, y_train)
+                logger.debug("New model results")
+                f1, accuracy = self.new_model.validate_model(label, x_test, y_test)
+                new_model_results.append(f1)
+                if label in found_sub_categories:
+                    baseline_model_results.append(0.001)
+                else:
+                    logger.debug("Baseline results")
+                    f1, accuracy = self.baseline_model.validate_model(label, x_test, y_test)
+                    baseline_model_results.append(f1)
         return baseline_model_results, new_model_results, bad_data
 
     def train(self, project_info):
@@ -262,18 +279,24 @@ class DefectTypeModelTraining:
 
                 logs_to_train_idx, labels_filtered, data_to_train,\
                     additional_logs, proportion_binary_labels = self.creating_binary_target_data(
-                        label, data, found_sub_categories, fix_proportion=True)
-                x_train, y_train = self.return_similar_objects_into_sample(
-                    logs_to_train_idx, labels_filtered, data_to_train, additional_logs, label)
-
+                        label, data, found_sub_categories)
+                if proportion_binary_labels < self.due_proportion:
+                    logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
+                    bad_data = True
+                train_log_info[label]["bad_data_proportion"] = int(bad_data)
                 train_log_info[label]["data_proportion"] = proportion_binary_labels
-                train_log_info[label]["model_saved"] = 1
-                data_proportion_min = min(train_log_info[label]["data_proportion"], data_proportion_min)
-                self.new_model.train_model(label, x_train, y_train)
-                custom_models.append(label)
-                if label not in found_sub_categories:
-                    f1_baseline_models.append(train_log_info[label]["baseline_mean_f1"])
-                    f1_chosen_models.append(train_log_info[label]["new_model_mean_f1"])
+                if not bad_data:
+                    x_train, y_train = self.return_similar_objects_into_sample(
+                        logs_to_train_idx, labels_filtered, data_to_train, additional_logs, label)
+                    train_log_info[label]["model_saved"] = 1
+                    data_proportion_min = min(train_log_info[label]["data_proportion"], data_proportion_min)
+                    self.new_model.train_model(label, x_train, y_train)
+                    custom_models.append(label)
+                    if label not in found_sub_categories:
+                        f1_baseline_models.append(train_log_info[label]["baseline_mean_f1"])
+                        f1_chosen_models.append(train_log_info[label]["new_model_mean_f1"])
+                else:
+                    train_log_info[label]["model_saved"] = 0
             else:
                 if label not in self.baseline_model.models:
                     if label in self.new_model.models:

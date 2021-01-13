@@ -71,7 +71,9 @@ class EsClient:
             return {
                 "_source": ["message", "test_item", "log_level", "found_exceptions",
                             "potential_status_codes", "original_message_lines",
-                            "original_message_words_number", "issue_type"],
+                            "original_message_words_number", "issue_type", "launch_id",
+                            "launch_name", "unique_id", "test_case_hash", "start_time",
+                            "is_auto_analyzed", "cluster_id"],
                 "size": 10000,
                 "query": {
                     "bool": {

@@ -75,6 +75,7 @@ SEARCH_CONFIG = {
     "PatternLabelMinPercentToSuggest": float(os.getenv("PATTERN_LABEL_MIN_PERCENT", "0.9")),
     "PatternLabelMinCountToSuggest":   int(os.getenv("PATTERN_LABEL_MIN_COUNT", "5")),
     "PatternMinCountToSuggest":        int(os.getenv("PATTERN_MIN_COUNT", "10")),
+    "MaxLogsForDefectTypeModel":        int(os.getenv("MAX_LOGS_FOR_DEFECT_TYPE_MODEL", "10000")),
     "BoostModelFolder":            "",
     "SuggestBoostModelFolder":     "",
     "SimilarityWeightsFolder":     "",

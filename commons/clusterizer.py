@@ -20,6 +20,7 @@ import numpy as np
 import sklearn
 from sklearn.feature_extraction.text import CountVectorizer
 from time import time
+from utils import utils
 
 logger = logging.getLogger("analyzerApp.clusterizer")
 
@@ -116,7 +117,31 @@ class Clusterizer:
         logger.debug("Time for finding hash groups: %.2f s", time() - start_time)
         return rearranged_groups
 
+    def perform_light_deduplication(self, messages):
+        text_messages_set = {}
+        messages_to_cluster = []
+        ids_with_duplicates = {}
+        new_id = 0
+        for idx, text_message in enumerate(messages):
+            text_message_normalized = " ".join(sorted(
+                utils.split_words(text_message, to_lower=True)))
+            if text_message_normalized not in text_messages_set:
+                messages_to_cluster.append(text_message)
+                text_messages_set[text_message_normalized] = new_id
+                ids_with_duplicates[new_id] = [idx]
+                new_id += 1
+            else:
+                ids_with_duplicates[text_messages_set[text_message_normalized]].append(idx)
+        return messages_to_cluster, ids_with_duplicates
+
     def find_clusters(self, messages):
-        hash_groups = self.unite_groups_by_hashes(messages)
-        groups = self.find_groups_by_similarity(messages, hash_groups)
-        return groups
+        messages_to_cluster, ids_with_duplicates = self.perform_light_deduplication(messages)
+        hash_groups = self.unite_groups_by_hashes(messages_to_cluster)
+        groups = self.find_groups_by_similarity(messages_to_cluster, hash_groups)
+        new_groups = {}
+        for cluster in groups:
+            new_log_ids = []
+            for idx in groups[cluster]:
+                new_log_ids.extend(ids_with_duplicates[idx])
+            new_groups[cluster] = new_log_ids
+        return new_groups

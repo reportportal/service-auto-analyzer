@@ -100,7 +100,7 @@ class ClusterService:
                         if log_dict_part[ind]["_source"]["cluster_id"].strip():
                             cluster_id = log_dict_part[ind]["_source"]["cluster_id"].strip()
                     if not cluster_id.strip():
-                        cluster_id = str(uuid.uuid1())
+                        cluster_id = str(uuid.uuid4())
                     for ind in groups_part[group]:
                         if ind == 0:
                             continue
@@ -129,7 +129,7 @@ class ClusterService:
             if cnt_items > 1:
                 cluster_num += 1
                 if not cluster_id:
-                    cluster_id = str(uuid.uuid1())
+                    cluster_id = str(uuid.uuid4())
             for ind in groups[group]:
                 results_to_return.append(ClusterResult(
                     logId=log_dict[ind]["_id"],

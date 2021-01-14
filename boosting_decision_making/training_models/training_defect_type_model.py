@@ -116,11 +116,14 @@ class DefectTypeModelTraining:
             detected_message = r["_source"]["detected_message_without_params_and_brackets"]
             text_message_normalized = " ".join(sorted(
                 utils.split_words(detected_message, to_lower=True)))
-            if (text_message_normalized, r["_source"]["launch_id"]) not in message_launch_dict:
+            message_info = (text_message_normalized,
+                            r["_source"]["launch_id"],
+                            r["_source"]["issue_type"])
+            if message_info not in message_launch_dict:
                 text_message = utils.enrich_text_with_method_and_classes(
                     r["_source"]["detected_message_without_params_and_brackets"])
                 data.append((text_message, label, r["_source"]["issue_type"]))
-                message_launch_dict.add((text_message_normalized, r["_source"]["launch_id"]))
+                message_launch_dict.add(message_info)
             if len(data) >= self.search_cfg["MaxLogsForDefectTypeModel"]:
                 break
         return data

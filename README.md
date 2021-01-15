@@ -66,6 +66,8 @@ volumes:
 
 **PATTERN_MIN_COUNT** - by default "10", the value of minimum count of pattern occurance to be suggested as a pattern without a label
 
+**MAX_LOGS_FOR_DEFECT_TYPE_MODEL** - by default "10000", the value of maximum count of logs per defect type to add into defect type model training. Default value is chosen in cosideration of having space for analyzer_train docker image setuo of 1GB, if you can give more GB you can linearly allow more logs to be considered.
+
 # Instructions for analyzer setup without Docker
 
 Install python with the version 3.7.4. (it is the version on which the service was developed, but it should work on the versions starting from 3.6).

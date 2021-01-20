@@ -17,10 +17,12 @@ from commons.esclient import EsClient
 from utils import utils
 from commons.log_preparation import LogPreparation
 from boosting_decision_making import defect_type_model, custom_defect_type_model
+from boosting_decision_making import custom_boosting_decision_maker
 from boosting_decision_making import weighted_similarity_calculator
 from commons import namespace_finder
 from commons.object_saving.object_saver import ObjectSaver
 import logging
+import numpy as np
 import re
 
 logger = logging.getLogger("analyzerApp.analyzerService")
@@ -37,6 +39,10 @@ class AnalyzerService:
         self.global_defect_type_model = None
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.object_saver = ObjectSaver(self.app_config)
+        self.model_folder_mapping = {
+            "defect_type_model/": custom_defect_type_model.CustomDefectTypeModel,
+            "suggestion_model/": custom_boosting_decision_maker.CustomBoostingDecisionMaker
+        }
         self.initialize_common_models()
 
     def initialize_common_models(self):
@@ -51,13 +57,15 @@ class AnalyzerService:
         return analyzer_config.minShouldMatch if analyzer_config.minShouldMatch > 0 else\
             int(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0))
 
-    def choose_model(self, project_id, model_name_folder):
+    def choose_model(self, project_id, model_name_folder, custom_model_prob=1.0):
         model = None
+        if np.random.uniform() > custom_model_prob:
+            return model
         if self.object_saver.does_object_exists(project_id, model_name_folder):
             folders = self.object_saver.get_folder_objects(project_id, model_name_folder)
             if len(folders):
                 try:
-                    model = custom_defect_type_model.CustomDefectTypeModel(
+                    model = self.model_folder_mapping[model_name_folder](
                         self.app_config, project_id, folder=folders[0])
                 except Exception as err:
                     logger.error(err)

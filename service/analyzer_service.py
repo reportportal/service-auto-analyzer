@@ -59,7 +59,8 @@ class AnalyzerService:
 
     def choose_model(self, project_id, model_name_folder, custom_model_prob=1.0):
         model = None
-        if np.random.uniform() > custom_model_prob:
+        prob_for_model = np.random.uniform()
+        if prob_for_model > custom_model_prob:
             return model
         if self.object_saver.does_object_exists(project_id, model_name_folder):
             folders = self.object_saver.get_folder_objects(project_id, model_name_folder)

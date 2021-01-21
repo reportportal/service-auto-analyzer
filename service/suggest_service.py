@@ -291,6 +291,7 @@ class SuggestService(AnalyzerService):
         if _suggest_decision_maker_to_use is None:
             _suggest_decision_maker_to_use = self.suggest_decision_maker
 
+
         _boosting_data_gatherer = SuggestBoostingFeaturizer(
             searched_res,
             boosting_config,

@@ -634,7 +634,9 @@ def rebalance_data(train_data, train_labels, due_proportion):
         zero_size = int(one_count * (1 / due_proportion) - 1)
         all_data.extend(zero_data[:zero_size])
         all_data_labels.extend([0] * zero_size)
-        real_proportion = due_proportion
+        real_proportion = calculate_proportions_for_labels(all_data_labels)
+        if real_proportion / due_proportion >= 0.9:
+            real_proportion = due_proportion
 
     random.seed(1257)
     random.shuffle(all_data)

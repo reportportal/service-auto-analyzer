@@ -301,6 +301,7 @@ class EsClient:
             es_client = self.es_client
         if not bodies:
             return commons.launch_objects.BulkResponse(took=0, errors=False)
+        start_time = time()
         logger.debug("Indexing %d logs...", len(bodies))
         try:
             try:
@@ -320,6 +321,7 @@ class EsClient:
             logger.debug("Processed %d logs", success_count)
             if errors:
                 logger.debug("Occured errors %s", errors)
+            logger.debug("Finished indexing for %.2f s", time() - start_time)
             return commons.launch_objects.BulkResponse(took=success_count, errors=len(errors) > 0)
         except Exception as err:
             logger.error("Error in bulk")

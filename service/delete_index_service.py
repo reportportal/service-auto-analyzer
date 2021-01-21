@@ -21,6 +21,7 @@ from commons import namespace_finder
 from commons.esclient import EsClient
 from commons.triggering_training.retraining_triggering import RetrainingTriggering
 from boosting_decision_making import custom_defect_type_model
+from boosting_decision_making import custom_boosting_decision_maker
 
 logger = logging.getLogger("analyzerApp.deleteIndexService")
 
@@ -51,5 +52,8 @@ class DeleteIndexService:
         self.custom_defect_type_model = custom_defect_type_model.CustomDefectTypeModel(
             self.app_config, index_name)
         self.custom_defect_type_model.delete_old_model()
+        self.custom_boosting_model = custom_boosting_decision_maker.CustomBoostingDecisionMaker(
+            self.app_config, index_name)
+        self.custom_boosting_model.delete_old_model("suggestion_model")
         logger.info("Finished deleting index %.2f s", time() - t_start)
         return int(is_index_deleted)

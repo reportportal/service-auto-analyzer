@@ -132,7 +132,8 @@ class TestService(unittest.TestCase):
             "SuggestBoostModelFolder":
                 self.model_settings["SUGGEST_BOOST_MODEL_FOLDER"],
             "GlobalDefectTypeModelFolder":
-                self.model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]
+                self.model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"],
+            "ProbabilityForCustomModelSuggestions": 0.9
         }
 
     @utils.ignore_warnings

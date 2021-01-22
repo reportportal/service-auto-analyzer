@@ -148,8 +148,8 @@ class DefectTypeModelTraining:
         return {"method": "training", "sub_model_type": label, "model_type": project_info["model_type"],
                 "baseline_model": [baseline_model], "new_model": [model_name],
                 "project_id": project_info["project_id"], "model_saved": 0, "p_value": 1.0,
-                "data_proportion": 0.0, "baseline_mean_f1": 0.0, "new_model_mean_f1": 0.0,
-                "bad_data_proportion": 0}
+                "data_proportion": 0.0, "baseline_mean_metric": 0.0, "new_model_mean_metric": 0.0,
+                "bad_data_proportion": 0, "metric_name": "F1"}
 
     def load_data_for_training(self, project_info, baseline_model, model_name):
         train_log_info = {}
@@ -266,8 +266,8 @@ class DefectTypeModelTraining:
                     pvalue = 1.0
                 train_log_info[label]["p_value"] = pvalue
                 mean_f1 = np.mean(new_model_results)
-                train_log_info[label]["baseline_mean_f1"] = np.mean(baseline_model_results)
-                train_log_info[label]["new_model_mean_f1"] = mean_f1
+                train_log_info[label]["baseline_mean_metric"] = np.mean(baseline_model_results)
+                train_log_info[label]["new_model_mean_metric"] = mean_f1
                 if pvalue < 0.05 and mean_f1 > np.mean(baseline_model_results) and mean_f1 >= 0.4:
                     p_value_max = max(p_value_max, pvalue)
                     use_custom_model = True
@@ -296,8 +296,8 @@ class DefectTypeModelTraining:
                     self.new_model.train_model(label, x_train, y_train)
                     custom_models.append(label)
                     if label not in found_sub_categories:
-                        f1_baseline_models.append(train_log_info[label]["baseline_mean_f1"])
-                        f1_chosen_models.append(train_log_info[label]["new_model_mean_f1"])
+                        f1_baseline_models.append(train_log_info[label]["baseline_mean_metric"])
+                        f1_chosen_models.append(train_log_info[label]["new_model_mean_metric"])
                 else:
                     train_log_info[label]["model_saved"] = 0
             else:
@@ -310,9 +310,9 @@ class DefectTypeModelTraining:
                 self.new_model.models[label] = self.baseline_model.models[label]
                 _count_vectorizer = self.baseline_model.count_vectorizer_models[label]
                 self.new_model.count_vectorizer_models[label] = _count_vectorizer
-                if train_log_info[label]["baseline_mean_f1"] > 0.001:
-                    f1_baseline_models.append(train_log_info[label]["baseline_mean_f1"])
-                    f1_chosen_models.append(train_log_info[label]["baseline_mean_f1"])
+                if train_log_info[label]["baseline_mean_metric"] > 0.001:
+                    f1_baseline_models.append(train_log_info[label]["baseline_mean_metric"])
+                    f1_chosen_models.append(train_log_info[label]["baseline_mean_metric"])
             train_log_info[label]["time_spent"] += (time() - time_training)
 
         logger.debug("Custom models were for labels: %s" % custom_models)
@@ -328,8 +328,10 @@ class DefectTypeModelTraining:
         logger.info("Finished for %d s", time_spent)
         train_log_info["all"]["time_spent"] = time_spent
         train_log_info["all"]["data_proportion"] = data_proportion_min
-        train_log_info["all"]["baseline_mean_f1"] = np.mean(f1_baseline_models) if f1_baseline_models else 0.0
-        train_log_info["all"]["new_model_mean_f1"] = np.mean(f1_chosen_models) if f1_chosen_models else 0.0
+        train_log_info["all"]["baseline_mean_metric"] = np.mean(
+            f1_baseline_models) if f1_baseline_models else 0.0
+        train_log_info["all"]["new_model_mean_metric"] = np.mean(
+            f1_chosen_models) if f1_chosen_models else 0.0
         train_log_info["all"]["bad_data_proportion"] = all_bad_data
         for label in train_log_info:
             train_log_info[label]["gather_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

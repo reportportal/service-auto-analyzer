@@ -669,3 +669,30 @@ def preprocess_words(text):
                             split_words.append("".join(split_parts[idx:idx + 2]).lower())
             all_words.extend(split_words)
     return all_words
+
+
+def topological_sort(feature_graph):
+    visited = {}
+    for key_ in feature_graph:
+        visited[key_] = 0
+    stack = []
+
+    for key_ in feature_graph:
+        if visited[key_] == 0:
+            stack_vertices = [key_]
+            while len(stack_vertices):
+                vert = stack_vertices[-1]
+                if vert not in visited:
+                    continue
+                if visited[vert] == 1:
+                    stack_vertices.pop()
+                    visited[vert] = 2
+                    stack.append(vert)
+                else:
+                    visited[vert] = 1
+                    for key_i in feature_graph[vert]:
+                        if key_i not in visited:
+                            continue
+                        if visited[key_i] == 0:
+                            stack_vertices.append(key_i)
+    return stack

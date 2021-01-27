@@ -17,6 +17,7 @@
 from utils import utils
 from commons import similarity_calculator
 import logging
+import numpy as np
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
@@ -43,45 +44,45 @@ class BoostingFeaturizer:
             "detected_message_without_params_and_brackets"]
 
         self.feature_functions = {
-            0: (self._calculate_score, {}),
-            1: (self._calculate_place, {}),
-            3: (self._calculate_max_score_and_pos, {"return_val_name": "max_score_pos"}),
-            5: (self._calculate_min_score_and_pos, {"return_val_name": "min_score_pos"}),
-            7: (self._calculate_percent_count_items_and_mean, {"return_val_name": "cnt_items_percent"}),
-            9: (self._calculate_percent_issue_types, {}),
-            11: (self._calculate_similarity_percent, {"field_name": "message"}),
-            12: (self.is_only_merged_small_logs, {}),
-            13: (self._calculate_similarity_percent, {"field_name": "merged_small_logs"}),
-            14: (self._has_test_item_several_logs, {}),
-            15: (self._has_query_several_logs, {}),
-            18: (self._calculate_similarity_percent, {"field_name": "detected_message"}),
-            19: (self._calculate_similarity_percent, {"field_name": "detected_message_with_numbers"}),
-            23: (self._calculate_similarity_percent, {"field_name": "stacktrace"}),
-            25: (self._calculate_similarity_percent, {"field_name": "only_numbers"}),
-            26: (self._calculate_max_score_and_pos, {"return_val_name": "max_score"}),
-            27: (self._calculate_min_score_and_pos, {"return_val_name": "min_score"}),
+            0: (self._calculate_score, {}, []),
+            1: (self._calculate_place, {}, []),
+            3: (self._calculate_max_score_and_pos, {"return_val_name": "max_score_pos"}, []),
+            5: (self._calculate_min_score_and_pos, {"return_val_name": "min_score_pos"}, []),
+            7: (self._calculate_percent_count_items_and_mean, {"return_val_name": "cnt_items_percent"}, []),
+            9: (self._calculate_percent_issue_types, {}, []),
+            11: (self._calculate_similarity_percent, {"field_name": "message"}, []),
+            12: (self.is_only_merged_small_logs, {}, []),
+            13: (self._calculate_similarity_percent, {"field_name": "merged_small_logs"}, []),
+            14: (self._has_test_item_several_logs, {}, []),
+            15: (self._has_query_several_logs, {}, []),
+            18: (self._calculate_similarity_percent, {"field_name": "detected_message"}, []),
+            19: (self._calculate_similarity_percent, {"field_name": "detected_message_with_numbers"}, []),
+            23: (self._calculate_similarity_percent, {"field_name": "stacktrace"}, []),
+            25: (self._calculate_similarity_percent, {"field_name": "only_numbers"}, []),
+            26: (self._calculate_max_score_and_pos, {"return_val_name": "max_score"}, []),
+            27: (self._calculate_min_score_and_pos, {"return_val_name": "min_score"}, []),
             28: (self._calculate_percent_count_items_and_mean,
-                 {"return_val_name": "mean_score"}),
-            29: (self._calculate_similarity_percent, {"field_name": "message_params"}),
-            34: (self._calculate_similarity_percent, {"field_name": "found_exceptions"}),
-            35: (self._is_all_log_lines, {}),
-            36: (self._calculate_similarity_percent, {"field_name": "detected_message_extended"}),
+                 {"return_val_name": "mean_score"}, []),
+            29: (self._calculate_similarity_percent, {"field_name": "message_params"}, []),
+            34: (self._calculate_similarity_percent, {"field_name": "found_exceptions"}, []),
+            35: (self._is_all_log_lines, {}, []),
+            36: (self._calculate_similarity_percent, {"field_name": "detected_message_extended"}, []),
             37: (self._calculate_similarity_percent,
-                 {"field_name": "detected_message_without_params_extended"}),
-            38: (self._calculate_similarity_percent, {"field_name": "stacktrace_extended"}),
-            40: (self._calculate_similarity_percent, {"field_name": "message_without_params_extended"}),
-            41: (self._calculate_similarity_percent, {"field_name": "message_extended"}),
-            42: (self.is_the_same_test_case, {}),
-            43: (self.has_the_same_test_case_in_all_results, {}),
-            48: (self.is_text_of_particular_defect_type, {"label_type": "ab"}),
-            49: (self.is_text_of_particular_defect_type, {"label_type": "pb"}),
-            50: (self.is_text_of_particular_defect_type, {"label_type": "si"}),
-            51: (self.predict_particular_defect_type, {}),
-            52: (self._calculate_similarity_percent, {"field_name": "namespaces_stacktrace"}),
+                 {"field_name": "detected_message_without_params_extended"}, []),
+            38: (self._calculate_similarity_percent, {"field_name": "stacktrace_extended"}, []),
+            40: (self._calculate_similarity_percent, {"field_name": "message_without_params_extended"}, []),
+            41: (self._calculate_similarity_percent, {"field_name": "message_extended"}, []),
+            42: (self.is_the_same_test_case, {}, []),
+            43: (self.has_the_same_test_case_in_all_results, {}, []),
+            48: (self.is_text_of_particular_defect_type, {"label_type": "ab"}, []),
+            49: (self.is_text_of_particular_defect_type, {"label_type": "pb"}, []),
+            50: (self.is_text_of_particular_defect_type, {"label_type": "si"}, []),
+            51: (self.predict_particular_defect_type, {}, []),
+            52: (self._calculate_similarity_percent, {"field_name": "namespaces_stacktrace"}, []),
             53: (self._calculate_similarity_percent,
-                 {"field_name": "detected_message_without_params_and_brackets"}),
+                 {"field_name": "detected_message_without_params_and_brackets"}, []),
             55: (self._calculate_similarity_percent,
-                 {"field_name": "potential_status_codes"})
+                 {"field_name": "potential_status_codes"}, [])
         }
 
         fields_to_calc_similarity = self.find_columns_to_find_similarities_for()
@@ -409,21 +410,35 @@ class BoostingFeaturizer:
     def gather_features_info(self):
         """Gather all features from feature_ids for a test item"""
         gathered_data = []
+        gathered_data_dict = {}
         issue_type_names = []
         issue_type_by_index = {}
         try:
             issue_types = self.find_most_relevant_by_type()
             for idx, issue_type in enumerate(issue_types):
-                gathered_data.append([])
-                issue_type_by_index[issue_type] = idx
+                issue_type_by_index[idx] = issue_type
                 issue_type_names.append(issue_type)
+
+            feature_graph = {}
             for feature in self.feature_ids:
-                func, args = self.feature_functions[feature]
+                _, _, dependants = self.feature_functions[feature]
+                feature_graph[feature] = dependants
+            ordered_features = utils.topological_sort(feature_graph)
+
+            for feature in ordered_features:
+                func, args, _ = self.feature_functions[feature]
                 result = func(**args)
-                for issue_type in result:
-                    gathered_data[issue_type_by_index[issue_type]].append(round(result[issue_type], 2))
+                gathered_data_dict[feature] = []
+                for idx in sorted(issue_type_by_index.keys()):
+                    issue_type = issue_type_by_index[idx]
+                    gathered_data_dict[feature].append(round(result[issue_type], 2))
+
+            gathered_data = np.zeros((len(issue_type_names), len(self.feature_ids)))
+            for idx, feature in enumerate(self.feature_ids):
+                for j in range(len(gathered_data_dict[feature])):
+                    gathered_data[j][idx] = gathered_data_dict[feature][j]
+            gathered_data = gathered_data.tolist()
         except Exception as err:
             logger.error("Errors in boosting features calculation")
             logger.error(err)
-
         return gathered_data, issue_type_names

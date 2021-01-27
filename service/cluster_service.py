@@ -100,7 +100,7 @@ class ClusterService:
                         if log_dict_part[ind]["_source"]["cluster_id"].strip():
                             cluster_id = log_dict_part[ind]["_source"]["cluster_id"].strip()
                     if not cluster_id.strip():
-                        cluster_id = str(uuid.uuid1())
+                        cluster_id = str(uuid.uuid4())
                     for ind in groups_part[group]:
                         if ind == 0:
                             continue
@@ -129,7 +129,7 @@ class ClusterService:
             if cnt_items > 1:
                 cluster_num += 1
                 if not cluster_id:
-                    cluster_id = str(uuid.uuid1())
+                    cluster_id = str(uuid.uuid4())
             for ind in groups[group]:
                 results_to_return.append(ClusterResult(
                     logId=log_dict[ind]["_id"],
@@ -151,11 +151,11 @@ class ClusterService:
         t_start = time()
         _clusterizer = clusterizer.Clusterizer()
         log_messages, log_dict = self.log_preparation.prepare_logs_for_clustering(
-            launch_info.launch, launch_info.numberOfLogLines)
+            launch_info.launch, launch_info.numberOfLogLines, launch_info.cleanNumbers)
         log_ids = set([int(log["_id"]) for log in log_dict.values()])
         groups = _clusterizer.find_clusters(log_messages)
         additional_results = {}
-        if launch_info.for_update:
+        if launch_info.forUpdate:
             additional_results = self.find_similar_items_from_es(
                 groups, log_dict, log_messages, log_ids, launch_info.numberOfLogLines)
 

@@ -285,11 +285,16 @@ class SuggestService(AnalyzerService):
         boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
         boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(
             test_item_info.project)
+        _suggest_decision_maker_to_use = self.choose_model(
+            test_item_info.project, "suggestion_model/",
+            custom_model_prob=self.search_cfg["ProbabilityForCustomModelSuggestions"])
+        if _suggest_decision_maker_to_use is None:
+            _suggest_decision_maker_to_use = self.suggest_decision_maker
 
         _boosting_data_gatherer = SuggestBoostingFeaturizer(
             searched_res,
             boosting_config,
-            feature_ids=self.suggest_decision_maker.get_feature_ids(),
+            feature_ids=_suggest_decision_maker_to_use.get_feature_ids(),
             weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
         defect_type_model_to_use = self.choose_model(
             test_item_info.project, "defect_type_model/")
@@ -300,10 +305,11 @@ class SuggestService(AnalyzerService):
         feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
         scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
         model_info_tags = _boosting_data_gatherer.get_used_model_info() +\
-            self.suggest_decision_maker.get_model_info()
+            _suggest_decision_maker_to_use.get_model_info()
 
         if feature_data:
-            predicted_labels, predicted_labels_probability = self.suggest_decision_maker.predict(feature_data)
+            predicted_labels, predicted_labels_probability = _suggest_decision_maker_to_use.predict(
+                feature_data)
             sorted_results = self.sort_results(
                 scores_by_test_items, test_item_ids, predicted_labels_probability)
 
@@ -333,7 +339,7 @@ class SuggestService(AnalyzerService):
                         esScore=round(scores_by_test_items[test_item_id]["mrHit"]["_score"], 2),
                         esPosition=scores_by_test_items[test_item_id]["mrHit"]["es_pos"],
                         modelFeatureNames=";".join(
-                            [str(feature) for feature in self.suggest_decision_maker.get_feature_ids()]),
+                            [str(feature) for feature in _suggest_decision_maker_to_use.get_feature_ids()]),
                         modelFeatureValues=";".join(
                             [str(feature) for feature in feature_data[idx]]),
                         modelInfo=";".join(model_info_tags),
@@ -360,6 +366,13 @@ class SuggestService(AnalyzerService):
         if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
             AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
                 self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
+            if results:
+                AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                    self.app_config["exchangeName"], "train_models", json.dumps({
+                        "model_type": "suggestions",
+                        "project_id": test_item_info.project,
+                        "gathered_metric_total": len(results)
+                    }))
 
         logger.debug("Stats info %s", results_to_share)
         logger.info("Processed the test item. It took %.2f sec.", time() - t_start)

@@ -152,44 +152,48 @@ def remove_starting_datetime(text, remove_first_digits=False):
 
 
 def is_starting_message_pattern(text):
-    processed_text = remove_starting_datetime(text).strip()
-    for ext in file_extensions:
-        res = re.search(r"\w*\s*\(\s*.*\.%s:\d+\s*\)" % ext, processed_text)
-        if res and processed_text.startswith(res.group(0)):
-            return True
+    processed_text = text
+    res = re.search(r"\w*\s*\(\s*.*\.%s:\d+\s*\)" % "|".join(file_extensions), processed_text)
+    if res and processed_text.startswith(res.group(0)):
+        return True
     return False
 
 
 def does_stacktrace_need_words_reweighting(log):
     found_file_extensions = []
-    for file_extension in ["py", "java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "scala"]:
-        if re.search(r"\.%s(?!\.)\b" % file_extension, log):
-            found_file_extensions.append(file_extension)
+    all_extensions_to_find = "|".join(
+        ["py", "java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "scala"])
+    for m in re.findall(r"\.(%s)(?!\.)\b" % all_extensions_to_find, log):
+        found_file_extensions.append(m)
     if len(found_file_extensions) == 1 and found_file_extensions[0] in ["js", "c", "h", "rb", "cpp"]:
         return True
     return False
 
 
-def delete_line_numbers(text):
+def is_line_from_stacktrace(text):
     """Deletes line numbers in the stacktrace"""
     if is_starting_message_pattern(text):
-        return text
-    text = re.sub(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)", r"\g<1>#\g<2>", text)
+        return False
 
+    text = re.sub(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)", "", text)
     res = re.sub(r"(?<=:)\d+(?=\)?\]?(\n|\r\n|$))", " ", text)
+    if res != text:
+        return True
     res = re.sub(r"((?<=line )|(?<=line))\s*\d+\s*((?=, in)|(?=,in)|(?=\n)|(?=\r\n)|(?=$))",
                  " ", res, flags=re.I)
+    if res != text:
+        return True
     res = re.sub("|".join([r"\.%s(?!\.)\b" % ext for ext in file_extensions]), " ", res, flags=re.I)
-    res = re.sub(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})#(\d+)", r"\g<1>:\g<2>", res)
+    if res != text:
+        return True
     result = re.search(r"^\s*at\s+.*\(.*?\)[\s]*$", res)
     if result and result.group(0) == res:
-        res = re.sub(r"\d", "", res)
-        res = "# " + res
+        return True
     else:
         result = re.search(r"^\s*\w+([\.\/]\s*\w+)+\s*\(.*?\)[\s]*$", res)
         if result and result.group(0) == res:
-            res = "# " + res
-    return res
+            return True
+    return False
 
 
 def find_only_numbers(detected_message_with_numbers):
@@ -201,9 +205,9 @@ def find_only_numbers(detected_message_with_numbers):
 def is_python_log(log):
     """Tries to find whether a log was for the python language"""
     found_file_extensions = []
-    for file_extension in file_extensions:
-        if re.search(r"\.%s(?!\.)\b" % file_extension, log):
-            found_file_extensions.append(file_extension)
+    for m in re.findall(r"\.(%s)(?!\.)\b" % "|".join(file_extensions), log):
+        found_file_extensions.append(m)
+    found_file_extensions = list(set(found_file_extensions))
     if len(found_file_extensions) == 1 and found_file_extensions[0] == "py":
         return True
     return False
@@ -257,6 +261,7 @@ def detect_log_parts_python(message, default_log_number=1):
 
 def detect_log_description_and_stacktrace(message):
     """Split a log into a log message and stacktrace"""
+    message = remove_starting_datetime(message)
     message = delete_empty_lines(message)
     if calculate_line_number(message) > 2:
         if is_python_log(message):
@@ -265,8 +270,7 @@ def detect_log_description_and_stacktrace(message):
         detected_message_lines = []
         stacktrace_lines = []
         for idx, line in enumerate(split_lines):
-            modified_line = delete_line_numbers(line)
-            if modified_line != line:
+            if is_line_from_stacktrace(line):
                 stacktrace_lines.append(line)
             else:
                 detected_message_lines.append(line)
@@ -614,28 +618,31 @@ def calculate_proportions_for_labels(labels):
     return 0.0
 
 
-def rebalance_data(train_data, train_labels):
+def rebalance_data(train_data, train_labels, due_proportion):
     one_data = [train_data[i] for i in range(len(train_data)) if train_labels[i] == 1]
     zero_data = [train_data[i] for i in range(len(train_data)) if train_labels[i] == 0]
     zero_count = len(zero_data)
     one_count = len(one_data)
     all_data = []
     all_data_labels = []
-    if zero_count > 0 and one_count / zero_count < 0.1:
+    real_proportion = 0.0 if zero_count < 0.001 else np.round(one_count / zero_count, 3)
+    if zero_count > 0 and real_proportion < due_proportion:
         all_data.extend(one_data)
         all_data_labels.extend([1] * len(one_data))
         random.seed(1763)
         random.shuffle(zero_data)
-        zero_size = one_count * 10 - 1
+        zero_size = int(one_count * (1 / due_proportion) - 1)
         all_data.extend(zero_data[:zero_size])
         all_data_labels.extend([0] * zero_size)
+        real_proportion = calculate_proportions_for_labels(all_data_labels)
+        if real_proportion / due_proportion >= 0.9:
+            real_proportion = due_proportion
 
     random.seed(1257)
     random.shuffle(all_data)
     random.seed(1257)
     random.shuffle(all_data_labels)
-    return all_data, all_data_labels, calculate_proportions_for_labels(
-        all_data_labels)
+    return all_data, all_data_labels, real_proportion
 
 
 def preprocess_words(text):

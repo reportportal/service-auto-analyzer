@@ -17,6 +17,7 @@
 import json
 import logging
 import requests
+import urllib3
 import elasticsearch
 import elasticsearch.helpers
 import commons.launch_objects
@@ -37,17 +38,12 @@ class EsClient:
         self.app_config = app_config
         self.host = app_config["esHost"]
         self.search_cfg = search_cfg
-        self.es_client = elasticsearch.Elasticsearch([self.host], timeout=30,
-                                                     max_retries=5, retry_on_timeout=True,
-                                                     use_ssl=app_config["esUseSsl"],
-                                                     verify_certs=app_config["esVerifyCerts"],
-                                                     ssl_show_warn=app_config["esSslShowWarn"],
-                                                     ca_certs=app_config["esCAcert"],
-                                                     client_cert=app_config["esClientCert"],
-                                                     client_key=app_config["esClientKey"])
+        self.es_client = self.create_es_client(app_config)
         self.log_preparation = LogPreparation()
 
     def create_es_client(self, app_config):
+        if not app_config["esVerifyCerts"]:
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         if app_config["turnOffSslVerification"]:
             return elasticsearch.Elasticsearch(
                 [self.host], timeout=30,
@@ -75,7 +71,9 @@ class EsClient:
             return {
                 "_source": ["message", "test_item", "log_level", "found_exceptions",
                             "potential_status_codes", "original_message_lines",
-                            "original_message_words_number", "issue_type"],
+                            "original_message_words_number", "issue_type", "launch_id",
+                            "launch_name", "unique_id", "test_case_hash", "start_time",
+                            "is_auto_analyzed", "cluster_id"],
                 "size": 10000,
                 "query": {
                     "bool": {
@@ -232,7 +230,7 @@ class EsClient:
                     self.app_config["exchangeName"], "train_models", json.dumps({
                         "model_type": "defect_type",
                         "project_id": project,
-                        "num_logs_with_defect_types": num_logs_with_defect_types
+                        "gathered_metric_total": num_logs_with_defect_types
                     }))
         except Exception as err:
             logger.error(err)
@@ -303,6 +301,7 @@ class EsClient:
             es_client = self.es_client
         if not bodies:
             return commons.launch_objects.BulkResponse(took=0, errors=False)
+        start_time = time()
         logger.debug("Indexing %d logs...", len(bodies))
         try:
             try:
@@ -322,6 +321,7 @@ class EsClient:
             logger.debug("Processed %d logs", success_count)
             if errors:
                 logger.debug("Occured errors %s", errors)
+            logger.debug("Finished indexing for %.2f s", time() - start_time)
             return commons.launch_objects.BulkResponse(took=success_count, errors=len(errors) > 0)
         except Exception as err:
             logger.error("Error in bulk")

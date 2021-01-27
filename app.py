@@ -35,6 +35,7 @@ from service.search_service import SearchService
 from service.namespace_finder_service import NamespaceFinderService
 from service.delete_index_service import DeleteIndexService
 from service.retraining_service import RetrainingService
+from service.suggest_patterns_service import SuggestPatternsService
 
 
 APP_CONFIG = {
@@ -71,6 +72,12 @@ SEARCH_CONFIG = {
     "MaxQueryTerms":               int(os.getenv("ES_MAX_QUERY_TERMS", "50")),
     "SearchLogsMinSimilarity":     float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.98")),
     "MinWordLength":               int(os.getenv("ES_MIN_WORD_LENGTH", "2")),
+    "PatternLabelMinPercentToSuggest": float(os.getenv("PATTERN_LABEL_MIN_PERCENT", "0.9")),
+    "PatternLabelMinCountToSuggest":  int(os.getenv("PATTERN_LABEL_MIN_COUNT", "5")),
+    "PatternMinCountToSuggest":       int(os.getenv("PATTERN_MIN_COUNT", "10")),
+    "MaxLogsForDefectTypeModel":      int(os.getenv("MAX_LOGS_FOR_DEFECT_TYPE_MODEL", "10000")),
+    "ProbabilityForCustomModelSuggestions":  min(
+        0.9, float(os.getenv("PROB_CUSTOM_MODEL_SUGGESTIONS", "0.3"))),
     "BoostModelFolder":            "",
     "SuggestBoostModelFolder":     "",
     "SimilarityWeightsFolder":     "",
@@ -207,6 +214,17 @@ def init_amqp(_amqp_client):
                                                         NamespaceFinderService(
                                                             APP_CONFIG,
                                                             SEARCH_CONFIG).update_chosen_namespaces))))
+        threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
+                       (APP_CONFIG["exchangeName"], "suggest_patterns", True, False,
+                       lambda channel, method, props, body:
+                       amqp_handler.handle_amqp_request(channel, method, props, body,
+                                                        SuggestPatternsService(
+                                                            APP_CONFIG,
+                                                            SEARCH_CONFIG).suggest_patterns,
+                                                        prepare_data_func=amqp_handler.
+                                                        prepare_delete_index,
+                                                        prepare_response_data=amqp_handler.
+                                                        prepare_index_response_data))))
 
     return threads
 

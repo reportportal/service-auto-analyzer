@@ -51,6 +51,7 @@ class TestEsQuery(unittest.TestCase):
             "esVerifyCerts":     False,
             "esUseSsl":          False,
             "esSslShowWarn":     False,
+            "turnOffSslVerification": True,
             "esCAcert":          "",
             "esClientCert":      "",
             "esClientKey":       "",

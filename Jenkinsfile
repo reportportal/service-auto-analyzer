@@ -17,7 +17,7 @@ node {
                         """
         }
         stage('Deploy Container') {
-            sh "docker-compose -f $COMPOSE_FILE_RP -p reportportal up -d --force-recreate analyzer"
+            sh "docker-compose -f $COMPOSE_FILE_RP -p reportportal up -d --force-recreate analyzer analyzer_train"
             stage('Push to ECR') {
                 withEnv(["AWS_URI=${AWS_URI}", "AWS_REGION=${AWS_REGION}"]) {
                     sh 'docker tag reportportal-dev/service-auto-analyzer ${AWS_URI}/service-auto-analyzer'

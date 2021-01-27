@@ -44,6 +44,30 @@ volumes:
   - ./data/analyzer:/backend/storage
 ```
 
+# Environmental variables for constants, used by algorithms:
+
+**ES_MIN_SHOULD_MATCH** - by default "80%", the global default min should match value for auto-analysis, but it is used only when the project settings are not set up.
+
+**ES_BOOST_AA** - by default "-8.0", the value to boost auto-analyzed items while querying for Auto-analysis
+
+**ES_BOOST_LAUNCH** - by default "4.0", the value to boost items with the same launch while querying for Auto-analysis
+
+**ES_BOOST_UNIQUE_ID** - by default "8.0", the value to boost items with the same unique id while querying for Auto-analysis
+
+**ES_MAX_QUERY_TERMS** - by default "50", the value to use in more like this query while querying for Auto-analysis
+
+**ES_MIN_WORD_LENGTH** - by default "2", the value to use in more like this query while querying for Auto-analysis
+
+**ES_LOGS_MIN_SHOULD_MATCH** - by default "0.98", the value of min should match for searching the same to investigate test items
+
+**PATTERN_LABEL_MIN_PERCENT** - by default "0.9", the value of minimum percent of the same issue type for pattern to be suggested as a pattern with a label
+
+**PATTERN_LABEL_MIN_COUNT** - by default "5", the value of minimum count of pattern occurance to be suggested as a pattern with a label
+
+**PATTERN_MIN_COUNT** - by default "10", the value of minimum count of pattern occurance to be suggested as a pattern without a label
+
+**MAX_LOGS_FOR_DEFECT_TYPE_MODEL** - by default "10000", the value of maximum count of logs per defect type to add into defect type model training. Default value is chosen in cosideration of having space for analyzer_train docker image setuo of 1GB, if you can give more GB you can linearly allow more logs to be considered.
+
 # Instructions for analyzer setup without Docker
 
 Install python with the version 3.7.4. (it is the version on which the service was developed, but it should work on the versions starting from 3.6).

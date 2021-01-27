@@ -42,7 +42,7 @@ class BoostingDecisionMaker:
             self.load_model(folder)
 
     def get_model_info(self):
-        folder_name = os.path.basename(self.folder).strip()
+        folder_name = os.path.basename(self.folder.strip("/").strip("\\")).strip()
         if folder_name:
             tags = [folder_name]
             if not self.is_global:

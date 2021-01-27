@@ -15,16 +15,19 @@
         "data_size": {
             "type": "integer"
         },
+        "metric_name": {
+            "type": "keyword"
+        },
         "baseline_model": {
             "type": "keyword"
         },
-        "baseline_mean_f1": {
+        "baseline_mean_metric": {
             "type": "float"
         },
         "new_model": {
             "type": "keyword"
         },
-        "new_model_mean_f1": {
+        "new_model_mean_metric": {
             "type": "float"
         },
         "gather_date": {

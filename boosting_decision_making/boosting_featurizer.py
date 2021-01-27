@@ -127,8 +127,11 @@ class BoostingFeaturizer:
             det_message = utils.clean_from_brackets(det_message)
             result[issue_type] = 0.0
             try:
+                model_to_use = issue_type_to_compare.lower()[:2]
+                if issue_type_to_compare in self.defect_type_predict_model.models:
+                    model_to_use = issue_type_to_compare
                 res, res_prob = self.defect_type_predict_model.predict(
-                    [det_message], issue_type_to_compare.lower()[:2])
+                    [det_message], model_to_use)
                 result[issue_type] = res_prob[0][1] if len(res_prob[0]) == 2 else 0.0
                 self.used_model_info.update(self.defect_type_predict_model.get_model_info())
             except Exception as err:

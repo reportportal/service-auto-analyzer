@@ -49,7 +49,8 @@ class AutoAnalyzerService(AnalyzerService):
             "filter_min_should_match": self.choose_fields_to_filter_strict(
                 analyzer_config.numberOfLogLines),
             "number_of_log_lines": analyzer_config.numberOfLogLines,
-            "filter_by_unique_id": True
+            "filter_by_unique_id": True,
+            "boosting_model": self.search_cfg["BoostModelFolder"]
         }
 
     def choose_fields_to_filter_strict(self, log_lines):

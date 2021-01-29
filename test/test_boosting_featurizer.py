@@ -59,7 +59,8 @@ class TestBoostingFeaturizer(unittest.TestCase):
             "min_word_length":  0,
             "filter_min_should_match": filter_fields,
             "filter_min_should_match_any": filter_fields_any,
-            "number_of_log_lines": -1
+            "number_of_log_lines": -1,
+            "boosting_model": ""
         }
 
     @utils.ignore_warnings

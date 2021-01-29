@@ -16,6 +16,7 @@
 
 from utils import utils
 from commons import similarity_calculator
+from boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
 import logging
 import numpy as np
 
@@ -27,6 +28,8 @@ class BoostingFeaturizer:
     def __init__(self, all_results, config, feature_ids,
                  weighted_log_similarity_calculator=None):
         self.config = config
+        self.previously_gathered_features = {}
+        self.models = {}
         self.similarity_calculator = similarity_calculator.SimilarityCalculator(
             self.config,
             weighted_similarity_calculator=weighted_log_similarity_calculator)
@@ -82,7 +85,10 @@ class BoostingFeaturizer:
             53: (self._calculate_similarity_percent,
                  {"field_name": "detected_message_without_params_and_brackets"}, []),
             55: (self._calculate_similarity_percent,
-                 {"field_name": "potential_status_codes"}, [])
+                 {"field_name": "potential_status_codes"}, []),
+            56: (self._calculate_model_probability,
+                 {"model_folder": self.config["boosting_model"]},
+                 self.get_necessary_features(self.config["boosting_model"]))
         }
 
         fields_to_calc_similarity = self.find_columns_to_find_similarities_for()
@@ -110,6 +116,45 @@ class BoostingFeaturizer:
         self.scores_by_issue_type = None
         self.defect_type_predict_model = None
         self.used_model_info = set()
+
+    def _calculate_model_probability(self, model_folder=""):
+        if not model_folder.strip():
+            return []
+        if model_folder not in self.models:
+            logger.error("Model folder is not found: '%s'", model_folder)
+            return []
+        feature_ids = self.models[model_folder].get_feature_ids()
+        feature_data = self.gather_feature_list(self.previously_gathered_features, feature_ids)
+        predicted_labels, predicted_labels_probability = self.models[model_folder].predict(
+            feature_data)
+        predicted_probability = []
+        for res in predicted_labels_probability:
+            predicted_probability.append(res[1])
+        return predicted_probability
+
+    def get_necessary_features(self, model_folder):
+        if not model_folder.strip():
+            return[]
+        if model_folder not in self.models:
+            try:
+                self.models[model_folder] = BoostingDecisionMaker(folder=model_folder)
+                return self.models[model_folder].get_feature_ids()
+            except Exception as err:
+                logger.debug(err)
+                return []
+        return self.models[model_folder].get_feature_ids()
+
+    def fill_prevously_gathered_features(self, feature_list, feature_ids):
+        self.previously_gathered_features = {}
+        if type(feature_ids) == str:
+            feature_ids = utils.transform_string_feature_range_into_list(feature_ids)
+        else:
+            feature_ids = feature_ids
+        for i in range(len(feature_list)):
+            for idx, feature in enumerate(feature_ids):
+                if feature not in self.previously_gathered_features:
+                    self.previously_gathered_features[feature] = []
+                self.previously_gathered_features[feature].append(feature_list[i][idx])
 
     def get_used_model_info(self):
         return list(self.used_model_info)
@@ -406,6 +451,18 @@ class BoostingFeaturizer:
             similarity_percent_by_type[issue_type] = sim_obj["similarity"]
         return similarity_percent_by_type
 
+    def gather_feature_list(self, gathered_data_dict, feature_ids):
+        len_data = 0
+        for feature in feature_ids:
+            len_data = len(gathered_data_dict[feature])
+            break
+        gathered_data = np.zeros((len_data, len(feature_ids)))
+        for idx, feature in enumerate(feature_ids):
+            for j in range(len(gathered_data_dict[feature])):
+                gathered_data[j][idx] = gathered_data_dict[feature][j]
+        gathered_data = gathered_data.tolist()
+        return gathered_data
+
     @utils.ignore_warnings
     def gather_features_info(self):
         """Gather all features from feature_ids for a test item"""
@@ -426,18 +483,21 @@ class BoostingFeaturizer:
             ordered_features = utils.topological_sort(feature_graph)
 
             for feature in ordered_features:
-                func, args, _ = self.feature_functions[feature]
-                result = func(**args)
-                gathered_data_dict[feature] = []
-                for idx in sorted(issue_type_by_index.keys()):
-                    issue_type = issue_type_by_index[idx]
-                    gathered_data_dict[feature].append(round(result[issue_type], 2))
+                if feature in self.previously_gathered_features:
+                    gathered_data_dict[feature] = self.previously_gathered_features[feature]
+                else:
+                    func, args, _ = self.feature_functions[feature]
+                    result = func(**args)
+                    if type(result) == list:
+                        gathered_data_dict[feature] = result
+                    else:
+                        gathered_data_dict[feature] = []
+                        for idx in sorted(issue_type_by_index.keys()):
+                            issue_type = issue_type_by_index[idx]
+                            gathered_data_dict[feature].append(round(result[issue_type], 2))
+                    self.previously_gathered_features[feature] = gathered_data_dict[feature]
 
-            gathered_data = np.zeros((len(issue_type_names), len(self.feature_ids)))
-            for idx, feature in enumerate(self.feature_ids):
-                for j in range(len(gathered_data_dict[feature])):
-                    gathered_data[j][idx] = gathered_data_dict[feature][j]
-            gathered_data = gathered_data.tolist()
+            gathered_data = self.gather_feature_list(gathered_data_dict, self.feature_ids)
         except Exception as err:
             logger.error("Errors in boosting features calculation")
             logger.error(err)

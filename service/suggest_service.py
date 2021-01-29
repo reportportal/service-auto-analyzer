@@ -47,7 +47,8 @@ class SuggestService(AnalyzerService):
             "filter_min_should_match_any": self.choose_fields_to_filter_suggests(
                 analyzerConfig.numberOfLogLines),
             "number_of_log_lines": analyzerConfig.numberOfLogLines,
-            "filter_by_unique_id": True}
+            "filter_by_unique_id": True,
+            "boosting_model": self.search_cfg["SuggestBoostModelFolder"]}
 
     def choose_fields_to_filter_suggests(self, log_lines_num):
         if log_lines_num == -1:

@@ -370,7 +370,7 @@ class SuggestService(AnalyzerService):
             if results:
                 AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
                     self.app_config["exchangeName"], "train_models", json.dumps({
-                        "model_type": "suggestions",
+                        "model_type": "suggestion",
                         "project_id": test_item_info.project,
                         "gathered_metric_total": len(results)
                     }))

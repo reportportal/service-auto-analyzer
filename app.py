@@ -60,7 +60,7 @@ APP_CONFIG = {
     "binaryStoreType":   os.getenv("ANALYZER_BINARYSTORE_TYPE", "minio"),
     "minioBucketPrefix": os.getenv("ANALYZER_BINARYSTORE_BUCKETPREFIX", "prj-"),
     "minioRegion":       os.getenv("ANALYZER_BINARYSTORE_MINIO_REGION", None),
-    "instanceTaskType":  os.getenv("INSTANCE_TASK_TYPE", "").strip(),
+    "instanceTaskType":  os.getenv("INSTANCE_TASK_TYPE", "train").strip(),
     "filesystemDefaultPath": os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
     "esChunkNumber":         int(os.getenv("ES_CHUNK_NUMBER", "1000"))
 }
@@ -82,7 +82,9 @@ SEARCH_CONFIG = {
     "BoostModelFolder":            "",
     "SuggestBoostModelFolder":     "",
     "SimilarityWeightsFolder":     "",
-    "GlobalDefectTypeModelFolder": ""
+    "GlobalDefectTypeModelFolder": "",
+    "RetrainSuggestBoostModelConfig": "",
+    "RetrainAutoBoostModelConfig": ""
 }
 
 
@@ -246,6 +248,8 @@ def read_model_settings():
     SEARCH_CONFIG["SuggestBoostModelFolder"] = model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
     SEARCH_CONFIG["SimilarityWeightsFolder"] = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
     SEARCH_CONFIG["GlobalDefectTypeModelFolder"] = model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]
+    SEARCH_CONFIG["RetrainSuggestBoostModelConfig"] = model_settings["RETRAIN_SUGGEST_BOOST_MODEL_CONFIG"]
+    SEARCH_CONFIG["RetrainAutoBoostModelConfig"] = model_settings["RETRAIN_AUTO_BOOST_MODEL_CONFIG"]
 
 
 log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.conf')

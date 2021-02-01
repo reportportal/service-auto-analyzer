@@ -116,6 +116,7 @@ class BoostingFeaturizer:
         self.scores_by_issue_type = None
         self.defect_type_predict_model = None
         self.used_model_info = set()
+        self.features_to_recalculate_always = set([56])
 
     def _calculate_model_probability(self, model_folder=""):
         if not model_folder.strip():
@@ -483,7 +484,8 @@ class BoostingFeaturizer:
             ordered_features = utils.topological_sort(feature_graph)
 
             for feature in ordered_features:
-                if feature in self.previously_gathered_features:
+                if feature in self.previously_gathered_features and\
+                        feature not in self.features_to_recalculate_always:
                     gathered_data_dict[feature] = self.previously_gathered_features[feature]
                 else:
                     func, args, _ = self.feature_functions[feature]

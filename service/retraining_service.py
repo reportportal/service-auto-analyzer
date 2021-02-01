@@ -22,6 +22,7 @@ from commons import namespace_finder
 from commons.esclient import EsClient
 from commons.triggering_training.retraining_triggering import RetrainingTriggering
 from boosting_decision_making.training_models import training_defect_type_model
+from boosting_decision_making.training_models import training_analysis_model
 from amqp.amqp import AmqpClient
 
 logger = logging.getLogger("analyzerApp.retrainingService")
@@ -38,9 +39,9 @@ class RetrainingService:
                                                  start_number=100, accumulated_difference=100),
                             training_defect_type_model.DefectTypeModelTraining(
                                 app_config, search_cfg)),
-            "suggestions": (RetrainingTriggering(app_config, "suggestions_trigger_info",
+            "suggestion": (RetrainingTriggering(app_config, "suggestion_trigger_info",
                                                  start_number=100, accumulated_difference=50),
-                            training_defect_type_model.DefectTypeModelTraining(
+                            training_analysis_model.AnalysisModelTraining(
                                 app_config, search_cfg))
         }
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)

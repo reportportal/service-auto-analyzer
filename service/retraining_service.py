@@ -40,9 +40,9 @@ class RetrainingService:
                             training_defect_type_model.DefectTypeModelTraining(
                                 app_config, search_cfg)),
             "suggestion": (RetrainingTriggering(app_config, "suggestion_trigger_info",
-                                                 start_number=100, accumulated_difference=50),
-                            training_analysis_model.AnalysisModelTraining(
-                                app_config, search_cfg))
+                                                start_number=100, accumulated_difference=50),
+                           training_analysis_model.AnalysisModelTraining(
+                               app_config, search_cfg))
         }
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
 

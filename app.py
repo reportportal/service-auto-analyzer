@@ -60,7 +60,7 @@ APP_CONFIG = {
     "binaryStoreType":   os.getenv("ANALYZER_BINARYSTORE_TYPE", "minio"),
     "minioBucketPrefix": os.getenv("ANALYZER_BINARYSTORE_BUCKETPREFIX", "prj-"),
     "minioRegion":       os.getenv("ANALYZER_BINARYSTORE_MINIO_REGION", None),
-    "instanceTaskType":  os.getenv("INSTANCE_TASK_TYPE", "train").strip(),
+    "instanceTaskType":  os.getenv("INSTANCE_TASK_TYPE", "").strip(),
     "filesystemDefaultPath": os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
     "esChunkNumber":         int(os.getenv("ES_CHUNK_NUMBER", "1000"))
 }

@@ -24,9 +24,6 @@ import numpy as np
 import logging
 from datetime import datetime
 import os
-import re
-from queue import Queue
-import elasticsearch.helpers
 import pickle
 
 logger = logging.getLogger("analyzerApp.trainingAnalysisModel")
@@ -49,7 +46,7 @@ class AnalysisModelTraining:
     def get_info_template(self, project_info, baseline_model, model_name):
         return {"method": "training", "sub_model_type": "all", "model_type": project_info["model_type"],
                 "baseline_model": [baseline_model], "new_model": [model_name],
-                "project_id": project_info["project_id"], "model_saved": 0, "p_value": 1.0,
+                "project_id": str(project_info["project_id"]), "model_saved": 0, "p_value": 1.0,
                 "data_proportion": 0.0, "baseline_mean_metric": 0.0, "new_model_mean_metric": 0.0,
                 "bad_data_proportion": 0, "metric_name": "F1"}
 
@@ -80,7 +77,7 @@ class AnalysisModelTraining:
         return baseline_model_results, new_model_results, bad_data
 
     def train(self, project_info):
-        start_time = time()
+        time_training = time()
         logger.debug("Started training model '%s'", project_info["model_type"])
         model_name = "%s_model_%s" % (project_info["model_type"], datetime.now().strftime("%d.%m.%y"))
 
@@ -98,11 +95,11 @@ class AnalysisModelTraining:
         logger.debug("Initialized training model '%s'", project_info["model_type"])
         data = pickle.load(open("model/train_data.pickle", "rb"))
         train_data, labels = data[3], data[4]
+        train_log_info["data_size"] = len(labels)
         _, features, _ = pickle.load(open(os.path.join(
             self.baseline_folders[project_info["model_type"]], "data_features_config.pickle"), "rb"))
 
         logger.debug("Loaded data for training model '%s'", project_info["model_type"])
-        time_training = time()
 
         train_log_info["data_proportion"] = utils.calculate_proportions_for_labels(labels)
         baseline_model_results, new_model_results, bad_data = self.train_several_times(train_data, labels)
@@ -119,9 +116,7 @@ class AnalysisModelTraining:
             train_log_info["baseline_mean_metric"] = np.mean(baseline_model_results)
             train_log_info["new_model_mean_metric"] = mean_f1
             if pvalue < 0.05 and mean_f1 > np.mean(baseline_model_results) and mean_f1 >= 0.4:
-                p_value_max = max(p_value_max, pvalue)
                 use_custom_model = True
-            all_bad_data = 0
             logger.debug(
                 "Model training validation results: p-value=%.3f mean baseline=%.3f mean new model=%.3f",
                 pvalue, np.mean(baseline_model_results), np.mean(new_model_results))
@@ -145,7 +140,7 @@ class AnalysisModelTraining:
                 "%s_model/%s/" % (project_info["model_type"], model_name))
         train_log_info["time_spent"] = (time() - time_training)
         logger.info("Finished for %d s", train_log_info["time_spent"])
-        
+
         train_log_info["gather_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         train_log_info["module_version"] = [self.app_config["appVersion"]]
         return len(data), {"all": train_log_info}

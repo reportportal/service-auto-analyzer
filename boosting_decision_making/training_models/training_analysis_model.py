@@ -17,6 +17,7 @@
 from boosting_decision_making import boosting_decision_maker, custom_boosting_decision_maker
 from sklearn.model_selection import train_test_split
 from commons.esclient import EsClient
+from imblearn.over_sampling import SMOTE
 from utils import utils
 from time import time
 import scipy.stats as stats
@@ -35,6 +36,7 @@ class AnalysisModelTraining:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.due_proportion = 0.2
+        self.due_proportion_to_smote = 0.4
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
         self.baseline_folders = {
             "suggestion": self.search_cfg["SuggestBoostModelFolder"],
@@ -67,6 +69,10 @@ class AnalysisModelTraining:
                 x_train, x_test, y_train, y_test = train_test_split(
                     data, labels,
                     test_size=0.1, random_state=random_state, stratify=labels)
+                proportion_binary_labels = utils.calculate_proportions_for_labels(y_train)
+                if proportion_binary_labels < self.due_proportion_to_smote:
+                    oversample = SMOTE(ratio="minority")
+                    x_train, y_train = oversample.fit_sample(x_train, y_train)
                 self.new_model.train_model(x_train, y_train)
                 logger.debug("New model results")
                 f1 = self.new_model.validate_model(x_test, y_test)
@@ -104,7 +110,7 @@ class AnalysisModelTraining:
         train_log_info["data_proportion"] = utils.calculate_proportions_for_labels(labels)
         baseline_model_results, new_model_results, bad_data = self.train_several_times(train_data, labels)
 
-        use_custom_model = True
+        use_custom_model = False
         if not bad_data:
             logger.debug("Baseline test results %s", baseline_model_results)
             logger.debug("New model test results %s", new_model_results)
@@ -126,6 +132,10 @@ class AnalysisModelTraining:
             logger.debug("Custom model should be saved")
 
             proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
+            if proportion_binary_labels < self.due_proportion_to_smote:
+                oversample = SMOTE(ratio="minority")
+                train_data, labels = oversample.fit_sample(train_data, labels)
+                proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
             if proportion_binary_labels < self.due_proportion:
                 logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
                 bad_data = True

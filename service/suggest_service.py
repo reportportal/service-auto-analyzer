@@ -328,6 +328,8 @@ class SuggestService(AnalyzerService):
                     issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
                     relevant_log_id = utils.extract_real_id(
                         scores_by_test_items[test_item_id]["mrHit"]["_id"])
+                    real_log_id = str(scores_by_test_items[test_item_id]["mrHit"]["_id"])
+                    is_merged = real_log_id != str(relevant_log_id)
                     test_item_log_id = utils.extract_real_id(
                         scores_by_test_items[test_item_id]["compared_log"]["_id"])
                     analysis_result = SuggestAnalysisResult(
@@ -336,6 +338,7 @@ class SuggestService(AnalyzerService):
                         issueType=issue_type,
                         relevantItem=test_item_id,
                         relevantLogId=relevant_log_id,
+                        isMergedLog=is_merged,
                         matchScore=round(prob * 100, 2),
                         esScore=round(scores_by_test_items[test_item_id]["mrHit"]["_score"], 2),
                         esPosition=scores_by_test_items[test_item_id]["mrHit"]["es_pos"],

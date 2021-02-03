@@ -543,10 +543,11 @@ class TestSuggestService(TestService):
                     **utils.get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
                 "expected_result":     [
                     launch_objects.SuggestAnalysisResult(testItem=123,
-                                                         testItemLogId=-1,
+                                                         testItemLogId=178,
                                                          issueType='AB001',
                                                          relevantItem=1,
                                                          relevantLogId=1,
+                                                         isMergedLog=True,
                                                          matchScore=90.0,
                                                          esScore=10.0,
                                                          esPosition=0,

@@ -518,7 +518,7 @@ def enrich_text_with_method_and_classes(text):
 def extract_real_id(elastic_id):
     real_id = str(elastic_id)
     if real_id[-2:] == "_m":
-        return -1
+        return int(real_id[:-2])
     return int(real_id)
 
 

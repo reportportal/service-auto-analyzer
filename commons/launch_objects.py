@@ -105,6 +105,7 @@ class SuggestAnalysisResult(BaseModel):
     issueType: str
     relevantItem: int
     relevantLogId: int
+    isMergedLog: bool = False
     matchScore: float
     resultPosition: int
     esScore: float
@@ -114,6 +115,7 @@ class SuggestAnalysisResult(BaseModel):
     modelInfo: str
     usedLogLines: int
     minShouldMatch: int
+    isUserChoice: bool = False
 
 
 class CleanIndex(BaseModel):

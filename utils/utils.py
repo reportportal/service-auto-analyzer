@@ -696,3 +696,13 @@ def topological_sort(feature_graph):
                         if visited[key_i] == 0:
                             stack_vertices.append(key_i)
     return stack
+
+
+def to_number_list(features_list):
+    feature_numbers_list = []
+    for res in features_list.split(","):
+        try:
+            feature_numbers_list.append(int(res))
+        except: #noqa
+            feature_numbers_list.append(float(res))
+    return feature_numbers_list

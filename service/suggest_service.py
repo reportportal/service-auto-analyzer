@@ -333,6 +333,7 @@ class SuggestService(AnalyzerService):
                     test_item_log_id = utils.extract_real_id(
                         scores_by_test_items[test_item_id]["compared_log"]["_id"])
                     analysis_result = SuggestAnalysisResult(
+                        project=test_item_info.project,
                         testItem=test_item_info.testItemId,
                         testItemLogId=test_item_log_id,
                         issueType=issue_type,

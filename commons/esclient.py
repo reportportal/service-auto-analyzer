@@ -364,21 +364,24 @@ class EsClient:
                     clean_index.ids, clean_index.project, time() - t_start)
         return result.took
 
-    def create_index_for_stats_info(self, es_client, rp_aa_stats_index):
+    def create_index_for_stats_info(self, rp_aa_stats_index, override_index_name=None):
+        index_name = rp_aa_stats_index
+        if override_index_name is not None:
+            index_name = override_index_name
         index = None
         try:
-            index = es_client.indices.get(index=rp_aa_stats_index)
+            index = self.es_client.indices.get(index=index_name)
         except Exception:
             pass
         if index is None:
-            es_client.indices.create(index=rp_aa_stats_index, body={
+            self.es_client.indices.create(index=index_name, body={
                 'settings': utils.read_json_file("", "index_settings.json", to_json=True),
                 'mappings': utils.read_json_file(
                     "", "%s_mappings.json" % rp_aa_stats_index, to_json=True)
             })
         else:
-            es_client.indices.put_mapping(
-                index=rp_aa_stats_index,
+            self.es_client.indices.put_mapping(
+                index=index_name,
                 body=utils.read_json_file("", "%s_mappings.json" % rp_aa_stats_index, to_json=True))
 
     @utils.ignore_warnings
@@ -391,7 +394,7 @@ class EsClient:
             rp_aa_stats_index = "rp_aa_stats"
             if "method" in obj_info and obj_info["method"] == "training":
                 rp_aa_stats_index = "rp_model_train_stats"
-            self.create_index_for_stats_info(self.es_client, rp_aa_stats_index)
+            self.create_index_for_stats_info(rp_aa_stats_index)
             stat_info_array.append({
                 "_index": rp_aa_stats_index,
                 "_source": obj_info

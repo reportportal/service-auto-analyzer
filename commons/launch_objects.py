@@ -100,6 +100,7 @@ class ClusterResult(BaseModel):
 
 class SuggestAnalysisResult(BaseModel):
     """Analysis result object"""
+    project: int
     testItem: int
     testItemLogId: int
     issueType: str

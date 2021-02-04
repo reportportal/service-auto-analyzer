@@ -109,9 +109,10 @@ class BoostingFeaturizer:
                 fields=self.config["filter_min_should_match_any"])
         if "filter_by_unique_id" in self.config and self.config["filter_by_unique_id"]:
             all_results = self.filter_by_unique_id(all_results)
-        self.similarity_calculator.find_similarity(
-            all_results,
-            fields_to_calc_similarity)
+        if "calculate_similarities" not in self.config or self.config["calculate_similarities"]:
+            self.similarity_calculator.find_similarity(
+                all_results,
+                fields_to_calc_similarity)
         self.all_results = self.normalize_results(all_results)
         self.scores_by_issue_type = None
         self.defect_type_predict_model = None
@@ -130,7 +131,7 @@ class BoostingFeaturizer:
             feature_data)
         predicted_probability = []
         for res in predicted_labels_probability:
-            predicted_probability.append(res[1])
+            predicted_probability.append(float(res[1]))
         return predicted_probability
 
     def get_necessary_features(self, model_folder):
@@ -460,7 +461,7 @@ class BoostingFeaturizer:
         gathered_data = np.zeros((len_data, len(feature_ids)))
         for idx, feature in enumerate(feature_ids):
             for j in range(len(gathered_data_dict[feature])):
-                gathered_data[j][idx] = gathered_data_dict[feature][j]
+                gathered_data[j][idx] = round(gathered_data_dict[feature][j], 2)
         gathered_data = gathered_data.tolist()
         return gathered_data
 
@@ -491,7 +492,7 @@ class BoostingFeaturizer:
                     func, args, _ = self.feature_functions[feature]
                     result = func(**args)
                     if type(result) == list:
-                        gathered_data_dict[feature] = result
+                        gathered_data_dict[feature] = [round(r, 2) for r in result]
                     else:
                         gathered_data_dict[feature] = []
                         for idx in sorted(issue_type_by_index.keys()):

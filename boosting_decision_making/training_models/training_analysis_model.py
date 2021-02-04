@@ -15,8 +15,14 @@
 """
 
 from boosting_decision_making import boosting_decision_maker, custom_boosting_decision_maker
+from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
+from boosting_decision_making import weighted_similarity_calculator, defect_type_model
 from sklearn.model_selection import train_test_split
+import elasticsearch
+import elasticsearch.helpers
+from commons.object_saving.object_saver import ObjectSaver
 from commons.esclient import EsClient
+from commons import namespace_finder
 from imblearn.over_sampling import SMOTE
 from utils import utils
 from time import time
@@ -26,6 +32,7 @@ import logging
 from datetime import datetime
 import os
 import pickle
+import numpy as np
 
 logger = logging.getLogger("analyzerApp.trainingAnalysisModel")
 
@@ -44,6 +51,44 @@ class AnalysisModelTraining:
         self.model_config = {
             "suggestion": self.search_cfg["RetrainSuggestBoostModelConfig"],
             "auto_analysis": self.search_cfg["RetrainAutoBoostModelConfig"]}
+        self.weighted_log_similarity_calculator = None
+        if self.search_cfg["SimilarityWeightsFolder"].strip():
+            self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
+                WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
+        self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
+        self.object_saver = ObjectSaver(self.app_config)
+        self.global_defect_type_model = None
+        if self.search_cfg["GlobalDefectTypeModelFolder"].strip():
+            self.global_defect_type_model = defect_type_model.\
+                DefectTypeModel(folder=self.search_cfg["GlobalDefectTypeModelFolder"])
+
+    def choose_model(self, project_id, model_name_folder, custom_model_prob=1.0):
+        model = None
+        prob_for_model = np.random.uniform()
+        if prob_for_model > custom_model_prob:
+            return model
+        if self.object_saver.does_object_exists(project_id, model_name_folder):
+            folders = self.object_saver.get_folder_objects(project_id, model_name_folder)
+            if len(folders):
+                try:
+                    model = self.model_folder_mapping[model_name_folder](
+                        self.app_config, project_id, folder=folders[0])
+                except Exception as err:
+                    logger.error(err)
+        return model
+
+    def get_config_for_boosting(self, numberOfLogLines, boosting_model_name, namespaces):
+        return {
+            "max_query_terms": self.search_cfg["MaxQueryTerms"],
+            "min_should_match": 0.4,
+            "min_word_length": self.search_cfg["MinWordLength"],
+            "filter_min_should_match": [],
+            "filter_min_should_match_any": [],
+            "number_of_log_lines": numberOfLogLines,
+            "filter_by_unique_id": False,
+            "boosting_model": self.baseline_folders[boosting_model_name],
+            "chosen_namespaces": namespaces,
+            "calculate_similarities": False}
 
     def get_info_template(self, project_info, baseline_model, model_name):
         return {"method": "training", "sub_model_type": "all", "model_type": project_info["model_type"],
@@ -52,7 +97,7 @@ class AnalysisModelTraining:
                 "data_proportion": 0.0, "baseline_mean_metric": 0.0, "new_model_mean_metric": 0.0,
                 "bad_data_proportion": 0, "metric_name": "F1"}
 
-    def train_several_times(self, data, labels):
+    def train_several_times(self, data, labels, features):
         new_model_results = []
         baseline_model_results = []
         random_states = [1257, 1873, 1917]
@@ -78,9 +123,102 @@ class AnalysisModelTraining:
                 f1 = self.new_model.validate_model(x_test, y_test)
                 new_model_results.append(f1)
                 logger.debug("Baseline results")
-                f1 = self.baseline_model.validate_model(x_test, y_test)
+                x_test_for_baseline = self.transform_data_from_feature_lists(
+                    x_test, features, self.baseline_model.get_feature_ids())
+                f1 = self.baseline_model.validate_model(x_test_for_baseline, y_test)
                 baseline_model_results.append(f1)
         return baseline_model_results, new_model_results, bad_data
+
+    def transform_data_from_feature_lists(self, feature_list, cur_features, desired_features):
+        previously_gathered_features = {}
+        for i in range(len(feature_list)):
+            for idx, feature in enumerate(cur_features):
+                if feature not in previously_gathered_features:
+                    previously_gathered_features[feature] = []
+                previously_gathered_features[feature].append(feature_list[i][idx])
+        len_data = 0
+        for feature in cur_features:
+            len_data = len(previously_gathered_features[feature])
+            break
+        gathered_data = np.zeros((len_data, len(desired_features)))
+        for idx, feature in enumerate(desired_features):
+            for j in range(len(previously_gathered_features[feature])):
+                gathered_data[j][idx] = previously_gathered_features[feature][j]
+        return gathered_data
+
+    def gather_data(self, model_type, project_id, features, defect_type_model_to_use):
+        namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
+        search_query = {
+            "sort": {"savedDate": "desc"},
+            "size": 10000,
+        }
+        log_ids_to_find = set()
+        gathered_suggested_data = []
+        for res in elasticsearch.helpers.scan(self.es_client.es_client,
+                                              query=search_query,
+                                              index=str(project_id) + "_suggest",
+                                              scroll="5m"):
+            if len(gathered_suggested_data) >= 30000:
+                break
+            for col in ["testItemLogId", "relevantLogId"]:
+                log_id = res["_source"][col]
+                if res["_source"]["isMergedLog"]:
+                    log_id = log_id + "_m"
+                log_ids_to_find.add(log_id)
+            gathered_suggested_data.append(res)
+        log_ids_to_find = list(log_ids_to_find)
+        batch_size = 1000
+        log_id_dict = {}
+        for i in range(int(len(log_ids_to_find) / batch_size) + 1):
+            log_ids = log_ids_to_find[i * batch_size: (i + 1) * batch_size]
+            ids_query = {
+                "size": 10000,
+                "query": {
+                    "bool": {
+                        "filter": [
+                            {"terms": {"_id": [str(_id) for _id in log_ids]}}
+                        ]
+                    }
+                }}
+            if not log_ids:
+                continue
+            test_items_dict = {}
+            for r in elasticsearch.helpers.scan(self.es_client.es_client,
+                                                query=ids_query,
+                                                index=project_id,
+                                                scroll="5m"):
+                log_id_dict[r["_id"]] = r
+        full_data_features, labels = [], []
+        for _suggest_res in gathered_suggested_data:
+            searched_res = []
+            found_logs = {}
+            for col in ["testItemLogId", "relevantLogId"]:
+                log_id = str(_suggest_res["_source"][col])
+                if _suggest_res["_source"]["isMergedLog"]:
+                    log_id = log_id + "_m"
+                if log_id in log_id_dict:
+                    found_logs[col] = log_id_dict[log_id]
+            if len(found_logs) == 2:
+                log_relevent = found_logs["relevantLogId"]
+                log_relevent["_score"] = _suggest_res["_source"]["esScore"]
+                searched_res = [
+                    (found_logs["testItemLogId"], {"hits": {"hits": [log_relevent]}})]
+            if searched_res:
+                _boosting_data_gatherer = SuggestBoostingFeaturizer(
+                    searched_res,
+                    self.get_config_for_boosting(
+                        _suggest_res["_source"]["usedLogLines"], model_type, namespaces),
+                    feature_ids=features,
+                    weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
+                _boosting_data_gatherer.set_defect_type_model(defect_type_model_to_use)
+                _boosting_data_gatherer.fill_prevously_gathered_features(
+                    [utils.to_number_list(_suggest_res["_source"]["modelFeatureValues"])],
+                    _suggest_res["_source"]["modelFeatureNames"])
+                feature_data, _ = _boosting_data_gatherer.gather_features_info()
+                if feature_data:
+                    full_data_features.extend(feature_data)
+                    labels.append(int(_suggest_res["_source"]["isUserChoice"]))
+        return np.asarray(full_data_features), np.asarray(labels)
 
     def train(self, project_info):
         time_training = time()
@@ -97,10 +235,16 @@ class AnalysisModelTraining:
             self.app_config, project_info["project_id"])
         self.new_model.add_config_info(full_config, features, monotonous_features)
 
+        defect_type_model_to_use = self.choose_model(
+            project_info["project_id"], "defect_type_model/")
+        if defect_type_model_to_use is None:
+            defect_type_model_to_use = self.global_defect_type_model
+
         train_log_info = self.get_info_template(project_info, baseline_model_folder, model_name)
         logger.debug("Initialized training model '%s'", project_info["model_type"])
-        data = pickle.load(open("model/train_data.pickle", "rb"))
-        train_data, labels = data[3], data[4]
+        train_data, labels = self.gather_data(
+            project_info["model_type"], project_info["project_id"],
+            self.new_model.get_feature_ids(), defect_type_model_to_use)
         train_log_info["data_size"] = len(labels)
         _, features, _ = pickle.load(open(os.path.join(
             self.baseline_folders[project_info["model_type"]], "data_features_config.pickle"), "rb"))
@@ -108,7 +252,8 @@ class AnalysisModelTraining:
         logger.debug("Loaded data for training model '%s'", project_info["model_type"])
 
         train_log_info["data_proportion"] = utils.calculate_proportions_for_labels(labels)
-        baseline_model_results, new_model_results, bad_data = self.train_several_times(train_data, labels)
+        baseline_model_results, new_model_results, bad_data = self.train_several_times(
+            train_data, labels, self.new_model.get_feature_ids())
 
         use_custom_model = False
         if not bad_data:
@@ -153,4 +298,4 @@ class AnalysisModelTraining:
 
         train_log_info["gather_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         train_log_info["module_version"] = [self.app_config["appVersion"]]
-        return len(data), {"all": train_log_info}
+        return len(train_data), {"all": train_log_info}

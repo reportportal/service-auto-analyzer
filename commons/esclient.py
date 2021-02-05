@@ -303,11 +303,12 @@ class EsClient:
             return commons.launch_objects.BulkResponse(took=0, errors=False)
         start_time = time()
         logger.debug("Indexing %d logs...", len(bodies))
+        es_chunk_number = self.app_config["esChunkNumber"]
         try:
             try:
                 success_count, errors = elasticsearch.helpers.bulk(es_client,
                                                                    bodies,
-                                                                   chunk_size=1000,
+                                                                   chunk_size=es_chunk_number,
                                                                    request_timeout=30,
                                                                    refresh=refresh)
             except Exception as err:
@@ -315,7 +316,7 @@ class EsClient:
                 self.update_settings_after_read_only(host)
                 success_count, errors = elasticsearch.helpers.bulk(es_client,
                                                                    bodies,
-                                                                   chunk_size=1000,
+                                                                   chunk_size=es_chunk_number,
                                                                    request_timeout=30,
                                                                    refresh=refresh)
             logger.debug("Processed %d logs", success_count)

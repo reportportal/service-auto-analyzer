@@ -18,11 +18,8 @@ import logging
 import json
 import utils.utils as utils
 from time import time
-from commons import namespace_finder
 from commons.esclient import EsClient
-from commons.triggering_training.retraining_triggering import RetrainingTriggering
-from boosting_decision_making.training_models import training_defect_type_model
-from boosting_decision_making.training_models import training_analysis_model
+from commons import trigger_manager
 from amqp.amqp import AmqpClient
 
 logger = logging.getLogger("analyzerApp.retrainingService")
@@ -33,30 +30,17 @@ class RetrainingService:
     def __init__(self, app_config={}, search_cfg={}):
         self.app_config = app_config
         self.search_cfg = search_cfg
-        self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
-        self.model_training_triggering = {
-            "defect_type": (RetrainingTriggering(app_config, "defect_type_trigger_info",
-                                                 start_number=100, accumulated_difference=100),
-                            training_defect_type_model.DefectTypeModelTraining(
-                                app_config, search_cfg)),
-            "suggestion": (RetrainingTriggering(app_config, "suggestion_trigger_info",
-                                                start_number=100, accumulated_difference=50),
-                           training_analysis_model.AnalysisModelTraining(
-                               app_config, search_cfg)),
-            "auto_analysis": (RetrainingTriggering(app_config, "auto_analysis_trigger_info",
-                                                   start_number=300, accumulated_difference=100),
-                              training_analysis_model.AnalysisModelTraining(
-                                  app_config, search_cfg))
-        }
+        self.trigger_manager = trigger_manager.TriggerManager(
+            app_config=app_config, search_cfg=search_cfg)
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
 
     @utils.ignore_warnings
     def train_models(self, train_info):
         logger.info("Started training")
         t_start = time()
-        assert train_info["model_type"] in self.model_training_triggering
+        assert self.trigger_manager.is_trigger_exists(train_info["model_type"])
 
-        _retraining_triggering, _retraining = self.model_training_triggering[train_info["model_type"]]
+        _retraining_triggering, _retraining = self.trigger_manager.get_trigger_info(train_info["model_type"])
         if _retraining_triggering.should_model_training_be_triggered(train_info):
             logger.debug("Should be trained ", train_info)
             try:

@@ -44,6 +44,8 @@ volumes:
   - ./data/analyzer:/backend/storage
 ```
 
+**ES_CHUNK_NUMBER** - by default 1000, the number of objects which is sent to ES while bulk indexing. **NOTE**: AWS Elasticsearch has restrictions for sent data size either 10Mb or 100Mb, so when 10Mb is chosen, make sure you don't get the error "TransportError(413, '{"Message": "Request size exceeded 10485760 bytes"}')" while generating index or indexing the data. If you get this error, please, decrease ES_CHUNK_NUMBER until you stop getting this error.
+
 # Environmental variables for constants, used by algorithms:
 
 **ES_MIN_SHOULD_MATCH** - by default "80%", the global default min should match value for auto-analysis, but it is used only when the project settings are not set up.

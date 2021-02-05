@@ -18,7 +18,6 @@ from utils import utils
 from commons import similarity_calculator
 from boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
 import logging
-import numpy as np
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
@@ -126,7 +125,7 @@ class BoostingFeaturizer:
             logger.error("Model folder is not found: '%s'", model_folder)
             return []
         feature_ids = self.models[model_folder].get_feature_ids()
-        feature_data = self.gather_feature_list(self.previously_gathered_features, feature_ids)
+        feature_data = utils.gather_feature_list(self.previously_gathered_features, feature_ids, to_list=True)
         predicted_labels, predicted_labels_probability = self.models[model_folder].predict(
             feature_data)
         predicted_probability = []
@@ -147,16 +146,8 @@ class BoostingFeaturizer:
         return self.models[model_folder].get_feature_ids()
 
     def fill_prevously_gathered_features(self, feature_list, feature_ids):
-        self.previously_gathered_features = {}
-        if type(feature_ids) == str:
-            feature_ids = utils.transform_string_feature_range_into_list(feature_ids)
-        else:
-            feature_ids = feature_ids
-        for i in range(len(feature_list)):
-            for idx, feature in enumerate(feature_ids):
-                if feature not in self.previously_gathered_features:
-                    self.previously_gathered_features[feature] = []
-                self.previously_gathered_features[feature].append(feature_list[i][idx])
+        self.previously_gathered_features = utils.fill_prevously_gathered_features(
+            feature_list, feature_ids)
 
     def get_used_model_info(self):
         return list(self.used_model_info)
@@ -453,18 +444,6 @@ class BoostingFeaturizer:
             similarity_percent_by_type[issue_type] = sim_obj["similarity"]
         return similarity_percent_by_type
 
-    def gather_feature_list(self, gathered_data_dict, feature_ids):
-        len_data = 0
-        for feature in feature_ids:
-            len_data = len(gathered_data_dict[feature])
-            break
-        gathered_data = np.zeros((len_data, len(feature_ids)))
-        for idx, feature in enumerate(feature_ids):
-            for j in range(len(gathered_data_dict[feature])):
-                gathered_data[j][idx] = round(gathered_data_dict[feature][j], 2)
-        gathered_data = gathered_data.tolist()
-        return gathered_data
-
     @utils.ignore_warnings
     def gather_features_info(self):
         """Gather all features from feature_ids for a test item"""
@@ -500,7 +479,7 @@ class BoostingFeaturizer:
                             gathered_data_dict[feature].append(round(result[issue_type], 2))
                     self.previously_gathered_features[feature] = gathered_data_dict[feature]
 
-            gathered_data = self.gather_feature_list(gathered_data_dict, self.feature_ids)
+            gathered_data = utils.gather_feature_list(gathered_data_dict, self.feature_ids, to_list=True)
         except Exception as err:
             logger.error("Errors in boosting features calculation")
             logger.error(err)

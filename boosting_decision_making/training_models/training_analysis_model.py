@@ -110,20 +110,8 @@ class AnalysisModelTraining:
         return baseline_model_results, new_model_results, bad_data
 
     def transform_data_from_feature_lists(self, feature_list, cur_features, desired_features):
-        previously_gathered_features = {}
-        for i in range(len(feature_list)):
-            for idx, feature in enumerate(cur_features):
-                if feature not in previously_gathered_features:
-                    previously_gathered_features[feature] = []
-                previously_gathered_features[feature].append(feature_list[i][idx])
-        len_data = 0
-        for feature in cur_features:
-            len_data = len(previously_gathered_features[feature])
-            break
-        gathered_data = np.zeros((len_data, len(desired_features)))
-        for idx, feature in enumerate(desired_features):
-            for j in range(len(previously_gathered_features[feature])):
-                gathered_data[j][idx] = previously_gathered_features[feature][j]
+        previously_gathered_features = utils.fill_prevously_gathered_features(feature_list, cur_features)
+        gathered_data = utils.gather_feature_list(previously_gathered_features, desired_features)
         return gathered_data
 
     def query_es_for_suggest_info(self, project_id):

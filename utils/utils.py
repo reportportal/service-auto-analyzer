@@ -706,3 +706,27 @@ def to_number_list(features_list):
         except: # noqa
             feature_numbers_list.append(float(res))
     return feature_numbers_list
+
+
+def fill_prevously_gathered_features(feature_list, feature_ids):
+    previously_gathered_features = {}
+    if type(feature_ids) == str:
+        feature_ids = transform_string_feature_range_into_list(feature_ids)
+    for i in range(len(feature_list)):
+        for idx, feature in enumerate(feature_ids):
+            if feature not in previously_gathered_features:
+                previously_gathered_features[feature] = []
+            previously_gathered_features[feature].append(feature_list[i][idx])
+    return previously_gathered_features
+
+
+def gather_feature_list(gathered_data_dict, feature_ids, to_list=False):
+    len_data = 0
+    for feature in feature_ids:
+        len_data = len(gathered_data_dict[feature])
+        break
+    gathered_data = np.zeros((len_data, len(feature_ids)))
+    for idx, feature in enumerate(feature_ids):
+        for j in range(len(gathered_data_dict[feature])):
+            gathered_data[j][idx] = round(gathered_data_dict[feature][j], 2)
+    return gathered_data.tolist() if to_list else gathered_data

@@ -15,7 +15,6 @@
 """
 from utils import utils
 from commons.launch_objects import SuggestAnalysisResult
-from boosting_decision_making import boosting_decision_maker
 from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from amqp.amqp import AmqpClient
 from commons.log_merger import LogMerger
@@ -34,9 +33,30 @@ class SuggestService(AnalyzerService):
     def __init__(self, app_config={}, search_cfg={}):
         super(SuggestService, self).__init__(app_config=app_config, search_cfg=search_cfg)
         self.suggest_threshold = 0.4
-        if self.search_cfg["SuggestBoostModelFolder"].strip():
-            self.suggest_decision_maker = boosting_decision_maker.BoostingDecisionMaker(
-                folder=self.search_cfg["SuggestBoostModelFolder"])
+        self.rp_suggest_index_template = "suggestions_info"
+
+    def build_index_name(self, project_id):
+        return str(project_id) + "_suggest"
+
+    @utils.ignore_warnings
+    def index_suggest_info(self, suggest_info_list):
+        logger.info("Started saving suggest_info_list")
+        t_start = time()
+        bodies = []
+        for obj in suggest_info_list:
+            obj_info = json.loads(obj.json())
+            obj_info["savedDate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            project_index_name = self.build_index_name(obj_info["project"])
+            self.es_client.create_index_for_stats_info(
+                self.rp_suggest_index_template,
+                override_index_name=project_index_name)
+            bodies.append({
+                "_index": project_index_name,
+                "_source": obj_info
+            })
+        result = self.es_client._bulk_index(bodies)
+        logger.info("Finished saving %.2f s", time() - t_start)
+        return result
 
     def get_config_for_boosting_suggests(self, analyzerConfig):
         return {
@@ -286,23 +306,17 @@ class SuggestService(AnalyzerService):
         boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
         boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(
             test_item_info.project)
-        _suggest_decision_maker_to_use = self.choose_model(
+        _suggest_decision_maker_to_use = self.model_chooser.choose_model(
             test_item_info.project, "suggestion_model/",
             custom_model_prob=self.search_cfg["ProbabilityForCustomModelSuggestions"])
-        if _suggest_decision_maker_to_use is None:
-            _suggest_decision_maker_to_use = self.suggest_decision_maker
 
         _boosting_data_gatherer = SuggestBoostingFeaturizer(
             searched_res,
             boosting_config,
             feature_ids=_suggest_decision_maker_to_use.get_feature_ids(),
             weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
-        defect_type_model_to_use = self.choose_model(
-            test_item_info.project, "defect_type_model/")
-        if defect_type_model_to_use is None:
-            _boosting_data_gatherer.set_defect_type_model(self.global_defect_type_model)
-        else:
-            _boosting_data_gatherer.set_defect_type_model(defect_type_model_to_use)
+        _boosting_data_gatherer.set_defect_type_model(self.model_chooser.choose_model(
+            test_item_info.project, "defect_type_model/"))
         feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
         scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
         model_info_tags = _boosting_data_gatherer.get_used_model_info() +\

@@ -703,6 +703,6 @@ def to_number_list(features_list):
     for res in features_list.split(","):
         try:
             feature_numbers_list.append(int(res))
-        except: #noqa
+        except: # noqa
             feature_numbers_list.append(float(res))
     return feature_numbers_list

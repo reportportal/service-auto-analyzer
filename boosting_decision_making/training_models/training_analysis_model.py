@@ -16,11 +16,11 @@
 
 from boosting_decision_making import boosting_decision_maker, custom_boosting_decision_maker
 from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
-from boosting_decision_making import weighted_similarity_calculator, defect_type_model
+from boosting_decision_making import weighted_similarity_calculator
 from sklearn.model_selection import train_test_split
 import elasticsearch
 import elasticsearch.helpers
-from commons.object_saving.object_saver import ObjectSaver
+from commons import model_chooser
 from commons.esclient import EsClient
 from commons import namespace_finder
 from imblearn.over_sampling import SMOTE
@@ -32,7 +32,6 @@ import logging
 from datetime import datetime
 import os
 import pickle
-import numpy as np
 
 logger = logging.getLogger("analyzerApp.trainingAnalysisModel")
 
@@ -56,26 +55,7 @@ class AnalysisModelTraining:
             self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
                 WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
-        self.object_saver = ObjectSaver(self.app_config)
-        self.global_defect_type_model = None
-        if self.search_cfg["GlobalDefectTypeModelFolder"].strip():
-            self.global_defect_type_model = defect_type_model.\
-                DefectTypeModel(folder=self.search_cfg["GlobalDefectTypeModelFolder"])
-
-    def choose_model(self, project_id, model_name_folder, custom_model_prob=1.0):
-        model = None
-        prob_for_model = np.random.uniform()
-        if prob_for_model > custom_model_prob:
-            return model
-        if self.object_saver.does_object_exists(project_id, model_name_folder):
-            folders = self.object_saver.get_folder_objects(project_id, model_name_folder)
-            if len(folders):
-                try:
-                    model = self.model_folder_mapping[model_name_folder](
-                        self.app_config, project_id, folder=folders[0])
-                except Exception as err:
-                    logger.error(err)
-        return model
+        self.model_chooser = model_chooser.ModelChooser(app_config=app_config, search_cfg=search_cfg)
 
     def get_config_for_boosting(self, numberOfLogLines, boosting_model_name, namespaces):
         return {
@@ -146,8 +126,7 @@ class AnalysisModelTraining:
                 gathered_data[j][idx] = previously_gathered_features[feature][j]
         return gathered_data
 
-    def gather_data(self, model_type, project_id, features, defect_type_model_to_use):
-        namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
+    def query_es_for_suggest_info(self, project_id):
         search_query = {
             "sort": {"savedDate": "desc"},
             "size": 10000,
@@ -182,12 +161,16 @@ class AnalysisModelTraining:
                 }}
             if not log_ids:
                 continue
-            test_items_dict = {}
             for r in elasticsearch.helpers.scan(self.es_client.es_client,
                                                 query=ids_query,
                                                 index=project_id,
                                                 scroll="5m"):
                 log_id_dict[r["_id"]] = r
+        return gathered_suggested_data, log_id_dict
+
+    def gather_data(self, model_type, project_id, features, defect_type_model_to_use):
+        namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
+        gathered_suggested_data, log_id_dict = self.query_es_for_suggest_info(project_id)
         full_data_features, labels = [], []
         for _suggest_res in gathered_suggested_data:
             searched_res = []
@@ -229,16 +212,15 @@ class AnalysisModelTraining:
             self.baseline_folders[project_info["model_type"]].strip("/").strip("\\"))
         self.baseline_model = boosting_decision_maker.BoostingDecisionMaker(
             folder=self.baseline_folders[project_info["model_type"]])
+
         full_config, features, monotonous_features = pickle.load(
             open(self.model_config[project_info["model_type"]], "rb"))
         self.new_model = custom_boosting_decision_maker.CustomBoostingDecisionMaker(
             self.app_config, project_info["project_id"])
         self.new_model.add_config_info(full_config, features, monotonous_features)
 
-        defect_type_model_to_use = self.choose_model(
+        defect_type_model_to_use = self.model_chooser.choose_model(
             project_info["project_id"], "defect_type_model/")
-        if defect_type_model_to_use is None:
-            defect_type_model_to_use = self.global_defect_type_model
 
         train_log_info = self.get_info_template(project_info, baseline_model_folder, model_name)
         logger.debug("Initialized training model '%s'", project_info["model_type"])

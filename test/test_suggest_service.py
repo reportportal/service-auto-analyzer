@@ -184,7 +184,8 @@ class TestSuggestService(TestService):
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='AB001',
                                                          relevantItem=1,
@@ -232,7 +233,8 @@ class TestSuggestService(TestService):
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='AB001',
                                                          relevantItem=1,
@@ -280,7 +282,8 @@ class TestSuggestService(TestService):
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='AB001',
                                                          relevantItem=1,
@@ -328,7 +331,8 @@ class TestSuggestService(TestService):
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='AB001',
                                                          relevantItem=1,
@@ -342,7 +346,8 @@ class TestSuggestService(TestService):
                                                          resultPosition=0,
                                                          usedLogLines=-1,
                                                          minShouldMatch=80),
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='PB001',
                                                          relevantItem=2,
@@ -390,7 +395,8 @@ class TestSuggestService(TestService):
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='PB001',
                                                          relevantItem=3,
@@ -404,7 +410,8 @@ class TestSuggestService(TestService):
                                                          resultPosition=0,
                                                          usedLogLines=-1,
                                                          minShouldMatch=80),
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='AB001',
                                                          relevantItem=1,
@@ -418,7 +425,8 @@ class TestSuggestService(TestService):
                                                          resultPosition=1,
                                                          usedLogLines=-1,
                                                          minShouldMatch=80),
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='PB001',
                                                          relevantItem=2,
@@ -466,7 +474,8 @@ class TestSuggestService(TestService):
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='AB001',
                                                          relevantItem=3,
@@ -480,7 +489,8 @@ class TestSuggestService(TestService):
                                                          resultPosition=0,
                                                          usedLogLines=-1,
                                                          minShouldMatch=80),
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='AB001',
                                                          relevantItem=1,
@@ -494,7 +504,8 @@ class TestSuggestService(TestService):
                                                          resultPosition=1,
                                                          usedLogLines=-1,
                                                          minShouldMatch=80),
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='PB001',
                                                          relevantItem=2,
@@ -542,7 +553,8 @@ class TestSuggestService(TestService):
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
                 "expected_result":     [
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='AB001',
                                                          relevantItem=1,
@@ -604,7 +616,8 @@ class TestSuggestService(TestService):
                 _boosting_decision_maker = BoostingDecisionMaker()
                 _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
                 _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])
-                suggest_service.suggest_decision_maker = _boosting_decision_maker
+                suggest_service.model_chooser.choose_model = MagicMock(
+                    return_value=_boosting_decision_maker)
                 response = suggest_service.suggest_items(test["test_item_info"])
 
                 response.should.have.length_of(len(test["expected_result"]))

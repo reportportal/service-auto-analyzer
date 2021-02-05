@@ -99,7 +99,8 @@ class TestService(unittest.TestCase):
             "appVersion":        "",
             "minioRegion":       "",
             "minioBucketPrefix": "",
-            "filesystemDefaultPath": ""
+            "filesystemDefaultPath": "",
+            "esChunkNumber":     1000
         }
         self.model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
         logging.disable(logging.CRITICAL)

@@ -58,6 +58,10 @@ class SuggestService(AnalyzerService):
         logger.info("Finished saving %.2f s", time() - t_start)
         return result
 
+    def remove_suggest_info(self, project_id):
+        logger.info("Removing suggest_info index")
+        return self.es_client.delete_index(self.build_index_name(project_id))
+
     def get_config_for_boosting_suggests(self, analyzerConfig):
         return {
             "max_query_terms": self.search_cfg["MaxQueryTerms"],

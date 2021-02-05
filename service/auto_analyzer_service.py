@@ -286,7 +286,8 @@ class AutoAnalyzerService(AnalyzerService):
                     chosen_namespaces[project_id] = self.namespace_finder.get_chosen_namespaces(project_id)
                 boosting_config["chosen_namespaces"] = chosen_namespaces[project_id]
                 _boosting_decision_maker = self.model_chooser.choose_model(
-                    project_id, "auto_analysis_model/", custom_model_prob=0.0)
+                    project_id, "auto_analysis_model/",
+                    custom_model_prob=self.search_cfg["ProbabilityForCustomModelAutoAnalysis"])
 
                 boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
                     searched_res,

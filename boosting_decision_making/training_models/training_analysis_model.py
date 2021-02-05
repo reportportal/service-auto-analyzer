@@ -225,7 +225,7 @@ class AnalysisModelTraining:
         baseline_model_results, new_model_results, bad_data = self.train_several_times(
             train_data, labels, self.new_model.get_feature_ids())
 
-        use_custom_model = False
+        use_custom_model = True
         if not bad_data:
             logger.debug("Baseline test results %s", baseline_model_results)
             logger.debug("New model test results %s", new_model_results)
@@ -260,7 +260,8 @@ class AnalysisModelTraining:
                 self.new_model.train_model(train_data, labels)
             else:
                 train_log_info["model_saved"] = 0
-            self.new_model.delete_old_model("%s_model" % project_info["model_type"])
+            self.model_chooser.delete_old_model(
+                "%s_model" % project_info["model_type"], project_info["project_id"])
             self.new_model.save_model(
                 "%s_model/%s/" % (project_info["model_type"], model_name))
         train_log_info["time_spent"] = (time() - time_training)

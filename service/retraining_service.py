@@ -42,7 +42,11 @@ class RetrainingService:
             "suggestion": (RetrainingTriggering(app_config, "suggestion_trigger_info",
                                                 start_number=100, accumulated_difference=50),
                            training_analysis_model.AnalysisModelTraining(
-                               app_config, search_cfg))
+                               app_config, search_cfg)),
+            "auto_analysis": (RetrainingTriggering(app_config, "auto_analysis_trigger_info",
+                                                   start_number=300, accumulated_difference=100),
+                              training_analysis_model.AnalysisModelTraining(
+                                  app_config, search_cfg))
         }
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
 

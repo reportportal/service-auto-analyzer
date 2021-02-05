@@ -392,6 +392,12 @@ class SuggestService(AnalyzerService):
                         "project_id": test_item_info.project,
                         "gathered_metric_total": len(results)
                     }))
+                AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                    self.app_config["exchangeName"], "train_models", json.dumps({
+                        "model_type": "auto_analysis",
+                        "project_id": test_item_info.project,
+                        "gathered_metric_total": len(results)
+                    }))
 
         logger.debug("Stats info %s", results_to_share)
         logger.info("Processed the test item. It took %.2f sec.", time() - t_start)

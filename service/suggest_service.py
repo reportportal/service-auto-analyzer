@@ -24,6 +24,8 @@ import json
 import logging
 from time import time
 from datetime import datetime
+import elasticsearch
+import elasticsearch.helpers
 
 logger = logging.getLogger("analyzerApp.suggestService")
 
@@ -61,6 +63,52 @@ class SuggestService(AnalyzerService):
     def remove_suggest_info(self, project_id):
         logger.info("Removing suggest_info index")
         return self.es_client.delete_index(self.build_index_name(project_id))
+
+    def build_suggest_info_ids_query(self, log_ids):
+        return {
+            "_source": ["testItem"],
+            "size": 10000,
+            "query": {
+                "bool": {
+                    "should": [
+                        {"terms": {"testItemLogId": [str(log_id) for log_id in log_ids]}},
+                        {"terms": {"relevantLogId": [str(log_id) for log_id in log_ids]}}
+                    ]
+                }
+            }}
+
+    def clean_suggest_info_logs(self, clean_index):
+        """Delete logs from elasticsearch"""
+        index_name = self.build_index_name(clean_index.project)
+        logger.info("Delete logs %s for the index %s",
+                    clean_index.ids, index_name)
+        t_start = time()
+        if not self.es_client.index_exists(index_name, print_error=False):
+            logger.info("Didn't find index '%s'", index_name)
+            return 0
+        sugggest_log_ids = set()
+        try:
+            search_query = self.build_suggest_info_ids_query(
+                clean_index.ids)
+            for res in elasticsearch.helpers.scan(self.es_client.es_client,
+                                                  query=search_query,
+                                                  index=index_name,
+                                                  scroll="5m"):
+                sugggest_log_ids.add(res["_id"])
+        except Exception as err:
+            logger.error("Couldn't find logs with specified ids")
+            logger.error(err)
+        bodies = []
+        for _id in sugggest_log_ids:
+            bodies.append({
+                "_op_type": "delete",
+                "_id":      _id,
+                "_index":   index_name,
+            })
+        result = self.es_client._bulk_index(bodies)
+        logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
+                    clean_index.ids, index_name, time() - t_start)
+        return result.took
 
     def get_config_for_boosting_suggests(self, analyzerConfig):
         return {

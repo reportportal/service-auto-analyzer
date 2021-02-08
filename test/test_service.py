@@ -87,6 +87,9 @@ class TestService(unittest.TestCase):
         self.cluster_update_es_update = "cluster_update_es_update.json"
         self.cluster_update_all_the_same_es_update = "cluster_update_all_the_same_es_update.json"
         self.cluster_update = "cluster_update.json"
+        self.search_suggest_info_ids_query = "search_suggest_info_ids_query.json"
+        self.one_hit_search_suggest_info_rs = "one_hit_search_suggest_info_rs.json"
+        self.delete_suggest_logs_rq = "delete_suggest_logs_rq.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
             "esVerifyCerts":     False,
@@ -138,7 +141,11 @@ class TestService(unittest.TestCase):
             "GlobalDefectTypeModelFolder":
                 self.model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"],
             "ProbabilityForCustomModelSuggestions": 0.9,
-            "ProbabilityForCustomModelAutoAnalysis": 0.1
+            "ProbabilityForCustomModelAutoAnalysis": 0.1,
+            "RetrainSuggestBoostModelConfig":
+                self.model_settings["RETRAIN_SUGGEST_BOOST_MODEL_CONFIG"],
+            "RetrainAutoBoostModelConfig":
+                self.model_settings["RETRAIN_AUTO_BOOST_MODEL_CONFIG"]
         }
 
     @utils.ignore_warnings

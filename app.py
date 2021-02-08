@@ -32,6 +32,7 @@ from service.cluster_service import ClusterService
 from service.auto_analyzer_service import AutoAnalyzerService
 from service.suggest_service import SuggestService
 from service.search_service import SearchService
+from service.clean_index_service import CleanIndexService
 from service.namespace_finder_service import NamespaceFinderService
 from service.delete_index_service import DeleteIndexService
 from service.retraining_service import RetrainingService
@@ -60,7 +61,7 @@ APP_CONFIG = {
     "binaryStoreType":   os.getenv("ANALYZER_BINARYSTORE_TYPE", "minio"),
     "minioBucketPrefix": os.getenv("ANALYZER_BINARYSTORE_BUCKETPREFIX", "prj-"),
     "minioRegion":       os.getenv("ANALYZER_BINARYSTORE_MINIO_REGION", None),
-    "instanceTaskType":  os.getenv("INSTANCE_TASK_TYPE", "train").strip(),
+    "instanceTaskType":  os.getenv("INSTANCE_TASK_TYPE", "").strip(),
     "filesystemDefaultPath": os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
     "esChunkNumber":         int(os.getenv("ES_CHUNK_NUMBER", "1000"))
 }
@@ -173,7 +174,8 @@ def init_amqp(_amqp_client):
                        (APP_CONFIG["exchangeName"], "clean", True, False,
                        lambda channel, method, props, body:
                        amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                        es_client.delete_logs,
+                                                        CleanIndexService(
+                                                            APP_CONFIG, SEARCH_CONFIG).delete_logs,
                                                         prepare_data_func=amqp_handler.
                                                         prepare_clean_index,
                                                         prepare_response_data=amqp_handler.

@@ -183,7 +183,6 @@ class TestCleanIndexService(TestService):
                 _clean_index_service = CleanIndexService(
                     app_config=self.app_config,
                     search_cfg=self.get_default_search_config())
-                self.call_number = 0
                 _clean_index_service.es_client.es_client.scroll = MagicMock(
                     return_value=json.loads(utils.get_fixture(self.no_hits_search_rs)))
                 _clean_index_service.suggest_service.es_client.es_client.scroll = MagicMock(

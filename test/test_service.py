@@ -90,6 +90,7 @@ class TestService(unittest.TestCase):
         self.search_suggest_info_ids_query = "search_suggest_info_ids_query.json"
         self.one_hit_search_suggest_info_rs = "one_hit_search_suggest_info_rs.json"
         self.delete_suggest_logs_rq = "delete_suggest_logs_rq.json"
+        self.suggest_info_list = "suggest_info_list.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
             "esVerifyCerts":     False,

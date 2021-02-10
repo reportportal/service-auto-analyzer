@@ -15,6 +15,7 @@
 """
 
 import unittest
+import json
 from unittest.mock import MagicMock
 from http import HTTPStatus
 import sure # noqa
@@ -623,6 +624,159 @@ class TestSuggestService(TestService):
                 response.should.have.length_of(len(test["expected_result"]))
                 for real_resp, expected_resp in zip(response, test["expected_result"]):
                     real_resp.should.equal(expected_resp)
+
+                TestSuggestService.shutdown_server(test["test_calls"])
+
+    @utils.ignore_warnings
+    def test_clean_suggest_info_logs(self):
+        """Test cleaning suggest info logs"""
+        tests = [
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2_suggest",
+                                    "status":         HTTPStatus.NOT_FOUND,
+                                    }, ],
+                "rq":             launch_objects.CleanIndex(ids=[1], project=2),
+                "expected_count": 0
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1_suggest",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/1_suggest/_search?scroll=5m&size=1000",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(self.search_suggest_info_ids_query),
+                                    "rs":             utils.get_fixture(
+                                        self.one_hit_search_suggest_info_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(self.delete_suggest_logs_rq),
+                                    "rs":             utils.get_fixture(self.delete_logs_rs),
+                                    }],
+                "rq":             launch_objects.CleanIndex(ids=[1], project=1),
+                "expected_count": 1
+            }
+        ]
+
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
+
+                suggest_service = SuggestService(app_config=self.app_config,
+                                                 search_cfg=self.get_default_search_config())
+                suggest_service.es_client.es_client.scroll = MagicMock(
+                    return_value=json.loads(utils.get_fixture(self.no_hits_search_rs)))
+                response = suggest_service.clean_suggest_info_logs(test["rq"])
+                test["expected_count"].should.equal(response)
+                TestSuggestService.shutdown_server(test["test_calls"])
+
+    @utils.ignore_warnings
+    def test_delete_suggest_info_index(self):
+        """Test deleting an index"""
+        tests = [
+            {
+                "test_calls": [{"method":         httpretty.DELETE,
+                                "uri":            "/1_suggest",
+                                "status":         HTTPStatus.OK,
+                                "content_type":   "application/json",
+                                "rs":             utils.get_fixture(self.index_deleted_rs),
+                                }, ],
+                "index":      1,
+                "result":     True,
+            },
+            {
+                "test_calls": [{"method":         httpretty.DELETE,
+                                "uri":            "/2_suggest",
+                                "status":         HTTPStatus.NOT_FOUND,
+                                "content_type":   "application/json",
+                                "rs":             utils.get_fixture(self.index_not_found_rs),
+                                }, ],
+                "index":      2,
+                "result":     False,
+            },
+        ]
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
+
+                suggest_service = SuggestService(app_config=self.app_config,
+                                                 search_cfg=self.get_default_search_config())
+
+                response = suggest_service.remove_suggest_info(test["index"])
+
+                test["result"].should.equal(response)
+
+                TestSuggestService.shutdown_server(test["test_calls"])
+
+    @utils.ignore_warnings
+    def test_index_suggest_info_logs(self):
+        """Test indexing suggest info"""
+        tests = [
+            {
+                "test_calls":     [],
+                "index_rq":       "[]",
+                "has_errors":     False,
+                "expected_count": 0
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1_suggest",
+                                    "status":         HTTPStatus.NOT_FOUND
+                                    },
+                                   {"method":         httpretty.PUT,
+                                    "uri":            "/1_suggest",
+                                    "status":         HTTPStatus.OK,
+                                    "rs":             utils.get_fixture(self.index_created_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rs":             utils.get_fixture(self.index_logs_rs),
+                                    }],
+                "index_rq":       utils.get_fixture(self.suggest_info_list),
+                "has_errors":     False,
+                "expected_count": 2
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1_suggest",
+                                    "status":         HTTPStatus.OK
+                                    },
+                                   {"method":         httpretty.PUT,
+                                    "uri":            "/1_suggest/_mapping",
+                                    "status":         HTTPStatus.OK,
+                                    "rs":             utils.get_fixture(self.index_created_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rs":             utils.get_fixture(self.index_logs_rs),
+                                    }],
+                "index_rq":       utils.get_fixture(self.suggest_info_list),
+                "has_errors":     False,
+                "expected_count": 2
+            }
+        ]
+
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
+
+                suggest_service = SuggestService(app_config=self.app_config,
+                                                 search_cfg=self.get_default_search_config())
+                response = suggest_service.index_suggest_info(
+                    [launch_objects.SuggestAnalysisResult(**res) for res in json.loads(test["index_rq"])])
+
+                test["has_errors"].should.equal(response.errors)
+                test["expected_count"].should.equal(response.took)
 
                 TestSuggestService.shutdown_server(test["test_calls"])
 

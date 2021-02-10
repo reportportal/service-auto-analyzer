@@ -45,13 +45,16 @@ class SuggestService(AnalyzerService):
         logger.info("Started saving suggest_info_list")
         t_start = time()
         bodies = []
+        project_index_names = set()
         for obj in suggest_info_list:
             obj_info = json.loads(obj.json())
             obj_info["savedDate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             project_index_name = self.build_index_name(obj_info["project"])
-            self.es_client.create_index_for_stats_info(
-                self.rp_suggest_index_template,
-                override_index_name=project_index_name)
+            if project_index_name not in project_index_names:
+                self.es_client.create_index_for_stats_info(
+                    self.rp_suggest_index_template,
+                    override_index_name=project_index_name)
+                project_index_names.add(project_index_name)
             bodies.append({
                 "_index": project_index_name,
                 "_source": obj_info

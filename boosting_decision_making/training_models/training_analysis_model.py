@@ -115,7 +115,7 @@ class AnalysisModelTraining:
                 "bad_data_proportion": 0, "metric_name": metric_name}
 
     def calculate_metrics(self, model, x_test, y_test,
-            metrics_to_gather, test_item_ids_with_pos, new_model_results):
+                          metrics_to_gather, test_item_ids_with_pos, new_model_results):
         for metric in metrics_to_gather:
             metric_res = 0.0
             if metric in self.metrics_calculations:

@@ -229,7 +229,6 @@ class TestEsClient(TestService):
                                     "uri":            "/_bulk?refresh=true",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
-                                    "rq":             utils.get_fixture(self.index_logs_rq),
                                     "rs":             utils.get_fixture(self.index_logs_rs),
                                     }, ],
                 "rq":             launch_objects.CleanIndex(ids=[1], project=1),

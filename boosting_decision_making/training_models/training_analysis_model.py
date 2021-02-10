@@ -70,17 +70,29 @@ class AnalysisModelTraining:
             "chosen_namespaces": namespaces,
             "calculate_similarities": False}
 
-    def get_info_template(self, project_info, baseline_model, model_name):
+    def get_info_template(self, project_info, baseline_model, model_name, metric_name):
         return {"method": "training", "sub_model_type": "all", "model_type": project_info["model_type"],
                 "baseline_model": [baseline_model], "new_model": [model_name],
                 "project_id": str(project_info["project_id"]), "model_saved": 0, "p_value": 1.0,
                 "data_proportion": 0.0, "baseline_mean_metric": 0.0, "new_model_mean_metric": 0.0,
-                "bad_data_proportion": 0, "metric_name": "F1"}
+                "bad_data_proportion": 0, "metric_name": metric_name}
 
-    def train_several_times(self, data, labels, features):
-        new_model_results = []
-        baseline_model_results = []
-        random_states = [1257, 1873, 1917]
+    def calculate_metrics(self, model, x_test, y_test, metrics_to_gather, new_model_results):
+        for metric in metrics_to_gather:
+            metric_res = 0.0
+            if metric == "F1":
+                metric_res = model.validate_model(x_test, y_test)
+            if metric == "Mean Reciprocal Rank":
+                metric_res = model.validate_model(x_test, y_test)
+            if metric not in new_model_results:
+                new_model_results[metric] = []
+            new_model_results[metric].append(metric_res)
+        return new_model_results
+
+    def train_several_times(self, data, labels, features, test_item_ids_with_pos, metrics_to_gather):
+        new_model_results = {}
+        baseline_model_results = {}
+        random_states = [1257, 1873, 1917, 2477, 3449]
         bad_data = False
 
         proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
@@ -100,13 +112,14 @@ class AnalysisModelTraining:
                     x_train, y_train = oversample.fit_sample(x_train, y_train)
                 self.new_model.train_model(x_train, y_train)
                 logger.debug("New model results")
-                f1 = self.new_model.validate_model(x_test, y_test)
-                new_model_results.append(f1)
+                new_model_results = self.calculate_metrics(
+                    self.new_model, x_test, y_test, metrics_to_gather, new_model_results)
                 logger.debug("Baseline results")
                 x_test_for_baseline = self.transform_data_from_feature_lists(
                     x_test, features, self.baseline_model.get_feature_ids())
-                f1 = self.baseline_model.validate_model(x_test_for_baseline, y_test)
-                baseline_model_results.append(f1)
+                baseline_model_results = self.calculate_metrics(
+                    self.baseline_model, x_test_for_baseline, y_test,
+                    metrics_to_gather, baseline_model_results)
         return baseline_model_results, new_model_results, bad_data
 
     def transform_data_from_feature_lists(self, feature_list, cur_features, desired_features):
@@ -159,7 +172,7 @@ class AnalysisModelTraining:
     def gather_data(self, model_type, project_id, features, defect_type_model_to_use):
         namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
         gathered_suggested_data, log_id_dict = self.query_es_for_suggest_info(project_id)
-        full_data_features, labels = [], []
+        full_data_features, labels, test_item_ids_with_pos = [], [], []
         for _suggest_res in gathered_suggested_data:
             searched_res = []
             found_logs = {}
@@ -189,7 +202,9 @@ class AnalysisModelTraining:
                 if feature_data:
                     full_data_features.extend(feature_data)
                     labels.append(int(_suggest_res["_source"]["isUserChoice"]))
-        return np.asarray(full_data_features), np.asarray(labels)
+                    test_item_ids_with_pos.append(
+                        (_suggest_res["_source"]["testItem"], _suggest_res["_source"]["resultPosition"]))
+        return np.asarray(full_data_features), np.asarray(labels), test_item_ids_with_pos
 
     def train(self, project_info):
         time_training = time()
@@ -210,38 +225,45 @@ class AnalysisModelTraining:
         defect_type_model_to_use = self.model_chooser.choose_model(
             project_info["project_id"], "defect_type_model/")
 
-        train_log_info = self.get_info_template(project_info, baseline_model_folder, model_name)
         logger.debug("Initialized training model '%s'", project_info["model_type"])
-        train_data, labels = self.gather_data(
+        train_data, labels, test_item_ids_with_pos = self.gather_data(
             project_info["model_type"], project_info["project_id"],
             self.new_model.get_feature_ids(), defect_type_model_to_use)
-        train_log_info["data_size"] = len(labels)
+
+        metrics_to_gather = ["F1", "Mean Reciprocal Rank"]
+        train_log_info = {}
+        for metric in metrics_to_gather:
+            train_log_info[metric] = self.get_info_template(
+                project_info, baseline_model_folder, model_name, metric)
+            train_log_info[metric]["data_size"] = len(labels)
+            train_log_info[metric]["data_proportion"] = utils.calculate_proportions_for_labels(labels)
+
         _, features, _ = pickle.load(open(os.path.join(
             self.baseline_folders[project_info["model_type"]], "data_features_config.pickle"), "rb"))
 
         logger.debug("Loaded data for training model '%s'", project_info["model_type"])
-
-        train_log_info["data_proportion"] = utils.calculate_proportions_for_labels(labels)
         baseline_model_results, new_model_results, bad_data = self.train_several_times(
-            train_data, labels, self.new_model.get_feature_ids())
+            train_data, labels, self.new_model.get_feature_ids(), test_item_ids_with_pos, metrics_to_gather)
+        for metric in metrics_to_gather:
+            train_log_info[metric]["bad_data_proportion"] = int(bad_data)
 
         use_custom_model = True
         if not bad_data:
-            logger.debug("Baseline test results %s", baseline_model_results)
-            logger.debug("New model test results %s", new_model_results)
-            pvalue = stats.f_oneway(baseline_model_results, new_model_results).pvalue
-            if pvalue != pvalue:
-                pvalue = 1.0
-            train_log_info["p_value"] = pvalue
-            mean_f1 = np.mean(new_model_results)
-            train_log_info["baseline_mean_metric"] = np.mean(baseline_model_results)
-            train_log_info["new_model_mean_metric"] = mean_f1
-            if pvalue < 0.05 and mean_f1 > np.mean(baseline_model_results) and mean_f1 >= 0.4:
-                use_custom_model = True
-            logger.debug(
-                "Model training validation results: p-value=%.3f mean baseline=%.3f mean new model=%.3f",
-                pvalue, np.mean(baseline_model_results), np.mean(new_model_results))
-        train_log_info["bad_data_proportion"] = int(bad_data)
+            for metric in metrics_to_gather:
+                logger.debug("Baseline test results %s", baseline_model_results[metric])
+                logger.debug("New model test results %s", new_model_results[metric])
+                pvalue = stats.f_oneway(baseline_model_results[metric], new_model_results[metric]).pvalue
+                if pvalue != pvalue:
+                    pvalue = 1.0
+                train_log_info[metric]["p_value"] = pvalue
+                mean_f1 = np.mean(new_model_results[metric])
+                train_log_info[metric]["baseline_mean_metric"] = np.mean(baseline_model_results[metric])
+                train_log_info[metric]["new_model_mean_metric"] = mean_f1
+                if pvalue < 0.05 and mean_f1 > np.mean(baseline_model_results[metric]) and mean_f1 >= 0.4:
+                    use_custom_model = True
+                logger.debug(
+                    "Model training validation results: p-value=%.3f mean baseline=%.3f mean new model=%.3f",
+                    pvalue, np.mean(baseline_model_results[metric]), np.mean(new_model_results[metric]))
 
         if use_custom_model:
             logger.debug("Custom model should be saved")
@@ -254,19 +276,24 @@ class AnalysisModelTraining:
             if proportion_binary_labels < self.due_proportion:
                 logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
                 bad_data = True
-            train_log_info["bad_data_proportion"] = int(bad_data)
+            for metric in metrics_to_gather:
+                train_log_info[metric]["bad_data_proportion"] = int(bad_data)
             if not bad_data:
-                train_log_info["model_saved"] = 1
+                for metric in metrics_to_gather:
+                    train_log_info[metric]["model_saved"] = 1
                 self.new_model.train_model(train_data, labels)
             else:
-                train_log_info["model_saved"] = 0
+                for metric in metrics_to_gather:
+                    train_log_info[metric]["model_saved"] = 0
             self.model_chooser.delete_old_model(
                 "%s_model" % project_info["model_type"], project_info["project_id"])
             self.new_model.save_model(
                 "%s_model/%s/" % (project_info["model_type"], model_name))
-        train_log_info["time_spent"] = (time() - time_training)
-        logger.info("Finished for %d s", train_log_info["time_spent"])
+        time_spent = (time() - time_training)
+        for metric in metrics_to_gather:
+            train_log_info[metric]["time_spent"] = time_spent
+            train_log_info[metric]["gather_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            train_log_info[metric]["module_version"] = [self.app_config["appVersion"]]
 
-        train_log_info["gather_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        train_log_info["module_version"] = [self.app_config["appVersion"]]
-        return len(train_data), {"all": train_log_info}
+        logger.info("Finished for %d s", time_spent)
+        return len(train_data), train_log_info

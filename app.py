@@ -61,7 +61,7 @@ APP_CONFIG = {
     "binaryStoreType":   os.getenv("ANALYZER_BINARYSTORE_TYPE", "minio"),
     "minioBucketPrefix": os.getenv("ANALYZER_BINARYSTORE_BUCKETPREFIX", "prj-"),
     "minioRegion":       os.getenv("ANALYZER_BINARYSTORE_MINIO_REGION", None),
-    "instanceTaskType":  os.getenv("INSTANCE_TASK_TYPE", "").strip(),
+    "instanceTaskType":  os.getenv("INSTANCE_TASK_TYPE", "train").strip(),
     "filesystemDefaultPath": os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
     "esChunkNumber":         int(os.getenv("ES_CHUNK_NUMBER", "1000"))
 }
@@ -81,7 +81,7 @@ SEARCH_CONFIG = {
     "ProbabilityForCustomModelSuggestions":  min(
         0.8, float(os.getenv("PROB_CUSTOM_MODEL_SUGGESTIONS", "0.3"))),
     "ProbabilityForCustomModelAutoAnalysis":  min(
-        1.0, float(os.getenv("PROB_CUSTOM_MODEL_AUTO_ANALYSIS", "0.1"))),
+        1.0, float(os.getenv("PROB_CUSTOM_MODEL_AUTO_ANALYSIS", "0.3"))),
     "BoostModelFolder":            "",
     "SuggestBoostModelFolder":     "",
     "SimilarityWeightsFolder":     "",

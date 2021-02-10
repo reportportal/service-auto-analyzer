@@ -56,6 +56,43 @@ class AnalysisModelTraining:
                 WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.model_chooser = model_chooser.ModelChooser(app_config=app_config, search_cfg=search_cfg)
+        self.metrics_calculations = {
+            "F1": self.calculate_F1,
+            "Mean Reciprocal Rank": self.calculate_MRR
+        }
+
+    def calculate_F1(self, model, x_test, y_test, test_item_ids_with_pos):
+        return model.validate_model(x_test, y_test)
+
+    def calculate_MRR(self, model, x_test, y_test, test_item_ids_with_pos):
+        res_labels, prob_labels = model.predict(x_test)
+        test_item_ids_res = {}
+        for i in range(len(test_item_ids_with_pos)):
+            test_item = test_item_ids_with_pos[i]
+            if test_item not in test_item_ids_res:
+                test_item_ids_res[test_item] = []
+            test_item_ids_res[test_item].append((res_labels[i], prob_labels[i][1], y_test[i]))
+        MRR = 0
+        cnt_to_use = 0
+        for test_item in test_item_ids_res:
+            res = sorted(test_item_ids_res[test_item], key=lambda x: x[1], reverse=True)
+            has_positives = False
+            for r in res:
+                if r[2] == 1:
+                    has_positives = True
+                    break
+            if not has_positives:
+                continue
+            RR_test_item = 0
+            for idx, r in enumerate(res):
+                if r[2] == 1 and r[0] == 1:
+                    RR_test_item = 1 / (idx + 1)
+                    break
+            MRR += RR_test_item
+            cnt_to_use += 1
+        if cnt_to_use:
+            MRR /= cnt_to_use
+        return MRR
 
     def get_config_for_boosting(self, numberOfLogLines, boosting_model_name, namespaces):
         return {
@@ -77,17 +114,27 @@ class AnalysisModelTraining:
                 "data_proportion": 0.0, "baseline_mean_metric": 0.0, "new_model_mean_metric": 0.0,
                 "bad_data_proportion": 0, "metric_name": metric_name}
 
-    def calculate_metrics(self, model, x_test, y_test, metrics_to_gather, new_model_results):
+    def calculate_metrics(self, model, x_test, y_test,
+            metrics_to_gather, test_item_ids_with_pos, new_model_results):
         for metric in metrics_to_gather:
             metric_res = 0.0
-            if metric == "F1":
-                metric_res = model.validate_model(x_test, y_test)
-            if metric == "Mean Reciprocal Rank":
-                metric_res = model.validate_model(x_test, y_test)
+            if metric in self.metrics_calculations:
+                metric_res = self.metrics_calculations[metric](
+                    model, x_test, y_test, test_item_ids_with_pos)
             if metric not in new_model_results:
                 new_model_results[metric] = []
             new_model_results[metric].append(metric_res)
         return new_model_results
+
+    def split_data(self, data, labels, random_state, test_item_ids_with_pos):
+        x_ids = [i for i in range(len(data))]
+        x_train_ids, x_test_ids, y_train, y_test = train_test_split(
+            x_ids, labels,
+            test_size=0.1, random_state=random_state, stratify=labels)
+        x_train = np.asarray([data[idx] for idx in x_train_ids])
+        x_test = np.asarray([data[idx] for idx in x_test_ids])
+        test_item_ids_with_pos_test = [test_item_ids_with_pos[idx] for idx in x_test_ids]
+        return x_train, x_test, y_train, y_test, test_item_ids_with_pos_test
 
     def train_several_times(self, data, labels, features, test_item_ids_with_pos, metrics_to_gather):
         new_model_results = {}
@@ -103,9 +150,8 @@ class AnalysisModelTraining:
 
         if not bad_data:
             for random_state in random_states:
-                x_train, x_test, y_train, y_test = train_test_split(
-                    data, labels,
-                    test_size=0.1, random_state=random_state, stratify=labels)
+                x_train, x_test, y_train, y_test, test_item_ids_with_pos_test = self.split_data(
+                    data, labels, random_state, test_item_ids_with_pos)
                 proportion_binary_labels = utils.calculate_proportions_for_labels(y_train)
                 if proportion_binary_labels < self.due_proportion_to_smote:
                     oversample = SMOTE(ratio="minority")
@@ -113,13 +159,14 @@ class AnalysisModelTraining:
                 self.new_model.train_model(x_train, y_train)
                 logger.debug("New model results")
                 new_model_results = self.calculate_metrics(
-                    self.new_model, x_test, y_test, metrics_to_gather, new_model_results)
+                    self.new_model, x_test, y_test, metrics_to_gather,
+                    test_item_ids_with_pos_test, new_model_results)
                 logger.debug("Baseline results")
                 x_test_for_baseline = self.transform_data_from_feature_lists(
                     x_test, features, self.baseline_model.get_feature_ids())
                 baseline_model_results = self.calculate_metrics(
                     self.baseline_model, x_test_for_baseline, y_test,
-                    metrics_to_gather, baseline_model_results)
+                    metrics_to_gather, test_item_ids_with_pos_test, baseline_model_results)
         return baseline_model_results, new_model_results, bad_data
 
     def transform_data_from_feature_lists(self, feature_list, cur_features, desired_features):
@@ -202,8 +249,7 @@ class AnalysisModelTraining:
                 if feature_data:
                     full_data_features.extend(feature_data)
                     labels.append(int(_suggest_res["_source"]["isUserChoice"]))
-                    test_item_ids_with_pos.append(
-                        (_suggest_res["_source"]["testItem"], _suggest_res["_source"]["resultPosition"]))
+                    test_item_ids_with_pos.append(_suggest_res["_source"]["testItem"])
         return np.asarray(full_data_features), np.asarray(labels), test_item_ids_with_pos
 
     def train(self, project_info):
@@ -247,7 +293,7 @@ class AnalysisModelTraining:
         for metric in metrics_to_gather:
             train_log_info[metric]["bad_data_proportion"] = int(bad_data)
 
-        use_custom_model = True
+        use_custom_model = False
         if not bad_data:
             for metric in metrics_to_gather:
                 logger.debug("Baseline test results %s", baseline_model_results[metric])

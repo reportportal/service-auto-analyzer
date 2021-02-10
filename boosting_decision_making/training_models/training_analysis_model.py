@@ -181,12 +181,17 @@ class AnalysisModelTraining:
         }
         log_ids_to_find = set()
         gathered_suggested_data = []
+        log_id_pairs_set = set()
         for res in elasticsearch.helpers.scan(self.es_client.es_client,
                                               query=search_query,
                                               index=str(project_id) + "_suggest",
                                               scroll="5m"):
             if len(gathered_suggested_data) >= 30000:
                 break
+            log_ids_pair = (res["_source"]["testItemLogId"], res["_source"]["relevantLogId"])
+            if log_ids_pair in log_id_pairs_set:
+                continue
+            log_id_pairs_set.add(log_ids_pair)
             for col in ["testItemLogId", "relevantLogId"]:
                 log_id = res["_source"][col]
                 if res["_source"]["isMergedLog"]:

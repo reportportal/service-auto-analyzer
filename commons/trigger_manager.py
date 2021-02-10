@@ -42,7 +42,7 @@ class TriggerManager:
                                   app_config, search_cfg))
         }
 
-    def is_trigger_exists(self, name):
+    def does_trigger_exist(self, name):
         return name in self.model_training_triggering
 
     def get_trigger_info(self, name):

@@ -38,7 +38,7 @@ class RetrainingService:
     def train_models(self, train_info):
         logger.info("Started training")
         t_start = time()
-        assert self.trigger_manager.is_trigger_exists(train_info["model_type"])
+        assert self.trigger_manager.does_trigger_exist(train_info["model_type"])
 
         _retraining_triggering, _retraining = self.trigger_manager.get_trigger_info(train_info["model_type"])
         if _retraining_triggering.should_model_training_be_triggered(train_info):

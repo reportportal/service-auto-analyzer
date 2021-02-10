@@ -41,6 +41,7 @@ class RetrainingService:
         assert self.trigger_manager.does_trigger_exist(train_info["model_type"])
 
         _retraining_triggering, _retraining = self.trigger_manager.get_trigger_info(train_info["model_type"])
+        is_model_trained = 0
         if _retraining_triggering.should_model_training_be_triggered(train_info):
             logger.debug("Should be trained ", train_info)
             try:
@@ -51,7 +52,10 @@ class RetrainingService:
                 if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
                     AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
                         self.app_config["exchangeName"], "stats_info", json.dumps(training_log_info))
+                is_model_trained = 1
             except Exception as err:
                 logger.error("Training finished with errors")
                 logger.error(err)
+                is_model_trained = 0
         logger.info("Finished training %.2f s", time() - t_start)
+        return is_model_trained

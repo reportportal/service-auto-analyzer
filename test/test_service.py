@@ -105,6 +105,7 @@ class TestService(unittest.TestCase):
             "minioBucketPrefix": "",
             "filesystemDefaultPath": "",
             "esChunkNumber":     1000,
+            "binaryStoreType":   "minio",
             "minioHost":         "",
             "minioAccessKey":    "",
             "minioSecretKey":    ""

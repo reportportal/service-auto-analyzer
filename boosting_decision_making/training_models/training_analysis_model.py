@@ -41,7 +41,7 @@ class AnalysisModelTraining:
     def __init__(self, app_config, search_cfg):
         self.app_config = app_config
         self.search_cfg = search_cfg
-        self.due_proportion = 0.2
+        self.due_proportion = 0.05
         self.due_proportion_to_smote = 0.4
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
         self.baseline_folders = {
@@ -288,9 +288,6 @@ class AnalysisModelTraining:
                 project_info, baseline_model_folder, model_name, metric)
             train_log_info[metric]["data_size"] = len(labels)
             train_log_info[metric]["data_proportion"] = utils.calculate_proportions_for_labels(labels)
-
-        _, features, _ = pickle.load(open(os.path.join(
-            self.baseline_folders[project_info["model_type"]], "data_features_config.pickle"), "rb"))
 
         logger.debug("Loaded data for training model '%s'", project_info["model_type"])
         baseline_model_results, new_model_results, bad_data = self.train_several_times(

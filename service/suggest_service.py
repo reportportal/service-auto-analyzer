@@ -36,6 +36,7 @@ class SuggestService(AnalyzerService):
         super(SuggestService, self).__init__(app_config=app_config, search_cfg=search_cfg)
         self.suggest_threshold = 0.4
         self.rp_suggest_index_template = "suggestions_info"
+        self.rp_suggest_metrics_index_template = "suggestions_info_metrics"
 
     def build_index_name(self, project_id):
         return str(project_id) + "_suggest"
@@ -46,9 +47,16 @@ class SuggestService(AnalyzerService):
         t_start = time()
         bodies = []
         project_index_names = set()
+        if len(suggest_info_list):
+            self.es_client.create_index_for_stats_info(
+                self.rp_suggest_metrics_index_template)
+        metrics_data_by_test_item = {}
         for obj in suggest_info_list:
             obj_info = json.loads(obj.json())
             obj_info["savedDate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            if obj_info["testItem"] not in metrics_data_by_test_item:
+                metrics_data_by_test_item[obj_info["testItem"]] = []
+            metrics_data_by_test_item[obj_info["testItem"]].append(obj_info)
             project_index_name = self.build_index_name(obj_info["project"])
             if project_index_name not in project_index_names:
                 self.es_client.create_index_for_stats_info(
@@ -59,9 +67,30 @@ class SuggestService(AnalyzerService):
                 "_index": project_index_name,
                 "_source": obj_info
             })
-        result = self.es_client._bulk_index(bodies)
+        bulk_result = self.es_client._bulk_index(bodies)
+        self.index_data_for_metrics(metrics_data_by_test_item)
         logger.info("Finished saving %.2f s", time() - t_start)
-        return result
+        return bulk_result
+
+    def index_data_for_metrics(self, metrics_data_by_test_item):
+        bodies = []
+        for test_item in metrics_data_by_test_item:
+            sorted_metrics_data = sorted(
+                metrics_data_by_test_item[test_item], key=lambda x: x["resultPosition"])
+            chosen_data = sorted_metrics_data[0]
+            for result in sorted_metrics_data:
+                if result["isUserChoice"] == 1:
+                    chosen_data = result
+                    break
+            if chosen_data["isUserChoice"] == 1:
+                chosen_data["reciprocalRank"] = 1 / chosen_data["resultPosition"]
+            else:
+                chosen_data["reciprocalRank"] = 0.0
+            bodies.append({
+                "_index": self.rp_suggest_metrics_index_template,
+                "_source": chosen_data
+            })
+        self.es_client._bulk_index(bodies)
 
     def remove_suggest_info(self, project_id):
         logger.info("Removing suggest_info index")

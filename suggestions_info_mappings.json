@@ -52,7 +52,7 @@
             "type": "integer"
         },
         "isUserChoice": {
-            "type": "keyword"
+            "type": "integer"
         },
         "savedDate": {
             "type":   "date",

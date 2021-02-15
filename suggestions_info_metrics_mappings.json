@@ -55,7 +55,7 @@
             "type": "integer"
         },
         "isUserChoice": {
-            "type": "integer"
+            "type": "keyword"
         },
         "savedDate": {
             "type":   "date",

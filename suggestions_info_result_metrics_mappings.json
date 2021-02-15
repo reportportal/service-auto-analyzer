@@ -27,6 +27,9 @@
         "resultPosition": {
             "type": "integer"
         },
+        "reciprocalRank": {
+            "type": "float"
+        },
         "esScore": {
             "type": "float"
         },

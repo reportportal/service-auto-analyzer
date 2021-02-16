@@ -60,6 +60,9 @@
         "processedTime": {
             "type": "float"
         },
+        "notFoundResults": {
+            "type": "boolean"
+        },
         "savedDate": {
             "type":   "date",
             "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"

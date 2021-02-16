@@ -82,6 +82,7 @@ class SuggestService(AnalyzerService):
                 if result["isUserChoice"] == 1:
                     chosen_data = result
                     break
+            chosen_data["notFoundResults"] = False
             if chosen_data["isUserChoice"] == 1:
                 chosen_data["reciprocalRank"] = 1 / chosen_data["resultPosition"]
             else:
@@ -370,6 +371,30 @@ class SuggestService(AnalyzerService):
         gathered_results = sorted(gathered_results, key=lambda x: (x[1], x[2]), reverse=True)
         return self.deduplicate_results(gathered_results, scores_by_test_items, test_item_ids)
 
+    def prepare_not_found_object_info(
+            self, test_item_info,
+            processed_time, model_feature_names, model_info):
+        return {  # reciprocalRank is not filled for not found results not to count in the metrics dashboard
+            "project": test_item_info.project,
+            "testItem": test_item_info.testItemId,
+            "testItemLogId": "",
+            "issueType": "",
+            "relevantItem": "",
+            "relevantLogId": "",
+            "isMergedLog": False,
+            "matchScore": 0.0,
+            "resultPosition": -1,
+            "modelFeatureNames": model_feature_names,
+            "modelFeatureValues": "",
+            "modelInfo": model_info,
+            "usedLogLines": test_item_info.analyzerConfig.numberOfLogLines,
+            "minShouldMatch": self.find_min_should_match_threshold(test_item_info.analyzerConfig),
+            "isUserChoice": False,
+            "processedTime": processed_time,
+            "notFoundResults": True,
+            "savedDate": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+
     @utils.ignore_warnings
     def suggest_items(self, test_item_info, num_items=5):
         logger.info("Started suggesting test items")
@@ -467,6 +492,15 @@ class SuggestService(AnalyzerService):
             "module_version": [self.app_config["appVersion"]],
             "min_should_match": self.find_min_should_match_threshold(
                 test_item_info.analyzerConfig)}}
+        if not results:
+            self.es_client.create_index_for_stats_info(self.rp_suggest_metrics_index_template)
+            self.es_client._bulk_index([{
+                "_index": self.rp_suggest_metrics_index_template,
+                "_source": self.prepare_not_found_object_info(
+                    test_item_info, time() - t_start,
+                    ";".join([str(feature) for feature in _suggest_decision_maker_to_use.get_feature_ids()]),
+                    ";".join(model_info_tags))
+            }])
         if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
             AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
                 self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))

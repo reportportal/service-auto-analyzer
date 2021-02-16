@@ -57,6 +57,9 @@
         "isUserChoice": {
             "type": "boolean"
         },
+        "processedTime": {
+            "type": "float"
+        },
         "savedDate": {
             "type":   "date",
             "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"

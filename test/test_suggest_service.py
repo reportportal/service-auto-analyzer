@@ -199,7 +199,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=0,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80)],
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0)],
                 "boost_predict":       ([1], [[0.2, 0.8]])
             },
             {
@@ -248,7 +249,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=0,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80)],
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0)],
                 "boost_predict":       ([1], [[0.3, 0.7]])
             },
             {
@@ -297,7 +299,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=0,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80)],
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0)],
                 "boost_predict":       ([1, 0], [[0.3, 0.7], [0.9, 0.1]])
             },
             {
@@ -346,7 +349,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=0,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80),
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0),
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=123,
                                                          testItemLogId=178,
@@ -361,7 +365,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=1,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80)],
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0)],
                 "boost_predict":       ([1, 0], [[0.3, 0.7], [0.55, 0.45]])
             },
             {
@@ -410,7 +415,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=0,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80),
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0),
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=123,
                                                          testItemLogId=178,
@@ -425,7 +431,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=1,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80),
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0),
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=123,
                                                          testItemLogId=178,
@@ -440,7 +447,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=2,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80)],
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0)],
                 "boost_predict":       ([1, 0, 1], [[0.3, 0.7], [0.55, 0.45], [0.2, 0.8]])
             },
             {
@@ -489,7 +497,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=0,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80),
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0),
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=123,
                                                          testItemLogId=178,
@@ -504,7 +513,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=1,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80),
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0),
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=123,
                                                          testItemLogId=178,
@@ -519,7 +529,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=2,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80)],
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0)],
                 "boost_predict":       ([1, 1, 1], [[0.3, 0.7], [0.3, 0.7], [0.3, 0.7]])
             },
             {
@@ -569,7 +580,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=0,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80)],
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0)],
                 "boost_predict":       ([1], [[0.1, 0.9]])
             },
             {
@@ -623,6 +635,7 @@ class TestSuggestService(TestService):
 
                 response.should.have.length_of(len(test["expected_result"]))
                 for real_resp, expected_resp in zip(response, test["expected_result"]):
+                    real_resp.processedTime = 10.0
                     real_resp.should.equal(expected_resp)
 
                 TestSuggestService.shutdown_server(test["test_calls"])

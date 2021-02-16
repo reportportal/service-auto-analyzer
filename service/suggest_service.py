@@ -418,7 +418,7 @@ class SuggestService(AnalyzerService):
                 issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
                 logger.debug("Test item id %d with issue type %s has probability %.2f",
                              test_item_id, issue_type, prob)
-
+            processed_time = time() - t_start
             global_idx = 0
             for idx, prob, _ in sorted_results[:num_items]:
                 if prob >= self.suggest_threshold:
@@ -448,7 +448,8 @@ class SuggestService(AnalyzerService):
                         modelInfo=";".join(model_info_tags),
                         resultPosition=global_idx,
                         usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
-                        minShouldMatch=self.find_min_should_match_threshold(test_item_info.analyzerConfig))
+                        minShouldMatch=self.find_min_should_match_threshold(test_item_info.analyzerConfig),
+                        processedTime=processed_time)
                     results.append(analysis_result)
                     logger.debug(analysis_result)
                 global_idx += 1

@@ -116,6 +116,7 @@ class SuggestAnalysisResult(BaseModel):
     modelInfo: str
     usedLogLines: int
     minShouldMatch: int
+    processedTime: float
     isUserChoice: bool = False
 
 

@@ -21,6 +21,7 @@
                 "_source": {
                     "issue_type": "AB001",
                     "launch_name": "Launch 1",
+                    "launch_id": 13,
                     "log_level": 40000,
                     "original_message_lines": 2,
                     "original_message_words_number": 6,
@@ -55,6 +56,7 @@
                 "_source": {
                     "issue_type": "PB001",
                     "launch_name": "Launch 1",
+                    "launch_id": 13,
                     "log_level": 40000,
                     "original_message_lines": 2,
                     "original_message_words_number": 7,

@@ -80,7 +80,7 @@ class LogPreparation:
 
         message = utils.first_lines(cleaned_message, number_of_lines)
         message_without_params = message
-        message = utils.sanitize_text(message)
+        message = utils.delete_empty_lines(utils.sanitize_text(message))
 
         message_without_params = utils.clean_from_urls(message_without_params)
         message_without_params = utils.clean_from_paths(message_without_params)
@@ -227,10 +227,12 @@ class LogPreparation:
         log_template["_source"]["potential_status_codes"] = potential_status_codes
         if clean_numbers:
             detected_message = detected_message + " " + potential_status_codes
-            log_template["_source"]["whole_message"] = detected_message + " \n " + stacktrace
+            log_template["_source"]["whole_message"] = utils.delete_empty_lines(
+                detected_message + " \n " + stacktrace)
         else:
             detected_message_with_numbers = detected_message_with_numbers + " " + potential_status_codes
-            log_template["_source"]["whole_message"] = detected_message_with_numbers + " \n " + stacktrace
+            log_template["_source"]["whole_message"] = utils.delete_empty_lines(
+                detected_message_with_numbers + " \n " + stacktrace)
         return log_template
 
     def prepare_logs_for_clustering(self, launch, number_of_lines, clean_numbers):

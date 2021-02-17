@@ -85,7 +85,9 @@ class BoostingFeaturizer:
                  {"field_name": "detected_message_without_params_and_brackets"}, []),
             55: (self._calculate_similarity_percent,
                  {"field_name": "potential_status_codes"}, []),
-            56: (self._calculate_model_probability,
+            56: (self._calculate_similarity_percent, {"field_name": "launch_name"}, []),
+            57: (self.is_launch_id_the_same, {}, []),
+            58: (self._calculate_model_probability,
                  {"model_folder": self.config["boosting_model"]},
                  self.get_necessary_features(self.config["boosting_model"]))
         }
@@ -112,11 +114,12 @@ class BoostingFeaturizer:
             self.similarity_calculator.find_similarity(
                 all_results,
                 fields_to_calc_similarity)
+        self.raw_results = all_results
         self.all_results = self.normalize_results(all_results)
         self.scores_by_issue_type = None
         self.defect_type_predict_model = None
         self.used_model_info = set()
-        self.features_to_recalculate_always = set([56])
+        self.features_to_recalculate_always = set([51, 58])
 
     def _calculate_model_probability(self, model_folder=""):
         if not model_folder.strip():
@@ -198,6 +201,15 @@ class BoostingFeaturizer:
             if new_elastic_res:
                 new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
+
+    def is_launch_id_the_same(self):
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        num_of_logs_issue_type = {}
+        for issue_type in scores_by_issue_type:
+            rel_item_launch_id = scores_by_issue_type[issue_type]["mrHit"]["_source"]["launch_id"]
+            queiried_item_launch_id = scores_by_issue_type[issue_type]["compared_log"]["_source"]["launch_id"]
+            num_of_logs_issue_type[issue_type] = int(rel_item_launch_id == queiried_item_launch_id)
+        return num_of_logs_issue_type
 
     def is_the_same_test_case(self):
         scores_by_issue_type = self.find_most_relevant_by_type()
@@ -436,6 +448,10 @@ class BoostingFeaturizer:
 
     def _calculate_similarity_percent(self, field_name="message"):
         scores_by_issue_type = self.find_most_relevant_by_type()
+        if field_name not in self.similarity_calculator.similarity_dict:
+            self.similarity_calculator.find_similarity(
+                self.raw_results,
+                [field_name])
         similarity_percent_by_type = {}
         for issue_type in scores_by_issue_type:
             group_id = (scores_by_issue_type[issue_type]["mrHit"]["_id"],

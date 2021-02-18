@@ -45,8 +45,7 @@
             "index":    false
         },
         "modelInfo": {
-            "type":     "text",
-            "index":    false
+            "type": "keyword"
         },
         "usedLogLines": {
             "type": "integer"

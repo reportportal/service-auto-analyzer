@@ -54,6 +54,7 @@ class SuggestService(AnalyzerService):
         for obj in suggest_info_list:
             obj_info = json.loads(obj.json())
             obj_info["savedDate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            obj_info["modelInfo"] = [obj.strip() for obj in obj_info["modelInfo"].split(";") if obj.strip()]
             if obj_info["testItem"] not in metrics_data_by_test_item:
                 metrics_data_by_test_item[obj_info["testItem"]] = []
             metrics_data_by_test_item[obj_info["testItem"]].append(obj_info)
@@ -499,7 +500,7 @@ class SuggestService(AnalyzerService):
                 "_source": self.prepare_not_found_object_info(
                     test_item_info, time() - t_start,
                     ";".join([str(feature) for feature in _suggest_decision_maker_to_use.get_feature_ids()]),
-                    ";".join(model_info_tags))
+                    model_info_tags)
             }])
         if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
             AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(

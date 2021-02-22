@@ -259,11 +259,11 @@ elif used_method.strip() in ["suggest_patterns"]:
 elif used_method.strip() in ["cluster"]:
     if not for_update:
         response = rpc.call(json.dumps({"launch": index_data[0],
-                                        "for_update": for_update,
+                                        "forUpdate": for_update,
                                         "numberOfLogLines": number_lines}), used_method)
     else:
         response = rpc.call(json.dumps({"launch": index_data[2],
-                                        "for_update": for_update,
+                                        "forUpdate": for_update,
                                         "numberOfLogLines": number_lines}), used_method)
 else:
     response = rpc.call(json.dumps(index_data), used_method)

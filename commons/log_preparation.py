@@ -44,6 +44,7 @@ class LogPreparation:
                 "test_item":        "",
                 "unique_id":        "",
                 "cluster_id":       "",
+                "cluster_message":  "",
                 "test_case_hash":   0,
                 "is_auto_analyzed": False,
                 "issue_type":       "",
@@ -115,7 +116,8 @@ class LogPreparation:
         found_exceptions_extended = utils.enrich_found_exceptions(found_exceptions)
 
         log_template["_id"] = log.logId
-        log_template["_source"]["cluster_id"] = log.clusterId
+        log_template["_source"]["cluster_id"] = str(log.clusterId)
+        log_template["_source"]["cluster_message"] = log.clusterMessage
         log_template["_source"]["log_level"] = log.logLevel
         log_template["_source"]["original_message_lines"] = utils.calculate_line_number(cleaned_message)
         log_template["_source"]["original_message_words_number"] = len(
@@ -211,7 +213,8 @@ class LogPreparation:
         message = utils.first_lines(cleaned_message, -1)
         message = utils.sanitize_text(message)
         log_template["_id"] = log.logId
-        log_template["_source"]["cluster_id"] = log.clusterId
+        log_template["_source"]["cluster_id"] = str(log.clusterId)
+        log_template["_source"]["cluster_message"] = log.clusterMessage
         log_template["_source"]["log_level"] = log.logLevel
         log_template["_source"]["original_message_lines"] = utils.calculate_line_number(
             cleaned_message)

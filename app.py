@@ -202,7 +202,7 @@ def init_amqp(_amqp_client):
                                                         prepare_data_func=amqp_handler.
                                                         prepare_launch_info,
                                                         prepare_response_data=amqp_handler.
-                                                        prepare_analyze_response_data))))
+                                                        prepare_index_response_data))))
         threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                        (APP_CONFIG["exchangeName"], "stats_info", True, False,
                        lambda channel, method, props, body:

@@ -39,6 +39,7 @@
                     "urls": "",
                     "paths": "",
                     "cluster_id": "123",
+                    "cluster_message": "error occured \n error found \n error mined",
                     "message_params": "",
                     "found_exceptions": "",
                     "found_exceptions_extended": "",

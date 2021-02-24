@@ -72,7 +72,8 @@ class Clusterizer:
         for idx in range(num_of_blocks):
             for jdx in range((idx + 1 if num_of_blocks > 1 else idx), num_of_blocks):
                 if for_text:
-                    _count_vector = CountVectorizer(binary=True, analyzer="word", token_pattern="[^ ]+")
+                    _count_vector = CountVectorizer(
+                        binary=True, analyzer="word", token_pattern="[^ ]+", ngram_range=(2, 2))
                 else:
                     _count_vector = CountVectorizer(binary=True, analyzer=lambda x: x)
 

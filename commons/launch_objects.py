@@ -39,7 +39,8 @@ class Log(BaseModel):
     logId: int
     logLevel: int = 0
     message: str
-    clusterId: str = ""
+    clusterId: int = 0
+    clusterMessage: str = ""
 
 
 class TestItem(BaseModel):
@@ -77,7 +78,7 @@ class Launch(BaseModel):
 
 class LaunchInfoForClustering(BaseModel):
     launch: Launch
-    forUpdate: bool
+    forUpdate: bool = False
     numberOfLogLines: int
     cleanNumbers: bool = False
 
@@ -89,13 +90,17 @@ class AnalysisResult(BaseModel):
     relevantItem: int
 
 
+class ClusterInfo(BaseModel):
+    clusterId: int
+    clusterMessage: str
+    logIds: List[int]
+
+
 class ClusterResult(BaseModel):
     """Analysis result object"""
-    logId: int
-    testItemId: int
-    clusterId: str
     project: int
     launchId: int
+    clusters: List[ClusterInfo]
 
 
 class SuggestAnalysisResult(BaseModel):

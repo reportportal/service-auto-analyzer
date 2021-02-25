@@ -206,7 +206,8 @@ class DefectTypeModelTraining:
     def train_several_times(self, label, data, found_sub_categories):
         new_model_results = []
         baseline_model_results = []
-        random_states = [1257, 1873, 1917, 2477, 3449]
+        random_states = [1257, 1873, 1917, 2477, 3449,
+                         353, 4561, 5417, 6427, 2029]
         bad_data = False
 
         logs_to_train_idx, labels_filtered, data_to_train,\

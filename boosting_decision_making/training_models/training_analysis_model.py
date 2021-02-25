@@ -139,7 +139,8 @@ class AnalysisModelTraining:
     def train_several_times(self, data, labels, features, test_item_ids_with_pos, metrics_to_gather):
         new_model_results = {}
         baseline_model_results = {}
-        random_states = [1257, 1873, 1917, 2477, 3449]
+        random_states = [1257, 1873, 1917, 2477, 3449,
+                         353, 4561, 5417, 6427, 2029]
         bad_data = False
 
         proportion_binary_labels = utils.calculate_proportions_for_labels(labels)

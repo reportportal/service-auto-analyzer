@@ -16,6 +16,8 @@
 
 import logging
 import utils.utils as utils
+import elasticsearch
+import elasticsearch.helpers
 from time import time
 from commons.esclient import EsClient
 from commons.launch_objects import SuggestPattern, SuggestPatternLabel
@@ -31,33 +33,33 @@ class SuggestPatternsService:
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
 
     def query_data(self, project, label):
-        label_data = self.es_client.es_client.search(
-            project,
-            {
-                "_source": ["detected_message", "issue_type"],
-                "sort": {"start_time": "desc"},
-                "size": 10000,
-                "query": {
-                    "bool": {
-                        "must": [
-                            {
-                                "bool": {
-                                    "should": [
-                                        {"wildcard": {"issue_type": "{}*".format(label.upper())}},
-                                        {"wildcard": {"issue_type": "{}*".format(label.lower())}},
-                                        {"wildcard": {"issue_type": "{}*".format(label)}},
-                                    ]
-                                }
-                            }
-                        ],
-                        "should": [
-                            {"term": {"is_auto_analyzed": {"value": "false", "boost": 1.0}}},
-                        ]
-                    }
-                }
-            })
         data = []
-        for d in label_data["hits"]["hits"]:
+        for d in elasticsearch.helpers.scan(
+                self.es_client.es_client,
+                index=project,
+                query={
+                    "_source": ["detected_message", "issue_type"],
+                    "sort": {"start_time": "desc"},
+                    "size": self.app_config["esChunkNumber"],
+                    "query": {
+                        "bool": {
+                            "must": [
+                                {
+                                    "bool": {
+                                        "should": [
+                                            {"wildcard": {"issue_type": "{}*".format(label.upper())}},
+                                            {"wildcard": {"issue_type": "{}*".format(label.lower())}},
+                                            {"wildcard": {"issue_type": "{}*".format(label)}},
+                                        ]
+                                    }
+                                }
+                            ],
+                            "should": [
+                                {"term": {"is_auto_analyzed": {"value": "false", "boost": 1.0}}},
+                            ]
+                        }
+                    }
+                }):
             data.append((d["_source"]["detected_message"], d["_source"]["issue_type"]))
         return data
 

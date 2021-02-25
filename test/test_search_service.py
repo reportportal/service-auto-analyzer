@@ -15,6 +15,8 @@
 """
 
 import unittest
+from unittest.mock import MagicMock
+import json
 from http import HTTPStatus
 import sure # noqa
 import httpretty
@@ -37,7 +39,7 @@ class TestSearchService(TestService):
                                     "status":         HTTPStatus.OK,
                                     },
                                    {"method":         httpretty.GET,
-                                    "uri":            "/1/_search",
+                                    "uri":            "/1/_search?scroll=5m&size=1000",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rq":             utils.get_fixture(self.search_logs_rq),
@@ -73,7 +75,7 @@ class TestSearchService(TestService):
                                     "status":         HTTPStatus.OK,
                                     },
                                    {"method":         httpretty.GET,
-                                    "uri":            "/1/_search",
+                                    "uri":            "/1/_search?scroll=5m&size=1000",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rq":             utils.get_fixture(self.search_logs_rq),
@@ -95,7 +97,7 @@ class TestSearchService(TestService):
                                     "status":         HTTPStatus.OK,
                                     },
                                    {"method":         httpretty.GET,
-                                    "uri":            "/1/_search",
+                                    "uri":            "/1/_search?scroll=5m&size=1000",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rq":             utils.get_fixture(
@@ -120,6 +122,9 @@ class TestSearchService(TestService):
 
                 search_service = SearchService(app_config=self.app_config,
                                                search_cfg=self.get_default_search_config())
+
+                search_service.es_client.es_client.scroll = MagicMock(return_value=json.loads(
+                    utils.get_fixture(self.no_hits_search_rs)))
 
                 response = search_service.search_logs(test["rq"])
                 response.should.have.length_of(test["expected_count"])

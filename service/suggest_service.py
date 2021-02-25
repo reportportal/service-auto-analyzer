@@ -15,7 +15,6 @@
 """
 from utils import utils
 from commons.launch_objects import SuggestAnalysisResult
-from boosting_decision_making import boosting_decision_maker
 from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from amqp.amqp import AmqpClient
 from commons.log_merger import LogMerger
@@ -25,6 +24,8 @@ import json
 import logging
 from time import time
 from datetime import datetime
+import elasticsearch
+import elasticsearch.helpers
 
 logger = logging.getLogger("analyzerApp.suggestService")
 
@@ -34,9 +35,114 @@ class SuggestService(AnalyzerService):
     def __init__(self, app_config={}, search_cfg={}):
         super(SuggestService, self).__init__(app_config=app_config, search_cfg=search_cfg)
         self.suggest_threshold = 0.4
-        if self.search_cfg["SuggestBoostModelFolder"].strip():
-            self.suggest_decision_maker = boosting_decision_maker.BoostingDecisionMaker(
-                folder=self.search_cfg["SuggestBoostModelFolder"])
+        self.rp_suggest_index_template = "suggestions_info"
+        self.rp_suggest_metrics_index_template = "suggestions_info_metrics"
+
+    def build_index_name(self, project_id):
+        return str(project_id) + "_suggest"
+
+    @utils.ignore_warnings
+    def index_suggest_info(self, suggest_info_list):
+        logger.info("Started saving suggest_info_list")
+        t_start = time()
+        bodies = []
+        project_index_names = set()
+        if len(suggest_info_list):
+            self.es_client.create_index_for_stats_info(
+                self.rp_suggest_metrics_index_template)
+        metrics_data_by_test_item = {}
+        for obj in suggest_info_list:
+            obj_info = json.loads(obj.json())
+            obj_info["savedDate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            obj_info["modelInfo"] = [obj.strip() for obj in obj_info["modelInfo"].split(";") if obj.strip()]
+            if obj_info["testItem"] not in metrics_data_by_test_item:
+                metrics_data_by_test_item[obj_info["testItem"]] = []
+            metrics_data_by_test_item[obj_info["testItem"]].append(obj_info)
+            project_index_name = self.build_index_name(obj_info["project"])
+            if project_index_name not in project_index_names:
+                self.es_client.create_index_for_stats_info(
+                    self.rp_suggest_index_template,
+                    override_index_name=project_index_name)
+                project_index_names.add(project_index_name)
+            bodies.append({
+                "_index": project_index_name,
+                "_source": obj_info
+            })
+        bulk_result = self.es_client._bulk_index(bodies)
+        self.index_data_for_metrics(metrics_data_by_test_item)
+        logger.info("Finished saving %.2f s", time() - t_start)
+        return bulk_result
+
+    def index_data_for_metrics(self, metrics_data_by_test_item):
+        bodies = []
+        for test_item in metrics_data_by_test_item:
+            sorted_metrics_data = sorted(
+                metrics_data_by_test_item[test_item], key=lambda x: x["resultPosition"])
+            chosen_data = sorted_metrics_data[0]
+            for result in sorted_metrics_data:
+                if result["isUserChoice"] == 1:
+                    chosen_data = result
+                    break
+            chosen_data["notFoundResults"] = False
+            if chosen_data["isUserChoice"] == 1:
+                chosen_data["reciprocalRank"] = 1 / chosen_data["resultPosition"]
+            else:
+                chosen_data["reciprocalRank"] = 0.0
+            bodies.append({
+                "_index": self.rp_suggest_metrics_index_template,
+                "_source": chosen_data
+            })
+        self.es_client._bulk_index(bodies)
+
+    def remove_suggest_info(self, project_id):
+        logger.info("Removing suggest_info index")
+        return self.es_client.delete_index(self.build_index_name(project_id))
+
+    def build_suggest_info_ids_query(self, log_ids):
+        return {
+            "_source": ["testItem"],
+            "size": 10000,
+            "query": {
+                "bool": {
+                    "should": [
+                        {"terms": {"testItemLogId": [str(log_id) for log_id in log_ids]}},
+                        {"terms": {"relevantLogId": [str(log_id) for log_id in log_ids]}}
+                    ]
+                }
+            }}
+
+    def clean_suggest_info_logs(self, clean_index):
+        """Delete logs from elasticsearch"""
+        index_name = self.build_index_name(clean_index.project)
+        logger.info("Delete logs %s for the index %s",
+                    clean_index.ids, index_name)
+        t_start = time()
+        if not self.es_client.index_exists(index_name, print_error=False):
+            logger.info("Didn't find index '%s'", index_name)
+            return 0
+        sugggest_log_ids = set()
+        try:
+            search_query = self.build_suggest_info_ids_query(
+                clean_index.ids)
+            for res in elasticsearch.helpers.scan(self.es_client.es_client,
+                                                  query=search_query,
+                                                  index=index_name,
+                                                  scroll="5m"):
+                sugggest_log_ids.add(res["_id"])
+        except Exception as err:
+            logger.error("Couldn't find logs with specified ids")
+            logger.error(err)
+        bodies = []
+        for _id in sugggest_log_ids:
+            bodies.append({
+                "_op_type": "delete",
+                "_id":      _id,
+                "_index":   index_name,
+            })
+        result = self.es_client._bulk_index(bodies)
+        logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
+                    clean_index.ids, index_name, time() - t_start)
+        return result.took
 
     def get_config_for_boosting_suggests(self, analyzerConfig):
         return {
@@ -47,7 +153,8 @@ class SuggestService(AnalyzerService):
             "filter_min_should_match_any": self.choose_fields_to_filter_suggests(
                 analyzerConfig.numberOfLogLines),
             "number_of_log_lines": analyzerConfig.numberOfLogLines,
-            "filter_by_unique_id": True}
+            "filter_by_unique_id": True,
+            "boosting_model": self.search_cfg["SuggestBoostModelFolder"]}
 
     def choose_fields_to_filter_suggests(self, log_lines_num):
         if log_lines_num == -1:
@@ -265,6 +372,30 @@ class SuggestService(AnalyzerService):
         gathered_results = sorted(gathered_results, key=lambda x: (x[1], x[2]), reverse=True)
         return self.deduplicate_results(gathered_results, scores_by_test_items, test_item_ids)
 
+    def prepare_not_found_object_info(
+            self, test_item_info,
+            processed_time, model_feature_names, model_info):
+        return {  # reciprocalRank is not filled for not found results not to count in the metrics dashboard
+            "project": test_item_info.project,
+            "testItem": test_item_info.testItemId,
+            "testItemLogId": "",
+            "issueType": "",
+            "relevantItem": "",
+            "relevantLogId": "",
+            "isMergedLog": False,
+            "matchScore": 0.0,
+            "resultPosition": -1,
+            "modelFeatureNames": model_feature_names,
+            "modelFeatureValues": "",
+            "modelInfo": model_info,
+            "usedLogLines": test_item_info.analyzerConfig.numberOfLogLines,
+            "minShouldMatch": self.find_min_should_match_threshold(test_item_info.analyzerConfig),
+            "isUserChoice": False,
+            "processedTime": processed_time,
+            "notFoundResults": True,
+            "savedDate": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+
     @utils.ignore_warnings
     def suggest_items(self, test_item_info, num_items=5):
         logger.info("Started suggesting test items")
@@ -285,23 +416,17 @@ class SuggestService(AnalyzerService):
         boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
         boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(
             test_item_info.project)
-        _suggest_decision_maker_to_use = self.choose_model(
+        _suggest_decision_maker_to_use = self.model_chooser.choose_model(
             test_item_info.project, "suggestion_model/",
             custom_model_prob=self.search_cfg["ProbabilityForCustomModelSuggestions"])
-        if _suggest_decision_maker_to_use is None:
-            _suggest_decision_maker_to_use = self.suggest_decision_maker
 
         _boosting_data_gatherer = SuggestBoostingFeaturizer(
             searched_res,
             boosting_config,
             feature_ids=_suggest_decision_maker_to_use.get_feature_ids(),
             weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
-        defect_type_model_to_use = self.choose_model(
-            test_item_info.project, "defect_type_model/")
-        if defect_type_model_to_use is None:
-            _boosting_data_gatherer.set_defect_type_model(self.global_defect_type_model)
-        else:
-            _boosting_data_gatherer.set_defect_type_model(defect_type_model_to_use)
+        _boosting_data_gatherer.set_defect_type_model(self.model_chooser.choose_model(
+            test_item_info.project, "defect_type_model/"))
         feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
         scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
         model_info_tags = _boosting_data_gatherer.get_used_model_info() +\
@@ -319,7 +444,7 @@ class SuggestService(AnalyzerService):
                 issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
                 logger.debug("Test item id %d with issue type %s has probability %.2f",
                              test_item_id, issue_type, prob)
-
+            processed_time = time() - t_start
             global_idx = 0
             for idx, prob, _ in sorted_results[:num_items]:
                 if prob >= self.suggest_threshold:
@@ -327,14 +452,18 @@ class SuggestService(AnalyzerService):
                     issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
                     relevant_log_id = utils.extract_real_id(
                         scores_by_test_items[test_item_id]["mrHit"]["_id"])
+                    real_log_id = str(scores_by_test_items[test_item_id]["mrHit"]["_id"])
+                    is_merged = real_log_id != str(relevant_log_id)
                     test_item_log_id = utils.extract_real_id(
                         scores_by_test_items[test_item_id]["compared_log"]["_id"])
                     analysis_result = SuggestAnalysisResult(
+                        project=test_item_info.project,
                         testItem=test_item_info.testItemId,
                         testItemLogId=test_item_log_id,
                         issueType=issue_type,
                         relevantItem=test_item_id,
                         relevantLogId=relevant_log_id,
+                        isMergedLog=is_merged,
                         matchScore=round(prob * 100, 2),
                         esScore=round(scores_by_test_items[test_item_id]["mrHit"]["_score"], 2),
                         esPosition=scores_by_test_items[test_item_id]["mrHit"]["es_pos"],
@@ -345,7 +474,8 @@ class SuggestService(AnalyzerService):
                         modelInfo=";".join(model_info_tags),
                         resultPosition=global_idx,
                         usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
-                        minShouldMatch=self.find_min_should_match_threshold(test_item_info.analyzerConfig))
+                        minShouldMatch=self.find_min_should_match_threshold(test_item_info.analyzerConfig),
+                        processedTime=processed_time)
                     results.append(analysis_result)
                     logger.debug(analysis_result)
                 global_idx += 1
@@ -363,16 +493,26 @@ class SuggestService(AnalyzerService):
             "module_version": [self.app_config["appVersion"]],
             "min_should_match": self.find_min_should_match_threshold(
                 test_item_info.analyzerConfig)}}
+        if not results:
+            self.es_client.create_index_for_stats_info(self.rp_suggest_metrics_index_template)
+            self.es_client._bulk_index([{
+                "_index": self.rp_suggest_metrics_index_template,
+                "_source": self.prepare_not_found_object_info(
+                    test_item_info, time() - t_start,
+                    ";".join([str(feature) for feature in _suggest_decision_maker_to_use.get_feature_ids()]),
+                    model_info_tags)
+            }])
         if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
             AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
                 self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
             if results:
-                AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
-                    self.app_config["exchangeName"], "train_models", json.dumps({
-                        "model_type": "suggestions",
-                        "project_id": test_item_info.project,
-                        "gathered_metric_total": len(results)
-                    }))
+                for model_type in ["suggestion", "auto_analysis"]:
+                    AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                        self.app_config["exchangeName"], "train_models", json.dumps({
+                            "model_type": model_type,
+                            "project_id": test_item_info.project,
+                            "gathered_metric_total": len(results)
+                        }))
 
         logger.debug("Stats info %s", results_to_share)
         logger.info("Processed the test item. It took %.2f sec.", time() - t_start)

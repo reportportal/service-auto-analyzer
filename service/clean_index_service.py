@@ -17,32 +17,25 @@
 import logging
 import utils.utils as utils
 from time import time
-from commons import namespace_finder
 from commons.esclient import EsClient
-from commons import trigger_manager
-from commons import model_chooser
+from service import suggest_service
 
-logger = logging.getLogger("analyzerApp.deleteIndexService")
+logger = logging.getLogger("analyzerApp.cleanIndexService")
 
 
-class DeleteIndexService:
+class CleanIndexService:
 
     def __init__(self, app_config={}, search_cfg={}):
         self.app_config = app_config
         self.search_cfg = search_cfg
-        self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
-        self.trigger_manager = trigger_manager.TriggerManager(
-            app_config=app_config, search_cfg=search_cfg)
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
-        self.model_chooser = model_chooser.ModelChooser(app_config=app_config, search_cfg=search_cfg)
+        self.suggest_service = suggest_service.SuggestService(app_config=app_config, search_cfg=search_cfg)
 
     @utils.ignore_warnings
-    def delete_index(self, index_name):
-        logger.info("Started deleting index")
+    def delete_logs(self, clean_index):
+        logger.info("Started cleaning index")
         t_start = time()
-        is_index_deleted = self.es_client.delete_index(index_name)
-        self.namespace_finder.remove_namespaces(index_name)
-        self.trigger_manager.delete_triggers(index_name)
-        self.model_chooser.delete_all_custom_models(index_name)
-        logger.info("Finished deleting index %.2f s", time() - t_start)
-        return int(is_index_deleted)
+        deleted_logs_cnt = self.es_client.delete_logs(clean_index)
+        self.suggest_service.clean_suggest_info_logs(clean_index)
+        logger.info("Finished cleaning index %.2f s", time() - t_start)
+        return deleted_logs_cnt

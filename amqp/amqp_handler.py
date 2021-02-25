@@ -27,6 +27,11 @@ def prepare_launches(launches):
     return [launch_objects.Launch(**launch) for launch in launches]
 
 
+def prepare_suggest_info_list(suggest_info_list):
+    """Function for deserializing array of suggest info results"""
+    return [launch_objects.SuggestAnalysisResult(**res) for res in suggest_info_list]
+
+
 def prepare_search_logs(search_data):
     """Function for deserializing search logs object"""
     return launch_objects.SearchLogs(**search_data)

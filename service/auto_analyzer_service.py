@@ -15,7 +15,7 @@
 """
 from utils import utils
 from commons.launch_objects import AnalysisResult
-from boosting_decision_making import boosting_decision_maker, boosting_featurizer
+from boosting_decision_making import boosting_featurizer
 from service.analyzer_service import AnalyzerService
 from amqp.amqp import AmqpClient
 from commons.log_merger import LogMerger
@@ -34,9 +34,6 @@ class AutoAnalyzerService(AnalyzerService):
 
     def __init__(self, app_config={}, search_cfg={}):
         super(AutoAnalyzerService, self).__init__(app_config=app_config, search_cfg=search_cfg)
-        if self.search_cfg["BoostModelFolder"].strip():
-            self.boosting_decision_maker = boosting_decision_maker.BoostingDecisionMaker(
-                folder=self.search_cfg["BoostModelFolder"])
 
     def get_config_for_boosting(self, analyzer_config):
         min_should_match = self.find_min_should_match_threshold(analyzer_config) / 100
@@ -49,7 +46,8 @@ class AutoAnalyzerService(AnalyzerService):
             "filter_min_should_match": self.choose_fields_to_filter_strict(
                 analyzer_config.numberOfLogLines),
             "number_of_log_lines": analyzer_config.numberOfLogLines,
-            "filter_by_unique_id": True
+            "filter_by_unique_id": True,
+            "boosting_model": self.search_cfg["BoostModelFolder"]
         }
 
     def choose_fields_to_filter_strict(self, log_lines):
@@ -287,29 +285,28 @@ class AutoAnalyzerService(AnalyzerService):
                 if project_id not in chosen_namespaces:
                     chosen_namespaces[project_id] = self.namespace_finder.get_chosen_namespaces(project_id)
                 boosting_config["chosen_namespaces"] = chosen_namespaces[project_id]
+                _boosting_decision_maker = self.model_chooser.choose_model(
+                    project_id, "auto_analysis_model/",
+                    custom_model_prob=self.search_cfg["ProbabilityForCustomModelAutoAnalysis"])
 
                 boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
                     searched_res,
                     boosting_config,
-                    feature_ids=self.boosting_decision_maker.get_feature_ids(),
+                    feature_ids=_boosting_decision_maker.get_feature_ids(),
                     weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
                 if project_id not in defect_type_model_to_use:
-                    defect_type_model_to_use[project_id] = self.choose_model(
+                    defect_type_model_to_use[project_id] = self.model_chooser.choose_model(
                         project_id, "defect_type_model/")
-                if defect_type_model_to_use[project_id] is None:
-                    boosting_data_gatherer.set_defect_type_model(self.global_defect_type_model)
-                else:
-                    boosting_data_gatherer.set_defect_type_model(
-                        defect_type_model_to_use[project_id])
+                boosting_data_gatherer.set_defect_type_model(defect_type_model_to_use[project_id])
                 feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
                 model_info_tags = boosting_data_gatherer.get_used_model_info() +\
-                    self.boosting_decision_maker.get_model_info()
+                    _boosting_decision_maker.get_model_info()
                 results_to_share[launch_id]["model_info"].update(model_info_tags)
 
                 if len(feature_data) > 0:
 
                     predicted_labels, predicted_labels_probability =\
-                        self.boosting_decision_maker.predict(feature_data)
+                        _boosting_decision_maker.predict(feature_data)
 
                     scores_by_issue_type = boosting_data_gatherer.scores_by_issue_type
 

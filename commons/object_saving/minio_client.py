@@ -89,6 +89,8 @@ class MinioClient:
             return {}
 
     def does_object_exists(self, project_id, object_name):
+        if self.minioClient is None:
+            return False
         try:
             if not self.minioClient.bucket_exists(project_id):
                 return False
@@ -99,6 +101,8 @@ class MinioClient:
             return False
 
     def get_folder_objects(self, project_id, folder):
+        if self.minioClient is None:
+            return []
         object_names = []
         if not self.minioClient.bucket_exists(project_id):
             return []
@@ -107,8 +111,13 @@ class MinioClient:
         return object_names
 
     def remove_folder_objects(self, project_id, folder):
+        if self.minioClient is None:
+            return
         if not self.minioClient.bucket_exists(project_id):
             return
-        for obj in self.minioClient.list_objects(project_id, prefix=folder):
-            self.minioClient.remove_object(
-                bucket_name=project_id, object_name=obj.object_name)
+        try:
+            for obj in self.minioClient.list_objects(project_id, prefix=folder):
+                self.minioClient.remove_object(
+                    bucket_name=project_id, object_name=obj.object_name)
+        except Exception as err:
+            logger.error(err)

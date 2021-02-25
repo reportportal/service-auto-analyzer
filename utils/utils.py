@@ -518,7 +518,7 @@ def enrich_text_with_method_and_classes(text):
 def extract_real_id(elastic_id):
     real_id = str(elastic_id)
     if real_id[-2:] == "_m":
-        return -1
+        return int(real_id[:-2])
     return int(real_id)
 
 
@@ -669,3 +669,64 @@ def preprocess_words(text):
                             split_words.append("".join(split_parts[idx:idx + 2]).lower())
             all_words.extend(split_words)
     return all_words
+
+
+def topological_sort(feature_graph):
+    visited = {}
+    for key_ in feature_graph:
+        visited[key_] = 0
+    stack = []
+
+    for key_ in feature_graph:
+        if visited[key_] == 0:
+            stack_vertices = [key_]
+            while len(stack_vertices):
+                vert = stack_vertices[-1]
+                if vert not in visited:
+                    continue
+                if visited[vert] == 1:
+                    stack_vertices.pop()
+                    visited[vert] = 2
+                    stack.append(vert)
+                else:
+                    visited[vert] = 1
+                    for key_i in feature_graph[vert]:
+                        if key_i not in visited:
+                            continue
+                        if visited[key_i] == 0:
+                            stack_vertices.append(key_i)
+    return stack
+
+
+def to_number_list(features_list):
+    feature_numbers_list = []
+    for res in features_list.split(","):
+        try:
+            feature_numbers_list.append(int(res))
+        except: # noqa
+            feature_numbers_list.append(float(res))
+    return feature_numbers_list
+
+
+def fill_prevously_gathered_features(feature_list, feature_ids):
+    previously_gathered_features = {}
+    if type(feature_ids) == str:
+        feature_ids = transform_string_feature_range_into_list(feature_ids)
+    for i in range(len(feature_list)):
+        for idx, feature in enumerate(feature_ids):
+            if feature not in previously_gathered_features:
+                previously_gathered_features[feature] = []
+            previously_gathered_features[feature].append(feature_list[i][idx])
+    return previously_gathered_features
+
+
+def gather_feature_list(gathered_data_dict, feature_ids, to_list=False):
+    len_data = 0
+    for feature in feature_ids:
+        len_data = len(gathered_data_dict[feature])
+        break
+    gathered_data = np.zeros((len_data, len(feature_ids)))
+    for idx, feature in enumerate(feature_ids):
+        for j in range(len(gathered_data_dict[feature])):
+            gathered_data[j][idx] = round(gathered_data_dict[feature][j], 2)
+    return gathered_data.tolist() if to_list else gathered_data

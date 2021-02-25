@@ -105,11 +105,13 @@ class ClusterResult(BaseModel):
 
 class SuggestAnalysisResult(BaseModel):
     """Analysis result object"""
+    project: int
     testItem: int
     testItemLogId: int
     issueType: str
     relevantItem: int
     relevantLogId: int
+    isMergedLog: bool = False
     matchScore: float
     resultPosition: int
     esScore: float
@@ -119,6 +121,8 @@ class SuggestAnalysisResult(BaseModel):
     modelInfo: str
     usedLogLines: int
     minShouldMatch: int
+    processedTime: float
+    isUserChoice: bool = False
 
 
 class CleanIndex(BaseModel):

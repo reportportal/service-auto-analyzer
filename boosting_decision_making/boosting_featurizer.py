@@ -16,6 +16,7 @@
 
 from utils import utils
 from commons import similarity_calculator
+from boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
 import logging
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
@@ -26,6 +27,8 @@ class BoostingFeaturizer:
     def __init__(self, all_results, config, feature_ids,
                  weighted_log_similarity_calculator=None):
         self.config = config
+        self.previously_gathered_features = {}
+        self.models = {}
         self.similarity_calculator = similarity_calculator.SimilarityCalculator(
             self.config,
             weighted_similarity_calculator=weighted_log_similarity_calculator)
@@ -43,45 +46,50 @@ class BoostingFeaturizer:
             "detected_message_without_params_and_brackets"]
 
         self.feature_functions = {
-            0: (self._calculate_score, {}),
-            1: (self._calculate_place, {}),
-            3: (self._calculate_max_score_and_pos, {"return_val_name": "max_score_pos"}),
-            5: (self._calculate_min_score_and_pos, {"return_val_name": "min_score_pos"}),
-            7: (self._calculate_percent_count_items_and_mean, {"return_val_name": "cnt_items_percent"}),
-            9: (self._calculate_percent_issue_types, {}),
-            11: (self._calculate_similarity_percent, {"field_name": "message"}),
-            12: (self.is_only_merged_small_logs, {}),
-            13: (self._calculate_similarity_percent, {"field_name": "merged_small_logs"}),
-            14: (self._has_test_item_several_logs, {}),
-            15: (self._has_query_several_logs, {}),
-            18: (self._calculate_similarity_percent, {"field_name": "detected_message"}),
-            19: (self._calculate_similarity_percent, {"field_name": "detected_message_with_numbers"}),
-            23: (self._calculate_similarity_percent, {"field_name": "stacktrace"}),
-            25: (self._calculate_similarity_percent, {"field_name": "only_numbers"}),
-            26: (self._calculate_max_score_and_pos, {"return_val_name": "max_score"}),
-            27: (self._calculate_min_score_and_pos, {"return_val_name": "min_score"}),
+            0: (self._calculate_score, {}, []),
+            1: (self._calculate_place, {}, []),
+            3: (self._calculate_max_score_and_pos, {"return_val_name": "max_score_pos"}, []),
+            5: (self._calculate_min_score_and_pos, {"return_val_name": "min_score_pos"}, []),
+            7: (self._calculate_percent_count_items_and_mean, {"return_val_name": "cnt_items_percent"}, []),
+            9: (self._calculate_percent_issue_types, {}, []),
+            11: (self._calculate_similarity_percent, {"field_name": "message"}, []),
+            12: (self.is_only_merged_small_logs, {}, []),
+            13: (self._calculate_similarity_percent, {"field_name": "merged_small_logs"}, []),
+            14: (self._has_test_item_several_logs, {}, []),
+            15: (self._has_query_several_logs, {}, []),
+            18: (self._calculate_similarity_percent, {"field_name": "detected_message"}, []),
+            19: (self._calculate_similarity_percent, {"field_name": "detected_message_with_numbers"}, []),
+            23: (self._calculate_similarity_percent, {"field_name": "stacktrace"}, []),
+            25: (self._calculate_similarity_percent, {"field_name": "only_numbers"}, []),
+            26: (self._calculate_max_score_and_pos, {"return_val_name": "max_score"}, []),
+            27: (self._calculate_min_score_and_pos, {"return_val_name": "min_score"}, []),
             28: (self._calculate_percent_count_items_and_mean,
-                 {"return_val_name": "mean_score"}),
-            29: (self._calculate_similarity_percent, {"field_name": "message_params"}),
-            34: (self._calculate_similarity_percent, {"field_name": "found_exceptions"}),
-            35: (self._is_all_log_lines, {}),
-            36: (self._calculate_similarity_percent, {"field_name": "detected_message_extended"}),
+                 {"return_val_name": "mean_score"}, []),
+            29: (self._calculate_similarity_percent, {"field_name": "message_params"}, []),
+            34: (self._calculate_similarity_percent, {"field_name": "found_exceptions"}, []),
+            35: (self._is_all_log_lines, {}, []),
+            36: (self._calculate_similarity_percent, {"field_name": "detected_message_extended"}, []),
             37: (self._calculate_similarity_percent,
-                 {"field_name": "detected_message_without_params_extended"}),
-            38: (self._calculate_similarity_percent, {"field_name": "stacktrace_extended"}),
-            40: (self._calculate_similarity_percent, {"field_name": "message_without_params_extended"}),
-            41: (self._calculate_similarity_percent, {"field_name": "message_extended"}),
-            42: (self.is_the_same_test_case, {}),
-            43: (self.has_the_same_test_case_in_all_results, {}),
-            48: (self.is_text_of_particular_defect_type, {"label_type": "ab"}),
-            49: (self.is_text_of_particular_defect_type, {"label_type": "pb"}),
-            50: (self.is_text_of_particular_defect_type, {"label_type": "si"}),
-            51: (self.predict_particular_defect_type, {}),
-            52: (self._calculate_similarity_percent, {"field_name": "namespaces_stacktrace"}),
+                 {"field_name": "detected_message_without_params_extended"}, []),
+            38: (self._calculate_similarity_percent, {"field_name": "stacktrace_extended"}, []),
+            40: (self._calculate_similarity_percent, {"field_name": "message_without_params_extended"}, []),
+            41: (self._calculate_similarity_percent, {"field_name": "message_extended"}, []),
+            42: (self.is_the_same_test_case, {}, []),
+            43: (self.has_the_same_test_case_in_all_results, {}, []),
+            48: (self.is_text_of_particular_defect_type, {"label_type": "ab"}, []),
+            49: (self.is_text_of_particular_defect_type, {"label_type": "pb"}, []),
+            50: (self.is_text_of_particular_defect_type, {"label_type": "si"}, []),
+            51: (self.predict_particular_defect_type, {}, []),
+            52: (self._calculate_similarity_percent, {"field_name": "namespaces_stacktrace"}, []),
             53: (self._calculate_similarity_percent,
-                 {"field_name": "detected_message_without_params_and_brackets"}),
+                 {"field_name": "detected_message_without_params_and_brackets"}, []),
             55: (self._calculate_similarity_percent,
-                 {"field_name": "potential_status_codes"})
+                 {"field_name": "potential_status_codes"}, []),
+            56: (self._calculate_similarity_percent, {"field_name": "launch_name"}, []),
+            57: (self.is_launch_id_the_same, {}, []),
+            58: (self._calculate_model_probability,
+                 {"model_folder": self.config["boosting_model"]},
+                 self.get_necessary_features(self.config["boosting_model"]))
         }
 
         fields_to_calc_similarity = self.find_columns_to_find_similarities_for()
@@ -102,13 +110,47 @@ class BoostingFeaturizer:
                 fields=self.config["filter_min_should_match_any"])
         if "filter_by_unique_id" in self.config and self.config["filter_by_unique_id"]:
             all_results = self.filter_by_unique_id(all_results)
-        self.similarity_calculator.find_similarity(
-            all_results,
-            fields_to_calc_similarity)
+        if "calculate_similarities" not in self.config or self.config["calculate_similarities"]:
+            self.similarity_calculator.find_similarity(
+                all_results,
+                fields_to_calc_similarity)
+        self.raw_results = all_results
         self.all_results = self.normalize_results(all_results)
         self.scores_by_issue_type = None
         self.defect_type_predict_model = None
         self.used_model_info = set()
+        self.features_to_recalculate_always = set([51, 58])
+
+    def _calculate_model_probability(self, model_folder=""):
+        if not model_folder.strip():
+            return []
+        if model_folder not in self.models:
+            logger.error("Model folder is not found: '%s'", model_folder)
+            return []
+        feature_ids = self.models[model_folder].get_feature_ids()
+        feature_data = utils.gather_feature_list(self.previously_gathered_features, feature_ids, to_list=True)
+        predicted_labels, predicted_labels_probability = self.models[model_folder].predict(
+            feature_data)
+        predicted_probability = []
+        for res in predicted_labels_probability:
+            predicted_probability.append(float(res[1]))
+        return predicted_probability
+
+    def get_necessary_features(self, model_folder):
+        if not model_folder.strip():
+            return[]
+        if model_folder not in self.models:
+            try:
+                self.models[model_folder] = BoostingDecisionMaker(folder=model_folder)
+                return self.models[model_folder].get_feature_ids()
+            except Exception as err:
+                logger.debug(err)
+                return []
+        return self.models[model_folder].get_feature_ids()
+
+    def fill_prevously_gathered_features(self, feature_list, feature_ids):
+        self.previously_gathered_features = utils.fill_prevously_gathered_features(
+            feature_list, feature_ids)
 
     def get_used_model_info(self):
         return list(self.used_model_info)
@@ -159,6 +201,15 @@ class BoostingFeaturizer:
             if new_elastic_res:
                 new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
+
+    def is_launch_id_the_same(self):
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        num_of_logs_issue_type = {}
+        for issue_type in scores_by_issue_type:
+            rel_item_launch_id = scores_by_issue_type[issue_type]["mrHit"]["_source"]["launch_id"]
+            queiried_item_launch_id = scores_by_issue_type[issue_type]["compared_log"]["_source"]["launch_id"]
+            num_of_logs_issue_type[issue_type] = int(rel_item_launch_id == queiried_item_launch_id)
+        return num_of_logs_issue_type
 
     def is_the_same_test_case(self):
         scores_by_issue_type = self.find_most_relevant_by_type()
@@ -397,6 +448,10 @@ class BoostingFeaturizer:
 
     def _calculate_similarity_percent(self, field_name="message"):
         scores_by_issue_type = self.find_most_relevant_by_type()
+        if field_name not in self.similarity_calculator.similarity_dict:
+            self.similarity_calculator.find_similarity(
+                self.raw_results,
+                [field_name])
         similarity_percent_by_type = {}
         for issue_type in scores_by_issue_type:
             group_id = (scores_by_issue_type[issue_type]["mrHit"]["_id"],
@@ -409,21 +464,39 @@ class BoostingFeaturizer:
     def gather_features_info(self):
         """Gather all features from feature_ids for a test item"""
         gathered_data = []
+        gathered_data_dict = {}
         issue_type_names = []
         issue_type_by_index = {}
         try:
             issue_types = self.find_most_relevant_by_type()
             for idx, issue_type in enumerate(issue_types):
-                gathered_data.append([])
-                issue_type_by_index[issue_type] = idx
+                issue_type_by_index[idx] = issue_type
                 issue_type_names.append(issue_type)
+
+            feature_graph = {}
             for feature in self.feature_ids:
-                func, args = self.feature_functions[feature]
-                result = func(**args)
-                for issue_type in result:
-                    gathered_data[issue_type_by_index[issue_type]].append(round(result[issue_type], 2))
+                _, _, dependants = self.feature_functions[feature]
+                feature_graph[feature] = dependants
+            ordered_features = utils.topological_sort(feature_graph)
+
+            for feature in ordered_features:
+                if feature in self.previously_gathered_features and\
+                        feature not in self.features_to_recalculate_always:
+                    gathered_data_dict[feature] = self.previously_gathered_features[feature]
+                else:
+                    func, args, _ = self.feature_functions[feature]
+                    result = func(**args)
+                    if type(result) == list:
+                        gathered_data_dict[feature] = [round(r, 2) for r in result]
+                    else:
+                        gathered_data_dict[feature] = []
+                        for idx in sorted(issue_type_by_index.keys()):
+                            issue_type = issue_type_by_index[idx]
+                            gathered_data_dict[feature].append(round(result[issue_type], 2))
+                    self.previously_gathered_features[feature] = gathered_data_dict[feature]
+
+            gathered_data = utils.gather_feature_list(gathered_data_dict, self.feature_ids, to_list=True)
         except Exception as err:
             logger.error("Errors in boosting features calculation")
             logger.error(err)
-
         return gathered_data, issue_type_names

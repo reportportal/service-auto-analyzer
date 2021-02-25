@@ -188,7 +188,8 @@ class TestAutoAnalyzerService(TestService):
                 if "msearch_results" in test:
                     analyzer_service.es_client.es_client.msearch = MagicMock(
                         return_value={"responses": test["msearch_results"]})
-                analyzer_service.boosting_decision_maker = _boosting_decision_maker
+                analyzer_service.model_chooser.choose_model = MagicMock(
+                    return_value=_boosting_decision_maker)
 
                 launches = [launch_objects.Launch(**launch)
                             for launch in json.loads(test["index_rq"])]

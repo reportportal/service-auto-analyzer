@@ -17,6 +17,7 @@
 from boosting_decision_making import defect_type_model, custom_defect_type_model
 from sklearn.model_selection import train_test_split
 from commons.esclient import EsClient
+from commons import model_chooser
 from utils import utils
 from time import time
 import scipy.stats as stats
@@ -41,6 +42,7 @@ class DefectTypeModelTraining:
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
         self.baseline_model = defect_type_model.DefectTypeModel(
             folder=search_cfg["GlobalDefectTypeModelFolder"])
+        self.model_chooser = model_chooser.ModelChooser(app_config=app_config, search_cfg=search_cfg)
 
     def return_similar_objects_into_sample(self, x_train_ind, y_train, data, additional_logs, label):
         x_train = []
@@ -204,7 +206,7 @@ class DefectTypeModelTraining:
     def train_several_times(self, label, data, found_sub_categories):
         new_model_results = []
         baseline_model_results = []
-        random_states = [1257, 1873, 1917]
+        random_states = [1257, 1873, 1917, 2477, 3449]
         bad_data = False
 
         logs_to_train_idx, labels_filtered, data_to_train,\
@@ -320,7 +322,7 @@ class DefectTypeModelTraining:
             logger.debug("The custom model should be saved")
             train_log_info["all"]["model_saved"] = 1
             train_log_info["all"]["p_value"] = p_value_max
-            self.new_model.delete_old_model()
+            self.model_chooser.delete_old_model("defect_type_model", project_info["project_id"])
             self.new_model.save_model(
                 "defect_type_model/%s/" % model_name)
 

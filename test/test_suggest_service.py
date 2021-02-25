@@ -15,6 +15,7 @@
 """
 
 import unittest
+import json
 from unittest.mock import MagicMock
 from http import HTTPStatus
 import sure # noqa
@@ -37,7 +38,22 @@ class TestSuggestService(TestService):
                 "test_calls":          [{"method":         httpretty.GET,
                                          "uri":            "/1",
                                          "status":         HTTPStatus.OK,
-                                         }, ],
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/suggestions_info_metrics",
+                                         "status":         HTTPStatus.OK
+                                         },
+                                        {"method":         httpretty.PUT,
+                                         "uri":            "/suggestions_info_metrics/_mapping",
+                                         "status":         HTTPStatus.OK,
+                                         "rs":             utils.get_fixture(self.index_created_rs),
+                                         },
+                                        {"method":         httpretty.POST,
+                                         "uri":            "/_bulk?refresh=true",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rs":             utils.get_fixture(self.index_logs_rs),
+                                         }],
                 "test_item_info":      launch_objects.TestItemInfo(testItemId=1,
                                                                    uniqueId="341",
                                                                    testCaseHash=123,
@@ -52,7 +68,7 @@ class TestSuggestService(TestService):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/2",
                                     "status":         HTTPStatus.NOT_FOUND,
-                                    }, ],
+                                    }],
                 "test_item_info": launch_objects.TestItemInfo(testItemId=1,
                                                               uniqueId="341",
                                                               testCaseHash=123,
@@ -70,7 +86,22 @@ class TestSuggestService(TestService):
                 "test_calls":          [{"method":         httpretty.GET,
                                          "uri":            "/1",
                                          "status":         HTTPStatus.OK,
-                                         }, ],
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/suggestions_info_metrics",
+                                         "status":         HTTPStatus.OK
+                                         },
+                                        {"method":         httpretty.PUT,
+                                         "uri":            "/suggestions_info_metrics/_mapping",
+                                         "status":         HTTPStatus.OK,
+                                         "rs":             utils.get_fixture(self.index_created_rs),
+                                         },
+                                        {"method":         httpretty.POST,
+                                         "uri":            "/_bulk?refresh=true",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rs":             utils.get_fixture(self.index_logs_rs),
+                                         }],
                 "test_item_info":      launch_objects.TestItemInfo(testItemId=1,
                                                                    uniqueId="341",
                                                                    testCaseHash=123,
@@ -112,6 +143,21 @@ class TestSuggestService(TestService):
                                     "rq":           utils.get_fixture(self.search_rq_third),
                                     "rs":           utils.get_fixture(
                                         self.no_hits_search_rs),
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/suggestions_info_metrics",
+                                    "status":         HTTPStatus.OK
+                                    },
+                                   {"method":         httpretty.PUT,
+                                    "uri":            "/suggestions_info_metrics/_mapping",
+                                    "status":         HTTPStatus.OK,
+                                    "rs":             utils.get_fixture(self.index_created_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rs":             utils.get_fixture(self.index_logs_rs),
                                     }],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
@@ -146,6 +192,21 @@ class TestSuggestService(TestService):
                                     "rq":           utils.get_fixture(self.search_rq_third),
                                     "rs":           utils.get_fixture(
                                         self.no_hits_search_rs),
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/suggestions_info_metrics",
+                                    "status":         HTTPStatus.OK
+                                    },
+                                   {"method":         httpretty.PUT,
+                                    "uri":            "/suggestions_info_metrics/_mapping",
+                                    "status":         HTTPStatus.OK,
+                                    "rs":             utils.get_fixture(self.index_created_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rs":             utils.get_fixture(self.index_logs_rs),
                                     }],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
@@ -184,7 +245,8 @@ class TestSuggestService(TestService):
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='AB001',
                                                          relevantItem=1,
@@ -197,7 +259,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=0,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80)],
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0)],
                 "boost_predict":       ([1], [[0.2, 0.8]])
             },
             {
@@ -232,7 +295,8 @@ class TestSuggestService(TestService):
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='AB001',
                                                          relevantItem=1,
@@ -245,7 +309,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=0,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80)],
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0)],
                 "boost_predict":       ([1], [[0.3, 0.7]])
             },
             {
@@ -280,7 +345,8 @@ class TestSuggestService(TestService):
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='AB001',
                                                          relevantItem=1,
@@ -293,7 +359,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=0,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80)],
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0)],
                 "boost_predict":       ([1, 0], [[0.3, 0.7], [0.9, 0.1]])
             },
             {
@@ -328,7 +395,8 @@ class TestSuggestService(TestService):
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='AB001',
                                                          relevantItem=1,
@@ -341,8 +409,10 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=0,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80),
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0),
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='PB001',
                                                          relevantItem=2,
@@ -355,7 +425,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=1,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80)],
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0)],
                 "boost_predict":       ([1, 0], [[0.3, 0.7], [0.55, 0.45]])
             },
             {
@@ -390,7 +461,8 @@ class TestSuggestService(TestService):
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='PB001',
                                                          relevantItem=3,
@@ -403,8 +475,10 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=0,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80),
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0),
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='AB001',
                                                          relevantItem=1,
@@ -417,8 +491,10 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=1,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80),
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0),
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='PB001',
                                                          relevantItem=2,
@@ -431,7 +507,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=2,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80)],
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0)],
                 "boost_predict":       ([1, 0, 1], [[0.3, 0.7], [0.55, 0.45], [0.2, 0.8]])
             },
             {
@@ -466,7 +543,8 @@ class TestSuggestService(TestService):
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='AB001',
                                                          relevantItem=3,
@@ -479,8 +557,10 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=0,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80),
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0),
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='AB001',
                                                          relevantItem=1,
@@ -493,8 +573,10 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=1,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80),
-                    launch_objects.SuggestAnalysisResult(testItem=123,
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0),
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
                                                          testItemLogId=178,
                                                          issueType='PB001',
                                                          relevantItem=2,
@@ -507,7 +589,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=2,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80)],
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0)],
                 "boost_predict":       ([1, 1, 1], [[0.3, 0.7], [0.3, 0.7], [0.3, 0.7]])
             },
             {
@@ -542,11 +625,13 @@ class TestSuggestService(TestService):
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
                 "expected_result":     [
-                    launch_objects.SuggestAnalysisResult(testItem=123,
-                                                         testItemLogId=-1,
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
+                                                         testItemLogId=178,
                                                          issueType='AB001',
                                                          relevantItem=1,
                                                          relevantLogId=1,
+                                                         isMergedLog=True,
                                                          matchScore=90.0,
                                                          esScore=10.0,
                                                          esPosition=0,
@@ -555,7 +640,8 @@ class TestSuggestService(TestService):
                                                          modelInfo='',
                                                          resultPosition=0,
                                                          usedLogLines=-1,
-                                                         minShouldMatch=80)],
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0)],
                 "boost_predict":       ([1], [[0.1, 0.9]])
             },
             {
@@ -586,7 +672,22 @@ class TestSuggestService(TestService):
                                     "rq":           utils.get_fixture(self.search_rq_merged_third),
                                     "rs":           utils.get_fixture(
                                         self.one_hit_search_rs_merged_wrong),
-                                    }, ],
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/suggestions_info_metrics",
+                                    "status":         HTTPStatus.OK
+                                    },
+                                   {"method":         httpretty.PUT,
+                                    "uri":            "/suggestions_info_metrics/_mapping",
+                                    "status":         HTTPStatus.OK,
+                                    "rs":             utils.get_fixture(self.index_created_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rs":             utils.get_fixture(self.index_logs_rs),
+                                    }],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
                 "expected_result":     [],
@@ -603,12 +704,197 @@ class TestSuggestService(TestService):
                 _boosting_decision_maker = BoostingDecisionMaker()
                 _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
                 _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])
-                suggest_service.suggest_decision_maker = _boosting_decision_maker
+                suggest_service.model_chooser.choose_model = MagicMock(
+                    return_value=_boosting_decision_maker)
                 response = suggest_service.suggest_items(test["test_item_info"])
 
                 response.should.have.length_of(len(test["expected_result"]))
                 for real_resp, expected_resp in zip(response, test["expected_result"]):
+                    real_resp.processedTime = 10.0
                     real_resp.should.equal(expected_resp)
+
+                TestSuggestService.shutdown_server(test["test_calls"])
+
+    @utils.ignore_warnings
+    def test_clean_suggest_info_logs(self):
+        """Test cleaning suggest info logs"""
+        tests = [
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2_suggest",
+                                    "status":         HTTPStatus.NOT_FOUND,
+                                    }, ],
+                "rq":             launch_objects.CleanIndex(ids=[1], project=2),
+                "expected_count": 0
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1_suggest",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/1_suggest/_search?scroll=5m&size=1000",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(self.search_suggest_info_ids_query),
+                                    "rs":             utils.get_fixture(
+                                        self.one_hit_search_suggest_info_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(self.delete_suggest_logs_rq),
+                                    "rs":             utils.get_fixture(self.delete_logs_rs),
+                                    }],
+                "rq":             launch_objects.CleanIndex(ids=[1], project=1),
+                "expected_count": 1
+            }
+        ]
+
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
+
+                suggest_service = SuggestService(app_config=self.app_config,
+                                                 search_cfg=self.get_default_search_config())
+                suggest_service.es_client.es_client.scroll = MagicMock(
+                    return_value=json.loads(utils.get_fixture(self.no_hits_search_rs)))
+                response = suggest_service.clean_suggest_info_logs(test["rq"])
+                test["expected_count"].should.equal(response)
+                TestSuggestService.shutdown_server(test["test_calls"])
+
+    @utils.ignore_warnings
+    def test_delete_suggest_info_index(self):
+        """Test deleting an index"""
+        tests = [
+            {
+                "test_calls": [{"method":         httpretty.DELETE,
+                                "uri":            "/1_suggest",
+                                "status":         HTTPStatus.OK,
+                                "content_type":   "application/json",
+                                "rs":             utils.get_fixture(self.index_deleted_rs),
+                                }, ],
+                "index":      1,
+                "result":     True,
+            },
+            {
+                "test_calls": [{"method":         httpretty.DELETE,
+                                "uri":            "/2_suggest",
+                                "status":         HTTPStatus.NOT_FOUND,
+                                "content_type":   "application/json",
+                                "rs":             utils.get_fixture(self.index_not_found_rs),
+                                }, ],
+                "index":      2,
+                "result":     False,
+            },
+        ]
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
+
+                suggest_service = SuggestService(app_config=self.app_config,
+                                                 search_cfg=self.get_default_search_config())
+
+                response = suggest_service.remove_suggest_info(test["index"])
+
+                test["result"].should.equal(response)
+
+                TestSuggestService.shutdown_server(test["test_calls"])
+
+    @utils.ignore_warnings
+    def test_index_suggest_info_logs(self):
+        """Test indexing suggest info"""
+        tests = [
+            {
+                "test_calls":     [],
+                "index_rq":       "[]",
+                "has_errors":     False,
+                "expected_count": 0
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/suggestions_info_metrics",
+                                    "status":         HTTPStatus.NOT_FOUND
+                                    },
+                                   {"method":         httpretty.PUT,
+                                    "uri":            "/suggestions_info_metrics",
+                                    "status":         HTTPStatus.OK,
+                                    "rs":             utils.get_fixture(self.index_created_rs),
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/1_suggest",
+                                    "status":         HTTPStatus.NOT_FOUND
+                                    },
+                                   {"method":         httpretty.PUT,
+                                    "uri":            "/1_suggest",
+                                    "status":         HTTPStatus.OK,
+                                    "rs":             utils.get_fixture(self.index_created_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rs":             utils.get_fixture(self.index_logs_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rs":             utils.get_fixture(self.index_logs_rs),
+                                    }],
+                "index_rq":       utils.get_fixture(self.suggest_info_list),
+                "has_errors":     False,
+                "expected_count": 2
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/suggestions_info_metrics",
+                                    "status":         HTTPStatus.OK
+                                    },
+                                   {"method":         httpretty.PUT,
+                                    "uri":            "/suggestions_info_metrics/_mapping",
+                                    "status":         HTTPStatus.OK,
+                                    "rs":             utils.get_fixture(self.index_created_rs),
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/1_suggest",
+                                    "status":         HTTPStatus.OK
+                                    },
+                                   {"method":         httpretty.PUT,
+                                    "uri":            "/1_suggest/_mapping",
+                                    "status":         HTTPStatus.OK,
+                                    "rs":             utils.get_fixture(self.index_created_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rs":             utils.get_fixture(self.index_logs_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rs":             utils.get_fixture(self.index_logs_rs),
+                                    }],
+                "index_rq":       utils.get_fixture(self.suggest_info_list),
+                "has_errors":     False,
+                "expected_count": 2
+            }
+        ]
+
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
+
+                suggest_service = SuggestService(app_config=self.app_config,
+                                                 search_cfg=self.get_default_search_config())
+                response = suggest_service.index_suggest_info(
+                    [launch_objects.SuggestAnalysisResult(**res) for res in json.loads(test["index_rq"])])
+
+                test["has_errors"].should.equal(response.errors)
+                test["expected_count"].should.equal(response.took)
 
                 TestSuggestService.shutdown_server(test["test_calls"])
 

@@ -35,8 +35,8 @@ class SuggestService(AnalyzerService):
     def __init__(self, app_config={}, search_cfg={}):
         super(SuggestService, self).__init__(app_config=app_config, search_cfg=search_cfg)
         self.suggest_threshold = 0.4
-        self.rp_suggest_index_template = "suggestions_info"
-        self.rp_suggest_metrics_index_template = "suggestions_info_metrics"
+        self.rp_suggest_index_template = "rp_suggestions_info"
+        self.rp_suggest_metrics_index_template = "rp_suggestions_info_metrics"
 
     def build_index_name(self, project_id):
         return str(project_id) + "_suggest"

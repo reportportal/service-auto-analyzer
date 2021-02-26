@@ -730,3 +730,11 @@ def gather_feature_list(gathered_data_dict, feature_ids, to_list=False):
         for j in range(len(gathered_data_dict[feature])):
             gathered_data[j][idx] = round(gathered_data_dict[feature][j], 2)
     return gathered_data.tolist() if to_list else gathered_data
+
+
+def unite_project_name(project_id, prefix):
+    return prefix + project_id
+
+
+def get_project_id(full_project, prefix):
+    return re.sub("^%s" % prefix, "", full_project) if prefix.strip() else full_project

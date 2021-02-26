@@ -59,6 +59,8 @@ class SuggestService(AnalyzerService):
                 metrics_data_by_test_item[obj_info["testItem"]] = []
             metrics_data_by_test_item[obj_info["testItem"]].append(obj_info)
             project_index_name = self.build_index_name(obj_info["project"])
+            project_index_name = utils.unite_project_name(
+                project_index_name, self.app_config["esProjectIndexPrefix"])
             if project_index_name not in project_index_names:
                 self.es_client.create_index_for_stats_info(
                     self.rp_suggest_index_template,
@@ -96,7 +98,10 @@ class SuggestService(AnalyzerService):
 
     def remove_suggest_info(self, project_id):
         logger.info("Removing suggest_info index")
-        return self.es_client.delete_index(self.build_index_name(project_id))
+        project_index_name = self.build_index_name(project_id)
+        project_index_name = utils.unite_project_name(
+            project_index_name, self.app_config["esProjectIndexPrefix"])
+        return self.es_client.delete_index(project_index_name)
 
     def build_suggest_info_ids_query(self, log_ids):
         return {
@@ -114,6 +119,8 @@ class SuggestService(AnalyzerService):
     def clean_suggest_info_logs(self, clean_index):
         """Delete logs from elasticsearch"""
         index_name = self.build_index_name(clean_index.project)
+        index_name = utils.unite_project_name(
+            index_name, self.app_config["esProjectIndexPrefix"])
         logger.info("Delete logs %s for the index %s",
                     clean_index.ids, index_name)
         t_start = time()
@@ -280,6 +287,8 @@ class SuggestService(AnalyzerService):
 
     def query_es_for_suggested_items(self, test_item_info, logs):
         full_results = []
+        index_name = utils.unite_project_name(
+            str(test_item_info.project), self.app_config["esProjectIndexPrefix"])
 
         for log in logs:
             message = log["_source"]["message"].strip()
@@ -293,7 +302,7 @@ class SuggestService(AnalyzerService):
                 message_field="message_extended",
                 det_mes_field="detected_message_extended",
                 stacktrace_field="stacktrace_extended")
-            es_res = self.es_client.es_client.search(index=str(test_item_info.project), body=query)
+            es_res = self.es_client.es_client.search(index=index_name, body=query)
             full_results.append((log, es_res))
 
             query = self.build_suggest_query(
@@ -301,7 +310,7 @@ class SuggestService(AnalyzerService):
                 message_field="message_without_params_extended",
                 det_mes_field="detected_message_without_params_extended",
                 stacktrace_field="stacktrace_extended")
-            es_res = self.es_client.es_client.search(index=str(test_item_info.project), body=query)
+            es_res = self.es_client.es_client.search(index=index_name, body=query)
             full_results.append((log, es_res))
 
             query = self.build_suggest_query(
@@ -309,7 +318,7 @@ class SuggestService(AnalyzerService):
                 message_field="message_without_params_and_brackets",
                 det_mes_field="detected_message_without_params_and_brackets",
                 stacktrace_field="stacktrace_extended")
-            es_res = self.es_client.es_client.search(index=str(test_item_info.project), body=query)
+            es_res = self.es_client.es_client.search(index=index_name, body=query)
             full_results.append((log, es_res))
         return full_results
 
@@ -400,15 +409,17 @@ class SuggestService(AnalyzerService):
     def suggest_items(self, test_item_info, num_items=5):
         logger.info("Started suggesting test items")
         logger.info("ES Url %s", utils.remove_credentials_from_url(self.es_client.host))
-        if not self.es_client.index_exists(str(test_item_info.project)):
-            logger.info("Project %d doesn't exist", test_item_info.project)
+        index_name = utils.unite_project_name(
+            str(test_item_info.project), self.app_config["esProjectIndexPrefix"])
+        if not self.es_client.index_exists(index_name):
+            logger.info("Project %d doesn't exist", index_name)
             logger.info("Finished suggesting for test item with 0 results.")
             return []
 
         t_start = time()
         results = []
         unique_logs = utils.leave_only_unique_logs(test_item_info.logs)
-        prepared_logs = [self.log_preparation._prepare_log_for_suggests(test_item_info, log)
+        prepared_logs = [self.log_preparation._prepare_log_for_suggests(test_item_info, log, index_name)
                          for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
         logs = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
         searched_res = self.query_es_for_suggested_items(test_item_info, logs)

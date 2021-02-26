@@ -1,8 +1,8 @@
-{"update":{"_index":"2","_id":4}}
+{"update":{"_index":"rp_2","_id":4}}
 {"doc":{"cluster_id":"123","cluster_message":"error occured \n error found \n error mined"}}
-{"update":{"_index":"2","_id":5}}
+{"update":{"_index":"rp_2","_id":5}}
 {"doc":{"cluster_id":"123","cluster_message":"error occured \n error found \n error mined"}}
-{"update":{"_index":"2","_id":9}}
+{"update":{"_index":"rp_2","_id":9}}
 {"doc":{"cluster_id":"123","cluster_message":"error occured \n error found \n error mined"}}
-{"update":{"_index":"2","_id":111}}
+{"update":{"_index":"rp_2","_id":111}}
 {"doc":{"cluster_id":"123","cluster_message":"error occured \n error found \n error mined"}}

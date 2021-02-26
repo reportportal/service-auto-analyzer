@@ -55,10 +55,88 @@ class TestSearchService(TestService):
             },
             {
                 "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/rp_1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   ],
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
+                "rq":             1,
+                "query_data":     [],
+                "expected_count_with_labels": [],
+                "expected_count_without_labels": []
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/1",
                                     "status":         HTTPStatus.OK,
                                     },
                                    ],
+                "rq":             1,
+                "query_data":     [("assertionError notFoundError", "ab001"),
+                                   ("assertionError ifElseError", "pb001"),
+                                   ("assertionError commonError", "ab001"),
+                                   ("assertionError commonError", "ab001"),
+                                   ("assertionError", "ab001"),
+                                   ("assertionError commonError", "ab001"),
+                                   ("assertionError commonError", "ti001")],
+                "expected_count_with_labels": [
+                    launch_objects.SuggestPatternLabel(
+                        pattern='assertionError', totalCount=24,
+                        percentTestItemsWithLabel=0.83, label='ab001'),
+                    launch_objects.SuggestPatternLabel(
+                        pattern='commonError', totalCount=12,
+                        percentTestItemsWithLabel=1.0, label='ab001')],
+                "expected_count_without_labels": [
+                    launch_objects.SuggestPatternLabel(
+                        pattern='assertionError', totalCount=28, percentTestItemsWithLabel=0.0, label=''),
+                    launch_objects.SuggestPatternLabel(
+                        pattern='commonError', totalCount=16, percentTestItemsWithLabel=0.0, label='')]
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/rp_1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   ],
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
                 "rq":             1,
                 "query_data":     [("assertionError notFoundError", "ab001"),
                                    ("assertionError ifElseError", "pb001"),
@@ -85,8 +163,10 @@ class TestSearchService(TestService):
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
-
-                search_service = SuggestPatternsService(app_config=self.app_config,
+                app_config = self.app_config
+                if "app_config" in test:
+                    app_config = test["app_config"]
+                search_service = SuggestPatternsService(app_config=app_config,
                                                         search_cfg=self.get_default_search_config())
                 search_service.query_data = MagicMock(return_value=test["query_data"])
 

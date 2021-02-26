@@ -242,13 +242,116 @@ class TestEsClient(TestService):
                 "rq":             launch_objects.CleanIndex(ids=[1], project=2),
                 "expected_count": 0
             },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/rp_1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/rp_1/_search?scroll=5m&size=1000",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.search_not_merged_logs_for_delete),
+                                    "rs":             utils.get_fixture(
+                                        self.one_hit_search_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rs":             utils.get_fixture(
+                                        self.delete_logs_rs),
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/rp_1/_search?scroll=5m&size=1000",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(self.search_merged_logs),
+                                    "rs":             utils.get_fixture(
+                                        self.one_hit_search_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rs":             utils.get_fixture(self.delete_logs_rs),
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/rp_1/_search?scroll=5m&size=1000",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(self.search_not_merged_logs),
+                                    "rs":             utils.get_fixture(
+                                        self.one_hit_search_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(self.index_logs_rq),
+                                    "rs":             utils.get_fixture(self.index_logs_rs),
+                                    }],
+                "rq":             launch_objects.CleanIndex(ids=[1], project=1),
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
+                "expected_count": 1
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/rp_2",
+                                    "status":         HTTPStatus.NOT_FOUND,
+                                    }],
+                "rq":             launch_objects.CleanIndex(ids=[1], project=2),
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
+                "expected_count": 0
+            }
         ]
 
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
-
-                es_client = esclient.EsClient(app_config=self.app_config,
+                app_config = self.app_config
+                if "app_config" in test:
+                    app_config = test["app_config"]
+                es_client = esclient.EsClient(app_config=app_config,
                                               search_cfg=self.get_default_search_config())
                 es_client.es_client.scroll = MagicMock(return_value=json.loads(
                     utils.get_fixture(self.no_hits_search_rs)))
@@ -416,13 +519,92 @@ class TestEsClient(TestService):
                 "expected_count": 1,
                 "expected_log_exceptions": [launch_objects.LogExceptionResult(logId=1, foundExceptions=[])]
             },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/rp_2",
+                                    "status":         HTTPStatus.NOT_FOUND,
+                                    },
+                                   {"method":         httpretty.PUT,
+                                    "uri":            "/rp_2",
+                                    "status":         HTTPStatus.OK,
+                                    "rs":             utils.get_fixture(
+                                        self.index_created_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.index_logs_rq_different_log_level_with_prefix),
+                                    "rs":             utils.get_fixture(
+                                        self.index_logs_rs_different_log_level),
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/rp_2/_search?scroll=5m&size=1000",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(self.search_merged_logs),
+                                    "rs":             utils.get_fixture(
+                                        self.one_hit_search_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rs":             utils.get_fixture(self.delete_logs_rs),
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/rp_2/_search?scroll=5m&size=1000",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(self.search_not_merged_logs),
+                                    "rs":             utils.get_fixture(
+                                        self.one_hit_search_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.index_logs_rq_different_log_level_merged),
+                                    "rs":             utils.get_fixture(
+                                        self.index_logs_rs_different_log_level),
+                                    }, ],
+                "index_rq":       utils.get_fixture(
+                    self.launch_w_test_items_w_logs_different_log_level),
+                "has_errors":     False,
+                "expected_count": 1,
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
+                "expected_log_exceptions": [launch_objects.LogExceptionResult(logId=1, foundExceptions=[])]
+            }
         ]
 
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
-
-                es_client = esclient.EsClient(app_config=self.app_config,
+                app_config = self.app_config
+                if "app_config" in test:
+                    app_config = test["app_config"]
+                es_client = esclient.EsClient(app_config=app_config,
                                               search_cfg=self.get_default_search_config())
                 es_client.es_client.scroll = MagicMock(return_value=json.loads(
                     utils.get_fixture(self.no_hits_search_rs)))

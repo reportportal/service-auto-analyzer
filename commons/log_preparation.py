@@ -63,8 +63,8 @@ class LogPreparation:
                 "whole_message":                 "",
                 "potential_status_codes":        ""}}
 
-    def _fill_launch_test_item_fields(self, log_template, launch, test_item):
-        log_template["_index"] = launch.project
+    def _fill_launch_test_item_fields(self, log_template, launch, test_item, project):
+        log_template["_index"] = project
         log_template["_source"]["launch_id"] = launch.launchId
         log_template["_source"]["launch_name"] = launch.launchName
         log_template["_source"]["test_item"] = test_item.testItemId
@@ -160,14 +160,14 @@ class LogPreparation:
             log_template["_source"][field] = utils.clean_colon_stacking(log_template["_source"][field])
         return log_template
 
-    def _prepare_log(self, launch, test_item, log):
+    def _prepare_log(self, launch, test_item, log, project):
         log_template = self._create_log_template()
-        log_template = self._fill_launch_test_item_fields(log_template, launch, test_item)
+        log_template = self._fill_launch_test_item_fields(log_template, launch, test_item, project)
         log_template = self._fill_log_fields(log_template, log, launch.analyzerConfig.numberOfLogLines)
         return log_template
 
-    def _fill_test_item_info_fields(self, log_template, test_item_info):
-        log_template["_index"] = test_item_info.project
+    def _fill_test_item_info_fields(self, log_template, test_item_info, project):
+        log_template["_index"] = project
         log_template["_source"]["launch_id"] = test_item_info.launchId
         log_template["_source"]["launch_name"] = test_item_info.launchName
         log_template["_source"]["test_item"] = test_item_info.testItemId
@@ -178,9 +178,9 @@ class LogPreparation:
         log_template["_source"]["start_time"] = ""
         return log_template
 
-    def _prepare_log_for_suggests(self, test_item_info, log):
+    def _prepare_log_for_suggests(self, test_item_info, log, project):
         log_template = self._create_log_template()
-        log_template = self._fill_test_item_info_fields(log_template, test_item_info)
+        log_template = self._fill_test_item_info_fields(log_template, test_item_info, project)
         log_template = self._fill_log_fields(
             log_template, log, test_item_info.analyzerConfig.numberOfLogLines)
         return log_template
@@ -203,9 +203,9 @@ class LogPreparation:
                             log_words[word] = 1
         return log_words, project
 
-    def prepare_log_clustering_light(self, launch, test_item, log, clean_numbers):
+    def prepare_log_clustering_light(self, launch, test_item, log, clean_numbers, project):
         log_template = self._create_log_template()
-        log_template = self._fill_launch_test_item_fields(log_template, launch, test_item)
+        log_template = self._fill_launch_test_item_fields(log_template, launch, test_item, project)
         cleaned_message = self.clean_message(log.message)
         detected_message, stacktrace = utils.detect_log_description_and_stacktrace(
             cleaned_message)
@@ -238,7 +238,7 @@ class LogPreparation:
                 detected_message_with_numbers + " \n " + stacktrace)
         return log_template
 
-    def prepare_logs_for_clustering(self, launch, number_of_lines, clean_numbers):
+    def prepare_logs_for_clustering(self, launch, number_of_lines, clean_numbers, project):
         log_messages = []
         log_dict = {}
         ind = 0
@@ -247,7 +247,8 @@ class LogPreparation:
             for log in test_item.logs:
                 if log.logLevel < ERROR_LOGGING_LEVEL:
                     continue
-                prepared_logs.append(self.prepare_log_clustering_light(launch, test_item, log, clean_numbers))
+                prepared_logs.append(
+                    self.prepare_log_clustering_light(launch, test_item, log, clean_numbers, project))
             merged_logs = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
             new_merged_logs = []
             for log in merged_logs:

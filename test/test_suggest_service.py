@@ -646,6 +646,77 @@ class TestSuggestService(TestService):
             },
             {
                 "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/rp_1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/rp_1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           utils.get_fixture(self.search_rq_merged_first),
+                                    "rs":           utils.get_fixture(
+                                        self.one_hit_search_rs_merged),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/rp_1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           utils.get_fixture(self.search_rq_merged_second),
+                                    "rs":           utils.get_fixture(
+                                        self.one_hit_search_rs_merged),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/rp_1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           utils.get_fixture(self.search_rq_merged_third),
+                                    "rs":           utils.get_fixture(
+                                        self.one_hit_search_rs_merged),
+                                    }, ],
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
+                "test_item_info":      launch_objects.TestItemInfo(
+                    **utils.get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
+                "expected_result":     [
+                    launch_objects.SuggestAnalysisResult(project=1,
+                                                         testItem=123,
+                                                         testItemLogId=178,
+                                                         issueType='AB001',
+                                                         relevantItem=1,
+                                                         relevantLogId=1,
+                                                         isMergedLog=True,
+                                                         matchScore=90.0,
+                                                         esScore=10.0,
+                                                         esPosition=0,
+                                                         modelFeatureNames='0',
+                                                         modelFeatureValues='1.0',
+                                                         modelInfo='',
+                                                         resultPosition=0,
+                                                         usedLogLines=-1,
+                                                         minShouldMatch=80,
+                                                         processedTime=10.0)],
+                "boost_predict":       ([1], [[0.1, 0.9]])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/1",
                                     "status":         HTTPStatus.OK,
                                     },
@@ -693,13 +764,85 @@ class TestSuggestService(TestService):
                 "expected_result":     [],
                 "boost_predict":       ([], [])
             },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/rp_1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/rp_1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           utils.get_fixture(self.search_rq_merged_first),
+                                    "rs":           utils.get_fixture(
+                                        self.one_hit_search_rs_merged_wrong),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/rp_1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           utils.get_fixture(self.search_rq_merged_second),
+                                    "rs":           utils.get_fixture(
+                                        self.one_hit_search_rs_merged_wrong),
+                                    },
+                                   {"method":       httpretty.GET,
+                                    "uri":          "/rp_1/_search",
+                                    "status":       HTTPStatus.OK,
+                                    "content_type": "application/json",
+                                    "rq":           utils.get_fixture(self.search_rq_merged_third),
+                                    "rs":           utils.get_fixture(
+                                        self.one_hit_search_rs_merged_wrong),
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/rp_suggestions_info_metrics",
+                                    "status":         HTTPStatus.OK
+                                    },
+                                   {"method":         httpretty.PUT,
+                                    "uri":            "/rp_suggestions_info_metrics/_mapping",
+                                    "status":         HTTPStatus.OK,
+                                    "rs":             utils.get_fixture(self.index_created_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rs":             utils.get_fixture(self.index_logs_rs),
+                                    }],
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
+                "test_item_info":      launch_objects.TestItemInfo(
+                    **utils.get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
+                "expected_result":     [],
+                "boost_predict":       ([], [])
+            }
         ]
 
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
                 config = self.get_default_search_config()
-                suggest_service = SuggestService(app_config=self.app_config,
+                app_config = self.app_config
+                if "app_config" in test:
+                    app_config = test["app_config"]
+                suggest_service = SuggestService(app_config=app_config,
                                                  search_cfg=config)
                 _boosting_decision_maker = BoostingDecisionMaker()
                 _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
@@ -749,15 +892,62 @@ class TestSuggestService(TestService):
                                     }],
                 "rq":             launch_objects.CleanIndex(ids=[1], project=1),
                 "expected_count": 1
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/rp_1_suggest",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/rp_1_suggest/_search?scroll=5m&size=1000",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(self.search_suggest_info_ids_query),
+                                    "rs":             utils.get_fixture(
+                                        self.one_hit_search_suggest_info_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.delete_suggest_logs_rq_with_prefix),
+                                    "rs":             utils.get_fixture(self.delete_logs_rs),
+                                    }],
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
+                "rq":             launch_objects.CleanIndex(ids=[1], project=1),
+                "expected_count": 1
             }
         ]
 
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
-
-                suggest_service = SuggestService(app_config=self.app_config,
+                app_config = self.app_config
+                if "app_config" in test:
+                    app_config = test["app_config"]
+                suggest_service = SuggestService(app_config=app_config,
                                                  search_cfg=self.get_default_search_config())
+
                 suggest_service.es_client.es_client.scroll = MagicMock(
                     return_value=json.loads(utils.get_fixture(self.no_hits_search_rs)))
                 response = suggest_service.clean_suggest_info_logs(test["rq"])
@@ -788,12 +978,44 @@ class TestSuggestService(TestService):
                 "index":      2,
                 "result":     False,
             },
+            {
+                "test_calls": [{"method":         httpretty.DELETE,
+                                "uri":            "/rp_2_suggest",
+                                "status":         HTTPStatus.NOT_FOUND,
+                                "content_type":   "application/json",
+                                "rs":             utils.get_fixture(self.index_not_found_rs),
+                                }, ],
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
+                "index":      2,
+                "result":     False,
+            }
         ]
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
-
-                suggest_service = SuggestService(app_config=self.app_config,
+                app_config = self.app_config
+                if "app_config" in test:
+                    app_config = test["app_config"]
+                suggest_service = SuggestService(app_config=app_config,
                                                  search_cfg=self.get_default_search_config())
 
                 response = suggest_service.remove_suggest_info(test["index"])
@@ -881,14 +1103,71 @@ class TestSuggestService(TestService):
                 "index_rq":       utils.get_fixture(self.suggest_info_list),
                 "has_errors":     False,
                 "expected_count": 2
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/rp_suggestions_info_metrics",
+                                    "status":         HTTPStatus.OK
+                                    },
+                                   {"method":         httpretty.PUT,
+                                    "uri":            "/rp_suggestions_info_metrics/_mapping",
+                                    "status":         HTTPStatus.OK,
+                                    "rs":             utils.get_fixture(self.index_created_rs),
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/rp_1_suggest",
+                                    "status":         HTTPStatus.OK
+                                    },
+                                   {"method":         httpretty.PUT,
+                                    "uri":            "/rp_1_suggest/_mapping",
+                                    "status":         HTTPStatus.OK,
+                                    "rs":             utils.get_fixture(self.index_created_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rs":             utils.get_fixture(self.index_logs_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rs":             utils.get_fixture(self.index_logs_rs),
+                                    }],
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
+                "index_rq":       utils.get_fixture(self.suggest_info_list),
+                "has_errors":     False,
+                "expected_count": 2
             }
         ]
 
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
-
-                suggest_service = SuggestService(app_config=self.app_config,
+                app_config = self.app_config
+                if "app_config" in test:
+                    app_config = test["app_config"]
+                suggest_service = SuggestService(app_config=app_config,
                                                  search_cfg=self.get_default_search_config())
                 response = suggest_service.index_suggest_info(
                     [launch_objects.SuggestAnalysisResult(**res) for res in json.loads(test["index_rq"])])

@@ -201,10 +201,11 @@ class EsClient:
         project = None
         test_item_queue = Queue()
         for launch in launches:
-            project = str(launch.project)
+            project = utils.unite_project_name(
+                str(launch.project), self.app_config["esProjectIndexPrefix"])
             test_items = launch.testItems
             launch.testItems = []
-            self.create_index_if_not_exists(str(launch.project))
+            self.create_index_if_not_exists(project)
             for test_item in test_items:
                 test_item_queue.put((launch, test_item))
         del launches
@@ -215,7 +216,7 @@ class EsClient:
                 if log.logLevel < utils.ERROR_LOGGING_LEVEL or not log.message.strip():
                     continue
 
-                bodies.append(self.log_preparation._prepare_log(launch, test_item, log))
+                bodies.append(self.log_preparation._prepare_log(launch, test_item, log, project))
                 logs_added = True
             if logs_added:
                 test_item_ids.append(str(test_item.testItemId))
@@ -332,11 +333,13 @@ class EsClient:
 
     def delete_logs(self, clean_index):
         """Delete logs from elasticsearch"""
+        index_name = utils.unite_project_name(
+            str(clean_index.project), self.app_config["esProjectIndexPrefix"])
         logger.info("Delete logs %s for the project %s",
-                    clean_index.ids, clean_index.project)
+                    clean_index.ids, index_name)
         logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
         t_start = time()
-        if not self.index_exists(clean_index.project):
+        if not self.index_exists(index_name):
             return 0
         test_item_ids = set()
         try:
@@ -344,7 +347,7 @@ class EsClient:
                 clean_index.ids)
             for res in elasticsearch.helpers.scan(self.es_client,
                                                   query=search_query,
-                                                  index=clean_index.project,
+                                                  index=index_name,
                                                   scroll="5m"):
                 test_item_ids.add(res["_source"]["test_item"])
         except Exception as err:
@@ -356,12 +359,12 @@ class EsClient:
             bodies.append({
                 "_op_type": "delete",
                 "_id":      _id,
-                "_index":   clean_index.project,
+                "_index":   index_name,
             })
         result = self._bulk_index(bodies)
-        self._merge_logs(list(test_item_ids), clean_index.project)
+        self._merge_logs(list(test_item_ids), index_name)
         logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
-                    clean_index.ids, clean_index.project, time() - t_start)
+                    clean_index.ids, index_name, time() - t_start)
         return result.took
 
     def create_index_for_stats_info(self, rp_aa_stats_index, override_index_name=None):

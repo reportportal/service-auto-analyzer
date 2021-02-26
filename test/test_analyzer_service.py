@@ -173,6 +173,40 @@ class TestAutoAnalyzerService(TestService):
                 "expected_count": 1,
                 "expected_issue_type": "AB001",
                 "boost_predict":       ([1], [[0.2, 0.8]])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/rp_2",
+                                    "status":         HTTPStatus.OK,
+                                    }],
+                "msearch_results": [
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.three_hits_search_rs_with_one_unique_id, to_json=True)],
+                "index_rq":       utils.get_fixture(
+                    self.launch_w_test_items_w_logs),
+                "expected_count": 1,
+                "expected_issue_type": "AB001",
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
+                "boost_predict":       ([1], [[0.2, 0.8]])
             }
         ]
 
@@ -180,7 +214,10 @@ class TestAutoAnalyzerService(TestService):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
                 config = self.get_default_search_config()
-                analyzer_service = AutoAnalyzerService(app_config=self.app_config,
+                app_config = self.app_config
+                if "app_config" in test:
+                    app_config = test["app_config"]
+                analyzer_service = AutoAnalyzerService(app_config=app_config,
                                                        search_cfg=config)
                 _boosting_decision_maker = BoostingDecisionMaker()
                 _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])

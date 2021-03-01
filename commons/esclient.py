@@ -201,14 +201,15 @@ class EsClient:
         project = None
         test_item_queue = Queue()
         for launch in launches:
-            project = utils.unite_project_name(
-                str(launch.project), self.app_config["esProjectIndexPrefix"])
+            project = str(launch.project)
             test_items = launch.testItems
             launch.testItems = []
             self.create_index_if_not_exists(project)
             for test_item in test_items:
                 test_item_queue.put((launch, test_item))
         del launches
+        project_with_prefix = utils.unite_project_name(
+            project, self.app_config["esProjectIndexPrefix"])
         while not test_item_queue.empty():
             launch, test_item = test_item_queue.get()
             logs_added = False
@@ -216,7 +217,8 @@ class EsClient:
                 if log.logLevel < utils.ERROR_LOGGING_LEVEL or not log.message.strip():
                     continue
 
-                bodies.append(self.log_preparation._prepare_log(launch, test_item, log, project))
+                bodies.append(self.log_preparation._prepare_log(
+                    launch, test_item, log, project_with_prefix))
                 logs_added = True
             if logs_added:
                 test_item_ids.append(str(test_item.testItemId))
@@ -224,7 +226,7 @@ class EsClient:
         logs_with_exceptions = utils.extract_all_exceptions(bodies)
         result = self._bulk_index(bodies)
         result.logResults = logs_with_exceptions
-        _, num_logs_with_defect_types = self._merge_logs(test_item_ids, project)
+        _, num_logs_with_defect_types = self._merge_logs(test_item_ids, project_with_prefix)
         try:
             if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
                 AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(

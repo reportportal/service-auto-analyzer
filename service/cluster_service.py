@@ -101,9 +101,11 @@ class ClusterService:
                     cluster_id = 0
                     cluster_message = ""
                     for ind in groups_part[group]:
-                        if log_dict_part[ind]["_source"]["cluster_id"].strip():
+                        if log_dict_part[ind]["_source"]["cluster_id"].strip() and int(
+                                log_dict_part[ind]["_source"]["cluster_id"].strip()) != 0:
                             cluster_id = int(log_dict_part[ind]["_source"]["cluster_id"].strip())
-                        cluster_message = log_dict_part[ind]["_source"]["cluster_message"]
+                        if log_dict_part[ind]["_source"]["cluster_message"].strip():
+                            cluster_message = log_dict_part[ind]["_source"]["cluster_message"]
                     new_group_log_ids = []
                     for ind in groups_part[group]:
                         if ind == 0:

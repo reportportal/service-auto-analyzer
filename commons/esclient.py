@@ -204,12 +204,12 @@ class EsClient:
             project = str(launch.project)
             test_items = launch.testItems
             launch.testItems = []
-            self.create_index_if_not_exists(project)
             for test_item in test_items:
                 test_item_queue.put((launch, test_item))
         del launches
         project_with_prefix = utils.unite_project_name(
             project, self.app_config["esProjectIndexPrefix"])
+        self.create_index_if_not_exists(project_with_prefix)
         while not test_item_queue.empty():
             launch, test_item = test_item_queue.get()
             logs_added = False

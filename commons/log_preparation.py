@@ -207,7 +207,7 @@ class LogPreparation:
         log_template = self._create_log_template()
         log_template = self._fill_launch_test_item_fields(log_template, launch, test_item)
         cleaned_message = self.clean_message(log.message)
-        detected_message, stacktrace = utils.detect_log_description_and_stacktrace(
+        detected_message, stacktrace = utils.detect_log_description_and_stacktrace_light(
             cleaned_message)
         stacktrace = utils.sanitize_text(stacktrace)
         message = utils.first_lines(cleaned_message, -1)

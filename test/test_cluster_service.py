@@ -84,6 +84,24 @@ class TestClusterService(TestService):
                                          "uri":            "/2",
                                          "status":         HTTPStatus.OK,
                                          },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/2/_search",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             utils.get_fixture(
+                                             self.search_logs_rq_first_group_not_for_update),
+                                         "rs":             utils.get_fixture(
+                                             self.no_hits_search_rs),
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/2/_search",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             utils.get_fixture(
+                                             self.search_logs_rq_second_group_not_for_update),
+                                         "rs":             utils.get_fixture(
+                                             self.no_hits_search_rs),
+                                         },
                                         {"method":         httpretty.POST,
                                          "uri":            "/_bulk?refresh=true",
                                          "status":         HTTPStatus.OK,
@@ -118,6 +136,15 @@ class TestClusterService(TestService):
                                          "uri":            "/2",
                                          "status":         HTTPStatus.OK,
                                          },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/2/_search",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             utils.get_fixture(
+                                             self.search_logs_rq_first_group_2lines_not_for_update),
+                                         "rs":             utils.get_fixture(
+                                             self.no_hits_search_rs),
+                                         },
                                         {"method":         httpretty.POST,
                                          "uri":            "/_bulk?refresh=true",
                                          "status":         HTTPStatus.OK,
@@ -147,6 +174,24 @@ class TestClusterService(TestService):
                 "test_calls":          [{"method":         httpretty.GET,
                                          "uri":            "/2",
                                          "status":         HTTPStatus.OK,
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/2/_search",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             utils.get_fixture(
+                                             self.search_logs_rq_first_group_not_for_update),
+                                         "rs":             utils.get_fixture(
+                                             self.no_hits_search_rs),
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/2/_search",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             utils.get_fixture(
+                                             self.search_logs_rq_second_group_not_for_update),
+                                         "rs":             utils.get_fixture(
+                                             self.no_hits_search_rs),
                                          },
                                         {"method":         httpretty.GET,
                                          "uri":            "/2/_search",
@@ -205,9 +250,27 @@ class TestClusterService(TestService):
                                          "status":         HTTPStatus.OK,
                                          "content_type":   "application/json",
                                          "rq":             utils.get_fixture(
+                                             self.search_logs_rq_first_group_not_for_update),
+                                         "rs":             utils.get_fixture(
+                                             self.one_hit_search_rs_clustering)
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/2/_search",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             utils.get_fixture(
+                                             self.search_logs_rq_second_group_not_for_update),
+                                         "rs":             utils.get_fixture(
+                                             self.one_hit_search_rs_clustering)
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/2/_search",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             utils.get_fixture(
                                              self.search_logs_rq_first_group),
                                          "rs":             utils.get_fixture(
-                                             self.one_hit_search_rs_clustering),
+                                             self.one_hit_search_rs_clustering)
                                          },
                                         {"method":         httpretty.GET,
                                          "uri":            "/2/_search",
@@ -216,7 +279,7 @@ class TestClusterService(TestService):
                                          "rq":             utils.get_fixture(
                                              self.search_logs_rq_second_group),
                                          "rs":             utils.get_fixture(
-                                             self.one_hit_search_rs_clustering),
+                                             self.one_hit_search_rs_clustering)
                                          },
                                         {"method":         httpretty.POST,
                                          "uri":            "/_bulk?refresh=true",
@@ -251,6 +314,15 @@ class TestClusterService(TestService):
                 "test_calls":          [{"method":         httpretty.GET,
                                          "uri":            "/2",
                                          "status":         HTTPStatus.OK,
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/2/_search",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             utils.get_fixture(
+                                             self.search_logs_rq_first_group_2lines_not_for_update),
+                                         "rs":             utils.get_fixture(
+                                             self.no_hits_search_rs),
                                          },
                                         {"method":         httpretty.GET,
                                          "uri":            "/2/_search",

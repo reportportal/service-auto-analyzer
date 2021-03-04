@@ -38,9 +38,9 @@ class ClusterService:
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
         self.log_preparation = LogPreparation()
 
-    def build_search_similar_items_query(self, launch_id, test_item, message):
+    def build_search_similar_items_query(self, launch_id, test_item, message, same_launch=False):
         """Build search query"""
-        return {
+        query = {
             "_source": ["whole_message", "test_item",
                         "detected_message", "stacktrace", "launch_id", "cluster_id",
                         "cluster_message"],
@@ -56,7 +56,6 @@ class ClusterService:
                         "term": {"test_item": {"value": test_item, "boost": 1.0}}
                     },
                     "must": [
-                        {"term": {"launch_id": launch_id}},
                         {"more_like_this": {
                             "fields":               ["whole_message"],
                             "like":                 message,
@@ -67,9 +66,18 @@ class ClusterService:
                             "boost": 1.0
                         }}
                     ]}}}
+        if same_launch:
+            query["query"]["bool"]["must"].append(
+                {"term": {"launch_id": launch_id}})
+            query["query"]["bool"]["should"] = [{"wildcard": {"cluster_message": "*"}}]
+        else:
+            query["query"]["bool"]["must"].append({"wildcard": {"cluster_message": "*"}})
+        return query
 
     def find_similar_items_from_es(
-            self, groups, log_dict, log_messages, log_ids, number_of_lines):
+            self, groups, log_dict, log_messages, log_ids, number_of_lines,
+            additional_results,
+            same_launch=False):
         new_clusters = {}
         _clusterizer = clusterizer.Clusterizer()
         for global_group in groups:
@@ -77,7 +85,8 @@ class ClusterService:
             query = self.build_search_similar_items_query(
                 log_dict[first_item_ind]["_source"]["launch_id"],
                 log_dict[first_item_ind]["_source"]["test_item"],
-                log_messages[first_item_ind])
+                log_messages[first_item_ind],
+                same_launch=same_launch)
             search_results = self.es_client.es_client.search(
                 index=log_dict[first_item_ind]["_index"],
                 body=query)
@@ -101,9 +110,11 @@ class ClusterService:
                     cluster_id = 0
                     cluster_message = ""
                     for ind in groups_part[group]:
-                        if log_dict_part[ind]["_source"]["cluster_id"].strip():
+                        if log_dict_part[ind]["_source"]["cluster_id"].strip() and int(
+                                log_dict_part[ind]["_source"]["cluster_id"].strip()) != 0:
                             cluster_id = int(log_dict_part[ind]["_source"]["cluster_id"].strip())
-                        cluster_message = log_dict_part[ind]["_source"]["cluster_message"]
+                            if log_dict_part[ind]["_source"]["cluster_message"].strip():
+                                cluster_message = log_dict_part[ind]["_source"]["cluster_message"]
                     new_group_log_ids = []
                     for ind in groups_part[group]:
                         if ind == 0:
@@ -117,7 +128,12 @@ class ClusterService:
                     break
             if new_group:
                 new_clusters[global_group] = new_group
-        return new_clusters
+        for group in new_clusters:
+            if group in additional_results:
+                additional_results[group].logIds.extend(new_clusters[group].logIds)
+            else:
+                additional_results[group] = new_clusters[group]
+        return additional_results
 
     def calculate_hash(self, group_ids, log_dict, log_messages, number_of_lines):
         group_logs = []
@@ -181,10 +197,13 @@ class ClusterService:
             launch_info.launch, launch_info.numberOfLogLines, launch_info.cleanNumbers)
         log_ids = set([int(log["_id"]) for log in log_dict.values()])
         groups = _clusterizer.find_clusters(log_messages)
-        additional_results = {}
+        additional_results = self.find_similar_items_from_es(
+            groups, log_dict, log_messages, log_ids, launch_info.numberOfLogLines,
+            {}, same_launch=False)
         if launch_info.forUpdate:
             additional_results = self.find_similar_items_from_es(
-                groups, log_dict, log_messages, log_ids, launch_info.numberOfLogLines)
+                groups, log_dict, log_messages, log_ids, launch_info.numberOfLogLines,
+                additional_results, same_launch=True)
 
         clusters, cluster_num = self.gather_cluster_results(
             groups, additional_results, log_dict, log_messages, launch_info.numberOfLogLines)

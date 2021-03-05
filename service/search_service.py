@@ -20,6 +20,8 @@ from commons.launch_objects import SearchLogInfo, Log
 from commons.log_preparation import LogPreparation
 from boosting_decision_making import weighted_similarity_calculator
 from commons import similarity_calculator
+import elasticsearch
+import elasticsearch.helpers
 import logging
 from time import time
 
@@ -42,7 +44,7 @@ class SearchService:
         """Build search query"""
         return {
             "_source": ["message", "test_item", "detected_message", "stacktrace"],
-            "size": 10000,
+            "size": self.app_config["esChunkNumber"],
             "query": {
                 "bool": {
                     "filter": [
@@ -103,9 +105,15 @@ class SearchService:
                 continue
             searched_logs.add(msg_words)
             query = self.build_search_query(search_req, queried_log["_source"]["message"])
-            res = self.es_client.es_client.search(index=str(search_req.projectId), body=query)
-            for es_res in res["hits"]["hits"]:
-                test_item_info[es_res["_id"]] = es_res["_source"]["test_item"]
+            res = []
+            for r in elasticsearch.helpers.scan(self.es_client.es_client,
+                                                query=query,
+                                                index=str(search_req.projectId)):
+                test_item_info[r["_id"]] = r["_source"]["test_item"]
+                res.append(r)
+                if len(res) >= 10000:
+                    break
+            res = {"hits": {"hits": res}}
 
             _similarity_calculator = similarity_calculator.SimilarityCalculator(
                 {

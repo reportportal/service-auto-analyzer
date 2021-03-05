@@ -74,7 +74,7 @@ class EsClient:
                             "original_message_words_number", "issue_type", "launch_id",
                             "launch_name", "unique_id", "test_case_hash", "start_time",
                             "is_auto_analyzed", "cluster_id", "cluster_message"],
-                "size": 10000,
+                "size": self.app_config["esChunkNumber"],
                 "query": {
                     "bool": {
                         "filter": [
@@ -86,7 +86,7 @@ class EsClient:
         else:
             return {
                 "_source": ["test_item"],
-                "size": 10000,
+                "size": self.app_config["esChunkNumber"],
                 "query": {
                     "bool": {
                         "filter": [
@@ -100,7 +100,7 @@ class EsClient:
         """Build search test item ids query"""
         return {
             "_source": ["test_item"],
-            "size": 10000,
+            "size": self.app_config["esChunkNumber"],
             "query": {
                 "bool": {
                     "filter": [

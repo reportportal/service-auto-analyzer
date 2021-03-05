@@ -60,6 +60,8 @@ class TestService(unittest.TestCase):
         self.index_logs_rq_different_log_level = "index_logs_rq_different_log_level.json"
         self.index_logs_rq_different_log_level_merged =\
             "index_logs_rq_different_log_level_merged.json"
+        self.index_logs_rq_different_log_level_with_prefix =\
+            "index_logs_rq_different_log_level_with_prefix.json"
         self.index_logs_rs_different_log_level = "index_logs_rs_different_log_level.json"
         self.delete_logs_rs = "delete_logs_rs.json"
         self.two_hits_search_with_big_messages_rs = "two_hits_search_with_big_messages_rs.json"
@@ -90,10 +92,13 @@ class TestService(unittest.TestCase):
             "search_logs_rq_first_group_2lines_not_for_update.json"
         self.cluster_update_es_update = "cluster_update_es_update.json"
         self.cluster_update_all_the_same_es_update = "cluster_update_all_the_same_es_update.json"
+        self.cluster_update_all_the_same_es_update_with_prefix =\
+            "cluster_update_all_the_same_es_update_with_prefix.json"
         self.cluster_update = "cluster_update.json"
         self.search_suggest_info_ids_query = "search_suggest_info_ids_query.json"
         self.one_hit_search_suggest_info_rs = "one_hit_search_suggest_info_rs.json"
         self.delete_suggest_logs_rq = "delete_suggest_logs_rq.json"
+        self.delete_suggest_logs_rq_with_prefix = "delete_suggest_logs_rq_with_prefix.json"
         self.suggest_info_list = "suggest_info_list.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
@@ -112,7 +117,8 @@ class TestService(unittest.TestCase):
             "binaryStoreType":   "minio",
             "minioHost":         "",
             "minioAccessKey":    "",
-            "minioSecretKey":    ""
+            "minioSecretKey":    "",
+            "esProjectIndexPrefix": ""
         }
         self.model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
         logging.disable(logging.CRITICAL)

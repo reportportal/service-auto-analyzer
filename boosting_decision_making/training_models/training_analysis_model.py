@@ -183,9 +183,13 @@ class AnalysisModelTraining:
         log_ids_to_find = set()
         gathered_suggested_data = []
         log_id_pairs_set = set()
+        index_name = utils.unite_project_name(
+            str(project_id) + "_suggest", self.app_config["esProjectIndexPrefix"])
+        project_index_name = utils.unite_project_name(
+            str(project_id), self.app_config["esProjectIndexPrefix"])
         for res in elasticsearch.helpers.scan(self.es_client.es_client,
                                               query=search_query,
-                                              index=str(project_id) + "_suggest",
+                                              index=index_name,
                                               scroll="5m"):
             if len(gathered_suggested_data) >= 30000:
                 break
@@ -217,7 +221,7 @@ class AnalysisModelTraining:
                 continue
             for r in elasticsearch.helpers.scan(self.es_client.es_client,
                                                 query=ids_query,
-                                                index=project_id,
+                                                index=project_index_name,
                                                 scroll="5m"):
                 log_id_dict[r["_id"]] = r
         return gathered_suggested_data, log_id_dict

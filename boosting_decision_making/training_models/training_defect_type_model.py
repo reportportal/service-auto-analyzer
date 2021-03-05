@@ -110,11 +110,13 @@ class DefectTypeModelTraining:
 
     def query_data(self, project, label):
         message_launch_dict = set()
+        project_index_name = utils.unite_project_name(
+            str(project), self.app_config["esProjectIndexPrefix"])
         data = []
         for r in elasticsearch.helpers.scan(self.es_client.es_client,
                                             query=self.get_message_query_by_label(
                                                 label),
-                                            index=project):
+                                            index=project_index_name):
             detected_message = r["_source"]["detected_message_without_params_and_brackets"]
             text_message_normalized = " ".join(sorted(
                 utils.split_words(detected_message, to_lower=True)))

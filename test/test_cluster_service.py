@@ -81,6 +81,42 @@ class TestClusterService(TestService):
             },
             {
                 "test_calls":          [{"method":         httpretty.GET,
+                                         "uri":            "/rp_2",
+                                         "status":         HTTPStatus.OK,
+                                         }, ],
+                "launch_info":            launch_objects.LaunchInfoForClustering(
+                    launch=launch_objects.Launch(
+                        **(utils.get_fixture(
+                            self.launch_w_test_items_w_empty_logs, to_json=True)[0])),
+                    forUpdate=False,
+                    numberOfLogLines=-1),
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
+                "expected_result":     launch_objects.ClusterResult(
+                    project=2,
+                    launchId=1,
+                    clusters=[])
+            },
+            {
+                "test_calls":          [{"method":         httpretty.GET,
                                          "uri":            "/2",
                                          "status":         HTTPStatus.OK,
                                          },
@@ -358,13 +394,75 @@ class TestClusterService(TestService):
                             logIds=[4, 5, 9, 111])
                     ])
             },
+            {
+                "test_calls":          [{"method":         httpretty.GET,
+                                         "uri":            "/rp_2",
+                                         "status":         HTTPStatus.OK,
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/rp_2/_search",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             utils.get_fixture(
+                                             self.search_logs_rq_first_group_2lines),
+                                         "rs":             utils.get_fixture(
+                                             self.one_hit_search_rs_clustering),
+                                         },
+                                        {"method":         httpretty.POST,
+                                         "uri":            "/_bulk?refresh=true",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             utils.get_fixture(
+                                             self.cluster_update_all_the_same_es_update_with_prefix),
+                                         "rs":             utils.get_fixture(
+                                             self.index_logs_rs),
+                                         }],
+                "launch_info":            launch_objects.LaunchInfoForClustering(
+                    launch=launch_objects.Launch(
+                        **utils.get_fixture(
+                            self.launch_w_items_clustering, to_json=True)),
+                    forUpdate=True,
+                    numberOfLogLines=2),
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
+                "expected_result":     launch_objects.ClusterResult(
+                    project=2,
+                    launchId=1,
+                    clusters=[
+                        launch_objects.ClusterInfo(
+                            clusterId="123",
+                            clusterMessage="error occured \n error found \n error mined",
+                            logIds=[4, 5, 9, 111])
+                    ])
+            }
         ]
 
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
                 config = self.get_default_search_config()
-                _cluster_service = ClusterService(app_config=self.app_config,
+                app_config = self.app_config
+                if "app_config" in test:
+                    app_config = test["app_config"]
+                _cluster_service = ClusterService(app_config=app_config,
                                                   search_cfg=config)
 
                 response = _cluster_service.find_clusters(test["launch_info"])

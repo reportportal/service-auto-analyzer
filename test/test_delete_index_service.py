@@ -50,12 +50,44 @@ class TestDeleteIndexService(TestService):
                 "index":      2,
                 "result":     False,
             },
+            {
+                "test_calls": [{"method":         httpretty.DELETE,
+                                "uri":            "/rp_2",
+                                "status":         HTTPStatus.NOT_FOUND,
+                                "content_type":   "application/json",
+                                "rs":             utils.get_fixture(self.index_not_found_rs),
+                                }, ],
+                "index":      2,
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
+                "result":     False,
+            },
         ]
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
-
-                _delete_index_service = DeleteIndexService(app_config=self.app_config,
+                app_config = self.app_config
+                if "app_config" in test:
+                    app_config = test["app_config"]
+                _delete_index_service = DeleteIndexService(app_config=app_config,
                                                            search_cfg=self.get_default_search_config())
 
                 response = _delete_index_service.delete_index(test["index"])

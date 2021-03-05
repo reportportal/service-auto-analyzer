@@ -1,6 +1,6 @@
-{"update":{"_index":2,"_id":4}}
+{"update":{"_index":"2","_id":4}}
 {"doc":{"cluster_id":"5130555442447530","cluster_message":"error occured \r\n error found \r\n error mined"}}
-{"update":{"_index":2,"_id":5}}
+{"update":{"_index":"2","_id":5}}
 {"doc":{"cluster_id":"5130555442447530","cluster_message":"error occured \r\n error found \r\n error mined"}}
-{"update":{"_index":2,"_id":9}}
+{"update":{"_index":"2","_id":9}}
 {"doc":{"cluster_id":"247493849502166","cluster_message":"error occured \r\n error found \r\n assert query"}}

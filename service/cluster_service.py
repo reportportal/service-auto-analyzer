@@ -187,14 +187,16 @@ class ClusterService:
     @utils.ignore_warnings
     def find_clusters(self, launch_info):
         logger.info("Started clusterizing logs")
-        if not self.es_client.index_exists(str(launch_info.launch.project)):
-            logger.info("Project %d doesn't exist", launch_info.launch.project)
+        index_name = utils.unite_project_name(
+            str(launch_info.launch.project), self.app_config["esProjectIndexPrefix"])
+        if not self.es_client.index_exists(index_name):
+            logger.info("Project %d doesn't exist", index_name)
             logger.info("Finished clustering log with 0 clusters.")
             return []
         t_start = time()
         _clusterizer = clusterizer.Clusterizer()
         log_messages, log_dict = self.log_preparation.prepare_logs_for_clustering(
-            launch_info.launch, launch_info.numberOfLogLines, launch_info.cleanNumbers)
+            launch_info.launch, launch_info.numberOfLogLines, launch_info.cleanNumbers, index_name)
         log_ids = set([int(log["_id"]) for log in log_dict.values()])
         groups = _clusterizer.find_clusters(log_messages)
         additional_results = self.find_similar_items_from_es(
@@ -214,7 +216,7 @@ class ClusterService:
                     bodies.append({
                         "_op_type": "update",
                         "_id": log_id,
-                        "_index": launch_info.launch.project,
+                        "_index": index_name,
                         "doc": {"cluster_id": str(result.clusterId),
                                 "cluster_message": result.clusterMessage}})
             self.es_client._bulk_index(bodies)

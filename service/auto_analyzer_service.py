@@ -177,7 +177,9 @@ class AutoAnalyzerService(AnalyzerService):
         test_items_number_to_process = 0
         try:
             for launch in launches:
-                if not self.es_client.index_exists(str(launch.project)):
+                index_name = utils.unite_project_name(
+                    str(launch.project), self.app_config["esProjectIndexPrefix"])
+                if not self.es_client.index_exists(index_name):
                     continue
                 if test_items_number_to_process >= 4000:
                     logger.info("Only first 4000 test items were taken")
@@ -193,7 +195,7 @@ class AutoAnalyzerService(AnalyzerService):
                         logger.info("Early finish from analyzer before timeout")
                         break
                     unique_logs = utils.leave_only_unique_logs(test_item.logs)
-                    prepared_logs = [self.log_preparation._prepare_log(launch, test_item, log)
+                    prepared_logs = [self.log_preparation._prepare_log(launch, test_item, log, index_name)
                                      for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
                     results = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
 
@@ -206,7 +208,7 @@ class AutoAnalyzerService(AnalyzerService):
 
                         query = self.build_analyze_query(
                             launch, log, launch.analyzerConfig.numberOfLogLines)
-                        full_query = "{}\n{}".format(json.dumps({"index": launch.project}), json.dumps(query))
+                        full_query = "{}\n{}".format(json.dumps({"index": index_name}), json.dumps(query))
                         batches.append(full_query)
                         batch_logs.append((launch.analyzerConfig, test_item.testItemId, log))
                         if test_item.testItemId not in test_item_dict:
@@ -264,7 +266,8 @@ class AutoAnalyzerService(AnalyzerService):
                 analyzer_config, test_item_id, searched_res, time_processed = item_to_process
                 launch_id = searched_res[0][0]["_source"]["launch_id"]
                 launch_name = searched_res[0][0]["_source"]["launch_name"]
-                project_id = searched_res[0][0]["_index"]
+                project_id = utils.get_project_id(
+                    searched_res[0][0]["_index"], self.app_config["esProjectIndexPrefix"])
                 if launch_id not in results_to_share:
                     results_to_share[launch_id] = {
                         "not_found": 0, "items_to_process": 0, "processed_time": 0,

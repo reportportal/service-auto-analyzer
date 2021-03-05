@@ -84,8 +84,10 @@ class SearchService:
         similar_log_ids = set()
         logger.info("Started searching by request %s", search_req.json())
         logger.info("ES Url %s", utils.remove_credentials_from_url(self.es_client.host))
+        index_name = utils.unite_project_name(
+            str(search_req.projectId), self.app_config["esProjectIndexPrefix"])
         t_start = time()
-        if not self.es_client.index_exists(str(search_req.projectId)):
+        if not self.es_client.index_exists(index_name):
             return []
         searched_logs = set()
         test_item_info = {}

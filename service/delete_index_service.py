@@ -40,7 +40,8 @@ class DeleteIndexService:
     def delete_index(self, index_name):
         logger.info("Started deleting index")
         t_start = time()
-        is_index_deleted = self.es_client.delete_index(index_name)
+        is_index_deleted = self.es_client.delete_index(utils.unite_project_name(
+            str(index_name), self.app_config["esProjectIndexPrefix"]))
         self.namespace_finder.remove_namespaces(index_name)
         self.trigger_manager.delete_triggers(index_name)
         self.model_chooser.delete_all_custom_models(index_name)

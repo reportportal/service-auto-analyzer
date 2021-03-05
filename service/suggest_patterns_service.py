@@ -91,17 +91,19 @@ class SuggestPatternsService:
 
     @utils.ignore_warnings
     def suggest_patterns(self, project_id):
-        logger.info("Started suggesting patterns for project '%s'", project_id)
+        index_name = utils.unite_project_name(
+            str(project_id), self.app_config["esProjectIndexPrefix"])
+        logger.info("Started suggesting patterns for project '%s'", index_name)
         t_start = time()
         found_data = []
         exceptions_with_labels = {}
         all_exceptions = {}
-        if not self.es_client.index_exists(project_id):
+        if not self.es_client.index_exists(index_name):
             return SuggestPattern(
                 suggestionsWithLabels=[],
                 suggestionsWithoutLabels=[])
         for label in ["ab", "pb", "si", "ti"]:
-            found_data.extend(self.query_data(project_id, label))
+            found_data.extend(self.query_data(index_name, label))
         for log, label in found_data:
             for exception in utils.get_found_exceptions(log).split(" "):
                 if exception.strip():

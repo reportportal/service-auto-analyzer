@@ -110,7 +110,7 @@ class SearchService:
             res = []
             for r in elasticsearch.helpers.scan(self.es_client.es_client,
                                                 query=query,
-                                                index=str(search_req.projectId)):
+                                                index=index_name):
                 test_item_info[r["_id"]] = r["_source"]["test_item"]
                 res.append(r)
                 if len(res) >= 10000:

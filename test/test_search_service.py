@@ -61,7 +61,7 @@ class TestSearchService(TestService):
                                     "status":         HTTPStatus.OK,
                                     },
                                    {"method":         httpretty.GET,
-                                    "uri":            "/rp_1/_search",
+                                    "uri":            "/rp_1/_search?scroll=5m&size=1000",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rq":             utils.get_fixture(self.search_logs_rq),
@@ -162,7 +162,7 @@ class TestSearchService(TestService):
                                     "status":         HTTPStatus.OK,
                                     },
                                    {"method":         httpretty.GET,
-                                    "uri":            "/rp_1/_search",
+                                    "uri":            "/rp_1/_search?scroll=5m&size=1000",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rq":             utils.get_fixture(

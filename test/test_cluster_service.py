@@ -404,6 +404,15 @@ class TestClusterService(TestService):
                                          "status":         HTTPStatus.OK,
                                          "content_type":   "application/json",
                                          "rq":             utils.get_fixture(
+                                             self.search_logs_rq_first_group_2lines_not_for_update),
+                                         "rs":             utils.get_fixture(
+                                             self.no_hits_search_rs),
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/rp_2/_search",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             utils.get_fixture(
                                              self.search_logs_rq_first_group_2lines),
                                          "rs":             utils.get_fixture(
                                              self.one_hit_search_rs_clustering),

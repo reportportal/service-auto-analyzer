@@ -81,9 +81,13 @@ class TestService(unittest.TestCase):
         self.launch_w_items_clustering = "launch_w_items_clustering.json"
         self.cluster_update_all_the_same = "cluster_update_all_the_same.json"
         self.search_logs_rq_first_group = "search_logs_rq_first_group.json"
+        self.search_logs_rq_first_group_not_for_update = "search_logs_rq_first_group_not_for_update.json"
+        self.search_logs_rq_second_group_not_for_update = "search_logs_rq_second_group_not_for_update.json"
         self.search_logs_rq_second_group = "search_logs_rq_second_group.json"
         self.one_hit_search_rs_clustering = "one_hit_search_rs_clustering.json"
         self.search_logs_rq_first_group_2lines = "search_logs_rq_first_group_2lines.json"
+        self.search_logs_rq_first_group_2lines_not_for_update =\
+            "search_logs_rq_first_group_2lines_not_for_update.json"
         self.cluster_update_es_update = "cluster_update_es_update.json"
         self.cluster_update_all_the_same_es_update = "cluster_update_all_the_same_es_update.json"
         self.cluster_update = "cluster_update.json"
@@ -161,14 +165,14 @@ class TestService(unittest.TestCase):
                     self.app_config["esHost"] + test_info["uri"],
                     body=test_info["rs"] if "rs" in test_info else "",
                     status=test_info["status"],
-                    content_type=test_info["content_type"],
+                    content_type=test_info["content_type"]
                 )
             else:
                 httpretty.register_uri(
                     test_info["method"],
                     self.app_config["esHost"] + test_info["uri"],
                     body=test_info["rs"] if "rs" in test_info else "",
-                    status=test_info["status"],
+                    status=test_info["status"]
                 )
 
     @staticmethod

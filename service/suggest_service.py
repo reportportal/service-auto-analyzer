@@ -106,7 +106,7 @@ class SuggestService(AnalyzerService):
     def build_suggest_info_ids_query(self, log_ids):
         return {
             "_source": ["testItem"],
-            "size": 10000,
+            "size": self.app_config["esChunkNumber"],
             "query": {
                 "bool": {
                     "should": [

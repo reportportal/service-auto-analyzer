@@ -1,6 +1,6 @@
 {
     "_source": ["testItem"],
-    "size": 10000,
+    "size": 1000,
     "query": {
         "bool": {
             "should": [

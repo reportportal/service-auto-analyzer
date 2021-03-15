@@ -35,7 +35,7 @@ WORKDIR /backend/
 
 COPY . .
 COPY --from=0 /backend/VERSION /backend/.bumpversion.cfg ./
-
+RUN rm -rf /backend/.git/
 
 EXPOSE 5001
 

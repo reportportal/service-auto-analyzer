@@ -1,6 +1,7 @@
 FROM python:3.7.4
 
-RUN apt-get update && apt-get install -y build-essential
+RUN apt-get update && apt-get install -y build-essential && \
+    rm -rf /var/lib/apt/lists/*
 RUN mkdir /backend/
 WORKDIR /backend/
 
@@ -35,7 +36,7 @@ WORKDIR /backend/
 
 COPY . .
 COPY --from=0 /backend/VERSION /backend/.bumpversion.cfg ./
-RUN rm -rf /backend/.git/
+
 
 EXPOSE 5001
 

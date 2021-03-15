@@ -24,8 +24,7 @@ RUN if [ "$prod" = "true" ]; then make release v=$version githubtoken=$githubtok
 
 # Multistage
 FROM python:3.7.4-slim
-RUN apt-get update && apt-get install -y e2fsprogs=1.44.5-1+deb10u3 perl=5.28.1-6+deb10u1 \
-libxml2 libgomp1 curl=7.64.0-4+deb10u1\
+RUN apt-get update && apt-get -y upgrade && apt-get install -y libxml2 libgomp1 curl=7.64.0-4+deb10u1 \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=0 /venv /venv
 RUN mkdir /usr/share/nltk_data && chmod g+w /usr/share/nltk_data

@@ -221,7 +221,8 @@ def init_amqp(_amqp_client):
                        amqp_handler.handle_amqp_request(channel, method, props, body,
                                                         NamespaceFinderService(
                                                             APP_CONFIG,
-                                                            SEARCH_CONFIG).update_chosen_namespaces))))
+                                                            SEARCH_CONFIG).update_chosen_namespaces,
+                                                        publish_result=False))))
         threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                        (APP_CONFIG["exchangeName"], "suggest_patterns", True, False,
                        lambda channel, method, props, body:

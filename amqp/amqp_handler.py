@@ -80,7 +80,8 @@ def output_result(response):
 
 def handle_amqp_request(channel, method, props, body,
                         request_handler, prepare_data_func=prepare_launches,
-                        prepare_response_data=prepare_search_response_data):
+                        prepare_response_data=prepare_search_response_data,
+                        publish_result=True):
     """Function for handling amqp reuqest: index, search and analyze"""
     logger.debug("Started processing %s method %s props", method, props)
     logger.debug("Started processing data %s", body)
@@ -109,17 +110,18 @@ def handle_amqp_request(channel, method, props, body,
         logger.error("Failed to dump launches result")
         logger.error(err)
         return False
-    try:
-        channel.basic_publish(exchange='',
-                              routing_key=props.reply_to,
-                              properties=pika.BasicProperties(
-                                  correlation_id=props.correlation_id,
-                                  content_type="application/json"),
-                              mandatory=False,
-                              body=response_body)
-    except Exception as err:
-        logger.error("Failed to publish result")
-        logger.error(err)
+    if publish_result:
+        try:
+            channel.basic_publish(exchange='',
+                                  routing_key=props.reply_to,
+                                  properties=pika.BasicProperties(
+                                      correlation_id=props.correlation_id,
+                                      content_type="application/json"),
+                                  mandatory=False,
+                                  body=response_body)
+        except Exception as err:
+            logger.error("Failed to publish result")
+            logger.error(err)
     logger.debug("Finished processing %s method", method)
     return True
 

@@ -27,6 +27,7 @@ logger = logging.getLogger("analyzerApp.minioClient")
 class MinioClient:
 
     def __init__(self, app_config):
+        self.app_config = app_config
         self.minioClient = None
         try:
             self.minioClient = Minio(
@@ -60,7 +61,8 @@ class MinioClient:
             bucket_name = project_id
             if not self.minioClient.bucket_exists(bucket_name):
                 logger.debug("Creating minio bucket %s" % bucket_name)
-                self.minioClient.make_bucket(bucket_name)
+                self.minioClient.make_bucket(
+                    bucket_name=bucket_name, location=self.app_config["minioRegion"])
                 logger.debug("Created minio bucket %s" % bucket_name)
             if using_json:
                 data_to_save = json.dumps(data).encode("utf-8")

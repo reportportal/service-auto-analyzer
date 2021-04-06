@@ -23,6 +23,7 @@ import numpy as np
 from amqp.amqp import AmqpClient
 import json
 import logging
+import traceback
 from time import time
 from datetime import datetime
 import hashlib
@@ -194,32 +195,44 @@ class ClusterService:
             logger.info("Finished clustering log with 0 clusters.")
             return []
         t_start = time()
-        _clusterizer = clusterizer.Clusterizer()
-        log_messages, log_dict = self.log_preparation.prepare_logs_for_clustering(
-            launch_info.launch, launch_info.numberOfLogLines, launch_info.cleanNumbers, index_name)
-        log_ids = set([int(log["_id"]) for log in log_dict.values()])
-        groups = _clusterizer.find_clusters(log_messages)
-        additional_results = self.find_similar_items_from_es(
-            groups, log_dict, log_messages, log_ids, launch_info.numberOfLogLines,
-            {}, same_launch=False)
-        if launch_info.forUpdate:
+        errors_found = []
+        errors_count = 0
+        cluster_num = 0
+        clusters = []
+        try:
+            _clusterizer = clusterizer.Clusterizer()
+            log_messages, log_dict = self.log_preparation.prepare_logs_for_clustering(
+                launch_info.launch, launch_info.numberOfLogLines, launch_info.cleanNumbers, index_name)
+            log_ids = set([int(log["_id"]) for log in log_dict.values()])
+            groups = _clusterizer.find_clusters(log_messages)
             additional_results = self.find_similar_items_from_es(
                 groups, log_dict, log_messages, log_ids, launch_info.numberOfLogLines,
-                additional_results, same_launch=True)
+                {}, same_launch=False)
+            if launch_info.forUpdate:
+                additional_results = self.find_similar_items_from_es(
+                    groups, log_dict, log_messages, log_ids, launch_info.numberOfLogLines,
+                    additional_results, same_launch=True)
 
-        clusters, cluster_num = self.gather_cluster_results(
-            groups, additional_results, log_dict, log_messages, launch_info.numberOfLogLines)
-        if clusters:
-            bodies = []
-            for result in clusters:
-                for log_id in result.logIds:
-                    bodies.append({
-                        "_op_type": "update",
-                        "_id": log_id,
-                        "_index": index_name,
-                        "doc": {"cluster_id": str(result.clusterId),
-                                "cluster_message": result.clusterMessage}})
-            self.es_client._bulk_index(bodies)
+            clusters, cluster_num = self.gather_cluster_results(
+                groups, additional_results, log_dict, log_messages, launch_info.numberOfLogLines)
+            if clusters:
+                bodies = []
+                for result in clusters:
+                    for log_id in result.logIds:
+                        bodies.append({
+                            "_op_type": "update",
+                            "_id": log_id,
+                            "_index": index_name,
+                            "doc": {"cluster_id": str(result.clusterId),
+                                    "cluster_message": result.clusterMessage}})
+                self.es_client._bulk_index(bodies)
+        except Exception as err:
+            logger.error(err)
+            err_message = traceback.format_exception_only(type(err), err)
+            if len(err_message):
+                err_message = err_message[-1]
+            errors_found.append(err_message)
+            errors_count += 1
 
         results_to_share = {launch_info.launch.launchId: {
             "not_found": int(cluster_num == 0), "items_to_process": len(log_ids),
@@ -229,7 +242,9 @@ class ClusterService:
             "gather_date": datetime.now().strftime("%Y-%m-%d"),
             "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "module_version": [self.app_config["appVersion"]],
-            "model_info": []}}
+            "model_info": [],
+            "errors": errors_found,
+            "errors_count": errors_count}}
         if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
             AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
                 self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))

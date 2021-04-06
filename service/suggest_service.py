@@ -22,6 +22,7 @@ from service.analyzer_service import AnalyzerService
 from commons import similarity_calculator
 import json
 import logging
+import traceback
 from time import time
 from datetime import datetime
 import elasticsearch
@@ -418,80 +419,91 @@ class SuggestService(AnalyzerService):
 
         t_start = time()
         results = []
-        unique_logs = utils.leave_only_unique_logs(test_item_info.logs)
-        prepared_logs = [self.log_preparation._prepare_log_for_suggests(test_item_info, log, index_name)
-                         for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
-        logs = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
-        searched_res = self.query_es_for_suggested_items(test_item_info, logs)
+        errors_found = []
+        errors_count = 0
+        try:
+            unique_logs = utils.leave_only_unique_logs(test_item_info.logs)
+            prepared_logs = [self.log_preparation._prepare_log_for_suggests(test_item_info, log, index_name)
+                             for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
+            logs = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+            searched_res = self.query_es_for_suggested_items(test_item_info, logs)
 
-        boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
-        boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(
-            test_item_info.project)
-        _suggest_decision_maker_to_use = self.model_chooser.choose_model(
-            test_item_info.project, "suggestion_model/",
-            custom_model_prob=self.search_cfg["ProbabilityForCustomModelSuggestions"])
+            boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
+            boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(
+                test_item_info.project)
+            _suggest_decision_maker_to_use = self.model_chooser.choose_model(
+                test_item_info.project, "suggestion_model/",
+                custom_model_prob=self.search_cfg["ProbabilityForCustomModelSuggestions"])
 
-        _boosting_data_gatherer = SuggestBoostingFeaturizer(
-            searched_res,
-            boosting_config,
-            feature_ids=_suggest_decision_maker_to_use.get_feature_ids(),
-            weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
-        _boosting_data_gatherer.set_defect_type_model(self.model_chooser.choose_model(
-            test_item_info.project, "defect_type_model/"))
-        feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
-        scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
-        model_info_tags = _boosting_data_gatherer.get_used_model_info() +\
-            _suggest_decision_maker_to_use.get_model_info()
+            _boosting_data_gatherer = SuggestBoostingFeaturizer(
+                searched_res,
+                boosting_config,
+                feature_ids=_suggest_decision_maker_to_use.get_feature_ids(),
+                weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
+            _boosting_data_gatherer.set_defect_type_model(self.model_chooser.choose_model(
+                test_item_info.project, "defect_type_model/"))
+            feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
+            scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
+            model_info_tags = _boosting_data_gatherer.get_used_model_info() +\
+                _suggest_decision_maker_to_use.get_model_info()
+            if feature_data:
+                predicted_labels, predicted_labels_probability = _suggest_decision_maker_to_use.predict(
+                    feature_data)
+                sorted_results = self.sort_results(
+                    scores_by_test_items, test_item_ids, predicted_labels_probability)
 
-        if feature_data:
-            predicted_labels, predicted_labels_probability = _suggest_decision_maker_to_use.predict(
-                feature_data)
-            sorted_results = self.sort_results(
-                scores_by_test_items, test_item_ids, predicted_labels_probability)
-
-            logger.debug("Found %d results for test items ", len(sorted_results))
-            for idx, prob, _ in sorted_results:
-                test_item_id = test_item_ids[idx]
-                issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
-                logger.debug("Test item id %d with issue type %s has probability %.2f",
-                             test_item_id, issue_type, prob)
-            processed_time = time() - t_start
-            global_idx = 0
-            for idx, prob, _ in sorted_results[:num_items]:
-                if prob >= self.suggest_threshold:
+                logger.debug("Found %d results for test items ", len(sorted_results))
+                for idx, prob, _ in sorted_results:
                     test_item_id = test_item_ids[idx]
                     issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
-                    relevant_log_id = utils.extract_real_id(
-                        scores_by_test_items[test_item_id]["mrHit"]["_id"])
-                    real_log_id = str(scores_by_test_items[test_item_id]["mrHit"]["_id"])
-                    is_merged = real_log_id != str(relevant_log_id)
-                    test_item_log_id = utils.extract_real_id(
-                        scores_by_test_items[test_item_id]["compared_log"]["_id"])
-                    analysis_result = SuggestAnalysisResult(
-                        project=test_item_info.project,
-                        testItem=test_item_info.testItemId,
-                        testItemLogId=test_item_log_id,
-                        issueType=issue_type,
-                        relevantItem=test_item_id,
-                        relevantLogId=relevant_log_id,
-                        isMergedLog=is_merged,
-                        matchScore=round(prob * 100, 2),
-                        esScore=round(scores_by_test_items[test_item_id]["mrHit"]["_score"], 2),
-                        esPosition=scores_by_test_items[test_item_id]["mrHit"]["es_pos"],
-                        modelFeatureNames=";".join(
-                            [str(feature) for feature in _suggest_decision_maker_to_use.get_feature_ids()]),
-                        modelFeatureValues=";".join(
-                            [str(feature) for feature in feature_data[idx]]),
-                        modelInfo=";".join(model_info_tags),
-                        resultPosition=global_idx,
-                        usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
-                        minShouldMatch=self.find_min_should_match_threshold(test_item_info.analyzerConfig),
-                        processedTime=processed_time)
-                    results.append(analysis_result)
-                    logger.debug(analysis_result)
-                global_idx += 1
-        else:
-            logger.debug("There are no results for test item %s", test_item_info.testItemId)
+                    logger.debug("Test item id %d with issue type %s has probability %.2f",
+                                 test_item_id, issue_type, prob)
+                processed_time = time() - t_start
+                global_idx = 0
+                for idx, prob, _ in sorted_results[:num_items]:
+                    if prob >= self.suggest_threshold:
+                        test_item_id = test_item_ids[idx]
+                        issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
+                        relevant_log_id = utils.extract_real_id(
+                            scores_by_test_items[test_item_id]["mrHit"]["_id"])
+                        real_log_id = str(scores_by_test_items[test_item_id]["mrHit"]["_id"])
+                        is_merged = real_log_id != str(relevant_log_id)
+                        test_item_log_id = utils.extract_real_id(
+                            scores_by_test_items[test_item_id]["compared_log"]["_id"])
+                        feature_names = ";".join(
+                            [str(feature) for feature in _suggest_decision_maker_to_use.get_feature_ids()])
+                        analysis_result = SuggestAnalysisResult(
+                            project=test_item_info.project,
+                            testItem=test_item_info.testItemId,
+                            testItemLogId=test_item_log_id,
+                            issueType=issue_type,
+                            relevantItem=test_item_id,
+                            relevantLogId=relevant_log_id,
+                            isMergedLog=is_merged,
+                            matchScore=round(prob * 100, 2),
+                            esScore=round(scores_by_test_items[test_item_id]["mrHit"]["_score"], 2),
+                            esPosition=scores_by_test_items[test_item_id]["mrHit"]["es_pos"],
+                            modelFeatureNames=feature_names,
+                            modelFeatureValues=";".join(
+                                [str(feature) for feature in feature_data[idx]]),
+                            modelInfo=";".join(model_info_tags),
+                            resultPosition=global_idx,
+                            usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
+                            minShouldMatch=self.find_min_should_match_threshold(
+                                test_item_info.analyzerConfig),
+                            processedTime=processed_time)
+                        results.append(analysis_result)
+                        logger.debug(analysis_result)
+                    global_idx += 1
+            else:
+                logger.debug("There are no results for test item %s", test_item_info.testItemId)
+        except Exception as err:
+            logger.error(err)
+            err_message = traceback.format_exception_only(type(err), err)
+            if len(err_message):
+                err_message = err_message[-1]
+            errors_found.append(err_message)
+            errors_count += 1
         results_to_share = {test_item_info.launchId: {
             "not_found": int(len(results) == 0), "items_to_process": 1,
             "processed_time": time() - t_start, "found_items": len(results),
@@ -503,7 +515,9 @@ class SuggestService(AnalyzerService):
             "model_info": model_info_tags,
             "module_version": [self.app_config["appVersion"]],
             "min_should_match": self.find_min_should_match_threshold(
-                test_item_info.analyzerConfig)}}
+                test_item_info.analyzerConfig),
+            "errors": errors_found,
+            "errors_count": errors_count}}
         if not results:
             self.es_client.create_index_for_stats_info(self.rp_suggest_metrics_index_template)
             self.es_client._bulk_index([{

@@ -21,6 +21,7 @@ from amqp.amqp import AmqpClient
 from commons.log_merger import LogMerger
 import json
 import logging
+import traceback
 from time import time, sleep
 from datetime import datetime
 from queue import Queue
@@ -263,88 +264,100 @@ class AutoAnalyzerService(AnalyzerService):
                     continue
                 else:
                     item_to_process = self.queue.get()
-                analyzer_config, test_item_id, searched_res, time_processed = item_to_process
-                launch_id = searched_res[0][0]["_source"]["launch_id"]
-                launch_name = searched_res[0][0]["_source"]["launch_name"]
-                project_id = utils.get_project_id(
-                    searched_res[0][0]["_index"], self.app_config["esProjectIndexPrefix"])
-                if launch_id not in results_to_share:
-                    results_to_share[launch_id] = {
-                        "not_found": 0, "items_to_process": 0, "processed_time": 0,
-                        "launch_id": launch_id, "launch_name": launch_name, "project_id": project_id,
-                        "method": "auto_analysis",
-                        "gather_date": datetime.now().strftime("%Y-%m-%d"),
-                        "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "number_of_log_lines": analyzer_config.numberOfLogLines,
-                        "min_should_match": self.find_min_should_match_threshold(analyzer_config),
-                        "model_info": set(),
-                        "module_version": [self.app_config["appVersion"]]}
+                try:
+                    analyzer_config, test_item_id, searched_res, time_processed = item_to_process
+                    launch_id = searched_res[0][0]["_source"]["launch_id"]
+                    launch_name = searched_res[0][0]["_source"]["launch_name"]
+                    project_id = utils.get_project_id(
+                        searched_res[0][0]["_index"], self.app_config["esProjectIndexPrefix"])
+                    if launch_id not in results_to_share:
+                        results_to_share[launch_id] = {
+                            "not_found": 0, "items_to_process": 0, "processed_time": 0,
+                            "launch_id": launch_id, "launch_name": launch_name, "project_id": project_id,
+                            "method": "auto_analysis",
+                            "gather_date": datetime.now().strftime("%Y-%m-%d"),
+                            "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "number_of_log_lines": analyzer_config.numberOfLogLines,
+                            "min_should_match": self.find_min_should_match_threshold(analyzer_config),
+                            "model_info": set(),
+                            "module_version": [self.app_config["appVersion"]],
+                            "errors": [],
+                            "errors_count": 0}
 
-                t_start_item = time()
-                cnt_items_to_process += 1
-                results_to_share[launch_id]["items_to_process"] += 1
-                results_to_share[launch_id]["processed_time"] += time_processed
-                boosting_config = self.get_config_for_boosting(analyzer_config)
-                if project_id not in chosen_namespaces:
-                    chosen_namespaces[project_id] = self.namespace_finder.get_chosen_namespaces(project_id)
-                boosting_config["chosen_namespaces"] = chosen_namespaces[project_id]
-                _boosting_decision_maker = self.model_chooser.choose_model(
-                    project_id, "auto_analysis_model/",
-                    custom_model_prob=self.search_cfg["ProbabilityForCustomModelAutoAnalysis"])
+                    t_start_item = time()
+                    cnt_items_to_process += 1
+                    results_to_share[launch_id]["items_to_process"] += 1
+                    results_to_share[launch_id]["processed_time"] += time_processed
+                    boosting_config = self.get_config_for_boosting(analyzer_config)
+                    if project_id not in chosen_namespaces:
+                        chosen_namespaces[project_id] = self.namespace_finder.get_chosen_namespaces(
+                            project_id)
+                    boosting_config["chosen_namespaces"] = chosen_namespaces[project_id]
+                    _boosting_decision_maker = self.model_chooser.choose_model(
+                        project_id, "auto_analysis_model/",
+                        custom_model_prob=self.search_cfg["ProbabilityForCustomModelAutoAnalysis"])
 
-                boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
-                    searched_res,
-                    boosting_config,
-                    feature_ids=_boosting_decision_maker.get_feature_ids(),
-                    weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
-                if project_id not in defect_type_model_to_use:
-                    defect_type_model_to_use[project_id] = self.model_chooser.choose_model(
-                        project_id, "defect_type_model/")
-                boosting_data_gatherer.set_defect_type_model(defect_type_model_to_use[project_id])
-                feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
-                model_info_tags = boosting_data_gatherer.get_used_model_info() +\
-                    _boosting_decision_maker.get_model_info()
-                results_to_share[launch_id]["model_info"].update(model_info_tags)
+                    boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
+                        searched_res,
+                        boosting_config,
+                        feature_ids=_boosting_decision_maker.get_feature_ids(),
+                        weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
+                    if project_id not in defect_type_model_to_use:
+                        defect_type_model_to_use[project_id] = self.model_chooser.choose_model(
+                            project_id, "defect_type_model/")
+                    boosting_data_gatherer.set_defect_type_model(defect_type_model_to_use[project_id])
+                    feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
+                    model_info_tags = boosting_data_gatherer.get_used_model_info() +\
+                        _boosting_decision_maker.get_model_info()
+                    results_to_share[launch_id]["model_info"].update(model_info_tags)
 
-                if len(feature_data) > 0:
+                    if len(feature_data) > 0:
 
-                    predicted_labels, predicted_labels_probability =\
-                        _boosting_decision_maker.predict(feature_data)
+                        predicted_labels, predicted_labels_probability =\
+                            _boosting_decision_maker.predict(feature_data)
 
-                    scores_by_issue_type = boosting_data_gatherer.scores_by_issue_type
+                        scores_by_issue_type = boosting_data_gatherer.scores_by_issue_type
 
-                    for i in range(len(issue_type_names)):
-                        logger.debug("Most relevant item with issue type %s has id %s",
-                                     issue_type_names[i],
-                                     boosting_data_gatherer.
-                                     scores_by_issue_type[issue_type_names[i]]["mrHit"]["_id"])
-                        logger.debug("Issue type %s has label %d and probability %.3f for features %s",
-                                     issue_type_names[i],
-                                     predicted_labels[i],
-                                     predicted_labels_probability[i][1],
-                                     feature_data[i])
+                        for i in range(len(issue_type_names)):
+                            logger.debug("Most relevant item with issue type %s has id %s",
+                                         issue_type_names[i],
+                                         boosting_data_gatherer.
+                                         scores_by_issue_type[issue_type_names[i]]["mrHit"]["_id"])
+                            logger.debug("Issue type %s has label %d and probability %.3f for features %s",
+                                         issue_type_names[i],
+                                         predicted_labels[i],
+                                         predicted_labels_probability[i][1],
+                                         feature_data[i])
 
-                    predicted_issue_type = utils.choose_issue_type(
-                        predicted_labels,
-                        predicted_labels_probability,
-                        issue_type_names,
-                        boosting_data_gatherer.scores_by_issue_type)
+                        predicted_issue_type = utils.choose_issue_type(
+                            predicted_labels,
+                            predicted_labels_probability,
+                            issue_type_names,
+                            boosting_data_gatherer.scores_by_issue_type)
 
-                    if predicted_issue_type:
-                        chosen_type = scores_by_issue_type[predicted_issue_type]
-                        relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
-                        analysis_result = AnalysisResult(testItem=test_item_id,
-                                                         issueType=predicted_issue_type,
-                                                         relevantItem=relevant_item)
-                        results.append(analysis_result)
-                        logger.debug(analysis_result)
+                        if predicted_issue_type:
+                            chosen_type = scores_by_issue_type[predicted_issue_type]
+                            relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
+                            analysis_result = AnalysisResult(testItem=test_item_id,
+                                                             issueType=predicted_issue_type,
+                                                             relevantItem=relevant_item)
+                            results.append(analysis_result)
+                            logger.debug(analysis_result)
+                        else:
+                            results_to_share[launch_id]["not_found"] += 1
+                            logger.debug("Test item %s has no relevant items", test_item_id)
                     else:
                         results_to_share[launch_id]["not_found"] += 1
-                        logger.debug("Test item %s has no relevant items", test_item_id)
-                else:
-                    results_to_share[launch_id]["not_found"] += 1
-                    logger.debug("There are no results for test item %s", test_item_id)
-                results_to_share[launch_id]["processed_time"] += (time() - t_start_item)
+                        logger.debug("There are no results for test item %s", test_item_id)
+                    results_to_share[launch_id]["processed_time"] += (time() - t_start_item)
+                except Exception as err:
+                    logger.error(err)
+                    err_message = traceback.format_exception_only(type(err), err)
+                    if len(err_message):
+                        err_message = err_message[-1]
+                    if launch_id in results_to_share:
+                        results_to_share[launch_id]["errors"].append(err_message)
+                        results_to_share[launch_id]["errors_count"] += 1
             if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
                 for launch_id in results_to_share:
                     results_to_share[launch_id]["model_info"] = list(

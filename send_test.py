@@ -268,6 +268,6 @@ elif used_method.strip() in ["cluster"]:
 else:
     response = rpc.call(json.dumps(index_data), used_method)
     print(" [.] Got %r" % response)
-    rpc.call(json.dumps(index_data), "namespace_finder")
+    rpc.call_without_wait(json.dumps(index_data), "namespace_finder")
     print("Namespace_finder info was processed")
 print(" [.] Got %r" % response)

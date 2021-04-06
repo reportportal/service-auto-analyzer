@@ -30,6 +30,7 @@ from commons.esclient import EsClient
 from utils import utils
 from service.cluster_service import ClusterService
 from service.auto_analyzer_service import AutoAnalyzerService
+from service.analyzer_service import AnalyzerService
 from service.suggest_service import SuggestService
 from service.search_service import SearchService
 from service.clean_index_service import CleanIndexService
@@ -254,6 +255,16 @@ def init_amqp(_amqp_client):
                                                             SEARCH_CONFIG).remove_suggest_info,
                                                         prepare_data_func=amqp_handler.
                                                         prepare_delete_index,
+                                                        prepare_response_data=amqp_handler.
+                                                        output_result))))
+        threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
+                       (APP_CONFIG["exchangeName"], "remove_models", True, False,
+                       lambda channel, method, props, body:
+                       amqp_handler.handle_amqp_request(channel, method, props, body,
+                                                        AnalyzerService(
+                                                            APP_CONFIG,
+                                                            SEARCH_CONFIG).remove_models,
+                                                        prepare_data_func=lambda x: x,
                                                         prepare_response_data=amqp_handler.
                                                         output_result))))
 

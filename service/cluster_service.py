@@ -23,7 +23,6 @@ import numpy as np
 from amqp.amqp import AmqpClient
 import json
 import logging
-import traceback
 from time import time
 from datetime import datetime
 import hashlib
@@ -228,10 +227,7 @@ class ClusterService:
                 self.es_client._bulk_index(bodies)
         except Exception as err:
             logger.error(err)
-            err_message = traceback.format_exception_only(type(err), err)
-            if len(err_message):
-                err_message = err_message[-1]
-            errors_found.append(err_message)
+            errors_found.append(utils.extract_exception(err))
             errors_count += 1
 
         results_to_share = {launch_info.launch.launchId: {

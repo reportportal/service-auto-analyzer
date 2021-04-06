@@ -22,7 +22,6 @@ from service.analyzer_service import AnalyzerService
 from commons import similarity_calculator
 import json
 import logging
-import traceback
 from time import time
 from datetime import datetime
 import elasticsearch
@@ -499,10 +498,7 @@ class SuggestService(AnalyzerService):
                 logger.debug("There are no results for test item %s", test_item_info.testItemId)
         except Exception as err:
             logger.error(err)
-            err_message = traceback.format_exception_only(type(err), err)
-            if len(err_message):
-                err_message = err_message[-1]
-            errors_found.append(err_message)
+            errors_found.append(utils.extract_exception(err))
             errors_count += 1
         results_to_share = {test_item_info.launchId: {
             "not_found": int(len(results) == 0), "items_to_process": 1,

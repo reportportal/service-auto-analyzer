@@ -29,6 +29,7 @@ import commons
 from collections import Counter
 import random
 import numpy as np
+import traceback
 
 logger = logging.getLogger("analyzerApp.utils")
 file_extensions = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
@@ -760,3 +761,12 @@ def unite_project_name(project_id, prefix):
 
 def get_project_id(full_project, prefix):
     return re.sub("^%s" % prefix, "", full_project) if prefix.strip() else full_project
+
+
+def extract_exception(err):
+    err_message = traceback.format_exception_only(type(err), err)
+    if len(err_message):
+        err_message = err_message[-1]
+    else:
+        err_message = ""
+    return err_message

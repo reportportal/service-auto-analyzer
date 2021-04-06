@@ -21,7 +21,6 @@ from amqp.amqp import AmqpClient
 from commons.log_merger import LogMerger
 import json
 import logging
-import traceback
 from time import time, sleep
 from datetime import datetime
 from queue import Queue
@@ -352,11 +351,8 @@ class AutoAnalyzerService(AnalyzerService):
                     results_to_share[launch_id]["processed_time"] += (time() - t_start_item)
                 except Exception as err:
                     logger.error(err)
-                    err_message = traceback.format_exception_only(type(err), err)
-                    if len(err_message):
-                        err_message = err_message[-1]
                     if launch_id in results_to_share:
-                        results_to_share[launch_id]["errors"].append(err_message)
+                        results_to_share[launch_id]["errors"].append(utils.extract_exception(err))
                         results_to_share[launch_id]["errors_count"] += 1
             if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
                 for launch_id in results_to_share:

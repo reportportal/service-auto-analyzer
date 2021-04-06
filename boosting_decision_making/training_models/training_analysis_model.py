@@ -112,7 +112,7 @@ class AnalysisModelTraining:
                 "baseline_model": [baseline_model], "new_model": [model_name],
                 "project_id": str(project_info["project_id"]), "model_saved": 0, "p_value": 1.0,
                 "data_proportion": 0.0, "baseline_mean_metric": 0.0, "new_model_mean_metric": 0.0,
-                "bad_data_proportion": 0, "metric_name": metric_name}
+                "bad_data_proportion": 0, "metric_name": metric_name, "errors": [], "errors_count": 0}
 
     def calculate_metrics(self, model, x_test, y_test,
                           metrics_to_gather, test_item_ids_with_pos, new_model_results):
@@ -294,59 +294,71 @@ class AnalysisModelTraining:
             train_log_info[metric]["data_size"] = len(labels)
             train_log_info[metric]["data_proportion"] = utils.calculate_proportions_for_labels(labels)
 
-        logger.debug("Loaded data for training model '%s'", project_info["model_type"])
-        baseline_model_results, new_model_results, bad_data = self.train_several_times(
-            train_data, labels, self.new_model.get_feature_ids(), test_item_ids_with_pos, metrics_to_gather)
-        for metric in metrics_to_gather:
-            train_log_info[metric]["bad_data_proportion"] = int(bad_data)
-
-        use_custom_model = False
-        if not bad_data:
-            for metric in metrics_to_gather:
-                logger.debug("Baseline test results %s", baseline_model_results[metric])
-                logger.debug("New model test results %s", new_model_results[metric])
-                pvalue = stats.f_oneway(baseline_model_results[metric], new_model_results[metric]).pvalue
-                if pvalue != pvalue:
-                    pvalue = 1.0
-                train_log_info[metric]["p_value"] = pvalue
-                mean_f1 = np.mean(new_model_results[metric])
-                train_log_info[metric]["baseline_mean_metric"] = np.mean(baseline_model_results[metric])
-                train_log_info[metric]["new_model_mean_metric"] = mean_f1
-                if pvalue < 0.05 and mean_f1 > np.mean(baseline_model_results[metric]) and mean_f1 >= 0.4:
-                    use_custom_model = True
-                logger.debug(
-                    "Model training validation results: p-value=%.3f mean baseline=%.3f mean new model=%.3f",
-                    pvalue, np.mean(baseline_model_results[metric]), np.mean(new_model_results[metric]))
-
-        if use_custom_model:
-            logger.debug("Custom model should be saved")
-
-            proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
-            if proportion_binary_labels < self.due_proportion_to_smote:
-                oversample = SMOTE(ratio="minority")
-                train_data, labels = oversample.fit_sample(train_data, labels)
-                proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
-            if proportion_binary_labels < self.due_proportion:
-                logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
-                bad_data = True
+        errors = []
+        errors_count = 0
+        try:
+            logger.debug("Loaded data for training model '%s'", project_info["model_type"])
+            baseline_model_results, new_model_results, bad_data = self.train_several_times(
+                train_data, labels, self.new_model.get_feature_ids(),
+                test_item_ids_with_pos, metrics_to_gather)
             for metric in metrics_to_gather:
                 train_log_info[metric]["bad_data_proportion"] = int(bad_data)
+
+            use_custom_model = False
             if not bad_data:
                 for metric in metrics_to_gather:
-                    train_log_info[metric]["model_saved"] = 1
-                self.new_model.train_model(train_data, labels)
-            else:
+                    logger.debug("Baseline test results %s", baseline_model_results[metric])
+                    logger.debug("New model test results %s", new_model_results[metric])
+                    pvalue = stats.f_oneway(baseline_model_results[metric], new_model_results[metric]).pvalue
+                    if pvalue != pvalue:
+                        pvalue = 1.0
+                    train_log_info[metric]["p_value"] = pvalue
+                    mean_f1 = np.mean(new_model_results[metric])
+                    train_log_info[metric]["baseline_mean_metric"] = np.mean(baseline_model_results[metric])
+                    train_log_info[metric]["new_model_mean_metric"] = mean_f1
+                    if pvalue < 0.05 and mean_f1 > np.mean(baseline_model_results[metric]) and mean_f1 >= 0.4:
+                        use_custom_model = True
+                    logger.debug(
+                        """Model training validation results:
+                            p-value=%.3f mean baseline=%.3f mean new model=%.3f""",
+                        pvalue, np.mean(baseline_model_results[metric]), np.mean(new_model_results[metric]))
+
+            if use_custom_model:
+                logger.debug("Custom model should be saved")
+
+                proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
+                if proportion_binary_labels < self.due_proportion_to_smote:
+                    oversample = SMOTE(ratio="minority")
+                    train_data, labels = oversample.fit_sample(train_data, labels)
+                    proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
+                if proportion_binary_labels < self.due_proportion:
+                    logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
+                    bad_data = True
                 for metric in metrics_to_gather:
-                    train_log_info[metric]["model_saved"] = 0
-            self.model_chooser.delete_old_model(
-                "%s_model" % project_info["model_type"], project_info["project_id"])
-            self.new_model.save_model(
-                "%s_model/%s/" % (project_info["model_type"], model_name))
+                    train_log_info[metric]["bad_data_proportion"] = int(bad_data)
+                if not bad_data:
+                    for metric in metrics_to_gather:
+                        train_log_info[metric]["model_saved"] = 1
+                    self.new_model.train_model(train_data, labels)
+                else:
+                    for metric in metrics_to_gather:
+                        train_log_info[metric]["model_saved"] = 0
+                self.model_chooser.delete_old_model(
+                    "%s_model" % project_info["model_type"], project_info["project_id"])
+                self.new_model.save_model(
+                    "%s_model/%s/" % (project_info["model_type"], model_name))
+        except Exception as err:
+            logger.error(err)
+            errors.append(utils.extract_exception(err))
+            errors_count += 1
+
         time_spent = (time() - time_training)
         for metric in metrics_to_gather:
             train_log_info[metric]["time_spent"] = time_spent
             train_log_info[metric]["gather_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             train_log_info[metric]["module_version"] = [self.app_config["appVersion"]]
+            train_log_info[metric]["errors"].extend(errors)
+            train_log_info[metric]["errors_count"] += errors_count
 
         logger.info("Finished for %d s", time_spent)
         return len(train_data), train_log_info

@@ -40,6 +40,12 @@
         },
         "model_info": {
             "type": "keyword"
+        },
+        "errors": {
+            "type": "keyword"
+        },
+        "errors_count": {
+            "type": "integer"
         }
     }
 }

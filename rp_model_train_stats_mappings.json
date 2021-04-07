@@ -51,6 +51,12 @@
         },
         "project_id": {
             "type": "keyword"
+        },
+        "errors": {
+            "type": "keyword"
+        },
+        "errors_count": {
+            "type": "integer"
         }
     }
 }

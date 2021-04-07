@@ -192,8 +192,8 @@ class EsClient:
 
     def index_logs(self, launches):
         """Index launches to the index with project name"""
-        cnt_launches = len(launches)
-        logger.info("Indexing logs for %d launches", cnt_launches)
+        launch_ids = []
+        logger.info("Indexing logs for %d launches", len(launches))
         logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
         t_start = time()
         bodies = []
@@ -206,6 +206,7 @@ class EsClient:
             launch.testItems = []
             for test_item in test_items:
                 test_item_queue.put((launch, test_item))
+                launch_ids.append(launch.launchId)
         del launches
         project_with_prefix = utils.unite_project_name(
             project, self.app_config["esProjectIndexPrefix"])
@@ -237,8 +238,8 @@ class EsClient:
                     }))
         except Exception as err:
             logger.error(err)
-        logger.info("Finished indexing logs for %d launches. It took %.2f sec.",
-                    cnt_launches, time() - t_start)
+        logger.info("Finished indexing logs for %d launches %s. It took %.2f sec.",
+                    len(launch_ids), launch_ids, time() - t_start)
         return result
 
     def _merge_logs(self, test_item_ids, project):

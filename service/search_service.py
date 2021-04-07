@@ -137,5 +137,12 @@ class SearchService:
 
         logger.info("Finished searching by request %s with %d results. It took %.2f sec.",
                     search_req.json(), len(similar_log_ids), time() - t_start)
+        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+            launch_ids = set()
+            for r in elasticsearch.helpers.scan(self.es_client.es_client,
+                                                query={"size": 10000},
+                                                index=index_name):
+                launch_ids.add(r["_source"]["launch_id"])
+            logger.info("Finished searching by request with launches in the index %s", launch_ids)
         return [SearchLogInfo(logId=log_info[0],
                               testItemId=log_info[1]) for log_info in similar_log_ids]

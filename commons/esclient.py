@@ -192,7 +192,7 @@ class EsClient:
 
     def index_logs(self, launches):
         """Index launches to the index with project name"""
-        launch_ids = []
+        launch_ids = set()
         logger.info("Indexing logs for %d launches", len(launches))
         logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
         t_start = time()
@@ -206,7 +206,7 @@ class EsClient:
             launch.testItems = []
             for test_item in test_items:
                 test_item_queue.put((launch, test_item))
-                launch_ids.append(launch.launchId)
+                launch_ids.add(launch.launchId)
         del launches
         project_with_prefix = utils.unite_project_name(
             project, self.app_config["esProjectIndexPrefix"])

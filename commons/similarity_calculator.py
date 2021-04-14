@@ -73,7 +73,7 @@ class SimilarityCalculator:
                                             gathered_lines.append(" ".join(line_words))
                                             weights.append(
                                                 self.config["chosen_namespaces"][part_of_namespace])
-                                if obj["_id"] == log["_id"] and len(gathered_lines):
+                                if len(gathered_lines):
                                     text = gathered_lines
                                     self.object_id_weights[obj["_id"]] = weights
                                 else:

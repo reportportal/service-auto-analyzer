@@ -73,8 +73,8 @@ class EsClient:
                             "potential_status_codes", "original_message_lines",
                             "original_message_words_number", "issue_type", "launch_id",
                             "launch_name", "unique_id", "test_case_hash", "start_time",
-                            "is_auto_analyzed", "cluster_id"],
-                "size": 10000,
+                            "is_auto_analyzed", "cluster_id", "cluster_message"],
+                "size": self.app_config["esChunkNumber"],
                 "query": {
                     "bool": {
                         "filter": [
@@ -86,7 +86,7 @@ class EsClient:
         else:
             return {
                 "_source": ["test_item"],
-                "size": 10000,
+                "size": self.app_config["esChunkNumber"],
                 "query": {
                     "bool": {
                         "filter": [
@@ -100,7 +100,7 @@ class EsClient:
         """Build search test item ids query"""
         return {
             "_source": ["test_item"],
-            "size": 10000,
+            "size": self.app_config["esChunkNumber"],
             "query": {
                 "bool": {
                     "filter": [
@@ -192,8 +192,8 @@ class EsClient:
 
     def index_logs(self, launches):
         """Index launches to the index with project name"""
-        cnt_launches = len(launches)
-        logger.info("Indexing logs for %d launches", cnt_launches)
+        launch_ids = set()
+        logger.info("Indexing logs for %d launches", len(launches))
         logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
         t_start = time()
         bodies = []
@@ -204,10 +204,13 @@ class EsClient:
             project = str(launch.project)
             test_items = launch.testItems
             launch.testItems = []
-            self.create_index_if_not_exists(str(launch.project))
             for test_item in test_items:
                 test_item_queue.put((launch, test_item))
+                launch_ids.add(launch.launchId)
         del launches
+        project_with_prefix = utils.unite_project_name(
+            project, self.app_config["esProjectIndexPrefix"])
+        self.create_index_if_not_exists(project_with_prefix)
         while not test_item_queue.empty():
             launch, test_item = test_item_queue.get()
             logs_added = False
@@ -215,7 +218,8 @@ class EsClient:
                 if log.logLevel < utils.ERROR_LOGGING_LEVEL or not log.message.strip():
                     continue
 
-                bodies.append(self.log_preparation._prepare_log(launch, test_item, log))
+                bodies.append(self.log_preparation._prepare_log(
+                    launch, test_item, log, project_with_prefix))
                 logs_added = True
             if logs_added:
                 test_item_ids.append(str(test_item.testItemId))
@@ -223,7 +227,7 @@ class EsClient:
         logs_with_exceptions = utils.extract_all_exceptions(bodies)
         result = self._bulk_index(bodies)
         result.logResults = logs_with_exceptions
-        _, num_logs_with_defect_types = self._merge_logs(test_item_ids, project)
+        _, num_logs_with_defect_types = self._merge_logs(test_item_ids, project_with_prefix)
         try:
             if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
                 AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
@@ -234,8 +238,8 @@ class EsClient:
                     }))
         except Exception as err:
             logger.error(err)
-        logger.info("Finished indexing logs for %d launches. It took %.2f sec.",
-                    cnt_launches, time() - t_start)
+        logger.info("Finished indexing logs for %d launches %s. It took %.2f sec.",
+                    len(launch_ids), launch_ids, time() - t_start)
         return result
 
     def _merge_logs(self, test_item_ids, project):
@@ -303,11 +307,12 @@ class EsClient:
             return commons.launch_objects.BulkResponse(took=0, errors=False)
         start_time = time()
         logger.debug("Indexing %d logs...", len(bodies))
+        es_chunk_number = self.app_config["esChunkNumber"]
         try:
             try:
                 success_count, errors = elasticsearch.helpers.bulk(es_client,
                                                                    bodies,
-                                                                   chunk_size=1000,
+                                                                   chunk_size=es_chunk_number,
                                                                    request_timeout=30,
                                                                    refresh=refresh)
             except Exception as err:
@@ -315,7 +320,7 @@ class EsClient:
                 self.update_settings_after_read_only(host)
                 success_count, errors = elasticsearch.helpers.bulk(es_client,
                                                                    bodies,
-                                                                   chunk_size=1000,
+                                                                   chunk_size=es_chunk_number,
                                                                    request_timeout=30,
                                                                    refresh=refresh)
             logger.debug("Processed %d logs", success_count)
@@ -331,11 +336,13 @@ class EsClient:
 
     def delete_logs(self, clean_index):
         """Delete logs from elasticsearch"""
+        index_name = utils.unite_project_name(
+            str(clean_index.project), self.app_config["esProjectIndexPrefix"])
         logger.info("Delete logs %s for the project %s",
-                    clean_index.ids, clean_index.project)
+                    clean_index.ids, index_name)
         logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
         t_start = time()
-        if not self.index_exists(clean_index.project):
+        if not self.index_exists(index_name):
             return 0
         test_item_ids = set()
         try:
@@ -343,7 +350,7 @@ class EsClient:
                 clean_index.ids)
             for res in elasticsearch.helpers.scan(self.es_client,
                                                   query=search_query,
-                                                  index=clean_index.project,
+                                                  index=index_name,
                                                   scroll="5m"):
                 test_item_ids.add(res["_source"]["test_item"])
         except Exception as err:
@@ -355,29 +362,32 @@ class EsClient:
             bodies.append({
                 "_op_type": "delete",
                 "_id":      _id,
-                "_index":   clean_index.project,
+                "_index":   index_name,
             })
         result = self._bulk_index(bodies)
-        self._merge_logs(list(test_item_ids), clean_index.project)
+        self._merge_logs(list(test_item_ids), index_name)
         logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
-                    clean_index.ids, clean_index.project, time() - t_start)
+                    clean_index.ids, index_name, time() - t_start)
         return result.took
 
-    def create_index_for_stats_info(self, es_client, rp_aa_stats_index):
+    def create_index_for_stats_info(self, rp_aa_stats_index, override_index_name=None):
+        index_name = rp_aa_stats_index
+        if override_index_name is not None:
+            index_name = override_index_name
         index = None
         try:
-            index = es_client.indices.get(index=rp_aa_stats_index)
+            index = self.es_client.indices.get(index=index_name)
         except Exception:
             pass
         if index is None:
-            es_client.indices.create(index=rp_aa_stats_index, body={
+            self.es_client.indices.create(index=index_name, body={
                 'settings': utils.read_json_file("", "index_settings.json", to_json=True),
                 'mappings': utils.read_json_file(
                     "", "%s_mappings.json" % rp_aa_stats_index, to_json=True)
             })
         else:
-            es_client.indices.put_mapping(
-                index=rp_aa_stats_index,
+            self.es_client.indices.put_mapping(
+                index=index_name,
                 body=utils.read_json_file("", "%s_mappings.json" % rp_aa_stats_index, to_json=True))
 
     @utils.ignore_warnings
@@ -390,7 +400,7 @@ class EsClient:
             rp_aa_stats_index = "rp_aa_stats"
             if "method" in obj_info and obj_info["method"] == "training":
                 rp_aa_stats_index = "rp_model_train_stats"
-            self.create_index_for_stats_info(self.es_client, rp_aa_stats_index)
+            self.create_index_for_stats_info(rp_aa_stats_index)
             stat_info_array.append({
                 "_index": rp_aa_stats_index,
                 "_source": obj_info

@@ -49,14 +49,3 @@ class CustomBoostingDecisionMaker(BoostingDecisionMaker):
             [self.full_config, self.feature_ids, self.monotonous_features],
             self.project_id, os.path.join(folder, "data_features_config"),
             using_json=False)
-
-    def delete_old_model(self, model_name):
-        all_folders = self.object_saver.get_folder_objects(
-            self.project_id, "%s/" % model_name)
-        old_model_folder = None
-        for folder in all_folders:
-            if os.path.basename(
-                    folder.strip("/").strip("\\")).startswith(model_name):
-                old_model_folder = folder
-        if old_model_folder is not None:
-            self.object_saver.remove_folder_objects(self.project_id, old_model_folder)

@@ -29,6 +29,7 @@ import commons
 from collections import Counter
 import random
 import numpy as np
+import traceback
 
 logger = logging.getLogger("analyzerApp.utils")
 file_extensions = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
@@ -283,6 +284,28 @@ def detect_log_description_and_stacktrace(message):
     return message, ""
 
 
+def detect_log_description_and_stacktrace_light(message):
+    """Split a log into a log message and stacktrace in a light way"""
+    message = delete_empty_lines(message)
+    if calculate_line_number(message) > 2:
+        if is_python_log(message):
+            return detect_log_parts_python(message)
+        split_lines = message.split("\n")
+        stacktrace_start_idx = len(split_lines)
+        for idx, line in enumerate(split_lines):
+            if is_line_from_stacktrace(line):
+                stacktrace_start_idx = idx
+                break
+
+        if stacktrace_start_idx == 0:
+            stacktrace_start_idx = 1
+
+        return "\n".join(
+            split_lines[:stacktrace_start_idx]), "\n".join(
+            split_lines[stacktrace_start_idx:])
+    return message, ""
+
+
 def fix_big_encoded_urls(message):
     """Decodes urls encoded with %12 and etc. and removes brackets to separate url"""
     try:
@@ -518,7 +541,7 @@ def enrich_text_with_method_and_classes(text):
 def extract_real_id(elastic_id):
     real_id = str(elastic_id)
     if real_id[-2:] == "_m":
-        return -1
+        return int(real_id[:-2])
     return int(real_id)
 
 
@@ -669,3 +692,81 @@ def preprocess_words(text):
                             split_words.append("".join(split_parts[idx:idx + 2]).lower())
             all_words.extend(split_words)
     return all_words
+
+
+def topological_sort(feature_graph):
+    visited = {}
+    for key_ in feature_graph:
+        visited[key_] = 0
+    stack = []
+
+    for key_ in feature_graph:
+        if visited[key_] == 0:
+            stack_vertices = [key_]
+            while len(stack_vertices):
+                vert = stack_vertices[-1]
+                if vert not in visited:
+                    continue
+                if visited[vert] == 1:
+                    stack_vertices.pop()
+                    visited[vert] = 2
+                    stack.append(vert)
+                else:
+                    visited[vert] = 1
+                    for key_i in feature_graph[vert]:
+                        if key_i not in visited:
+                            continue
+                        if visited[key_i] == 0:
+                            stack_vertices.append(key_i)
+    return stack
+
+
+def to_number_list(features_list):
+    feature_numbers_list = []
+    for res in features_list.split(","):
+        try:
+            feature_numbers_list.append(int(res))
+        except: # noqa
+            feature_numbers_list.append(float(res))
+    return feature_numbers_list
+
+
+def fill_prevously_gathered_features(feature_list, feature_ids):
+    previously_gathered_features = {}
+    if type(feature_ids) == str:
+        feature_ids = transform_string_feature_range_into_list(feature_ids)
+    for i in range(len(feature_list)):
+        for idx, feature in enumerate(feature_ids):
+            if feature not in previously_gathered_features:
+                previously_gathered_features[feature] = []
+            previously_gathered_features[feature].append(feature_list[i][idx])
+    return previously_gathered_features
+
+
+def gather_feature_list(gathered_data_dict, feature_ids, to_list=False):
+    len_data = 0
+    for feature in feature_ids:
+        len_data = len(gathered_data_dict[feature])
+        break
+    gathered_data = np.zeros((len_data, len(feature_ids)))
+    for idx, feature in enumerate(feature_ids):
+        for j in range(len(gathered_data_dict[feature])):
+            gathered_data[j][idx] = round(gathered_data_dict[feature][j], 2)
+    return gathered_data.tolist() if to_list else gathered_data
+
+
+def unite_project_name(project_id, prefix):
+    return prefix + project_id
+
+
+def get_project_id(full_project, prefix):
+    return re.sub("^%s" % prefix, "", full_project) if prefix.strip() else full_project
+
+
+def extract_exception(err):
+    err_message = traceback.format_exception_only(type(err), err)
+    if len(err_message):
+        err_message = err_message[-1]
+    else:
+        err_message = ""
+    return err_message

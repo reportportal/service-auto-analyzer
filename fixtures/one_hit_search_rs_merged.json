@@ -17,7 +17,7 @@
             {
                 "_index": "idx2",
                 "_type": "log",
-                "_id": "1",
+                "_id": "1_m",
                 "_score": 10,
                 "_source": {
                     "issue_type": "AB001",

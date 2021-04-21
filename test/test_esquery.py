@@ -55,7 +55,8 @@ class TestEsQuery(unittest.TestCase):
             "esCAcert":          "",
             "esClientCert":      "",
             "esClientKey":       "",
-            "appVersion":        ""
+            "appVersion":        "",
+            "esChunkNumber":     1000
         }
         logging.disable(logging.CRITICAL)
 

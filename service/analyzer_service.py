@@ -16,13 +16,10 @@
 from commons.esclient import EsClient
 from utils import utils
 from commons.log_preparation import LogPreparation
-from boosting_decision_making import defect_type_model, custom_defect_type_model
-from boosting_decision_making import custom_boosting_decision_maker
 from boosting_decision_making import weighted_similarity_calculator
 from commons import namespace_finder
-from commons.object_saving.object_saver import ObjectSaver
+from commons import model_chooser
 import logging
-import numpy as np
 import re
 
 logger = logging.getLogger("analyzerApp.analyzerService")
@@ -35,42 +32,16 @@ class AnalyzerService:
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
         self.log_preparation = LogPreparation()
-        self.weighted_log_similarity_calculator = None
-        self.global_defect_type_model = None
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
-        self.object_saver = ObjectSaver(self.app_config)
-        self.model_folder_mapping = {
-            "defect_type_model/": custom_defect_type_model.CustomDefectTypeModel,
-            "suggestion_model/": custom_boosting_decision_maker.CustomBoostingDecisionMaker
-        }
-        self.initialize_common_models()
-
-    def initialize_common_models(self):
+        self.model_chooser = model_chooser.ModelChooser(app_config=app_config, search_cfg=search_cfg)
+        self.weighted_log_similarity_calculator = None
         if self.search_cfg["SimilarityWeightsFolder"].strip():
             self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
                 WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
-        if self.search_cfg["GlobalDefectTypeModelFolder"].strip():
-            self.global_defect_type_model = defect_type_model.\
-                DefectTypeModel(folder=self.search_cfg["GlobalDefectTypeModelFolder"])
 
     def find_min_should_match_threshold(self, analyzer_config):
         return analyzer_config.minShouldMatch if analyzer_config.minShouldMatch > 0 else\
             int(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0))
-
-    def choose_model(self, project_id, model_name_folder, custom_model_prob=1.0):
-        model = None
-        prob_for_model = np.random.uniform()
-        if prob_for_model > custom_model_prob:
-            return model
-        if self.object_saver.does_object_exists(project_id, model_name_folder):
-            folders = self.object_saver.get_folder_objects(project_id, model_name_folder)
-            if len(folders):
-                try:
-                    model = self.model_folder_mapping[model_name_folder](
-                        self.app_config, project_id, folder=folders[0])
-                except Exception as err:
-                    logger.error(err)
-        return model
 
     def build_more_like_this_query(self,
                                    min_should_match, log_message,

@@ -54,9 +54,10 @@ class BoostingDecisionMaker:
         return utils.transform_string_feature_range_into_list(self.feature_ids)\
             if isinstance(self.feature_ids, str) else self.feature_ids
 
-    def add_config_info(self, full_config, features):
+    def add_config_info(self, full_config, features, monotonous_features):
         self.full_config = full_config
         self.feature_ids = features
+        self.monotonous_features = monotonous_features
 
     def load_model(self, folder):
         self.folder = folder
@@ -81,15 +82,16 @@ class BoostingDecisionMaker:
                                       max_depth=self.max_depth, random_state=43,
                                       monotone_constraints=mon_features_prepared)
         self.xg_boost.fit(train_data, labels)
-        logger.info("Train score: ", self.xg_boost.score(train_data, labels))
-        logger.info("Feature importances: ", self.xg_boost.feature_importances_)
+        logger.info("Train score: %s", self.xg_boost.score(train_data, labels))
+        logger.info("Feature importances: %s", self.xg_boost.feature_importances_)
 
     def validate_model(self, valid_test_set, valid_test_labels):
         res, res_prob = self.predict(valid_test_set)
-        logger.info("Valid dataset F1 score: ",
-                    self.xg_boost.score(valid_test_set, valid_test_labels))
+        f1_score = self.xg_boost.score(valid_test_set, valid_test_labels)
+        logger.info("Valid dataset F1 score: %s", f1_score)
         logger.info(confusion_matrix(valid_test_labels, res))
         logger.info(classification_report(valid_test_labels, res))
+        return f1_score
 
     def predict(self, data):
         if not len(data):

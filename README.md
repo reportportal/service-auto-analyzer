@@ -44,6 +44,10 @@ volumes:
   - ./data/analyzer:/backend/storage
 ```
 
+**ES_CHUNK_NUMBER** - by default 1000, the number of objects which is sent to ES while bulk indexing. **NOTE**: AWS Elasticsearch has restrictions for sent data size either 10Mb or 100Mb, so when 10Mb is chosen, make sure you don't get the error "TransportError(413, '{"Message": "Request size exceeded 10485760 bytes"}')" while generating index or indexing the data. If you get this error, please, decrease ES_CHUNK_NUMBER until you stop getting this error.
+
+**ES_PROJECT_INDEX_PREFIX** - by default "", the prefix which is added to the created for each project indices. Our index name is the project id, so if it is 34, then the index "34" will be created. If you set ES_PROJECT_INDEX_PREFIX="rp_", then "rp_34" index will be created. We create several other indices which are sharable between projects, and this perfix won't influence them: rp_aa_stats, rp_stats, rp_model_train_stats, rp_done_tasks, rp_suggestions_info_metrics. **NOTE**: if you change an environmental variable, you'll need to generate index, so that a nex index is created and filled appropriately.
+
 # Environmental variables for constants, used by algorithms:
 
 **ES_MIN_SHOULD_MATCH** - by default "80%", the global default min should match value for auto-analysis, but it is used only when the project settings are not set up.

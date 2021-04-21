@@ -32,6 +32,7 @@ from service.cluster_service import ClusterService
 from service.auto_analyzer_service import AutoAnalyzerService
 from service.suggest_service import SuggestService
 from service.search_service import SearchService
+from service.clean_index_service import CleanIndexService
 from service.namespace_finder_service import NamespaceFinderService
 from service.delete_index_service import DeleteIndexService
 from service.retraining_service import RetrainingService
@@ -62,6 +63,8 @@ APP_CONFIG = {
     "minioRegion":       os.getenv("ANALYZER_BINARYSTORE_MINIO_REGION", None),
     "instanceTaskType":  os.getenv("INSTANCE_TASK_TYPE", "").strip(),
     "filesystemDefaultPath": os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
+    "esChunkNumber":         int(os.getenv("ES_CHUNK_NUMBER", "1000")),
+    "esProjectIndexPrefix":  os.getenv("ES_PROJECT_INDEX_PREFIX", "").strip()
 }
 
 SEARCH_CONFIG = {
@@ -77,11 +80,15 @@ SEARCH_CONFIG = {
     "PatternMinCountToSuggest":       int(os.getenv("PATTERN_MIN_COUNT", "10")),
     "MaxLogsForDefectTypeModel":      int(os.getenv("MAX_LOGS_FOR_DEFECT_TYPE_MODEL", "10000")),
     "ProbabilityForCustomModelSuggestions":  min(
-        0.9, float(os.getenv("PROB_CUSTOM_MODEL_SUGGESTIONS", "0.3"))),
+        0.8, float(os.getenv("PROB_CUSTOM_MODEL_SUGGESTIONS", "0.3"))),
+    "ProbabilityForCustomModelAutoAnalysis":  min(
+        1.0, float(os.getenv("PROB_CUSTOM_MODEL_AUTO_ANALYSIS", "0.3"))),
     "BoostModelFolder":            "",
     "SuggestBoostModelFolder":     "",
     "SimilarityWeightsFolder":     "",
-    "GlobalDefectTypeModelFolder": ""
+    "GlobalDefectTypeModelFolder": "",
+    "RetrainSuggestBoostModelConfig": "",
+    "RetrainAutoBoostModelConfig": ""
 }
 
 
@@ -168,7 +175,8 @@ def init_amqp(_amqp_client):
                        (APP_CONFIG["exchangeName"], "clean", True, False,
                        lambda channel, method, props, body:
                        amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                        es_client.delete_logs,
+                                                        CleanIndexService(
+                                                            APP_CONFIG, SEARCH_CONFIG).delete_logs,
                                                         prepare_data_func=amqp_handler.
                                                         prepare_clean_index,
                                                         prepare_response_data=amqp_handler.
@@ -201,7 +209,7 @@ def init_amqp(_amqp_client):
                                                         prepare_data_func=amqp_handler.
                                                         prepare_launch_info,
                                                         prepare_response_data=amqp_handler.
-                                                        prepare_analyze_response_data))))
+                                                        prepare_index_response_data))))
         threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                        (APP_CONFIG["exchangeName"], "stats_info", True, False,
                        lambda channel, method, props, body:
@@ -213,7 +221,8 @@ def init_amqp(_amqp_client):
                        amqp_handler.handle_amqp_request(channel, method, props, body,
                                                         NamespaceFinderService(
                                                             APP_CONFIG,
-                                                            SEARCH_CONFIG).update_chosen_namespaces))))
+                                                            SEARCH_CONFIG).update_chosen_namespaces,
+                                                        publish_result=False))))
         threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                        (APP_CONFIG["exchangeName"], "suggest_patterns", True, False,
                        lambda channel, method, props, body:
@@ -225,6 +234,28 @@ def init_amqp(_amqp_client):
                                                         prepare_delete_index,
                                                         prepare_response_data=amqp_handler.
                                                         prepare_index_response_data))))
+        threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
+                       (APP_CONFIG["exchangeName"], "index_suggest_info", True, False,
+                       lambda channel, method, props, body:
+                       amqp_handler.handle_amqp_request(channel, method, props, body,
+                                                        SuggestService(
+                                                            APP_CONFIG,
+                                                            SEARCH_CONFIG).index_suggest_info,
+                                                        prepare_data_func=amqp_handler.
+                                                        prepare_suggest_info_list,
+                                                        prepare_response_data=amqp_handler.
+                                                        prepare_index_response_data))))
+        threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
+                       (APP_CONFIG["exchangeName"], "remove_suggest_info", True, False,
+                       lambda channel, method, props, body:
+                       amqp_handler.handle_amqp_request(channel, method, props, body,
+                                                        SuggestService(
+                                                            APP_CONFIG,
+                                                            SEARCH_CONFIG).remove_suggest_info,
+                                                        prepare_data_func=amqp_handler.
+                                                        prepare_delete_index,
+                                                        prepare_response_data=amqp_handler.
+                                                        output_result))))
 
     return threads
 
@@ -245,6 +276,8 @@ def read_model_settings():
     SEARCH_CONFIG["SuggestBoostModelFolder"] = model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
     SEARCH_CONFIG["SimilarityWeightsFolder"] = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
     SEARCH_CONFIG["GlobalDefectTypeModelFolder"] = model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]
+    SEARCH_CONFIG["RetrainSuggestBoostModelConfig"] = model_settings["RETRAIN_SUGGEST_BOOST_MODEL_CONFIG"]
+    SEARCH_CONFIG["RetrainAutoBoostModelConfig"] = model_settings["RETRAIN_AUTO_BOOST_MODEL_CONFIG"]
 
 
 log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.conf')

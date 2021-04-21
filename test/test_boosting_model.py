@@ -65,7 +65,9 @@ class TestBoostingModel(unittest.TestCase):
             "filter_min_should_match": filter_fields,
             "filter_min_should_match_any": filter_fields_any,
             "number_of_log_lines": number_of_log_lines,
-            "chosen_namespaces": {"tv.horizon": 25, "sun.reflect": 10}
+            "chosen_namespaces": {"tv.horizon": 25, "sun.reflect": 10},
+            "boosting_model": utils.read_json_file(
+                "", "model_settings.json", to_json=True)["BOOST_MODEL_FOLDER"]
         }
 
     @utils.ignore_warnings

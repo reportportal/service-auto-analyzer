@@ -44,6 +44,7 @@ class LogPreparation:
                 "test_item":        "",
                 "unique_id":        "",
                 "cluster_id":       "",
+                "cluster_message":  "",
                 "test_case_hash":   0,
                 "is_auto_analyzed": False,
                 "issue_type":       "",
@@ -62,8 +63,8 @@ class LogPreparation:
                 "whole_message":                 "",
                 "potential_status_codes":        ""}}
 
-    def _fill_launch_test_item_fields(self, log_template, launch, test_item):
-        log_template["_index"] = launch.project
+    def _fill_launch_test_item_fields(self, log_template, launch, test_item, project):
+        log_template["_index"] = project
         log_template["_source"]["launch_id"] = launch.launchId
         log_template["_source"]["launch_name"] = launch.launchName
         log_template["_source"]["test_item"] = test_item.testItemId
@@ -80,7 +81,7 @@ class LogPreparation:
 
         message = utils.first_lines(cleaned_message, number_of_lines)
         message_without_params = message
-        message = utils.sanitize_text(message)
+        message = utils.delete_empty_lines(utils.sanitize_text(message))
 
         message_without_params = utils.clean_from_urls(message_without_params)
         message_without_params = utils.clean_from_paths(message_without_params)
@@ -115,7 +116,8 @@ class LogPreparation:
         found_exceptions_extended = utils.enrich_found_exceptions(found_exceptions)
 
         log_template["_id"] = log.logId
-        log_template["_source"]["cluster_id"] = log.clusterId
+        log_template["_source"]["cluster_id"] = str(log.clusterId)
+        log_template["_source"]["cluster_message"] = log.clusterMessage
         log_template["_source"]["log_level"] = log.logLevel
         log_template["_source"]["original_message_lines"] = utils.calculate_line_number(cleaned_message)
         log_template["_source"]["original_message_words_number"] = len(
@@ -158,14 +160,14 @@ class LogPreparation:
             log_template["_source"][field] = utils.clean_colon_stacking(log_template["_source"][field])
         return log_template
 
-    def _prepare_log(self, launch, test_item, log):
+    def _prepare_log(self, launch, test_item, log, project):
         log_template = self._create_log_template()
-        log_template = self._fill_launch_test_item_fields(log_template, launch, test_item)
+        log_template = self._fill_launch_test_item_fields(log_template, launch, test_item, project)
         log_template = self._fill_log_fields(log_template, log, launch.analyzerConfig.numberOfLogLines)
         return log_template
 
-    def _fill_test_item_info_fields(self, log_template, test_item_info):
-        log_template["_index"] = test_item_info.project
+    def _fill_test_item_info_fields(self, log_template, test_item_info, project):
+        log_template["_index"] = project
         log_template["_source"]["launch_id"] = test_item_info.launchId
         log_template["_source"]["launch_name"] = test_item_info.launchName
         log_template["_source"]["test_item"] = test_item_info.testItemId
@@ -176,9 +178,9 @@ class LogPreparation:
         log_template["_source"]["start_time"] = ""
         return log_template
 
-    def _prepare_log_for_suggests(self, test_item_info, log):
+    def _prepare_log_for_suggests(self, test_item_info, log, project):
         log_template = self._create_log_template()
-        log_template = self._fill_test_item_info_fields(log_template, test_item_info)
+        log_template = self._fill_test_item_info_fields(log_template, test_item_info, project)
         log_template = self._fill_log_fields(
             log_template, log, test_item_info.analyzerConfig.numberOfLogLines)
         return log_template
@@ -201,17 +203,18 @@ class LogPreparation:
                             log_words[word] = 1
         return log_words, project
 
-    def prepare_log_clustering_light(self, launch, test_item, log, clean_numbers):
+    def prepare_log_clustering_light(self, launch, test_item, log, clean_numbers, project):
         log_template = self._create_log_template()
-        log_template = self._fill_launch_test_item_fields(log_template, launch, test_item)
+        log_template = self._fill_launch_test_item_fields(log_template, launch, test_item, project)
         cleaned_message = self.clean_message(log.message)
-        detected_message, stacktrace = utils.detect_log_description_and_stacktrace(
+        detected_message, stacktrace = utils.detect_log_description_and_stacktrace_light(
             cleaned_message)
         stacktrace = utils.sanitize_text(stacktrace)
         message = utils.first_lines(cleaned_message, -1)
         message = utils.sanitize_text(message)
         log_template["_id"] = log.logId
-        log_template["_source"]["cluster_id"] = log.clusterId
+        log_template["_source"]["cluster_id"] = str(log.clusterId)
+        log_template["_source"]["cluster_message"] = log.clusterMessage
         log_template["_source"]["log_level"] = log.logLevel
         log_template["_source"]["original_message_lines"] = utils.calculate_line_number(
             cleaned_message)
@@ -227,13 +230,15 @@ class LogPreparation:
         log_template["_source"]["potential_status_codes"] = potential_status_codes
         if clean_numbers:
             detected_message = detected_message + " " + potential_status_codes
-            log_template["_source"]["whole_message"] = detected_message + " \n " + stacktrace
+            log_template["_source"]["whole_message"] = utils.delete_empty_lines(
+                detected_message + " \n " + stacktrace)
         else:
             detected_message_with_numbers = detected_message_with_numbers + " " + potential_status_codes
-            log_template["_source"]["whole_message"] = detected_message_with_numbers + " \n " + stacktrace
+            log_template["_source"]["whole_message"] = utils.delete_empty_lines(
+                detected_message_with_numbers + " \n " + stacktrace)
         return log_template
 
-    def prepare_logs_for_clustering(self, launch, number_of_lines, clean_numbers):
+    def prepare_logs_for_clustering(self, launch, number_of_lines, clean_numbers, project):
         log_messages = []
         log_dict = {}
         ind = 0
@@ -242,7 +247,8 @@ class LogPreparation:
             for log in test_item.logs:
                 if log.logLevel < ERROR_LOGGING_LEVEL:
                     continue
-                prepared_logs.append(self.prepare_log_clustering_light(launch, test_item, log, clean_numbers))
+                prepared_logs.append(
+                    self.prepare_log_clustering_light(launch, test_item, log, clean_numbers, project))
             merged_logs = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
             new_merged_logs = []
             for log in merged_logs:

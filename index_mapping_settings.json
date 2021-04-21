@@ -108,6 +108,10 @@
         "cluster_id": {
             "type": "keyword"
         },
+        "cluster_message": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
         "whole_message": {
             "type":     "text",
             "analyzer": "standard_english_analyzer"

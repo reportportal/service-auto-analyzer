@@ -1,0 +1,64 @@
+{
+    "properties": {
+        "project": {
+            "type": "keyword"
+        },
+        "testItem": {
+            "type": "keyword"
+        },
+        "testItemLogId": {
+            "type": "keyword"
+        },
+        "issueType": {
+            "type": "keyword"
+        },
+        "relevantItem": {
+            "type": "keyword"
+        },
+        "relevantLogId": {
+            "type": "keyword"
+        },
+        "isMergedLog": {
+            "type": "boolean"
+        },
+        "matchScore": {
+            "type": "float"
+        },
+        "resultPosition": {
+            "type": "integer"
+        },
+        "esScore": {
+            "type": "float"
+        },
+        "esPosition": {
+            "type": "integer"
+        },
+        "modelFeatureNames": {
+            "type":     "text",
+            "index":    false
+        },
+        "modelFeatureValues": {
+            "type":     "text",
+            "index":    false
+        },
+        "modelInfo": {
+            "type": "keyword"
+        },
+        "usedLogLines": {
+            "type": "integer"
+        },
+        "minShouldMatch": {
+            "type": "integer"
+        },
+        "isUserChoice": {
+            "type": "boolean"
+        },
+        "processedTime": {
+            "type": "float"
+        },
+        "savedDate": {
+            "type":   "date",
+            "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        }
+    }
+}

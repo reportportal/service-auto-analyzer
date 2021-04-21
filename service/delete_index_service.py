@@ -19,9 +19,8 @@ import utils.utils as utils
 from time import time
 from commons import namespace_finder
 from commons.esclient import EsClient
-from commons.triggering_training.retraining_triggering import RetrainingTriggering
-from boosting_decision_making import custom_defect_type_model
-from boosting_decision_making import custom_boosting_decision_maker
+from commons import trigger_manager
+from commons import model_chooser
 
 logger = logging.getLogger("analyzerApp.deleteIndexService")
 
@@ -32,28 +31,19 @@ class DeleteIndexService:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
-        self.model_training_triggering = {
-            "defect_type": RetrainingTriggering(app_config, "defect_type_trigger_info",
-                                                start_number=100, accumulated_difference=100),
-            "suggestions": RetrainingTriggering(app_config, "suggestions_trigger_info",
-                                                start_number=100, accumulated_difference=50)
-        }
+        self.trigger_manager = trigger_manager.TriggerManager(
+            app_config=app_config, search_cfg=search_cfg)
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
+        self.model_chooser = model_chooser.ModelChooser(app_config=app_config, search_cfg=search_cfg)
 
     @utils.ignore_warnings
     def delete_index(self, index_name):
         logger.info("Started deleting index")
         t_start = time()
-        is_index_deleted = self.es_client.delete_index(index_name)
+        is_index_deleted = self.es_client.delete_index(utils.unite_project_name(
+            str(index_name), self.app_config["esProjectIndexPrefix"]))
         self.namespace_finder.remove_namespaces(index_name)
-        for model_type in self.model_training_triggering:
-            self.model_training_triggering[model_type].remove_triggering_info(
-                {"project_id": index_name})
-        self.custom_defect_type_model = custom_defect_type_model.CustomDefectTypeModel(
-            self.app_config, index_name)
-        self.custom_defect_type_model.delete_old_model()
-        self.custom_boosting_model = custom_boosting_decision_maker.CustomBoostingDecisionMaker(
-            self.app_config, index_name)
-        self.custom_boosting_model.delete_old_model("suggestion_model")
+        self.trigger_manager.delete_triggers(index_name)
+        self.model_chooser.delete_all_custom_models(index_name)
         logger.info("Finished deleting index %.2f s", time() - t_start)
         return int(is_index_deleted)

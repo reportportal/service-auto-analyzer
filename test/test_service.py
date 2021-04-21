@@ -60,6 +60,8 @@ class TestService(unittest.TestCase):
         self.index_logs_rq_different_log_level = "index_logs_rq_different_log_level.json"
         self.index_logs_rq_different_log_level_merged =\
             "index_logs_rq_different_log_level_merged.json"
+        self.index_logs_rq_different_log_level_with_prefix =\
+            "index_logs_rq_different_log_level_with_prefix.json"
         self.index_logs_rs_different_log_level = "index_logs_rs_different_log_level.json"
         self.delete_logs_rs = "delete_logs_rs.json"
         self.two_hits_search_with_big_messages_rs = "two_hits_search_with_big_messages_rs.json"
@@ -81,12 +83,23 @@ class TestService(unittest.TestCase):
         self.launch_w_items_clustering = "launch_w_items_clustering.json"
         self.cluster_update_all_the_same = "cluster_update_all_the_same.json"
         self.search_logs_rq_first_group = "search_logs_rq_first_group.json"
+        self.search_logs_rq_first_group_not_for_update = "search_logs_rq_first_group_not_for_update.json"
+        self.search_logs_rq_second_group_not_for_update = "search_logs_rq_second_group_not_for_update.json"
         self.search_logs_rq_second_group = "search_logs_rq_second_group.json"
         self.one_hit_search_rs_clustering = "one_hit_search_rs_clustering.json"
         self.search_logs_rq_first_group_2lines = "search_logs_rq_first_group_2lines.json"
+        self.search_logs_rq_first_group_2lines_not_for_update =\
+            "search_logs_rq_first_group_2lines_not_for_update.json"
         self.cluster_update_es_update = "cluster_update_es_update.json"
         self.cluster_update_all_the_same_es_update = "cluster_update_all_the_same_es_update.json"
+        self.cluster_update_all_the_same_es_update_with_prefix =\
+            "cluster_update_all_the_same_es_update_with_prefix.json"
         self.cluster_update = "cluster_update.json"
+        self.search_suggest_info_ids_query = "search_suggest_info_ids_query.json"
+        self.one_hit_search_suggest_info_rs = "one_hit_search_suggest_info_rs.json"
+        self.delete_suggest_logs_rq = "delete_suggest_logs_rq.json"
+        self.delete_suggest_logs_rq_with_prefix = "delete_suggest_logs_rq_with_prefix.json"
+        self.suggest_info_list = "suggest_info_list.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
             "esVerifyCerts":     False,
@@ -99,7 +112,13 @@ class TestService(unittest.TestCase):
             "appVersion":        "",
             "minioRegion":       "",
             "minioBucketPrefix": "",
-            "filesystemDefaultPath": ""
+            "filesystemDefaultPath": "",
+            "esChunkNumber":     1000,
+            "binaryStoreType":   "minio",
+            "minioHost":         "",
+            "minioAccessKey":    "",
+            "minioSecretKey":    "",
+            "esProjectIndexPrefix": ""
         }
         self.model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
         logging.disable(logging.CRITICAL)
@@ -133,7 +152,12 @@ class TestService(unittest.TestCase):
                 self.model_settings["SUGGEST_BOOST_MODEL_FOLDER"],
             "GlobalDefectTypeModelFolder":
                 self.model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"],
-            "ProbabilityForCustomModelSuggestions": 0.9
+            "ProbabilityForCustomModelSuggestions": 0.9,
+            "ProbabilityForCustomModelAutoAnalysis": 0.1,
+            "RetrainSuggestBoostModelConfig":
+                self.model_settings["RETRAIN_SUGGEST_BOOST_MODEL_CONFIG"],
+            "RetrainAutoBoostModelConfig":
+                self.model_settings["RETRAIN_AUTO_BOOST_MODEL_CONFIG"]
         }
 
     @utils.ignore_warnings
@@ -147,14 +171,14 @@ class TestService(unittest.TestCase):
                     self.app_config["esHost"] + test_info["uri"],
                     body=test_info["rs"] if "rs" in test_info else "",
                     status=test_info["status"],
-                    content_type=test_info["content_type"],
+                    content_type=test_info["content_type"]
                 )
             else:
                 httpretty.register_uri(
                     test_info["method"],
                     self.app_config["esHost"] + test_info["uri"],
                     body=test_info["rs"] if "rs" in test_info else "",
-                    status=test_info["status"],
+                    status=test_info["status"]
                 )
 
     @staticmethod

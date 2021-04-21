@@ -1,0 +1,13 @@
+{
+    "_source": ["testItem"],
+    "size": 1000,
+    "query": {
+        "bool": {
+            "should": [
+                {"terms": {"testItemLogId": ["1"]}},
+                {"terms": {"relevantLogId": ["1"]}}
+            ]
+        }
+    },
+    "sort": "_doc"
+}

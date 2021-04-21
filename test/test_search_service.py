@@ -15,6 +15,8 @@
 """
 
 import unittest
+from unittest.mock import MagicMock
+import json
 from http import HTTPStatus
 import sure # noqa
 import httpretty
@@ -37,7 +39,7 @@ class TestSearchService(TestService):
                                     "status":         HTTPStatus.OK,
                                     },
                                    {"method":         httpretty.GET,
-                                    "uri":            "/1/_search",
+                                    "uri":            "/1/_search?scroll=5m&size=1000",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rq":             utils.get_fixture(self.search_logs_rq),
@@ -51,6 +53,48 @@ class TestSearchService(TestService):
                                                             filteredLaunchIds=[1],
                                                             logMessages=["error"],
                                                             logLines=-1),
+                "expected_count": 0
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/rp_1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/rp_1/_search?scroll=5m&size=1000",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(self.search_logs_rq),
+                                    "rs":             utils.get_fixture(
+                                        self.no_hits_search_rs),
+                                    }, ],
+                "rq":             launch_objects.SearchLogs(launchId=1,
+                                                            launchName="Launch 1",
+                                                            itemId=3,
+                                                            projectId=1,
+                                                            filteredLaunchIds=[1],
+                                                            logMessages=["error"],
+                                                            logLines=-1),
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
                 "expected_count": 0
             },
             {
@@ -73,7 +117,7 @@ class TestSearchService(TestService):
                                     "status":         HTTPStatus.OK,
                                     },
                                    {"method":         httpretty.GET,
-                                    "uri":            "/1/_search",
+                                    "uri":            "/1/_search?scroll=5m&size=1000",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rq":             utils.get_fixture(self.search_logs_rq),
@@ -95,7 +139,7 @@ class TestSearchService(TestService):
                                     "status":         HTTPStatus.OK,
                                     },
                                    {"method":         httpretty.GET,
-                                    "uri":            "/1/_search",
+                                    "uri":            "/1/_search?scroll=5m&size=1000",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rq":             utils.get_fixture(
@@ -112,14 +156,62 @@ class TestSearchService(TestService):
                                                             logLines=-1),
                 "expected_count": 1
             },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/rp_1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/rp_1/_search?scroll=5m&size=1000",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.search_logs_rq_not_found),
+                                    "rs":             utils.get_fixture(
+                                        self.two_hits_search_rs_search_logs),
+                                    }, ],
+                "rq":             launch_objects.SearchLogs(launchId=1,
+                                                            launchName="Launch 1",
+                                                            itemId=3,
+                                                            projectId=1,
+                                                            filteredLaunchIds=[1],
+                                                            logMessages=["error occured once"],
+                                                            logLines=-1),
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
+                "expected_count": 1
+            },
         ]
 
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
-
-                search_service = SearchService(app_config=self.app_config,
+                app_config = self.app_config
+                if "app_config" in test:
+                    app_config = test["app_config"]
+                search_service = SearchService(app_config=app_config,
                                                search_cfg=self.get_default_search_config())
+
+                search_service.es_client.es_client.scroll = MagicMock(return_value=json.loads(
+                    utils.get_fixture(self.no_hits_search_rs)))
 
                 response = search_service.search_logs(test["rq"])
                 response.should.have.length_of(test["expected_count"])

@@ -295,6 +295,8 @@ class TestEsClient(TestService):
                 "rq":             launch_objects.CleanIndex(ids=[1], project=1),
                 "app_config": {
                     "esHost": "http://localhost:9200",
+                    "esUser": "",
+                    "esPassword": "",
                     "esVerifyCerts":     False,
                     "esUseSsl":          False,
                     "esSslShowWarn":     False,
@@ -323,6 +325,8 @@ class TestEsClient(TestService):
                 "rq":             launch_objects.CleanIndex(ids=[1], project=2),
                 "app_config": {
                     "esHost": "http://localhost:9200",
+                    "esUser": "",
+                    "esPassword": "",
                     "esVerifyCerts":     False,
                     "esUseSsl":          False,
                     "esSslShowWarn":     False,
@@ -576,6 +580,8 @@ class TestEsClient(TestService):
                 "expected_count": 1,
                 "app_config": {
                     "esHost": "http://localhost:9200",
+                    "esUser": "",
+                    "esPassword": "",
                     "esVerifyCerts":     False,
                     "esUseSsl":          False,
                     "esSslShowWarn":     False,

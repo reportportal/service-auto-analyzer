@@ -48,6 +48,8 @@ class TestEsQuery(unittest.TestCase):
         self.suggest_query_merged_small_logs_search = "suggest_query_merged_small_logs_search.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
+            "esUser": "",
+            "esPassword": "",
             "esVerifyCerts":     False,
             "esUseSsl":          False,
             "esSslShowWarn":     False,

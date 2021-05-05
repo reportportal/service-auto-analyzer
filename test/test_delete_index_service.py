@@ -60,6 +60,8 @@ class TestDeleteIndexService(TestService):
                 "index":      2,
                 "app_config": {
                     "esHost": "http://localhost:9200",
+                    "esUser": "",
+                    "esPassword": "",
                     "esVerifyCerts":     False,
                     "esUseSsl":          False,
                     "esSslShowWarn":     False,

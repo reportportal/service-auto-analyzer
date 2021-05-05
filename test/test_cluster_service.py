@@ -92,6 +92,8 @@ class TestClusterService(TestService):
                     numberOfLogLines=-1),
                 "app_config": {
                     "esHost": "http://localhost:9200",
+                    "esUser": "",
+                    "esPassword": "",
                     "esVerifyCerts":     False,
                     "esUseSsl":          False,
                     "esSslShowWarn":     False,
@@ -434,6 +436,8 @@ class TestClusterService(TestService):
                     numberOfLogLines=2),
                 "app_config": {
                     "esHost": "http://localhost:9200",
+                    "esUser": "",
+                    "esPassword": "",
                     "esVerifyCerts":     False,
                     "esUseSsl":          False,
                     "esSslShowWarn":     False,

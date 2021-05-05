@@ -188,6 +188,8 @@ class TestAutoAnalyzerService(TestService):
                 "expected_issue_type": "AB001",
                 "app_config": {
                     "esHost": "http://localhost:9200",
+                    "esUser": "",
+                    "esPassword": "",
                     "esVerifyCerts":     False,
                     "esUseSsl":          False,
                     "esSslShowWarn":     False,

@@ -675,6 +675,8 @@ class TestSuggestService(TestService):
                                     }, ],
                 "app_config": {
                     "esHost": "http://localhost:9200",
+                    "esUser": "",
+                    "esPassword": "",
                     "esVerifyCerts":     False,
                     "esUseSsl":          False,
                     "esSslShowWarn":     False,
@@ -810,6 +812,8 @@ class TestSuggestService(TestService):
                                     }],
                 "app_config": {
                     "esHost": "http://localhost:9200",
+                    "esUser": "",
+                    "esPassword": "",
                     "esVerifyCerts":     False,
                     "esUseSsl":          False,
                     "esSslShowWarn":     False,
@@ -916,6 +920,8 @@ class TestSuggestService(TestService):
                                     }],
                 "app_config": {
                     "esHost": "http://localhost:9200",
+                    "esUser": "",
+                    "esPassword": "",
                     "esVerifyCerts":     False,
                     "esUseSsl":          False,
                     "esSslShowWarn":     False,
@@ -987,6 +993,8 @@ class TestSuggestService(TestService):
                                 }, ],
                 "app_config": {
                     "esHost": "http://localhost:9200",
+                    "esUser": "",
+                    "esPassword": "",
                     "esVerifyCerts":     False,
                     "esUseSsl":          False,
                     "esSslShowWarn":     False,
@@ -1137,6 +1145,8 @@ class TestSuggestService(TestService):
                                     }],
                 "app_config": {
                     "esHost": "http://localhost:9200",
+                    "esUser": "",
+                    "esPassword": "",
                     "esVerifyCerts":     False,
                     "esUseSsl":          False,
                     "esSslShowWarn":     False,

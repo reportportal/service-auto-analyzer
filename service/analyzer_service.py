@@ -87,3 +87,17 @@ class AnalyzerService:
                                 "value": str(self.search_cfg["BoostAA"] > 0).lower(),
                                 "boost": abs(self.search_cfg["BoostAA"]), }}},
                         ]}}}
+
+    def remove_models(self, model_info):
+        try:
+            logger.info("Started removing %s models from project %d",
+                        model_info["model_type"], model_info["project"])
+            self.model_chooser.delete_old_model(model_name=model_info["model_type"] + "_model",
+                                                project_id=model_info["project"])
+            logger.info("Finished removing %s models from project %d",
+                        model_info["model_type"], model_info["project"])
+            return 1
+        except Exception as err:
+            logger.error("Error while removing models.")
+            logger.error(err)
+            return 0

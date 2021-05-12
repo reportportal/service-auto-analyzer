@@ -238,6 +238,11 @@ test_item_info = {
               "message": "assertionError occured \r\n error found \r\n error mined"}]
 }
 
+remove_models_data = {
+    "project": 34,
+    "model_type": "auto_analysis",
+}
+
 used_method = sys.argv[1] if len(sys.argv) > 1 else "index"
 for_update = False
 if len(sys.argv) > 2:
@@ -256,6 +261,8 @@ elif used_method.strip() in ["suggest"]:
     response = rpc.call(json.dumps(test_item_info), used_method)
 elif used_method.strip() in ["suggest_patterns"]:
     response = rpc.call("34", used_method)
+elif used_method.strip() in ["remove_models"]:
+    response = rpc.call(json.dumps(remove_models_data), used_method)
 elif used_method.strip() in ["cluster"]:
     if not for_update:
         response = rpc.call(json.dumps({"launch": index_data[0],

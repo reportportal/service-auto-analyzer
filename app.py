@@ -42,6 +42,8 @@ from service.suggest_patterns_service import SuggestPatternsService
 
 APP_CONFIG = {
     "esHost":            os.getenv("ES_HOSTS", "http://elasticsearch:9200").strip("/").strip("\\"),
+    "esUser":            os.getenv("ES_USER", "").strip(),
+    "esPassword":        os.getenv("ES_PASSWORD", "").strip(),
     "logLevel":          os.getenv("LOGGING_LEVEL", "DEBUG").strip(),
     "amqpUrl":           os.getenv("AMQP_URL", "").strip("/").strip("\\"),
     "exchangeName":      os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),

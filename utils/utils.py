@@ -605,10 +605,13 @@ def prepare_message_for_clustering(message, number_of_log_lines):
     return " ".join(words)
 
 
-def send_request(url, method):
+def send_request(url, method, username, password):
     """Send request with specified url and http method"""
     try:
-        response = requests.get(url) if method == "GET" else {}
+        if username.strip() and password.strip():
+            response = requests.get(url, auth=(username, password)) if method == "GET" else {}
+        else:
+            response = requests.get(url) if method == "GET" else {}
         data = response._content.decode("utf-8")
         content = json.loads(data, strict=False)
         return content

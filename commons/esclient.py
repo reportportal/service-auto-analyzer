@@ -48,6 +48,7 @@ class EsClient:
             return elasticsearch.Elasticsearch(
                 [self.host], timeout=30,
                 max_retries=5, retry_on_timeout=True,
+                http_auth=(app_config["esUser"], app_config["esPassword"]),
                 use_ssl=app_config["esUseSsl"],
                 verify_certs=app_config["esVerifyCerts"],
                 ssl_show_warn=app_config["esSslShowWarn"],
@@ -58,6 +59,7 @@ class EsClient:
         return elasticsearch.Elasticsearch(
             [self.host], timeout=30,
             max_retries=5, retry_on_timeout=True,
+            http_auth=(app_config["esUser"], app_config["esPassword"]),
             use_ssl=app_config["esUseSsl"],
             verify_certs=app_config["esVerifyCerts"],
             ssl_show_warn=app_config["esSslShowWarn"],
@@ -116,7 +118,7 @@ class EsClient:
         """Check whether elasticsearch is healthy"""
         try:
             url = utils.build_url(self.host, ["_cluster/health"])
-            res = utils.send_request(url, "GET")
+            res = utils.send_request(url, "GET", self.app_config["esUser"], self.app_config["esPassword"])
             return res["status"] in ["green", "yellow"]
         except Exception as err:
             logger.error("Elasticsearch is not healthy")
@@ -156,7 +158,7 @@ class EsClient:
     def list_indices(self):
         """Get all indices from elasticsearch"""
         url = utils.build_url(self.host, ["_cat", "indices?format=json"])
-        res = utils.send_request(url, "GET")
+        res = utils.send_request(url, "GET", self.app_config["esUser"], self.app_config["esPassword"])
         return res
 
     def index_exists(self, index_name, print_error=True):

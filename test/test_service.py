@@ -102,6 +102,8 @@ class TestService(unittest.TestCase):
         self.suggest_info_list = "suggest_info_list.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
+            "esUser": "",
+            "esPassword": "",
             "esVerifyCerts":     False,
             "esUseSsl":          False,
             "esSslShowWarn":     False,

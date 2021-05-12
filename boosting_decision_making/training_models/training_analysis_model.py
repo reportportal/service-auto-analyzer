@@ -126,6 +126,17 @@ class AnalysisModelTraining:
             new_model_results[metric].append(metric_res)
         return new_model_results
 
+    def deduplicate_data(self, data, labels):
+        data_wo_duplicates = []
+        labels_wo_duplicates = []
+        data_set = set()
+        for i in range(len(data)):
+            if tuple(data[i]) not in data_set:
+                data_set.add(tuple(data[i]))
+                data_wo_duplicates.append(data[i])
+                labels_wo_duplicates.append(labels[i])
+        return data_wo_duplicates, labels_wo_duplicates
+
     def split_data(self, data, labels, random_state, test_item_ids_with_pos):
         x_ids = [i for i in range(len(data))]
         x_train_ids, x_test_ids, y_train, y_test = train_test_split(
@@ -150,6 +161,7 @@ class AnalysisModelTraining:
             bad_data = True
 
         if not bad_data:
+            data, labels = self.deduplicate_data(data, labels)
             for random_state in random_states:
                 x_train, x_test, y_train, y_test, test_item_ids_with_pos_test = self.split_data(
                     data, labels, random_state, test_item_ids_with_pos)

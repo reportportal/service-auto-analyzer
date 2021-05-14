@@ -92,11 +92,12 @@ class AnalyzerService:
         try:
             logger.info("Started removing %s models from project %d",
                         model_info["model_type"], model_info["project"])
-            self.model_chooser.delete_old_model(model_name=model_info["model_type"] + "_model",
-                                                project_id=model_info["project"])
+            deleted_models = self.model_chooser.delete_old_model(
+                model_name=model_info["model_type"] + "_model",
+                project_id=model_info["project"])
             logger.info("Finished removing %s models from project %d",
                         model_info["model_type"], model_info["project"])
-            return 1
+            return deleted_models
         except Exception as err:
             logger.error("Error while removing models.")
             logger.error(err)

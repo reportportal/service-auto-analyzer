@@ -122,7 +122,7 @@ class SuggestAnalysisResult(BaseModel):
     usedLogLines: int
     minShouldMatch: int
     processedTime: float
-    isUserChoice: bool = False
+    isUserChoice: int = False
 
 
 class CleanIndex(BaseModel):

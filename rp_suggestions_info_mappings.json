@@ -51,7 +51,7 @@
             "type": "integer"
         },
         "isUserChoice": {
-            "type": "boolean"
+            "type": "integer"
         },
         "processedTime": {
             "type": "float"

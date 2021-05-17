@@ -85,11 +85,12 @@ class SuggestService(AnalyzerService):
                 if result["isUserChoice"] == 1:
                     chosen_data = result
                     break
-            chosen_data["notFoundResults"] = False
+            chosen_data["notFoundResults"] = 0
             if chosen_data["isUserChoice"] == 1:
                 chosen_data["reciprocalRank"] = 1 / chosen_data["resultPosition"]
             else:
                 chosen_data["reciprocalRank"] = 0.0
+            chosen_data["reciprocalRank"] = int(chosen_data["reciprocalRank"] * 100)
             bodies.append({
                 "_index": self.rp_suggest_metrics_index_template,
                 "_source": chosen_data
@@ -399,9 +400,9 @@ class SuggestService(AnalyzerService):
             "modelInfo": model_info,
             "usedLogLines": test_item_info.analyzerConfig.numberOfLogLines,
             "minShouldMatch": self.find_min_should_match_threshold(test_item_info.analyzerConfig),
-            "isUserChoice": False,
+            "isUserChoice": 0,
             "processedTime": processed_time,
-            "notFoundResults": True,
+            "notFoundResults": 100,
             "savedDate": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
 

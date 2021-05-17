@@ -79,3 +79,8 @@ class ModelChooser:
     def delete_all_custom_models(self, project_id):
         for model_name_folder in self.model_folder_mapping:
             self.delete_old_model(model_name_folder.strip("/").strip("\\"), project_id)
+
+    def get_model_info(self, model_name, project_id):
+        all_folders = self.object_saver.get_folder_objects(
+            project_id, "%s/" % model_name)
+        return all_folders[0] if len(all_folders) else ""

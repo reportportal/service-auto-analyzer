@@ -55,6 +55,7 @@ class SuggestService(AnalyzerService):
             obj_info = json.loads(obj.json())
             obj_info["savedDate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             obj_info["modelInfo"] = [obj.strip() for obj in obj_info["modelInfo"].split(";") if obj.strip()]
+            obj_info["module_version"] = [self.app_config["appVersion"]]
             if obj_info["testItem"] not in metrics_data_by_test_item:
                 metrics_data_by_test_item[obj_info["testItem"]] = []
             metrics_data_by_test_item[obj_info["testItem"]].append(obj_info)
@@ -403,7 +404,8 @@ class SuggestService(AnalyzerService):
             "isUserChoice": 0,
             "processedTime": processed_time,
             "notFoundResults": 100,
-            "savedDate": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "savedDate": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "module_version": [self.app_config["appVersion"]]
         }
 
     @utils.ignore_warnings

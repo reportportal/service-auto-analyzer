@@ -277,6 +277,22 @@ def init_amqp(_amqp_client):
                                                             APP_CONFIG,
                                                             SEARCH_CONFIG).get_model_info,
                                                         prepare_data_func=lambda x: x))))
+        threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
+                       (APP_CONFIG["exchangeName"], "defect_update", True, False,
+                       lambda channel, method, props, body:
+                       amqp_handler.handle_amqp_request(channel, method, props, body,
+                                                        es_client.defect_update,
+                                                        prepare_data_func=lambda x: x,
+                                                        prepare_response_data=amqp_handler.
+                                                        prepare_search_response_data))))
+        threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
+                       (APP_CONFIG["exchangeName"], "item_remove", True, False,
+                       lambda channel, method, props, body:
+                       amqp_handler.handle_amqp_request(channel, method, props, body,
+                                                        es_client.remove_test_items,
+                                                        prepare_data_func=lambda x: x,
+                                                        prepare_response_data=amqp_handler.
+                                                        output_result))))
 
     return threads
 

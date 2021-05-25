@@ -243,6 +243,16 @@ remove_models_data = {
     "model_type": "auto_analysis",
 }
 
+defect_update_data = {
+    "project": 34,
+    "items_to_update": {5: "pb001", 113: "ab001", 78: "si001"}
+}
+
+delete_test_items = {
+    "project": 34,
+    "items_to_delete": [5, 78, 113]
+}
+
 used_method = sys.argv[1] if len(sys.argv) > 1 else "index"
 for_update = False
 if len(sys.argv) > 2:
@@ -263,6 +273,10 @@ elif used_method.strip() in ["suggest_patterns"]:
     response = rpc.call("34", used_method)
 elif used_method.strip() in ["remove_models"]:
     response = rpc.call(json.dumps(remove_models_data), used_method)
+elif used_method.strip() in ["defect_update"]:
+    response = rpc.call(json.dumps(defect_update_data), used_method)
+elif used_method.strip() in ["item_remove"]:
+    response = rpc.call(json.dumps(delete_test_items), used_method)
 elif used_method.strip() in ["cluster"]:
     if not for_update:
         response = rpc.call(json.dumps({"launch": index_data[0],

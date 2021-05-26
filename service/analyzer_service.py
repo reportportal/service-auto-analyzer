@@ -92,12 +92,28 @@ class AnalyzerService:
         try:
             logger.info("Started removing %s models from project %d",
                         model_info["model_type"], model_info["project"])
-            self.model_chooser.delete_old_model(model_name=model_info["model_type"] + "_model",
-                                                project_id=model_info["project"])
+            deleted_models = self.model_chooser.delete_old_model(
+                model_name=model_info["model_type"] + "_model",
+                project_id=model_info["project"])
             logger.info("Finished removing %s models from project %d",
                         model_info["model_type"], model_info["project"])
-            return 1
+            return deleted_models
         except Exception as err:
             logger.error("Error while removing models.")
             logger.error(err)
             return 0
+
+    def get_model_info(self, model_info):
+        try:
+            logger.info("Started getting info for %s model from project %d",
+                        model_info["model_type"], model_info["project"])
+            model_folder = self.model_chooser.get_model_info(
+                model_name=model_info["model_type"] + "_model",
+                project_id=model_info["project"])
+            logger.info("Finished getting info for %s model from project %d",
+                        model_info["model_type"], model_info["project"])
+            return {"model_folder": model_folder}
+        except Exception as err:
+            logger.error("Error while getting info for models.")
+            logger.error(err)
+            return ""

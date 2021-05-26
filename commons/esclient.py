@@ -18,6 +18,7 @@ import json
 import logging
 import requests
 import urllib3
+import traceback
 import elasticsearch
 import elasticsearch.helpers
 import commons.launch_objects
@@ -40,6 +41,8 @@ class EsClient:
         self.search_cfg = search_cfg
         self.es_client = self.create_es_client(app_config)
         self.log_preparation = LogPreparation()
+        self.tables_to_recreate = ["rp_aa_stats", "rp_model_train_stats",
+                                   "rp_suggestions_info_metrics"]
 
     def create_es_client(self, app_config):
         if not app_config["esVerifyCerts"]:
@@ -300,6 +303,18 @@ class EsClient:
         if bodies:
             self._bulk_index(bodies)
 
+    def _recreate_index_if_needed(self, bodies, formatted_exception):
+        index_name = ""
+        if bodies:
+            index_name = bodies[0]["_index"]
+        if not index_name.strip():
+            return
+        if "'type': 'mapper_parsing_exception'" in formatted_exception or\
+                "RequestError(400, 'illegal_argument_exception'" in formatted_exception:
+            if index_name in self.tables_to_recreate:
+                self.delete_index(index_name)
+                self.create_index_for_stats_info(index_name)
+
     def _bulk_index(self, bodies, host=None, es_client=None, refresh=True):
         if host is None:
             host = self.host
@@ -317,8 +332,9 @@ class EsClient:
                                                                    chunk_size=es_chunk_number,
                                                                    request_timeout=30,
                                                                    refresh=refresh)
-            except Exception as err:
-                logger.error(err)
+            except: # noqa
+                formatted_exception = traceback.format_exc()
+                self._recreate_index_if_needed(bodies, formatted_exception)
                 self.update_settings_after_read_only(host)
                 success_count, errors = elasticsearch.helpers.bulk(es_client,
                                                                    bodies,
@@ -388,9 +404,13 @@ class EsClient:
                     "", "%s_mappings.json" % rp_aa_stats_index, to_json=True)
             })
         else:
-            self.es_client.indices.put_mapping(
-                index=index_name,
-                body=utils.read_json_file("", "%s_mappings.json" % rp_aa_stats_index, to_json=True))
+            try:
+                self.es_client.indices.put_mapping(
+                    index=index_name,
+                    body=utils.read_json_file("", "%s_mappings.json" % rp_aa_stats_index, to_json=True))
+            except: # noqa
+                formatted_exception = traceback.format_exc()
+                self._recreate_index_if_needed([{"_index": index_name}], formatted_exception)
 
     @utils.ignore_warnings
     def send_stats_info(self, stats_info):

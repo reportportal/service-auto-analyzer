@@ -55,6 +55,7 @@ class SuggestService(AnalyzerService):
             obj_info = json.loads(obj.json())
             obj_info["savedDate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             obj_info["modelInfo"] = [obj.strip() for obj in obj_info["modelInfo"].split(";") if obj.strip()]
+            obj_info["module_version"] = [self.app_config["appVersion"]]
             if obj_info["testItem"] not in metrics_data_by_test_item:
                 metrics_data_by_test_item[obj_info["testItem"]] = []
             metrics_data_by_test_item[obj_info["testItem"]].append(obj_info)
@@ -82,14 +83,15 @@ class SuggestService(AnalyzerService):
                 metrics_data_by_test_item[test_item], key=lambda x: x["resultPosition"])
             chosen_data = sorted_metrics_data[0]
             for result in sorted_metrics_data:
-                if result["isUserChoice"] == 1:
+                if result["userChoice"] == 1:
                     chosen_data = result
                     break
-            chosen_data["notFoundResults"] = False
-            if chosen_data["isUserChoice"] == 1:
+            chosen_data["notFoundResults"] = 0
+            if chosen_data["userChoice"] == 1:
                 chosen_data["reciprocalRank"] = 1 / chosen_data["resultPosition"]
             else:
                 chosen_data["reciprocalRank"] = 0.0
+            chosen_data["reciprocalRank"] = int(chosen_data["reciprocalRank"] * 100)
             bodies.append({
                 "_index": self.rp_suggest_metrics_index_template,
                 "_source": chosen_data
@@ -399,10 +401,11 @@ class SuggestService(AnalyzerService):
             "modelInfo": model_info,
             "usedLogLines": test_item_info.analyzerConfig.numberOfLogLines,
             "minShouldMatch": self.find_min_should_match_threshold(test_item_info.analyzerConfig),
-            "isUserChoice": False,
+            "userChoice": 0,
             "processedTime": processed_time,
-            "notFoundResults": True,
-            "savedDate": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "notFoundResults": 100,
+            "savedDate": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "module_version": [self.app_config["appVersion"]]
         }
 
     @utils.ignore_warnings

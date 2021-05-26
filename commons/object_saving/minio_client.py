@@ -114,12 +114,14 @@ class MinioClient:
 
     def remove_folder_objects(self, project_id, folder):
         if self.minioClient is None:
-            return
+            return 0
         if not self.minioClient.bucket_exists(project_id):
-            return
+            return 0
         try:
             for obj in self.minioClient.list_objects(project_id, prefix=folder):
                 self.minioClient.remove_object(
                     bucket_name=project_id, object_name=obj.object_name)
+            return 1
         except Exception as err:
             logger.error(err)
+            return 0

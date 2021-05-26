@@ -270,7 +270,7 @@ class AnalysisModelTraining:
                 feature_data, _ = _boosting_data_gatherer.gather_features_info()
                 if feature_data:
                     full_data_features.extend(feature_data)
-                    labels.append(int(_suggest_res["_source"]["isUserChoice"]))
+                    labels.append(_suggest_res["_source"]["userChoice"])
                     test_item_ids_with_pos.append(_suggest_res["_source"]["testItem"])
         return np.asarray(full_data_features), np.asarray(labels), test_item_ids_with_pos
 

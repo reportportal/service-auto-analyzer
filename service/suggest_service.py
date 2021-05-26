@@ -83,11 +83,11 @@ class SuggestService(AnalyzerService):
                 metrics_data_by_test_item[test_item], key=lambda x: x["resultPosition"])
             chosen_data = sorted_metrics_data[0]
             for result in sorted_metrics_data:
-                if result["isUserChoice"] == 1:
+                if result["userChoice"] == 1:
                     chosen_data = result
                     break
             chosen_data["notFoundResults"] = 0
-            if chosen_data["isUserChoice"] == 1:
+            if chosen_data["userChoice"] == 1:
                 chosen_data["reciprocalRank"] = 1 / chosen_data["resultPosition"]
             else:
                 chosen_data["reciprocalRank"] = 0.0
@@ -401,7 +401,7 @@ class SuggestService(AnalyzerService):
             "modelInfo": model_info,
             "usedLogLines": test_item_info.analyzerConfig.numberOfLogLines,
             "minShouldMatch": self.find_min_should_match_threshold(test_item_info.analyzerConfig),
-            "isUserChoice": 0,
+            "userChoice": 0,
             "processedTime": processed_time,
             "notFoundResults": 100,
             "savedDate": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

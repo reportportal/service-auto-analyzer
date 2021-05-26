@@ -53,7 +53,7 @@
         "minShouldMatch": {
             "type": "integer"
         },
-        "isUserChoice": {
+        "userChoice": {
             "type": "integer"
         },
         "processedTime": {

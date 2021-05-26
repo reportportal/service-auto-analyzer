@@ -245,33 +245,33 @@ remove_models_data = {
 
 defect_update_data = {
     "project": 34,
-    "items_to_update": {5: "pb001", 113: "ab001", 78: "si001"}
+    "itemsToUpdate": {5: "pb001", 113: "ab001", 78: "si001"}
 }
 
 delete_test_items = {
     "project": 34,
-    "items_to_delete": [5, 78, 113]
+    "itemsToDelete": [5, 78, 113]
 }
 
 index_suggest_info_items = [{
-  "project": 34,
-  "testItem": 5,
-  "testItemLogId": 1,
-  "issueType": "pb001",
-  "relevantItem": 3,
-  "relevantLogId": 4,
-  "isMergedLog": False,
-  "matchScore": 80,
-  "resultPosition": 1,
-  "esScore": 1,
-  "esPosition": 1,
-  "modelFeatureNames": "",
-  "modelFeatureValues": "",
-  "modelInfo": "",
-  "usedLogLines": -1,
-  "minShouldMatch": 80,
-  "userChoice": 1,
-  "processedTime": 0.11
+    "project": 34,
+    "testItem": 5,
+    "testItemLogId": 1,
+    "issueType": "pb001",
+    "relevantItem": 3,
+    "relevantLogId": 4,
+    "isMergedLog": False,
+    "matchScore": 80,
+    "resultPosition": 1,
+    "esScore": 1,
+    "esPosition": 1,
+    "modelFeatureNames": "",
+    "modelFeatureValues": "",
+    "modelInfo": "",
+    "usedLogLines": -1,
+    "minShouldMatch": 80,
+    "userChoice": 1,
+    "processedTime": 0.11
 }]
 
 used_method = sys.argv[1] if len(sys.argv) > 1 else "index"

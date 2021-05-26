@@ -444,9 +444,9 @@ class EsClient:
     def defect_update(self, defect_update_info):
         logger.info("Started updating defect types")
         t_start = time()
-        test_item_ids = [int(key_) for key_ in defect_update_info["items_to_update"].keys()]
-        defect_update_info["items_to_update"] = {
-            int(key_): val for key_, val in defect_update_info["items_to_update"].items()}
+        test_item_ids = [int(key_) for key_ in defect_update_info["itemsToUpdate"].keys()]
+        defect_update_info["itemsToUpdate"] = {
+            int(key_): val for key_, val in defect_update_info["itemsToUpdate"].items()}
         index_name = utils.unite_project_name(
             str(defect_update_info["project"]), self.app_config["esProjectIndexPrefix"])
         if not self.index_exists(index_name):
@@ -465,7 +465,7 @@ class EsClient:
                 try:
                     test_item_id = int(log["_source"]["test_item"])
                     found_test_items.add(test_item_id)
-                    issue_type = defect_update_info["items_to_update"][test_item_id]
+                    issue_type = defect_update_info["itemsToUpdate"][test_item_id]
                 except: # noqa
                     pass
                 if issue_type.strip():
@@ -483,15 +483,30 @@ class EsClient:
         logger.info("Finished updating defect types. It took %.2f sec", time() - t_start)
         return items_not_updated
 
+    def build_delete_query_by_test_items(self, sub_test_item_ids):
+        return {"query": {
+                "bool": {
+                    "filter": [
+                        {"terms": {"test_item": sub_test_item_ids}}
+                    ]
+                }}}
+
     @utils.ignore_warnings
     def remove_test_items(self, remove_items_info):
         logger.info("Started removing test items")
         t_start = time()
         index_name = utils.unite_project_name(
             str(remove_items_info["project"]), self.app_config["esProjectIndexPrefix"])
+        deleted_logs = self.delete_by_query(
+            index_name, remove_items_info["itemsToDelete"], self.build_delete_query_by_test_items)
+        logger.debug("Removed %s logs by test item ids", deleted_logs)
+        logger.info("Finished removing test items. It took %.2f sec", time() - t_start)
+        return deleted_logs
+
+    @utils.ignore_warnings
+    def delete_by_query(self, index_name, test_item_ids, delete_query_deriver):
         if not self.index_exists(index_name):
             return 0
-        test_item_ids = remove_items_info["items_to_delete"]
         batch_size = 1000
         deleted_logs = 0
         for i in range(int(len(test_item_ids) / batch_size) + 1):
@@ -499,14 +514,7 @@ class EsClient:
             if not sub_test_item_ids:
                 continue
             result = self.es_client.delete_by_query(
-                index_name, body={"query": {
-                    "bool": {
-                        "filter": [
-                            {"terms": {"test_item": sub_test_item_ids}}
-                        ]
-                    }}})
+                index_name, body=delete_query_deriver(sub_test_item_ids))
             if "deleted" in result:
                 deleted_logs += result["deleted"]
-        logger.debug("Removed %s logs by test item ids", deleted_logs)
-        logger.info("Finished removing test items. It took %.2f sec", time() - t_start)
         return deleted_logs

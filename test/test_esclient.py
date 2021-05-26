@@ -634,7 +634,7 @@ class TestEsClient(TestService):
                                     }],
                 "defect_update_info": {
                     "project": 1,
-                    "items_to_update": {1: "pb001", 2: "ab001"}},
+                    "itemsToUpdate": {1: "pb001", 2: "ab001"}},
                 "result":     [1, 2]
             },
             {
@@ -663,7 +663,7 @@ class TestEsClient(TestService):
                                     }],
                 "defect_update_info": {
                     "project": 1,
-                    "items_to_update": {1: "pb001", 2: "ab001"}},
+                    "itemsToUpdate": {1: "pb001", 2: "ab001"}},
                 "result":     []
             },
             {
@@ -692,7 +692,7 @@ class TestEsClient(TestService):
                                     }],
                 "defect_update_info": {
                     "project": 1,
-                    "items_to_update": {1: "pb001", 2: "ab001"}},
+                    "itemsToUpdate": {1: "pb001", 2: "ab001"}},
                 "result":     [2]
             },
         ]
@@ -723,7 +723,7 @@ class TestEsClient(TestService):
                                     }],
                 "item_remove_info": {
                     "project": 1,
-                    "items_to_delete": [1, 2]},
+                    "itemsToDelete": [1, 2]},
                 "result":     0
             },
             {
@@ -741,26 +741,48 @@ class TestEsClient(TestService):
                                     "rs":             json.dumps({"deleted": 1})}],
                 "item_remove_info": {
                     "project": 1,
-                    "items_to_delete": [1, 2]},
+                    "itemsToDelete": [1, 2]},
                 "result":     1
             },
             {
                 "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/1",
+                                    "uri":            "/rp_1",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     },
                                    {"method":         httpretty.POST,
-                                    "uri":            "/1/_delete_by_query",
+                                    "uri":            "/rp_1/_delete_by_query",
                                     "status":         HTTPStatus.OK,
                                     "content_type":   "application/json",
                                     "rq":             utils.get_fixture(
                                         self.delete_by_query_1),
                                     "rs":             json.dumps({"deleted": 3}),
                                     }],
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esUser": "",
+                    "esPassword": "",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
                 "item_remove_info": {
                     "project": 1,
-                    "items_to_delete": [1, 2]},
+                    "itemsToDelete": [1, 2]},
                 "result":    3
             }
         ]

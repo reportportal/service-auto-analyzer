@@ -289,7 +289,8 @@ def init_amqp(_amqp_client):
                        (APP_CONFIG["exchangeName"], "item_remove", True, False,
                        lambda channel, method, props, body:
                        amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                        es_client.remove_test_items,
+                                                        CleanIndexService(
+                                                            APP_CONFIG, SEARCH_CONFIG).delete_test_items,
                                                         prepare_data_func=lambda x: x,
                                                         prepare_response_data=amqp_handler.
                                                         output_result))))

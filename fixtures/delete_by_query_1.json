@@ -1,0 +1,6 @@
+{"query": {
+ "bool": {
+    "filter": [
+        {"terms": {"test_item": [1,2]}}
+    ]
+}}}

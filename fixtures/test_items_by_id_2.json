@@ -1,0 +1,37 @@
+{
+    "_scroll_id":"DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAADl8Wa1lLdFBYRHlRanF6V3BoS1lpRjhQQQ==",
+    "took": 13,
+    "timed_out": false,
+    "_shards": {
+        "total": 1,
+        "successful": 1,
+        "failed": 0
+    },
+    "hits": {
+        "total": {
+            "value": 2,
+            "relation": "eq"
+        },
+        "max_score": 20,
+        "hits": [
+            {
+                "_index": "1",
+                "_type": "log",
+                "_id": "1",
+                "_score": 15,
+                "_source": {
+                    "test_item": 1
+                }
+            },
+            {
+                "_index": "1",
+                "_type": "log",
+                "_id": "2",
+                "_score": 10,
+                "_source": {
+                    "test_item": 1
+                }
+            }
+        ]
+    }
+}

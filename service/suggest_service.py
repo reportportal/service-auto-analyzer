@@ -118,6 +118,17 @@ class SuggestService(AnalyzerService):
                 }
             }}
 
+    def build_suggest_info_ids_query_by_test_item(self, test_item_ids):
+        return {
+            "query": {
+                "bool": {
+                    "should": [
+                        {"terms": {"testItem": [str(log_id) for log_id in test_item_ids]}},
+                        {"terms": {"relevantItem": [str(log_id) for log_id in test_item_ids]}}
+                    ]
+                }
+            }}
+
     def clean_suggest_info_logs(self, clean_index):
         """Delete logs from elasticsearch"""
         index_name = self.build_index_name(clean_index.project)
@@ -152,6 +163,33 @@ class SuggestService(AnalyzerService):
         logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
                     clean_index.ids, index_name, time() - t_start)
         return result.took
+
+    def clean_suggest_info_logs_by_test_item(self, remove_items_info):
+        """Delete logs from elasticsearch"""
+        index_name = self.build_index_name(remove_items_info["project"])
+        index_name = utils.unite_project_name(
+            index_name, self.app_config["esProjectIndexPrefix"])
+        logger.info("Delete test items %s for the index %s",
+                    remove_items_info["items_to_delete"], index_name)
+        t_start = time()
+        if not self.es_client.index_exists(index_name, print_error=False):
+            logger.info("Didn't find index '%s'", index_name)
+            return 0
+        test_item_ids = remove_items_info["items_to_delete"]
+        batch_size = 1000
+        deleted_logs = 0
+        for i in range(int(len(test_item_ids) / batch_size) + 1):
+            sub_test_item_ids = test_item_ids[i * batch_size: (i + 1) * batch_size]
+            if not sub_test_item_ids:
+                continue
+            result = self.es_client.es_client.delete_by_query(
+                index_name,
+                body=self.build_suggest_info_ids_query_by_test_item(sub_test_item_ids))
+            if "deleted" in result:
+                deleted_logs += result["deleted"]
+        logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
+                    remove_items_info["items_to_delete"], index_name, time() - t_start)
+        return deleted_logs
 
     def get_config_for_boosting_suggests(self, analyzerConfig):
         return {

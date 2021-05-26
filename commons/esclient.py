@@ -436,7 +436,7 @@ class EsClient:
                 "query": {
                     "bool": {
                         "filter": [
-                            {"terms": {"test_item": [str(_id) for _id in test_item_ids]}}
+                            {"terms": {"test_item": test_item_ids}}
                         ]
                     }}}
 
@@ -449,6 +449,8 @@ class EsClient:
             int(key_): val for key_, val in defect_update_info["items_to_update"].items()}
         index_name = utils.unite_project_name(
             str(defect_update_info["project"]), self.app_config["esProjectIndexPrefix"])
+        if not self.index_exists(index_name):
+            return test_item_ids
         batch_size = 1000
         log_update_queries = []
         found_test_items = set()
@@ -487,6 +489,8 @@ class EsClient:
         t_start = time()
         index_name = utils.unite_project_name(
             str(remove_items_info["project"]), self.app_config["esProjectIndexPrefix"])
+        if not self.index_exists(index_name):
+            return 0
         test_item_ids = remove_items_info["items_to_delete"]
         batch_size = 1000
         deleted_logs = 0

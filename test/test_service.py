@@ -106,6 +106,7 @@ class TestService(unittest.TestCase):
         self.index_test_item_update = "index_test_item_update.json"
         self.index_test_item_update_2 = "index_test_item_update_2.json"
         self.delete_by_query_1 = "delete_by_query_1.json"
+        self.delete_by_query_suggest_1 = "delete_by_query_suggest_1.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
             "esUser": "",

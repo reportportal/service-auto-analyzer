@@ -100,6 +100,13 @@ class TestService(unittest.TestCase):
         self.delete_suggest_logs_rq = "delete_suggest_logs_rq.json"
         self.delete_suggest_logs_rq_with_prefix = "delete_suggest_logs_rq_with_prefix.json"
         self.suggest_info_list = "suggest_info_list.json"
+        self.get_test_items_by_ids_query = "get_test_items_by_ids_query.json"
+        self.test_items_by_id_1 = "test_items_by_id_1.json"
+        self.test_items_by_id_2 = "test_items_by_id_2.json"
+        self.index_test_item_update = "index_test_item_update.json"
+        self.index_test_item_update_2 = "index_test_item_update_2.json"
+        self.delete_by_query_1 = "delete_by_query_1.json"
+        self.delete_by_query_suggest_1 = "delete_by_query_suggest_1.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
             "esUser": "",

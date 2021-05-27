@@ -1187,6 +1187,94 @@ class TestSuggestService(TestService):
 
                 TestSuggestService.shutdown_server(test["test_calls"])
 
+    def test_remove_test_items_suggests(self):
+        tests = [
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1_suggest",
+                                    "status":         HTTPStatus.NOT_FOUND,
+                                    "content_type":   "application/json",
+                                    }],
+                "item_remove_info": {
+                    "project": 1,
+                    "itemsToDelete": [1, 2]},
+                "result":     0
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1_suggest",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/1_suggest/_delete_by_query",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.delete_by_query_suggest_1),
+                                    "rs":             json.dumps({"deleted": 1})}],
+                "item_remove_info": {
+                    "project": 1,
+                    "itemsToDelete": [1, 2]},
+                "result":     1
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/rp_1_suggest",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/rp_1_suggest/_delete_by_query",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.delete_by_query_suggest_1),
+                                    "rs":             json.dumps({"deleted": 3}),
+                                    }],
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esUser": "",
+                    "esPassword": "",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
+                "item_remove_info": {
+                    "project": 1,
+                    "itemsToDelete": [1, 2]},
+                "result":    3
+            }
+        ]
+
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
+                app_config = self.app_config
+                if "app_config" in test:
+                    app_config = test["app_config"]
+                suggest_service = SuggestService(app_config=app_config,
+                                                 search_cfg=self.get_default_search_config())
+                response = suggest_service.clean_suggest_info_logs_by_test_item(test["item_remove_info"])
+
+                test["result"].should.equal(response)
+
+                TestSuggestService.shutdown_server(test["test_calls"])
+
 
 if __name__ == '__main__':
     unittest.main()

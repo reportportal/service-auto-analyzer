@@ -112,8 +112,19 @@ class SuggestService(AnalyzerService):
             "query": {
                 "bool": {
                     "should": [
-                        {"terms": {"testItemLogId": [str(log_id) for log_id in log_ids]}},
-                        {"terms": {"relevantLogId": [str(log_id) for log_id in log_ids]}}
+                        {"terms": {"testItemLogId": log_ids}},
+                        {"terms": {"relevantLogId": log_ids}}
+                    ]
+                }
+            }}
+
+    def build_suggest_info_ids_query_by_test_item(self, test_item_ids):
+        return {
+            "query": {
+                "bool": {
+                    "should": [
+                        {"terms": {"testItem": test_item_ids}},
+                        {"terms": {"relevantItem": test_item_ids}}
                     ]
                 }
             }}
@@ -152,6 +163,21 @@ class SuggestService(AnalyzerService):
         logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
                     clean_index.ids, index_name, time() - t_start)
         return result.took
+
+    def clean_suggest_info_logs_by_test_item(self, remove_items_info):
+        """Delete logs from elasticsearch"""
+        index_name = self.build_index_name(remove_items_info["project"])
+        index_name = utils.unite_project_name(
+            index_name, self.app_config["esProjectIndexPrefix"])
+        logger.info("Delete test items %s for the index %s",
+                    remove_items_info["itemsToDelete"], index_name)
+        t_start = time()
+        deleted_logs = self.es_client.delete_by_query(
+            index_name, remove_items_info["itemsToDelete"],
+            self.build_suggest_info_ids_query_by_test_item)
+        logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
+                    remove_items_info["itemsToDelete"], index_name, time() - t_start)
+        return deleted_logs
 
     def get_config_for_boosting_suggests(self, analyzerConfig):
         return {

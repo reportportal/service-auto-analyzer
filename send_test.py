@@ -243,6 +243,37 @@ remove_models_data = {
     "model_type": "auto_analysis",
 }
 
+defect_update_data = {
+    "project": 34,
+    "itemsToUpdate": {5: "pb001", 113: "ab001", 78: "si001"}
+}
+
+delete_test_items = {
+    "project": 34,
+    "itemsToDelete": [5, 78, 113]
+}
+
+index_suggest_info_items = [{
+    "project": 34,
+    "testItem": 5,
+    "testItemLogId": 1,
+    "issueType": "pb001",
+    "relevantItem": 3,
+    "relevantLogId": 4,
+    "isMergedLog": False,
+    "matchScore": 80,
+    "resultPosition": 1,
+    "esScore": 1,
+    "esPosition": 1,
+    "modelFeatureNames": "",
+    "modelFeatureValues": "",
+    "modelInfo": "",
+    "usedLogLines": -1,
+    "minShouldMatch": 80,
+    "userChoice": 1,
+    "processedTime": 0.11
+}]
+
 used_method = sys.argv[1] if len(sys.argv) > 1 else "index"
 for_update = False
 if len(sys.argv) > 2:
@@ -263,6 +294,12 @@ elif used_method.strip() in ["suggest_patterns"]:
     response = rpc.call("34", used_method)
 elif used_method.strip() in ["remove_models"]:
     response = rpc.call(json.dumps(remove_models_data), used_method)
+elif used_method.strip() in ["defect_update"]:
+    response = rpc.call(json.dumps(defect_update_data), used_method)
+elif used_method.strip() in ["item_remove"]:
+    response = rpc.call(json.dumps(delete_test_items), used_method)
+elif used_method.strip() in ["index_suggest_info"]:
+    response = rpc.call(json.dumps(index_suggest_info_items), used_method)
 elif used_method.strip() in ["cluster"]:
     if not for_update:
         response = rpc.call(json.dumps({"launch": index_data[0],

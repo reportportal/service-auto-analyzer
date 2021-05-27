@@ -4,8 +4,8 @@
     "query": {
         "bool": {
             "should": [
-                {"terms": {"testItemLogId": ["1"]}},
-                {"terms": {"relevantLogId": ["1"]}}
+                {"terms": {"testItemLogId": [1]}},
+                {"terms": {"relevantLogId": [1]}}
             ]
         }
     },

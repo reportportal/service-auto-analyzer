@@ -1,0 +1,4 @@
+{"update":{"_index":"1","_id":"1"}}
+{"doc":{"issue_type":"pb001"}}
+{"update":{"_index":"1","_id":"2"}}
+{"doc":{"issue_type":"pb001"}}

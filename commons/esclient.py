@@ -429,3 +429,92 @@ class EsClient:
             })
         self._bulk_index(stat_info_array)
         logger.info("Finished sending stats about analysis")
+
+    def get_test_items_by_ids_query(self, test_item_ids):
+        return {"_source": ["test_item"],
+                "size": self.app_config["esChunkNumber"],
+                "query": {
+                    "bool": {
+                        "filter": [
+                            {"terms": {"test_item": test_item_ids}}
+                        ]
+                    }}}
+
+    @utils.ignore_warnings
+    def defect_update(self, defect_update_info):
+        logger.info("Started updating defect types")
+        t_start = time()
+        test_item_ids = [int(key_) for key_ in defect_update_info["itemsToUpdate"].keys()]
+        defect_update_info["itemsToUpdate"] = {
+            int(key_): val for key_, val in defect_update_info["itemsToUpdate"].items()}
+        index_name = utils.unite_project_name(
+            str(defect_update_info["project"]), self.app_config["esProjectIndexPrefix"])
+        if not self.index_exists(index_name):
+            return test_item_ids
+        batch_size = 1000
+        log_update_queries = []
+        found_test_items = set()
+        for i in range(int(len(test_item_ids) / batch_size) + 1):
+            sub_test_item_ids = test_item_ids[i * batch_size: (i + 1) * batch_size]
+            if not sub_test_item_ids:
+                continue
+            for log in elasticsearch.helpers.scan(self.es_client,
+                                                  query=self.get_test_items_by_ids_query(sub_test_item_ids),
+                                                  index=index_name):
+                issue_type = ""
+                try:
+                    test_item_id = int(log["_source"]["test_item"])
+                    found_test_items.add(test_item_id)
+                    issue_type = defect_update_info["itemsToUpdate"][test_item_id]
+                except: # noqa
+                    pass
+                if issue_type.strip():
+                    log_update_queries.append({
+                        "_op_type": "update",
+                        "_id": log["_id"],
+                        "_index": index_name,
+                        "doc": {
+                            "issue_type": issue_type
+                        }
+                    })
+        self._bulk_index(log_update_queries)
+        items_not_updated = list(set(test_item_ids) - found_test_items)
+        logger.debug("Not updated test items: %s", items_not_updated)
+        logger.info("Finished updating defect types. It took %.2f sec", time() - t_start)
+        return items_not_updated
+
+    def build_delete_query_by_test_items(self, sub_test_item_ids):
+        return {"query": {
+                "bool": {
+                    "filter": [
+                        {"terms": {"test_item": sub_test_item_ids}}
+                    ]
+                }}}
+
+    @utils.ignore_warnings
+    def remove_test_items(self, remove_items_info):
+        logger.info("Started removing test items")
+        t_start = time()
+        index_name = utils.unite_project_name(
+            str(remove_items_info["project"]), self.app_config["esProjectIndexPrefix"])
+        deleted_logs = self.delete_by_query(
+            index_name, remove_items_info["itemsToDelete"], self.build_delete_query_by_test_items)
+        logger.debug("Removed %s logs by test item ids", deleted_logs)
+        logger.info("Finished removing test items. It took %.2f sec", time() - t_start)
+        return deleted_logs
+
+    @utils.ignore_warnings
+    def delete_by_query(self, index_name, test_item_ids, delete_query_deriver):
+        if not self.index_exists(index_name):
+            return 0
+        batch_size = 1000
+        deleted_logs = 0
+        for i in range(int(len(test_item_ids) / batch_size) + 1):
+            sub_test_item_ids = test_item_ids[i * batch_size: (i + 1) * batch_size]
+            if not sub_test_item_ids:
+                continue
+            result = self.es_client.delete_by_query(
+                index_name, body=delete_query_deriver(sub_test_item_ids))
+            if "deleted" in result:
+                deleted_logs += result["deleted"]
+        return deleted_logs

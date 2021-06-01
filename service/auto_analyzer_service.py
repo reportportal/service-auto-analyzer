@@ -14,7 +14,7 @@
 * limitations under the License.
 """
 from utils import utils
-from commons.launch_objects import AnalysisResult
+from commons.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate
 from boosting_decision_making import boosting_featurizer
 from service.analyzer_service import AnalyzerService
 from amqp.amqp import AmqpClient
@@ -60,13 +60,13 @@ class AutoAnalyzerService(AnalyzerService):
             "detected_message", "detected_message_without_params_extended"]\
             if log_lines == -1 else ["message", "message_without_params_extended"]
 
-    def build_analyze_query(self, launch, log, size=10):
+    def build_analyze_query(self, launch, log, size=10, filter_out_no_defect=True):
         """Build analyze query"""
         min_should_match = "{}%".format(launch.analyzerConfig.minShouldMatch)\
             if launch.analyzerConfig.minShouldMatch > 0\
             else self.search_cfg["MinShouldMatch"]
 
-        query = self.build_common_query(log, size=size)
+        query = self.build_common_query(log, size=size, filter_out_no_defect=filter_out_no_defect)
 
         if launch.analyzerConfig.analyzerMode in ["LAUNCH_NAME"]:
             query["query"]["bool"]["must"].append(
@@ -158,13 +158,28 @@ class AutoAnalyzerService(AnalyzerService):
         partial_res = self.es_client.es_client.msearch("\n".join(batches) + "\n")["responses"]
         avg_time_processed = (time() - t_start) / (len(partial_res) if partial_res else 1)
         for test_item_id in test_item_dict:
-            new_result = []
+            candidates = []
+            candidates_with_no_defect = []
             time_processed = 0.0
             for ind in test_item_dict[test_item_id]:
-                all_info = batch_logs[ind]
-                new_result.append((all_info[2], partial_res[ind]))
+                batch_log_info = batch_logs[ind]
+                if batch_log_info.query_type == "without no defect":
+                    candidates.append(
+                        (batch_log_info.log_info, partial_res[ind]))
+                if batch_log_info.query_type == "with no defect":
+                    candidates_with_no_defect.append(
+                        (batch_log_info.log_info, partial_res[ind]))
                 time_processed += avg_time_processed
-            self.queue.put((all_info[0], all_info[1], new_result, time_processed))
+            self.queue.put(AnalysisCandidate(
+                analyzerConfig=batch_log_info.analyzerConfig,
+                testItemId=batch_log_info.testItemId,
+                project=batch_log_info.project,
+                launchId=batch_log_info.launchId,
+                launchName=batch_log_info.launchName,
+                timeProcessed=time_processed,
+                candidates=candidates,
+                candidatesWithNoDefect=candidates_with_no_defect
+            ))
 
     def _query_elasticsearch(self, launches, max_batch_size=30):
         t_start = time()
@@ -205,16 +220,28 @@ class AutoAnalyzerService(AnalyzerService):
                         if log["_source"]["log_level"] < utils.ERROR_LOGGING_LEVEL or\
                                 (not message and not merged_logs):
                             continue
-
-                        query = self.build_analyze_query(
-                            launch, log, launch.analyzerConfig.numberOfLogLines)
-                        full_query = "{}\n{}".format(json.dumps({"index": index_name}), json.dumps(query))
-                        batches.append(full_query)
-                        batch_logs.append((launch.analyzerConfig, test_item.testItemId, log))
-                        if test_item.testItemId not in test_item_dict:
-                            test_item_dict[test_item.testItemId] = []
-                        test_item_dict[test_item.testItemId].append(index_in_batch)
-                        index_in_batch += 1
+                        for query_type, query in [
+                                ("without no defect", self.build_analyze_query(
+                                 launch, log, launch.analyzerConfig.numberOfLogLines)),
+                                ("with no defect", self.build_analyze_query(
+                                 launch, log, launch.analyzerConfig.numberOfLogLines,
+                                 filter_out_no_defect=False))]:
+                            full_query = "{}\n{}".format(
+                                json.dumps({"index": index_name}), json.dumps(query))
+                            batches.append(full_query)
+                            batch_logs.append(BatchLogInfo(
+                                analyzerConfig=launch.analyzerConfig,
+                                testItemId=test_item.testItemId,
+                                log_info=log,
+                                query_type=query_type,
+                                project=launch.project,
+                                launchId=launch.launchId,
+                                launchName=launch.launchName
+                                ))
+                            if test_item.testItemId not in test_item_dict:
+                                test_item_dict[test_item.testItemId] = []
+                            test_item_dict[test_item.testItemId].append(index_in_batch)
+                            index_in_batch += 1
                     if n_first_blocks <= 0:
                         batch_size = max_batch_size
                     if len(batches) >= batch_size:
@@ -262,22 +289,22 @@ class AutoAnalyzerService(AnalyzerService):
                     sleep(0.1)
                     continue
                 else:
-                    item_to_process = self.queue.get()
+                    analyzer_candidates = self.queue.get()
                 try:
-                    analyzer_config, test_item_id, searched_res, time_processed = item_to_process
-                    launch_id = searched_res[0][0]["_source"]["launch_id"]
-                    launch_name = searched_res[0][0]["_source"]["launch_name"]
-                    project_id = utils.get_project_id(
-                        searched_res[0][0]["_index"], self.app_config["esProjectIndexPrefix"])
+                    project_id = analyzer_candidates.project
+                    launch_id = analyzer_candidates.launchId
                     if launch_id not in results_to_share:
                         results_to_share[launch_id] = {
                             "not_found": 0, "items_to_process": 0, "processed_time": 0,
-                            "launch_id": launch_id, "launch_name": launch_name, "project_id": project_id,
+                            "launch_id": launch_id,
+                            "launch_name": analyzer_candidates.launchName,
+                            "project_id": project_id,
                             "method": "auto_analysis",
                             "gather_date": datetime.now().strftime("%Y-%m-%d"),
                             "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            "number_of_log_lines": analyzer_config.numberOfLogLines,
-                            "min_should_match": self.find_min_should_match_threshold(analyzer_config),
+                            "number_of_log_lines": analyzer_candidates.analyzerConfig.numberOfLogLines,
+                            "min_should_match": self.find_min_should_match_threshold(
+                                analyzer_candidates.analyzerConfig),
                             "model_info": set(),
                             "module_version": [self.app_config["appVersion"]],
                             "errors": [],
@@ -286,8 +313,8 @@ class AutoAnalyzerService(AnalyzerService):
                     t_start_item = time()
                     cnt_items_to_process += 1
                     results_to_share[launch_id]["items_to_process"] += 1
-                    results_to_share[launch_id]["processed_time"] += time_processed
-                    boosting_config = self.get_config_for_boosting(analyzer_config)
+                    results_to_share[launch_id]["processed_time"] += analyzer_candidates.timeProcessed
+                    boosting_config = self.get_config_for_boosting(analyzer_candidates.analyzerConfig)
                     if project_id not in chosen_namespaces:
                         chosen_namespaces[project_id] = self.namespace_finder.get_chosen_namespaces(
                             project_id)
@@ -297,7 +324,7 @@ class AutoAnalyzerService(AnalyzerService):
                         custom_model_prob=self.search_cfg["ProbabilityForCustomModelAutoAnalysis"])
 
                     boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
-                        searched_res,
+                        analyzer_candidates.candidates,
                         boosting_config,
                         feature_ids=_boosting_decision_maker.get_feature_ids(),
                         weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
@@ -337,22 +364,24 @@ class AutoAnalyzerService(AnalyzerService):
                         if predicted_issue_type:
                             chosen_type = scores_by_issue_type[predicted_issue_type]
                             relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
-                            analysis_result = AnalysisResult(testItem=test_item_id,
+                            analysis_result = AnalysisResult(testItem=analyzer_candidates.testItemId,
                                                              issueType=predicted_issue_type,
                                                              relevantItem=relevant_item)
                             results.append(analysis_result)
                             logger.debug(analysis_result)
                         else:
                             results_to_share[launch_id]["not_found"] += 1
-                            logger.debug("Test item %s has no relevant items", test_item_id)
+                            logger.debug("Test item %s has no relevant items", analyzer_candidates.testItemId)
                     else:
                         results_to_share[launch_id]["not_found"] += 1
-                        logger.debug("There are no results for test item %s", test_item_id)
-                    results_to_share[launch_id]["processed_time"] += (time() - t_start_item)
+                        logger.debug("There are no results for test item %s", analyzer_candidates.testItemId)
+                    results_to_share[launch_id]["processed_time"] += (
+                        time() - t_start_item)
                 except Exception as err:
                     logger.error(err)
                     if launch_id in results_to_share:
-                        results_to_share[launch_id]["errors"].append(utils.extract_exception(err))
+                        results_to_share[launch_id]["errors"].append(
+                            utils.extract_exception(err))
                         results_to_share[launch_id]["errors_count"] += 1
             if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
                 for launch_id in results_to_share:

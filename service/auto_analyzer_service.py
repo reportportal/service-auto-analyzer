@@ -19,6 +19,7 @@ from boosting_decision_making import boosting_featurizer
 from service.analyzer_service import AnalyzerService
 from amqp.amqp import AmqpClient
 from commons.log_merger import LogMerger
+from commons.similarity_calculator import SimilarityCalculator
 import json
 import logging
 from time import time, sleep
@@ -60,14 +61,7 @@ class AutoAnalyzerService(AnalyzerService):
             "detected_message", "detected_message_without_params_extended"]\
             if log_lines == -1 else ["message", "message_without_params_extended"]
 
-    def build_analyze_query(self, launch, log, size=10, filter_out_no_defect=True):
-        """Build analyze query"""
-        min_should_match = "{}%".format(launch.analyzerConfig.minShouldMatch)\
-            if launch.analyzerConfig.minShouldMatch > 0\
-            else self.search_cfg["MinShouldMatch"]
-
-        query = self.build_common_query(log, size=size, filter_out_no_defect=filter_out_no_defect)
-
+    def add_constraints_for_launches_into_query(self, query, launch):
         if launch.analyzerConfig.analyzerMode in ["LAUNCH_NAME"]:
             query["query"]["bool"]["must"].append(
                 {"term": {
@@ -84,6 +78,19 @@ class AutoAnalyzerService(AnalyzerService):
                     "launch_name": {
                         "value": launch.launchName,
                         "boost": abs(self.search_cfg["BoostLaunch"])}}})
+        return query
+
+    def get_min_should_match_setting(self, launch):
+        return "{}%".format(launch.analyzerConfig.minShouldMatch)\
+            if launch.analyzerConfig.minShouldMatch > 0\
+            else self.search_cfg["MinShouldMatch"]
+
+    def build_analyze_query(self, launch, log, size=10):
+        """Build analyze query"""
+        min_should_match = self.get_min_should_match_setting(launch)
+
+        query = self.build_common_query(log, size=size)
+        query = self.add_constraints_for_launches_into_query(query, launch)
 
         if log["_source"]["message"].strip():
             log_lines = launch.analyzerConfig.numberOfLogLines
@@ -153,6 +160,64 @@ class AutoAnalyzerService(AnalyzerService):
 
         return query
 
+    def build_query_with_no_defect(self, launch, log, size=10):
+        min_should_match = self.get_min_should_match_setting(launch)
+        query = {
+            "size": size,
+            "sort": ["_score",
+                     {"start_time": "desc"}],
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
+                        {"exists": {"field": "issue_type"}},
+                    ],
+                    "must_not": [
+                        {"wildcard": {"issue_type": "TI*"}},
+                        {"wildcard": {"issue_type": "ti*"}},
+                        {"term": {"test_item": log["_source"]["test_item"]}}
+                    ],
+                    "must": [
+                        {"term": {"unique_id": log["_source"]["unique_id"]}},
+                        {"term": {"test_case_hash": log["_source"]["test_case_hash"]}}
+                    ],
+                    "should": []
+                }}}
+        query = self.add_constraints_for_launches_into_query(query, launch)
+        query["query"]["bool"]["must"].append(
+            self.build_more_like_this_query(min_should_match,
+                                            log["_source"]["message"],
+                                            field_name="message"))
+        return query
+
+    def find_relevant_with_no_defect(self, candidates_with_no_defect, boosting_config):
+        for log_info, search_res in candidates_with_no_defect:
+            no_defect_candidate_exists = False
+            for log in search_res["hits"]["hits"]:
+                if log["_source"]["issue_type"][:2].lower() == "nd":
+                    no_defect_candidate_exists = True
+            _similarity_calculator = SimilarityCalculator(
+                boosting_config,
+                weighted_similarity_calculator=self.weighted_log_similarity_calculator)
+            if no_defect_candidate_exists:
+                _similarity_calculator.find_similarity(
+                    search_res,
+                    ["message", "merged_small_logs"])
+                latest_type = None
+                latest_item = None
+                for obj in search_res["hits"]["hits"]:
+                    group_id = (obj["_id"], log_info["_id"])
+                    if group_id in _similarity_calculator.similarity_dict["message"]:
+                        sim_val = _similarity_calculator.similarity_dict["message"][group_id]
+                        if sim_val["both_empty"]:
+                            sim_val = _similarity_calculator.similarity_dict["merged_small_logs"][group_id]
+                        if not sim_val["both_empty"] and sim_val["similarity"] > 0.95:
+                            latest_type = obj["_source"]["issue_type"]
+                            latest_item = obj
+                if latest_type and latest_type[:2].lower() == "nd":
+                    return latest_item
+        return None
+
     def _send_result_to_queue(self, test_item_dict, batches, batch_logs):
         t_start = time()
         partial_res = self.es_client.es_client.msearch("\n".join(batches) + "\n")["responses"]
@@ -221,11 +286,8 @@ class AutoAnalyzerService(AnalyzerService):
                                 (not message and not merged_logs):
                             continue
                         for query_type, query in [
-                                ("without no defect", self.build_analyze_query(
-                                 launch, log, launch.analyzerConfig.numberOfLogLines)),
-                                ("with no defect", self.build_analyze_query(
-                                 launch, log, launch.analyzerConfig.numberOfLogLines,
-                                 filter_out_no_defect=False))]:
+                                ("without no defect", self.build_analyze_query(launch, log)),
+                                ("with no defect", self.build_query_with_no_defect(launch, log))]:
                             full_query = "{}\n{}".format(
                                 json.dumps({"index": index_name}), json.dumps(query))
                             batches.append(full_query)
@@ -237,7 +299,7 @@ class AutoAnalyzerService(AnalyzerService):
                                 project=launch.project,
                                 launchId=launch.launchId,
                                 launchName=launch.launchName
-                                ))
+                            ))
                             if test_item.testItemId not in test_item_dict:
                                 test_item_dict[test_item.testItemId] = []
                             test_item_dict[test_item.testItemId].append(index_in_batch)
@@ -315,6 +377,18 @@ class AutoAnalyzerService(AnalyzerService):
                     results_to_share[launch_id]["items_to_process"] += 1
                     results_to_share[launch_id]["processed_time"] += analyzer_candidates.timeProcessed
                     boosting_config = self.get_config_for_boosting(analyzer_candidates.analyzerConfig)
+
+                    relevant_with_no_defect = self.find_relevant_with_no_defect(
+                        analyzer_candidates.candidatesWithNoDefect, boosting_config)
+                    if relevant_with_no_defect is not None:
+                        analysis_result = AnalysisResult(
+                            testItem=analyzer_candidates.testItemId,
+                            issueType=relevant_with_no_defect["_source"]["issue_type"],
+                            relevantItem=relevant_with_no_defect["_source"]["test_item"])
+                        results.append(analysis_result)
+                        logger.debug("Found relevant item with No defect %s", analysis_result)
+                        continue
+
                     if project_id not in chosen_namespaces:
                         chosen_namespaces[project_id] = self.namespace_finder.get_chosen_namespaces(
                             project_id)

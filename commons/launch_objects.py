@@ -177,6 +177,7 @@ class SuggestPattern(BaseModel):
     suggestionsWithLabels: List[SuggestPatternLabel] = []
     suggestionsWithoutLabels: List[SuggestPatternLabel] = []
 
+
 class BatchLogInfo(BaseModel):
     analyzerConfig: AnalyzerConf
     testItemId: int
@@ -185,6 +186,7 @@ class BatchLogInfo(BaseModel):
     project: int
     launchId: int
     launchName: str
+
 
 class AnalysisCandidate(BaseModel):
     analyzerConfig: AnalyzerConf

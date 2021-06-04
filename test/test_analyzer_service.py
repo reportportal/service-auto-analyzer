@@ -235,7 +235,7 @@ class TestAutoAnalyzerService(TestService):
                 "msearch_results": [
                     utils.get_fixture(self.no_hits_search_rs, to_json=True),
                     utils.get_fixture(self.no_hits_search_rs, to_json=True),
-                    utils.get_fixture(self.two_hits_with_no_defect, to_json=True),
+                    utils.get_fixture(self.two_hits_search_rs, to_json=True),
                     utils.get_fixture(self.two_hits_with_no_defect, to_json=True)],
                 "index_rq":       utils.get_fixture(
                     self.launch_w_test_items_w_logs),

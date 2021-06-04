@@ -206,7 +206,7 @@ class AutoAnalyzerService(AnalyzerService):
                     ["message", "merged_small_logs"])
                 latest_type = None
                 latest_item = None
-                for obj in search_res["hits"]["hits"]:
+                for obj in reversed(search_res["hits"]["hits"]):
                     group_id = (obj["_id"], log_info["_id"])
                     if group_id in _similarity_calculator.similarity_dict["message"]:
                         sim_val = _similarity_calculator.similarity_dict["message"][group_id]

@@ -206,7 +206,8 @@ class AutoAnalyzerService(AnalyzerService):
                         sim_val = _similarity_calculator.similarity_dict["message"][group_id]
                         if sim_val["both_empty"]:
                             sim_val = _similarity_calculator.similarity_dict["merged_small_logs"][group_id]
-                        if not sim_val["both_empty"] and sim_val["similarity"] >= 0.95:
+                        threshold = self.search_cfg["NoDefectMinSimilarity"]
+                        if not sim_val["both_empty"] and sim_val["similarity"] >= threshold:
                             latest_type = obj["_source"]["issue_type"]
                             latest_item = obj
                 if latest_type and latest_type[:2].lower() == "nd":

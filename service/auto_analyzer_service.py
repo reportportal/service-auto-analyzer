@@ -42,8 +42,7 @@ class AutoAnalyzerService(AnalyzerService):
             "max_query_terms": self.search_cfg["MaxQueryTerms"],
             "min_should_match": min_should_match,
             "min_word_length": self.search_cfg["MinWordLength"],
-            "filter_min_should_match_any": self.choose_fields_to_filter_light(
-                analyzer_config.numberOfLogLines),
+            "filter_min_should_match_any": [],
             "filter_min_should_match": self.choose_fields_to_filter_strict(
                 analyzer_config.numberOfLogLines),
             "number_of_log_lines": analyzer_config.numberOfLogLines,
@@ -53,13 +52,8 @@ class AutoAnalyzerService(AnalyzerService):
 
     def choose_fields_to_filter_strict(self, log_lines):
         return [
-            "stacktrace", "potential_status_codes"]\
-            if log_lines == -1 else ["potential_status_codes"]
-
-    def choose_fields_to_filter_light(self, log_lines):
-        return [
-            "detected_message", "detected_message_without_params_extended"]\
-            if log_lines == -1 else ["message", "message_without_params_extended"]
+            "detected_message", "stacktrace", "potential_status_codes"]\
+            if log_lines == -1 else ["message", "potential_status_codes"]
 
     def add_constraints_for_launches_into_query(self, query, launch):
         if launch.analyzerConfig.analyzerMode in ["LAUNCH_NAME"]:

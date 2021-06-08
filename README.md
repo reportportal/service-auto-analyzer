@@ -68,6 +68,8 @@ volumes:
 
 **ES_LOGS_MIN_SHOULD_MATCH** - by default "0.98", the value of min should match for searching the same to investigate test items
 
+**NO_DEFECT_MIN_SHOULD_MATCH** - by default "0.98", the value of min should match for No defect test items to be equal to be used for setting in Auto-analysis
+
 **PATTERN_LABEL_MIN_PERCENT** - by default "0.9", the value of minimum percent of the same issue type for pattern to be suggested as a pattern with a label
 
 **PATTERN_LABEL_MIN_COUNT** - by default "5", the value of minimum count of pattern occurance to be suggested as a pattern with a label

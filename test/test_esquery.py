@@ -46,6 +46,7 @@ class TestEsQuery(unittest.TestCase):
         self.suggest_query_all_logs_nonempty_stacktrace_launches_with_the_same_name =\
             "suggest_query_all_logs_nonempty_stacktrace_launches_with_the_same_name.json"
         self.suggest_query_merged_small_logs_search = "suggest_query_merged_small_logs_search.json"
+        self.query_analyze_items_including_no_defect = "query_analyze_items_including_no_defect.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
             "esUser": "",
@@ -652,6 +653,37 @@ class TestEsQuery(unittest.TestCase):
             message_field="message_extended", det_mes_field="detected_message_extended",
             stacktrace_field="stacktrace_extended")
         demo_query = utils.get_fixture(self.suggest_query_merged_small_logs_search, to_json=True)
+
+        query_from_service.should.equal(demo_query)
+
+    @utils.ignore_warnings
+    def test_build_query_with_no_defect(self):
+        """Tests building analyze query with finding No defect"""
+        search_cfg = TestEsQuery.get_default_search_config()
+
+        launch = launch_objects.Launch(**{
+            "analyzerConfig": {"analyzerMode": "LAUNCH_NAME", "numberOfLogLines": -1},
+            "launchId": 12,
+            "launchName": "Launch name",
+            "project": 1})
+        log = {
+            "_id":    1,
+            "_index": 1,
+            "_source": {
+                "unique_id":        "unique",
+                "test_case_hash":   1,
+                "test_item":        "123",
+                "message":          "hello world",
+                "merged_small_logs":  "",
+                "detected_message": "hello world",
+                "detected_message_with_numbers": "hello world 1",
+                "stacktrace": "invoke.method(arg)",
+                "only_numbers": "1",
+                "found_exceptions": "AssertionError",
+                "potential_status_codes": "300 401"}}
+        query_from_service = AutoAnalyzerService(
+            self.app_config, search_cfg).build_query_with_no_defect(launch, log)
+        demo_query = utils.get_fixture(self.query_analyze_items_including_no_defect, to_json=True)
 
         query_from_service.should.equal(demo_query)
 

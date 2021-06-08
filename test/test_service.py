@@ -107,6 +107,8 @@ class TestService(unittest.TestCase):
         self.index_test_item_update_2 = "index_test_item_update_2.json"
         self.delete_by_query_1 = "delete_by_query_1.json"
         self.delete_by_query_suggest_1 = "delete_by_query_suggest_1.json"
+        self.two_hits_with_no_defect = "two_hits_with_no_defect.json"
+        self.three_hits_with_no_defect = "three_hits_with_no_defect.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
             "esUser": "",
@@ -149,6 +151,7 @@ class TestService(unittest.TestCase):
             "MaxQueryTerms":  50,
             "SearchLogsMinShouldMatch": "98%",
             "SearchLogsMinSimilarity": 0.9,
+            "NoDefectMinSimilarity": 0.98,
             "MinWordLength":  0,
             "PatternLabelMinPercentToSuggest": 0.5,
             "PatternLabelMinCountToSuggest":   5,

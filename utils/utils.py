@@ -773,3 +773,29 @@ def extract_exception(err):
     else:
         err_message = ""
     return err_message
+
+
+def find_test_methods_in_text(text):
+    test_methods = set()
+    for m in re.findall(
+            r"([^ \(\)\/\\\\:]+(Test|Step)[s]*\.[^ \(\)\/\\\\:]+)|([^ \(\)\/\\\\:]+\.spec\.js)", text):
+        if m[0].strip():
+            test_methods.add(m[0].strip())
+        if m[2].strip():
+            test_methods.add(m[2].strip())
+    final_test_methods = set()
+    for method in test_methods:
+        exceptions = get_found_exceptions(method)
+        if not exceptions:
+            final_test_methods.add(method)
+    return final_test_methods
+
+
+def replace_text_pieces(text, text_pieces):
+    for w in sorted(text_pieces, key=lambda x: len(x), reverse=True):
+        text = text.replace(w, " ")
+    return text
+
+
+def split_and_filter_empty_words(text):
+    return [_s.strip() for _s in text.split() if _s.strip()]

@@ -310,6 +310,13 @@ class SuggestService(AnalyzerService):
                                             field_name="potential_status_codes",
                                             boost=4.0,
                                             override_min_should_match="1"))
+        if log["_source"]["found_tests_and_methods"].strip():
+            query["query"]["bool"]["should"].append(
+                self.build_more_like_this_query("1",
+                                                log["_source"]["found_tests_and_methods"],
+                                                field="found_tests_and_methods",
+                                                boost=4.0,
+                                                override_min_sh_match="1"))
 
         return query
 

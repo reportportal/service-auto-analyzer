@@ -531,6 +531,7 @@ class SuggestService(AnalyzerService):
                             project=test_item_info.project,
                             testItem=test_item_info.testItemId,
                             testItemLogId=test_item_log_id,
+                            launchId=test_item_info.launchId,
                             issueType=issue_type,
                             relevantItem=test_item_id,
                             relevantLogId=relevant_log_id,

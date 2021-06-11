@@ -802,6 +802,95 @@ class TestEsClient(TestService):
 
                 TestEsClient.shutdown_server(test["test_calls"])
 
+    def test_launches(self):
+        tests = [
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.NOT_FOUND,
+                                    "content_type":   "application/json",
+                                    }],
+                "launch_remove_info": {
+                    "project": 1,
+                    "launch_ids": [1, 2]},
+                "result":     0
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/1/_delete_by_query",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.delete_by_query_2),
+                                    "rs":             json.dumps({"deleted": 1})}],
+                "launch_remove_info": {
+                    "project": 1,
+                    "launch_ids": [1, 2]},
+                "result":     1
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/rp_1",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/rp_1/_delete_by_query",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.delete_by_query_2),
+                                    "rs":             json.dumps({"deleted": 3}),
+                                    }],
+                "app_config": {
+                    "esHost": "http://localhost:9200",
+                    "esUser": "",
+                    "esPassword": "",
+                    "esVerifyCerts":     False,
+                    "esUseSsl":          False,
+                    "esSslShowWarn":     False,
+                    "turnOffSslVerification": True,
+                    "esCAcert":          "",
+                    "esClientCert":      "",
+                    "esClientKey":       "",
+                    "appVersion":        "",
+                    "minioRegion":       "",
+                    "minioBucketPrefix": "",
+                    "filesystemDefaultPath": "",
+                    "esChunkNumber":     1000,
+                    "binaryStoreType":   "minio",
+                    "minioHost":         "",
+                    "minioAccessKey":    "",
+                    "minioSecretKey":    "",
+                    "esProjectIndexPrefix": "rp_"
+                },
+                "launch_remove_info": {
+                    "project": 1,
+                    "launch_ids": [1, 2]},
+                "result":    3
+            }
+        ]
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
+                app_config = self.app_config
+                if "app_config" in test:
+                    app_config = test["app_config"]
+                es_client = esclient.EsClient(app_config=app_config,
+                                              search_cfg=self.get_default_search_config())
+                es_client.es_client.scroll = MagicMock(return_value=json.loads(
+                    utils.get_fixture(self.no_hits_search_rs)))
+                response = es_client.remove_launches(test["launch_remove_info"])
+
+                test["result"].should.equal(response)
+
+                TestEsClient.shutdown_server(test["test_calls"])
+
 
 if __name__ == '__main__':
     unittest.main()

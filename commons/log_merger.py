@@ -66,7 +66,8 @@ class LogMerger:
     @staticmethod
     def decompose_logs_merged_and_without_duplicates(logs):
         """Merge big logs with small ones without duplcates"""
-        log_level_messages = {"message": {}, "found_exceptions": {}, "potential_status_codes": {}}
+        log_level_messages = {"message": {}, "found_exceptions": {}, "potential_status_codes": {},
+                              "found_tests_and_methods": {}}
         log_level_ids_to_add = {}
         log_level_ids_merged = {}
         logs_unique_log_level = {}

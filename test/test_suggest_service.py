@@ -262,7 +262,7 @@ class TestSuggestService(TestService):
                                                          usedLogLines=-1,
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
-                                                         methodName="suggest")],
+                                                         methodName="suggestion")],
                 "boost_predict":       ([1], [[0.2, 0.8]])
             },
             {
@@ -314,7 +314,7 @@ class TestSuggestService(TestService):
                                                          usedLogLines=-1,
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
-                                                         methodName="suggest")],
+                                                         methodName="suggestion")],
                 "boost_predict":       ([1], [[0.3, 0.7]])
             },
             {
@@ -366,7 +366,7 @@ class TestSuggestService(TestService):
                                                          usedLogLines=-1,
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
-                                                         methodName="suggest")],
+                                                         methodName="suggestion")],
                 "boost_predict":       ([1, 0], [[0.3, 0.7], [0.9, 0.1]])
             },
             {
@@ -418,7 +418,7 @@ class TestSuggestService(TestService):
                                                          usedLogLines=-1,
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
-                                                         methodName="suggest"),
+                                                         methodName="suggestion"),
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=123,
                                                          testItemLogId=178,
@@ -436,7 +436,7 @@ class TestSuggestService(TestService):
                                                          usedLogLines=-1,
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
-                                                         methodName="suggest")],
+                                                         methodName="suggestion")],
                 "boost_predict":       ([1, 0], [[0.3, 0.7], [0.55, 0.45]])
             },
             {
@@ -488,7 +488,7 @@ class TestSuggestService(TestService):
                                                          usedLogLines=-1,
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
-                                                         methodName="suggest"),
+                                                         methodName="suggestion"),
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=123,
                                                          testItemLogId=178,
@@ -506,7 +506,7 @@ class TestSuggestService(TestService):
                                                          usedLogLines=-1,
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
-                                                         methodName="suggest"),
+                                                         methodName="suggestion"),
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=123,
                                                          testItemLogId=178,
@@ -524,7 +524,7 @@ class TestSuggestService(TestService):
                                                          usedLogLines=-1,
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
-                                                         methodName="suggest")],
+                                                         methodName="suggestion")],
                 "boost_predict":       ([1, 0, 1], [[0.3, 0.7], [0.55, 0.45], [0.2, 0.8]])
             },
             {
@@ -576,7 +576,7 @@ class TestSuggestService(TestService):
                                                          usedLogLines=-1,
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
-                                                         methodName="suggest"),
+                                                         methodName="suggestion"),
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=123,
                                                          testItemLogId=178,
@@ -594,7 +594,7 @@ class TestSuggestService(TestService):
                                                          usedLogLines=-1,
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
-                                                         methodName="suggest"),
+                                                         methodName="suggestion"),
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=123,
                                                          testItemLogId=178,
@@ -612,7 +612,7 @@ class TestSuggestService(TestService):
                                                          usedLogLines=-1,
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
-                                                         methodName="suggest")],
+                                                         methodName="suggestion")],
                 "boost_predict":       ([1, 1, 1], [[0.3, 0.7], [0.3, 0.7], [0.3, 0.7]])
             },
             {
@@ -665,7 +665,7 @@ class TestSuggestService(TestService):
                                                          usedLogLines=-1,
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
-                                                         methodName="suggest")],
+                                                         methodName="suggestion")],
                 "boost_predict":       ([1], [[0.1, 0.9]])
             },
             {
@@ -740,7 +740,7 @@ class TestSuggestService(TestService):
                                                          usedLogLines=-1,
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
-                                                         methodName="suggest")],
+                                                         methodName="suggestion")],
                 "boost_predict":       ([1], [[0.1, 0.9]])
             },
             {

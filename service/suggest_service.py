@@ -230,7 +230,7 @@ class SuggestService(AnalyzerService):
         index_name = self.build_index_name(defect_update_info["project"])
         index_name = utils.unite_project_name(index_name, self.app_config["esProjectIndexPrefix"])
         if not self.es_client.index_exists(index_name):
-            return
+            return 0
         batch_size = 1000
         log_update_queries = []
         for i in range(int(len(test_item_ids) / batch_size) + 1):
@@ -256,8 +256,9 @@ class SuggestService(AnalyzerService):
                             "userChoice": 0
                         }
                     })
-        self.es_client._bulk_index(log_update_queries)
+        result = self.es_client._bulk_index(log_update_queries)
         logger.info("Finished updating suggest info for %.2f sec.", time() - t_start)
+        return result.took
 
     def get_config_for_boosting_suggests(self, analyzerConfig):
         return {

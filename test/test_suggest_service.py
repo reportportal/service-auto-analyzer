@@ -1389,6 +1389,95 @@ class TestSuggestService(TestService):
 
                 TestSuggestService.shutdown_server(test["test_calls"])
 
+    def test_suggest_info_update(self):
+        tests = [
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1_suggest",
+                                    "status":         HTTPStatus.NOT_FOUND,
+                                    "content_type":   "application/json",
+                                    }],
+                "defect_update_info": {
+                    "project": 1,
+                    "itemsToUpdate": {1: "pb001", 2: "ab001"}},
+                "result":     0
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1_suggest",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/1_suggest/_search?scroll=5m&size=1000",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.get_suggest_info_by_test_item_ids_query),
+                                    "rs":             utils.get_fixture(
+                                        self.suggest_info_test_items_by_id_1),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.suggest_index_test_item_update),
+                                    "rs":             utils.get_fixture(
+                                        self.index_logs_rs),
+                                    }],
+                "defect_update_info": {
+                    "project": 1,
+                    "itemsToUpdate": {1: "pb001", 2: "ab001"}},
+                "result":     1
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1_suggest",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/1_suggest/_search?scroll=5m&size=1000",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.get_suggest_info_by_test_item_ids_query),
+                                    "rs":             utils.get_fixture(
+                                        self.suggest_info_test_items_by_id_2),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.suggest_index_test_item_update_2),
+                                    "rs":             utils.get_fixture(
+                                        self.index_logs_rs),
+                                    }],
+                "defect_update_info": {
+                    "project": 1,
+                    "itemsToUpdate": {1: "pb001", 2: "ab001"}},
+                "result":     2
+            },
+        ]
+
+        for idx, test in enumerate(tests):
+            with sure.ensure('Error in the test case number: {0}', idx):
+                self._start_server(test["test_calls"])
+                app_config = self.app_config
+                if "app_config" in test:
+                    app_config = test["app_config"]
+                suggest_service = SuggestService(app_config=app_config,
+                                                 search_cfg=self.get_default_search_config())
+                suggest_service.es_client.es_client.scroll = MagicMock(return_value=json.loads(
+                    utils.get_fixture(self.no_hits_search_rs)))
+                response = suggest_service.update_suggest_info(test["defect_update_info"])
+
+                test["result"].should.equal(response)
+
+                TestSuggestService.shutdown_server(test["test_calls"])
+
 
 if __name__ == '__main__':
     unittest.main()

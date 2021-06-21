@@ -111,6 +111,12 @@ class TestService(unittest.TestCase):
         self.delete_by_query_suggest_2 = "delete_by_query_suggest_2.json"
         self.two_hits_with_no_defect = "two_hits_with_no_defect.json"
         self.three_hits_with_no_defect = "three_hits_with_no_defect.json"
+        self.get_suggest_info_by_test_item_ids_query =\
+            "get_suggest_info_by_test_item_ids_query.json"
+        self.suggest_info_test_items_by_id_1 = "suggest_info_test_items_by_id_1.json"
+        self.suggest_info_test_items_by_id_2 = "suggest_info_test_items_by_id_2.json"
+        self.suggest_index_test_item_update = "suggest_index_test_item_update.json"
+        self.suggest_index_test_item_update_2 = "suggest_index_test_item_update_2.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
             "esUser": "",

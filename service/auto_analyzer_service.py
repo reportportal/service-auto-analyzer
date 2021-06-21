@@ -470,7 +470,8 @@ class AutoAnalyzerService(AnalyzerService):
                                 minShouldMatch=self.find_min_should_match_threshold(
                                     analyzer_candidates.analyzerConfig),
                                 processedTime=time() - t_start_item,
-                                methodName="auto_analysis"))
+                                methodName="auto_analysis",
+                                userChoice=1))  # default choice in AA, user will change via defect change
 
                             results.append(analysis_result)
                             logger.debug(analysis_result)

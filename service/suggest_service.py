@@ -207,6 +207,58 @@ class SuggestService(AnalyzerService):
         )
         return deleted_logs
 
+    def build_query_for_getting_suggest_info(self, test_item_ids):
+        return {
+            "_source": ["testItem", "issueType"],
+            "size": self.app_config["esChunkNumber"],
+            "query": {
+                "bool": {
+                    "must": [
+                        {"terms": {"testItem": test_item_ids}},
+                        {"term": {"methodName": "auto_analysis"}},
+                        {"term": {"userChoice": 1}}
+                    ]
+                }
+            }}
+
+    def update_suggest_info(self, defect_update_info):
+        logger.info("Started updating suggest info")
+        t_start = time()
+        test_item_ids = [int(key_) for key_ in defect_update_info["itemsToUpdate"].keys()]
+        defect_update_info["itemsToUpdate"] = {
+            int(key_): val for key_, val in defect_update_info["itemsToUpdate"].items()}
+        index_name = self.build_index_name(defect_update_info["project"])
+        index_name = utils.unite_project_name(index_name, self.app_config["esProjectIndexPrefix"])
+        if not self.es_client.index_exists(index_name):
+            return
+        batch_size = 1000
+        log_update_queries = []
+        for i in range(int(len(test_item_ids) / batch_size) + 1):
+            sub_test_item_ids = test_item_ids[i * batch_size: (i + 1) * batch_size]
+            if not sub_test_item_ids:
+                continue
+            for res in elasticsearch.helpers.scan(self.es_client.es_client,
+                                                  query=self.build_query_for_getting_suggest_info(
+                                                      sub_test_item_ids),
+                                                  index=index_name):
+                issue_type = ""
+                try:
+                    test_item_id = int(res["_source"]["testItem"])
+                    issue_type = defect_update_info["itemsToUpdate"][test_item_id]
+                except: # noqa
+                    pass
+                if issue_type.strip() and issue_type != res["_source"]["issueType"]:
+                    log_update_queries.append({
+                        "_op_type": "update",
+                        "_id": res["_id"],
+                        "_index": index_name,
+                        "doc": {
+                            "userChoice": 0
+                        }
+                    })
+        self.es_client._bulk_index(log_update_queries)
+        logger.info("Finished updating suggest info for %.2f sec.", time() - t_start)
+
     def get_config_for_boosting_suggests(self, analyzerConfig):
         return {
             "max_query_terms": self.search_cfg["MaxQueryTerms"],

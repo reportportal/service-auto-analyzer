@@ -220,7 +220,7 @@ class AnalysisModelTraining:
             "query": {
                 "bool": {
                     "must": [
-                        {"term": {"methodName": "suggest"}}
+                        {"term": {"methodName": "suggestion"}}
                     ]
                 }
             }
@@ -260,9 +260,9 @@ class AnalysisModelTraining:
         cur_number_of_logs_0 = 0
         cur_number_of_logs_1 = 0
         for query_name, query in [
-                ("auto_analysis", self.get_search_query_aa(0)),
-                ("suggest", self.get_search_query_suggest()),
-                ("auto_analysis", self.get_search_query_aa(1))]:
+                ("auto_analysis 0s", self.get_search_query_aa(0)),
+                ("suggestion", self.get_search_query_suggest()),
+                ("auto_analysis 1s", self.get_search_query_aa(1))]:
             if cur_number_of_logs >= max_number_of_logs:
                 break
             for res in elasticsearch.helpers.scan(self.es_client.es_client,
@@ -286,9 +286,11 @@ class AnalysisModelTraining:
                     cur_number_of_logs_1 += 1
                 else:
                     cur_number_of_logs_0 += 1
-                if query_name == "suggest" and self.stop_gathering_info_from_suggest_query(
+                if query_name == "suggestion" and self.stop_gathering_info_from_suggest_query(
                         cur_number_of_logs_1, cur_number_of_logs_0, max_number_of_logs):
                     break
+            logger.debug("Query: '%s', results number: %d, number of 1s: %d",
+                         query_name, cur_number_of_logs, cur_number_of_logs_1)
         log_id_dict = self.query_logs(project_id, log_ids_to_find)
         return gathered_suggested_data, log_id_dict
 

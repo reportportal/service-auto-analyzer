@@ -257,6 +257,14 @@ class SuggestService(AnalyzerService):
                         }
                     })
         result = self.es_client._bulk_index(log_update_queries)
+        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+            for model_type in ["suggestion", "auto_analysis"]:
+                AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                    self.app_config["exchangeName"], "train_models", json.dumps({
+                        "model_type": model_type,
+                        "project_id": defect_update_info["project"],
+                        "gathered_metric_total": result.took
+                    }))
         logger.info("Finished updating suggest info for %.2f sec.", time() - t_start)
         return result.took
 
@@ -610,7 +618,7 @@ class SuggestService(AnalyzerService):
                             minShouldMatch=self.find_min_should_match_threshold(
                                 test_item_info.analyzerConfig),
                             processedTime=processed_time,
-                            methodName="suggest")
+                            methodName="suggestion")
                         results.append(analysis_result)
                         logger.debug(analysis_result)
                         global_idx += 1

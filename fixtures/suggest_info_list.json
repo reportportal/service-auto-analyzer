@@ -17,7 +17,8 @@
     "usedLogLines": -1,
     "minShouldMatch": 80,
     "processedTime": 10.0,
-    "isUserChoice": 1
+    "isUserChoice": 1,
+    "methodName": "suggest"
 },
 {
     "project": 1,
@@ -38,5 +39,6 @@
     "usedLogLines": -1,
     "minShouldMatch": 80,
     "processedTime": 10.0,
-    "isUserChoice": 0
+    "isUserChoice": 0,
+    "methodName": "suggest"
 }]

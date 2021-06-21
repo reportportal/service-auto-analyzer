@@ -124,6 +124,7 @@ class SuggestAnalysisResult(BaseModel):
     minShouldMatch: int
     processedTime: float
     userChoice: int = 0
+    methodName: str
 
 
 class CleanIndex(BaseModel):

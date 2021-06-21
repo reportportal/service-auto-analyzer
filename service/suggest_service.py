@@ -86,9 +86,11 @@ class SuggestService(AnalyzerService):
                 if result["userChoice"] == 1:
                     chosen_data = result
                     break
+            if chosen_data["methodName"] == "auto_analysis":
+                continue
             chosen_data["notFoundResults"] = 0
             if chosen_data["userChoice"] == 1:
-                chosen_data["reciprocalRank"] = 1 / chosen_data["resultPosition"]
+                chosen_data["reciprocalRank"] = 1 / (chosen_data["resultPosition"] + 1)
             else:
                 chosen_data["reciprocalRank"] = 0.0
             chosen_data["reciprocalRank"] = int(chosen_data["reciprocalRank"] * 100)
@@ -554,10 +556,11 @@ class SuggestService(AnalyzerService):
                             usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
                             minShouldMatch=self.find_min_should_match_threshold(
                                 test_item_info.analyzerConfig),
-                            processedTime=processed_time)
+                            processedTime=processed_time,
+                            methodName="suggest")
                         results.append(analysis_result)
                         logger.debug(analysis_result)
-                    global_idx += 1
+                        global_idx += 1
             else:
                 logger.debug("There are no results for test item %s", test_item_info.testItemId)
         except Exception as err:

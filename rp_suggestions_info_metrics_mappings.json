@@ -71,6 +71,9 @@
         },
         "module_version": {
             "type": "keyword"
+        },
+        "methodName": {
+            "type": "keyword"
         }
     }
 }

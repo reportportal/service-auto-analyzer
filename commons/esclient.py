@@ -491,6 +491,9 @@ class EsClient:
                     ]
                 }}}
 
+    def build_delete_query_by_launch_ids(self, launch_ids):
+        return {"query": {"bool": {"filter": [{"terms": {"launch_id": launch_ids}}]}}}
+
     @utils.ignore_warnings
     def remove_test_items(self, remove_items_info):
         logger.info("Started removing test items")
@@ -504,17 +507,35 @@ class EsClient:
         return deleted_logs
 
     @utils.ignore_warnings
-    def delete_by_query(self, index_name, test_item_ids, delete_query_deriver):
+    def remove_launches(self, remove_launches_info):
+        project = remove_launches_info["project"]
+        launch_ids = remove_launches_info["launch_ids"]
+        logger.info("Started removing launches")
+        t_start = time()
+        index_name = utils.unite_project_name(
+            str(project), self.app_config["esProjectIndexPrefix"]
+        )
+        deleted_logs = self.delete_by_query(
+            index_name,
+            launch_ids,
+            self.build_delete_query_by_launch_ids,
+        )
+        logger.debug("Removed %s logs by launch ids", deleted_logs)
+        logger.info("Finished removing launches. It took %.2f sec", time() - t_start)
+        return deleted_logs
+
+    @utils.ignore_warnings
+    def delete_by_query(self, index_name, ids_for_removal, delete_query_deriver):
         if not self.index_exists(index_name):
             return 0
         batch_size = 1000
         deleted_logs = 0
-        for i in range(int(len(test_item_ids) / batch_size) + 1):
-            sub_test_item_ids = test_item_ids[i * batch_size: (i + 1) * batch_size]
-            if not sub_test_item_ids:
+        for i in range(int(len(ids_for_removal) / batch_size) + 1):
+            sub_ids_for_removal = ids_for_removal[i * batch_size: (i + 1) * batch_size]
+            if not sub_ids_for_removal:
                 continue
             result = self.es_client.delete_by_query(
-                index_name, body=delete_query_deriver(sub_test_item_ids))
+                index_name, body=delete_query_deriver(sub_ids_for_removal))
             if "deleted" in result:
                 deleted_logs += result["deleted"]
         return deleted_logs

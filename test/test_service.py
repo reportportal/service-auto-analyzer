@@ -106,7 +106,9 @@ class TestService(unittest.TestCase):
         self.index_test_item_update = "index_test_item_update.json"
         self.index_test_item_update_2 = "index_test_item_update_2.json"
         self.delete_by_query_1 = "delete_by_query_1.json"
+        self.delete_by_query_2 = "delete_by_query_2.json"
         self.delete_by_query_suggest_1 = "delete_by_query_suggest_1.json"
+        self.delete_by_query_suggest_2 = "delete_by_query_suggest_2.json"
         self.two_hits_with_no_defect = "two_hits_with_no_defect.json"
         self.three_hits_with_no_defect = "three_hits_with_no_defect.json"
         self.app_config = {

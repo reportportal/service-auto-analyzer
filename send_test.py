@@ -253,10 +253,16 @@ delete_test_items = {
     "itemsToDelete": [5, 78, 113]
 }
 
+delete_launches = {
+    "project": 34,
+    "launch_ids": [2, 42]
+}
+
 index_suggest_info_items = [{
     "project": 34,
     "testItem": 5,
     "testItemLogId": 1,
+    "launchId": 2,
     "issueType": "pb001",
     "relevantItem": 3,
     "relevantLogId": 4,
@@ -298,6 +304,8 @@ elif used_method.strip() in ["defect_update"]:
     response = rpc.call(json.dumps(defect_update_data), used_method)
 elif used_method.strip() in ["item_remove"]:
     response = rpc.call(json.dumps(delete_test_items), used_method)
+elif used_method.strip() in ["launch_remove"]:
+    response = rpc.call(json.dumps(delete_launches), used_method)
 elif used_method.strip() in ["index_suggest_info"]:
     response = rpc.call(json.dumps(index_suggest_info_items), used_method)
 elif used_method.strip() in ["cluster"]:

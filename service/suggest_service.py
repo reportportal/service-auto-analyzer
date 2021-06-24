@@ -129,6 +129,9 @@ class SuggestService(AnalyzerService):
                 }
             }}
 
+    def build_suggest_info_ids_query_by_launch_ids(self, launch_ids):
+        return {"query": {"bool": {"filter": [{"terms": {"launchId": launch_ids}}]}}}
+
     def clean_suggest_info_logs(self, clean_index):
         """Delete logs from elasticsearch"""
         index_name = self.build_index_name(clean_index.project)
@@ -177,6 +180,29 @@ class SuggestService(AnalyzerService):
             self.build_suggest_info_ids_query_by_test_item)
         logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
                     remove_items_info["itemsToDelete"], index_name, time() - t_start)
+        return deleted_logs
+
+    def clean_suggest_info_logs_by_launch_id(self, launch_remove_info):
+        """Delete logs with specified launch ids from elasticsearch"""
+        project = launch_remove_info["project"]
+        launch_ids = launch_remove_info["launch_ids"]
+        index_name = self.build_index_name(project)
+        index_name = utils.unite_project_name(
+            index_name, self.app_config["esProjectIndexPrefix"]
+        )
+        logger.info("Delete launches %s for the index %s", launch_ids, index_name)
+        t_start = time()
+        deleted_logs = self.es_client.delete_by_query(
+            index_name, launch_ids, self.build_suggest_info_ids_query_by_launch_ids
+        )
+        logger.info(
+            "Finished deleting launches %s for the project %s. It took %.2f sec. "
+            "%s logs deleted",
+            launch_ids,
+            index_name,
+            time() - t_start,
+            deleted_logs
+        )
         return deleted_logs
 
     def get_config_for_boosting_suggests(self, analyzerConfig):
@@ -416,6 +442,7 @@ class SuggestService(AnalyzerService):
             "project": test_item_info.project,
             "testItem": test_item_info.testItemId,
             "testItemLogId": "",
+            "launchId": test_item_info.launchId,
             "issueType": "",
             "relevantItem": "",
             "relevantLogId": "",
@@ -504,6 +531,7 @@ class SuggestService(AnalyzerService):
                             project=test_item_info.project,
                             testItem=test_item_info.testItemId,
                             testItemLogId=test_item_log_id,
+                            launchId=test_item_info.launchId,
                             issueType=issue_type,
                             relevantItem=test_item_id,
                             relevantLogId=relevant_log_id,

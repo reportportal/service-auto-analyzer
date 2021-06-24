@@ -9,6 +9,9 @@
         "testItemLogId": {
             "type": "keyword"
         },
+        "launchId": {
+            "type": "integer"
+        },
         "issueType": {
             "type": "keyword"
         },

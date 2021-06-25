@@ -581,20 +581,21 @@ def get_potential_status_codes(text):
 def choose_issue_type(predicted_labels, predicted_labels_probability,
                       issue_type_names, scores_by_issue_type):
     predicted_issue_type = ""
-    max_val = 0.0
+    max_prob = 0.0
     max_val_start_time = None
     for i in range(len(predicted_labels)):
         if predicted_labels[i] == 1:
             issue_type = issue_type_names[i]
             chosen_type = scores_by_issue_type[issue_type]
             start_time = chosen_type["mrHit"]["_source"]["start_time"]
-            if (predicted_labels_probability[i][1] > max_val) or\
-                    ((predicted_labels_probability[i][1] == max_val) and # noqa
+            if (predicted_labels_probability[i][1] > max_prob) or\
+                    ((predicted_labels_probability[i][1] == max_prob) and # noqa
                         (max_val_start_time is None or start_time > max_val_start_time)):
-                max_val = predicted_labels_probability[i][1]
+                max_prob = predicted_labels_probability[i][1]
                 predicted_issue_type = issue_type
+                global_idx = i
                 max_val_start_time = start_time
-    return predicted_issue_type
+    return predicted_issue_type, max_prob, global_idx
 
 
 def prepare_message_for_clustering(message, number_of_log_lines):

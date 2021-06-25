@@ -14,7 +14,7 @@
 * limitations under the License.
 """
 from utils import utils
-from commons.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate
+from commons.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult
 from boosting_decision_making import boosting_featurizer
 from service.analyzer_service import AnalyzerService
 from amqp.amqp import AmqpClient
@@ -341,6 +341,7 @@ class AutoAnalyzerService(AnalyzerService):
         es_query_thread = Thread(target=self._query_elasticsearch, args=(launches, ))
         es_query_thread.daemon = True
         es_query_thread.start()
+        analyzed_results_for_index = []
         try:
             results = []
             t_start = time()
@@ -435,7 +436,7 @@ class AutoAnalyzerService(AnalyzerService):
                                          predicted_labels_probability[i][1],
                                          feature_data[i])
 
-                        predicted_issue_type = utils.choose_issue_type(
+                        predicted_issue_type, prob, global_idx = utils.choose_issue_type(
                             predicted_labels,
                             predicted_labels_probability,
                             issue_type_names,
@@ -447,6 +448,33 @@ class AutoAnalyzerService(AnalyzerService):
                             analysis_result = AnalysisResult(testItem=analyzer_candidates.testItemId,
                                                              issueType=predicted_issue_type,
                                                              relevantItem=relevant_item)
+                            feature_names = ";".join(
+                                [str(f_) for f_ in _boosting_decision_maker.get_feature_ids()])
+                            analyzed_results_for_index.append(SuggestAnalysisResult(
+                                project=analyzer_candidates.project,
+                                testItem=analyzer_candidates.testItemId,
+                                testItemLogId=chosen_type["compared_log"]["_id"],
+                                launchId=analyzer_candidates.launchId,
+                                launchName=analyzer_candidates.launchName,
+                                issueType=predicted_issue_type,
+                                relevantItem=relevant_item,
+                                relevantLogId=chosen_type["mrHit"]["_id"],
+                                isMergedLog=chosen_type["compared_log"]["_source"]["is_merged"],
+                                matchScore=round(prob * 100, 2),
+                                esScore=round(chosen_type["mrHit"]["_score"], 2),
+                                esPosition=chosen_type["mrHit"]["es_pos"],
+                                modelFeatureNames=feature_names,
+                                modelFeatureValues=";".join(
+                                    [str(feature) for feature in feature_data[global_idx]]),
+                                modelInfo=";".join(model_info_tags),
+                                resultPosition=0,
+                                usedLogLines=analyzer_candidates.analyzerConfig.numberOfLogLines,
+                                minShouldMatch=self.find_min_should_match_threshold(
+                                    analyzer_candidates.analyzerConfig),
+                                processedTime=time() - t_start_item,
+                                methodName="auto_analysis",
+                                userChoice=1))  # default choice in AA, user will change via defect change
+
                             results.append(analysis_result)
                             logger.debug(analysis_result)
                         else:
@@ -464,6 +492,9 @@ class AutoAnalyzerService(AnalyzerService):
                             utils.extract_exception(err))
                         results_to_share[launch_id]["errors_count"] += 1
             if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+                AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                    self.app_config["exchangeName"], "index_suggest_info",
+                    json.dumps([_info.dict() for _info in analyzed_results_for_index]))
                 for launch_id in results_to_share:
                     results_to_share[launch_id]["model_info"] = list(
                         results_to_share[launch_id]["model_info"])

@@ -112,13 +112,14 @@ def handle_amqp_request(channel, method, props, body,
         return False
     if publish_result:
         try:
-            channel.basic_publish(exchange='',
-                                  routing_key=props.reply_to,
-                                  properties=pika.BasicProperties(
-                                      correlation_id=props.correlation_id,
-                                      content_type="application/json"),
-                                  mandatory=False,
-                                  body=response_body)
+            if props.reply_to:
+                channel.basic_publish(exchange='',
+                                      routing_key=props.reply_to,
+                                      properties=pika.BasicProperties(
+                                          correlation_id=props.correlation_id,
+                                          content_type="application/json"),
+                                      mandatory=False,
+                                      body=response_body)
         except Exception as err:
             logger.error("Failed to publish result")
             logger.error(err)

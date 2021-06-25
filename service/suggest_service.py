@@ -86,9 +86,11 @@ class SuggestService(AnalyzerService):
                 if result["userChoice"] == 1:
                     chosen_data = result
                     break
+            if chosen_data["methodName"] == "auto_analysis":
+                continue
             chosen_data["notFoundResults"] = 0
             if chosen_data["userChoice"] == 1:
-                chosen_data["reciprocalRank"] = 1 / chosen_data["resultPosition"]
+                chosen_data["reciprocalRank"] = 1 / (chosen_data["resultPosition"] + 1)
             else:
                 chosen_data["reciprocalRank"] = 0.0
             chosen_data["reciprocalRank"] = int(chosen_data["reciprocalRank"] * 100)
@@ -204,6 +206,67 @@ class SuggestService(AnalyzerService):
             deleted_logs
         )
         return deleted_logs
+
+    def build_query_for_getting_suggest_info(self, test_item_ids):
+        return {
+            "_source": ["testItem", "issueType"],
+            "size": self.app_config["esChunkNumber"],
+            "query": {
+                "bool": {
+                    "must": [
+                        {"terms": {"testItem": test_item_ids}},
+                        {"term": {"methodName": "auto_analysis"}},
+                        {"term": {"userChoice": 1}}
+                    ]
+                }
+            }}
+
+    def update_suggest_info(self, defect_update_info):
+        logger.info("Started updating suggest info")
+        t_start = time()
+        test_item_ids = [int(key_) for key_ in defect_update_info["itemsToUpdate"].keys()]
+        defect_update_info["itemsToUpdate"] = {
+            int(key_): val for key_, val in defect_update_info["itemsToUpdate"].items()}
+        index_name = self.build_index_name(defect_update_info["project"])
+        index_name = utils.unite_project_name(index_name, self.app_config["esProjectIndexPrefix"])
+        if not self.es_client.index_exists(index_name):
+            return 0
+        batch_size = 1000
+        log_update_queries = []
+        for i in range(int(len(test_item_ids) / batch_size) + 1):
+            sub_test_item_ids = test_item_ids[i * batch_size: (i + 1) * batch_size]
+            if not sub_test_item_ids:
+                continue
+            for res in elasticsearch.helpers.scan(self.es_client.es_client,
+                                                  query=self.build_query_for_getting_suggest_info(
+                                                      sub_test_item_ids),
+                                                  index=index_name):
+                issue_type = ""
+                try:
+                    test_item_id = int(res["_source"]["testItem"])
+                    issue_type = defect_update_info["itemsToUpdate"][test_item_id]
+                except: # noqa
+                    pass
+                if issue_type.strip() and issue_type != res["_source"]["issueType"]:
+                    log_update_queries.append({
+                        "_op_type": "update",
+                        "_id": res["_id"],
+                        "_index": index_name,
+                        "doc": {
+                            "userChoice": 0
+                        }
+                    })
+        result = self.es_client._bulk_index(log_update_queries)
+        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+            for model_type in ["suggestion", "auto_analysis"]:
+                AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                    self.app_config["exchangeName"], "train_models", json.dumps({
+                        "model_type": model_type,
+                        "project_id": defect_update_info["project"],
+                        "gathered_metric_total": result.took
+                    }))
+        logger.info("Finished updating suggest info for %.2f sec.", time() - t_start)
+        return result.took
 
     def get_config_for_boosting_suggests(self, analyzerConfig):
         return {
@@ -450,6 +513,7 @@ class SuggestService(AnalyzerService):
             "testItem": test_item_info.testItemId,
             "testItemLogId": "",
             "launchId": test_item_info.launchId,
+            "launchName": test_item_info.launchName,
             "issueType": "",
             "relevantItem": "",
             "relevantLogId": "",
@@ -465,7 +529,8 @@ class SuggestService(AnalyzerService):
             "processedTime": processed_time,
             "notFoundResults": 100,
             "savedDate": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "module_version": [self.app_config["appVersion"]]
+            "module_version": [self.app_config["appVersion"]],
+            "methodName": "suggestion"
         }
 
     @utils.ignore_warnings
@@ -539,6 +604,7 @@ class SuggestService(AnalyzerService):
                             testItem=test_item_info.testItemId,
                             testItemLogId=test_item_log_id,
                             launchId=test_item_info.launchId,
+                            launchName=test_item_info.launchName,
                             issueType=issue_type,
                             relevantItem=test_item_id,
                             relevantLogId=relevant_log_id,
@@ -554,10 +620,11 @@ class SuggestService(AnalyzerService):
                             usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
                             minShouldMatch=self.find_min_should_match_threshold(
                                 test_item_info.analyzerConfig),
-                            processedTime=processed_time)
+                            processedTime=processed_time,
+                            methodName="suggestion")
                         results.append(analysis_result)
                         logger.debug(analysis_result)
-                    global_idx += 1
+                        global_idx += 1
             else:
                 logger.debug("There are no results for test item %s", test_item_info.testItemId)
         except Exception as err:

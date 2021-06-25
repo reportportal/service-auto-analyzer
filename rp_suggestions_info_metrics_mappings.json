@@ -12,6 +12,9 @@
         "launchId": {
             "type": "integer"
         },
+        "launchName": {
+            "type": "keyword"
+        },
         "issueType": {
             "type": "keyword"
         },
@@ -70,6 +73,9 @@
             "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
         },
         "module_version": {
+            "type": "keyword"
+        },
+        "methodName": {
             "type": "keyword"
         }
     }

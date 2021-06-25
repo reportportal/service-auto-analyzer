@@ -78,7 +78,7 @@ class EsClient:
                             "potential_status_codes", "original_message_lines",
                             "original_message_words_number", "issue_type", "launch_id",
                             "launch_name", "unique_id", "test_case_hash", "start_time",
-                            "is_auto_analyzed", "cluster_id", "cluster_message"],
+                            "is_auto_analyzed", "cluster_id", "cluster_message", "found_tests_and_methods"],
                 "size": self.app_config["esChunkNumber"],
                 "query": {
                     "bool": {
@@ -480,6 +480,9 @@ class EsClient:
         self._bulk_index(log_update_queries)
         items_not_updated = list(set(test_item_ids) - found_test_items)
         logger.debug("Not updated test items: %s", items_not_updated)
+        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+            AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                self.app_config["exchangeName"], "update_suggest_info", json.dumps(defect_update_info))
         logger.info("Finished updating defect types. It took %.2f sec", time() - t_start)
         return items_not_updated
 

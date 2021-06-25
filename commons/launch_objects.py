@@ -109,6 +109,7 @@ class SuggestAnalysisResult(BaseModel):
     testItem: int
     testItemLogId: int
     launchId: int
+    launchName: str
     issueType: str
     relevantItem: int
     relevantLogId: int
@@ -124,6 +125,7 @@ class SuggestAnalysisResult(BaseModel):
     minShouldMatch: int
     processedTime: float
     userChoice: int = 0
+    methodName: str
 
 
 class CleanIndex(BaseModel):

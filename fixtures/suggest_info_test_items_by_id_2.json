@@ -1,0 +1,49 @@
+{
+    "_scroll_id":"DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAADl8Wa1lLdFBYRHlRanF6V3BoS1lpRjhQQQ==",
+    "took": 13,
+    "timed_out": false,
+    "_shards": {
+        "total": 1,
+        "successful": 1,
+        "failed": 0
+    },
+    "hits": {
+        "total": {
+            "value": 2,
+            "relation": "eq"
+        },
+        "max_score": 20,
+        "hits": [
+            {
+                "_index": "1_suggest",
+                "_type": "log",
+                "_id": "1",
+                "_score": 15,
+                "_source": {
+                    "testItem": 1,
+                    "issueType": "si001"
+                }
+            },
+            {
+                "_index": "1_suggest",
+                "_type": "log",
+                "_id": "2",
+                "_score": 10,
+                "_source": {
+                    "testItem": 1,
+                    "issueType": "pb001"
+                }
+            },
+            {
+                "_index": "1_suggest",
+                "_type": "log",
+                "_id": "3",
+                "_score": 10,
+                "_source": {
+                    "testItem": 2,
+                    "issueType": "si001"
+                }
+            }
+        ]
+    }
+}

@@ -261,6 +261,14 @@ def init_amqp(_amqp_client):
                                                         prepare_response_data=amqp_handler.
                                                         output_result))))
         threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
+                       (APP_CONFIG["exchangeName"], "update_suggest_info", True, False,
+                       lambda channel, method, props, body:
+                       amqp_handler.handle_amqp_request(channel, method, props, body,
+                                                        SuggestService(
+                                                            APP_CONFIG,
+                                                            SEARCH_CONFIG).update_suggest_info,
+                                                        prepare_data_func=lambda x: x))))
+        threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                        (APP_CONFIG["exchangeName"], "remove_models", True, False,
                        lambda channel, method, props, body:
                        amqp_handler.handle_amqp_request(channel, method, props, body,

@@ -277,7 +277,8 @@ index_suggest_info_items = [{
     "usedLogLines": -1,
     "minShouldMatch": 80,
     "userChoice": 1,
-    "processedTime": 0.11
+    "processedTime": 0.11,
+    "methodName": "suggest"
 }]
 
 used_method = sys.argv[1] if len(sys.argv) > 1 else "index"
@@ -319,7 +320,7 @@ elif used_method.strip() in ["cluster"]:
                                         "numberOfLogLines": number_lines}), used_method)
 else:
     response = rpc.call(json.dumps(index_data), used_method)
-    print(" [.] Got %r" % response)
+if used_method.strip() in ["index"]:
     rpc.call_without_wait(json.dumps(index_data), "namespace_finder")
     print("Namespace_finder info was processed")
 print(" [.] Got %r" % response)

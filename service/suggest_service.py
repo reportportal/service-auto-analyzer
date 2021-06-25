@@ -548,6 +548,8 @@ class SuggestService(AnalyzerService):
         results = []
         errors_found = []
         errors_count = 0
+        model_info_tags = []
+        feature_names = ""
         try:
             unique_logs = utils.leave_only_unique_logs(test_item_info.logs)
             prepared_logs = [self.log_preparation._prepare_log_for_suggests(test_item_info, log, index_name)
@@ -573,6 +575,8 @@ class SuggestService(AnalyzerService):
             scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
             model_info_tags = _boosting_data_gatherer.get_used_model_info() +\
                 _suggest_decision_maker_to_use.get_model_info()
+            feature_names = ";".join(
+                [str(feature) for feature in _suggest_decision_maker_to_use.get_feature_ids()])
             if feature_data:
                 predicted_labels, predicted_labels_probability = _suggest_decision_maker_to_use.predict(
                     feature_data)
@@ -597,8 +601,6 @@ class SuggestService(AnalyzerService):
                         is_merged = real_log_id != str(relevant_log_id)
                         test_item_log_id = utils.extract_real_id(
                             scores_by_test_items[test_item_id]["compared_log"]["_id"])
-                        feature_names = ";".join(
-                            [str(feature) for feature in _suggest_decision_maker_to_use.get_feature_ids()])
                         analysis_result = SuggestAnalysisResult(
                             project=test_item_info.project,
                             testItem=test_item_info.testItemId,
@@ -651,7 +653,7 @@ class SuggestService(AnalyzerService):
                 "_index": self.rp_suggest_metrics_index_template,
                 "_source": self.prepare_not_found_object_info(
                     test_item_info, time() - t_start,
-                    ";".join([str(feature) for feature in _suggest_decision_maker_to_use.get_feature_ids()]),
+                    feature_names,
                     model_info_tags)
             }])
         if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():

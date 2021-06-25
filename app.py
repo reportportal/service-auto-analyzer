@@ -50,6 +50,7 @@ APP_CONFIG = {
     "analyzerPriority":  int(os.getenv("ANALYZER_PRIORITY", "1")),
     "analyzerIndex":     json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),
     "analyzerLogSearch": json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower()),
+    "analyzerSuggest":   json.loads(os.getenv("ANALYZER_SUGGEST", "true").lower()),
     "turnOffSslVerification": json.loads(os.getenv("ES_TURN_OFF_SSL_VERIFICATION", "false").lower()),
     "esVerifyCerts":     json.loads(os.getenv("ES_VERIFY_CERTS", "false").lower()),
     "esUseSsl":          json.loads(os.getenv("ES_USE_SSL", "false").lower()),
@@ -120,6 +121,7 @@ def declare_exchange(channel, config):
                                      "analyzer_index":      config["analyzerIndex"],
                                      "analyzer_priority":   config["analyzerPriority"],
                                      "analyzer_log_search": config["analyzerLogSearch"],
+                                     "analyzer_suggest":    config["analyzerSuggest"],
                                      "version":             APP_CONFIG["appVersion"], })
     except Exception as err:
         logger.error("Failed to declare exchange")

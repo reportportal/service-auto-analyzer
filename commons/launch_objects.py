@@ -109,6 +109,7 @@ class SuggestAnalysisResult(BaseModel):
     testItem: int
     testItemLogId: int
     launchId: int
+    launchName: str
     issueType: str
     relevantItem: int
     relevantLogId: int

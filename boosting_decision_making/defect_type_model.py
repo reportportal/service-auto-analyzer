@@ -45,15 +45,17 @@ class DefectTypeModel:
         return []
 
     def load_model(self, folder):
-        self.count_vectorizer_models = pickle.load(
-            open(os.path.join(folder, "count_vectorizer_models.pickle"), "rb"))
-        self.models = pickle.load(open(os.path.join(folder, "models.pickle"), "rb"))
+        with open(os.path.join(folder, "count_vectorizer_models.pickle"), "rb") as f:
+            self.count_vectorizer_models = pickle.load(f)
+        with open(os.path.join(folder, "models.pickle"), "rb") as f:
+            self.models = pickle.load(f)
 
     def save_model(self, folder):
         os.makedirs(folder, exist_ok=True)
-        pickle.dump(self.count_vectorizer_models,
-                    open(os.path.join(folder, "count_vectorizer_models.pickle"), "wb"))
-        pickle.dump(self.models, open(os.path.join(folder, "models.pickle"), "wb"))
+        with open(os.path.join(folder, "count_vectorizer_models.pickle"), "wb") as f:
+            pickle.dump(self.count_vectorizer_models, f)
+        with open(os.path.join(folder, "models.pickle"), "wb") as f:
+            pickle.dump(self.models, f)
 
     def train_model(self, name, train_data_x, labels):
         self.count_vectorizer_models[name] = TfidfVectorizer(

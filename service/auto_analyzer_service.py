@@ -454,6 +454,8 @@ class AutoAnalyzerService(AnalyzerService):
                                 project=analyzer_candidates.project,
                                 testItem=analyzer_candidates.testItemId,
                                 testItemLogId=chosen_type["compared_log"]["_id"],
+                                launchId=analyzer_candidates.launchId,
+                                launchName=analyzer_candidates.launchName,
                                 issueType=predicted_issue_type,
                                 relevantItem=relevant_item,
                                 relevantLogId=chosen_type["mrHit"]["_id"],

@@ -12,6 +12,9 @@
         "launchId": {
             "type": "integer"
         },
+        "launchName": {
+            "type": "keyword"
+        },
         "issueType": {
             "type": "keyword"
         },

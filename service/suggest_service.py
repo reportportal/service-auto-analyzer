@@ -513,6 +513,7 @@ class SuggestService(AnalyzerService):
             "testItem": test_item_info.testItemId,
             "testItemLogId": "",
             "launchId": test_item_info.launchId,
+            "launchName": test_item_info.launchName,
             "issueType": "",
             "relevantItem": "",
             "relevantLogId": "",
@@ -528,7 +529,8 @@ class SuggestService(AnalyzerService):
             "processedTime": processed_time,
             "notFoundResults": 100,
             "savedDate": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "module_version": [self.app_config["appVersion"]]
+            "module_version": [self.app_config["appVersion"]],
+            "methodName": "suggestion"
         }
 
     @utils.ignore_warnings
@@ -602,6 +604,7 @@ class SuggestService(AnalyzerService):
                             testItem=test_item_info.testItemId,
                             testItemLogId=test_item_log_id,
                             launchId=test_item_info.launchId,
+                            launchName=test_item_info.launchName,
                             issueType=issue_type,
                             relevantItem=test_item_id,
                             relevantLogId=relevant_log_id,

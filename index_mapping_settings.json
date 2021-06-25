@@ -115,6 +115,10 @@
         "whole_message": {
             "type":     "text",
             "analyzer": "standard_english_analyzer"
+        },
+        "found_tests_and_methods": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
         }
     }
 }

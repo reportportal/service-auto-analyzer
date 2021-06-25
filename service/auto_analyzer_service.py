@@ -44,16 +44,19 @@ class AutoAnalyzerService(AnalyzerService):
             "min_word_length": self.search_cfg["MinWordLength"],
             "filter_min_should_match_any": [],
             "filter_min_should_match": self.choose_fields_to_filter_strict(
-                analyzer_config.numberOfLogLines),
+                analyzer_config.numberOfLogLines, min_should_match),
             "number_of_log_lines": analyzer_config.numberOfLogLines,
             "filter_by_unique_id": True,
             "boosting_model": self.search_cfg["BoostModelFolder"]
         }
 
-    def choose_fields_to_filter_strict(self, log_lines):
-        return [
+    def choose_fields_to_filter_strict(self, log_lines, min_should_match):
+        fields = [
             "detected_message", "stacktrace", "potential_status_codes"]\
             if log_lines == -1 else ["message", "potential_status_codes"]
+        if min_should_match > 0.99:
+            fields.append("found_tests_and_methods")
+        return fields
 
     def add_constraints_for_launches_into_query(self, query, launch):
         if launch.analyzerConfig.analyzerMode in ["LAUNCH_NAME"]:
@@ -149,6 +152,13 @@ class AutoAnalyzerService(AnalyzerService):
                 self.build_more_like_this_query("1",
                                                 log["_source"]["potential_status_codes"],
                                                 field_name="potential_status_codes",
+                                                boost=4.0,
+                                                override_min_should_match="1"))
+        if log["_source"]["found_tests_and_methods"].strip():
+            query["query"]["bool"]["should"].append(
+                self.build_more_like_this_query("1",
+                                                log["_source"]["found_tests_and_methods"],
+                                                field_name="found_tests_and_methods",
                                                 boost=4.0,
                                                 override_min_should_match="1"))
 

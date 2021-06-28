@@ -58,7 +58,17 @@ class AnalyzerService:
             "max_query_terms":      self.search_cfg["MaxQueryTerms"],
             "boost": boost, }}
 
-    def build_common_query(self, log, size=10):
+    def prepare_restrictions_by_issue_type(self, filter_no_defect=True):
+        conditions = [{"wildcard": {"issue_type": "TI*"}},
+                      {"wildcard": {"issue_type": "ti*"}}]
+        if filter_no_defect:
+            return conditions + [{"wildcard": {"issue_type": "nd*"}},
+                                 {"wildcard": {"issue_type": "ND*"}}]
+        return conditions
+
+    def build_common_query(self, log, size=10, filter_no_defect=True):
+        issue_type_conditions = self.prepare_restrictions_by_issue_type(
+            filter_no_defect=filter_no_defect)
         return {"size": size,
                 "sort": ["_score",
                          {"start_time": "desc"}, ],
@@ -68,11 +78,7 @@ class AnalyzerService:
                             {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
                             {"exists": {"field": "issue_type"}},
                         ],
-                        "must_not": [
-                            {"wildcard": {"issue_type": "TI*"}},
-                            {"wildcard": {"issue_type": "ti*"}},
-                            {"wildcard": {"issue_type": "nd*"}},
-                            {"wildcard": {"issue_type": "ND*"}},
+                        "must_not": issue_type_conditions + [
                             {"term": {"test_item": log["_source"]["test_item"]}}
                         ],
                         "must": [],

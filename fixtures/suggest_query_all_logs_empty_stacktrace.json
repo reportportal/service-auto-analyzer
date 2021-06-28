@@ -12,8 +12,6 @@
             "must_not": [
                 {"wildcard": {"issue_type": "TI*"}},
                 {"wildcard": {"issue_type": "ti*"}},
-                {"wildcard": {"issue_type": "nd*"}},
-                {"wildcard": {"issue_type": "ND*"}},
                 {"term": {"test_item": "123"}},
                 {"wildcard": {"stacktrace_extended": "*"}}
             ],

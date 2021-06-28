@@ -297,7 +297,7 @@ class SuggestService(AnalyzerService):
             else self.search_cfg["MinShouldMatch"]
         log_lines = test_item_info.analyzerConfig.numberOfLogLines
 
-        query = self.build_common_query(log, size=size)
+        query = self.build_common_query(log, size=size, filter_no_defect=False)
 
         if test_item_info.analyzerConfig.analyzerMode in ["LAUNCH_NAME"]:
             query["query"]["bool"]["must"].append(

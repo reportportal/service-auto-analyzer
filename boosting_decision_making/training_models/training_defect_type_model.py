@@ -153,7 +153,8 @@ class DefectTypeModelTraining:
                 "baseline_model": [baseline_model], "new_model": [model_name],
                 "project_id": project_info["project_id"], "model_saved": 0, "p_value": 1.0,
                 "data_proportion": 0.0, "baseline_mean_metric": 0.0, "new_model_mean_metric": 0.0,
-                "bad_data_proportion": 0, "metric_name": "F1", "errors": [], "errors_count": 0}
+                "bad_data_proportion": 0, "metric_name": "F1", "errors": [], "errors_count": 0,
+                "time_spent": 0.0}
 
     def load_data_for_training(self, project_info, baseline_model, model_name):
         train_log_info = {}

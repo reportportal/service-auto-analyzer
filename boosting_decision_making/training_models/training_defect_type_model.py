@@ -88,7 +88,8 @@ class DefectTypeModelTraining:
                 "bool": {
                     "filter": [
                         {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
-                        {"exists": {"field": "issue_type"}}
+                        {"exists": {"field": "issue_type"}},
+                        {"term": {"is_merged": False}}
                     ],
                     "must": [
                         {

@@ -83,7 +83,7 @@ class DefectTypeModelTraining:
         return {
             "_source": ["detected_message_without_params_and_brackets", "issue_type", "launch_id"],
             "sort": {"start_time": "desc"},
-            "size": 10000,
+            "size": self.app_config["esChunkNumber"],
             "query": {
                 "bool": {
                     "filter": [

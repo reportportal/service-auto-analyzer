@@ -37,7 +37,6 @@ class NamespaceFinderService:
         t_start = time()
         log_words, project_id = self.log_preparation.prepare_log_words(launches)
         logger.debug("Project id %s", project_id)
-        logger.debug("Found namespaces %s", log_words)
         if project_id is not None:
             self.namespace_finder.update_namespaces(
                 project_id, log_words)

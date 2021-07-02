@@ -164,7 +164,7 @@ class DefectTypeModelTraining:
         labels_to_find_queue = Queue()
         errors = []
         errors_count = 0
-        
+
         for label in self.label2inds:
             labels_to_find_queue.put(label)
         while not labels_to_find_queue.empty():

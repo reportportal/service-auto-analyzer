@@ -213,6 +213,8 @@ class EsClient:
                 test_item_queue.put((launch, test_item))
                 launch_ids.add(launch.launchId)
         del launches
+        if project is None:
+            return commons.launch_objects.BulkResponse(took=0, errors=False)
         project_with_prefix = utils.unite_project_name(
             project, self.app_config["esProjectIndexPrefix"])
         self.create_index_if_not_exists(project_with_prefix)

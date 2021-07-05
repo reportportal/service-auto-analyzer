@@ -740,13 +740,16 @@ def to_number_list(features_list):
 
 def fill_prevously_gathered_features(feature_list, feature_ids):
     previously_gathered_features = {}
-    if type(feature_ids) == str:
-        feature_ids = transform_string_feature_range_into_list(feature_ids)
-    for i in range(len(feature_list)):
-        for idx, feature in enumerate(feature_ids):
-            if feature not in previously_gathered_features:
-                previously_gathered_features[feature] = []
-            previously_gathered_features[feature].append(feature_list[i][idx])
+    try:
+        if type(feature_ids) == str:
+            feature_ids = to_number_list(feature_ids)
+        for i in range(len(feature_list)):
+            for idx, feature in enumerate(feature_ids):
+                if feature not in previously_gathered_features:
+                    previously_gathered_features[feature] = []
+                previously_gathered_features[feature].append(feature_list[i][idx])
+    except Exception as err:
+        logger.error(err)
     return previously_gathered_features
 
 

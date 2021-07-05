@@ -727,11 +727,14 @@ def topological_sort(feature_graph):
 
 def to_number_list(features_list):
     feature_numbers_list = []
-    for res in features_list.split(","):
+    for res in features_list.split(";"):
         try:
             feature_numbers_list.append(int(res))
         except: # noqa
-            feature_numbers_list.append(float(res))
+            try:
+                feature_numbers_list.append(float(res))
+            except: # noqa
+                pass
     return feature_numbers_list
 
 

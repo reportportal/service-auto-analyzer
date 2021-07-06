@@ -141,24 +141,24 @@ def init_amqp(_amqp_client):
             logger.error(err)
             return
     threads = []
-    _es_client = EsClient(APP_CONFIG, SEARCH_CONFIG)
-    _retraining_service = RetrainingService(APP_CONFIG, SEARCH_CONFIG)
-    _auto_analyzer_service = AutoAnalyzerService(APP_CONFIG, SEARCH_CONFIG)
-    _delete_index_service = DeleteIndexService(APP_CONFIG, SEARCH_CONFIG)
-    _clean_index_service = CleanIndexService(APP_CONFIG, SEARCH_CONFIG)
-    _analyzer_service = AnalyzerService(APP_CONFIG, SEARCH_CONFIG)
-    _suggest_service = SuggestService(APP_CONFIG, SEARCH_CONFIG)
-    _search_service = SearchService(APP_CONFIG, SEARCH_CONFIG)
-    _cluster_service = ClusterService(APP_CONFIG, SEARCH_CONFIG)
-    _namespace_finder_service = NamespaceFinderService(APP_CONFIG, SEARCH_CONFIG)
-    _suggest_patterns_service = SuggestPatternsService(APP_CONFIG, SEARCH_CONFIG)
     if APP_CONFIG["instanceTaskType"] == "train":
+        _retraining_service = RetrainingService(APP_CONFIG, SEARCH_CONFIG)
         threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                        (APP_CONFIG["exchangeName"], "train_models", True, False,
                        lambda channel, method, props, body:
                        amqp_handler.handle_inner_amqp_request(channel, method, props, body,
                                                               _retraining_service.train_models))))
     else:
+        _es_client = EsClient(APP_CONFIG, SEARCH_CONFIG)
+        _auto_analyzer_service = AutoAnalyzerService(APP_CONFIG, SEARCH_CONFIG)
+        _delete_index_service = DeleteIndexService(APP_CONFIG, SEARCH_CONFIG)
+        _clean_index_service = CleanIndexService(APP_CONFIG, SEARCH_CONFIG)
+        _analyzer_service = AnalyzerService(APP_CONFIG, SEARCH_CONFIG)
+        _suggest_service = SuggestService(APP_CONFIG, SEARCH_CONFIG)
+        _search_service = SearchService(APP_CONFIG, SEARCH_CONFIG)
+        _cluster_service = ClusterService(APP_CONFIG, SEARCH_CONFIG)
+        _namespace_finder_service = NamespaceFinderService(APP_CONFIG, SEARCH_CONFIG)
+        _suggest_patterns_service = SuggestPatternsService(APP_CONFIG, SEARCH_CONFIG)
         threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                        (APP_CONFIG["exchangeName"], "index", True, False,
                        lambda channel, method, props, body:

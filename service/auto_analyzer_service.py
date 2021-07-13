@@ -450,15 +450,17 @@ class AutoAnalyzerService(AnalyzerService):
                                                              relevantItem=relevant_item)
                             feature_names = ";".join(
                                 [str(f_) for f_ in _boosting_decision_maker.get_feature_ids()])
+                            relevant_log_id = utils.extract_real_id(chosen_type["mrHit"]["_id"])
+                            test_item_log_id = utils.extract_real_id(chosen_type["compared_log"]["_id"])
                             analyzed_results_for_index.append(SuggestAnalysisResult(
                                 project=analyzer_candidates.project,
                                 testItem=analyzer_candidates.testItemId,
-                                testItemLogId=chosen_type["compared_log"]["_id"],
+                                testItemLogId=test_item_log_id,
                                 launchId=analyzer_candidates.launchId,
                                 launchName=analyzer_candidates.launchName,
                                 issueType=predicted_issue_type,
                                 relevantItem=relevant_item,
-                                relevantLogId=chosen_type["mrHit"]["_id"],
+                                relevantLogId=relevant_log_id,
                                 isMergedLog=chosen_type["compared_log"]["_source"]["is_merged"],
                                 matchScore=round(prob * 100, 2),
                                 esScore=round(chosen_type["mrHit"]["_score"], 2),

@@ -18,6 +18,7 @@ import json
 import logging
 import requests
 import urllib3
+import traceback
 import elasticsearch
 import elasticsearch.helpers
 import commons.launch_objects
@@ -40,6 +41,8 @@ class EsClient:
         self.search_cfg = search_cfg
         self.es_client = self.create_es_client(app_config)
         self.log_preparation = LogPreparation()
+        self.tables_to_recreate = ["rp_aa_stats", "rp_model_train_stats",
+                                   "rp_suggestions_info_metrics"]
 
     def create_es_client(self, app_config):
         if not app_config["esVerifyCerts"]:
@@ -48,6 +51,7 @@ class EsClient:
             return elasticsearch.Elasticsearch(
                 [self.host], timeout=30,
                 max_retries=5, retry_on_timeout=True,
+                http_auth=(app_config["esUser"], app_config["esPassword"]),
                 use_ssl=app_config["esUseSsl"],
                 verify_certs=app_config["esVerifyCerts"],
                 ssl_show_warn=app_config["esSslShowWarn"],
@@ -58,6 +62,7 @@ class EsClient:
         return elasticsearch.Elasticsearch(
             [self.host], timeout=30,
             max_retries=5, retry_on_timeout=True,
+            http_auth=(app_config["esUser"], app_config["esPassword"]),
             use_ssl=app_config["esUseSsl"],
             verify_certs=app_config["esVerifyCerts"],
             ssl_show_warn=app_config["esSslShowWarn"],
@@ -73,7 +78,7 @@ class EsClient:
                             "potential_status_codes", "original_message_lines",
                             "original_message_words_number", "issue_type", "launch_id",
                             "launch_name", "unique_id", "test_case_hash", "start_time",
-                            "is_auto_analyzed", "cluster_id", "cluster_message"],
+                            "is_auto_analyzed", "cluster_id", "cluster_message", "found_tests_and_methods"],
                 "size": self.app_config["esChunkNumber"],
                 "query": {
                     "bool": {
@@ -116,7 +121,7 @@ class EsClient:
         """Check whether elasticsearch is healthy"""
         try:
             url = utils.build_url(self.host, ["_cluster/health"])
-            res = utils.send_request(url, "GET")
+            res = utils.send_request(url, "GET", self.app_config["esUser"], self.app_config["esPassword"])
             return res["status"] in ["green", "yellow"]
         except Exception as err:
             logger.error("Elasticsearch is not healthy")
@@ -156,7 +161,7 @@ class EsClient:
     def list_indices(self):
         """Get all indices from elasticsearch"""
         url = utils.build_url(self.host, ["_cat", "indices?format=json"])
-        res = utils.send_request(url, "GET")
+        res = utils.send_request(url, "GET", self.app_config["esUser"], self.app_config["esPassword"])
         return res
 
     def index_exists(self, index_name, print_error=True):
@@ -208,6 +213,8 @@ class EsClient:
                 test_item_queue.put((launch, test_item))
                 launch_ids.add(launch.launchId)
         del launches
+        if project is None:
+            return commons.launch_objects.BulkResponse(took=0, errors=False)
         project_with_prefix = utils.unite_project_name(
             project, self.app_config["esProjectIndexPrefix"])
         self.create_index_if_not_exists(project_with_prefix)
@@ -298,6 +305,18 @@ class EsClient:
         if bodies:
             self._bulk_index(bodies)
 
+    def _recreate_index_if_needed(self, bodies, formatted_exception):
+        index_name = ""
+        if bodies:
+            index_name = bodies[0]["_index"]
+        if not index_name.strip():
+            return
+        if "'type': 'mapper_parsing_exception'" in formatted_exception or\
+                "RequestError(400, 'illegal_argument_exception'" in formatted_exception:
+            if index_name in self.tables_to_recreate:
+                self.delete_index(index_name)
+                self.create_index_for_stats_info(index_name)
+
     def _bulk_index(self, bodies, host=None, es_client=None, refresh=True):
         if host is None:
             host = self.host
@@ -315,8 +334,9 @@ class EsClient:
                                                                    chunk_size=es_chunk_number,
                                                                    request_timeout=30,
                                                                    refresh=refresh)
-            except Exception as err:
-                logger.error(err)
+            except: # noqa
+                formatted_exception = traceback.format_exc()
+                self._recreate_index_if_needed(bodies, formatted_exception)
                 self.update_settings_after_read_only(host)
                 success_count, errors = elasticsearch.helpers.bulk(es_client,
                                                                    bodies,
@@ -386,9 +406,13 @@ class EsClient:
                     "", "%s_mappings.json" % rp_aa_stats_index, to_json=True)
             })
         else:
-            self.es_client.indices.put_mapping(
-                index=index_name,
-                body=utils.read_json_file("", "%s_mappings.json" % rp_aa_stats_index, to_json=True))
+            try:
+                self.es_client.indices.put_mapping(
+                    index=index_name,
+                    body=utils.read_json_file("", "%s_mappings.json" % rp_aa_stats_index, to_json=True))
+            except: # noqa
+                formatted_exception = traceback.format_exc()
+                self._recreate_index_if_needed([{"_index": index_name}], formatted_exception)
 
     @utils.ignore_warnings
     def send_stats_info(self, stats_info):
@@ -407,3 +431,116 @@ class EsClient:
             })
         self._bulk_index(stat_info_array)
         logger.info("Finished sending stats about analysis")
+
+    def get_test_items_by_ids_query(self, test_item_ids):
+        return {"_source": ["test_item"],
+                "size": self.app_config["esChunkNumber"],
+                "query": {
+                    "bool": {
+                        "filter": [
+                            {"terms": {"test_item": test_item_ids}}
+                        ]
+                    }}}
+
+    @utils.ignore_warnings
+    def defect_update(self, defect_update_info):
+        logger.info("Started updating defect types")
+        t_start = time()
+        test_item_ids = [int(key_) for key_ in defect_update_info["itemsToUpdate"].keys()]
+        defect_update_info["itemsToUpdate"] = {
+            int(key_): val for key_, val in defect_update_info["itemsToUpdate"].items()}
+        index_name = utils.unite_project_name(
+            str(defect_update_info["project"]), self.app_config["esProjectIndexPrefix"])
+        if not self.index_exists(index_name):
+            return test_item_ids
+        batch_size = 1000
+        log_update_queries = []
+        found_test_items = set()
+        for i in range(int(len(test_item_ids) / batch_size) + 1):
+            sub_test_item_ids = test_item_ids[i * batch_size: (i + 1) * batch_size]
+            if not sub_test_item_ids:
+                continue
+            for log in elasticsearch.helpers.scan(self.es_client,
+                                                  query=self.get_test_items_by_ids_query(sub_test_item_ids),
+                                                  index=index_name):
+                issue_type = ""
+                try:
+                    test_item_id = int(log["_source"]["test_item"])
+                    found_test_items.add(test_item_id)
+                    issue_type = defect_update_info["itemsToUpdate"][test_item_id]
+                except: # noqa
+                    pass
+                if issue_type.strip():
+                    log_update_queries.append({
+                        "_op_type": "update",
+                        "_id": log["_id"],
+                        "_index": index_name,
+                        "doc": {
+                            "issue_type": issue_type
+                        }
+                    })
+        self._bulk_index(log_update_queries)
+        items_not_updated = list(set(test_item_ids) - found_test_items)
+        logger.debug("Not updated test items: %s", items_not_updated)
+        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+            AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                self.app_config["exchangeName"], "update_suggest_info", json.dumps(defect_update_info))
+        logger.info("Finished updating defect types. It took %.2f sec", time() - t_start)
+        return items_not_updated
+
+    def build_delete_query_by_test_items(self, sub_test_item_ids):
+        return {"query": {
+                "bool": {
+                    "filter": [
+                        {"terms": {"test_item": sub_test_item_ids}}
+                    ]
+                }}}
+
+    def build_delete_query_by_launch_ids(self, launch_ids):
+        return {"query": {"bool": {"filter": [{"terms": {"launch_id": launch_ids}}]}}}
+
+    @utils.ignore_warnings
+    def remove_test_items(self, remove_items_info):
+        logger.info("Started removing test items")
+        t_start = time()
+        index_name = utils.unite_project_name(
+            str(remove_items_info["project"]), self.app_config["esProjectIndexPrefix"])
+        deleted_logs = self.delete_by_query(
+            index_name, remove_items_info["itemsToDelete"], self.build_delete_query_by_test_items)
+        logger.debug("Removed %s logs by test item ids", deleted_logs)
+        logger.info("Finished removing test items. It took %.2f sec", time() - t_start)
+        return deleted_logs
+
+    @utils.ignore_warnings
+    def remove_launches(self, remove_launches_info):
+        project = remove_launches_info["project"]
+        launch_ids = remove_launches_info["launch_ids"]
+        logger.info("Started removing launches")
+        t_start = time()
+        index_name = utils.unite_project_name(
+            str(project), self.app_config["esProjectIndexPrefix"]
+        )
+        deleted_logs = self.delete_by_query(
+            index_name,
+            launch_ids,
+            self.build_delete_query_by_launch_ids,
+        )
+        logger.debug("Removed %s logs by launch ids", deleted_logs)
+        logger.info("Finished removing launches. It took %.2f sec", time() - t_start)
+        return deleted_logs
+
+    @utils.ignore_warnings
+    def delete_by_query(self, index_name, ids_for_removal, delete_query_deriver):
+        if not self.index_exists(index_name):
+            return 0
+        batch_size = 1000
+        deleted_logs = 0
+        for i in range(int(len(ids_for_removal) / batch_size) + 1):
+            sub_ids_for_removal = ids_for_removal[i * batch_size: (i + 1) * batch_size]
+            if not sub_ids_for_removal:
+                continue
+            result = self.es_client.delete_by_query(
+                index_name, body=delete_query_deriver(sub_ids_for_removal))
+            if "deleted" in result:
+                deleted_logs += result["deleted"]
+        return deleted_logs

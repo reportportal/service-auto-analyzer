@@ -126,6 +126,17 @@ class AnalysisModelTraining:
             new_model_results[metric].append(metric_res)
         return new_model_results
 
+    def deduplicate_data(self, data, labels):
+        data_wo_duplicates = []
+        labels_wo_duplicates = []
+        data_set = set()
+        for i in range(len(data)):
+            if tuple(data[i]) not in data_set:
+                data_set.add(tuple(data[i]))
+                data_wo_duplicates.append(data[i])
+                labels_wo_duplicates.append(labels[i])
+        return data_wo_duplicates, labels_wo_duplicates
+
     def split_data(self, data, labels, random_state, test_item_ids_with_pos):
         x_ids = [i for i in range(len(data))]
         x_train_ids, x_test_ids, y_train, y_test = train_test_split(
@@ -150,6 +161,7 @@ class AnalysisModelTraining:
             bad_data = True
 
         if not bad_data:
+            data, labels = self.deduplicate_data(data, labels)
             for random_state in random_states:
                 x_train, x_test, y_train, y_test, test_item_ids_with_pos_test = self.split_data(
                     data, labels, random_state, test_item_ids_with_pos)
@@ -175,41 +187,16 @@ class AnalysisModelTraining:
         gathered_data = utils.gather_feature_list(previously_gathered_features, desired_features)
         return gathered_data
 
-    def query_es_for_suggest_info(self, project_id):
-        search_query = {
-            "sort": {"savedDate": "desc"},
-            "size": 10000,
-        }
-        log_ids_to_find = set()
-        gathered_suggested_data = []
-        log_id_pairs_set = set()
-        index_name = utils.unite_project_name(
-            str(project_id) + "_suggest", self.app_config["esProjectIndexPrefix"])
+    def query_logs(self, project_id, log_ids_to_find):
+        log_ids_to_find = list(log_ids_to_find)
         project_index_name = utils.unite_project_name(
             str(project_id), self.app_config["esProjectIndexPrefix"])
-        for res in elasticsearch.helpers.scan(self.es_client.es_client,
-                                              query=search_query,
-                                              index=index_name,
-                                              scroll="5m"):
-            if len(gathered_suggested_data) >= 30000:
-                break
-            log_ids_pair = (res["_source"]["testItemLogId"], res["_source"]["relevantLogId"])
-            if log_ids_pair in log_id_pairs_set:
-                continue
-            log_id_pairs_set.add(log_ids_pair)
-            for col in ["testItemLogId", "relevantLogId"]:
-                log_id = res["_source"][col]
-                if res["_source"]["isMergedLog"]:
-                    log_id = log_id + "_m"
-                log_ids_to_find.add(log_id)
-            gathered_suggested_data.append(res)
-        log_ids_to_find = list(log_ids_to_find)
         batch_size = 1000
         log_id_dict = {}
         for i in range(int(len(log_ids_to_find) / batch_size) + 1):
             log_ids = log_ids_to_find[i * batch_size: (i + 1) * batch_size]
             ids_query = {
-                "size": 10000,
+                "size": self.app_config["esChunkNumber"],
                 "query": {
                     "bool": {
                         "filter": [
@@ -224,6 +211,94 @@ class AnalysisModelTraining:
                                                 index=project_index_name,
                                                 scroll="5m"):
                 log_id_dict[r["_id"]] = r
+        return log_id_dict
+
+    def get_search_query_suggest(self):
+        return {
+            "sort": {"savedDate": "desc"},
+            "size": self.app_config["esChunkNumber"],
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"methodName": "suggestion"}}
+                    ]
+                }
+            }
+        }
+
+    def get_search_query_aa(self, user_choice):
+        return {
+            "sort": {"savedDate": "desc"},
+            "size": self.app_config["esChunkNumber"],
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"methodName": "auto_analysis"}},
+                        {"term": {"userChoice": user_choice}}
+                    ]
+                }
+            }
+        }
+
+    def stop_gathering_info_from_suggest_query(self, num_of_1s, num_of_0s, max_num):
+        if (num_of_1s + num_of_0s) == 0:
+            return False
+        percent_logs = (num_of_1s + num_of_0s) / max_num
+        percent_1s = num_of_1s / (num_of_1s + num_of_0s)
+        if percent_logs >= 0.8 and percent_1s <= 0.2:
+            return True
+        return False
+
+    def query_es_for_suggest_info(self, project_id):
+        log_ids_to_find = set()
+        gathered_suggested_data = []
+        log_id_pairs_set = set()
+        index_name = utils.unite_project_name(
+            str(project_id) + "_suggest", self.app_config["esProjectIndexPrefix"])
+        max_number_of_logs = 30000
+        cur_number_of_logs = 0
+        cur_number_of_logs_0 = 0
+        cur_number_of_logs_1 = 0
+        unique_saved_features = set()
+        for query_name, query in [
+                ("auto_analysis 0s", self.get_search_query_aa(0)),
+                ("suggestion", self.get_search_query_suggest()),
+                ("auto_analysis 1s", self.get_search_query_aa(1))]:
+            if cur_number_of_logs >= max_number_of_logs:
+                break
+            for res in elasticsearch.helpers.scan(self.es_client.es_client,
+                                                  query=query,
+                                                  index=index_name,
+                                                  scroll="5m"):
+                if cur_number_of_logs >= max_number_of_logs:
+                    break
+                saved_model_features = "{}|{}".format(
+                    res["_source"]["modelFeatureNames"],
+                    res["_source"]["modelFeatureValues"])
+                if saved_model_features in unique_saved_features:
+                    continue
+                unique_saved_features.add(saved_model_features)
+                log_ids_pair = (res["_source"]["testItemLogId"], res["_source"]["relevantLogId"])
+                if log_ids_pair in log_id_pairs_set:
+                    continue
+                log_id_pairs_set.add(log_ids_pair)
+                for col in ["testItemLogId", "relevantLogId"]:
+                    log_id = res["_source"][col]
+                    if res["_source"]["isMergedLog"]:
+                        log_id = log_id + "_m"
+                    log_ids_to_find.add(log_id)
+                gathered_suggested_data.append(res)
+                cur_number_of_logs += 1
+                if res["_source"]["userChoice"] == 1:
+                    cur_number_of_logs_1 += 1
+                else:
+                    cur_number_of_logs_0 += 1
+                if query_name == "suggestion" and self.stop_gathering_info_from_suggest_query(
+                        cur_number_of_logs_1, cur_number_of_logs_0, max_number_of_logs):
+                    break
+            logger.debug("Query: '%s', results number: %d, number of 1s: %d",
+                         query_name, cur_number_of_logs, cur_number_of_logs_1)
+        log_id_dict = self.query_logs(project_id, log_ids_to_find)
         return gathered_suggested_data, log_id_dict
 
     def gather_data(self, model_type, project_id, features, defect_type_model_to_use):
@@ -258,7 +333,7 @@ class AnalysisModelTraining:
                 feature_data, _ = _boosting_data_gatherer.gather_features_info()
                 if feature_data:
                     full_data_features.extend(feature_data)
-                    labels.append(int(_suggest_res["_source"]["isUserChoice"]))
+                    labels.append(_suggest_res["_source"]["userChoice"])
                     test_item_ids_with_pos.append(_suggest_res["_source"]["testItem"])
         return np.asarray(full_data_features), np.asarray(labels), test_item_ids_with_pos
 

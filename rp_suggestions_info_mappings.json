@@ -9,6 +9,12 @@
         "testItemLogId": {
             "type": "keyword"
         },
+        "launchId": {
+            "type": "integer"
+        },
+        "launchName": {
+            "type": "keyword"
+        },
         "issueType": {
             "type": "keyword"
         },
@@ -50,8 +56,8 @@
         "minShouldMatch": {
             "type": "integer"
         },
-        "isUserChoice": {
-            "type": "boolean"
+        "userChoice": {
+            "type": "integer"
         },
         "processedTime": {
             "type": "float"
@@ -59,6 +65,12 @@
         "savedDate": {
             "type":   "date",
             "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        },
+        "module_version": {
+            "type": "keyword"
+        },
+        "methodName": {
+            "type": "keyword"
         }
     }
 }

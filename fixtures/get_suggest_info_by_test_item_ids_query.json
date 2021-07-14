@@ -1,0 +1,12 @@
+{"_source": ["testItem", "issueType"],
+ "size": 1000,
+ "query": {
+    "bool": {
+        "must": [
+            {"terms": {"testItem": [1, 2]}},
+            {"term": {"methodName": "auto_analysis"}},
+            {"term": {"userChoice": 1}}
+        ]
+    }
+},
+"sort": "_doc"}

@@ -58,7 +58,17 @@ class AnalyzerService:
             "max_query_terms":      self.search_cfg["MaxQueryTerms"],
             "boost": boost, }}
 
-    def build_common_query(self, log, size=10):
+    def prepare_restrictions_by_issue_type(self, filter_no_defect=True):
+        conditions = [{"wildcard": {"issue_type": "TI*"}},
+                      {"wildcard": {"issue_type": "ti*"}}]
+        if filter_no_defect:
+            return conditions + [{"wildcard": {"issue_type": "nd*"}},
+                                 {"wildcard": {"issue_type": "ND*"}}]
+        return conditions
+
+    def build_common_query(self, log, size=10, filter_no_defect=True):
+        issue_type_conditions = self.prepare_restrictions_by_issue_type(
+            filter_no_defect=filter_no_defect)
         return {"size": size,
                 "sort": ["_score",
                          {"start_time": "desc"}, ],
@@ -68,11 +78,7 @@ class AnalyzerService:
                             {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
                             {"exists": {"field": "issue_type"}},
                         ],
-                        "must_not": [
-                            {"wildcard": {"issue_type": "TI*"}},
-                            {"wildcard": {"issue_type": "ti*"}},
-                            {"wildcard": {"issue_type": "nd*"}},
-                            {"wildcard": {"issue_type": "ND*"}},
+                        "must_not": issue_type_conditions + [
                             {"term": {"test_item": log["_source"]["test_item"]}}
                         ],
                         "must": [],
@@ -87,3 +93,33 @@ class AnalyzerService:
                                 "value": str(self.search_cfg["BoostAA"] > 0).lower(),
                                 "boost": abs(self.search_cfg["BoostAA"]), }}},
                         ]}}}
+
+    def remove_models(self, model_info):
+        try:
+            logger.info("Started removing %s models from project %d",
+                        model_info["model_type"], model_info["project"])
+            deleted_models = self.model_chooser.delete_old_model(
+                model_name=model_info["model_type"] + "_model",
+                project_id=model_info["project"])
+            logger.info("Finished removing %s models from project %d",
+                        model_info["model_type"], model_info["project"])
+            return deleted_models
+        except Exception as err:
+            logger.error("Error while removing models.")
+            logger.error(err)
+            return 0
+
+    def get_model_info(self, model_info):
+        try:
+            logger.info("Started getting info for %s model from project %d",
+                        model_info["model_type"], model_info["project"])
+            model_folder = self.model_chooser.get_model_info(
+                model_name=model_info["model_type"] + "_model",
+                project_id=model_info["project"])
+            logger.info("Finished getting info for %s model from project %d",
+                        model_info["model_type"], model_info["project"])
+            return {"model_folder": model_folder}
+        except Exception as err:
+            logger.error("Error while getting info for models.")
+            logger.error(err)
+            return ""

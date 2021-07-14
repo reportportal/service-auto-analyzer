@@ -12,8 +12,6 @@
             "must_not": [
                 {"wildcard": {"issue_type": "TI*"}},
                 {"wildcard": {"issue_type": "ti*"}},
-                {"wildcard": {"issue_type": "nd*"}},
-                {"wildcard": {"issue_type": "ND*"}},
                 {"term": {"test_item": "123"}},
                 {"wildcard": {"message": "*"}}
             ],
@@ -65,6 +63,15 @@
                 {"more_like_this": {
                     "fields":               ["potential_status_codes"],
                     "like":                 "200 400",
+                    "min_doc_freq":         1,
+                    "min_term_freq":        1,
+                    "minimum_should_match": "1",
+                    "max_query_terms":      50,
+                    "boost":                4.0
+                }},
+                {"more_like_this": {
+                    "fields":               ["found_tests_and_methods"],
+                    "like":                 "FindAllMessagesTest.findMessage",
                     "min_doc_freq":         1,
                     "min_term_freq":        1,
                     "minimum_should_match": "1",

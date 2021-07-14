@@ -84,5 +84,8 @@ class FilesystemSaver:
                                        project_id, folder).replace("\\", "/")
             if os.path.exists(folder_name):
                 shutil.rmtree(folder_name, ignore_errors=True)
+                return 1
+            return 0
         except Exception as err:
             logger.error(err)
+            return 0

@@ -238,6 +238,49 @@ test_item_info = {
               "message": "assertionError occured \r\n error found \r\n error mined"}]
 }
 
+remove_models_data = {
+    "project": 34,
+    "model_type": "auto_analysis",
+}
+
+defect_update_data = {
+    "project": 34,
+    "itemsToUpdate": {5: "pb001", 113: "ab001", 78: "si001"}
+}
+
+delete_test_items = {
+    "project": 34,
+    "itemsToDelete": [5, 78, 113]
+}
+
+delete_launches = {
+    "project": 34,
+    "launch_ids": [2, 42]
+}
+
+index_suggest_info_items = [{
+    "project": 34,
+    "testItem": 5,
+    "testItemLogId": 1,
+    "launchId": 2,
+    "issueType": "pb001",
+    "relevantItem": 3,
+    "relevantLogId": 4,
+    "isMergedLog": False,
+    "matchScore": 80,
+    "resultPosition": 1,
+    "esScore": 1,
+    "esPosition": 1,
+    "modelFeatureNames": "",
+    "modelFeatureValues": "",
+    "modelInfo": "",
+    "usedLogLines": -1,
+    "minShouldMatch": 80,
+    "userChoice": 1,
+    "processedTime": 0.11,
+    "methodName": "suggest"
+}]
+
 used_method = sys.argv[1] if len(sys.argv) > 1 else "index"
 for_update = False
 if len(sys.argv) > 2:
@@ -256,6 +299,16 @@ elif used_method.strip() in ["suggest"]:
     response = rpc.call(json.dumps(test_item_info), used_method)
 elif used_method.strip() in ["suggest_patterns"]:
     response = rpc.call("34", used_method)
+elif used_method.strip() in ["remove_models"]:
+    response = rpc.call(json.dumps(remove_models_data), used_method)
+elif used_method.strip() in ["defect_update"]:
+    response = rpc.call(json.dumps(defect_update_data), used_method)
+elif used_method.strip() in ["item_remove"]:
+    response = rpc.call(json.dumps(delete_test_items), used_method)
+elif used_method.strip() in ["launch_remove"]:
+    response = rpc.call(json.dumps(delete_launches), used_method)
+elif used_method.strip() in ["index_suggest_info"]:
+    response = rpc.call(json.dumps(index_suggest_info_items), used_method)
 elif used_method.strip() in ["cluster"]:
     if not for_update:
         response = rpc.call(json.dumps({"launch": index_data[0],
@@ -267,7 +320,7 @@ elif used_method.strip() in ["cluster"]:
                                         "numberOfLogLines": number_lines}), used_method)
 else:
     response = rpc.call(json.dumps(index_data), used_method)
-    print(" [.] Got %r" % response)
+if used_method.strip() in ["index"]:
     rpc.call_without_wait(json.dumps(index_data), "namespace_finder")
     print("Namespace_finder info was processed")
 print(" [.] Got %r" % response)

@@ -61,7 +61,8 @@ class LogPreparation:
                 "only_numbers":                  "",
                 "found_exceptions":              "",
                 "whole_message":                 "",
-                "potential_status_codes":        ""}}
+                "potential_status_codes":        "",
+                "found_tests_and_methods":       ""}}
 
     def _fill_launch_test_item_fields(self, log_template, launch, test_item, project):
         log_template["_index"] = project
@@ -79,7 +80,9 @@ class LogPreparation:
     def _fill_log_fields(self, log_template, log, number_of_lines):
         cleaned_message = self.clean_message(log.message)
 
+        test_and_methods = utils.find_test_methods_in_text(cleaned_message)
         message = utils.first_lines(cleaned_message, number_of_lines)
+        message = utils.replace_text_pieces(message, test_and_methods)
         message_without_params = message
         message = utils.delete_empty_lines(utils.sanitize_text(message))
 
@@ -100,6 +103,9 @@ class LogPreparation:
         paths = " ".join(utils.extract_paths(detected_message_without_params))
         detected_message_without_params = utils.clean_from_paths(detected_message_without_params)
         potential_status_codes = " ".join(utils.get_potential_status_codes(detected_message_without_params))
+        detected_message_without_params = utils.replace_text_pieces(
+            detected_message_without_params, test_and_methods)
+        detected_message = utils.replace_text_pieces(detected_message, test_and_methods)
         message_params = " ".join(utils.extract_message_params(detected_message_without_params))
         detected_message_without_params = utils.clean_from_params(detected_message_without_params)
         detected_message_without_params_and_brackets = utils.remove_starting_datetime(
@@ -114,6 +120,7 @@ class LogPreparation:
         stacktrace = utils.sanitize_text(stacktrace)
         found_exceptions = utils.get_found_exceptions(detected_message)
         found_exceptions_extended = utils.enrich_found_exceptions(found_exceptions)
+        found_test_methods = utils.enrich_text_with_method_and_classes(" ".join(test_and_methods))
 
         log_template["_id"] = log.logId
         log_template["_source"]["cluster_id"] = str(log.clusterId)
@@ -149,6 +156,7 @@ class LogPreparation:
             message_without_params_and_brackets
         log_template["_source"]["potential_status_codes"] =\
             potential_status_codes
+        log_template["_source"]["found_tests_and_methods"] = found_test_methods
 
         for field in ["message", "detected_message", "detected_message_with_numbers",
                       "stacktrace", "only_numbers", "found_exceptions", "found_exceptions_extended",
@@ -209,6 +217,8 @@ class LogPreparation:
         cleaned_message = self.clean_message(log.message)
         detected_message, stacktrace = utils.detect_log_description_and_stacktrace_light(
             cleaned_message)
+        test_and_methods = utils.find_test_methods_in_text(cleaned_message)
+        detected_message = utils.replace_text_pieces(detected_message, test_and_methods)
         stacktrace = utils.sanitize_text(stacktrace)
         message = utils.first_lines(cleaned_message, -1)
         message = utils.sanitize_text(message)

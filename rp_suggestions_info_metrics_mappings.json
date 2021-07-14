@@ -9,6 +9,12 @@
         "testItemLogId": {
             "type": "keyword"
         },
+        "launchId": {
+            "type": "integer"
+        },
+        "launchName": {
+            "type": "keyword"
+        },
         "issueType": {
             "type": "keyword"
         },
@@ -28,7 +34,7 @@
             "type": "integer"
         },
         "reciprocalRank": {
-            "type": "float"
+            "type": "integer"
         },
         "esScore": {
             "type": "float"
@@ -53,18 +59,24 @@
         "minShouldMatch": {
             "type": "integer"
         },
-        "isUserChoice": {
-            "type": "boolean"
+        "userChoice": {
+            "type": "integer"
         },
         "processedTime": {
             "type": "float"
         },
         "notFoundResults": {
-            "type": "boolean"
+            "type": "integer"
         },
         "savedDate": {
             "type":   "date",
             "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        },
+        "module_version": {
+            "type": "keyword"
+        },
+        "methodName": {
+            "type": "keyword"
         }
     }
 }

@@ -108,6 +108,8 @@ class SuggestAnalysisResult(BaseModel):
     project: int
     testItem: int
     testItemLogId: int
+    launchId: int
+    launchName: str
     issueType: str
     relevantItem: int
     relevantLogId: int
@@ -122,7 +124,8 @@ class SuggestAnalysisResult(BaseModel):
     usedLogLines: int
     minShouldMatch: int
     processedTime: float
-    isUserChoice: bool = False
+    userChoice: int = 0
+    methodName: str
 
 
 class CleanIndex(BaseModel):
@@ -176,3 +179,24 @@ class SuggestPattern(BaseModel):
     """Suggest pattern object with 2 lists of suggestions"""
     suggestionsWithLabels: List[SuggestPatternLabel] = []
     suggestionsWithoutLabels: List[SuggestPatternLabel] = []
+
+
+class BatchLogInfo(BaseModel):
+    analyzerConfig: AnalyzerConf
+    testItemId: int
+    log_info: dict
+    query_type: str
+    project: int
+    launchId: int
+    launchName: str
+
+
+class AnalysisCandidate(BaseModel):
+    analyzerConfig: AnalyzerConf
+    testItemId: int
+    timeProcessed: float
+    candidates: List[tuple]
+    candidatesWithNoDefect: List[tuple]
+    project: int
+    launchId: int
+    launchName: str

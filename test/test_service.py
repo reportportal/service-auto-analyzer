@@ -100,8 +100,27 @@ class TestService(unittest.TestCase):
         self.delete_suggest_logs_rq = "delete_suggest_logs_rq.json"
         self.delete_suggest_logs_rq_with_prefix = "delete_suggest_logs_rq_with_prefix.json"
         self.suggest_info_list = "suggest_info_list.json"
+        self.get_test_items_by_ids_query = "get_test_items_by_ids_query.json"
+        self.test_items_by_id_1 = "test_items_by_id_1.json"
+        self.test_items_by_id_2 = "test_items_by_id_2.json"
+        self.index_test_item_update = "index_test_item_update.json"
+        self.index_test_item_update_2 = "index_test_item_update_2.json"
+        self.delete_by_query_1 = "delete_by_query_1.json"
+        self.delete_by_query_2 = "delete_by_query_2.json"
+        self.delete_by_query_suggest_1 = "delete_by_query_suggest_1.json"
+        self.delete_by_query_suggest_2 = "delete_by_query_suggest_2.json"
+        self.two_hits_with_no_defect = "two_hits_with_no_defect.json"
+        self.three_hits_with_no_defect = "three_hits_with_no_defect.json"
+        self.get_suggest_info_by_test_item_ids_query =\
+            "get_suggest_info_by_test_item_ids_query.json"
+        self.suggest_info_test_items_by_id_1 = "suggest_info_test_items_by_id_1.json"
+        self.suggest_info_test_items_by_id_2 = "suggest_info_test_items_by_id_2.json"
+        self.suggest_index_test_item_update = "suggest_index_test_item_update.json"
+        self.suggest_index_test_item_update_2 = "suggest_index_test_item_update_2.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
+            "esUser": "",
+            "esPassword": "",
             "esVerifyCerts":     False,
             "esUseSsl":          False,
             "esSslShowWarn":     False,
@@ -140,6 +159,7 @@ class TestService(unittest.TestCase):
             "MaxQueryTerms":  50,
             "SearchLogsMinShouldMatch": "98%",
             "SearchLogsMinSimilarity": 0.9,
+            "NoDefectMinSimilarity": 0.98,
             "MinWordLength":  0,
             "PatternLabelMinPercentToSuggest": 0.5,
             "PatternLabelMinCountToSuggest":   5,

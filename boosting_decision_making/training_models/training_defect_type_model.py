@@ -83,12 +83,13 @@ class DefectTypeModelTraining:
         return {
             "_source": ["detected_message_without_params_and_brackets", "issue_type", "launch_id"],
             "sort": {"start_time": "desc"},
-            "size": 10000,
+            "size": self.app_config["esChunkNumber"],
             "query": {
                 "bool": {
                     "filter": [
                         {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
-                        {"exists": {"field": "issue_type"}}
+                        {"exists": {"field": "issue_type"}},
+                        {"term": {"is_merged": False}}
                     ],
                     "must": [
                         {
@@ -153,7 +154,8 @@ class DefectTypeModelTraining:
                 "baseline_model": [baseline_model], "new_model": [model_name],
                 "project_id": project_info["project_id"], "model_saved": 0, "p_value": 1.0,
                 "data_proportion": 0.0, "baseline_mean_metric": 0.0, "new_model_mean_metric": 0.0,
-                "bad_data_proportion": 0, "metric_name": "F1", "errors": [], "errors_count": 0}
+                "bad_data_proportion": 0, "metric_name": "F1", "errors": [], "errors_count": 0,
+                "time_spent": 0.0}
 
     def load_data_for_training(self, project_info, baseline_model, model_name):
         train_log_info = {}
@@ -162,10 +164,11 @@ class DefectTypeModelTraining:
         labels_to_find_queue = Queue()
         errors = []
         errors_count = 0
-        try:
-            for label in self.label2inds:
-                labels_to_find_queue.put(label)
-            while not labels_to_find_queue.empty():
+
+        for label in self.label2inds:
+            labels_to_find_queue.put(label)
+        while not labels_to_find_queue.empty():
+            try:
                 label = labels_to_find_queue.get()
                 train_log_info[label] = self.get_info_template(
                     project_info, label, baseline_model, model_name)
@@ -184,11 +187,11 @@ class DefectTypeModelTraining:
                 logger.debug("Finished quering for %d s", time_spent)
                 train_log_info[label]["time_spent"] = time_spent
                 train_log_info[label]["data_size"] = len(found_data)
-                labels_to_find_queue.task_done()
-        except Exception as err:
-            logger.error(err)
-            errors.append(utils.extract_exception(err))
-            errors_count += 1
+            except Exception as err:
+                logger.error(err)
+                errors.append(utils.extract_exception(err))
+                errors_count += 1
+            labels_to_find_queue.task_done()
         logger.debug("Data gathered: %d" % len(data))
         train_log_info["all"] = self.get_info_template(
             project_info, "all", baseline_model, model_name)

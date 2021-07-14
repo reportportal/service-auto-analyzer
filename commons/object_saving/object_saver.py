@@ -65,5 +65,5 @@ class ObjectSaver:
             self.get_bucket_name(project_id), folder)
 
     def remove_folder_objects(self, project_id, folder):
-        self.saving_strategy[self.binarystore_type]().remove_folder_objects(
+        return self.saving_strategy[self.binarystore_type]().remove_folder_objects(
             self.get_bucket_name(project_id), folder)

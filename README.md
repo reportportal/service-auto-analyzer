@@ -4,6 +4,10 @@
 
 **ES_HOSTS** - Elasticsearch host (can be either like this "http://elasticsearch:9200", or with login and password delimited by : and separated from the host name by @)
 
+**ES_USER** - Elasticsearch host login, set up here the username for elasticsearch, if you choose setup username here, in the **ES_HOSTS** you should leave only url without login and password
+
+**ES_PASSWORD** - Elasticsearch host password, set up here the password for elasticsearch, if you choose setup the password here, in the **ES_HOSTS** you should leave only url without login and password
+
 **LOGGING_LEVEL** - logging level for the whole module, can be DEBUG, INFO, ERROR, CRITICAL
 
 **AMQP_URL** - an url to the rabbitmq instance
@@ -63,6 +67,8 @@ volumes:
 **ES_MIN_WORD_LENGTH** - by default "2", the value to use in more like this query while querying for Auto-analysis
 
 **ES_LOGS_MIN_SHOULD_MATCH** - by default "0.98", the value of min should match for searching the same to investigate test items
+
+**NO_DEFECT_MIN_SHOULD_MATCH** - by default "0.98", the value of min should match for No defect test items to be equal to be used for setting in Auto-analysis
 
 **PATTERN_LABEL_MIN_PERCENT** - by default "0.9", the value of minimum percent of the same issue type for pattern to be suggested as a pattern with a label
 

@@ -581,20 +581,21 @@ def get_potential_status_codes(text):
 def choose_issue_type(predicted_labels, predicted_labels_probability,
                       issue_type_names, scores_by_issue_type):
     predicted_issue_type = ""
-    max_val = 0.0
+    max_prob = 0.0
     max_val_start_time = None
     for i in range(len(predicted_labels)):
         if predicted_labels[i] == 1:
             issue_type = issue_type_names[i]
             chosen_type = scores_by_issue_type[issue_type]
             start_time = chosen_type["mrHit"]["_source"]["start_time"]
-            if (predicted_labels_probability[i][1] > max_val) or\
-                    ((predicted_labels_probability[i][1] == max_val) and # noqa
+            if (predicted_labels_probability[i][1] > max_prob) or\
+                    ((predicted_labels_probability[i][1] == max_prob) and # noqa
                         (max_val_start_time is None or start_time > max_val_start_time)):
-                max_val = predicted_labels_probability[i][1]
+                max_prob = predicted_labels_probability[i][1]
                 predicted_issue_type = issue_type
+                global_idx = i
                 max_val_start_time = start_time
-    return predicted_issue_type
+    return predicted_issue_type, max_prob, global_idx
 
 
 def prepare_message_for_clustering(message, number_of_log_lines):
@@ -605,10 +606,13 @@ def prepare_message_for_clustering(message, number_of_log_lines):
     return " ".join(words)
 
 
-def send_request(url, method):
+def send_request(url, method, username, password):
     """Send request with specified url and http method"""
     try:
-        response = requests.get(url) if method == "GET" else {}
+        if username.strip() and password.strip():
+            response = requests.get(url, auth=(username, password)) if method == "GET" else {}
+        else:
+            response = requests.get(url) if method == "GET" else {}
         data = response._content.decode("utf-8")
         content = json.loads(data, strict=False)
         return content
@@ -723,23 +727,29 @@ def topological_sort(feature_graph):
 
 def to_number_list(features_list):
     feature_numbers_list = []
-    for res in features_list.split(","):
+    for res in features_list.split(";"):
         try:
             feature_numbers_list.append(int(res))
         except: # noqa
-            feature_numbers_list.append(float(res))
+            try:
+                feature_numbers_list.append(float(res))
+            except: # noqa
+                pass
     return feature_numbers_list
 
 
 def fill_prevously_gathered_features(feature_list, feature_ids):
     previously_gathered_features = {}
-    if type(feature_ids) == str:
-        feature_ids = transform_string_feature_range_into_list(feature_ids)
-    for i in range(len(feature_list)):
-        for idx, feature in enumerate(feature_ids):
-            if feature not in previously_gathered_features:
-                previously_gathered_features[feature] = []
-            previously_gathered_features[feature].append(feature_list[i][idx])
+    try:
+        if type(feature_ids) == str:
+            feature_ids = to_number_list(feature_ids)
+        for i in range(len(feature_list)):
+            for idx, feature in enumerate(feature_ids):
+                if feature not in previously_gathered_features:
+                    previously_gathered_features[feature] = []
+                previously_gathered_features[feature].append(feature_list[i][idx])
+    except Exception as err:
+        logger.error(err)
     return previously_gathered_features
 
 
@@ -770,3 +780,29 @@ def extract_exception(err):
     else:
         err_message = ""
     return err_message
+
+
+def find_test_methods_in_text(text):
+    test_methods = set()
+    for m in re.findall(
+            r"([^ \(\)\/\\\\:]+(Test|Step)[s]*\.[^ \(\)\/\\\\:]+)|([^ \(\)\/\\\\:]+\.spec\.js)", text):
+        if m[0].strip():
+            test_methods.add(m[0].strip())
+        if m[2].strip():
+            test_methods.add(m[2].strip())
+    final_test_methods = set()
+    for method in test_methods:
+        exceptions = get_found_exceptions(method)
+        if not exceptions:
+            final_test_methods.add(method)
+    return final_test_methods
+
+
+def replace_text_pieces(text, text_pieces):
+    for w in sorted(text_pieces, key=lambda x: len(x), reverse=True):
+        text = text.replace(w, " ")
+    return text
+
+
+def split_and_filter_empty_words(text):
+    return [_s.strip() for _s in text.split() if _s.strip()]

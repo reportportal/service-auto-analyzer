@@ -2,6 +2,8 @@
     "project": 1,
     "testItem": 123,
     "testItemLogId": 11,
+    "launchId": 2,
+    "launchName": "Launch",
     "issueType": "pb001",
     "relevantItem": 112,
     "relevantLogId": 34,
@@ -16,12 +18,15 @@
     "usedLogLines": -1,
     "minShouldMatch": 80,
     "processedTime": 10.0,
-    "isUserChoice": 1
+    "isUserChoice": 1,
+    "methodName": "suggest"
 },
 {
     "project": 1,
     "testItem": 123,
     "testItemLogId": 11,
+    "launchId": 145,
+    "launchName": "Launch",
     "issueType": "pb001",
     "relevantItem": 123,
     "relevantLogId": 36,
@@ -36,5 +41,6 @@
     "usedLogLines": -1,
     "minShouldMatch": 80,
     "processedTime": 10.0,
-    "isUserChoice": 0
+    "isUserChoice": 0,
+    "methodName": "suggest"
 }]

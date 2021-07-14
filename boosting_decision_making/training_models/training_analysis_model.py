@@ -259,6 +259,7 @@ class AnalysisModelTraining:
         cur_number_of_logs = 0
         cur_number_of_logs_0 = 0
         cur_number_of_logs_1 = 0
+        unique_saved_features = set()
         for query_name, query in [
                 ("auto_analysis 0s", self.get_search_query_aa(0)),
                 ("suggestion", self.get_search_query_suggest()),
@@ -271,6 +272,12 @@ class AnalysisModelTraining:
                                                   scroll="5m"):
                 if cur_number_of_logs >= max_number_of_logs:
                     break
+                saved_model_features = "{}|{}".format(
+                    res["_source"]["modelFeatureNames"],
+                    res["_source"]["modelFeatureValues"])
+                if saved_model_features in unique_saved_features:
+                    continue
+                unique_saved_features.add(saved_model_features)
                 log_ids_pair = (res["_source"]["testItemLogId"], res["_source"]["relevantLogId"])
                 if log_ids_pair in log_id_pairs_set:
                     continue

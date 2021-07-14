@@ -28,7 +28,6 @@ class SimilarityCalculator:
         self.similarity_dict = {}
         self.object_id_weights = {}
         self.fields_mapping_for_weighting = {
-            "message": ["detected_message", "stacktrace"],
             "message_without_params_extended": [
                 "detected_message_without_params_extended", "stacktrace_extended"],
             "message_extended": ["detected_message_extended", "stacktrace_extended"]

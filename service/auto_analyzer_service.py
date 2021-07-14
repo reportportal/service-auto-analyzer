@@ -52,7 +52,7 @@ class AutoAnalyzerService(AnalyzerService):
 
     def choose_fields_to_filter_strict(self, log_lines, min_should_match):
         fields = [
-            "detected_message", "stacktrace", "potential_status_codes"]\
+            "detected_message", "message", "potential_status_codes"]\
             if log_lines == -1 else ["message", "potential_status_codes"]
         if min_should_match > 0.99:
             fields.append("found_tests_and_methods")

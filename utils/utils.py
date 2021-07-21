@@ -806,3 +806,17 @@ def replace_text_pieces(text, text_pieces):
 
 def split_and_filter_empty_words(text):
     return [_s.strip() for _s in text.split() if _s.strip()]
+
+
+def remove_guid_uids_from_text(text):
+    for pattern in [
+            r"[0-9a-fA-F]{16,48}|[0-9a-fA-F]{10,48}\.\.\.",
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" # noqa
+            ]:
+        strings_to_replace = set()
+        for m in re.findall(pattern, text):
+            if not m.isdigit() and m.strip():
+                strings_to_replace.add(m)
+        for _str in sorted(strings_to_replace, key=lambda x: (len(x), x), reverse=True):
+            text = text.replace(_str, " ")
+    return text

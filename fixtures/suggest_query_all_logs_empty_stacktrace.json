@@ -10,8 +10,7 @@
                 {"term": {"is_merged": false}}
             ],
             "must_not": [
-                {"wildcard": {"issue_type": "TI*"}},
-                {"wildcard": {"issue_type": "ti*"}},
+                {"term": {"issue_type": "ti001"}},
                 {"term": {"test_item": "123"}},
                 {"wildcard": {"stacktrace_extended": "*"}}
             ],

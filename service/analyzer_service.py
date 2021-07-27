@@ -59,12 +59,11 @@ class AnalyzerService:
             "boost": boost, }}
 
     def prepare_restrictions_by_issue_type(self, filter_no_defect=True):
-        conditions = [{"wildcard": {"issue_type": "TI*"}},
-                      {"wildcard": {"issue_type": "ti*"}}]
         if filter_no_defect:
-            return conditions + [{"wildcard": {"issue_type": "nd*"}},
-                                 {"wildcard": {"issue_type": "ND*"}}]
-        return conditions
+            return [
+                {"wildcard": {"issue_type": "ti*"}},
+                {"wildcard": {"issue_type": "nd*"}}]
+        return [{"term": {"issue_type": "ti001"}}]
 
     def build_common_query(self, log, size=10, filter_no_defect=True):
         issue_type_conditions = self.prepare_restrictions_by_issue_type(

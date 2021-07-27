@@ -178,8 +178,7 @@ class AutoAnalyzerService(AnalyzerService):
                         {"term": {"is_merged": False}}
                     ],
                     "must_not": [
-                        {"wildcard": {"issue_type": "TI*"}},
-                        {"wildcard": {"issue_type": "ti*"}},
+                        {"term": {"issue_type": "ti001"}},
                         {"term": {"test_item": log["_source"]["test_item"]}}
                     ],
                     "must": [
@@ -199,7 +198,7 @@ class AutoAnalyzerService(AnalyzerService):
         for log_info, search_res in candidates_with_no_defect:
             no_defect_candidate_exists = False
             for log in search_res["hits"]["hits"]:
-                if log["_source"]["issue_type"][:2].lower() == "nd":
+                if log["_source"]["issue_type"][:2].lower() in ["nd", "ti"]:
                     no_defect_candidate_exists = True
             _similarity_calculator = SimilarityCalculator(
                 boosting_config,
@@ -220,7 +219,7 @@ class AutoAnalyzerService(AnalyzerService):
                         if not sim_val["both_empty"] and sim_val["similarity"] >= threshold:
                             latest_type = obj["_source"]["issue_type"]
                             latest_item = obj
-                if latest_type and latest_type[:2].lower() == "nd":
+                if latest_type and latest_type[:2].lower() in ["nd", "ti"]:
                     return latest_item
         return None
 

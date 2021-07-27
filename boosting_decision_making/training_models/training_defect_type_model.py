@@ -81,7 +81,7 @@ class DefectTypeModelTraining:
 
     def get_message_query_by_label(self, label):
         return {
-            "_source": ["detected_message_without_params_and_brackets", "issue_type", "launch_id"],
+            "_source": ["detected_message_without_params_extended", "issue_type", "launch_id"],
             "sort": {"start_time": "desc"},
             "size": self.app_config["esChunkNumber"],
             "query": {
@@ -118,7 +118,7 @@ class DefectTypeModelTraining:
                                             query=self.get_message_query_by_label(
                                                 label),
                                             index=project_index_name):
-            detected_message = r["_source"]["detected_message_without_params_and_brackets"]
+            detected_message = r["_source"]["detected_message_without_params_extended"]
             text_message_normalized = " ".join(sorted(
                 utils.split_words(detected_message, to_lower=True)))
             message_info = (text_message_normalized,
@@ -126,7 +126,7 @@ class DefectTypeModelTraining:
                             r["_source"]["issue_type"])
             if message_info not in message_launch_dict:
                 text_message = utils.enrich_text_with_method_and_classes(
-                    r["_source"]["detected_message_without_params_and_brackets"])
+                    r["_source"]["detected_message_without_params_extended"])
                 data.append((text_message, label, r["_source"]["issue_type"]))
                 message_launch_dict.add(message_info)
             if len(data) >= self.search_cfg["MaxLogsForDefectTypeModel"]:

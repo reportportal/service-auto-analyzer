@@ -125,9 +125,7 @@ class DefectTypeModelTraining:
                             r["_source"]["launch_id"],
                             r["_source"]["issue_type"])
             if message_info not in message_launch_dict:
-                text_message = utils.enrich_text_with_method_and_classes(
-                    r["_source"]["detected_message_without_params_extended"])
-                data.append((text_message, label, r["_source"]["issue_type"]))
+                data.append((detected_message, label, r["_source"]["issue_type"]))
                 message_launch_dict.add(message_info)
             if len(data) >= self.search_cfg["MaxLogsForDefectTypeModel"]:
                 break

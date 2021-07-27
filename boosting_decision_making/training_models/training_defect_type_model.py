@@ -215,6 +215,17 @@ class DefectTypeModelTraining:
                 logs_to_train_idx, labels_filtered, self.due_proportion)
         return logs_to_train_idx, labels_filtered, data_to_train, additional_logs, proportion_binary_labels
 
+    def copy_model_part_from_baseline(self, label):
+        if label not in self.baseline_model.models:
+            if label in self.new_model.models:
+                del self.new_model.models[label]
+            if label in self.new_model.count_vectorizer_models:
+                del self.new_model.count_vectorizer_models[label]
+        else:
+            self.new_model.models[label] = self.baseline_model.models[label]
+            _count_vectorizer = self.baseline_model.count_vectorizer_models[label]
+            self.new_model.count_vectorizer_models[label] = _count_vectorizer
+
     def train_several_times(self, label, data, found_sub_categories):
         new_model_results = []
         baseline_model_results = []
@@ -321,15 +332,7 @@ class DefectTypeModelTraining:
                     else:
                         train_log_info[label]["model_saved"] = 0
                 else:
-                    if label not in self.baseline_model.models:
-                        if label in self.new_model.models:
-                            del self.new_model.models[label]
-                        if label in self.new_model.count_vectorizer_models:
-                            del self.new_model.count_vectorizer_models[label]
-                        continue
-                    self.new_model.models[label] = self.baseline_model.models[label]
-                    _count_vectorizer = self.baseline_model.count_vectorizer_models[label]
-                    self.new_model.count_vectorizer_models[label] = _count_vectorizer
+                    self.copy_model_part_from_baseline(label)
                     if train_log_info[label]["baseline_mean_metric"] > 0.001:
                         f1_baseline_models.append(train_log_info[label]["baseline_mean_metric"])
                         f1_chosen_models.append(train_log_info[label]["baseline_mean_metric"])
@@ -340,6 +343,7 @@ class DefectTypeModelTraining:
                 train_log_info[label]["errors"].append(utils.extract_exception(err))
                 errors.append(utils.extract_exception(err))
                 errors_count += 1
+                self.copy_model_part_from_baseline(label)
 
         logger.debug("Custom models were for labels: %s" % custom_models)
         if len(custom_models):

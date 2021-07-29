@@ -1,0 +1,42 @@
+{
+    "size": 10,
+    "sort": ["_score",
+             {"start_time": "desc"}],
+    "query": {
+        "bool": {
+            "filter": [
+                {"range": {"log_level": {"gte": 40000}}},
+                {"exists": {"field": "issue_type"}},
+                {"term": {"is_merged": true}}
+            ],
+            "must_not": [
+                {"term": {"issue_type": "ti001"}},
+                {"term": {"test_item": "123"}},
+                {"wildcard": {"message": "*"}}
+            ],
+            "must": [
+                {"term": {
+                    "unique_id": "unique"
+                }},
+                {"term": {
+                    "test_case_hash": 1
+                }},
+                {"term": {
+                    "launch_name": {
+                        "value": "Launch name"
+                    }
+                }},
+                {"more_like_this": {
+                    "fields":               ["merged_small_logs"],
+                    "like":                 "hello world",
+                    "min_doc_freq":         1,
+                    "min_term_freq":        1,
+                    "minimum_should_match": "5<80%",
+                    "max_query_terms":      50,
+                    "boost":                1.0
+                }}
+            ],
+            "should": []
+        }
+    }
+}

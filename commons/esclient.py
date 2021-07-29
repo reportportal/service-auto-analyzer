@@ -476,7 +476,8 @@ class EsClient:
                         "_id": log["_id"],
                         "_index": index_name,
                         "doc": {
-                            "issue_type": issue_type
+                            "issue_type": issue_type,
+                            "is_auto_analyzed": False
                         }
                     })
         self._bulk_index(log_update_queries)

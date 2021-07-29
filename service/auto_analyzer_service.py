@@ -174,8 +174,7 @@ class AutoAnalyzerService(AnalyzerService):
                 "bool": {
                     "filter": [
                         {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
-                        {"exists": {"field": "issue_type"}},
-                        {"term": {"is_merged": False}}
+                        {"exists": {"field": "issue_type"}}
                     ],
                     "must_not": [
                         {"term": {"issue_type": "ti001"}},
@@ -188,10 +187,19 @@ class AutoAnalyzerService(AnalyzerService):
                     "should": []
                 }}}
         query = self.add_constraints_for_launches_into_query(query, launch)
-        query["query"]["bool"]["must"].append(
-            self.build_more_like_this_query(min_should_match,
-                                            log["_source"]["message"],
-                                            field_name="message"))
+        if log["_source"]["message"].strip():
+            query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
+            query["query"]["bool"]["must"].append(
+                self.build_more_like_this_query(min_should_match,
+                                                log["_source"]["message"],
+                                                field_name="message"))
+        else:
+            query["query"]["bool"]["filter"].append({"term": {"is_merged": True}})
+            query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
+            query["query"]["bool"]["must"].append(
+                self.build_more_like_this_query(min_should_match,
+                                                log["_source"]["merged_small_logs"],
+                                                field_name="merged_small_logs"))
         return query
 
     def find_relevant_with_no_defect(self, candidates_with_no_defect, boosting_config):

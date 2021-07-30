@@ -65,6 +65,9 @@ class LogPreparation:
                 "potential_status_codes":        "",
                 "found_tests_and_methods":       ""}}
 
+    def transform_issue_type_into_lowercase(self, issue_type):
+        return issue_type[:2].lower() + issue_type[2:]
+
     def _fill_launch_test_item_fields(self, log_template, launch, test_item, project):
         log_template["_index"] = project
         log_template["_source"]["launch_id"] = launch.launchId
@@ -73,7 +76,8 @@ class LogPreparation:
         log_template["_source"]["unique_id"] = test_item.uniqueId
         log_template["_source"]["test_case_hash"] = test_item.testCaseHash
         log_template["_source"]["is_auto_analyzed"] = test_item.isAutoAnalyzed
-        log_template["_source"]["issue_type"] = test_item.issueType
+        log_template["_source"]["issue_type"] = self.transform_issue_type_into_lowercase(
+            test_item.issueType)
         log_template["_source"]["start_time"] = datetime(
             *test_item.startTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
         return log_template

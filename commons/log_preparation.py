@@ -23,7 +23,7 @@ ERROR_LOGGING_LEVEL = 40000
 class LogPreparation:
 
     def __init__(self):
-        pass
+        self.log_merger = LogMerger()
 
     def clean_message(self, message):
         message = utils.replace_tabs_for_newlines(message)
@@ -268,7 +268,7 @@ class LogPreparation:
                     continue
                 prepared_logs.append(
                     self.prepare_log_clustering_light(launch, test_item, log, clean_numbers, project))
-            merged_logs = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+            merged_logs = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
             new_merged_logs = []
             for log in merged_logs:
                 if not log["_source"]["stacktrace"].strip():

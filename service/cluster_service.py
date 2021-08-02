@@ -198,6 +198,7 @@ class ClusterService:
         errors_count = 0
         cluster_num = 0
         clusters = []
+        log_ids = []
         try:
             _clusterizer = clusterizer.Clusterizer()
             log_messages, log_dict = self.log_preparation.prepare_logs_for_clustering(
@@ -207,6 +208,7 @@ class ClusterService:
             additional_results = self.find_similar_items_from_es(
                 groups, log_dict, log_messages, log_ids, launch_info.numberOfLogLines,
                 {}, same_launch=False)
+
             if launch_info.forUpdate:
                 additional_results = self.find_similar_items_from_es(
                     groups, log_dict, log_messages, log_ids, launch_info.numberOfLogLines,

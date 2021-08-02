@@ -15,7 +15,7 @@
 """
 from commons.esclient import EsClient
 from utils import utils
-from commons.log_preparation import LogPreparation
+from commons.log_preparation import LogPreparation, LogMerger
 from boosting_decision_making import weighted_similarity_calculator
 from commons import namespace_finder
 from commons import model_chooser
@@ -32,6 +32,7 @@ class AnalyzerService:
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
         self.log_preparation = LogPreparation()
+        self.log_merger = LogMerger()
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.model_chooser = model_chooser.ModelChooser(app_config=app_config, search_cfg=search_cfg)
         self.weighted_log_similarity_calculator = None
@@ -42,6 +43,25 @@ class AnalyzerService:
     def find_min_should_match_threshold(self, analyzer_config):
         return analyzer_config.minShouldMatch if analyzer_config.minShouldMatch > 0 else\
             int(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0))
+
+    def add_constraints_for_launches_into_query(self, query, launch):
+        if launch.analyzerConfig.analyzerMode in ["LAUNCH_NAME"]:
+            query["query"]["bool"]["must"].append(
+                {"term": {
+                    "launch_name": {
+                        "value": launch.launchName}}})
+        elif launch.analyzerConfig.analyzerMode in ["CURRENT_LAUNCH"]:
+            query["query"]["bool"]["must"].append(
+                {"term": {
+                    "launch_id": {
+                        "value": launch.launchId}}})
+        else:
+            query["query"]["bool"]["should"].append(
+                {"term": {
+                    "launch_name": {
+                        "value": launch.launchName,
+                        "boost": abs(self.search_cfg["BoostLaunch"])}}})
+        return query
 
     def build_more_like_this_query(self,
                                    min_should_match, log_message,

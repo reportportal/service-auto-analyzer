@@ -18,7 +18,6 @@ from commons.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandida
 from boosting_decision_making import boosting_featurizer
 from service.analyzer_service import AnalyzerService
 from amqp.amqp import AmqpClient
-from commons.log_merger import LogMerger
 from commons.similarity_calculator import SimilarityCalculator
 import json
 import logging
@@ -57,25 +56,6 @@ class AutoAnalyzerService(AnalyzerService):
         if min_should_match > 0.99:
             fields.append("found_tests_and_methods")
         return fields
-
-    def add_constraints_for_launches_into_query(self, query, launch):
-        if launch.analyzerConfig.analyzerMode in ["LAUNCH_NAME"]:
-            query["query"]["bool"]["must"].append(
-                {"term": {
-                    "launch_name": {
-                        "value": launch.launchName}}})
-        elif launch.analyzerConfig.analyzerMode in ["CURRENT_LAUNCH"]:
-            query["query"]["bool"]["must"].append(
-                {"term": {
-                    "launch_id": {
-                        "value": launch.launchId}}})
-        else:
-            query["query"]["bool"]["should"].append(
-                {"term": {
-                    "launch_name": {
-                        "value": launch.launchName,
-                        "boost": abs(self.search_cfg["BoostLaunch"])}}})
-        return query
 
     def get_min_should_match_setting(self, launch):
         return "{}%".format(launch.analyzerConfig.minShouldMatch)\
@@ -126,12 +106,6 @@ class AutoAnalyzerService(AnalyzerService):
                                                 log["_source"]["merged_small_logs"],
                                                 field_name="merged_small_logs",
                                                 boost=0.5))
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["only_numbers"],
-                                                field_name="only_numbers",
-                                                boost=4.0,
-                                                override_min_should_match="1"))
         else:
             query["query"]["bool"]["filter"].append({"term": {"is_merged": True}})
             query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
@@ -140,6 +114,7 @@ class AutoAnalyzerService(AnalyzerService):
                                                 log["_source"]["merged_small_logs"],
                                                 field_name="merged_small_logs",
                                                 boost=2.0))
+
         if log["_source"]["found_exceptions"].strip():
             query["query"]["bool"]["must"].append(
                 self.build_more_like_this_query("1",
@@ -147,27 +122,14 @@ class AutoAnalyzerService(AnalyzerService):
                                                 field_name="found_exceptions",
                                                 boost=4.0,
                                                 override_min_should_match="1"))
-        if log["_source"]["potential_status_codes"].strip():
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["potential_status_codes"],
-                                                field_name="potential_status_codes",
-                                                boost=4.0,
-                                                override_min_should_match="1"))
-        if log["_source"]["found_tests_and_methods"].strip():
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["found_tests_and_methods"],
-                                                field_name="found_tests_and_methods",
-                                                boost=4.0,
-                                                override_min_should_match="1"))
-        if log["_source"]["test_item_name"].strip():
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["test_item_name"],
-                                                field_name="test_item_name",
-                                                boost=4.0,
-                                                override_min_should_match="1"))
+        for field in ["only_numbers", "potential_status_codes", "found_tests_and_methods", "test_item_name"]:
+            if log["_source"][field].strip():
+                query["query"]["bool"]["should"].append(
+                    self.build_more_like_this_query("1",
+                                                    log["_source"][field],
+                                                    field_name=field,
+                                                    boost=4.0,
+                                                    override_min_should_match="1"))
 
         return query
 
@@ -297,7 +259,7 @@ class AutoAnalyzerService(AnalyzerService):
                     unique_logs = utils.leave_only_unique_logs(test_item.logs)
                     prepared_logs = [self.log_preparation._prepare_log(launch, test_item, log, index_name)
                                      for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
-                    results = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+                    results = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
 
                     for log in results:
                         message = log["_source"]["message"].strip()

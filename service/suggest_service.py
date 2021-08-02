@@ -406,6 +406,13 @@ class SuggestService(AnalyzerService):
                                                 field_name="found_tests_and_methods",
                                                 boost=4.0,
                                                 override_min_should_match="1"))
+        if log["_source"]["test_item_name"].strip():
+            query["query"]["bool"]["should"].append(
+                self.build_more_like_this_query("1",
+                                                log["_source"]["test_item_name"],
+                                                field_name="test_item_name",
+                                                boost=4.0,
+                                                override_min_should_match="1"))
 
         return query
 

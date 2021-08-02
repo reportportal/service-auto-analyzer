@@ -43,6 +43,7 @@ class LogPreparation:
                 "launch_id":        "",
                 "launch_name":      "",
                 "test_item":        "",
+                "test_item_name":   "",
                 "unique_id":        "",
                 "cluster_id":       "",
                 "cluster_message":  "",
@@ -76,6 +77,7 @@ class LogPreparation:
         log_template["_source"]["unique_id"] = test_item.uniqueId
         log_template["_source"]["test_case_hash"] = test_item.testCaseHash
         log_template["_source"]["is_auto_analyzed"] = test_item.isAutoAnalyzed
+        log_template["_source"]["test_item_name"] = utils.preprocess_test_item_name(test_item.testItemName)
         log_template["_source"]["issue_type"] = self.transform_issue_type_into_lowercase(
             test_item.issueType)
         log_template["_source"]["start_time"] = datetime(
@@ -186,6 +188,8 @@ class LogPreparation:
         log_template["_source"]["test_item"] = test_item_info.testItemId
         log_template["_source"]["unique_id"] = test_item_info.uniqueId
         log_template["_source"]["test_case_hash"] = test_item_info.testCaseHash
+        log_template["_source"]["test_item_name"] = utils.preprocess_test_item_name(
+            test_item_info.testItemName)
         log_template["_source"]["is_auto_analyzed"] = False
         log_template["_source"]["issue_type"] = ""
         log_template["_source"]["start_time"] = ""

@@ -93,7 +93,9 @@ class BoostingFeaturizer:
                  {"model_folder": self.config["boosting_model"]},
                  self.get_necessary_features(self.config["boosting_model"])),
             59: (self._calculate_similarity_percent, {"field_name": "found_tests_and_methods"}, []),
-            60: (self._calculate_percent_via_levenshtein, {"field_name": "found_tests_and_methods"}, [])
+            60: (self._calculate_percent_via_levenshtein, {"field_name": "found_tests_and_methods"}, []),
+            61: (self._calculate_similarity_percent, {"field_name": "test_item_name"}, []),
+            62: (self._calculate_percent_via_levenshtein, {"field_name": "test_item_name"}, [])
         }
 
         fields_to_calc_similarity = self.find_columns_to_find_similarities_for()

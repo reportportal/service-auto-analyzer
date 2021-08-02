@@ -59,6 +59,15 @@
                         "value": "Launch name",
                         "boost": 5
                     }
+                }},
+                {"more_like_this": {
+                    "fields":               ["test_item_name"],
+                    "like":                 "test item Common Query",
+                    "min_doc_freq":         1,
+                    "min_term_freq":        1,
+                    "minimum_should_match": "1",
+                    "max_query_terms":      50,
+                    "boost":                4.0
                 }}
             ]
         }

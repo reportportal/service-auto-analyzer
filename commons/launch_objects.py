@@ -52,6 +52,7 @@ class TestItem(BaseModel):
     originalIssueType: str = ""
     startTime: List[int] = list(datetime.now().timetuple())[:7]
     testCaseHash: int = 0
+    testItemName: str = ""
     logs: List[Log] = []
 
 
@@ -62,6 +63,7 @@ class TestItemInfo(BaseModel):
     testCaseHash: int = 0
     launchId: int
     launchName: str = ""
+    testItemName: str = ""
     project: int
     analyzerConfig: AnalyzerConf = AnalyzerConf()
     logs: List[Log] = []

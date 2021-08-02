@@ -820,3 +820,16 @@ def remove_guid_uids_from_text(text):
         for _str in sorted(strings_to_replace, key=lambda x: (len(x), x), reverse=True):
             text = text.replace(_str, " ")
     return text
+
+
+def preprocess_test_item_name(text):
+    text = text.replace("-", " ").replace("_", " ")
+    all_words = []
+    words = split_words(text, to_lower=False, only_unique=False)
+    for w in words:
+        if "." not in w:
+            all_words.extend([s.strip() for s in re.split("([A-Z][^A-Z]+)", w) if s.strip()])
+        else:
+            all_words.extend(
+                [s.strip() for s in enrich_text_with_method_and_classes(w).split(" ") if s.strip()])
+    return " ".join(all_words)

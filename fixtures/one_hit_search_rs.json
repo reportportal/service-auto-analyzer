@@ -27,6 +27,7 @@
                     "original_message_words_number": 2,
                     "message": "Message http : localhost/admin \r\n java.lang.NoClassDefFoundError\r",
                     "test_item": 1,
+                    "test_item_name": "first test",
                     "start_time": "2020-01-15 10:57:43",
                     "unique_id": "unique1",
                     "detected_message": "Message http : localhost/admin \r\n java.lang.NoClassDefFoundError\r",

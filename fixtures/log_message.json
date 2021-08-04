@@ -4,6 +4,8 @@
 		"log_level": 40000,
 		"launch_id": 12,
 		"launch_name": "launch test",
+		"test_item": 43,
+		"test_item_name": "first test",
 		"unique_id": "unique1",
 		"merged_small_logs": "",
 		"detected_message": "java.lang.NullPointerException status",

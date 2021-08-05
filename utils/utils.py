@@ -832,4 +832,17 @@ def preprocess_test_item_name(text):
         else:
             all_words.extend(
                 [s.strip() for s in enrich_text_with_method_and_classes(w).split(" ") if s.strip()])
+            all_words.extend(
+                [s.strip() for s in re.split("([A-Z][^A-Z]+)", w.split(".")[-1]) if s.strip()])
+    return " ".join(all_words)
+
+
+def preprocess_found_test_methods(text):
+    all_words = []
+    words = split_words(text, to_lower=False, only_unique=False)
+    for w in words:
+        if "." not in w:
+            all_words.extend([s.strip() for s in re.split("([A-Z][^A-Z]+)", w) if s.strip()])
+        else:
+            all_words.append(w)
     return " ".join(all_words)

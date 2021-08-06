@@ -326,12 +326,6 @@ class SuggestService(AnalyzerService):
                                                     log["_source"][stacktrace_field],
                                                     field_name=stacktrace_field,
                                                     boost=1.0))
-                query["query"]["bool"]["should"].append(
-                    self.build_more_like_this_query(
-                        "60%",
-                        log["_source"]["detected_message_without_params_extended"],
-                        field_name="detected_message_without_params_extended",
-                        boost=1.0))
             query["query"]["bool"]["should"].append(
                 self.build_more_like_this_query("80%",
                                                 log["_source"]["merged_small_logs"],
@@ -345,15 +339,17 @@ class SuggestService(AnalyzerService):
                                                 log["_source"]["merged_small_logs"],
                                                 field_name="merged_small_logs",
                                                 boost=2.0))
-        for field in ["only_numbers", "message_params", "urls", "paths",
-                      "found_exceptions_extended", "potential_status_codes",
-                      "found_tests_and_methods", "test_item_name"]:
+        for field, boost_score in [
+                ("detected_message_without_params_extended", 2.0),
+                ("only_numbers", 2.0), ("message_params", 2.0), ("urls", 2.0),
+                ("paths", 2.0), ("found_exceptions_extended", 8.0), ("potential_status_codes", 8.0),
+                ("found_tests_and_methods", 2.0), ("test_item_name", 2.0)]:
             if log["_source"][field].strip():
                 query["query"]["bool"]["should"].append(
                     self.build_more_like_this_query("1",
                                                     log["_source"][field],
                                                     field_name=field,
-                                                    boost=4.0,
+                                                    boost=boost_score,
                                                     override_min_should_match="1"))
 
         return query

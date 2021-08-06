@@ -120,15 +120,18 @@ class AutoAnalyzerService(AnalyzerService):
                 self.build_more_like_this_query("1",
                                                 log["_source"]["found_exceptions"],
                                                 field_name="found_exceptions",
-                                                boost=4.0,
+                                                boost=8.0,
                                                 override_min_should_match="1"))
-        for field in ["only_numbers", "potential_status_codes", "found_tests_and_methods", "test_item_name"]:
+        for field, boost_score in [
+                ("detected_message_without_params_extended", 2.0),
+                ("only_numbers", 2.0), ("potential_status_codes", 8.0),
+                ("found_tests_and_methods", 2), ("test_item_name", 2.0)]:
             if log["_source"][field].strip():
                 query["query"]["bool"]["should"].append(
                     self.build_more_like_this_query("1",
                                                     log["_source"][field],
                                                     field_name=field,
-                                                    boost=4.0,
+                                                    boost=boost_score,
                                                     override_min_should_match="1"))
 
         return query

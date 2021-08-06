@@ -24,14 +24,13 @@ class LogMerger:
         self.fields_to_clean = ["message", "detected_message",
                                 "detected_message_with_numbers", "stacktrace",
                                 "detected_message_extended",
-                                "detected_message_without_params_extended",
                                 "stacktrace_extended", "message_extended",
                                 "message_without_params_extended",
                                 "message_without_params_and_brackets",
                                 "detected_message_without_params_and_brackets"]
         self.fields_to_merge = ["message", "found_exceptions", "potential_status_codes",
                                 "found_tests_and_methods", "only_numbers", "urls",
-                                "paths", "message_params"]
+                                "paths", "message_params", "detected_message_without_params_extended"]
 
     def merge_big_and_small_logs(self, logs, log_level_ids_to_add,
                                  log_level_messages, log_level_ids_merged):

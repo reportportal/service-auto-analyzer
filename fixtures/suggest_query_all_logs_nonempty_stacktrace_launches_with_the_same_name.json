@@ -67,13 +67,22 @@
                     "boost":                0.5
                 }},
                 {"more_like_this": {
+                    "fields":               ["detected_message_without_params_extended"],
+                    "like":                 "hello world",
+                    "min_doc_freq":         1,
+                    "min_term_freq":        1,
+                    "minimum_should_match": "1",
+                    "max_query_terms":      50,
+                    "boost":                2.0
+                }},
+                {"more_like_this": {
                     "fields":               ["only_numbers"],
                     "like":                 "1",
                     "min_doc_freq":         1,
                     "min_term_freq":        1,
                     "minimum_should_match": "1",
                     "max_query_terms":      50,
-                    "boost":                4.0
+                    "boost":                2.0
                 }},
                 {"more_like_this": {
                     "fields":               ["message_params"],
@@ -82,25 +91,7 @@
                     "min_term_freq":        1,
                     "minimum_should_match": "1",
                     "max_query_terms":      50,
-                    "boost":                4.0
-                }},
-                {"more_like_this": {
-                    "fields":               ["urls"],
-                    "like":                 "",
-                    "min_doc_freq":         1,
-                    "min_term_freq":        1,
-                    "minimum_should_match": "1",
-                    "max_query_terms":      50,
-                    "boost":                4.0
-                }},
-                {"more_like_this": {
-                    "fields":               ["paths"],
-                    "like":                 "",
-                    "min_doc_freq":         1,
-                    "min_term_freq":        1,
-                    "minimum_should_match": "1",
-                    "max_query_terms":      50,
-                    "boost":                4.0
+                    "boost":                2.0
                 }},
                 {"more_like_this": {
                     "fields":               ["found_exceptions_extended"],
@@ -109,7 +100,7 @@
                     "min_term_freq":        1,
                     "minimum_should_match": "1",
                     "max_query_terms":      50,
-                    "boost":                4.0
+                    "boost":                8.0
                 }},
                 {"more_like_this": {
                     "fields":               ["potential_status_codes"],
@@ -118,7 +109,16 @@
                     "min_term_freq":        1,
                     "minimum_should_match": "1",
                     "max_query_terms":      50,
-                    "boost":                4.0
+                    "boost":                8.0
+                }},
+                {"more_like_this": {
+                    "fields":               ["test_item_name"],
+                    "like":                 "test item Common Query",
+                    "min_doc_freq":         1,
+                    "min_term_freq":        1,
+                    "minimum_should_match": "1",
+                    "max_query_terms":      50,
+                    "boost":                2.0
                 }}
             ]
         }

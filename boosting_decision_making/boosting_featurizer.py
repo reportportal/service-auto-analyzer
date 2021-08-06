@@ -18,8 +18,6 @@ from utils import utils
 from commons import similarity_calculator
 from boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
 import logging
-import textdistance
-import numpy as np
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
@@ -93,10 +91,11 @@ class BoostingFeaturizer:
                  {"model_folder": self.config["boosting_model"]},
                  self.get_necessary_features(self.config["boosting_model"])),
             59: (self._calculate_similarity_percent, {"field_name": "found_tests_and_methods"}, []),
-            60: (self._calculate_percent_via_levenshtein, {"field_name": "found_tests_and_methods"}, [])
+            61: (self._calculate_similarity_percent, {"field_name": "test_item_name"}, [])
         }
 
         fields_to_calc_similarity = self.find_columns_to_find_similarities_for()
+        all_results = self._perform_additional_text_processing(all_results)
 
         if "filter_min_should_match" in self.config and len(self.config["filter_min_should_match"]) > 0:
             self.similarity_calculator.find_similarity(
@@ -124,6 +123,14 @@ class BoostingFeaturizer:
         self.defect_type_predict_model = None
         self.used_model_info = set()
         self.features_to_recalculate_always = set([51, 58])
+
+    def _perform_additional_text_processing(self, all_results):
+        for log, res in all_results:
+            for r in res["hits"]["hits"]:
+                if "found_tests_and_methods" in r["_source"]:
+                    r["_source"]["found_tests_and_methods"] = utils.preprocess_found_test_methods(
+                        r["_source"]["found_tests_and_methods"])
+        return all_results
 
     def _calculate_model_probability(self, model_folder=""):
         if not model_folder.strip():
@@ -453,29 +460,6 @@ class BoostingFeaturizer:
             sim_obj = self.similarity_calculator.similarity_dict[field_name][group_id]
             similarity_percent_by_type[issue_type] = sim_obj["similarity"]
         return similarity_percent_by_type
-
-    def _calculate_percent_via_levenshtein(self, field_name):
-        scores_by_issue_type = self.find_most_relevant_by_type()
-        result = {}
-        for issue_type in scores_by_issue_type:
-            rel_item_field = utils.split_and_filter_empty_words(
-                scores_by_issue_type[issue_type]["mrHit"]["_source"][field_name])
-            queiried_item_field = utils.split_and_filter_empty_words(
-                scores_by_issue_type[issue_type]["compared_log"]["_source"][field_name])
-            if not rel_item_field and not queiried_item_field:
-                result[issue_type] = 1.0
-            elif not rel_item_field or not queiried_item_field:
-                result[issue_type] = 0.0
-            else:
-                sim = []
-                for i in range(len(rel_item_field)):
-                    max_sim = 0.0
-                    for j in range(len(queiried_item_field)):
-                        max_sim = max(max_sim, textdistance.levenshtein.normalized_similarity(
-                            rel_item_field[i], queiried_item_field[j]))
-                    sim.append(max_sim)
-                result[issue_type] = np.mean([s for s in sim if s >= np.mean(sim)])
-        return result
 
     @utils.ignore_warnings
     def gather_features_info(self):

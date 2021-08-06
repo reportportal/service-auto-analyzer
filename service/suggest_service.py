@@ -17,7 +17,6 @@ from utils import utils
 from commons.launch_objects import SuggestAnalysisResult
 from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from amqp.amqp import AmqpClient
-from commons.log_merger import LogMerger
 from service.analyzer_service import AnalyzerService
 from commons import similarity_calculator
 import json
@@ -298,23 +297,7 @@ class SuggestService(AnalyzerService):
         log_lines = test_item_info.analyzerConfig.numberOfLogLines
 
         query = self.build_common_query(log, size=size, filter_no_defect=False)
-
-        if test_item_info.analyzerConfig.analyzerMode in ["LAUNCH_NAME"]:
-            query["query"]["bool"]["must"].append(
-                {"term": {
-                    "launch_name": {
-                        "value": test_item_info.launchName}}})
-        elif test_item_info.analyzerConfig.analyzerMode in ["CURRENT_LAUNCH"]:
-            query["query"]["bool"]["must"].append(
-                {"term": {
-                    "launch_id": {
-                        "value": test_item_info.launchId}}})
-        else:
-            query["query"]["bool"]["should"].append(
-                {"term": {
-                    "launch_name": {
-                        "value": test_item_info.launchName,
-                        "boost": abs(self.search_cfg["BoostLaunch"])}}})
+        query = self.add_constraints_for_launches_into_query(query, test_item_info)
 
         if log["_source"]["message"].strip():
             query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
@@ -343,41 +326,11 @@ class SuggestService(AnalyzerService):
                                                     log["_source"][stacktrace_field],
                                                     field_name=stacktrace_field,
                                                     boost=1.0))
-                query["query"]["bool"]["should"].append(
-                    self.build_more_like_this_query(
-                        "60%",
-                        log["_source"]["detected_message_without_params_extended"],
-                        field_name="detected_message_without_params_extended",
-                        boost=1.0))
             query["query"]["bool"]["should"].append(
                 self.build_more_like_this_query("80%",
                                                 log["_source"]["merged_small_logs"],
                                                 field_name="merged_small_logs",
                                                 boost=0.5))
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["only_numbers"],
-                                                field_name="only_numbers",
-                                                boost=4.0,
-                                                override_min_should_match="1"))
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["message_params"],
-                                                field_name="message_params",
-                                                boost=4.0,
-                                                override_min_should_match="1"))
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["urls"],
-                                                field_name="urls",
-                                                boost=4.0,
-                                                override_min_should_match="1"))
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["paths"],
-                                                field_name="paths",
-                                                boost=4.0,
-                                                override_min_should_match="1"))
         else:
             query["query"]["bool"]["filter"].append({"term": {"is_merged": True}})
             query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
@@ -386,26 +339,18 @@ class SuggestService(AnalyzerService):
                                                 log["_source"]["merged_small_logs"],
                                                 field_name="merged_small_logs",
                                                 boost=2.0))
-
-        query["query"]["bool"]["should"].append(
-            self.build_more_like_this_query("1",
-                                            log["_source"]["found_exceptions_extended"],
-                                            field_name="found_exceptions_extended",
-                                            boost=4.0,
-                                            override_min_should_match="1"))
-        query["query"]["bool"]["should"].append(
-            self.build_more_like_this_query("1",
-                                            log["_source"]["potential_status_codes"],
-                                            field_name="potential_status_codes",
-                                            boost=4.0,
-                                            override_min_should_match="1"))
-        if log["_source"]["found_tests_and_methods"].strip():
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["found_tests_and_methods"],
-                                                field_name="found_tests_and_methods",
-                                                boost=4.0,
-                                                override_min_should_match="1"))
+        for field, boost_score in [
+                ("detected_message_without_params_extended", 2.0),
+                ("only_numbers", 2.0), ("message_params", 2.0), ("urls", 2.0),
+                ("paths", 2.0), ("found_exceptions_extended", 8.0), ("potential_status_codes", 8.0),
+                ("found_tests_and_methods", 2.0), ("test_item_name", 2.0)]:
+            if log["_source"][field].strip():
+                query["query"]["bool"]["should"].append(
+                    self.build_more_like_this_query("1",
+                                                    log["_source"][field],
+                                                    field_name=field,
+                                                    boost=boost_score,
+                                                    override_min_should_match="1"))
 
         return query
 
@@ -554,7 +499,7 @@ class SuggestService(AnalyzerService):
             unique_logs = utils.leave_only_unique_logs(test_item_info.logs)
             prepared_logs = [self.log_preparation._prepare_log_for_suggests(test_item_info, log, index_name)
                              for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
-            logs = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+            logs = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
             searched_res = self.query_es_for_suggested_items(test_item_info, logs)
 
             boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)

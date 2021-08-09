@@ -365,30 +365,29 @@ class SuggestService(AnalyzerService):
             if log["_source"]["log_level"] < utils.ERROR_LOGGING_LEVEL or\
                     (not message and not merged_small_logs):
                 continue
+            queries = []
 
-            query = self.build_suggest_query(
-                test_item_info, log,
-                message_field="message_extended",
-                det_mes_field="detected_message_extended",
-                stacktrace_field="stacktrace_extended")
-            es_res = self.es_client.es_client.search(index=index_name, body=query)
-            full_results.append((log, es_res))
+            for query in [
+                    self.build_suggest_query(
+                        test_item_info, log,
+                        message_field="message_extended",
+                        det_mes_field="detected_message_extended",
+                        stacktrace_field="stacktrace_extended"),
+                    self.build_suggest_query(
+                        test_item_info, log,
+                        message_field="message_without_params_extended",
+                        det_mes_field="detected_message_without_params_extended",
+                        stacktrace_field="stacktrace_extended"),
+                    self.build_suggest_query(
+                        test_item_info, log,
+                        message_field="message_without_params_and_brackets",
+                        det_mes_field="detected_message_without_params_and_brackets",
+                        stacktrace_field="stacktrace_extended")]:
+                queries.append("{}\n{}".format(json.dumps({"index": index_name}), json.dumps(query)))
 
-            query = self.build_suggest_query(
-                test_item_info, log,
-                message_field="message_without_params_extended",
-                det_mes_field="detected_message_without_params_extended",
-                stacktrace_field="stacktrace_extended")
-            es_res = self.es_client.es_client.search(index=index_name, body=query)
-            full_results.append((log, es_res))
-
-            query = self.build_suggest_query(
-                test_item_info, log,
-                message_field="message_without_params_and_brackets",
-                det_mes_field="detected_message_without_params_and_brackets",
-                stacktrace_field="stacktrace_extended")
-            es_res = self.es_client.es_client.search(index=index_name, body=query)
-            full_results.append((log, es_res))
+            partial_res = self.es_client.es_client.msearch("\n".join(queries) + "\n")["responses"]
+            for ind in range(len(partial_res)):
+                full_results.append((log, partial_res[ind]))
         return full_results
 
     def deduplicate_results(self, gathered_results, scores_by_test_items, test_item_ids):
@@ -485,7 +484,7 @@ class SuggestService(AnalyzerService):
         index_name = utils.unite_project_name(
             str(test_item_info.project), self.app_config["esProjectIndexPrefix"])
         if not self.es_client.index_exists(index_name):
-            logger.info("Project %d doesn't exist", index_name)
+            logger.info("Project %s doesn't exist", index_name)
             logger.info("Finished suggesting for test item with 0 results.")
             return []
 

@@ -120,29 +120,35 @@ class TestSuggestService(TestService):
                                     "uri":            "/1",
                                     "status":         HTTPStatus.OK,
                                     },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_first),
-                                    "rs":           utils.get_fixture(
-                                        self.no_hits_search_rs),
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/rp_suggestions_info_metrics",
+                                    "status":         HTTPStatus.OK
                                     },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_second),
-                                    "rs":           utils.get_fixture(
-                                        self.no_hits_search_rs),
+                                   {"method":         httpretty.PUT,
+                                    "uri":            "/rp_suggestions_info_metrics/_mapping",
+                                    "status":         HTTPStatus.OK,
+                                    "rs":             utils.get_fixture(self.index_created_rs),
                                     },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_third),
-                                    "rs":           utils.get_fixture(
-                                        self.no_hits_search_rs),
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rs":             utils.get_fixture(self.index_logs_rs),
+                                    }],
+                "msearch_results": [
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True)
+                ],
+                "test_item_info":      launch_objects.TestItemInfo(
+                    **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
+                "expected_result":     [],
+                "boost_predict":       ([], [])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.OK,
                                     },
                                    {"method":         httpretty.GET,
                                     "uri":            "/rp_suggestions_info_metrics",
@@ -159,6 +165,11 @@ class TestSuggestService(TestService):
                                     "content_type":   "application/json",
                                     "rs":             utils.get_fixture(self.index_logs_rs),
                                     }],
+                "msearch_results": [
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True)
+                ],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [],
@@ -168,80 +179,12 @@ class TestSuggestService(TestService):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/1",
                                     "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_first),
-                                    "rs":           utils.get_fixture(
-                                        self.no_hits_search_rs),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_second),
-                                    "rs":           utils.get_fixture(
-                                        self.no_hits_search_rs),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_third),
-                                    "rs":           utils.get_fixture(
-                                        self.no_hits_search_rs),
-                                    },
-                                   {"method":         httpretty.GET,
-                                    "uri":            "/rp_suggestions_info_metrics",
-                                    "status":         HTTPStatus.OK
-                                    },
-                                   {"method":         httpretty.PUT,
-                                    "uri":            "/rp_suggestions_info_metrics/_mapping",
-                                    "status":         HTTPStatus.OK,
-                                    "rs":             utils.get_fixture(self.index_created_rs),
-                                    },
-                                   {"method":         httpretty.POST,
-                                    "uri":            "/_bulk?refresh=true",
-                                    "status":         HTTPStatus.OK,
-                                    "content_type":   "application/json",
-                                    "rs":             utils.get_fixture(self.index_logs_rs),
                                     }],
-                "test_item_info":      launch_objects.TestItemInfo(
-                    **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
-                "expected_result":     [],
-                "boost_predict":       ([], [])
-            },
-            {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/1",
-                                    "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_first),
-                                    "rs":           utils.get_fixture(
-                                        self.no_hits_search_rs),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_second),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_third),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs),
-                                    }, ],
+                "msearch_results": [
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.one_hit_search_rs, to_json=True),
+                    utils.get_fixture(self.one_hit_search_rs, to_json=True)
+                ],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
@@ -270,31 +213,12 @@ class TestSuggestService(TestService):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/1",
                                     "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_first),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_second),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_third),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs),
-                                    }, ],
+                                    }],
+                "msearch_results": [
+                    utils.get_fixture(self.one_hit_search_rs, to_json=True),
+                    utils.get_fixture(self.one_hit_search_rs, to_json=True),
+                    utils.get_fixture(self.one_hit_search_rs, to_json=True)
+                ],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
@@ -323,31 +247,12 @@ class TestSuggestService(TestService):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/1",
                                     "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_first),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_second),
-                                    "rs":           utils.get_fixture(
-                                        self.two_hits_search_rs),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_third),
-                                    "rs":           utils.get_fixture(
-                                        self.two_hits_search_rs),
-                                    }, ],
+                                    }],
+                "msearch_results": [
+                    utils.get_fixture(self.one_hit_search_rs, to_json=True),
+                    utils.get_fixture(self.two_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.two_hits_search_rs, to_json=True)
+                ],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
@@ -376,31 +281,12 @@ class TestSuggestService(TestService):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/1",
                                     "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_first),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_second),
-                                    "rs":           utils.get_fixture(
-                                        self.two_hits_search_rs),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_third),
-                                    "rs":           utils.get_fixture(
-                                        self.no_hits_search_rs),
-                                    }, ],
+                                    }],
+                "msearch_results": [
+                    utils.get_fixture(self.one_hit_search_rs, to_json=True),
+                    utils.get_fixture(self.two_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True)
+                ],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
@@ -448,31 +334,12 @@ class TestSuggestService(TestService):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/1",
                                     "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_first),
-                                    "rs":           utils.get_fixture(
-                                        self.two_hits_search_rs),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_second),
-                                    "rs":           utils.get_fixture(
-                                        self.three_hits_search_rs),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_third),
-                                    "rs":           utils.get_fixture(
-                                        self.no_hits_search_rs),
-                                    }, ],
+                                    }],
+                "msearch_results": [
+                    utils.get_fixture(self.two_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.three_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True)
+                ],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
@@ -539,31 +406,12 @@ class TestSuggestService(TestService):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/1",
                                     "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_first),
-                                    "rs":           utils.get_fixture(
-                                        self.two_hits_search_rs),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_second),
-                                    "rs":           utils.get_fixture(
-                                        self.three_hits_search_rs_with_duplicate),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_third),
-                                    "rs":           utils.get_fixture(
-                                        self.no_hits_search_rs),
-                                    }, ],
+                                    }],
+                "msearch_results": [
+                    utils.get_fixture(self.two_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.three_hits_search_rs_with_duplicate, to_json=True),
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True)
+                ],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
                 "expected_result":     [
@@ -630,31 +478,12 @@ class TestSuggestService(TestService):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/1",
                                     "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_merged_first),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs_merged),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_merged_second),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs_merged),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_merged_third),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs_merged),
-                                    }, ],
+                                    }],
+                "msearch_results": [
+                    utils.get_fixture(self.one_hit_search_rs_merged, to_json=True),
+                    utils.get_fixture(self.one_hit_search_rs_merged, to_json=True),
+                    utils.get_fixture(self.one_hit_search_rs_merged, to_json=True)
+                ],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
                 "expected_result":     [
@@ -684,31 +513,7 @@ class TestSuggestService(TestService):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/rp_1",
                                     "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/rp_1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_merged_first),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs_merged),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/rp_1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_merged_second),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs_merged),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/rp_1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_merged_third),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs_merged),
-                                    }, ],
+                                    }],
                 "app_config": {
                     "esHost": "http://localhost:9200",
                     "esUser": "",
@@ -731,6 +536,11 @@ class TestSuggestService(TestService):
                     "minioSecretKey":    "",
                     "esProjectIndexPrefix": "rp_"
                 },
+                "msearch_results": [
+                    utils.get_fixture(self.one_hit_search_rs_merged, to_json=True),
+                    utils.get_fixture(self.one_hit_search_rs_merged, to_json=True),
+                    utils.get_fixture(self.one_hit_search_rs_merged, to_json=True)
+                ],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
                 "expected_result":     [
@@ -761,30 +571,6 @@ class TestSuggestService(TestService):
                                     "uri":            "/1",
                                     "status":         HTTPStatus.OK,
                                     },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_merged_first),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs_merged_wrong),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_merged_second),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs_merged_wrong),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_merged_third),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs_merged_wrong),
-                                    },
                                    {"method":         httpretty.GET,
                                     "uri":            "/rp_suggestions_info_metrics",
                                     "status":         HTTPStatus.OK
@@ -800,6 +586,11 @@ class TestSuggestService(TestService):
                                     "content_type":   "application/json",
                                     "rs":             utils.get_fixture(self.index_logs_rs),
                                     }],
+                "msearch_results": [
+                    utils.get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True),
+                    utils.get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True),
+                    utils.get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True)
+                ],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
                 "expected_result":     [],
@@ -809,30 +600,6 @@ class TestSuggestService(TestService):
                 "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/rp_1",
                                     "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/rp_1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_merged_first),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs_merged_wrong),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/rp_1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_merged_second),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs_merged_wrong),
-                                    },
-                                   {"method":       httpretty.GET,
-                                    "uri":          "/rp_1/_search",
-                                    "status":       HTTPStatus.OK,
-                                    "content_type": "application/json",
-                                    "rq":           utils.get_fixture(self.search_rq_merged_third),
-                                    "rs":           utils.get_fixture(
-                                        self.one_hit_search_rs_merged_wrong),
                                     },
                                    {"method":         httpretty.GET,
                                     "uri":            "/rp_suggestions_info_metrics",
@@ -871,6 +638,11 @@ class TestSuggestService(TestService):
                     "minioSecretKey":    "",
                     "esProjectIndexPrefix": "rp_"
                 },
+                "msearch_results": [
+                    utils.get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True),
+                    utils.get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True),
+                    utils.get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True)
+                ],
                 "test_item_info":      launch_objects.TestItemInfo(
                     **utils.get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
                 "expected_result":     [],
@@ -887,6 +659,9 @@ class TestSuggestService(TestService):
                     app_config = test["app_config"]
                 suggest_service = SuggestService(app_config=app_config,
                                                  search_cfg=config)
+                if "msearch_results" in test:
+                    suggest_service.es_client.es_client.msearch = MagicMock(
+                        return_value={"responses": test["msearch_results"]})
                 _boosting_decision_maker = BoostingDecisionMaker()
                 _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
                 _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])

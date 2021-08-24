@@ -249,7 +249,8 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                      utils.get_fixture(self.one_hit_search_rs_small_logs, to_json=True))],
                 "config":           TestBoostingFeaturizer.get_default_config(filter_fields=[
                     "detected_message", "stacktrace"]),
-                "result":          []
+                "result":          [(utils.get_fixture(self.log_message_only_small_logs, to_json=True),
+                                     {"hits": {"hits": []}})]
             },
             {
                 "elastic_results": [(utils.get_fixture(self.log_message_only_small_logs, to_json=True),
@@ -403,7 +404,9 @@ class TestBoostingFeaturizer(unittest.TestCase):
                     filter_fields=[],
                     filter_fields_any=["detected_message"]),
                 "result":          [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True))]
+                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True)),
+                                    (utils.get_fixture(self.log_message, to_json=True),
+                                     {"hits": {"hits": []}})]
             },
             {
                 "elastic_results": [(utils.get_fixture(self.log_message_only_small_logs, to_json=True),
@@ -412,7 +415,8 @@ class TestBoostingFeaturizer(unittest.TestCase):
                     filter_fields=[],
                     filter_fields_any=["detected_message",
                                        "detected_message_without_params_extended"]),
-                "result":          []
+                "result":          [(utils.get_fixture(self.log_message_only_small_logs, to_json=True),
+                                     {"hits": {"hits": []}})]
             },
             {
                 "elastic_results": [(utils.get_fixture(self.log_message_only_small_logs, to_json=True),

@@ -46,7 +46,8 @@ class AutoAnalyzerService(AnalyzerService):
                 analyzer_config.numberOfLogLines, min_should_match),
             "number_of_log_lines": analyzer_config.numberOfLogLines,
             "filter_by_unique_id": True,
-            "boosting_model": self.search_cfg["BoostModelFolder"]
+            "boosting_model": self.search_cfg["BoostModelFolder"],
+            "filter_by_all_logs_should_be_similar": analyzer_config.allMessagesShouldMatch
         }
 
     def choose_fields_to_filter_strict(self, log_lines, min_should_match):
@@ -174,12 +175,14 @@ class AutoAnalyzerService(AnalyzerService):
                                                 field_name="merged_small_logs"))
         return query
 
-    def find_relevant_with_no_defect(self, candidates_with_no_defect, boosting_config):
+    def leave_only_similar_logs(self, candidates_with_no_defect, boosting_config):
+        new_results = []
         for log_info, search_res in candidates_with_no_defect:
             no_defect_candidate_exists = False
             for log in search_res["hits"]["hits"]:
                 if log["_source"]["issue_type"][:2].lower() in ["nd", "ti"]:
                     no_defect_candidate_exists = True
+            new_search_res = []
             _similarity_calculator = SimilarityCalculator(
                 boosting_config,
                 weighted_similarity_calculator=self.weighted_log_similarity_calculator)
@@ -187,9 +190,7 @@ class AutoAnalyzerService(AnalyzerService):
                 _similarity_calculator.find_similarity(
                     [(log_info, search_res)],
                     ["message", "merged_small_logs"])
-                latest_type = None
-                latest_item = None
-                for obj in reversed(search_res["hits"]["hits"]):
+                for obj in search_res["hits"]["hits"]:
                     group_id = (obj["_id"], log_info["_id"])
                     if group_id in _similarity_calculator.similarity_dict["message"]:
                         sim_val = _similarity_calculator.similarity_dict["message"][group_id]
@@ -197,10 +198,42 @@ class AutoAnalyzerService(AnalyzerService):
                             sim_val = _similarity_calculator.similarity_dict["merged_small_logs"][group_id]
                         threshold = self.search_cfg["NoDefectMinSimilarity"]
                         if not sim_val["both_empty"] and sim_val["similarity"] >= threshold:
-                            latest_type = obj["_source"]["issue_type"]
-                            latest_item = obj
-                if latest_type and latest_type[:2].lower() in ["nd", "ti"]:
-                    return latest_item
+                            new_search_res.append(obj)
+            new_results.append((log_info, {"hits": {"hits": new_search_res}}))
+        return new_results
+
+    def filter_by_all_logs_should_be_similar(self, candidates_with_no_defect, boosting_config):
+        if boosting_config["filter_by_all_logs_should_be_similar"]:
+            test_item_stats = {}
+            for log_info, search_res in candidates_with_no_defect:
+                for log in search_res["hits"]["hits"]:
+                    if log["_source"]["test_item"] not in test_item_stats:
+                        test_item_stats[log["_source"]["test_item"]] = 0
+                    test_item_stats[log["_source"]["test_item"]] += 1
+            new_results = []
+            for log_info, search_res in candidates_with_no_defect:
+                new_search_res = []
+                for log in search_res["hits"]["hits"]:
+                    if log["_source"]["test_item"] in test_item_stats:
+                        if test_item_stats[log["_source"]["test_item"]] == len(candidates_with_no_defect):
+                            new_search_res.append(log)
+                new_results.append((log_info, {"hits": {"hits": new_search_res}}))
+            return new_results
+        return candidates_with_no_defect
+
+    def find_relevant_with_no_defect(self, candidates_with_no_defect, boosting_config):
+        candidates_with_no_defect = self.leave_only_similar_logs(
+            candidates_with_no_defect, boosting_config)
+        candidates_with_no_defect = self.filter_by_all_logs_should_be_similar(
+            candidates_with_no_defect, boosting_config)
+        for log_info, search_res in candidates_with_no_defect:
+            latest_type = None
+            latest_item = None
+            for obj in reversed(search_res["hits"]["hits"]):
+                latest_type = obj["_source"]["issue_type"]
+                latest_item = obj
+            if latest_type and latest_type[:2].lower() in ["nd", "ti"]:
+                return latest_item
         return None
 
     def _send_result_to_queue(self, test_item_dict, batches, batch_logs):
@@ -366,6 +399,7 @@ class AutoAnalyzerService(AnalyzerService):
 
                     relevant_with_no_defect = self.find_relevant_with_no_defect(
                         analyzer_candidates.candidatesWithNoDefect, boosting_config)
+
                     if relevant_with_no_defect is not None:
                         analysis_result = AnalysisResult(
                             testItem=analyzer_candidates.testItemId,

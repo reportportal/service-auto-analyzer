@@ -583,6 +583,7 @@ def choose_issue_type(predicted_labels, predicted_labels_probability,
     predicted_issue_type = ""
     max_prob = 0.0
     max_val_start_time = None
+    global_idx = 0
     for i in range(len(predicted_labels)):
         if predicted_labels[i] == 1:
             issue_type = issue_type_names[i]

@@ -91,7 +91,9 @@ class BoostingFeaturizer:
                  {"model_folder": self.config["boosting_model"]},
                  self.get_necessary_features(self.config["boosting_model"])),
             59: (self._calculate_similarity_percent, {"field_name": "found_tests_and_methods"}, []),
-            61: (self._calculate_similarity_percent, {"field_name": "test_item_name"}, [])
+            61: (self._calculate_similarity_percent, {"field_name": "test_item_name"}, []),
+            65: (self._calculate_test_item_logs_similar_percent, {}, []),
+            66: (self._count_test_item_logs, {}, [])
         }
 
         fields_to_calc_similarity = self.find_columns_to_find_similarities_for()
@@ -111,6 +113,10 @@ class BoostingFeaturizer:
             all_results = self.filter_by_min_should_match_any(
                 all_results,
                 fields=self.config["filter_min_should_match_any"])
+        self.test_item_log_stats = self._calculate_stats_by_test_item_ids(all_results)
+        if "filter_by_all_logs_should_be_similar" in self.config:
+            if self.config["filter_by_all_logs_should_be_similar"]:
+                all_results = self.filter_by_all_logs_should_be_similar(all_results)
         if "filter_by_unique_id" in self.config and self.config["filter_by_unique_id"]:
             all_results = self.filter_by_unique_id(all_results)
         if "calculate_similarities" not in self.config or self.config["calculate_similarities"]:
@@ -123,6 +129,36 @@ class BoostingFeaturizer:
         self.defect_type_predict_model = None
         self.used_model_info = set()
         self.features_to_recalculate_always = set([51, 58])
+
+    def _count_test_item_logs(self):
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        sim_logs_num_scores = {}
+        for issue_type in scores_by_issue_type:
+            sim_logs_num_scores[issue_type] = len(self.all_results)
+        return sim_logs_num_scores
+
+    def _calculate_test_item_logs_similar_percent(self):
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        sim_logs_num_scores = {}
+        for issue_type in scores_by_issue_type:
+            test_item_id = scores_by_issue_type[issue_type]["mrHit"]["_source"]["test_item"]
+            sim_logs_num_scores[issue_type] = 0.0
+            if test_item_id in self.test_item_log_stats:
+                sim_logs_num_scores[issue_type] = self.test_item_log_stats[test_item_id]
+        return sim_logs_num_scores
+
+    def _calculate_stats_by_test_item_ids(self, all_results):
+        test_item_log_stats = {}
+        for log, res in all_results:
+            for r in res["hits"]["hits"]:
+                if r["_source"]["test_item"] not in test_item_log_stats:
+                    test_item_log_stats[r["_source"]["test_item"]] = 0
+                test_item_log_stats[r["_source"]["test_item"]] += 1
+        all_logs = len(all_results)
+        if all_logs:
+            for test_item_id in test_item_log_stats:
+                test_item_log_stats[test_item_id] /= all_logs
+        return test_item_log_stats
 
     def _perform_additional_text_processing(self, all_results):
         for log, res in all_results:
@@ -199,6 +235,17 @@ class BoostingFeaturizer:
             rel_item_issue_type = mr_hit["_source"]["issue_type"]
             issue_type_stats[issue_type] = int(label_type == rel_item_issue_type.lower()[:2])
         return issue_type_stats
+
+    def filter_by_all_logs_should_be_similar(self, all_results):
+        new_results = []
+        for log, res in all_results:
+            new_elastic_res = []
+            for r in res["hits"]["hits"]:
+                if r["_source"]["test_item"] in self.test_item_log_stats:
+                    if self.test_item_log_stats[r["_source"]["test_item"]] > 0.99:
+                        new_elastic_res.append(r)
+            new_results.append((log, {"hits": {"hits": new_elastic_res}}))
+        return new_results
 
     def filter_by_unique_id(self, all_results):
         new_results = []
@@ -288,8 +335,7 @@ class BoostingFeaturizer:
                     similarity = sim_obj[group_id]["similarity"]
                 if similarity >= self.config["min_should_match"]:
                     new_elastic_res.append(elastic_res)
-            if new_elastic_res:
-                new_results.append((log, {"hits": {"hits": new_elastic_res}}))
+            new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
 
     def filter_by_min_should_match_any(self, all_results, fields=["detected_message"]):
@@ -312,8 +358,7 @@ class BoostingFeaturizer:
                     max_similarity = max(max_similarity, similarity)
                 if max_similarity >= similarity_to_compare:
                     new_elastic_res.append(elastic_res)
-            if len(new_elastic_res) > 0:
-                new_results.append((log, {"hits": {"hits": new_elastic_res}}))
+            new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
 
     def _calculate_percent_issue_types(self):

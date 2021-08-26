@@ -26,6 +26,7 @@ class AnalyzerConf(BaseModel):
     numberOfLogLines: int = -1
     isAutoAnalyzerEnabled: bool = True
     indexingRunning: bool = True
+    allMessagesShouldMatch: bool = False
 
 
 class SearchLogInfo(BaseModel):

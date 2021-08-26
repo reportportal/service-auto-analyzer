@@ -53,6 +53,7 @@ class TestService(unittest.TestCase):
         self.one_hit_search_rs = "one_hit_search_rs.json"
         self.one_hit_search_rs_search_logs = "one_hit_search_rs_search_logs.json"
         self.two_hits_search_rs = "two_hits_search_rs.json"
+        self.two_hits_search_rs_second_message = "two_hits_search_rs_second_message.json"
         self.two_hits_search_rs_search_logs = "two_hits_search_rs_search_logs.json"
         self.three_hits_search_rs = "three_hits_search_rs.json"
         self.launch_w_test_items_w_logs_different_log_level =\

@@ -80,6 +80,7 @@ SEARCH_CONFIG = {
     "SearchLogsMinSimilarity":     float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.98")),
     "NoDefectMinSimilarity":     float(os.getenv("NO_DEFECT_MIN_SHOULD_MATCH", "0.98")),
     "MinWordLength":               int(os.getenv("ES_MIN_WORD_LENGTH", "2")),
+    "TimeWeightDecay":               float(os.getenv("ES_TIME_WEIGHT_DECAY", "0.95")),
     "PatternLabelMinPercentToSuggest": float(os.getenv("PATTERN_LABEL_MIN_PERCENT", "0.9")),
     "PatternLabelMinCountToSuggest":  int(os.getenv("PATTERN_LABEL_MIN_COUNT", "5")),
     "PatternMinCountToSuggest":       int(os.getenv("PATTERN_MIN_COUNT", "10")),

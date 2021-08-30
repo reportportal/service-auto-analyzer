@@ -18,6 +18,8 @@ from utils import utils
 from commons import similarity_calculator
 from boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
 import logging
+import numpy as np
+from datetime import datetime
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
@@ -92,6 +94,7 @@ class BoostingFeaturizer:
                  self.get_necessary_features(self.config["boosting_model"])),
             59: (self._calculate_similarity_percent, {"field_name": "found_tests_and_methods"}, []),
             61: (self._calculate_similarity_percent, {"field_name": "test_item_name"}, []),
+            64: (self._calculate_decay_function_score, {"field_name": "start_time"}, []),
             65: (self._calculate_test_item_logs_similar_percent, {}, []),
             66: (self._count_test_item_logs, {}, [])
         }
@@ -167,6 +170,21 @@ class BoostingFeaturizer:
                     r["_source"]["found_tests_and_methods"] = utils.preprocess_found_test_methods(
                         r["_source"]["found_tests_and_methods"])
         return all_results
+
+    def _calculate_decay_function_score(self, field_name):
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        dates_by_issue_types = {}
+        for issue_type in scores_by_issue_type:
+            field_date = scores_by_issue_type[issue_type]["mrHit"]["_source"][field_name]
+            field_date = datetime.strptime(field_date, '%Y-%m-%d %H:%M:%S')
+            compared_field_date = scores_by_issue_type[issue_type]["compared_log"]["_source"][field_name]
+            compared_field_date = datetime.strptime(compared_field_date, '%Y-%m-%d %H:%M:%S')
+            if compared_field_date < field_date:
+                field_date, compared_field_date = compared_field_date, field_date
+            dates_by_issue_types[issue_type] = np.exp(
+                np.log(self.config["time_weight_decay"]) * max(
+                    0, ((compared_field_date - field_date).days - 7)) / 7)
+        return dates_by_issue_types
 
     def _calculate_model_probability(self, model_folder=""):
         if not model_folder.strip():

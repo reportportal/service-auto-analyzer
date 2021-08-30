@@ -113,6 +113,33 @@ class AnalyzerService:
                                 "boost": abs(self.search_cfg["BoostAA"]), }}},
                         ]}}}
 
+    def add_query_with_start_time_decay(self, main_query, start_time):
+        return {
+            "size": main_query["size"],
+            "sort": main_query["sort"],
+            "query": {
+                "function_score": {
+                    "query": main_query["query"],
+                    "functions": [
+                        {
+                            "exp": {
+                                "start_time": {
+                                    "origin": start_time,
+                                    "scale": "7d",
+                                    "offset": "7d",
+                                    "decay": self.search_cfg["TimeWeightDecay"]
+                                }
+                            }
+                        },
+                        {
+                            "script_score": {"script": {"source": "0.6"}}
+                        }],
+                    "score_mode": "max",
+                    "boost_mode": "multiply"
+                }
+            }
+        }
+
     def remove_models(self, model_info):
         try:
             logger.info("Started removing %s models from project %d",

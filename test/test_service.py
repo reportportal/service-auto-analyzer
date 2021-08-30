@@ -162,6 +162,7 @@ class TestService(unittest.TestCase):
             "SearchLogsMinSimilarity": 0.9,
             "NoDefectMinSimilarity": 0.98,
             "MinWordLength":  0,
+            "TimeWeightDecay": 0.95,
             "PatternLabelMinPercentToSuggest": 0.5,
             "PatternLabelMinCountToSuggest":   5,
             "PatternMinCountToSuggest":        10,

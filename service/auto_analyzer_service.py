@@ -47,7 +47,8 @@ class AutoAnalyzerService(AnalyzerService):
             "number_of_log_lines": analyzer_config.numberOfLogLines,
             "filter_by_unique_id": True,
             "boosting_model": self.search_cfg["BoostModelFolder"],
-            "filter_by_all_logs_should_be_similar": analyzer_config.allMessagesShouldMatch
+            "filter_by_all_logs_should_be_similar": analyzer_config.allMessagesShouldMatch,
+            "time_weight_decay": self.search_cfg["TimeWeightDecay"]
         }
 
     def choose_fields_to_filter_strict(self, log_lines, min_should_match):
@@ -135,7 +136,7 @@ class AutoAnalyzerService(AnalyzerService):
                                                     boost=boost_score,
                                                     override_min_should_match="1"))
 
-        return query
+        return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
     def build_query_with_no_defect(self, launch, log, size=10):
         min_should_match = self.get_min_should_match_setting(launch)
@@ -173,7 +174,7 @@ class AutoAnalyzerService(AnalyzerService):
                 self.build_more_like_this_query(min_should_match,
                                                 log["_source"]["merged_small_logs"],
                                                 field_name="merged_small_logs"))
-        return query
+        return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
     def leave_only_similar_logs(self, candidates_with_no_defect, boosting_config):
         new_results = []

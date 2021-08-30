@@ -1,6 +1,7 @@
 {
 	"_id": 1,
 	"_source": {
+		"start_time": "2021-07-31 18:34:55",
 		"log_level": 40000,
 		"launch_name": "launch test",
 		"launch_id": 12,

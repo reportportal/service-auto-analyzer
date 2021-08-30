@@ -174,6 +174,20 @@ class AutoAnalyzerService(AnalyzerService):
                 self.build_more_like_this_query(min_should_match,
                                                 log["_source"]["merged_small_logs"],
                                                 field_name="merged_small_logs"))
+        if log["_source"]["found_exceptions"].strip():
+            query["query"]["bool"]["must"].append(
+                self.build_more_like_this_query("1",
+                                                log["_source"]["found_exceptions"],
+                                                field_name="found_exceptions",
+                                                boost=8.0,
+                                                override_min_should_match="1"))
+        if log["_source"]["potential_status_codes"].strip():
+            query["query"]["bool"]["must"].append(
+                self.build_more_like_this_query("1",
+                                                log["_source"]["potential_status_codes"],
+                                                field_name="potential_status_codes",
+                                                boost=8.0,
+                                                override_min_should_match="1"))
         return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
     def leave_only_similar_logs(self, candidates_with_no_defect, boosting_config):
@@ -230,9 +244,13 @@ class AutoAnalyzerService(AnalyzerService):
         for log_info, search_res in candidates_with_no_defect:
             latest_type = None
             latest_item = None
-            for obj in reversed(search_res["hits"]["hits"]):
-                latest_type = obj["_source"]["issue_type"]
-                latest_item = obj
+            latest_date = None
+            for obj in search_res["hits"]["hits"]:
+                start_time = datetime.strptime(obj["_source"]["start_time"], '%Y-%m-%d %H:%M:%S')
+                if latest_date is None or latest_date < start_time:
+                    latest_type = obj["_source"]["issue_type"]
+                    latest_item = obj
+                    latest_date = start_time
             if latest_type and latest_type[:2].lower() in ["nd", "ti"]:
                 return latest_item
         return None

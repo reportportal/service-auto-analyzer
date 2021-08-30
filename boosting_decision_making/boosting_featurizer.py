@@ -268,14 +268,29 @@ class BoostingFeaturizer:
     def filter_by_unique_id(self, all_results):
         new_results = []
         for log, res in all_results:
+            unique_id_dict = {}
+            for r in res["hits"]["hits"]:
+                if r["_source"]["unique_id"] not in unique_id_dict:
+                    unique_id_dict[r["_source"]["unique_id"]] = []
+                unique_id_dict[r["_source"]["unique_id"]].append(
+                    (r["_id"], int(r["_score"]), datetime.strptime(
+                        r["_source"]["start_time"], '%Y-%m-%d %H:%M:%S')))
+            log_ids_to_take = set()
+            for unique_id in unique_id_dict:
+                unique_id_dict[unique_id] = sorted(
+                    unique_id_dict[unique_id],
+                    key=lambda x: (x[1], x[2]),
+                    reverse=True)
+                scores_used = set()
+                for sorted_score in unique_id_dict[unique_id]:
+                    if sorted_score[1] not in scores_used:
+                        log_ids_to_take.add(sorted_score[0])
+                        scores_used.add(sorted_score[1])
             new_elastic_res = []
-            unique_ids = set()
             for elastic_res in res["hits"]["hits"]:
-                if elastic_res["_source"]["unique_id"] not in unique_ids:
-                    unique_ids.add(elastic_res["_source"]["unique_id"])
+                if elastic_res["_id"] in log_ids_to_take:
                     new_elastic_res.append(elastic_res)
-            if new_elastic_res:
-                new_results.append((log, {"hits": {"hits": new_elastic_res}}))
+            new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
 
     def is_launch_id_the_same(self):

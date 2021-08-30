@@ -187,7 +187,7 @@ class TestAutoAnalyzerService(TestService):
                     self.launch_w_test_items_w_logs),
                 "expected_count": 1,
                 "expected_issue_type": "AB001",
-                "boost_predict":       ([1], [[0.2, 0.8]])
+                "boost_predict":       ([1, 0], [[0.2, 0.8], [0.7, 0.3]])
             },
             {
                 "test_calls":     [{"method":         httpretty.GET,
@@ -225,7 +225,7 @@ class TestAutoAnalyzerService(TestService):
                     "minioSecretKey":    "",
                     "esProjectIndexPrefix": "rp_"
                 },
-                "boost_predict":       ([1], [[0.2, 0.8]])
+                "boost_predict":       ([1, 0], [[0.2, 0.8], [0.7, 0.3]])
             },
             {
                 "test_calls":     [{"method":         httpretty.GET,

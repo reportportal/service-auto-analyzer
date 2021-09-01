@@ -18,6 +18,8 @@ from utils import utils
 from commons import similarity_calculator
 from boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
 import logging
+import numpy as np
+from datetime import datetime
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
@@ -92,6 +94,7 @@ class BoostingFeaturizer:
                  self.get_necessary_features(self.config["boosting_model"])),
             59: (self._calculate_similarity_percent, {"field_name": "found_tests_and_methods"}, []),
             61: (self._calculate_similarity_percent, {"field_name": "test_item_name"}, []),
+            64: (self._calculate_decay_function_score, {"field_name": "start_time"}, []),
             65: (self._calculate_test_item_logs_similar_percent, {}, []),
             66: (self._count_test_item_logs, {}, [])
         }
@@ -167,6 +170,21 @@ class BoostingFeaturizer:
                     r["_source"]["found_tests_and_methods"] = utils.preprocess_found_test_methods(
                         r["_source"]["found_tests_and_methods"])
         return all_results
+
+    def _calculate_decay_function_score(self, field_name):
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        dates_by_issue_types = {}
+        for issue_type in scores_by_issue_type:
+            field_date = scores_by_issue_type[issue_type]["mrHit"]["_source"][field_name]
+            field_date = datetime.strptime(field_date, '%Y-%m-%d %H:%M:%S')
+            compared_field_date = scores_by_issue_type[issue_type]["compared_log"]["_source"][field_name]
+            compared_field_date = datetime.strptime(compared_field_date, '%Y-%m-%d %H:%M:%S')
+            if compared_field_date < field_date:
+                field_date, compared_field_date = compared_field_date, field_date
+            dates_by_issue_types[issue_type] = np.exp(
+                np.log(self.config["time_weight_decay"]) * max(
+                    0, ((compared_field_date - field_date).days - 7)) / 7)
+        return dates_by_issue_types
 
     def _calculate_model_probability(self, model_folder=""):
         if not model_folder.strip():
@@ -250,14 +268,29 @@ class BoostingFeaturizer:
     def filter_by_unique_id(self, all_results):
         new_results = []
         for log, res in all_results:
+            unique_id_dict = {}
+            for r in res["hits"]["hits"]:
+                if r["_source"]["unique_id"] not in unique_id_dict:
+                    unique_id_dict[r["_source"]["unique_id"]] = []
+                unique_id_dict[r["_source"]["unique_id"]].append(
+                    (r["_id"], int(r["_score"]), datetime.strptime(
+                        r["_source"]["start_time"], '%Y-%m-%d %H:%M:%S')))
+            log_ids_to_take = set()
+            for unique_id in unique_id_dict:
+                unique_id_dict[unique_id] = sorted(
+                    unique_id_dict[unique_id],
+                    key=lambda x: (x[1], x[2]),
+                    reverse=True)
+                scores_used = set()
+                for sorted_score in unique_id_dict[unique_id]:
+                    if sorted_score[1] not in scores_used:
+                        log_ids_to_take.add(sorted_score[0])
+                        scores_used.add(sorted_score[1])
             new_elastic_res = []
-            unique_ids = set()
             for elastic_res in res["hits"]["hits"]:
-                if elastic_res["_source"]["unique_id"] not in unique_ids:
-                    unique_ids.add(elastic_res["_source"]["unique_id"])
+                if elastic_res["_id"] in log_ids_to_take:
                     new_elastic_res.append(elastic_res)
-            if new_elastic_res:
-                new_results.append((log, {"hits": {"hits": new_elastic_res}}))
+            new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
 
     def is_launch_id_the_same(self):

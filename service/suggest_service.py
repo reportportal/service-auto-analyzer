@@ -277,7 +277,9 @@ class SuggestService(AnalyzerService):
                 analyzerConfig.numberOfLogLines),
             "number_of_log_lines": analyzerConfig.numberOfLogLines,
             "filter_by_unique_id": True,
-            "boosting_model": self.search_cfg["SuggestBoostModelFolder"]}
+            "boosting_model": self.search_cfg["SuggestBoostModelFolder"],
+            "time_weight_decay": self.search_cfg["TimeWeightDecay"]
+        }
 
     def choose_fields_to_filter_suggests(self, log_lines_num):
         if log_lines_num == -1:
@@ -352,7 +354,7 @@ class SuggestService(AnalyzerService):
                                                     boost=boost_score,
                                                     override_min_should_match="1"))
 
-        return query
+        return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
     def query_es_for_suggested_items(self, test_item_info, logs):
         full_results = []

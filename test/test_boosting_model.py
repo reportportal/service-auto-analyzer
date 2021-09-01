@@ -67,7 +67,8 @@ class TestBoostingModel(unittest.TestCase):
             "number_of_log_lines": number_of_log_lines,
             "chosen_namespaces": {"tv.horizon": 25, "sun.reflect": 10},
             "boosting_model": utils.read_json_file(
-                "", "model_settings.json", to_json=True)["BOOST_MODEL_FOLDER"]
+                "", "model_settings.json", to_json=True)["BOOST_MODEL_FOLDER"],
+            "time_weight_decay": 0.95
         }
 
     @utils.ignore_warnings

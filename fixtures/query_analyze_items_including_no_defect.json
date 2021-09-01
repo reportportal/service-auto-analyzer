@@ -3,39 +3,77 @@
     "sort": ["_score",
              {"start_time": "desc"}],
     "query": {
-        "bool": {
-            "filter": [
-                {"range": {"log_level": {"gte": 40000}}},
-                {"exists": {"field": "issue_type"}},
-                {"term": {"is_merged": false}}
-            ],
-            "must_not": [
-                {"term": {"issue_type": "ti001"}},
-                {"term": {"test_item": "123"}}
-            ],
-            "must": [
-                {"term": {
-                    "unique_id": "unique"
-                }},
-                {"term": {
-                    "test_case_hash": 1
-                }},
-                {"term": {
-                    "launch_name": {
-                        "value": "Launch name"
+        "function_score": {
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"range": {"log_level": {"gte": 40000}}},
+                        {"exists": {"field": "issue_type"}},
+                        {"term": {"is_merged": false}}
+                    ],
+                    "must_not": [
+                        {"term": {"issue_type": "ti001"}},
+                        {"term": {"test_item": "123"}}
+                    ],
+                    "must": [
+                        {"term": {
+                            "unique_id": "unique"
+                        }},
+                        {"term": {
+                            "test_case_hash": 1
+                        }},
+                        {"term": {
+                            "launch_name": {
+                                "value": "Launch name"
+                            }
+                        }},
+                        {"more_like_this": {
+                            "fields":               ["message"],
+                            "like":                 "hello world",
+                            "min_doc_freq":         1,
+                            "min_term_freq":        1,
+                            "minimum_should_match": "5<80%",
+                            "max_query_terms":      50,
+                            "boost":                1.0
+                        }},
+                        {"more_like_this": {
+                            "fields":               ["found_exceptions"],
+                            "like":                 "AssertionError",
+                            "min_doc_freq":         1,
+                            "min_term_freq":        1,
+                            "minimum_should_match": "1",
+                            "max_query_terms":      50,
+                            "boost":                8.0
+                        }},
+                        {"more_like_this": {
+                            "fields":               ["potential_status_codes"],
+                            "like":                 "300 401",
+                            "min_doc_freq":         1,
+                            "min_term_freq":        1,
+                            "minimum_should_match": "1",
+                            "max_query_terms":      50,
+                            "boost":                8.0
+                        }}
+                    ],
+                    "should": []
+                }
+            },
+            "functions": [
+                {
+                    "exp": {
+                        "start_time": {
+                            "origin": "2021-08-30 08:11:23",
+                            "scale": "7d",
+                            "offset": "7d",
+                            "decay": 0.95
+                        }
                     }
-                }},
-                {"more_like_this": {
-                    "fields":               ["message"],
-                    "like":                 "hello world",
-                    "min_doc_freq":         1,
-                    "min_term_freq":        1,
-                    "minimum_should_match": "5<80%",
-                    "max_query_terms":      50,
-                    "boost":                1.0
-                }}
-            ],
-            "should": []
+                },
+                {
+                    "script_score": {"script": {"source": "0.6"}}
+                }],
+            "score_mode": "max",
+            "boost_mode": "multiply"
         }
     }
 }

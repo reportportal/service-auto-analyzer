@@ -87,7 +87,8 @@ class TestEsQuery(unittest.TestCase):
             "BoostModelFolder":    "",
             "SimilarityWeightsFolder":     "",
             "GlobalDefectTypeModelFolder": "",
-            "SuggestBoostModelFolder":     ""
+            "SuggestBoostModelFolder":     "",
+            "TimeWeightDecay": 0.95
         }
 
     @utils.ignore_warnings
@@ -104,6 +105,7 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
@@ -138,6 +140,7 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
@@ -172,6 +175,7 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
@@ -207,6 +211,7 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
@@ -242,6 +247,7 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
@@ -276,6 +282,7 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
@@ -311,6 +318,7 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
@@ -368,6 +376,7 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
@@ -417,6 +426,7 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
@@ -466,6 +476,7 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
@@ -515,6 +526,7 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
@@ -566,6 +578,7 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
@@ -610,6 +623,7 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
@@ -643,6 +657,7 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",

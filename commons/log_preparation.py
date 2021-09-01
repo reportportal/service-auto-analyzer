@@ -192,7 +192,7 @@ class LogPreparation:
             test_item_info.testItemName)
         log_template["_source"]["is_auto_analyzed"] = False
         log_template["_source"]["issue_type"] = ""
-        log_template["_source"]["start_time"] = ""
+        log_template["_source"]["start_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         return log_template
 
     def _prepare_log_for_suggests(self, test_item_info, log, project):

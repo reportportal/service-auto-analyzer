@@ -19,6 +19,7 @@
                 "_id": "1",
                 "_score": 158.08437,
                 "_source": {
+                    "start_time": "2021-07-31 18:34:55",
                     "issue_type": "AB001",
                     "launch_name": "Launch 1",
                     "launch_id": 13,
@@ -56,6 +57,7 @@
                 "_id": "2",
                 "_score": 77.53298,
                 "_source": {
+                    "start_time": "2021-07-31 18:34:55",
                     "issue_type": "PB001",
                     "launch_name": "Launch 1",
                     "launch_id": 13,

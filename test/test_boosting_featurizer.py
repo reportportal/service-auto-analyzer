@@ -60,7 +60,8 @@ class TestBoostingFeaturizer(unittest.TestCase):
             "filter_min_should_match": filter_fields,
             "filter_min_should_match_any": filter_fields_any,
             "number_of_log_lines": -1,
-            "boosting_model": ""
+            "boosting_model": "",
+            "time_weight_decay": 0.95
         }
 
     @utils.ignore_warnings

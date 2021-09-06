@@ -847,3 +847,55 @@ def preprocess_found_test_methods(text):
         else:
             all_words.append(w)
     return " ".join(all_words)
+
+
+def get_allowed_number_of_missed(cur_threshold):
+    if cur_threshold >= 0.95 and cur_threshold <= 0.99:
+        return 1
+    if cur_threshold >= 0.9 and cur_threshold < 0.95:
+        return 2
+    if cur_threshold >= 0.8 and cur_threshold < 0.9:
+        return 3
+    return 0
+
+
+def calculate_threshold(
+        text_size, cur_threshold, min_recalculated_threshold=0.8):
+    if not text_size:
+        return cur_threshold
+    allowed_words_missed = get_allowed_number_of_missed(cur_threshold)
+    new_threshold = cur_threshold
+    for words_num in range(allowed_words_missed, 0, -1):
+        threshold = (text_size - allowed_words_missed) / text_size
+        if threshold >= min_recalculated_threshold:
+            new_threshold = round(threshold, 2)
+            break
+    return min(new_threshold, cur_threshold)
+
+
+def calculate_threshold_for_text(text, cur_threshold, min_recalculated_threshold=0.8):
+    text_size = len(split_words(text, only_unique=True))
+    return calculate_threshold(
+        text_size, cur_threshold,
+        min_recalculated_threshold=min_recalculated_threshold)
+
+
+def prepare_es_min_should_match(min_should_match):
+    return str(int(min_should_match * 100)) + "%"
+
+
+def build_more_like_this_query(min_should_match, log_message,
+                               field_name="message", boost=1.0,
+                               override_min_should_match=None,
+                               max_query_terms=50):
+    min_should_match_settings = override_min_should_match
+    if not override_min_should_match:
+        min_should_match_settings = "5<" + min_should_match
+    return {"more_like_this": {
+        "fields":               [field_name],
+        "like":                 log_message,
+        "min_doc_freq":         1,
+        "min_term_freq":        1,
+        "minimum_should_match": min_should_match_settings,
+        "max_query_terms":      max_query_terms,
+        "boost": boost}}

@@ -66,7 +66,8 @@ class AnalyzerService:
     def build_more_like_this_query(self,
                                    min_should_match, log_message,
                                    field_name="message", boost=1.0,
-                                   override_min_should_match=None):
+                                   override_min_should_match=None,
+                                   max_query_terms=50):
         """Build more like this query"""
         return {"more_like_this": {
             "fields":               [field_name],

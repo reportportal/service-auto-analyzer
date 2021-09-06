@@ -81,6 +81,7 @@ class Clusterizer:
                 block_j = hash_prints[jdx * block_size: (jdx + 1) * block_size] if num_of_blocks > 1 else []
 
                 transformed_hashes = _count_vector.fit_transform(block_i + block_j).astype(np.int8)
+                transformed_hashes_count_words = np.asarray(np.sum(transformed_hashes, axis=1))
                 similarities = sklearn.metrics.pairwise.cosine_similarity(transformed_hashes)
 
                 indices_looked = list(range(idx * block_size, idx * block_size + len(block_i))) + list(
@@ -94,11 +95,15 @@ class Clusterizer:
                     for seq_num_j in range(seq_num_i + 1, len(indices_looked)):
                         j = indices_looked[seq_num_j]
                         if j not in hash_groups:
-                            if similarities[seq_num_i][seq_num_j] >= threshold:
+                            min_words_num = min(transformed_hashes_count_words[seq_num_i][0],
+                                                transformed_hashes_count_words[seq_num_j][0])
+                            recalculated_threshold = utils.calculate_threshold(
+                                min_words_num, threshold)
+                            if similarities[seq_num_i][seq_num_j] >= recalculated_threshold:
                                 hash_groups[j] = hash_groups[i]
         return hash_groups
 
-    def unite_groups_by_hashes(self, messages, min_jaccard_sim=0.98):
+    def unite_groups_by_hashes(self, messages, threshold=0.98):
         start_time = time()
         hash_prints = self.calculate_hashes(messages)
         has_no_empty = False
@@ -108,7 +113,7 @@ class Clusterizer:
                 break
         if not has_no_empty:
             return {}
-        hash_groups = self.similarity_groupping(hash_prints, for_text=False, threshold=min_jaccard_sim)
+        hash_groups = self.similarity_groupping(hash_prints, for_text=False, threshold=threshold)
         rearranged_groups = {}
         for key in hash_groups:
             cluster = hash_groups[key]
@@ -135,10 +140,11 @@ class Clusterizer:
                 ids_with_duplicates[text_messages_set[text_message_normalized]].append(idx)
         return messages_to_cluster, ids_with_duplicates
 
-    def find_clusters(self, messages):
+    def find_clusters(self, messages, threshold=0.98):
         messages_to_cluster, ids_with_duplicates = self.perform_light_deduplication(messages)
-        hash_groups = self.unite_groups_by_hashes(messages_to_cluster)
-        groups = self.find_groups_by_similarity(messages_to_cluster, hash_groups)
+        hash_groups = self.unite_groups_by_hashes(messages_to_cluster, threshold=threshold)
+        groups = self.find_groups_by_similarity(
+            messages_to_cluster, hash_groups, threshold=threshold)
         new_groups = {}
         for cluster in groups:
             new_log_ids = []

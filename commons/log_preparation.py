@@ -228,6 +228,8 @@ class LogPreparation:
             cleaned_message)
         test_and_methods = utils.find_test_methods_in_text(cleaned_message)
         detected_message = utils.replace_text_pieces(detected_message, test_and_methods)
+        detected_message = utils.clean_from_urls(detected_message)
+        detected_message = utils.clean_from_paths(detected_message)
         stacktrace = utils.sanitize_text(stacktrace)
         message = utils.first_lines(cleaned_message, -1)
         message = utils.sanitize_text(message)
@@ -247,6 +249,7 @@ class LogPreparation:
         log_template["_source"]["stacktrace"] = stacktrace
         potential_status_codes = " ".join(utils.get_potential_status_codes(detected_message_with_numbers))
         log_template["_source"]["potential_status_codes"] = potential_status_codes
+        log_template["_source"]["found_exceptions"] = utils.get_found_exceptions(detected_message)
         if clean_numbers:
             detected_message = detected_message + " " + potential_status_codes
             log_template["_source"]["whole_message"] = utils.delete_empty_lines(

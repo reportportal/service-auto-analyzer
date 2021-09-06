@@ -50,7 +50,7 @@
                             "like":                 "300 401",
                             "min_doc_freq":         1,
                             "min_term_freq":        1,
-                            "minimum_should_match": "1",
+                            "minimum_should_match": "2",
                             "max_query_terms":      50,
                             "boost":                8.0
                         }}

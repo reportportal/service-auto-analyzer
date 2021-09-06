@@ -182,12 +182,13 @@ class AutoAnalyzerService(AnalyzerService):
                                                 boost=8.0,
                                                 override_min_should_match="1"))
         if log["_source"]["potential_status_codes"].strip():
+            number_of_status_codes = str(len(set(log["_source"]["potential_status_codes"].split())))
             query["query"]["bool"]["must"].append(
                 self.build_more_like_this_query("1",
                                                 log["_source"]["potential_status_codes"],
                                                 field_name="potential_status_codes",
                                                 boost=8.0,
-                                                override_min_should_match="1"))
+                                                override_min_should_match=number_of_status_codes))
         return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
     def leave_only_similar_logs(self, candidates_with_no_defect, boosting_config):

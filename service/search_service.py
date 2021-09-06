@@ -40,9 +40,9 @@ class SearchService:
             self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
                 WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
 
-    def build_search_query(self, search_req, message):
+    def build_search_query(self, search_req, queried_log, search_min_should_match="90%"):
         """Build search query"""
-        return {
+        query = {
             "_source": ["message", "test_item", "detected_message", "stacktrace"],
             "size": self.app_config["esChunkNumber"],
             "query": {
@@ -65,19 +65,36 @@ class SearchService:
                             }
                         },
                         {"terms": {"launch_id": search_req.filteredLaunchIds}},
-                        {"more_like_this": {
-                            "fields":               ["message"],
-                            "like":                 message,
-                            "min_doc_freq":         1,
-                            "min_term_freq":        1,
-                            "minimum_should_match": "5<90%",
-                            "max_query_terms":      self.search_cfg["MaxQueryTerms"],
-                            "boost": 1.0
-                        }}
+                        utils.build_more_like_this_query(
+                            search_min_should_match,
+                            queried_log["_source"]["message"],
+                            field_name="message", boost=1.0,
+                            override_min_should_match=None,
+                            max_query_terms=self.search_cfg["MaxQueryTerms"])
+
                     ],
                     "should": [
                         {"term": {"is_auto_analyzed": {"value": "false", "boost": 1.0}}},
                     ]}}}
+        if queried_log["_source"]["found_exceptions"].strip():
+            query["query"]["bool"]["must"].append(
+                utils.build_more_like_this_query(
+                    "1",
+                    queried_log["_source"]["found_exceptions"],
+                    field_name="found_exceptions", boost=1.0,
+                    override_min_should_match="1",
+                    max_query_terms=self.search_cfg["MaxQueryTerms"]))
+        if queried_log["_source"]["potential_status_codes"].strip():
+            number_of_status_codes = str(len(set(
+                queried_log["_source"]["potential_status_codes"].split())))
+            query["query"]["bool"]["must"].append(
+                utils.build_more_like_this_query(
+                    "1",
+                    queried_log["_source"]["potential_status_codes"],
+                    field_name="potential_status_codes", boost=1.0,
+                    override_min_should_match=number_of_status_codes,
+                    max_query_terms=self.search_cfg["MaxQueryTerms"]))
+        return query
 
     def search_logs(self, search_req):
         """Get all logs similar to given logs"""
@@ -106,7 +123,14 @@ class SearchService:
             if not msg_words.strip() or msg_words in searched_logs:
                 continue
             searched_logs.add(msg_words)
-            query = self.build_search_query(search_req, queried_log["_source"]["message"])
+            search_min_should_match = utils.calculate_threshold_for_text(
+                queried_log["_source"]["message"],
+                self.search_cfg["SearchLogsMinSimilarity"])
+            query = self.build_search_query(
+                search_req,
+                queried_log,
+                search_min_should_match=utils.prepare_es_min_should_match(
+                    search_min_should_match))
             res = []
             for r in elasticsearch.helpers.scan(self.es_client.es_client,
                                                 query=query,
@@ -132,7 +156,7 @@ class SearchService:
                 similarity_percent = similarity_obj["similarity"]
                 logger.debug("Log with id %s has %.3f similarity with the queried log '%s'",
                              log_id, similarity_percent, queried_log["_source"]["message"])
-                if similarity_percent >= self.search_cfg["SearchLogsMinSimilarity"]:
+                if similarity_percent >= search_min_should_match:
                     similar_log_ids.add((utils.extract_real_id(log_id), int(test_item_info[log_id])))
 
         logger.info("Finished searching by request %s with %d results. It took %.2f sec.",

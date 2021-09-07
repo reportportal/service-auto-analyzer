@@ -40,7 +40,7 @@ class SearchService:
             self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
                 WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
 
-    def build_search_query(self, search_req, queried_log, search_min_should_match="90%"):
+    def build_search_query(self, search_req, queried_log, search_min_should_match="95%"):
         """Build search query"""
         query = {
             "_source": ["message", "test_item", "detected_message", "stacktrace"],
@@ -145,7 +145,7 @@ class SearchService:
                 {
                     "max_query_terms": self.search_cfg["MaxQueryTerms"],
                     "min_word_length": self.search_cfg["MinWordLength"],
-                    "min_should_match": "90%",
+                    "min_should_match": "95%",
                     "number_of_log_lines": search_req.logLines
                 },
                 weighted_similarity_calculator=self.weighted_log_similarity_calculator)

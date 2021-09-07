@@ -40,7 +40,7 @@ class ClusterService:
 
     def build_search_similar_items_query(self, queried_log, message,
                                          same_launch=False,
-                                         min_should_match="98%"):
+                                         min_should_match="95%"):
         """Build search query"""
         query = {
             "_source": ["whole_message", "test_item",

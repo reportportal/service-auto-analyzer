@@ -41,7 +41,7 @@ class Clusterizer:
             hashes.append(hash_print)
         return hashes
 
-    def find_groups_by_similarity(self, messages, groups_to_check, threshold=0.98):
+    def find_groups_by_similarity(self, messages, groups_to_check, threshold=0.95):
         if len(messages) == 0:
             return {}
         rearranged_groups = {}
@@ -65,7 +65,7 @@ class Clusterizer:
         logger.debug("Time for finding groups: %.2f s", time() - start_time)
         return rearranged_groups
 
-    def similarity_groupping(self, hash_prints, block_size=1000, for_text=True, threshold=0.98):
+    def similarity_groupping(self, hash_prints, block_size=1000, for_text=True, threshold=0.95):
         num_of_blocks = int(np.ceil(len(hash_prints) / block_size))
         hash_groups = {}
         global_ind = 0
@@ -103,7 +103,7 @@ class Clusterizer:
                                 hash_groups[j] = hash_groups[i]
         return hash_groups
 
-    def unite_groups_by_hashes(self, messages, threshold=0.98):
+    def unite_groups_by_hashes(self, messages, threshold=0.95):
         start_time = time()
         hash_prints = self.calculate_hashes(messages)
         has_no_empty = False
@@ -140,7 +140,7 @@ class Clusterizer:
                 ids_with_duplicates[text_messages_set[text_message_normalized]].append(idx)
         return messages_to_cluster, ids_with_duplicates
 
-    def find_clusters(self, messages, threshold=0.98):
+    def find_clusters(self, messages, threshold=0.95):
         messages_to_cluster, ids_with_duplicates = self.perform_light_deduplication(messages)
         hash_groups = self.unite_groups_by_hashes(messages_to_cluster, threshold=threshold)
         groups = self.find_groups_by_similarity(

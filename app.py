@@ -86,9 +86,9 @@ SEARCH_CONFIG = {
     "PatternMinCountToSuggest":       int(os.getenv("PATTERN_MIN_COUNT", "10")),
     "MaxLogsForDefectTypeModel":      int(os.getenv("MAX_LOGS_FOR_DEFECT_TYPE_MODEL", "10000")),
     "ProbabilityForCustomModelSuggestions":  min(
-        0.8, float(os.getenv("PROB_CUSTOM_MODEL_SUGGESTIONS", "0.3"))),
+        0.8, float(os.getenv("PROB_CUSTOM_MODEL_SUGGESTIONS", "0.7"))),
     "ProbabilityForCustomModelAutoAnalysis":  min(
-        1.0, float(os.getenv("PROB_CUSTOM_MODEL_AUTO_ANALYSIS", "0.3"))),
+        1.0, float(os.getenv("PROB_CUSTOM_MODEL_AUTO_ANALYSIS", "0.5"))),
     "BoostModelFolder":            "",
     "SuggestBoostModelFolder":     "",
     "SimilarityWeightsFolder":     "",

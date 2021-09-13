@@ -33,28 +33,28 @@ class FeatureEncoder:
     @staticmethod
     def prepare_text_message(data):
         messages = [" ".join(utils.split_words(text)).replace(".", "_") for text in data]
-        return add_default_value(messages, "nomessage")
+        return FeatureEncoder.add_default_value(messages, "nomessage")
 
     @staticmethod
     def prepare_stacktrace(data):
         stacktraces = [
             " ".join([w for w in utils.split_words(text) if "." in w]).replace(".", "_") for text in data]
-        return add_default_value(stacktraces, "nostacktrace")
+        return FeatureEncoder.add_default_value(stacktraces, "nostacktrace")
 
     @staticmethod
     def prepare_found_exceptions(data):
         found_exceptions = [text.replace(".", "_") for text in data]
-        return add_default_value(found_exceptions, "noexception")
+        return FeatureEncoder.add_default_value(found_exceptions, "noexception")
 
     @staticmethod
     def prepare_text_launch_name(data):
         launch_names = [re.sub(r"\d+", " ", text.replace("-", " ").replace("_", " ")) for text in data]
-        return add_default_value(launch_names, "nolaunchname")
+        return FeatureEncoder.add_default_value(launch_names, "nolaunchname")
 
     @staticmethod
     def prepare_test_item_name(data):
         test_item_names =  [re.sub(r"\d+", " ", text).replace(".", "_") for text in data]
-        return add_default_value(test_item_names, "notestitemname")
+        return FeatureEncoder.add_default_value(test_item_names, "notestitemname")
 
     @staticmethod
     def encode_categories(data, categories_data, include_zero=False):

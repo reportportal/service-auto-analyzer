@@ -56,14 +56,13 @@ class ModelChooser:
         prob_for_model = np.random.uniform()
         if prob_for_model > custom_model_prob:
             return model
-        if self.object_saver.does_object_exists(project_id, model_name_folder):
-            folders = self.object_saver.get_folder_objects(project_id, model_name_folder)
-            if len(folders):
-                try:
-                    model = self.model_folder_mapping[model_name_folder](
-                        self.app_config, project_id, folder=folders[0])
-                except Exception as err:
-                    logger.error(err)
+        folders = self.object_saver.get_folder_objects(project_id, model_name_folder)
+        if len(folders):
+            try:
+                model = self.model_folder_mapping[model_name_folder](
+                    self.app_config, project_id, folder=folders[0])
+            except Exception as err:
+                logger.error(err)
         return model
 
     def delete_old_model(self, model_name, project_id):

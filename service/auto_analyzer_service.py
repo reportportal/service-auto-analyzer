@@ -435,12 +435,14 @@ class AutoAnalyzerService(AnalyzerService):
                     _boosting_decision_maker = self.model_chooser.choose_model(
                         project_id, "auto_analysis_model/",
                         custom_model_prob=self.search_cfg["ProbabilityForCustomModelAutoAnalysis"])
+                    features_dict_objects = _boosting_decision_maker.features_dict_with_saved_objects
 
                     boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
                         analyzer_candidates.candidates,
                         boosting_config,
                         feature_ids=_boosting_decision_maker.get_feature_ids(),
-                        weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
+                        weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
+                        features_dict_with_saved_objects=features_dict_objects)
                     if project_id not in defect_type_model_to_use:
                         defect_type_model_to_use[project_id] = self.model_chooser.choose_model(
                             project_id, "defect_type_model/")
@@ -480,8 +482,6 @@ class AutoAnalyzerService(AnalyzerService):
                             analysis_result = AnalysisResult(testItem=analyzer_candidates.testItemId,
                                                              issueType=predicted_issue_type,
                                                              relevantItem=relevant_item)
-                            feature_names = ";".join(
-                                [str(f_) for f_ in _boosting_decision_maker.get_feature_ids()])
                             relevant_log_id = utils.extract_real_id(chosen_type["mrHit"]["_id"])
                             test_item_log_id = utils.extract_real_id(chosen_type["compared_log"]["_id"])
                             analyzed_results_for_index.append(SuggestAnalysisResult(
@@ -497,7 +497,7 @@ class AutoAnalyzerService(AnalyzerService):
                                 matchScore=round(prob * 100, 2),
                                 esScore=round(chosen_type["mrHit"]["_score"], 2),
                                 esPosition=chosen_type["mrHit"]["es_pos"],
-                                modelFeatureNames=feature_names,
+                                modelFeatureNames=";".join(_boosting_decision_maker.get_feature_names()),
                                 modelFeatureValues=";".join(
                                     [str(feature) for feature in feature_data[global_idx]]),
                                 modelInfo=";".join(model_info_tags),

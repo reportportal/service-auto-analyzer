@@ -755,15 +755,15 @@ def fill_prevously_gathered_features(feature_list, feature_ids):
 
 
 def gather_feature_list(gathered_data_dict, feature_ids, to_list=False):
-    len_data = 0
-    for feature in feature_ids:
-        len_data = len(gathered_data_dict[feature])
-        break
-    gathered_data = np.zeros((len_data, len(feature_ids)))
+    features_array = None
     for idx, feature in enumerate(feature_ids):
-        for j in range(len(gathered_data_dict[feature])):
-            gathered_data[j][idx] = round(gathered_data_dict[feature][j], 2)
-    return gathered_data.tolist() if to_list else gathered_data
+        if len(gathered_data_dict[feature]) == 0:
+            return []
+        if features_array is None:
+            features_array = np.asarray(gathered_data_dict[feature])
+        else:
+            features_array = np.concatenate([features_array, gathered_data_dict[feature]], axis=1)
+    return features_array.tolist() if to_list else features_array
 
 
 def unite_project_name(project_id, prefix):

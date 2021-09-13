@@ -509,20 +509,21 @@ class SuggestService(AnalyzerService):
             _suggest_decision_maker_to_use = self.model_chooser.choose_model(
                 test_item_info.project, "suggestion_model/",
                 custom_model_prob=self.search_cfg["ProbabilityForCustomModelSuggestions"])
+            features_dict_objects = _suggest_decision_maker_to_use.features_dict_with_saved_objects
 
             _boosting_data_gatherer = SuggestBoostingFeaturizer(
                 searched_res,
                 boosting_config,
                 feature_ids=_suggest_decision_maker_to_use.get_feature_ids(),
-                weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
+                weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
+                features_dict_with_saved_objects=features_dict_objects)
             _boosting_data_gatherer.set_defect_type_model(self.model_chooser.choose_model(
                 test_item_info.project, "defect_type_model/"))
             feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
             scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
             model_info_tags = _boosting_data_gatherer.get_used_model_info() +\
                 _suggest_decision_maker_to_use.get_model_info()
-            feature_names = ";".join(
-                [str(feature) for feature in _suggest_decision_maker_to_use.get_feature_ids()])
+            feature_names = ";".join(_suggest_decision_maker_to_use.get_feature_names())
             if feature_data:
                 predicted_labels, predicted_labels_probability = _suggest_decision_maker_to_use.predict(
                     feature_data)

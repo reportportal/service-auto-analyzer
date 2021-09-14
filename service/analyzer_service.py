@@ -27,14 +27,15 @@ logger = logging.getLogger("analyzerApp.analyzerService")
 
 class AnalyzerService:
 
-    def __init__(self, app_config={}, search_cfg={}):
+    def __init__(self, app_config={}, search_cfg={}, init_models=True):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
         self.log_preparation = LogPreparation()
         self.log_merger = LogMerger()
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
-        self.model_chooser = model_chooser.ModelChooser(app_config=app_config, search_cfg=search_cfg)
+        self.model_chooser = model_chooser.ModelChooser(
+            app_config=app_config, search_cfg=search_cfg, init_models=init_models)
         self.weighted_log_similarity_calculator = None
         if self.search_cfg["SimilarityWeightsFolder"].strip():
             self.weighted_log_similarity_calculator = weighted_similarity_calculator.\

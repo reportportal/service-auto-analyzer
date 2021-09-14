@@ -155,7 +155,7 @@ def init_amqp(_amqp_client):
         _auto_analyzer_service = AutoAnalyzerService(APP_CONFIG, SEARCH_CONFIG)
         _delete_index_service = DeleteIndexService(APP_CONFIG, SEARCH_CONFIG)
         _clean_index_service = CleanIndexService(APP_CONFIG, SEARCH_CONFIG)
-        _analyzer_service = AnalyzerService(APP_CONFIG, SEARCH_CONFIG)
+        _analyzer_service = AnalyzerService(APP_CONFIG, SEARCH_CONFIG, init_models=False)
         _suggest_service = SuggestService(APP_CONFIG, SEARCH_CONFIG)
         _suggest_info_service = SuggestInfoService(APP_CONFIG, SEARCH_CONFIG)
         _search_service = SearchService(APP_CONFIG, SEARCH_CONFIG)

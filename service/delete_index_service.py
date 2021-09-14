@@ -34,7 +34,8 @@ class DeleteIndexService:
         self.trigger_manager = trigger_manager.TriggerManager(
             app_config=app_config, search_cfg=search_cfg)
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
-        self.model_chooser = model_chooser.ModelChooser(app_config=app_config, search_cfg=search_cfg)
+        self.model_chooser = model_chooser.ModelChooser(
+            app_config=app_config, search_cfg=search_cfg, init_models=False)
 
     @utils.ignore_warnings
     def delete_index(self, index_name):

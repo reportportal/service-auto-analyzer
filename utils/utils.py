@@ -760,6 +760,8 @@ def fill_prevously_gathered_features(feature_list, feature_ids):
 def gather_feature_list(gathered_data_dict, feature_ids, to_list=False):
     features_array = None
     axis_x_size = max(map(lambda x: len(x), gathered_data_dict.values()))
+    if axis_x_size <= 0:
+        return []
     for idx, feature in enumerate(feature_ids):
         if feature not in gathered_data_dict or len(gathered_data_dict[feature]) == 0:
             gathered_data_dict[feature] = [[0.0] for i in range(axis_x_size)]

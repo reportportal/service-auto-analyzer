@@ -32,6 +32,7 @@ from service.cluster_service import ClusterService
 from service.auto_analyzer_service import AutoAnalyzerService
 from service.analyzer_service import AnalyzerService
 from service.suggest_service import SuggestService
+from service.suggest_info_service import SuggestInfoService
 from service.search_service import SearchService
 from service.clean_index_service import CleanIndexService
 from service.namespace_finder_service import NamespaceFinderService
@@ -156,6 +157,7 @@ def init_amqp(_amqp_client):
         _clean_index_service = CleanIndexService(APP_CONFIG, SEARCH_CONFIG)
         _analyzer_service = AnalyzerService(APP_CONFIG, SEARCH_CONFIG)
         _suggest_service = SuggestService(APP_CONFIG, SEARCH_CONFIG)
+        _suggest_info_service = SuggestInfoService(APP_CONFIG, SEARCH_CONFIG)
         _search_service = SearchService(APP_CONFIG, SEARCH_CONFIG)
         _cluster_service = ClusterService(APP_CONFIG, SEARCH_CONFIG)
         _namespace_finder_service = NamespaceFinderService(APP_CONFIG, SEARCH_CONFIG)
@@ -243,7 +245,7 @@ def init_amqp(_amqp_client):
                        (APP_CONFIG["exchangeName"], "index_suggest_info", True, False,
                        lambda channel, method, props, body:
                        amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                        _suggest_service.index_suggest_info,
+                                                        _suggest_info_service.index_suggest_info,
                                                         prepare_data_func=amqp_handler.
                                                         prepare_suggest_info_list,
                                                         prepare_response_data=amqp_handler.
@@ -252,7 +254,7 @@ def init_amqp(_amqp_client):
                        (APP_CONFIG["exchangeName"], "remove_suggest_info", True, False,
                        lambda channel, method, props, body:
                        amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                        _suggest_service.remove_suggest_info,
+                                                        _suggest_info_service.remove_suggest_info,
                                                         prepare_data_func=amqp_handler.
                                                         prepare_delete_index,
                                                         prepare_response_data=amqp_handler.
@@ -261,7 +263,7 @@ def init_amqp(_amqp_client):
                        (APP_CONFIG["exchangeName"], "update_suggest_info", True, False,
                        lambda channel, method, props, body:
                        amqp_handler.handle_amqp_request(channel, method, props, body,
-                                                        _suggest_service.update_suggest_info,
+                                                        _suggest_info_service.update_suggest_info,
                                                         prepare_data_func=lambda x: x))))
         threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                        (APP_CONFIG["exchangeName"], "remove_models", True, False,

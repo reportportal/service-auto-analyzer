@@ -728,12 +728,13 @@ def topological_sort(feature_graph):
 
 def to_number_list(features_list):
     feature_numbers_list = []
-    for res in features_list.split(";"):
+    for feature_name in features_list.split(";"):
+        feature_name = feature_name.split("_")[0]
         try:
-            feature_numbers_list.append(int(res))
+            feature_numbers_list.append(int(feature_name))
         except: # noqa
             try:
-                feature_numbers_list.append(float(res))
+                feature_numbers_list.append(float(feature_name))
             except: # noqa
                 pass
     return feature_numbers_list
@@ -748,7 +749,9 @@ def fill_prevously_gathered_features(feature_list, feature_ids):
             for idx, feature in enumerate(feature_ids):
                 if feature not in previously_gathered_features:
                     previously_gathered_features[feature] = []
-                previously_gathered_features[feature].append(feature_list[i][idx])
+                if len(previously_gathered_features[feature]) <= i:
+                    previously_gathered_features[feature].append([])
+                previously_gathered_features[feature][i].append(feature_list[i][idx])
     except Exception as err:
         logger.error(err)
     return previously_gathered_features
@@ -756,9 +759,10 @@ def fill_prevously_gathered_features(feature_list, feature_ids):
 
 def gather_feature_list(gathered_data_dict, feature_ids, to_list=False):
     features_array = None
+    axis_x_size = max(map(lambda x: len(x), gathered_data_dict.values()))
     for idx, feature in enumerate(feature_ids):
-        if len(gathered_data_dict[feature]) == 0:
-            return []
+        if feature not in gathered_data_dict or len(gathered_data_dict[feature]) == 0:
+            gathered_data_dict[feature] = [[0.0] for i in range(axis_x_size)]
         if features_array is None:
             features_array = np.asarray(gathered_data_dict[feature])
         else:

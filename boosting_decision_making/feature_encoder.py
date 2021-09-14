@@ -53,7 +53,7 @@ class FeatureEncoder:
 
     @staticmethod
     def prepare_test_item_name(data):
-        test_item_names =  [re.sub(r"\d+", " ", text).replace(".", "_") for text in data]
+        test_item_names = [re.sub(r"\d+", " ", text).replace(".", "_") for text in data]
         return FeatureEncoder.add_default_value(test_item_names, "notestitemname")
 
     @staticmethod

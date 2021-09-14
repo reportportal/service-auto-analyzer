@@ -39,7 +39,8 @@ class CustomBoostingDecisionMaker(BoostingDecisionMaker):
             self.project_id, os.path.join(folder, "data_features_config"),
             using_json=False)
         assert len(self.full_config) > 0
-        if self.object_saver.does_object_exists(self.project_id, os.path.join(folder, "features_dict_with_saved_objects")):
+        if self.object_saver.does_object_exists(
+                self.project_id, os.path.join(folder, "features_dict_with_saved_objects")):
             features_dict_with_saved_objects = self.object_saver.get_project_object(
                 self.project_id, os.path.join(folder, "features_dict_with_saved_objects"),
                 using_json=False)

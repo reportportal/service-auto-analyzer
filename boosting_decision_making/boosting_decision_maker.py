@@ -27,7 +27,7 @@ logger = logging.getLogger("analyzerApp.boosting_decision_maker")
 
 class BoostingDecisionMaker:
 
-    def __init__(self, folder="", n_estimators=50, max_depth=5,
+    def __init__(self, folder="", n_estimators=75, max_depth=5,
                  monotonous_features="", is_global=True):
         self.n_estimators = n_estimators
         self.max_depth = max_depth

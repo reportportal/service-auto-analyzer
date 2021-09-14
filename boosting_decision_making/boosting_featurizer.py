@@ -20,6 +20,7 @@ from boosting_decision_making.boosting_decision_maker import BoostingDecisionMak
 import logging
 import numpy as np
 from datetime import datetime
+from collections import deque
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
@@ -249,7 +250,7 @@ class BoostingFeaturizer:
         predicted_probability = []
         for res in predicted_labels_probability:
             predicted_probability.append(float(res[1]))
-        return predicted_probability
+        return [[round(r, 2)] for r in predicted_probability]
 
     def get_necessary_features(self, model_folder):
         if not model_folder.strip():
@@ -589,6 +590,19 @@ class BoostingFeaturizer:
             similarity_percent_by_type[issue_type] = sim_obj["similarity"]
         return similarity_percent_by_type
 
+    def get_ordered_features_to_process(self):
+        feature_graph = {}
+        features_queue = deque(self.feature_ids.copy())
+        while features_queue:
+            cur_feature = features_queue.popleft()
+            if cur_feature in feature_graph:
+                continue
+            _, _, dependants = self.feature_functions[cur_feature]
+            feature_graph[cur_feature] = dependants
+            features_queue.extend(dependants)
+        ordered_features = utils.topological_sort(feature_graph)
+        return ordered_features
+
     @utils.ignore_warnings
     def gather_features_info(self):
         """Gather all features from feature_ids for a test item"""
@@ -602,12 +616,7 @@ class BoostingFeaturizer:
                 issue_type_by_index[idx] = issue_type
                 issue_type_names.append(issue_type)
 
-            feature_graph = {}
-            for feature in self.feature_ids:
-                _, _, dependants = self.feature_functions[feature]
-                feature_graph[feature] = dependants
-            ordered_features = utils.topological_sort(feature_graph)
-            for feature in ordered_features:
+            for feature in self.get_ordered_features_to_process():
                 if feature in self.previously_gathered_features and\
                         feature not in self.features_to_recalculate_always:
                     gathered_data_dict[feature] = self.previously_gathered_features[feature]
@@ -615,7 +624,7 @@ class BoostingFeaturizer:
                     func, args, _ = self.feature_functions[feature]
                     result = func(**args)
                     if type(result) == list:
-                        gathered_data_dict[feature] = [[round(r, 2)] for r in result]
+                        gathered_data_dict[feature] = result
                     else:
                         gathered_data_dict[feature] = []
                         for idx in sorted(issue_type_by_index.keys()):

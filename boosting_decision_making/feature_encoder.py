@@ -122,14 +122,14 @@ class FeatureEncoder:
             self.encoder = TfidfVectorizer(
                 max_features=self.max_features, ngram_range=(1, self.ngram_max), stop_words="english")
         else:
-            logger.error("Encoding type '%s' is not found" % self.encoding_type)
+            logger.error("Encoding type '%s' is not found", self.encoding_type)
         if self.encoder:
             extracted_data = self.extract_data(texts)
-            logger.debug("Extracted data ", len(extracted_data))
+            logger.debug("Extracted data %d", len(extracted_data))
             if self.encoding_type == "one_hot":
                 self.additional_info = self.get_categories(extracted_data)
             prepared_data = self.prepare_data_for_encoding(extracted_data)
-            logger.debug("Prepared data ", len(prepared_data))
+            logger.debug("Prepared data %d", len(prepared_data))
             self.encoder.fit(prepared_data)
             logger.debug("Fit data with encoding '%s'" % self.encoding_type)
 

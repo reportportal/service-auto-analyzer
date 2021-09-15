@@ -176,7 +176,8 @@ class TestRetrainingService(TestService):
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case number: {0}', idx):
 
-                _retraining_service = RetrainingService(app_config=self.app_config,
+                _retraining_service = RetrainingService(self.model_chooser,
+                                                        app_config=self.app_config,
                                                         search_cfg=self.get_default_search_config())
                 model_triggering = _retraining_service.trigger_manager.model_training_triggering
                 model_triggering = model_triggering[test["train_info"]["model_type"]]

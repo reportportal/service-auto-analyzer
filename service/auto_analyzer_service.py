@@ -32,8 +32,9 @@ EARLY_FINISH = False
 
 class AutoAnalyzerService(AnalyzerService):
 
-    def __init__(self, app_config={}, search_cfg={}):
-        super(AutoAnalyzerService, self).__init__(app_config=app_config, search_cfg=search_cfg)
+    def __init__(self, model_chooser, app_config={}, search_cfg={}):
+        super(AutoAnalyzerService, self).__init__(
+            model_chooser, app_config=app_config, search_cfg=search_cfg)
 
     def get_config_for_boosting(self, analyzer_config):
         min_should_match = self.find_min_should_match_threshold(analyzer_config) / 100

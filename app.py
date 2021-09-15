@@ -27,6 +27,7 @@ from flask_cors import CORS
 import amqp.amqp_handler as amqp_handler
 from amqp.amqp import AmqpClient
 from commons.esclient import EsClient
+from commons import model_chooser
 from utils import utils
 from service.cluster_service import ClusterService
 from service.auto_analyzer_service import AutoAnalyzerService
@@ -143,8 +144,9 @@ def init_amqp(_amqp_client):
             logger.error(err)
             return
     threads = []
+    _model_chooser = model_chooser.ModelChooser(APP_CONFIG, SEARCH_CONFIG)
     if APP_CONFIG["instanceTaskType"] == "train":
-        _retraining_service = RetrainingService(APP_CONFIG, SEARCH_CONFIG)
+        _retraining_service = RetrainingService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
         threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                        (APP_CONFIG["exchangeName"], "train_models", True, False,
                        lambda channel, method, props, body:
@@ -152,11 +154,11 @@ def init_amqp(_amqp_client):
                                                               _retraining_service.train_models))))
     else:
         _es_client = EsClient(APP_CONFIG, SEARCH_CONFIG)
-        _auto_analyzer_service = AutoAnalyzerService(APP_CONFIG, SEARCH_CONFIG)
-        _delete_index_service = DeleteIndexService(APP_CONFIG, SEARCH_CONFIG)
+        _auto_analyzer_service = AutoAnalyzerService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
+        _delete_index_service = DeleteIndexService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
         _clean_index_service = CleanIndexService(APP_CONFIG, SEARCH_CONFIG)
-        _analyzer_service = AnalyzerService(APP_CONFIG, SEARCH_CONFIG, init_models=False)
-        _suggest_service = SuggestService(APP_CONFIG, SEARCH_CONFIG)
+        _analyzer_service = AnalyzerService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
+        _suggest_service = SuggestService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
         _suggest_info_service = SuggestInfoService(APP_CONFIG, SEARCH_CONFIG)
         _search_service = SearchService(APP_CONFIG, SEARCH_CONFIG)
         _cluster_service = ClusterService(APP_CONFIG, SEARCH_CONFIG)

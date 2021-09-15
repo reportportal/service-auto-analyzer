@@ -656,7 +656,8 @@ class TestSuggestService(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                suggest_service = SuggestService(app_config=app_config,
+                suggest_service = SuggestService(self.model_chooser,
+                                                 app_config=app_config,
                                                  search_cfg=config)
                 if "msearch_results" in test:
                     suggest_service.es_client.es_client.msearch = MagicMock(

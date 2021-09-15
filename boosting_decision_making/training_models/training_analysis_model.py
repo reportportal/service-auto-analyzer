@@ -21,7 +21,6 @@ from boosting_decision_making.feature_encoding_configurer import FeatureEncoding
 from sklearn.model_selection import train_test_split
 import elasticsearch
 import elasticsearch.helpers
-from commons import model_chooser
 from commons.esclient import EsClient
 from commons import namespace_finder
 from imblearn.over_sampling import SMOTE
@@ -39,7 +38,7 @@ logger = logging.getLogger("analyzerApp.trainingAnalysisModel")
 
 class AnalysisModelTraining:
 
-    def __init__(self, app_config, search_cfg):
+    def __init__(self, model_chooser, app_config, search_cfg):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.due_proportion = 0.05
@@ -56,7 +55,7 @@ class AnalysisModelTraining:
             self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
                 WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
-        self.model_chooser = model_chooser.ModelChooser(app_config=app_config, search_cfg=search_cfg)
+        self.model_chooser = model_chooser
         self.metrics_calculations = {
             "F1": self.calculate_F1,
             "Mean Reciprocal Rank": self.calculate_MRR

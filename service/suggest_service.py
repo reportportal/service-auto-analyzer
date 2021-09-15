@@ -29,8 +29,8 @@ logger = logging.getLogger("analyzerApp.suggestService")
 
 class SuggestService(AnalyzerService):
 
-    def __init__(self, app_config={}, search_cfg={}):
-        super(SuggestService, self).__init__(app_config=app_config, search_cfg=search_cfg)
+    def __init__(self, model_chooser, app_config={}, search_cfg={}):
+        super(SuggestService, self).__init__(model_chooser, app_config=app_config, search_cfg=search_cfg)
         self.suggest_threshold = 0.4
         self.rp_suggest_index_template = "rp_suggestions_info"
         self.rp_suggest_metrics_index_template = "rp_suggestions_info_metrics"

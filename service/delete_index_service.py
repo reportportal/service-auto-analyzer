@@ -20,22 +20,20 @@ from time import time
 from commons import namespace_finder
 from commons.esclient import EsClient
 from commons import trigger_manager
-from commons import model_chooser
 
 logger = logging.getLogger("analyzerApp.deleteIndexService")
 
 
 class DeleteIndexService:
 
-    def __init__(self, app_config={}, search_cfg={}):
+    def __init__(self, model_chooser, app_config={}, search_cfg={}):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.trigger_manager = trigger_manager.TriggerManager(
-            app_config=app_config, search_cfg=search_cfg)
+            model_chooser, app_config=app_config, search_cfg=search_cfg)
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
-        self.model_chooser = model_chooser.ModelChooser(
-            app_config=app_config, search_cfg=search_cfg, init_models=False)
+        self.model_chooser = model_chooser
 
     @utils.ignore_warnings
     def delete_index(self, index_name):

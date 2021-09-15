@@ -26,7 +26,7 @@ logger = logging.getLogger("analyzerApp.modelChooser")
 
 class ModelChooser:
 
-    def __init__(self, app_config={}, search_cfg={}, init_models=True):
+    def __init__(self, app_config={}, search_cfg={}):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.object_saver = ObjectSaver(self.app_config)
@@ -35,8 +35,7 @@ class ModelChooser:
             "suggestion_model/": custom_boosting_decision_maker.CustomBoostingDecisionMaker,
             "auto_analysis_model/": custom_boosting_decision_maker.CustomBoostingDecisionMaker
         }
-        if init_models:
-            self.initialize_global_models()
+        self.initialize_global_models()
 
     def initialize_global_models(self):
         self.global_models = {}

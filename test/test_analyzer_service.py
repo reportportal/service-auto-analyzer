@@ -321,7 +321,8 @@ class TestAutoAnalyzerService(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                analyzer_service = AutoAnalyzerService(app_config=app_config,
+                analyzer_service = AutoAnalyzerService(self.model_chooser,
+                                                       app_config=app_config,
                                                        search_cfg=config)
                 _boosting_decision_maker = BoostingDecisionMaker()
                 _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])

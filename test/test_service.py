@@ -181,7 +181,8 @@ class TestService(unittest.TestCase):
             "RetrainSuggestBoostModelConfig":
                 self.model_settings["RETRAIN_SUGGEST_BOOST_MODEL_CONFIG"],
             "RetrainAutoBoostModelConfig":
-                self.model_settings["RETRAIN_AUTO_BOOST_MODEL_CONFIG"]
+                self.model_settings["RETRAIN_AUTO_BOOST_MODEL_CONFIG"],
+            "MaxSuggestionsNumber": 3
         }
 
     @utils.ignore_warnings

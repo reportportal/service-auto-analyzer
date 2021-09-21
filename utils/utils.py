@@ -589,10 +589,11 @@ def choose_issue_type(predicted_labels, predicted_labels_probability,
             issue_type = issue_type_names[i]
             chosen_type = scores_by_issue_type[issue_type]
             start_time = chosen_type["mrHit"]["_source"]["start_time"]
-            if (predicted_labels_probability[i][1] > max_prob) or\
-                    ((predicted_labels_probability[i][1] == max_prob) and # noqa
+            predicted_prob = round(predicted_labels_probability[i][1], 2)
+            if (predicted_prob > max_prob) or\
+                    ((predicted_prob == max_prob) and # noqa
                         (max_val_start_time is None or start_time > max_val_start_time)):
-                max_prob = predicted_labels_probability[i][1]
+                max_prob = predicted_prob
                 predicted_issue_type = issue_type
                 global_idx = i
                 max_val_start_time = start_time

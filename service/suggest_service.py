@@ -248,7 +248,7 @@ class SuggestService(AnalyzerService):
         }
 
     @utils.ignore_warnings
-    def suggest_items(self, test_item_info, num_items=5):
+    def suggest_items(self, test_item_info):
         logger.info("Started suggesting test items")
         logger.info("ES Url %s", utils.remove_credentials_from_url(self.es_client.host))
         index_name = utils.unite_project_name(
@@ -306,7 +306,7 @@ class SuggestService(AnalyzerService):
                                  test_item_id, issue_type, prob)
                 processed_time = time() - t_start
                 global_idx = 0
-                for idx, prob, _ in sorted_results[:num_items]:
+                for idx, prob, _ in sorted_results[:self.search_cfg["MaxSuggestionsNumber"]]:
                     if prob >= self.suggest_threshold:
                         test_item_id = test_item_ids[idx]
                         issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]

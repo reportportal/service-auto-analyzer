@@ -201,8 +201,7 @@ class BoostingFeaturizer:
             if compared_field_date < field_date:
                 field_date, compared_field_date = compared_field_date, field_date
             dates_by_issue_types[issue_type] = np.exp(
-                np.log(self.config["time_weight_decay"]) * max(
-                    0, ((compared_field_date - field_date).days - 7)) / 7)
+                np.log(self.config["time_weight_decay"]) * ((compared_field_date - field_date).days) / 7)
         return dates_by_issue_types
 
     def _encode_into_vector(self, field_name, feature_name, only_query):

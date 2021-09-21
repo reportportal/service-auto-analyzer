@@ -96,7 +96,8 @@ SEARCH_CONFIG = {
     "SimilarityWeightsFolder":     "",
     "GlobalDefectTypeModelFolder": "",
     "RetrainSuggestBoostModelConfig": "",
-    "RetrainAutoBoostModelConfig": ""
+    "RetrainAutoBoostModelConfig": "",
+    "MaxSuggestionsNumber": int(os.getenv("MAX_SUGGESTIONS_NUMBER", "3"))
 }
 
 

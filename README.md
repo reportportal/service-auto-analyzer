@@ -78,6 +78,12 @@ volumes:
 
 **MAX_LOGS_FOR_DEFECT_TYPE_MODEL** - by default "10000", the value of maximum count of logs per defect type to add into defect type model training. Default value is chosen in cosideration of having space for analyzer_train docker image setuo of 1GB, if you can give more GB you can linearly allow more logs to be considered.
 
+**PROB_CUSTOM_MODEL_SUGGESTIONS** - by default "0.7", the probability of custom retrained model to be used for running when suggestions are requested. The maximum value is 0.8, because we want at least 20% of requests to process with a global model not to overfit for project too much. The bigger the value of this env varibale the more often custom retrained model will be used.
+
+**PROB_CUSTOM_MODEL_AUTO_ANALYSIS** - by default "0.5", the probability of custom retrained model to be used for running when auto-analysis is performed. The maximum value is 1.0. The bigger the value of this env varibale the more often custom retrained model will be used.
+
+**MAX_SUGGESTIONS_NUMBER** - by default "3", the maximum number of suggestions shown in the ML suggestions area in the defect type editor.
+
 # Instructions for analyzer setup without Docker
 
 Install python with the version 3.7.4. (it is the version on which the service was developed, but it should work on the versions starting from 3.6).

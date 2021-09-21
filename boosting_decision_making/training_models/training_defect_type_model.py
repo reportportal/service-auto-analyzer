@@ -17,7 +17,6 @@
 from boosting_decision_making import defect_type_model, custom_defect_type_model
 from sklearn.model_selection import train_test_split
 from commons.esclient import EsClient
-from commons import model_chooser
 from utils import utils
 from time import time
 import scipy.stats as stats
@@ -34,7 +33,7 @@ logger = logging.getLogger("analyzerApp.trainingDefectTypeModel")
 
 class DefectTypeModelTraining:
 
-    def __init__(self, app_config, search_cfg):
+    def __init__(self, model_chooser, app_config, search_cfg):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.label2inds = {"ab": 0, "pb": 1, "si": 2}
@@ -42,7 +41,7 @@ class DefectTypeModelTraining:
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
         self.baseline_model = defect_type_model.DefectTypeModel(
             folder=search_cfg["GlobalDefectTypeModelFolder"])
-        self.model_chooser = model_chooser.ModelChooser(app_config=app_config, search_cfg=search_cfg)
+        self.model_chooser = model_chooser
 
     def return_similar_objects_into_sample(self, x_train_ind, y_train, data, additional_logs, label):
         x_train = []

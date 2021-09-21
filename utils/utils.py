@@ -589,10 +589,11 @@ def choose_issue_type(predicted_labels, predicted_labels_probability,
             issue_type = issue_type_names[i]
             chosen_type = scores_by_issue_type[issue_type]
             start_time = chosen_type["mrHit"]["_source"]["start_time"]
-            if (predicted_labels_probability[i][1] > max_prob) or\
-                    ((predicted_labels_probability[i][1] == max_prob) and # noqa
+            predicted_prob = round(predicted_labels_probability[i][1], 2)
+            if (predicted_prob > max_prob) or\
+                    ((predicted_prob == max_prob) and # noqa
                         (max_val_start_time is None or start_time > max_val_start_time)):
-                max_prob = predicted_labels_probability[i][1]
+                max_prob = predicted_prob
                 predicted_issue_type = issue_type
                 global_idx = i
                 max_val_start_time = start_time
@@ -728,12 +729,13 @@ def topological_sort(feature_graph):
 
 def to_number_list(features_list):
     feature_numbers_list = []
-    for res in features_list.split(";"):
+    for feature_name in features_list.split(";"):
+        feature_name = feature_name.split("_")[0]
         try:
-            feature_numbers_list.append(int(res))
+            feature_numbers_list.append(int(feature_name))
         except: # noqa
             try:
-                feature_numbers_list.append(float(res))
+                feature_numbers_list.append(float(feature_name))
             except: # noqa
                 pass
     return feature_numbers_list
@@ -748,22 +750,27 @@ def fill_prevously_gathered_features(feature_list, feature_ids):
             for idx, feature in enumerate(feature_ids):
                 if feature not in previously_gathered_features:
                     previously_gathered_features[feature] = []
-                previously_gathered_features[feature].append(feature_list[i][idx])
+                if len(previously_gathered_features[feature]) <= i:
+                    previously_gathered_features[feature].append([])
+                previously_gathered_features[feature][i].append(feature_list[i][idx])
     except Exception as err:
         logger.error(err)
     return previously_gathered_features
 
 
 def gather_feature_list(gathered_data_dict, feature_ids, to_list=False):
-    len_data = 0
-    for feature in feature_ids:
-        len_data = len(gathered_data_dict[feature])
-        break
-    gathered_data = np.zeros((len_data, len(feature_ids)))
+    features_array = None
+    axis_x_size = max(map(lambda x: len(x), gathered_data_dict.values()))
+    if axis_x_size <= 0:
+        return []
     for idx, feature in enumerate(feature_ids):
-        for j in range(len(gathered_data_dict[feature])):
-            gathered_data[j][idx] = round(gathered_data_dict[feature][j], 2)
-    return gathered_data.tolist() if to_list else gathered_data
+        if feature not in gathered_data_dict or len(gathered_data_dict[feature]) == 0:
+            gathered_data_dict[feature] = [[0.0] for i in range(axis_x_size)]
+        if features_array is None:
+            features_array = np.asarray(gathered_data_dict[feature])
+        else:
+            features_array = np.concatenate([features_array, gathered_data_dict[feature]], axis=1)
+    return features_array.tolist() if to_list else features_array
 
 
 def unite_project_name(project_id, prefix):

@@ -89,7 +89,8 @@ class TestDeleteIndexService(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                _delete_index_service = DeleteIndexService(app_config=app_config,
+                _delete_index_service = DeleteIndexService(self.model_chooser,
+                                                           app_config=app_config,
                                                            search_cfg=self.get_default_search_config())
 
                 response = _delete_index_service.delete_index(test["index"])

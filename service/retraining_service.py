@@ -27,11 +27,11 @@ logger = logging.getLogger("analyzerApp.retrainingService")
 
 class RetrainingService:
 
-    def __init__(self, app_config={}, search_cfg={}):
+    def __init__(self, model_chooser, app_config={}, search_cfg={}):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.trigger_manager = trigger_manager.TriggerManager(
-            app_config=app_config, search_cfg=search_cfg)
+            model_chooser, app_config=app_config, search_cfg=search_cfg)
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
 
     @utils.ignore_warnings

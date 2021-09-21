@@ -20,6 +20,7 @@ import logging
 import sure # noqa
 import httpretty
 from utils import utils
+from commons import model_chooser
 
 
 class TestService(unittest.TestCase):
@@ -151,6 +152,7 @@ class TestService(unittest.TestCase):
             "esProjectIndexPrefix": ""
         }
         self.model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
+        self.model_chooser = model_chooser.ModelChooser(self.app_config, self.get_default_search_config())
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings
@@ -190,7 +192,8 @@ class TestService(unittest.TestCase):
             "RetrainSuggestBoostModelConfig":
                 self.model_settings["RETRAIN_SUGGEST_BOOST_MODEL_CONFIG"],
             "RetrainAutoBoostModelConfig":
-                self.model_settings["RETRAIN_AUTO_BOOST_MODEL_CONFIG"]
+                self.model_settings["RETRAIN_AUTO_BOOST_MODEL_CONFIG"],
+            "MaxSuggestionsNumber": 3
         }
 
     @utils.ignore_warnings

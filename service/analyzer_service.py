@@ -18,7 +18,6 @@ from utils import utils
 from commons.log_preparation import LogPreparation, LogMerger
 from boosting_decision_making import weighted_similarity_calculator
 from commons import namespace_finder
-from commons import model_chooser
 import logging
 import re
 
@@ -27,14 +26,14 @@ logger = logging.getLogger("analyzerApp.analyzerService")
 
 class AnalyzerService:
 
-    def __init__(self, app_config={}, search_cfg={}):
+    def __init__(self, model_chooser, app_config={}, search_cfg={}):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
         self.log_preparation = LogPreparation()
         self.log_merger = LogMerger()
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
-        self.model_chooser = model_chooser.ModelChooser(app_config=app_config, search_cfg=search_cfg)
+        self.model_chooser = model_chooser
         self.weighted_log_similarity_calculator = None
         if self.search_cfg["SimilarityWeightsFolder"].strip():
             self.weighted_log_similarity_calculator = weighted_similarity_calculator.\

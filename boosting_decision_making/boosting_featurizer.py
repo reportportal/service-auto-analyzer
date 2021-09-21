@@ -20,6 +20,7 @@ from boosting_decision_making.boosting_decision_maker import BoostingDecisionMak
 import logging
 import numpy as np
 from datetime import datetime
+from collections import deque
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
@@ -27,10 +28,14 @@ logger = logging.getLogger("analyzerApp.boosting_featurizer")
 class BoostingFeaturizer:
 
     def __init__(self, all_results, config, feature_ids,
-                 weighted_log_similarity_calculator=None):
+                 weighted_log_similarity_calculator=None,
+                 features_dict_with_saved_objects=None):
         self.config = config
         self.previously_gathered_features = {}
         self.models = {}
+        self.features_dict_with_saved_objects = {}
+        if features_dict_with_saved_objects is not None:
+            self.features_dict_with_saved_objects = features_dict_with_saved_objects
         self.similarity_calculator = similarity_calculator.SimilarityCalculator(
             self.config,
             weighted_similarity_calculator=weighted_log_similarity_calculator)
@@ -96,7 +101,21 @@ class BoostingFeaturizer:
             61: (self._calculate_similarity_percent, {"field_name": "test_item_name"}, []),
             64: (self._calculate_decay_function_score, {"field_name": "start_time"}, []),
             65: (self._calculate_test_item_logs_similar_percent, {}, []),
-            66: (self._count_test_item_logs, {}, [])
+            66: (self._count_test_item_logs, {}, []),
+            67: (self._encode_into_vector,
+                 {"field_name": "launch_name", "feature_name": 67, "only_query": True}, []),
+            68: (self._encode_into_vector,
+                 {"field_name": "detected_message", "feature_name": 68, "only_query": False}, []),
+            69: (self._encode_into_vector,
+                 {"field_name": "stacktrace", "feature_name": 69, "only_query": False}, []),
+            70: (self._encode_into_vector,
+                 {"field_name": "launch_name", "feature_name": 70, "only_query": True}, []),
+            71: (self._encode_into_vector,
+                 {"field_name": "test_item_name", "feature_name": 71, "only_query": False}, []),
+            72: (self._encode_into_vector,
+                 {"field_name": "unique_id", "feature_name": 72, "only_query": True}, []),
+            73: (self._encode_into_vector,
+                 {"field_name": "found_exceptions", "feature_name": 73, "only_query": True}, [])
         }
 
         fields_to_calc_similarity = self.find_columns_to_find_similarities_for()
@@ -131,7 +150,7 @@ class BoostingFeaturizer:
         self.scores_by_issue_type = None
         self.defect_type_predict_model = None
         self.used_model_info = set()
-        self.features_to_recalculate_always = set([51, 58])
+        self.features_to_recalculate_always = set([51, 58] + list(range(67, 74)))
 
     def _count_test_item_logs(self):
         scores_by_issue_type = self.find_most_relevant_by_type()
@@ -182,9 +201,40 @@ class BoostingFeaturizer:
             if compared_field_date < field_date:
                 field_date, compared_field_date = compared_field_date, field_date
             dates_by_issue_types[issue_type] = np.exp(
-                np.log(self.config["time_weight_decay"]) * max(
-                    0, ((compared_field_date - field_date).days - 7)) / 7)
+                np.log(self.config["time_weight_decay"]) * ((compared_field_date - field_date).days) / 7)
         return dates_by_issue_types
+
+    def _encode_into_vector(self, field_name, feature_name, only_query):
+        if feature_name not in self.features_dict_with_saved_objects:
+            logger.error(self.features_dict_with_saved_objects)
+            logger.error("Feature '%s' has no encoder" % feature_name)
+            return []
+        if field_name != self.features_dict_with_saved_objects[feature_name].field_name:
+            logger.error(field_name)
+            logger.error("Field name '%s' is not the same as in the settings '%s'" % (
+                         field_name, self.features_dict_with_saved_objects[feature_name].field_name))
+            return []
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        encodings_by_issue_type = {}
+        issue_types, gathered_data = [], []
+        for issue_type in scores_by_issue_type:
+            field_data = scores_by_issue_type[issue_type]["compared_log"]["_source"][field_name]
+            issue_types.append(issue_type)
+            gathered_data.append(field_data)
+            if not only_query:
+                gathered_data.append(
+                    scores_by_issue_type[issue_type]["mrHit"]["_source"][field_name])
+        if gathered_data:
+            encoded_data = self.features_dict_with_saved_objects[feature_name].transform(
+                gathered_data).toarray()
+            encoded_data[encoded_data != 0.0] = 1.0
+            for idx in range(len(issue_types)):
+                if only_query:
+                    encodings_by_issue_type[issue_types[idx]] = list(encoded_data[idx])
+                else:
+                    encodings_by_issue_type[issue_types[idx]] = list(
+                        (encoded_data[2 * idx] + encoded_data[2 * idx + 1]) / 2)
+        return encodings_by_issue_type
 
     def _calculate_model_probability(self, model_folder=""):
         if not model_folder.strip():
@@ -199,7 +249,7 @@ class BoostingFeaturizer:
         predicted_probability = []
         for res in predicted_labels_probability:
             predicted_probability.append(float(res[1]))
-        return predicted_probability
+        return [[round(r, 2)] for r in predicted_probability]
 
     def get_necessary_features(self, model_folder):
         if not model_folder.strip():
@@ -539,6 +589,19 @@ class BoostingFeaturizer:
             similarity_percent_by_type[issue_type] = sim_obj["similarity"]
         return similarity_percent_by_type
 
+    def get_ordered_features_to_process(self):
+        feature_graph = {}
+        features_queue = deque(self.feature_ids.copy())
+        while features_queue:
+            cur_feature = features_queue.popleft()
+            if cur_feature in feature_graph:
+                continue
+            _, _, dependants = self.feature_functions[cur_feature]
+            feature_graph[cur_feature] = dependants
+            features_queue.extend(dependants)
+        ordered_features = utils.topological_sort(feature_graph)
+        return ordered_features
+
     @utils.ignore_warnings
     def gather_features_info(self):
         """Gather all features from feature_ids for a test item"""
@@ -552,13 +615,7 @@ class BoostingFeaturizer:
                 issue_type_by_index[idx] = issue_type
                 issue_type_names.append(issue_type)
 
-            feature_graph = {}
-            for feature in self.feature_ids:
-                _, _, dependants = self.feature_functions[feature]
-                feature_graph[feature] = dependants
-            ordered_features = utils.topological_sort(feature_graph)
-
-            for feature in ordered_features:
+            for feature in self.get_ordered_features_to_process():
                 if feature in self.previously_gathered_features and\
                         feature not in self.features_to_recalculate_always:
                     gathered_data_dict[feature] = self.previously_gathered_features[feature]
@@ -566,14 +623,17 @@ class BoostingFeaturizer:
                     func, args, _ = self.feature_functions[feature]
                     result = func(**args)
                     if type(result) == list:
-                        gathered_data_dict[feature] = [round(r, 2) for r in result]
+                        gathered_data_dict[feature] = result
                     else:
                         gathered_data_dict[feature] = []
                         for idx in sorted(issue_type_by_index.keys()):
                             issue_type = issue_type_by_index[idx]
-                            gathered_data_dict[feature].append(round(result[issue_type], 2))
+                            try:
+                                _ = result[issue_type][0]
+                                gathered_data_dict[feature].append(result[issue_type])
+                            except: # noqa
+                                gathered_data_dict[feature].append([round(result[issue_type], 2)])
                     self.previously_gathered_features[feature] = gathered_data_dict[feature]
-
             gathered_data = utils.gather_feature_list(gathered_data_dict, self.feature_ids, to_list=True)
         except Exception as err:
             logger.error("Errors in boosting features calculation")

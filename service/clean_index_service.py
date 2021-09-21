@@ -18,7 +18,7 @@ import logging
 import utils.utils as utils
 from time import time
 from commons.esclient import EsClient
-from service import suggest_service
+from service import suggest_info_service
 
 logger = logging.getLogger("analyzerApp.cleanIndexService")
 
@@ -29,14 +29,15 @@ class CleanIndexService:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
-        self.suggest_service = suggest_service.SuggestService(app_config=app_config, search_cfg=search_cfg)
+        self.suggest_info_service = suggest_info_service.SuggestInfoService(
+            app_config=app_config, search_cfg=search_cfg)
 
     @utils.ignore_warnings
     def delete_logs(self, clean_index):
         logger.info("Started cleaning index")
         t_start = time()
         deleted_logs_cnt = self.es_client.delete_logs(clean_index)
-        self.suggest_service.clean_suggest_info_logs(clean_index)
+        self.suggest_info_service.clean_suggest_info_logs(clean_index)
         logger.info("Finished cleaning index %.2f s", time() - t_start)
         return deleted_logs_cnt
 
@@ -45,7 +46,7 @@ class CleanIndexService:
         logger.info("Started removing test items")
         t_start = time()
         deleted_logs_cnt = self.es_client.remove_test_items(remove_items_info)
-        self.suggest_service.clean_suggest_info_logs_by_test_item(remove_items_info)
+        self.suggest_info_service.clean_suggest_info_logs_by_test_item(remove_items_info)
         logger.info("Finished removing test items %.2f s", time() - t_start)
         return deleted_logs_cnt
 
@@ -54,6 +55,6 @@ class CleanIndexService:
         logger.info("Started removing launches")
         t_start = time()
         deleted_logs_cnt = self.es_client.remove_launches(launch_remove_info)
-        self.suggest_service.clean_suggest_info_logs_by_launch_id(launch_remove_info)
+        self.suggest_info_service.clean_suggest_info_logs_by_launch_id(launch_remove_info)
         logger.info("Finished removing launches %.2f s", time() - t_start)
         return deleted_logs_cnt

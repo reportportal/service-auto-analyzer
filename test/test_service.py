@@ -118,6 +118,16 @@ class TestService(unittest.TestCase):
         self.suggest_info_test_items_by_id_2 = "suggest_info_test_items_by_id_2.json"
         self.suggest_index_test_item_update = "suggest_index_test_item_update.json"
         self.suggest_index_test_item_update_2 = "suggest_index_test_item_update_2.json"
+        self.launch_w_items_clustering_with_different_errors =\
+            "launch_w_items_clustering_with_different_errors.json"
+        self.cluster_update_all_the_same_es_with_different_errors =\
+            "cluster_update_all_the_same_es_with_different_errors.json"
+        self.search_logs_rq_first_group_assertion_error = \
+            "search_logs_rq_first_group_assertion_error.json"
+        self.search_logs_rq_first_group_assertion_error_status_code = \
+            "search_logs_rq_first_group_assertion_error_status_code.json"
+        self.search_logs_rq_first_group_no_such_element = \
+            "search_logs_rq_first_group_no_such_element.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
             "esUser": "",
@@ -158,9 +168,10 @@ class TestService(unittest.TestCase):
             "BoostLaunch":    2,
             "BoostUniqueID":  2,
             "MaxQueryTerms":  50,
-            "SearchLogsMinShouldMatch": "98%",
-            "SearchLogsMinSimilarity": 0.9,
-            "NoDefectMinSimilarity": 0.98,
+            "SearchLogsMinShouldMatch": "95%",
+            "SearchLogsMinSimilarity": 0.95,
+            "NoDefectMinSimilarity": 0.95,
+            "ClusterLogsMinSimilarity": 0.95,
             "MinWordLength":  0,
             "TimeWeightDecay": 0.95,
             "PatternLabelMinPercentToSuggest": 0.5,

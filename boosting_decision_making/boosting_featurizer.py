@@ -285,6 +285,8 @@ class BoostingFeaturizer:
             result[issue_type] = 0.0
             try:
                 model_to_use = issue_type_to_compare.lower()[:2]
+                if model_to_use in ["nd", "ti"]:
+                    continue
                 if issue_type_to_compare in self.defect_type_predict_model.models:
                     model_to_use = issue_type_to_compare
                 res, res_prob = self.defect_type_predict_model.predict(

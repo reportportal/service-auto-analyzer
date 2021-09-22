@@ -242,7 +242,23 @@ class TestAutoAnalyzerService(TestService):
                 "expected_count": 1,
                 "expected_id": 34,
                 "expected_issue_type": "ND001",
-                "boost_predict":       ([], [])
+                "boost_predict":       ([1], [[0.1, 0.9]])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.OK,
+                                    }],
+                "msearch_results": [
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.two_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.two_hits_with_no_defect, to_json=True)],
+                "index_rq":       utils.get_fixture(
+                    self.launch_w_test_items_w_logs),
+                "expected_count": 0,
+                "expected_issue_type": "",
+                "boost_predict":       ([0], [[0.9, 0.1]])
             },
             {
                 "test_calls":     [{"method":         httpretty.GET,

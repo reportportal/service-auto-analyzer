@@ -562,6 +562,7 @@ def clean_from_brackets(text):
 
 def get_potential_status_codes(text):
     potential_codes = set()
+    potential_codes_list = []
     for line in text.split("\n"):
         line = clean_from_brackets(line)
         patterns_to_check = [r"\bcode[^\w\d\.]+(\d+)[^\d;\.]*(\d*)|\bcode[^\w\d\.]+(\d+?)$",
@@ -572,10 +573,12 @@ def get_potential_status_codes(text):
                 try:
                     found_code = result.group(i)
                     if found_code and found_code.strip():
-                        potential_codes.add(found_code)
+                        if found_code not in potential_codes:
+                            potential_codes.add(found_code)
+                            potential_codes_list.append(found_code)
                 except: # noqa
                     pass
-    return list(potential_codes)
+    return potential_codes_list
 
 
 def choose_issue_type(predicted_labels, predicted_labels_probability,
@@ -589,7 +592,7 @@ def choose_issue_type(predicted_labels, predicted_labels_probability,
             issue_type = issue_type_names[i]
             chosen_type = scores_by_issue_type[issue_type]
             start_time = chosen_type["mrHit"]["_source"]["start_time"]
-            predicted_prob = round(predicted_labels_probability[i][1], 2)
+            predicted_prob = round(predicted_labels_probability[i][1], 4)
             if (predicted_prob > max_prob) or\
                     ((predicted_prob == max_prob) and # noqa
                         (max_val_start_time is None or start_time > max_val_start_time)):

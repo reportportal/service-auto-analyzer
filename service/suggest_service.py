@@ -213,7 +213,7 @@ class SuggestService(AnalyzerService):
             test_item_id = test_item_ids[idx]
             gathered_results.append(
                 (idx,
-                 round(prob[1], 2),
+                 round(prob[1], 4),
                  scores_by_test_items[test_item_id]["mrHit"]["_source"]["start_time"]))
 
         gathered_results = sorted(gathered_results, key=lambda x: (x[1], x[2]), reverse=True)

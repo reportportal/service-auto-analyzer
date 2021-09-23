@@ -196,22 +196,22 @@ class AnalysisModelTraining:
         log_id_dict = {}
         for i in range(int(len(log_ids_to_find) / batch_size) + 1):
             log_ids = log_ids_to_find[i * batch_size: (i + 1) * batch_size]
+            if not log_ids:
+                continue
             ids_query = {
                 "size": self.app_config["esChunkNumber"],
                 "query": {
                     "bool": {
                         "filter": [
-                            {"terms": {"_id": [str(_id) for _id in log_ids]}}
+                            {"terms": {"_id": log_ids}}
                         ]
                     }
                 }}
-            if not log_ids:
-                continue
             for r in elasticsearch.helpers.scan(self.es_client.es_client,
                                                 query=ids_query,
                                                 index=project_index_name,
                                                 scroll="5m"):
-                log_id_dict[r["_id"]] = r
+                log_id_dict[str(r["_id"])] = r
         return log_id_dict
 
     def get_search_query_suggest(self):
@@ -284,7 +284,7 @@ class AnalysisModelTraining:
                     continue
                 log_id_pairs_set.add(log_ids_pair)
                 for col in ["testItemLogId", "relevantLogId"]:
-                    log_id = res["_source"][col]
+                    log_id = str(res["_source"][col])
                     if res["_source"]["isMergedLog"]:
                         log_id = log_id + "_m"
                     log_ids_to_find.add(log_id)

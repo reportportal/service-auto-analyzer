@@ -96,11 +96,9 @@ class LogPreparation:
         message_without_params = utils.clean_from_urls(message_without_params)
         message_without_params = utils.clean_from_paths(message_without_params)
         message_without_params = utils.clean_from_params(message_without_params)
-        message_without_params_and_brackets = utils.remove_starting_datetime(
-            message_without_params)
-        message_without_params_and_brackets = utils.clean_from_brackets(
-            message_without_params_and_brackets)
+        message_without_params = utils.remove_starting_datetime(message_without_params)
         message_without_params = utils.sanitize_text(message_without_params)
+        message_without_params_and_brackets = utils.clean_from_brackets(message_without_params)
 
         detected_message, stacktrace = utils.detect_log_description_and_stacktrace(cleaned_message)
 
@@ -115,11 +113,10 @@ class LogPreparation:
         detected_message = utils.replace_text_pieces(detected_message, test_and_methods)
         message_params = " ".join(utils.extract_message_params(detected_message_without_params))
         detected_message_without_params = utils.clean_from_params(detected_message_without_params)
-        detected_message_without_params_and_brackets = utils.remove_starting_datetime(
-            detected_message_without_params)
-        detected_message_without_params_and_brackets = utils.clean_from_brackets(
-            detected_message_without_params_and_brackets)
+        detected_message_without_params = utils.remove_starting_datetime(detected_message_without_params)
         detected_message_without_params = utils.sanitize_text(detected_message_without_params)
+        detected_message_without_params_and_brackets = utils.clean_from_brackets(
+            detected_message_without_params)
 
         detected_message_with_numbers = utils.remove_starting_datetime(detected_message)
         detected_message_only_numbers = utils.find_only_numbers(detected_message_with_numbers)

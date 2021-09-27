@@ -29,7 +29,8 @@
                     "stacktrace": "",
                     "detected_message": "error occured once",
                     "detected_message_with_numbers": "error occured once",
-                    "only_numbers": ""
+                    "only_numbers": "",
+                    "potential_status_codes": ""
                 }
             }
         ]

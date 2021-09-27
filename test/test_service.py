@@ -129,6 +129,10 @@ class TestService(unittest.TestCase):
             "search_logs_rq_first_group_assertion_error_status_code.json"
         self.search_logs_rq_first_group_no_such_element = \
             "search_logs_rq_first_group_no_such_element.json"
+        self.search_logs_rq_with_status_codes = \
+            "search_logs_rq_with_status_codes.json"
+        self.two_hits_search_rs_search_logs_with_status_codes = \
+            "two_hits_search_rs_search_logs_with_status_codes.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
             "esUser": "",
@@ -172,7 +176,6 @@ class TestService(unittest.TestCase):
             "MaxQueryTerms":  50,
             "SearchLogsMinShouldMatch": "95%",
             "SearchLogsMinSimilarity": 0.95,
-            "NoDefectMinSimilarity": 0.95,
             "ClusterLogsMinSimilarity": 0.95,
             "MinWordLength":  0,
             "TimeWeightDecay": 0.95,

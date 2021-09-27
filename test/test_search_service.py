@@ -160,6 +160,31 @@ class TestSearchService(TestService):
             },
             {
                 "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/1",
+                                    "status":         HTTPStatus.OK,
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/1/_search?scroll=5m&size=1000",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.search_logs_rq_with_status_codes),
+                                    "rs":             utils.get_fixture(
+                                        self.two_hits_search_rs_search_logs_with_status_codes),
+                                    }, ],
+                "rq":             launch_objects.SearchLogs(
+                    launchId=1,
+                    launchName="Launch 1",
+                    itemId=3,
+                    projectId=1,
+                    filteredLaunchIds=[1],
+                    logMessages=["error occured once status code: 500 but got 200"],
+                    logLines=-1),
+                "expected_count": 1,
+                "response": [launch_objects.SearchLogInfo(logId=2, testItemId=1)]
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
                                     "uri":            "/rp_1",
                                     "status":         HTTPStatus.OK,
                                     },
@@ -219,6 +244,8 @@ class TestSearchService(TestService):
 
                 response = search_service.search_logs(test["rq"])
                 response.should.have.length_of(test["expected_count"])
+                if "response" in test:
+                    response.should.equal(test["response"])
 
                 TestSearchService.shutdown_server(test["test_calls"])
 

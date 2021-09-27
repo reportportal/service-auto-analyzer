@@ -1,5 +1,5 @@
 {
-    "_source": ["message", "test_item", "detected_message", "stacktrace"],
+    "_source": ["message", "test_item", "detected_message", "stacktrace", "potential_status_codes"],
     "size": 1000,
     "query": {
         "bool": {

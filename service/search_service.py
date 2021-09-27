@@ -43,7 +43,7 @@ class SearchService:
     def build_search_query(self, search_req, queried_log, search_min_should_match="95%"):
         """Build search query"""
         query = {
-            "_source": ["message", "test_item", "detected_message", "stacktrace"],
+            "_source": ["message", "test_item", "detected_message", "stacktrace", "potential_status_codes"],
             "size": self.app_config["esChunkNumber"],
             "query": {
                 "bool": {
@@ -149,13 +149,20 @@ class SearchService:
                     "number_of_log_lines": search_req.logLines
                 },
                 weighted_similarity_calculator=self.weighted_log_similarity_calculator)
-            _similarity_calculator.find_similarity([(queried_log, res)], ["message"])
+            _similarity_calculator.find_similarity(
+                [(queried_log, res)], ["message", "potential_status_codes"])
 
             for group_id, similarity_obj in _similarity_calculator.similarity_dict["message"].items():
                 log_id, _ = group_id
                 similarity_percent = similarity_obj["similarity"]
                 logger.debug("Log with id %s has %.3f similarity with the queried log '%s'",
                              log_id, similarity_percent, queried_log["_source"]["message"])
+                potential_status_codes_match = 0.0
+                _similarity_dict = _similarity_calculator.similarity_dict["potential_status_codes"]
+                if group_id in _similarity_dict:
+                    potential_status_codes_match = _similarity_dict[group_id]["similarity"]
+                if potential_status_codes_match < 0.99:
+                    continue
                 if similarity_percent >= search_min_should_match:
                     similar_log_ids.add((utils.extract_real_id(log_id), int(test_item_info[log_id])))
 

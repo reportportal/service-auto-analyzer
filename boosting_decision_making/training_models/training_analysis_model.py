@@ -367,23 +367,26 @@ class AnalysisModelTraining:
         defect_type_model_to_use = self.model_chooser.choose_model(
             project_info["project_id"], "defect_type_model/")
 
-        logger.debug("Initialized training model '%s'", project_info["model_type"])
-        train_data, labels, test_item_ids_with_pos, features_dict_with_saved_objects = self.gather_data(
-            project_info["model_type"], project_info["project_id"],
-            self.new_model.get_feature_ids(), defect_type_model_to_use, full_config)
-        self.new_model.features_dict_with_saved_objects = features_dict_with_saved_objects
-
         metrics_to_gather = ["F1", "Mean Reciprocal Rank"]
         train_log_info = {}
         for metric in metrics_to_gather:
             train_log_info[metric] = self.get_info_template(
                 project_info, baseline_model_folder, model_name, metric)
-            train_log_info[metric]["data_size"] = len(labels)
-            train_log_info[metric]["data_proportion"] = utils.calculate_proportions_for_labels(labels)
 
         errors = []
         errors_count = 0
+        train_data = []
         try:
+            logger.debug("Initialized training model '%s'", project_info["model_type"])
+            train_data, labels, test_item_ids_with_pos, features_dict_with_saved_objects = self.gather_data(
+                project_info["model_type"], project_info["project_id"],
+                self.new_model.get_feature_ids(), defect_type_model_to_use, full_config)
+            self.new_model.features_dict_with_saved_objects = features_dict_with_saved_objects
+
+            for metric in metrics_to_gather:
+                train_log_info[metric]["data_size"] = len(labels)
+                train_log_info[metric]["data_proportion"] = utils.calculate_proportions_for_labels(labels)
+
             logger.debug("Loaded data for training model '%s'", project_info["model_type"])
             baseline_model_results, new_model_results, bad_data = self.train_several_times(
                 train_data, labels, self.new_model.get_feature_ids(),

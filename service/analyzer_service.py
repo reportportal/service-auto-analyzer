@@ -126,7 +126,7 @@ class AnalyzerService:
                                 "start_time": {
                                     "origin": start_time,
                                     "scale": "7d",
-                                    "offset": "7d",
+                                    "offset": "1d",
                                     "decay": self.search_cfg["TimeWeightDecay"]
                                 }
                             }

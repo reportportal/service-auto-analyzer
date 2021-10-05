@@ -98,7 +98,7 @@ class SearchService:
 
     def search_logs(self, search_req):
         """Get all logs similar to given logs"""
-        similar_log_ids = set()
+        similar_log_ids = {}
         logger.info("Started searching by request %s", search_req.json())
         logger.info("ES Url %s", utils.remove_credentials_from_url(self.es_client.host))
         index_name = utils.unite_project_name(
@@ -108,6 +108,7 @@ class SearchService:
             return []
         searched_logs = set()
         test_item_info = {}
+        global_search_min_should_match = search_req.analyzerConfig.searchLogsMinShouldMatch / 100
 
         for message in search_req.logMessages:
             if not message.strip():
@@ -125,7 +126,7 @@ class SearchService:
             searched_logs.add(msg_words)
             search_min_should_match = utils.calculate_threshold_for_text(
                 queried_log["_source"]["message"],
-                self.search_cfg["SearchLogsMinSimilarity"])
+                global_search_min_should_match)
             query = self.build_search_query(
                 search_req,
                 queried_log,
@@ -164,9 +165,15 @@ class SearchService:
                 if potential_status_codes_match < 0.99:
                     continue
                 if similarity_percent >= search_min_should_match:
-                    similar_log_ids.add((utils.extract_real_id(log_id), int(test_item_info[log_id])))
+                    log_id_extracted = utils.extract_real_id(log_id)
+                    test_item_id = int(test_item_info[log_id])
+                    match_score = max(round(similarity_percent, 2),
+                                      round(global_search_min_should_match, 2))
+                    similar_log_ids[(log_id_extracted, test_item_id)] = SearchLogInfo(
+                        logId=log_id_extracted,
+                        testItemId=test_item_id,
+                        matchScore=match_score * 100)
 
         logger.info("Finished searching by request %s with %d results. It took %.2f sec.",
                     search_req.json(), len(similar_log_ids), time() - t_start)
-        return [SearchLogInfo(logId=log_info[0],
-                              testItemId=log_info[1]) for log_info in similar_log_ids]
+        return list(similar_log_ids.values())

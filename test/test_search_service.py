@@ -181,7 +181,7 @@ class TestSearchService(TestService):
                     logMessages=["error occured once status code: 500 but got 200"],
                     logLines=-1),
                 "expected_count": 1,
-                "response": [launch_objects.SearchLogInfo(logId=2, testItemId=1)]
+                "response": [launch_objects.SearchLogInfo(logId=2, testItemId=1, matchScore=100)]
             },
             {
                 "test_calls":     [{"method":         httpretty.GET,
@@ -226,7 +226,8 @@ class TestSearchService(TestService):
                     "minioSecretKey":    "",
                     "esProjectIndexPrefix": "rp_"
                 },
-                "expected_count": 1
+                "expected_count": 1,
+                "response": [launch_objects.SearchLogInfo(logId=1, testItemId=1, matchScore=100)]
             },
         ]
 

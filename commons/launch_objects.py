@@ -27,12 +27,14 @@ class AnalyzerConf(BaseModel):
     isAutoAnalyzerEnabled: bool = True
     indexingRunning: bool = True
     allMessagesShouldMatch: bool = False
+    searchLogsMinShouldMatch: int = 95
 
 
 class SearchLogInfo(BaseModel):
     """Search log info"""
     logId: int
     testItemId: int
+    matchScore: float
 
 
 class Log(BaseModel):
@@ -145,6 +147,7 @@ class SearchLogs(BaseModel):
     projectId: int
     filteredLaunchIds: List[int]
     logMessages: List[str]
+    analyzerConfig: AnalyzerConf = AnalyzerConf()
     logLines: int
 
 

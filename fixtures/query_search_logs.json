@@ -1,5 +1,5 @@
 {
-    "_source": ["message", "test_item", "detected_message", "stacktrace", "potential_status_codes"],
+    "_source": ["message", "test_item", "detected_message", "stacktrace", "potential_status_codes", "merged_small_logs"],
     "size": 1000,
     "query": {
         "bool": {
@@ -8,9 +8,9 @@
                 {"exists": {"field": "issue_type"}},
                 {"term": {"is_merged": false}}
             ],
-            "must_not": {
+            "must_not": [{
                 "term": {"test_item": {"value": 2, "boost": 1.0}}
-            },
+            }],
             "must": [
                 {
                     "bool": {

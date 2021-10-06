@@ -148,6 +148,15 @@ class TestSearchService(TestService):
                                         self.search_logs_rq_not_found),
                                     "rs":             utils.get_fixture(
                                         self.two_hits_search_rs_search_logs),
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/1/_search?scroll=5m&size=1000",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.search_not_merged_logs_by_test_item),
+                                    "rs":             utils.get_fixture(
+                                        self.two_hits_search_rs_search_logs),
                                     }, ],
                 "rq":             launch_objects.SearchLogs(launchId=1,
                                                             launchName="Launch 1",
@@ -171,7 +180,16 @@ class TestSearchService(TestService):
                                         self.search_logs_rq_with_status_codes),
                                     "rs":             utils.get_fixture(
                                         self.two_hits_search_rs_search_logs_with_status_codes),
-                                    }, ],
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/1/_search?scroll=5m&size=1000",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.search_not_merged_logs_by_test_item),
+                                    "rs":             utils.get_fixture(
+                                        self.two_hits_search_rs_search_logs_with_status_codes),
+                                    }],
                 "rq":             launch_objects.SearchLogs(
                     launchId=1,
                     launchName="Launch 1",
@@ -196,7 +214,16 @@ class TestSearchService(TestService):
                                         self.search_logs_rq_not_found),
                                     "rs":             utils.get_fixture(
                                         self.two_hits_search_rs_search_logs),
-                                    }, ],
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/rp_1/_search?scroll=5m&size=1000",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.search_not_merged_logs_by_test_item),
+                                    "rs":             utils.get_fixture(
+                                        self.two_hits_search_rs_search_logs),
+                                    }],
                 "rq":             launch_objects.SearchLogs(launchId=1,
                                                             launchName="Launch 1",
                                                             itemId=3,

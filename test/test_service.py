@@ -133,6 +133,8 @@ class TestService(unittest.TestCase):
             "search_logs_rq_with_status_codes.json"
         self.two_hits_search_rs_search_logs_with_status_codes = \
             "two_hits_search_rs_search_logs_with_status_codes.json"
+        self.search_not_merged_logs_by_test_item = \
+            "search_not_merged_logs_by_test_item.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
             "esUser": "",

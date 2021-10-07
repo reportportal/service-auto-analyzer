@@ -225,7 +225,7 @@ class SearchService:
                     continue
                 if similarity_percent >= search_min_should_match:
                     log_id_extracted = utils.extract_real_id(log_id)
-                    is_merged = log_id != log_id_extracted
+                    is_merged = log_id != str(log_id_extracted)
                     test_item_id = int(test_item_info[log_id])
                     match_score = max(round(similarity_percent, 2),
                                       round(global_search_min_should_match, 2))

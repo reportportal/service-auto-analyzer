@@ -823,7 +823,8 @@ def split_and_filter_empty_words(text):
 def remove_guid_uids_from_text(text):
     for pattern in [
             r"[0-9a-fA-F]{16,48}|[0-9a-fA-F]{10,48}\.\.\.",
-            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" # noqa
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", # noqa
+            r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-\w+" # noqa
             ]:
         strings_to_replace = set()
         for m in re.findall(pattern, text):

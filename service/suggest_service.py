@@ -109,10 +109,21 @@ class SuggestService(AnalyzerService):
                                                 log["_source"]["merged_small_logs"],
                                                 field_name="merged_small_logs",
                                                 boost=2.0))
+
+        if log["_source"]["potential_status_codes"].strip():
+            number_of_status_codes = str(len(set(
+                log["_source"]["potential_status_codes"].split())))
+            query["query"]["bool"]["must"].append(
+                self.build_more_like_this_query(
+                    "1",
+                    log["_source"]["potential_status_codes"],
+                    field_name="potential_status_codes", boost=8.0,
+                    override_min_should_match=number_of_status_codes))
+
         for field, boost_score in [
                 ("detected_message_without_params_extended", 2.0),
                 ("only_numbers", 2.0), ("message_params", 2.0), ("urls", 2.0),
-                ("paths", 2.0), ("found_exceptions_extended", 8.0), ("potential_status_codes", 8.0),
+                ("paths", 2.0), ("found_exceptions_extended", 8.0),
                 ("found_tests_and_methods", 2.0), ("test_item_name", 2.0)]:
             if log["_source"][field].strip():
                 query["query"]["bool"]["should"].append(

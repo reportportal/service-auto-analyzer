@@ -567,7 +567,8 @@ def get_potential_status_codes(text):
         line = clean_from_brackets(line)
         patterns_to_check = [r"\bcode[^\w\d\.]+(\d+)[^\d]*(\d*)|\bcode[^\w\d\.]+(\d+?)$",
                              r"\w+_code[^\w\d\.]+(\d+)[^\d]*(\d*)|\w+_code[^\w\d\.]+(\d+?)$",
-                             r"\breturn[^\w\d\.]+(\d+)[^\d]*(\d*)|\breturn[^\w\d\.]+(\d+?)$"]
+                             r"\bstatus[^\w\d\.]+(\d+)[^\d]*(\d*)|\bstatus[^\w\d\.]+(\d+?)$",
+                             r"\w+_status[^\w\d\.]+(\d+)[^\d]*(\d*)|\w+_status[^\w\d\.]+(\d+?)$"]
         for pattern in patterns_to_check:
             result = re.search(pattern, line, flags=re.IGNORECASE)
             for i in range(1, 4):

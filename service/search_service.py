@@ -125,8 +125,12 @@ class SearchService:
                 test_items_dict[test_item_id].append(r["_id"])
         return test_items_dict
 
-    def prepare_final_search_results(self, similar_log_ids, all_logs_to_find_for_test_items, index_name):
+    def prepare_final_search_results(self, similar_log_ids, index_name):
         final_results = []
+        all_logs_to_find_for_test_items = set()
+        for log_id, test_item, is_merged in similar_log_ids:
+            if is_merged:
+                all_logs_to_find_for_test_items.add(test_item)
         test_items_dict = self.find_log_ids_for_test_items_with_merged_logs(
             list(all_logs_to_find_for_test_items), index_name)
         for log_id, test_item, is_merged in similar_log_ids:
@@ -141,22 +145,19 @@ class SearchService:
                 final_results.append(search_result_object)
         return final_results
 
-    def search_logs(self, search_req):
-        """Get all logs similar to given logs"""
-        similar_log_ids = {}
-        logger.info("Started searching by request %s", search_req.json())
-        logger.info("ES Url %s", utils.remove_credentials_from_url(self.es_client.host))
-        index_name = utils.unite_project_name(
-            str(search_req.projectId), self.app_config["esProjectIndexPrefix"])
-        t_start = time()
-        if not self.es_client.index_exists(index_name):
-            return []
+    def filter_test_items_to_have_all_messages_match(self, similar_log_ids,
+                                                     test_items_found_dict, messages_length):
+        new_similar_log_ids = {}
+        for log_id, test_item, is_merged in similar_log_ids:
+            similar_log_result_obj = (log_id, test_item, is_merged)
+            if test_item in test_items_found_dict and test_items_found_dict[test_item] == messages_length:
+                new_similar_log_ids[similar_log_result_obj] = similar_log_ids[similar_log_result_obj]
+        return new_similar_log_ids
+
+    def prepare_messages_for_queries(self, search_req):
         searched_logs = set()
         logs_to_query = []
-        test_item_info = {}
-        global_search_min_should_match = search_req.analyzerConfig.searchLogsMinShouldMatch / 100
         global_id = 0
-
         for message in search_req.logMessages:
             if not message.strip():
                 continue
@@ -175,8 +176,41 @@ class SearchService:
             global_id += 1
 
         logs_to_query = self.log_merger.decompose_logs_merged_and_without_duplicates(logs_to_query)
-        all_logs_to_find_for_test_items = set()
+        return logs_to_query
 
+    def search_similar_items_for_log(self, search_req, queried_log,
+                                     search_min_should_match, test_item_info, index_name):
+        query = self.build_search_query(
+            search_req,
+            queried_log,
+            search_min_should_match=utils.prepare_es_min_should_match(
+                search_min_should_match))
+        res = []
+        for r in elasticsearch.helpers.scan(self.es_client.es_client,
+                                            query=query,
+                                            index=index_name):
+            test_item_info[r["_id"]] = r["_source"]["test_item"]
+            res.append(r)
+            if len(res) >= 10000:
+                break
+        return {"hits": {"hits": res}}
+
+    def search_logs(self, search_req):
+        """Get all logs similar to given logs"""
+        similar_log_ids = {}
+        logger.info("Started searching by request %s", search_req.json())
+        logger.info("ES Url %s", utils.remove_credentials_from_url(self.es_client.host))
+        index_name = utils.unite_project_name(
+            str(search_req.projectId), self.app_config["esProjectIndexPrefix"])
+        t_start = time()
+        if not self.es_client.index_exists(index_name):
+            return []
+
+        logs_to_query = self.prepare_messages_for_queries(search_req)
+
+        global_search_min_should_match = search_req.analyzerConfig.searchLogsMinShouldMatch / 100
+        test_items_found_dict = {}
+        test_item_info = {}
         for queried_log in logs_to_query:
             message_to_use = queried_log["_source"]["message"]
             if not message_to_use.strip():
@@ -184,20 +218,9 @@ class SearchService:
             search_min_should_match = utils.calculate_threshold_for_text(
                 message_to_use,
                 global_search_min_should_match)
-            query = self.build_search_query(
-                search_req,
-                queried_log,
-                search_min_should_match=utils.prepare_es_min_should_match(
-                    search_min_should_match))
-            res = []
-            for r in elasticsearch.helpers.scan(self.es_client.es_client,
-                                                query=query,
-                                                index=index_name):
-                test_item_info[r["_id"]] = r["_source"]["test_item"]
-                res.append(r)
-                if len(res) >= 10000:
-                    break
-            res = {"hits": {"hits": res}}
+            search_results = self.search_similar_items_for_log(
+                search_req, queried_log,
+                search_min_should_match, test_item_info, index_name)
 
             _similarity_calculator = similarity_calculator.SimilarityCalculator(
                 {
@@ -207,7 +230,7 @@ class SearchService:
                 },
                 weighted_similarity_calculator=self.weighted_log_similarity_calculator)
             _similarity_calculator.find_similarity(
-                [(queried_log, res)], ["message", "potential_status_codes", "merged_small_logs"])
+                [(queried_log, search_results)], ["message", "potential_status_codes", "merged_small_logs"])
 
             for group_id, similarity_obj in _similarity_calculator.similarity_dict["message"].items():
                 log_id, _ = group_id
@@ -233,10 +256,13 @@ class SearchService:
                         logId=log_id_extracted,
                         testItemId=test_item_id,
                         matchScore=match_score * 100)
-                    if is_merged:
-                        all_logs_to_find_for_test_items.add(test_item_id)
-        final_results = self.prepare_final_search_results(
-            similar_log_ids, all_logs_to_find_for_test_items, index_name)
+                    if test_item_id not in test_items_found_dict:
+                        test_items_found_dict[test_item_id] = 0
+                    test_items_found_dict[test_item_id] += 1
+        if search_req.analyzerConfig.allMessagesShouldMatch:
+            similar_log_ids = self.filter_test_items_to_have_all_messages_match(
+                similar_log_ids, test_items_found_dict, len(logs_to_query))
+        final_results = self.prepare_final_search_results(similar_log_ids, index_name)
 
         logger.info("Finished searching by request %s with %d results. It took %.2f sec.",
                     search_req.json(), len(final_results), time() - t_start)

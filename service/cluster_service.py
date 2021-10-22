@@ -58,7 +58,9 @@ class ClusterService:
                         "term": {"test_item": {"value": queried_log["_source"]["test_item"],
                                                "boost": 1.0}}
                     },
+                    "should": [],
                     "must": [
+                        {"wildcard": {"cluster_message": "*"}},
                         utils.build_more_like_this_query(
                             min_should_match, message,
                             field_name="whole_message", boost=1.0,
@@ -66,11 +68,8 @@ class ClusterService:
                             max_query_terms=self.search_cfg["MaxQueryTerms"])
                     ]}}}
         if same_launch:
-            query["query"]["bool"]["must"].append(
+            query["query"]["bool"]["should"].append(
                 {"term": {"launch_id": queried_log["_source"]["launch_id"]}})
-            query["query"]["bool"]["should"] = [{"wildcard": {"cluster_message": "*"}}]
-        else:
-            query["query"]["bool"]["must"].append({"wildcard": {"cluster_message": "*"}})
         if queried_log["_source"]["found_exceptions"].strip():
             query["query"]["bool"]["must"].append(
                 utils.build_more_like_this_query(
@@ -89,7 +88,33 @@ class ClusterService:
                     field_name="potential_status_codes", boost=1.0,
                     override_min_should_match=number_of_status_codes,
                     max_query_terms=self.search_cfg["MaxQueryTerms"]))
-        return query
+        return self.add_query_with_start_time_decay(query)
+
+    def add_query_with_start_time_decay(self, main_query):
+        return {
+            "size": main_query["size"],
+            "query": {
+                "function_score": {
+                    "query": main_query["query"],
+                    "functions": [
+                        {
+                            "exp": {
+                                "start_time": {
+                                    "origin": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                    "scale": "7d",
+                                    "offset": "1d",
+                                    "decay": self.search_cfg["TimeWeightDecay"]
+                                }
+                            }
+                        },
+                        {
+                            "script_score": {"script": {"source": "0.2"}}
+                        }],
+                    "score_mode": "max",
+                    "boost_mode": "multiply"
+                }
+            }
+        }
 
     def find_similar_items_from_es(
             self, groups, log_dict,

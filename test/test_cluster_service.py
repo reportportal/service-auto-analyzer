@@ -23,10 +23,12 @@ import commons.launch_objects as launch_objects
 from utils import utils
 from service.cluster_service import ClusterService
 from test.test_service import TestService
+from freezegun import freeze_time
 
 
 class TestClusterService(TestService):
 
+    @freeze_time("2021-10-18 17:00:00")
     @utils.ignore_warnings
     def test_find_clusters(self):
         """Test finding clusters"""

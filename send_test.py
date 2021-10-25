@@ -161,7 +161,7 @@ index_data = [{
                    "logs": [
                        {"logId": 38,
                         "logLevel": 40000,
-                        "message": "assertionError occured \r\n error found \r\n error mined"} ]
+                        "message": "assertionError occured \r\n error found \r\n error mined"}]
                    }, ],
 }, {
     "launchId": 1,
@@ -198,7 +198,7 @@ index_data = [{
                        {"logId": 78,
                         "logLevel": 40000,
                         "message": "assertionError occured \r\n error found \r\n error mined"},
-                        {"logId": 113,
+                       {"logId": 113,
                         "logLevel": 40000,
                         "message": "nullpointerException occured \r\n error occurred \r\n error mined"}]
                    }]}]

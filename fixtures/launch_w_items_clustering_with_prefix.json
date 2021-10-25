@@ -1,7 +1,7 @@
 {
     "2": [{
         "_id": 4,
-        "_index": "2",
+        "_index": "rp_2",
         "_source": {
             "whole_message": "error occured \r\n error found \r\n error mined",
             "test_item": 3,
@@ -20,7 +20,7 @@
     },
     {
         "_id": 3,
-        "_index": "2",
+        "_index": "rp_2",
         "_source": {
             "whole_message": "error occured",
             "test_item": 3,
@@ -39,7 +39,7 @@
     }],
     "5": [{
         "_id": 5,
-        "_index": "2",
+        "_index": "rp_2",
         "_source": {
             "whole_message": "error occured \r\n error found \r\n error mined",
             "test_item": 5,
@@ -58,7 +58,7 @@
     }],
     "6": [{
         "_id": 9,
-        "_index": "2",
+        "_index": "rp_2",
         "_source": {
             "whole_message": "error occured \r\n error found \r\n assert query",
             "test_item": 6,

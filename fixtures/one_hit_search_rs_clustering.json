@@ -42,6 +42,7 @@
                     "cluster_message": "error occured \n error found \n error mined",
                     "message_params": "",
                     "found_exceptions": "",
+                    "potential_status_codes": "",
                     "found_exceptions_extended": "",
                     "stacktrace_extended": "",
                     "message_extended": "error occured \n error found \n error mined",

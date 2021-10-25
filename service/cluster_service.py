@@ -312,7 +312,7 @@ class ClusterService:
                 {"wildcard": {"cluster_message": "*"}})
         return query
 
-    def find_logs_to_cluster(self, launch_info, index_name):
+    def query_logs(self, launch_info, index_name):
         logs_by_test_item = {}
         for log in elasticsearch.helpers.scan(self.es_client.es_client,
                                               query=self.get_logs_for_clustering_query(launch_info),
@@ -320,6 +320,10 @@ class ClusterService:
             if log["_source"]["test_item"] not in logs_by_test_item:
                 logs_by_test_item[log["_source"]["test_item"]] = []
             logs_by_test_item[log["_source"]["test_item"]].append(log)
+        return logs_by_test_item
+
+    def find_logs_to_cluster(self, launch_info, index_name):
+        logs_by_test_item = self.query_logs(launch_info, index_name)
         log_messages = []
         log_dict = {}
         ind = 0
@@ -369,13 +373,6 @@ class ClusterService:
                 groups, log_dict, log_messages,
                 log_ids, launch_info,
                 {})
-
-            if launch_info.forUpdate:
-                additional_results = self.find_similar_items_from_es(
-                    groups, log_dict, log_messages,
-                    log_ids, launch_info,
-                    additional_results)
-
             clusters, cluster_num = self.gather_cluster_results(
                 groups, additional_results, log_dict, log_messages, launch_info.numberOfLogLines)
             if clusters:

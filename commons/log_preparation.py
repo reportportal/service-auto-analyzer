@@ -14,16 +14,13 @@
 * limitations under the License.
 """
 import utils.utils as utils
-from commons.log_merger import LogMerger
 from datetime import datetime
-
-ERROR_LOGGING_LEVEL = 40000
 
 
 class LogPreparation:
 
     def __init__(self):
-        self.log_merger = LogMerger()
+        pass
 
     def clean_message(self, message):
         message = utils.replace_tabs_for_newlines(message)
@@ -111,9 +108,11 @@ class LogPreparation:
         detected_message_without_params = utils.replace_text_pieces(
             detected_message_without_params, test_and_methods)
         detected_message = utils.replace_text_pieces(detected_message, test_and_methods)
+        detected_message_without_params = utils.remove_starting_datetime(detected_message_without_params)
+        detected_message_wo_urls_and_paths = detected_message_without_params
+
         message_params = " ".join(utils.extract_message_params(detected_message_without_params))
         detected_message_without_params = utils.clean_from_params(detected_message_without_params)
-        detected_message_without_params = utils.remove_starting_datetime(detected_message_without_params)
         detected_message_without_params = utils.sanitize_text(detected_message_without_params)
         detected_message_without_params_and_brackets = utils.clean_from_brackets(
             detected_message_without_params)
@@ -153,7 +152,7 @@ class LogPreparation:
             utils.enrich_text_with_method_and_classes(message)
         log_template["_source"]["message_without_params_extended"] =\
             utils.enrich_text_with_method_and_classes(message_without_params)
-        log_template["_source"]["whole_message"] = detected_message_with_numbers + " \n " + stacktrace
+        log_template["_source"]["whole_message"] = detected_message_wo_urls_and_paths + " \n " + stacktrace
         log_template["_source"]["detected_message_without_params_and_brackets"] =\
             detected_message_without_params_and_brackets
         log_template["_source"]["message_without_params_and_brackets"] =\
@@ -207,7 +206,7 @@ class LogPreparation:
             for test_item in launch.testItems:
                 for log in test_item.logs:
 
-                    if log.logLevel < ERROR_LOGGING_LEVEL or not log.message.strip():
+                    if log.logLevel < utils.ERROR_LOGGING_LEVEL or not log.message.strip():
                         continue
                     clean_message = self.clean_message(log.message)
                     det_message, stacktrace = utils.detect_log_description_and_stacktrace(
@@ -216,74 +215,3 @@ class LogPreparation:
                         if "." in word and len(word.split(".")) > 2:
                             log_words[word] = 1
         return log_words, project
-
-    def prepare_log_clustering_light(self, launch, test_item, log, clean_numbers, project):
-        log_template = self._create_log_template()
-        log_template = self._fill_launch_test_item_fields(log_template, launch, test_item, project)
-        cleaned_message = self.clean_message(log.message)
-        detected_message, stacktrace = utils.detect_log_description_and_stacktrace_light(
-            cleaned_message)
-        test_and_methods = utils.find_test_methods_in_text(cleaned_message)
-        detected_message = utils.replace_text_pieces(detected_message, test_and_methods)
-        detected_message = utils.clean_from_urls(detected_message)
-        detected_message = utils.clean_from_paths(detected_message)
-        stacktrace = utils.sanitize_text(stacktrace)
-        message = utils.first_lines(cleaned_message, -1)
-        message = utils.sanitize_text(message)
-        log_template["_id"] = log.logId
-        log_template["_source"]["cluster_id"] = str(log.clusterId)
-        log_template["_source"]["cluster_message"] = log.clusterMessage
-        log_template["_source"]["log_level"] = log.logLevel
-        log_template["_source"]["original_message_lines"] = utils.calculate_line_number(
-            cleaned_message)
-        log_template["_source"]["original_message_words_number"] = len(
-            utils.split_words(cleaned_message, split_urls=False))
-        detected_message_with_numbers = utils.remove_starting_datetime(detected_message)
-        detected_message = utils.sanitize_text(detected_message)
-        log_template["_source"]["message"] = message
-        log_template["_source"]["detected_message"] = detected_message
-        log_template["_source"]["detected_message_with_numbers"] = detected_message_with_numbers
-        log_template["_source"]["stacktrace"] = stacktrace
-        potential_status_codes = " ".join(utils.get_potential_status_codes(detected_message_with_numbers))
-        log_template["_source"]["potential_status_codes"] = potential_status_codes
-        log_template["_source"]["found_exceptions"] = utils.get_found_exceptions(detected_message)
-        if clean_numbers:
-            detected_message = detected_message + " " + potential_status_codes
-            log_template["_source"]["whole_message"] = utils.delete_empty_lines(
-                detected_message + " \n " + stacktrace)
-        else:
-            detected_message_with_numbers = detected_message_with_numbers + " " + potential_status_codes
-            log_template["_source"]["whole_message"] = utils.delete_empty_lines(
-                detected_message_with_numbers + " \n " + stacktrace)
-        return log_template
-
-    def prepare_logs_for_clustering(self, launch, number_of_lines, clean_numbers, project):
-        log_messages = []
-        log_dict = {}
-        ind = 0
-        for test_item in launch.testItems:
-            prepared_logs = []
-            for log in test_item.logs:
-                if log.logLevel < ERROR_LOGGING_LEVEL:
-                    continue
-                prepared_logs.append(
-                    self.prepare_log_clustering_light(launch, test_item, log, clean_numbers, project))
-            merged_logs = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
-            new_merged_logs = []
-            for log in merged_logs:
-                if not log["_source"]["stacktrace"].strip():
-                    continue
-                new_merged_logs.append(log)
-            if len(new_merged_logs) > 0:
-                merged_logs = new_merged_logs
-            for log in merged_logs:
-                if log["_source"]["is_merged"]:
-                    continue
-                log_message = utils.prepare_message_for_clustering(
-                    log["_source"]["whole_message"], number_of_lines)
-                if not log_message.strip():
-                    continue
-                log_messages.append(log_message)
-                log_dict[ind] = log
-                ind += 1
-        return log_messages, log_dict

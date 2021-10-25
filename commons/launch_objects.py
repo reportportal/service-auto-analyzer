@@ -82,7 +82,9 @@ class Launch(BaseModel):
 
 
 class LaunchInfoForClustering(BaseModel):
-    launch: Launch
+    launchId: int
+    launchName: str
+    project: int
     forUpdate: bool = False
     numberOfLogLines: int
     cleanNumbers: bool = False

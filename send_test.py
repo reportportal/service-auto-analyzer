@@ -161,7 +161,7 @@ index_data = [{
                    "logs": [
                        {"logId": 38,
                         "logLevel": 40000,
-                        "message": "assertionError occured \r\n error found \r\n error mined"}, ]
+                        "message": "assertionError occured \r\n error found \r\n error mined"} ]
                    }, ],
 }, {
     "launchId": 1,
@@ -197,7 +197,10 @@ index_data = [{
                    "logs": [
                        {"logId": 78,
                         "logLevel": 40000,
-                        "message": "assertionError occured \r\n error found \r\n error mined"}]
+                        "message": "assertionError occured \r\n error found \r\n error mined"},
+                        {"logId": 113,
+                        "logLevel": 40000,
+                        "message": "nullpointerException occured \r\n error occurred \r\n error mined"}]
                    }]}]
 
 search_data = {
@@ -311,11 +314,15 @@ elif used_method.strip() in ["index_suggest_info"]:
     response = rpc.call(json.dumps(index_suggest_info_items), used_method)
 elif used_method.strip() in ["cluster"]:
     if not for_update:
-        response = rpc.call(json.dumps({"launch": index_data[0],
+        response = rpc.call(json.dumps({"launchId": 1,
+                                        "launchName": "Launch name",
+                                        "project": 34,
                                         "forUpdate": for_update,
                                         "numberOfLogLines": number_lines}), used_method)
     else:
-        response = rpc.call(json.dumps({"launch": index_data[2],
+        response = rpc.call(json.dumps({"launchId": 2,
+                                        "launchName": "Launch name",
+                                        "project": 34,
                                         "forUpdate": for_update,
                                         "numberOfLogLines": number_lines}), used_method)
 else:

@@ -18,7 +18,8 @@ import unittest
 from http import HTTPStatus
 import sure # noqa
 import httpretty
-
+import json
+from unittest.mock import MagicMock
 import commons.launch_objects as launch_objects
 from utils import utils
 from service.cluster_service import ClusterService
@@ -37,11 +38,23 @@ class TestClusterService(TestService):
                 "test_calls":          [{"method":         httpretty.GET,
                                          "uri":            "/1",
                                          "status":         HTTPStatus.OK,
-                                         }, ],
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/1/_search?scroll=5m&size=1000",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             utils.get_fixture(
+                                             self.get_test_items_by_ids_query),
+                                         "rs":             utils.get_fixture(
+                                             self.test_items_by_id_1),
+                                         }],
                 "launch_info":         launch_objects.LaunchInfoForClustering(
                     launch=launch_objects.Launch(
                         **(utils.get_fixture(
                             self.launch_wo_test_items, to_json=True))[0]),
+                    launchId=1,
+                    launchName="Launch name",
+                    project=1,
                     forUpdate=False,
                     numberOfLogLines=-1),
                 "expected_result":     launch_objects.ClusterResult(
@@ -544,6 +557,8 @@ class TestClusterService(TestService):
                     app_config = test["app_config"]
                 _cluster_service = ClusterService(app_config=app_config,
                                                   search_cfg=config)
+                _cluster_service.es_client.es_client.scroll = MagicMock(return_value=json.loads(
+                    utils.get_fixture(self.no_hits_search_rs)))
 
                 response = _cluster_service.find_clusters(test["launch_info"])
 

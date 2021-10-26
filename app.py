@@ -98,7 +98,9 @@ SEARCH_CONFIG = {
     "GlobalDefectTypeModelFolder": "",
     "RetrainSuggestBoostModelConfig": "",
     "RetrainAutoBoostModelConfig": "",
-    "MaxSuggestionsNumber": int(os.getenv("MAX_SUGGESTIONS_NUMBER", "3"))
+    "MaxSuggestionsNumber": int(os.getenv("MAX_SUGGESTIONS_NUMBER", "3")),
+    "AutoAnalysisTimeout": int(os.getenv("AUTO_ANALYSIS_TIMEOUT", "300")),
+    "MaxAutoAnalysisItemsToProcess": int(os.getenv("MAX_AUTO_ANALYSIS_ITEMS_TO_PROCESS", "4000"))
 }
 
 

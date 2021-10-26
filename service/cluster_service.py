@@ -14,10 +14,13 @@
 * limitations under the License.
 """
 from commons.esclient import EsClient
+import elasticsearch
+import elasticsearch.helpers
 from commons import clusterizer
 from utils import utils
 from commons.launch_objects import ClusterResult, ClusterInfo
 from commons.log_preparation import LogPreparation
+from commons.log_merger import LogMerger
 from sklearn.feature_extraction.text import CountVectorizer
 import numpy as np
 from amqp.amqp import AmqpClient
@@ -37,15 +40,16 @@ class ClusterService:
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
         self.log_preparation = LogPreparation()
+        self.log_merger = LogMerger()
 
     def build_search_similar_items_query(self, queried_log, message,
-                                         same_launch=False,
+                                         launch_info,
                                          min_should_match="95%"):
         """Build search query"""
         query = {
             "_source": ["whole_message", "test_item",
                         "detected_message", "stacktrace", "launch_id", "cluster_id",
-                        "cluster_message"],
+                        "cluster_message", "potential_status_codes", "found_exceptions"],
             "size": 10,
             "query": {
                 "bool": {
@@ -54,10 +58,10 @@ class ClusterService:
                         {"exists": {"field": "issue_type"}},
                         {"term": {"is_merged": False}},
                     ],
-                    "must_not": {
+                    "must_not": [{
                         "term": {"test_item": {"value": queried_log["_source"]["test_item"],
                                                "boost": 1.0}}
-                    },
+                    }],
                     "should": [],
                     "must": [
                         {"wildcard": {"cluster_message": "*"}},
@@ -67,9 +71,14 @@ class ClusterService:
                             override_min_should_match=None,
                             max_query_terms=self.search_cfg["MaxQueryTerms"])
                     ]}}}
-        if same_launch:
+        if launch_info.forUpdate:
             query["query"]["bool"]["should"].append(
                 {"term": {"launch_id": queried_log["_source"]["launch_id"]}})
+        else:
+            query["query"]["bool"]["must_not"].append(
+                {"term": {"launch_id": queried_log["_source"]["launch_id"]}})
+        query["query"]["bool"]["should"].append(
+            {"term": {"launch_name": launch_info.launchName}})
         if queried_log["_source"]["found_exceptions"].strip():
             query["query"]["bool"]["must"].append(
                 utils.build_more_like_this_query(
@@ -118,9 +127,8 @@ class ClusterService:
 
     def find_similar_items_from_es(
             self, groups, log_dict,
-            log_messages, log_ids, number_of_lines,
-            additional_results,
-            same_launch=False):
+            log_messages, log_ids, launch_info,
+            additional_results):
         new_clusters = {}
         _clusterizer = clusterizer.Clusterizer()
         for global_group in groups:
@@ -131,7 +139,7 @@ class ClusterService:
             query = self.build_search_similar_items_query(
                 log_dict[first_item_ind],
                 log_messages[first_item_ind],
-                same_launch=same_launch,
+                launch_info,
                 min_should_match=utils.prepare_es_min_should_match(
                     min_should_match))
             search_results = self.es_client.es_client.search(
@@ -144,16 +152,27 @@ class ClusterService:
                 if int(res["_id"]) in log_ids:
                     continue
                 log_dict_part[ind] = res
+                log_message = res["_source"]["whole_message"]
+                if launch_info.cleanNumbers:
+                    log_message = utils.sanitize_text(log_message)
                 log_message = utils.prepare_message_for_clustering(
-                    res["_source"]["whole_message"], number_of_lines)
-                if not log_message.strip():
+                    log_message, launch_info.numberOfLogLines)
+                equal = True
+                for column in ["found_exceptions", "potential_status_codes"]:
+                    candidate_text = " ".join(sorted(res["_source"][column].split())).strip()
+                    text_to_compare = " ".join(
+                        sorted(log_dict[first_item_ind]["_source"][column].split())).strip()
+                    if candidate_text != text_to_compare:
+                        equal = False
+                        break
+                if not log_message.strip() or not equal:
                     continue
                 log_messages_part.append(log_message)
                 ind += 1
             groups_part = _clusterizer.find_clusters(log_messages_part, threshold=min_should_match)
             new_group = None
             for group in groups_part:
-                if 0 in groups_part[group] and len(groups_part[group]) > 1:
+                if 0 in groups_part[group]:  # and len(groups_part[group]) > 1:
                     cluster_id = 0
                     cluster_message = ""
                     for ind in groups_part[group]:
@@ -165,6 +184,8 @@ class ClusterService:
                     new_group_log_ids = []
                     for ind in groups_part[group]:
                         if ind == 0:
+                            continue
+                        if log_dict_part[ind]["_source"]["launch_id"] != launch_info.launchId:
                             continue
                         log_ids.add(int(log_dict_part[ind]["_id"]))
                         new_group_log_ids.append(log_dict_part[ind]["_id"])
@@ -269,11 +290,70 @@ class ClusterService:
             start_group_id = start_group_id + max_group_id + 1
         return all_groups
 
+    def get_logs_for_clustering_query(self, launch_info):
+        query = {
+            "_source": ["whole_message", "test_item",
+                        "detected_message", "stacktrace", "launch_id", "cluster_id",
+                        "cluster_message", "message", "log_level", "original_message_lines",
+                        "original_message_words_number", "potential_status_codes", "found_exceptions"],
+            "size": self.app_config["esChunkNumber"],
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
+                        {"exists": {"field": "issue_type"}},
+                        {"term": {"is_merged": False}},
+                    ],
+                    "must_not": [],
+                    "should": [],
+                    "must": [{"term": {"launch_id": launch_info.launchId}}]}}}
+        if launch_info.forUpdate:
+            query["query"]["bool"]["must_not"].append(
+                {"wildcard": {"cluster_message": "*"}})
+        return query
+
+    def query_logs(self, launch_info, index_name):
+        logs_by_test_item = {}
+        for log in elasticsearch.helpers.scan(self.es_client.es_client,
+                                              query=self.get_logs_for_clustering_query(launch_info),
+                                              index=index_name):
+            if log["_source"]["test_item"] not in logs_by_test_item:
+                logs_by_test_item[log["_source"]["test_item"]] = []
+            logs_by_test_item[log["_source"]["test_item"]].append(log)
+        return logs_by_test_item
+
+    def find_logs_to_cluster(self, launch_info, index_name):
+        logs_by_test_item = self.query_logs(launch_info, index_name)
+        log_messages = []
+        log_dict = {}
+        ind = 0
+        for test_item in logs_by_test_item:
+            merged_logs = self.log_merger.decompose_logs_merged_and_without_duplicates(
+                logs_by_test_item[test_item])
+            new_merged_logs = []
+            for log in merged_logs:
+                if not log["_source"]["stacktrace"].strip():
+                    continue
+                new_merged_logs.append(log)
+            if len(new_merged_logs) > 0:
+                merged_logs = new_merged_logs
+            for log in merged_logs:
+                if log["_source"]["is_merged"]:
+                    continue
+                log_message = utils.prepare_message_for_clustering(
+                    log["_source"]["whole_message"], launch_info.numberOfLogLines)
+                if not log_message.strip():
+                    continue
+                log_messages.append(log_message)
+                log_dict[ind] = log
+                ind += 1
+        return log_messages, log_dict
+
     @utils.ignore_warnings
     def find_clusters(self, launch_info):
         logger.info("Started clusterizing logs")
         index_name = utils.unite_project_name(
-            str(launch_info.launch.project), self.app_config["esProjectIndexPrefix"])
+            str(launch_info.project), self.app_config["esProjectIndexPrefix"])
         if not self.es_client.index_exists(index_name):
             logger.info("Project %d doesn't exist", index_name)
             logger.info("Finished clustering log with 0 clusters.")
@@ -285,22 +365,14 @@ class ClusterService:
         clusters = []
         log_ids = []
         try:
-            log_messages, log_dict = self.log_preparation.prepare_logs_for_clustering(
-                launch_info.launch, launch_info.numberOfLogLines, launch_info.cleanNumbers, index_name)
+            log_messages, log_dict = self.find_logs_to_cluster(launch_info, index_name)
             log_ids = set([int(log["_id"]) for log in log_dict.values()])
 
             groups = self.cluster_messages_with_groupping_by_error(log_messages, log_dict)
             additional_results = self.find_similar_items_from_es(
                 groups, log_dict, log_messages,
-                log_ids, launch_info.numberOfLogLines,
-                {}, same_launch=False)
-
-            if launch_info.forUpdate:
-                additional_results = self.find_similar_items_from_es(
-                    groups, log_dict, log_messages,
-                    log_ids, launch_info.numberOfLogLines,
-                    additional_results, same_launch=True)
-
+                log_ids, launch_info,
+                {})
             clusters, cluster_num = self.gather_cluster_results(
                 groups, additional_results, log_dict, log_messages, launch_info.numberOfLogLines)
             if clusters:
@@ -319,11 +391,11 @@ class ClusterService:
             errors_found.append(utils.extract_exception(err))
             errors_count += 1
 
-        results_to_share = {launch_info.launch.launchId: {
+        results_to_share = {launch_info.launchId: {
             "not_found": int(cluster_num == 0), "items_to_process": len(log_ids),
             "processed_time": time() - t_start, "found_clusters": cluster_num,
-            "launch_id": launch_info.launch.launchId, "launch_name": launch_info.launch.launchName,
-            "project_id": launch_info.launch.project, "method": "find_clusters",
+            "launch_id": launch_info.launchId, "launch_name": launch_info.launchName,
+            "project_id": launch_info.project, "method": "find_clusters",
             "gather_date": datetime.now().strftime("%Y-%m-%d"),
             "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "module_version": [self.app_config["appVersion"]],
@@ -338,6 +410,6 @@ class ClusterService:
         logger.info("Processed the launch. It took %.2f sec.", time() - t_start)
         logger.info("Finished clustering for the launch with %d clusters.", cluster_num)
         return ClusterResult(
-            project=launch_info.launch.project,
-            launchId=launch_info.launch.launchId,
+            project=launch_info.project,
+            launchId=launch_info.launchId,
             clusters=clusters)

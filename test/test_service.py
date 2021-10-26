@@ -135,6 +135,8 @@ class TestService(unittest.TestCase):
             "two_hits_search_rs_search_logs_with_status_codes.json"
         self.search_not_merged_logs_by_test_item = \
             "search_not_merged_logs_by_test_item.json"
+        self.launch_w_items_clustering_with_prefix = \
+            "launch_w_items_clustering_with_prefix.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
             "esUser": "",

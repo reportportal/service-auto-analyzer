@@ -16,6 +16,14 @@
 
 **ANALYZER_PRIORITY** - priority for this analyzer, by default 1
 
+**ANALYZER_INDEX** - default "true", the parameter for rabbitmq exchange params, where the analyzer supports indexing
+
+**ANALYZER_LOG_SEARCH** - default "true", the parameter for rabbitmq exchange params, where the analyzer supports searching logs
+
+**ANALYZER_SUGGEST** - default "true", the parameter for rabbitmq exchange params, where the analyzer supports suggesting
+
+**ANALYZER_CLUSTER** - default "true", the parameter for rabbitmq exchange params, where the analyzer supports clustering
+
 **ES_VERIFY_CERTS** - turn on SSL certificates verification, by default "false"
 
 **ES_USE_SSL** - turn on SSL, by default "false"
@@ -65,8 +73,6 @@ volumes:
 **ES_MAX_QUERY_TERMS** - by default "50", the value to use in more like this query while querying for Auto-analysis
 
 **ES_MIN_WORD_LENGTH** - by default "2", the value to use in more like this query while querying for Auto-analysis
-
-**ES_LOGS_MIN_SHOULD_MATCH** - by default "0.98", the value of min should match for searching the same to investigate test items
 
 **PATTERN_LABEL_MIN_PERCENT** - by default "0.9", the value of minimum percent of the same issue type for pattern to be suggested as a pattern with a label
 

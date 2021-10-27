@@ -60,6 +60,10 @@ volumes:
 
 **ES_PROJECT_INDEX_PREFIX** - by default "", the prefix which is added to the created for each project indices. Our index name is the project id, so if it is 34, then the index "34" will be created. If you set ES_PROJECT_INDEX_PREFIX="rp_", then "rp_34" index will be created. We create several other indices which are sharable between projects, and this perfix won't influence them: rp_aa_stats, rp_stats, rp_model_train_stats, rp_done_tasks, rp_suggestions_info_metrics. **NOTE**: if you change an environmental variable, you'll need to generate index, so that a nex index is created and filled appropriately.
 
+**AUTO_ANALYSIS_TIMEOUT** - by default 300, which sets timeout in seconds for auto-analysis operations to return results after this timeout, so if the request to the analyzer will be running out of time, the analyzer stops processing and returns results to the backend.
+
+**MAX_AUTO_ANALYSIS_ITEMS_TO_PROCESS** - by default 4000, which sets how many test items can be processed for one request, so if analyzer processes more than 4000 items, the analyzer stops processing and returns results to the backend.
+
 # Environmental variables for constants, used by algorithms:
 
 **ES_MIN_SHOULD_MATCH** - by default "80%", the global default min should match value for auto-analysis, but it is used only when the project settings are not set up.

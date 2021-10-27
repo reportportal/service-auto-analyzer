@@ -200,7 +200,9 @@ class TestService(unittest.TestCase):
                 self.model_settings["RETRAIN_SUGGEST_BOOST_MODEL_CONFIG"],
             "RetrainAutoBoostModelConfig":
                 self.model_settings["RETRAIN_AUTO_BOOST_MODEL_CONFIG"],
-            "MaxSuggestionsNumber": 3
+            "MaxSuggestionsNumber": 3,
+            "AutoAnalysisTimeout": 300,
+            "MaxAutoAnalysisItemsToProcess": 4000
         }
 
     @utils.ignore_warnings

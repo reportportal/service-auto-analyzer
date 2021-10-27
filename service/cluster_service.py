@@ -290,8 +290,8 @@ class ClusterService:
             start_group_id = start_group_id + max_group_id + 1
         return all_groups
 
-    def get_logs_for_clustering_query(self, launch_info):
-        query = {
+    def get_all_logs_for_clustering_query(self, launch_info):
+        return {
             "_source": ["whole_message", "test_item",
                         "detected_message", "stacktrace", "launch_id", "cluster_id",
                         "cluster_message", "message", "log_level", "original_message_lines",
@@ -307,20 +307,79 @@ class ClusterService:
                     "must_not": [],
                     "should": [],
                     "must": [{"term": {"launch_id": launch_info.launchId}}]}}}
-        if launch_info.forUpdate:
-            query["query"]["bool"]["must_not"].append(
-                {"wildcard": {"cluster_message": "*"}})
-        return query
 
-    def query_logs(self, launch_info, index_name):
+    def query_all_logs(self, launch_info, index_name):
         logs_by_test_item = {}
         for log in elasticsearch.helpers.scan(self.es_client.es_client,
-                                              query=self.get_logs_for_clustering_query(launch_info),
+                                              query=self.get_all_logs_for_clustering_query(launch_info),
                                               index=index_name):
             if log["_source"]["test_item"] not in logs_by_test_item:
                 logs_by_test_item[log["_source"]["test_item"]] = []
             logs_by_test_item[log["_source"]["test_item"]].append(log)
         return logs_by_test_item
+
+    def get_test_items_for_clustering_for_update_query(self, launch_info):
+        return {
+            "_source": ["test_item"],
+            "size": self.app_config["esChunkNumber"],
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
+                        {"exists": {"field": "issue_type"}},
+                        {"term": {"is_merged": False}},
+                    ],
+                    "must_not": [{"wildcard": {"cluster_message": "*"}}],
+                    "should": [],
+                    "must": [{"term": {"launch_id": launch_info.launchId}}]}}}
+
+    def get_logs_by_test_items(self, test_item_ids, launch_id):
+        return {
+            "_source": ["whole_message", "test_item",
+                        "detected_message", "stacktrace", "launch_id", "cluster_id",
+                        "cluster_message", "message", "log_level", "original_message_lines",
+                        "original_message_words_number", "potential_status_codes", "found_exceptions"],
+            "size": self.app_config["esChunkNumber"],
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
+                        {"exists": {"field": "issue_type"}},
+                        {"term": {"is_merged": False}},
+                        {"terms": {"test_item": test_item_ids}}
+                    ],
+                    "must_not": [],
+                    "should": [],
+                    "must": [{"term": {"launch_id": launch_id}}]}}}
+
+    def query_logs_for_update(self, launch_info, index_name):
+        test_items_to_query = set()
+        for log in elasticsearch.helpers.scan(self.es_client.es_client,
+                                              query=self.get_test_items_for_clustering_for_update_query(
+                                                  launch_info),
+                                              index=index_name):
+            test_items_to_query.add(log["_source"]["test_item"])
+        test_items_to_query = list(test_items_to_query)
+        logs_by_test_item = {}
+        batch_size = 1000
+        for i in range(int(len(test_items_to_query) / batch_size) + 1):
+            sub_test_item_ids = test_items_to_query[i * batch_size: (i + 1) * batch_size]
+            if not sub_test_item_ids:
+                continue
+            for log in elasticsearch.helpers.scan(self.es_client.es_client,
+                                                  query=self.get_logs_by_test_items(
+                                                      sub_test_item_ids, launch_info.launchId),
+                                                  index=index_name):
+                if log["_source"]["test_item"] not in logs_by_test_item:
+                    logs_by_test_item[log["_source"]["test_item"]] = []
+                logs_by_test_item[log["_source"]["test_item"]].append(log)
+        return logs_by_test_item
+
+    def query_logs(self, launch_info, index_name):
+        if launch_info.forUpdate:
+            return self.query_logs_for_update(launch_info, index_name)
+        else:
+            return self.query_all_logs(launch_info, index_name)
 
     def find_logs_to_cluster(self, launch_info, index_name):
         logs_by_test_item = self.query_logs(launch_info, index_name)

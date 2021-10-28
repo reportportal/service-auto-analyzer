@@ -279,7 +279,7 @@ class SuggestService(AnalyzerService):
             unique_logs = utils.leave_only_unique_logs(test_item_info.logs)
             prepared_logs = [self.log_preparation._prepare_log_for_suggests(test_item_info, log, index_name)
                              for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
-            logs = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+            logs, _ = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
             searched_res = self.query_es_for_suggested_items(test_item_info, logs)
 
             boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)

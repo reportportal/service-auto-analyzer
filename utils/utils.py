@@ -609,7 +609,7 @@ def prepare_message_for_clustering(message, number_of_log_lines):
     message = first_lines(message, number_of_log_lines)
     words = split_words(message, min_word_length=2, only_unique=False)
     if len(words) < 2:
-        return ""
+        return " ".join(words) + " error"
     return " ".join(words)
 
 

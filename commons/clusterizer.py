@@ -35,7 +35,8 @@ class Clusterizer:
         for message in messages:
             words = message.split()
             hash_print = set()
-            for i in range(len(words) - n_gram):
+            len_words = (len(words) - n_gram) if len(words) > n_gram else len(words)
+            for i in range(len_words):
                 hash_print.add(hashlib.md5(" ".join(words[i:i + n_gram]).encode("utf-8")).hexdigest())
             hash_print = list(heapq.nlargest(n_permutations, hash_print))
             hashes.append(hash_print)

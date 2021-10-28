@@ -55,8 +55,7 @@ class ClusterService:
                 "bool": {
                     "filter": [
                         {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
-                        {"exists": {"field": "issue_type"}},
-                        {"term": {"is_merged": False}},
+                        {"exists": {"field": "issue_type"}}
                     ],
                     "must_not": [{
                         "term": {"test_item": {"value": queried_log["_source"]["test_item"],
@@ -77,6 +76,8 @@ class ClusterService:
         else:
             query["query"]["bool"]["must_not"].append(
                 {"term": {"launch_id": queried_log["_source"]["launch_id"]}})
+        query["query"]["bool"]["filter"].append(
+            {"term": {"is_merged": queried_log["_source"]["is_merged"]}})
         query["query"]["bool"]["should"].append(
             {"term": {"launch_name": launch_info.launchName}})
         if queried_log["_source"]["found_exceptions"].strip():
@@ -149,7 +150,7 @@ class ClusterService:
             log_dict_part = {0: log_dict[first_item_ind]}
             ind = 1
             for res in search_results["hits"]["hits"]:
-                if int(res["_id"]) in log_ids:
+                if str(res["_id"]) in log_ids:
                     continue
                 log_dict_part[ind] = res
                 log_message = res["_source"]["whole_message"]
@@ -172,7 +173,7 @@ class ClusterService:
             groups_part = _clusterizer.find_clusters(log_messages_part, threshold=min_should_match)
             new_group = None
             for group in groups_part:
-                if 0 in groups_part[group]:  # and len(groups_part[group]) > 1:
+                if 0 in groups_part[group]:
                     cluster_id = 0
                     cluster_message = ""
                     for ind in groups_part[group]:
@@ -187,8 +188,8 @@ class ClusterService:
                             continue
                         if log_dict_part[ind]["_source"]["launch_id"] != launch_info.launchId:
                             continue
-                        log_ids.add(int(log_dict_part[ind]["_id"]))
-                        new_group_log_ids.append(log_dict_part[ind]["_id"])
+                        log_ids.add(str(log_dict_part[ind]["_id"]))
+                        new_group_log_ids.append(str(log_dict_part[ind]["_id"]))
                     new_group = ClusterInfo(
                         logIds=new_group_log_ids,
                         clusterMessage=cluster_message,
@@ -225,7 +226,8 @@ class ClusterService:
         return hash_message, log_message
 
     def gather_cluster_results(
-            self, groups, additional_results, log_dict, log_messages, number_of_lines):
+            self, groups, additional_results, log_dict, log_messages,
+            log_ids_for_merged_logs, number_of_lines):
         results_to_return = []
         cluster_num = 0
         for group in groups:
@@ -243,9 +245,17 @@ class ClusterService:
                     groups[group], log_dict, log_messages, number_of_lines)
             log_ids = []
             for ind in groups[group]:
-                log_ids.append(log_dict[ind]["_id"])
+                if str(utils.extract_real_id(log_dict[ind]["_id"])) != str(log_dict[ind]["_id"]):
+                    if log_dict[ind]["_id"] in log_ids_for_merged_logs:
+                        for _id in log_ids_for_merged_logs[log_dict[ind]["_id"]]:
+                            log_ids.append(_id)
+                else:
+                    log_ids.append(log_dict[ind]["_id"])
             if group in additional_results:
-                log_ids.extend(additional_results[group].logIds)
+                for log_id in additional_results[group].logIds:
+                    if str(utils.extract_real_id(log_id)) != str(log_id):
+                        continue
+                    log_ids.append(log_id)
             results_to_return.append(ClusterInfo(
                 clusterId=cluster_id,
                 clusterMessage=cluster_message,
@@ -386,27 +396,30 @@ class ClusterService:
         log_messages = []
         log_dict = {}
         ind = 0
+        full_log_ids_for_merged_logs = {}
         for test_item in logs_by_test_item:
-            merged_logs = self.log_merger.decompose_logs_merged_and_without_duplicates(
+            merged_logs, log_ids_for_merged_logs = self.log_merger.decompose_logs_merged_and_without_duplicates( # noqa
                 logs_by_test_item[test_item])
-            new_merged_logs = []
+            logs_with_clusters = 0
             for log in merged_logs:
-                if not log["_source"]["stacktrace"].strip():
-                    continue
-                new_merged_logs.append(log)
-            if len(new_merged_logs) > 0:
-                merged_logs = new_merged_logs
+                if log["_source"]["cluster_message"].strip():
+                    logs_with_clusters += 1
+            if len(merged_logs) == logs_with_clusters:
+                continue
+            for _id in log_ids_for_merged_logs:
+                full_log_ids_for_merged_logs[_id] = log_ids_for_merged_logs[_id]
             for log in merged_logs:
+                number_of_log_lines = launch_info.numberOfLogLines
                 if log["_source"]["is_merged"]:
-                    continue
+                    number_of_log_lines = -1
                 log_message = utils.prepare_message_for_clustering(
-                    log["_source"]["whole_message"], launch_info.numberOfLogLines)
+                    log["_source"]["whole_message"], number_of_log_lines)
                 if not log_message.strip():
                     continue
                 log_messages.append(log_message)
                 log_dict[ind] = log
                 ind += 1
-        return log_messages, log_dict
+        return log_messages, log_dict, full_log_ids_for_merged_logs
 
     @utils.ignore_warnings
     def find_clusters(self, launch_info):
@@ -424,8 +437,9 @@ class ClusterService:
         clusters = []
         log_ids = []
         try:
-            log_messages, log_dict = self.find_logs_to_cluster(launch_info, index_name)
-            log_ids = set([int(log["_id"]) for log in log_dict.values()])
+            log_messages, log_dict, log_ids_for_merged_logs = self.find_logs_to_cluster(
+                launch_info, index_name)
+            log_ids = set([str(log["_id"]) for log in log_dict.values()])
 
             groups = self.cluster_messages_with_groupping_by_error(log_messages, log_dict)
             additional_results = self.find_similar_items_from_es(
@@ -433,7 +447,8 @@ class ClusterService:
                 log_ids, launch_info,
                 {})
             clusters, cluster_num = self.gather_cluster_results(
-                groups, additional_results, log_dict, log_messages, launch_info.numberOfLogLines)
+                groups, additional_results, log_dict, log_messages,
+                log_ids_for_merged_logs, launch_info.numberOfLogLines)
             if clusters:
                 bodies = []
                 for result in clusters:

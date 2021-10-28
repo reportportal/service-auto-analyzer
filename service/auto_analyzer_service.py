@@ -320,7 +320,7 @@ class AutoAnalyzerService(AnalyzerService):
                     unique_logs = utils.leave_only_unique_logs(test_item.logs)
                     prepared_logs = [self.log_preparation._prepare_log(launch, test_item, log, index_name)
                                      for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
-                    results = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+                    results, _ = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
 
                     for log in results:
                         message = log["_source"]["message"].strip()

@@ -264,7 +264,7 @@ class EsClient:
                     test_items_dict[test_item_id] = []
                 test_items_dict[test_item_id].append(r)
             for test_item_id in test_items_dict:
-                merged_logs = self.log_merger.decompose_logs_merged_and_without_duplicates(
+                merged_logs, _ = self.log_merger.decompose_logs_merged_and_without_duplicates(
                     test_items_dict[test_item_id])
                 for log in merged_logs:
                     if log["_source"]["is_merged"]:

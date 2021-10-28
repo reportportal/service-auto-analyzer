@@ -162,7 +162,20 @@ index_data = [{
                        {"logId": 38,
                         "logLevel": 40000,
                         "message": "assertionError occured \r\n error found \r\n error mined"}]
-                   }, ],
+                   },
+                  {"testItemId": 15,
+                   "uniqueId": "df",
+                   "isAutoAnalyzed": False,
+                   "issueType": "pb001",
+                   "originalIssueType": "PB001",
+                   "logs": [
+                       {"logId": 555,
+                        "logLevel": 40000,
+                        "message": "assertionError occured"},
+                       {"logId": 556,
+                        "logLevel": 40000,
+                        "message": "nullpointerException occured"}]
+                   }],
 }, {
     "launchId": 1,
     "project": 34,
@@ -201,6 +214,19 @@ index_data = [{
                        {"logId": 113,
                         "logLevel": 40000,
                         "message": "nullpointerException occured \r\n error occurred \r\n error mined"}]
+                   },
+                  {"testItemId": 14,
+                   "uniqueId": "df",
+                   "isAutoAnalyzed": False,
+                   "issueType": "pb001",
+                   "originalIssueType": "PB001",
+                   "logs": [
+                       {"logId": 111,
+                        "logLevel": 40000,
+                        "message": "assertionError occured"},
+                       {"logId": 112,
+                        "logLevel": 40000,
+                        "message": "nullpointerException occured"}]
                    }]}]
 
 search_data = {

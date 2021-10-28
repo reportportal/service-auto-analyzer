@@ -64,6 +64,7 @@ class TestItemInfo(BaseModel):
     testItemId: int = 0
     uniqueId: str = ""
     testCaseHash: int = 0
+    clusterId: int = 0
     launchId: int
     launchName: str = ""
     testItemName: str = ""
@@ -133,6 +134,7 @@ class SuggestAnalysisResult(BaseModel):
     processedTime: float
     userChoice: int = 0
     methodName: str
+    clusterId: int = 0
 
 
 class CleanIndex(BaseModel):

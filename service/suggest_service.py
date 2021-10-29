@@ -302,6 +302,11 @@ class SuggestService(AnalyzerService):
         for log in elasticsearch.helpers.scan(self.es_client.es_client,
                                               query=self.get_query_for_logs_by_test_item(test_item_id),
                                               index=index_name):
+            # clean test item info not to boost by it
+            log["_source"]["test_item"] = 0
+            log["_source"]["test_case_hash"] = 0
+            log["_source"]["unique_id"] = ""
+            log["_source"]["test_item_name"] = ""
             logs.append(log)
         return logs, test_item_id
 
@@ -336,6 +341,7 @@ class SuggestService(AnalyzerService):
         feature_names = ""
         try:
             logs, test_item_id_for_suggest = self.prepare_logs_for_suggestions(test_item_info, index_name)
+            logger.info("Number of logs for suggestions: %d", len(logs))
             searched_res = self.query_es_for_suggested_items(test_item_info, logs)
 
             boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)

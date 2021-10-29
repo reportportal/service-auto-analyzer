@@ -137,6 +137,21 @@ class TestService(unittest.TestCase):
             "search_not_merged_logs_by_test_item.json"
         self.launch_w_items_clustering_with_prefix = \
             "launch_w_items_clustering_with_prefix.json"
+        self.launch_w_small_logs_for_clustering = \
+            "launch_w_small_logs_for_clustering.json"
+        self.search_logs_rq_first_group_small_logs = \
+            "search_logs_rq_first_group_small_logs.json"
+        self.search_logs_rq_second_group_small_logs = \
+            "search_logs_rq_second_group_small_logs.json"
+        self.cluster_update_small_logs = "cluster_update_small_logs.json"
+        self.search_logs_rq_first_group_no_such_element_all_log_lines = \
+            "search_logs_rq_first_group_no_such_element_all_log_lines.json"
+        self.suggest_test_item_info_cluster = "suggest_test_item_info_cluster.json"
+        self.three_hits_search_rs_for_cluster_suggestions = \
+            "three_hits_search_rs_for_cluster_suggestions.json"
+        self.search_test_item_cluster = "search_test_item_cluster.json"
+        self.search_logs_by_test_item = "search_logs_by_test_item.json"
+        self.one_hit_search_rs_small_logs = "one_hit_search_rs_small_logs.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
             "esUser": "",

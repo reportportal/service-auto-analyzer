@@ -4,7 +4,7 @@
         "_index": "rp_2",
         "_source": {
             "whole_message": "error occured \r\n error found \r\n error mined",
-            "test_item": 3,
+            "test_item": 2,
             "detected_message": "error occured \r\n error found \r\n error mined",
             "stacktrace": "",
             "launch_id": 1,
@@ -23,7 +23,7 @@
         "_index": "rp_2",
         "_source": {
             "whole_message": "error occured",
-            "test_item": 3,
+            "test_item": 2,
             "detected_message": "error occured",
             "stacktrace": "",
             "launch_id": 1,

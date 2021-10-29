@@ -3,28 +3,28 @@
         "_id": 4,
         "_index": "2",
         "_source": {
-            "whole_message": "error occured \r\n error found \r\n error mined",
+            "whole_message": "AssertionError error occured \r\n error found",
             "test_item": 2,
-            "detected_message": "error occured \r\n error found \r\n error mined",
+            "detected_message": "AssertionError error occured \r\n error found",
             "stacktrace": "",
             "launch_id": 1,
             "cluster_id": "0",
             "cluster_message": "",
-            "message": "error occured \r\n error found \r\n error mined",
+            "message": "AssertionError error occured \r\n error found",
             "log_level": 40000,
-            "original_message_lines": 3,
-            "original_message_words_number": 6,
+            "original_message_lines": 2,
+            "original_message_words_number": 5,
             "potential_status_codes": "",
-            "found_exceptions": ""
+            "found_exceptions": "AssertionError"
         }
     },
     {
         "_id": 3,
         "_index": "2",
         "_source": {
-            "whole_message": "error occured",
+            "whole_message": "error occured twice",
             "test_item": 2,
-            "detected_message": "error occured",
+            "detected_message": "error occured twice",
             "stacktrace": "",
             "launch_id": 1,
             "cluster_id": "0",
@@ -32,7 +32,7 @@
             "message": "error occured",
             "log_level": 40000,
             "original_message_lines": 1,
-            "original_message_words_number": 2,
+            "original_message_words_number": 3,
             "potential_status_codes": "",
             "found_exceptions": ""
         }
@@ -41,38 +41,38 @@
         "_id": 5,
         "_index": "2",
         "_source": {
-            "whole_message": "error occured \r\n error found \r\n error mined",
+            "whole_message": "AssertionError status code: 500 error occured",
             "test_item": 5,
-            "detected_message": "error occured \r\n error found \r\n error mined",
+            "detected_message": "AssertionError status code: 500 error occured",
             "stacktrace": "",
             "launch_id": 1,
             "cluster_id": "0",
             "cluster_message": "",
-            "message": "error occured \r\n error found \r\n error mined",
+            "message": "AssertionError status code: 500 error occured",
             "log_level": 40000,
-            "original_message_lines": 3,
+            "original_message_lines": 1,
             "original_message_words_number": 6,
-            "potential_status_codes": "",
-            "found_exceptions": ""
+            "potential_status_codes": "500",
+            "found_exceptions": "AssertionError"
         }
     }],
     "6": [{
         "_id": 9,
         "_index": "2",
         "_source": {
-            "whole_message": "error occured \r\n error found \r\n assert query",
+            "whole_message": "NoSuchElementException error occured \r\n error found \r\n assert query",
             "test_item": 6,
-            "detected_message": "error occured \r\n error found \r\n assert query",
+            "detected_message": "NoSuchElementException error occured \r\n error found \r\n assert query",
             "stacktrace": "",
             "launch_id": 1,
             "cluster_id": "0",
             "cluster_message": "",
-            "message": "error occured \r\n error found \r\n assert query",
+            "message": "NoSuchElementException error occured \r\n error found \r\n assert query",
             "log_level": 40000,
             "original_message_lines": 3,
-            "original_message_words_number": 6,
+            "original_message_words_number": 7,
             "potential_status_codes": "",
-            "found_exceptions": ""
+            "found_exceptions": "NoSuchElementException"
         }
     }]
 }

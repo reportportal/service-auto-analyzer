@@ -1,0 +1,8 @@
+{"update":{"_index":"2","_id":4}}
+{"doc":{"cluster_id":"5126178521781361","cluster_message":"AssertionError error occured \r\n error found\r\nerror occured twice"}}
+{"update":{"_index":"2","_id":3}}
+{"doc":{"cluster_id":"5126178521781361","cluster_message":"AssertionError error occured \r\n error found\r\nerror occured twice"}}
+{"update":{"_index":"2","_id":5}}
+{"doc":{"cluster_id":"3705433180262434","cluster_message":"AssertionError status code: 500 error occured"}}
+{"update":{"_index":"2","_id":9}}
+{"doc":{"cluster_id":"1649283492901597","cluster_message":"NoSuchElementException error occured \r\n error found \r\n assert query"}}

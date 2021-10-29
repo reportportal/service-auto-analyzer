@@ -386,10 +386,14 @@ class ClusterService:
         return logs_by_test_item
 
     def query_logs(self, launch_info, index_name):
+        start_time = time()
+        all_logs = []
         if launch_info.forUpdate:
-            return self.query_logs_for_update(launch_info, index_name)
+            all_logs = self.query_logs_for_update(launch_info, index_name)
         else:
-            return self.query_all_logs(launch_info, index_name)
+            all_logs = self.query_all_logs(launch_info, index_name)
+        logger.info("Time spent for loading data: %.2f sec.", time() - start_time)
+        return all_logs
 
     def find_logs_to_cluster(self, launch_info, index_name):
         logs_by_test_item = self.query_logs(launch_info, index_name)
@@ -404,7 +408,7 @@ class ClusterService:
             for log in merged_logs:
                 if log["_source"]["cluster_message"].strip():
                     logs_with_clusters += 1
-            if len(merged_logs) == logs_with_clusters:
+            if launch_info.forUpdate and (len(merged_logs) == logs_with_clusters):
                 continue
             for _id in log_ids_for_merged_logs:
                 full_log_ids_for_merged_logs[_id] = log_ids_for_merged_logs[_id]

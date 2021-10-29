@@ -23,6 +23,7 @@ import json
 import logging
 from time import time
 from datetime import datetime
+import elasticsearch.helpers
 
 logger = logging.getLogger("analyzerApp.suggestService")
 
@@ -255,8 +256,71 @@ class SuggestService(AnalyzerService):
             "notFoundResults": 100,
             "savedDate": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "module_version": [self.app_config["appVersion"]],
-            "methodName": "suggestion"
+            "methodName": "suggestion",
+            "clusterId": test_item_info.clusterId
         }
+
+    def get_query_for_test_item_in_cluster(self, test_item_info):
+        return {
+            "_source": ["test_item"],
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
+                        {"exists": {"field": "issue_type"}},
+                        {"term": {"is_merged": False}},
+                    ],
+                    "should": [],
+                    "must": [
+                        {"term": {"launch_id": test_item_info.launchId}},
+                        {"term": {"cluster_id": test_item_info.clusterId}}
+                    ]}}}
+
+    def get_query_for_logs_by_test_item(self, test_item_id):
+        return {
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
+                        {"exists": {"field": "issue_type"}},
+                        {"term": {"is_merged": False}},
+                        {"term": {"test_item": test_item_id}}]
+                }
+            }
+        }
+
+    def query_logs_for_cluster(self, test_item_info, index_name):
+        test_item_id = None
+        test_items = self.es_client.es_client.search(
+            index_name, body=self.get_query_for_test_item_in_cluster(test_item_info))
+        for res in test_items["hits"]["hits"]:
+            test_item_id = int(res["_source"]["test_item"])
+            break
+        if test_item_id is None:
+            return [], 0
+        logs = []
+        for log in elasticsearch.helpers.scan(self.es_client.es_client,
+                                              query=self.get_query_for_logs_by_test_item(test_item_id),
+                                              index=index_name):
+            # clean test item info not to boost by it
+            log["_source"]["test_item"] = 0
+            log["_source"]["test_case_hash"] = 0
+            log["_source"]["unique_id"] = ""
+            log["_source"]["test_item_name"] = ""
+            logs.append(log)
+        return logs, test_item_id
+
+    def prepare_logs_for_suggestions(self, test_item_info, index_name):
+        prepared_logs = []
+        test_item_id_for_suggest = test_item_info.testItemId
+        if test_item_info.clusterId != 0:
+            prepared_logs, test_item_id_for_suggest = self.query_logs_for_cluster(test_item_info, index_name)
+        else:
+            unique_logs = utils.leave_only_unique_logs(test_item_info.logs)
+            prepared_logs = [self.log_preparation._prepare_log_for_suggests(test_item_info, log, index_name)
+                             for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
+        logs, _ = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+        return logs, test_item_id_for_suggest
 
     @utils.ignore_warnings
     def suggest_items(self, test_item_info):
@@ -276,10 +340,8 @@ class SuggestService(AnalyzerService):
         model_info_tags = []
         feature_names = ""
         try:
-            unique_logs = utils.leave_only_unique_logs(test_item_info.logs)
-            prepared_logs = [self.log_preparation._prepare_log_for_suggests(test_item_info, log, index_name)
-                             for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
-            logs = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+            logs, test_item_id_for_suggest = self.prepare_logs_for_suggestions(test_item_info, index_name)
+            logger.info("Number of logs for suggestions: %d", len(logs))
             searched_res = self.query_es_for_suggested_items(test_item_info, logs)
 
             boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
@@ -329,7 +391,7 @@ class SuggestService(AnalyzerService):
                             scores_by_test_items[test_item_id]["compared_log"]["_id"])
                         analysis_result = SuggestAnalysisResult(
                             project=test_item_info.project,
-                            testItem=test_item_info.testItemId,
+                            testItem=test_item_id_for_suggest,
                             testItemLogId=test_item_log_id,
                             launchId=test_item_info.launchId,
                             launchName=test_item_info.launchName,
@@ -349,6 +411,7 @@ class SuggestService(AnalyzerService):
                             minShouldMatch=self.find_min_should_match_threshold(
                                 test_item_info.analyzerConfig),
                             processedTime=processed_time,
+                            clusterId=test_item_info.clusterId,
                             methodName="suggestion")
                         results.append(analysis_result)
                         logger.debug(analysis_result)

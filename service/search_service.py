@@ -176,7 +176,7 @@ class SearchService:
             logs_to_query.append(queried_log)
             global_id += 1
 
-        logs_to_query = self.log_merger.decompose_logs_merged_and_without_duplicates(logs_to_query)
+        logs_to_query, _ = self.log_merger.decompose_logs_merged_and_without_duplicates(logs_to_query)
         return logs_to_query
 
     def search_similar_items_for_log(self, search_req, queried_log,

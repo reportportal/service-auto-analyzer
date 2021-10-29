@@ -162,7 +162,20 @@ index_data = [{
                        {"logId": 38,
                         "logLevel": 40000,
                         "message": "assertionError occured \r\n error found \r\n error mined"}]
-                   }, ],
+                   },
+                  {"testItemId": 15,
+                   "uniqueId": "df",
+                   "isAutoAnalyzed": False,
+                   "issueType": "pb001",
+                   "originalIssueType": "PB001",
+                   "logs": [
+                       {"logId": 555,
+                        "logLevel": 40000,
+                        "message": "assertionError occured"},
+                       {"logId": 556,
+                        "logLevel": 40000,
+                        "message": "nullpointerException occured"}]
+                   }],
 }, {
     "launchId": 1,
     "project": 34,
@@ -201,6 +214,19 @@ index_data = [{
                        {"logId": 113,
                         "logLevel": 40000,
                         "message": "nullpointerException occured \r\n error occurred \r\n error mined"}]
+                   },
+                  {"testItemId": 14,
+                   "uniqueId": "df",
+                   "isAutoAnalyzed": False,
+                   "issueType": "pb001",
+                   "originalIssueType": "PB001",
+                   "logs": [
+                       {"logId": 111,
+                        "logLevel": 40000,
+                        "message": "assertionError occured"},
+                       {"logId": 112,
+                        "logLevel": 40000,
+                        "message": "nullpointerException occured"}]
                    }]}]
 
 search_data = {
@@ -241,6 +267,26 @@ test_item_info = {
               "message": "assertionError occured \r\n error found \r\n error mined"}]
 }
 
+test_item_info_cluster = {
+    "testItemId": 0,
+    "uniqueId": "",
+    "testCaseHash": 0,
+    "launchId": 2,
+    "launchName": "Launch name",
+    "project": 34,
+    "analyzerConfig": {
+        "minDocFreq": 1.0,
+        "minTermFreq": 1.0,
+        "minShouldMatch": 80,
+        "numberOfLogLines": -1,
+        "isAutoAnalyzerEnabled": True,
+        "analyzerMode": "ALL",
+        "indexingRunning": True,
+    },
+    "logs": [],
+    "clusterId": 2202462168660536
+}
+
 remove_models_data = {
     "project": 34,
     "model_type": "auto_analysis",
@@ -266,6 +312,7 @@ index_suggest_info_items = [{
     "testItem": 5,
     "testItemLogId": 1,
     "launchId": 2,
+    "launchName": "Launch name",
     "issueType": "pb001",
     "relevantItem": 3,
     "relevantLogId": 4,
@@ -281,7 +328,8 @@ index_suggest_info_items = [{
     "minShouldMatch": 80,
     "userChoice": 1,
     "processedTime": 0.11,
-    "methodName": "suggest"
+    "methodName": "suggest",
+    "clusterId": 2202462168660536
 }]
 
 used_method = sys.argv[1] if len(sys.argv) > 1 else "index"
@@ -300,6 +348,8 @@ elif used_method.strip() in ["search"]:
     response = rpc.call(json.dumps(search_data), used_method)
 elif used_method.strip() in ["suggest"]:
     response = rpc.call(json.dumps(test_item_info), used_method)
+elif used_method.strip() in ["suggest_cluster"]:
+    response = rpc.call(json.dumps(test_item_info_cluster), "suggest")
 elif used_method.strip() in ["suggest_patterns"]:
     response = rpc.call("34", used_method)
 elif used_method.strip() in ["remove_models"]:

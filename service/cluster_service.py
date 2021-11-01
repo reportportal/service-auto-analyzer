@@ -393,6 +393,8 @@ class ClusterService:
         else:
             all_logs = self.query_all_logs(launch_info, index_name)
         logger.info("Time spent for loading data: %.2f sec.", time() - start_time)
+        print(time() - start_time)
+        print("Number of logs found ", len(all_logs))
         return all_logs
 
     def find_logs_to_cluster(self, launch_info, index_name):
@@ -444,8 +446,10 @@ class ClusterService:
             log_messages, log_dict, log_ids_for_merged_logs = self.find_logs_to_cluster(
                 launch_info, index_name)
             log_ids = set([str(log["_id"]) for log in log_dict.values()])
+            logger.debug("Log messages: %s", log_messages)
 
             groups = self.cluster_messages_with_groupping_by_error(log_messages, log_dict)
+            logger.debug("Groups: %s", groups)
             additional_results = self.find_similar_items_from_es(
                 groups, log_dict, log_messages,
                 log_ids, launch_info,
@@ -456,6 +460,9 @@ class ClusterService:
             if clusters:
                 bodies = []
                 for result in clusters:
+                    logger.debug("Cluster Id: %s, Cluster message: %s",
+                                 result.clusterId, result.clusterMessage)
+                    logger.debug("Cluster Ids: %s", result.logIds)
                     for log_id in result.logIds:
                         bodies.append({
                             "_op_type": "update",

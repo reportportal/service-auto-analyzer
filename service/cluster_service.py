@@ -447,7 +447,6 @@ class ClusterService:
             log_messages, log_dict, log_ids_for_merged_logs = self.find_logs_to_cluster(
                 launch_info, index_name)
             log_ids = set([str(log["_id"]) for log in log_dict.values()])
-            logger.debug("Log messages: %s", log_messages)
 
             groups = self.cluster_messages_with_groupping_by_error(log_messages, log_dict)
             logger.debug("Groups: %s", groups)

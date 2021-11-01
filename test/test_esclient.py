@@ -601,7 +601,70 @@ class TestEsClient(TestService):
                     "esProjectIndexPrefix": "rp_"
                 },
                 "expected_log_exceptions": [launch_objects.LogExceptionResult(logId=1, foundExceptions=[])]
-            }
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.NOT_FOUND,
+                                    },
+                                   {"method":         httpretty.PUT,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.OK,
+                                    "rs":             utils.get_fixture(
+                                        self.index_created_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.index_logs_rq_big_messages_with_clusters),
+                                    "rs":             utils.get_fixture(
+                                        self.index_logs_rs),
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/2/_search?scroll=5m&size=1000",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.search_merged_logs),
+                                    "rs":             utils.get_fixture(
+                                        self.two_hits_search_with_big_messages_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rs":             utils.get_fixture(
+                                        self.delete_logs_rs),
+                                    },
+                                   {"method":         httpretty.GET,
+                                    "uri":            "/2/_search?scroll=5m&size=1000",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.search_not_merged_logs),
+                                    "rs":             utils.get_fixture(
+                                        self.two_hits_search_with_big_messages_rs),
+                                    },
+                                   {"method":         httpretty.POST,
+                                    "uri":            "/_bulk?refresh=true",
+                                    "status":         HTTPStatus.OK,
+                                    "content_type":   "application/json",
+                                    "rq":             utils.get_fixture(
+                                        self.index_logs_rq_merged_logs),
+                                    "rs":             utils.get_fixture(
+                                        self.index_logs_rs),
+                                    }, ],
+                "index_rq":       utils.get_fixture(self.launch_w_test_items_w_logs_with_clusters),
+                "has_errors":     False,
+                "expected_count": 2,
+                "expected_log_exceptions":  [
+                    launch_objects.LogExceptionResult(
+                        logId=1, foundExceptions=['java.lang.NoClassDefFoundError']),
+                    launch_objects.LogExceptionResult(
+                        logId=2, foundExceptions=['java.lang.NoClassDefFoundError'])]
+            },
         ]
 
         for idx, test in enumerate(tests):

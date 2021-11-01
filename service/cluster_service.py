@@ -177,6 +177,8 @@ class ClusterService:
                     cluster_id = 0
                     cluster_message = ""
                     for ind in groups_part[group]:
+                        if ind == 0:  # not to use old cluster id and message
+                            continue
                         if log_dict_part[ind]["_source"]["cluster_id"].strip() and int(
                                 log_dict_part[ind]["_source"]["cluster_id"].strip()) != 0:
                             cluster_id = int(log_dict_part[ind]["_source"]["cluster_id"].strip())
@@ -190,6 +192,8 @@ class ClusterService:
                             continue
                         log_ids.add(str(log_dict_part[ind]["_id"]))
                         new_group_log_ids.append(str(log_dict_part[ind]["_id"]))
+                    if not new_group_log_ids:
+                        continue
                     new_group = ClusterInfo(
                         logIds=new_group_log_ids,
                         clusterMessage=cluster_message,
@@ -231,7 +235,6 @@ class ClusterService:
             self, groups, additional_results, log_dict, log_messages,
             log_ids_for_merged_logs, number_of_lines):
         results_to_return = []
-        cluster_num = 0
         for group in groups:
             cnt_items = len(groups[group])
             cluster_id = 0
@@ -260,7 +263,7 @@ class ClusterService:
                 clusterId=cluster_id,
                 clusterMessage=cluster_message,
                 logIds=log_ids))
-        return results_to_return, cluster_num
+        return results_to_return, len(results_to_return)
 
     def regroup_by_error_ans_status_codes(self, log_messages, log_dict):
         regroupped_by_error = {}

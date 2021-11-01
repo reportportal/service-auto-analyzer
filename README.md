@@ -50,6 +50,8 @@
 
 **ANALYZER_BINARYSTORE_MINIO_REGION** - by default None, the region which you can specify for saving in AWS S3.
 
+**INSTANCE_TASK_TYPE** - by default "", if you want to run a standard analyzer instance, leave it as blank. If you want to run an instance for training, set "train" here.
+
 **FILESYSTEM_DEFAULT_PATH** - by default "storage", the path where will be stored all the information connected with analyzer, if ANALYZER_BINARYSTORE_TYPE = "filesystem". If you want to mount this folder to some folder on your machine, you can use this instruction in the docker compose:
 ```
 volumes:

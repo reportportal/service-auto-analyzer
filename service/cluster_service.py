@@ -194,6 +194,8 @@ class ClusterService:
                         logIds=new_group_log_ids,
                         clusterMessage=cluster_message,
                         clusterId=cluster_id)
+                    logger.debug("ES found cluster Id: %s log ids %s cluster message: % s",
+                                 cluster_id, new_group_log_ids, cluster_message)
                     break
             if new_group:
                 new_clusters[global_group] = new_group
@@ -238,9 +240,7 @@ class ClusterService:
                 cnt_items += len(additional_results[group].logIds)
                 cluster_id = additional_results[group].clusterId
                 cluster_message = additional_results[group].clusterMessage
-            if cnt_items > 1:
-                cluster_num += 1
-            if not cluster_id:
+            if not cluster_id or not cluster_message:
                 cluster_id, cluster_message = self.calculate_hash(
                     groups[group], log_dict, log_messages, number_of_lines)
             log_ids = []
@@ -393,8 +393,6 @@ class ClusterService:
         else:
             all_logs = self.query_all_logs(launch_info, index_name)
         logger.info("Time spent for loading data: %.2f sec.", time() - start_time)
-        print(time() - start_time)
-        print("Number of logs found ", len(all_logs))
         return all_logs
 
     def find_logs_to_cluster(self, launch_info, index_name):

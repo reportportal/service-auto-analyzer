@@ -206,6 +206,9 @@ class EsClient:
             test_items = launch.testItems
             launch.testItems = []
             for test_item in test_items:
+                for log in test_item.logs:
+                    if str(log.clusterId) in launch.clusters:
+                        log.clusterMessage = launch.clusters[str(log.clusterId)]
                 test_item_queue.put((launch, test_item))
                 launch_ids.add(launch.launchId)
         del launches

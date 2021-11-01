@@ -152,6 +152,9 @@ class TestService(unittest.TestCase):
         self.search_test_item_cluster = "search_test_item_cluster.json"
         self.search_logs_by_test_item = "search_logs_by_test_item.json"
         self.one_hit_search_rs_small_logs = "one_hit_search_rs_small_logs.json"
+        self.launch_w_test_items_w_logs_with_clusters = "launch_w_test_items_w_logs_with_clusters.json"
+        self.index_logs_rq_big_messages_with_clusters = \
+            "index_logs_rq_big_messages_with_clusters.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
             "esUser": "",

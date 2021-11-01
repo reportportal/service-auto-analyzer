@@ -80,6 +80,7 @@ class Launch(BaseModel):
     launchName: str = ""
     analyzerConfig: AnalyzerConf = AnalyzerConf()
     testItems: List[TestItem] = []
+    clusters: dict = {}
 
 
 class LaunchInfoForClustering(BaseModel):

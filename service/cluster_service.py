@@ -158,6 +158,12 @@ class ClusterService:
                     number_of_log_lines = -1
                 log_message = utils.prepare_message_for_clustering(
                     res["_source"]["whole_message"], number_of_log_lines, launch_info.cleanNumbers)
+                cluster_message_processed = utils.prepare_message_for_clustering(
+                    res["_source"]["cluster_message"], number_of_log_lines, launch_info.cleanNumbers,
+                    leave_log_structure=True).strip()
+                cluster_message_original = res["_source"]["cluster_message"].strip()
+                if cluster_message_original and cluster_message_processed != cluster_message_original:
+                    continue
                 equal = True
                 for column in ["found_exceptions", "potential_status_codes"]:
                     candidate_text = " ".join(sorted(res["_source"][column].split())).strip()
@@ -170,7 +176,6 @@ class ClusterService:
                     continue
                 log_messages_part.append(log_message)
                 ind += 1
-            logger.debug("Messages to cluster: %s", log_messages_part)
             groups_part = _clusterizer.find_clusters(log_messages_part, threshold=min_should_match)
             new_group = None
             for group in groups_part:

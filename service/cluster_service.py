@@ -78,6 +78,8 @@ class ClusterService:
                 {"term": {"launch_id": queried_log["_source"]["launch_id"]}})
         query["query"]["bool"]["filter"].append(
             {"term": {"is_merged": queried_log["_source"]["is_merged"]}})
+        query["query"]["bool"]["filter"].append(
+            {"term": {"cluster_with_numbers": not launch_info.cleanNumbers}})
         query["query"]["bool"]["should"].append(
             {"term": {"launch_name": launch_info.launchName}})
         if queried_log["_source"]["found_exceptions"].strip():
@@ -176,7 +178,6 @@ class ClusterService:
                     continue
                 log_messages_part.append(log_message)
                 ind += 1
-            logger.debug("Messages to cluster: %s", log_messages_part)
             groups_part = _clusterizer.find_clusters(log_messages_part, threshold=min_should_match)
             new_group = None
             for group in groups_part:
@@ -241,6 +242,7 @@ class ClusterService:
                 bigrams_list.append(feature_name)
         hash_message = int(
             hashlib.sha1(" ".join(bigrams_list).encode("utf-8")).hexdigest(), 16) % (10 ** 16)
+        hash_message = hash_message * 10 + int(not launch_info.cleanNumbers)
         return hash_message, log_message
 
     def gather_cluster_results(
@@ -486,7 +488,8 @@ class ClusterService:
                             "_id": log_id,
                             "_index": index_name,
                             "doc": {"cluster_id": str(result.clusterId),
-                                    "cluster_message": result.clusterMessage}})
+                                    "cluster_message": result.clusterMessage,
+                                    "cluster_with_numbers": not launch_info.cleanNumbers}})
                 for log_id in merged_logs_to_update:
                     cluster_id, cluster_message = merged_logs_to_update[log_id]
                     bodies.append({
@@ -494,7 +497,8 @@ class ClusterService:
                         "_id": log_id,
                         "_index": index_name,
                         "doc": {"cluster_id": str(cluster_id),
-                                "cluster_message": cluster_message}})
+                                "cluster_message": cluster_message,
+                                "cluster_with_numbers": not launch_info.cleanNumbers}})
                 self.es_client._bulk_index(bodies)
         except Exception as err:
             logger.error(err)

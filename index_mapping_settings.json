@@ -112,6 +112,9 @@
             "type":     "text",
             "analyzer": "standard_english_analyzer"
         },
+        "cluster_with_numbers": {
+            "type":     "boolean"
+        },
         "whole_message": {
             "type":     "text",
             "analyzer": "standard_english_analyzer"

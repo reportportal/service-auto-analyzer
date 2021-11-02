@@ -61,7 +61,8 @@ class LogPreparation:
                 "found_exceptions":              "",
                 "whole_message":                 "",
                 "potential_status_codes":        "",
-                "found_tests_and_methods":       ""}}
+                "found_tests_and_methods":       "",
+                "cluster_with_numbers":          False}}
 
     def transform_issue_type_into_lowercase(self, issue_type):
         return issue_type[:2].lower() + issue_type[2:]
@@ -128,6 +129,7 @@ class LogPreparation:
         log_template["_id"] = log.logId
         log_template["_source"]["cluster_id"] = str(log.clusterId)
         log_template["_source"]["cluster_message"] = log.clusterMessage
+        log_template["_source"]["cluster_with_numbers"] = utils.extract_clustering_setting(log.clusterId)
         log_template["_source"]["log_level"] = log.logLevel
         log_template["_source"]["original_message_lines"] = utils.calculate_line_number(cleaned_message)
         log_template["_source"]["original_message_words_number"] = len(

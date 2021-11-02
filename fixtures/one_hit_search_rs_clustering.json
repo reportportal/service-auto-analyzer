@@ -35,6 +35,7 @@
                     "detected_message_with_numbers": "error occured \n error found \n error mined",
                     "only_numbers": "",
                     "merged_small_logs": "",
+                    "is_merged": "False",
                     "stacktrace": "",
                     "urls": "",
                     "paths": "",

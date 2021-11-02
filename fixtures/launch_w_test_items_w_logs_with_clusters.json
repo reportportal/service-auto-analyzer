@@ -14,7 +14,7 @@
               {
                 "logId": 1,
                 "logLevel": 40000,
-                "clusterId": 272777727272772772,
+                "clusterId": 2727777272727727721,
                 "message": "Message 1 \r\n Message 2 \r\n Message 3 'prod_en' /src/prod/results.html \r\n java.lang.NoClassDefFoundError\r\n de.hybris.platform.servicelayer.interceptor.impl.MandatoryAttributesValidator$1@31ca8ab4 \r\n ca.canadiantire.steps.hybris.ws.WebserviceHybrisCustomerAndCartSteps$$EnhancerByCGLIB$$84837ae7.CGLIB$add_products_to_cart$16(<generated>)"
               },
               {

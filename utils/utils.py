@@ -927,3 +927,10 @@ def build_more_like_this_query(min_should_match, log_message,
         "minimum_should_match": min_should_match_settings,
         "max_query_terms":      max_query_terms,
         "boost": boost}}
+
+
+def extract_clustering_setting(cluster_id):
+    if not cluster_id or int(cluster_id) == 0:
+        return False
+    last_bit = cluster_id % 10
+    return (last_bit % 2) == 1

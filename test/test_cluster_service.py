@@ -53,6 +53,23 @@ class TestClusterService(TestService):
             },
             {
                 "test_calls":          [{"method":         httpretty.GET,
+                                         "uri":            "/1",
+                                         "status":         HTTPStatus.NOT_FOUND,
+                                         }],
+                "query_logs_result":   {},
+                "launch_info":         launch_objects.LaunchInfoForClustering(
+                    launchId=1,
+                    launchName="Launch name",
+                    project=1,
+                    forUpdate=False,
+                    numberOfLogLines=-1),
+                "expected_result":     launch_objects.ClusterResult(
+                    project=1,
+                    launchId=1,
+                    clusters=[])
+            },
+            {
+                "test_calls":          [{"method":         httpretty.GET,
                                          "uri":            "/rp_2",
                                          "status":         HTTPStatus.OK,
                                          }],
@@ -324,9 +341,9 @@ class TestClusterService(TestService):
                     launchId=1,
                     clusters=[
                         launch_objects.ClusterInfo(
-                            clusterId="123",
-                            clusterMessage="error occured \n error found \n error mined",
-                            logIds=[4, 5, 9, 111])
+                            clusterId="5349085043832165",
+                            clusterMessage="error occured \r\n error found",
+                            logIds=[4, 5, 9])
                     ])
             },
             {
@@ -387,9 +404,9 @@ class TestClusterService(TestService):
                     launchId=1,
                     clusters=[
                         launch_objects.ClusterInfo(
-                            clusterId="123",
-                            clusterMessage="error occured \n error found \n error mined",
-                            logIds=[4, 5, 9, 111])
+                            clusterId="5349085043832165",
+                            clusterMessage="error occured \r\n error found",
+                            logIds=[4, 5, 9])
                     ])
             },
             {

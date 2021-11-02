@@ -605,11 +605,23 @@ def choose_issue_type(predicted_labels, predicted_labels_probability,
     return predicted_issue_type, max_prob, global_idx
 
 
-def prepare_message_for_clustering(message, number_of_log_lines, clean_numbers):
+def prepare_message_for_clustering(message, number_of_log_lines, clean_numbers,
+                                   leave_log_structure=False):
+    potential_status_codes = get_potential_status_codes(message)
+    message = remove_starting_datetime(message)
     if clean_numbers:
+        status_codes_replaced = {}
+        for idx, code in enumerate(potential_status_codes):
+            replaced_code = "#&#" * (idx + 1)
+            status_codes_replaced[replaced_code] = code
+            message = re.sub(r"\b%s\b" % code, replaced_code, message)
         message = sanitize_text(message)
+        for code_replaced in sorted(status_codes_replaced.keys(), reverse=True):
+            message = re.sub(r"%s" % code_replaced, str(code), message)
     message = delete_empty_lines(message)
     message = first_lines(message, number_of_log_lines)
+    if leave_log_structure:
+        return message
     words = split_words(message, min_word_length=2, only_unique=False)
     if len(words) == 1:
         return " ".join(words) + " error"

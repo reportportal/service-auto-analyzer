@@ -210,15 +210,20 @@ class ClusterService:
                 additional_results[group] = new_clusters[group]
         return additional_results
 
-    def calculate_hash(self, group_ids, log_dict, log_messages, number_of_lines):
+    def calculate_hash(self, group_ids, log_dict, log_messages, launch_info):
         group_logs = []
         log_message = ""
         for i in range(min(100, len(group_ids))):
             ind = group_ids[i]
             group_logs.append(log_messages[ind])
             if not log_message:
-                log_message = utils.first_lines(
-                    log_dict[ind]["_source"]["whole_message"], number_of_lines).strip()
+                number_of_log_lines = launch_info.numberOfLogLines
+                if log_dict[ind]["_source"]["is_merged"]:
+                    number_of_log_lines = -1
+                log_message = utils.prepare_message_for_clustering(
+                    log_dict[ind]["_source"]["whole_message"],
+                    number_of_log_lines, launch_info.cleanNumbers,
+                    leave_log_structure=True).strip()
         _cnt_vectorizer = CountVectorizer(
             binary=True, analyzer="word", token_pattern="[^ ]+", ngram_range=(2, 2))
         group_res = _cnt_vectorizer.fit_transform(group_logs).astype(np.int8)
@@ -233,7 +238,7 @@ class ClusterService:
 
     def gather_cluster_results(
             self, groups, additional_results, log_dict, log_messages,
-            log_ids_for_merged_logs, number_of_lines):
+            log_ids_for_merged_logs, launch_info):
         results_to_return = []
         merged_logs_to_update = {}
         for group in groups:
@@ -246,7 +251,7 @@ class ClusterService:
                 cluster_message = additional_results[group].clusterMessage
             if not cluster_id or not cluster_message:
                 cluster_id, cluster_message = self.calculate_hash(
-                    groups[group], log_dict, log_messages, number_of_lines)
+                    groups[group], log_dict, log_messages, launch_info)
             log_ids = []
             for ind in groups[group]:
                 if str(utils.extract_real_id(log_dict[ind]["_id"])) != str(log_dict[ind]["_id"]):
@@ -461,7 +466,7 @@ class ClusterService:
                 {})
             clusters, cluster_num, merged_logs_to_update = self.gather_cluster_results(
                 groups, additional_results, log_dict, log_messages,
-                log_ids_for_merged_logs, launch_info.numberOfLogLines)
+                log_ids_for_merged_logs, launch_info)
             if clusters:
                 bodies = []
                 for result in clusters:

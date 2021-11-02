@@ -170,7 +170,7 @@ class ClusterService:
                     continue
                 log_messages_part.append(log_message)
                 ind += 1
-            logger.debug("Messages to cluster: ", log_messages_part)
+            logger.debug("Messages to cluster: %s", log_messages_part)
             groups_part = _clusterizer.find_clusters(log_messages_part, threshold=min_should_match)
             new_group = None
             for group in groups_part:

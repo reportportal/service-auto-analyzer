@@ -325,7 +325,7 @@ class ClusterService:
                         "detected_message", "stacktrace", "launch_id", "cluster_id",
                         "cluster_message", "message", "log_level", "original_message_lines",
                         "original_message_words_number", "potential_status_codes", "found_exceptions"],
-            "size": self.app_config["esChunkNumber"],
+            "size": self.app_config["esChunkNumberGetLogsCluster"],
             "query": {
                 "bool": {
                     "filter": [
@@ -350,7 +350,7 @@ class ClusterService:
     def get_test_items_for_clustering_for_update_query(self, launch_info):
         return {
             "_source": ["test_item"],
-            "size": self.app_config["esChunkNumber"],
+            "size": self.app_config["esChunkNumberGetLogsCluster"],
             "query": {
                 "bool": {
                     "filter": [
@@ -368,7 +368,7 @@ class ClusterService:
                         "detected_message", "stacktrace", "launch_id", "cluster_id",
                         "cluster_message", "message", "log_level", "original_message_lines",
                         "original_message_words_number", "potential_status_codes", "found_exceptions"],
-            "size": self.app_config["esChunkNumber"],
+            "size": self.app_config["esChunkNumberGetLogsCluster"],
             "query": {
                 "bool": {
                     "filter": [

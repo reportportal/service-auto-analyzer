@@ -71,6 +71,7 @@ APP_CONFIG = {
     "instanceTaskType":  os.getenv("INSTANCE_TASK_TYPE", "").strip(),
     "filesystemDefaultPath": os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
     "esChunkNumber":         int(os.getenv("ES_CHUNK_NUMBER", "1000")),
+    "esChunkNumberGetLogsCluster": int(os.getenv("ES_CHUNK_NUMBER_GET_LOGS_CLUSTER", "5000")),
     "esProjectIndexPrefix":  os.getenv("ES_PROJECT_INDEX_PREFIX", "").strip()
 }
 

@@ -39,6 +39,7 @@ class LogPreparation:
             "_source": {
                 "launch_id":        "",
                 "launch_name":      "",
+                "launch_start_time": "",
                 "test_item":        "",
                 "test_item_name":   "",
                 "unique_id":        "",
@@ -47,6 +48,7 @@ class LogPreparation:
                 "test_case_hash":   0,
                 "is_auto_analyzed": False,
                 "issue_type":       "",
+                "log_time":         "",
                 "log_level":        0,
                 "original_message_lines": 0,
                 "original_message_words_number": 0,

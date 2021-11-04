@@ -92,6 +92,10 @@
         "launch_id": {
             "type": "keyword"
         },
+        "launch_start_time": {
+            "type":   "date",
+            "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        },
         "unique_id": {
             "type": "keyword"
         },

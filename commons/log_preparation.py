@@ -73,6 +73,9 @@ class LogPreparation:
         log_template["_index"] = project
         log_template["_source"]["launch_id"] = launch.launchId
         log_template["_source"]["launch_name"] = launch.launchName
+        log_template["_source"]["launch_start_time"] = datetime(
+            *launch.launchStartTime
+        ).strftime("%Y-%m-%d %H:%M:%S")
         log_template["_source"]["test_item"] = test_item.testItemId
         log_template["_source"]["unique_id"] = test_item.uniqueId
         log_template["_source"]["test_case_hash"] = test_item.testCaseHash

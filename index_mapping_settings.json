@@ -6,6 +6,10 @@
         "issue_type": {
             "type": "keyword"
         },
+        "log_time": {
+            "type":   "date",
+            "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        },
         "message": {
             "type":     "text",
             "analyzer": "standard_english_analyzer"

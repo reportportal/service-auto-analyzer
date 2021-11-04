@@ -132,6 +132,7 @@ class LogPreparation:
         found_test_methods = utils.enrich_text_with_method_and_classes(" ".join(test_and_methods))
 
         log_template["_id"] = log.logId
+        log_template["_source"]["log_time"] = datetime(*log.logTime).strftime("%Y-%m-%d %H:%M:%S")
         log_template["_source"]["cluster_id"] = str(log.clusterId)
         log_template["_source"]["cluster_message"] = log.clusterMessage
         log_template["_source"]["cluster_with_numbers"] = utils.extract_clustering_setting(log.clusterId)

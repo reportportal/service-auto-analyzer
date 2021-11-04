@@ -41,6 +41,7 @@ class Log(BaseModel):
     """Log object"""
     logId: int
     logLevel: int = 0
+    logTime: List[int] = list(datetime.now().timetuple())[:7]
     message: str
     clusterId: int = 0
     clusterMessage: str = ""

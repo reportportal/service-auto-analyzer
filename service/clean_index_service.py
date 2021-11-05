@@ -58,3 +58,26 @@ class CleanIndexService:
         self.suggest_info_service.clean_suggest_info_logs_by_launch_id(launch_remove_info)
         logger.info("Finished removing launches %.2f s", time() - t_start)
         return deleted_logs_cnt
+
+    @utils.ignore_warnings
+    def remove_by_launch_start_time(self, remove_by_launch_start_time_info: dict):
+        project: int = remove_by_launch_start_time_info["project"]
+        start_date: str = remove_by_launch_start_time_info["interval_start_date"]
+        end_date: str = remove_by_launch_start_time_info["interval_end_date"]
+        logger.info("Started removing logs by launch start time")
+        t_start = time()
+        launch_ids = self.es_client.get_launch_ids_by_start_time_range(
+            project, start_date, end_date
+        )
+        deleted_logs_cnt = self.es_client.remove_by_launch_start_time_range(
+            project, start_date, end_date
+        )
+        launch_remove_info = {
+            "project": project,
+            "launch_ids": launch_ids
+        }
+        self.suggest_info_service.clean_suggest_info_logs_by_launch_id(launch_remove_info)
+        logger.info(
+            "Finished removing logs by launch start time %.2f s", time() - t_start
+        )
+        return deleted_logs_cnt

@@ -567,3 +567,23 @@ class EsClient:
         for log in elasticsearch.helpers.scan(self.es_client, query=query, index=index_name):
             launch_ids.add(log["_source"]["launch_id"])
         return list(launch_ids)
+
+    @utils.ignore_warnings
+    def remove_by_launch_start_time_range(
+            self, project: int, start_date: str, end_date: str
+    ) -> int:
+        index_name = utils.unite_project_name(
+            str(project), self.app_config["esProjectIndexPrefix"]
+        )
+        query = {
+            "query": {
+                "range": {
+                    "launch_start_time": {
+                        "gte": start_date,
+                        "lte": end_date
+                    }
+                }
+            }
+        }
+        delete_response = self.es_client.delete_by_query(index_name, body=query)
+        return delete_response["deleted"]

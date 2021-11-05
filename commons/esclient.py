@@ -29,6 +29,7 @@ from commons.log_merger import LogMerger
 from queue import Queue
 from commons.log_preparation import LogPreparation
 from amqp.amqp import AmqpClient
+from typing import List
 
 logger = logging.getLogger("analyzerApp.esclient")
 
@@ -544,3 +545,25 @@ class EsClient:
             if "deleted" in result:
                 deleted_logs += result["deleted"]
         return deleted_logs
+
+    @utils.ignore_warnings
+    def get_launch_ids_by_start_time_range(
+            self, project: int, start_date: str, end_date: str
+    ) -> List[str]:
+        index_name = utils.unite_project_name(
+            str(project), self.app_config["esProjectIndexPrefix"]
+        )
+        query = {
+            "query": {
+                "range": {
+                    "launch_start_time": {
+                        "gte": start_date,
+                        "lte": end_date
+                    }
+                }
+            }
+        }
+        launch_ids = set()
+        for log in elasticsearch.helpers.scan(self.es_client, query=query, index=index_name):
+            launch_ids.add(log["_source"]["launch_id"])
+        return list(launch_ids)

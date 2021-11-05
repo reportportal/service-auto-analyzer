@@ -310,6 +310,26 @@ def init_amqp(_amqp_client):
                                                         prepare_data_func=lambda x: x,
                                                         prepare_response_data=amqp_handler.
                                                         output_result))))
+        threads.append(
+            create_thread(
+                AmqpClient(APP_CONFIG["amqpUrl"]).receive,
+                (
+                    APP_CONFIG["exchangeName"],
+                    "remove_by_launch_start_time",
+                    True,
+                    False,
+                    lambda channel, method, props, body: amqp_handler.handle_amqp_request(
+                        channel,
+                        method,
+                        props,
+                        body,
+                        _clean_index_service.remove_by_launch_start_time,
+                        prepare_data_func=lambda x: x,
+                        prepare_response_data=amqp_handler.output_result,
+                    ),
+                ),
+            )
+        )
 
     return threads
 

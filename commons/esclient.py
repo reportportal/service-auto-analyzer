@@ -316,7 +316,7 @@ class EsClient:
                 self.delete_index(index_name)
                 self.create_index_for_stats_info(index_name)
 
-    def _bulk_index(self, bodies, host=None, es_client=None, refresh=True):
+    def _bulk_index(self, bodies, host=None, es_client=None, refresh=False):
         if host is None:
             host = self.host
         if es_client is None:

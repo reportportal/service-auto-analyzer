@@ -15,12 +15,13 @@
 """
 import utils.utils as utils
 from datetime import datetime
+from commons.log_merger import LogMerger
 
 
 class LogPreparation:
 
     def __init__(self):
-        pass
+        self.log_merger = LogMerger()
 
     def clean_message(self, message):
         message = utils.replace_tabs_for_newlines(message)
@@ -217,3 +218,67 @@ class LogPreparation:
                         if "." in word and len(word.split(".")) > 2:
                             log_words[word] = 1
         return log_words, project
+
+    def prepare_log_clustering_light(self, launch, test_item, log, clean_numbers, project):
+        log_template = self._create_log_template()
+        log_template = self._fill_launch_test_item_fields(log_template, launch, test_item, project)
+        cleaned_message = self.clean_message(log.message)
+        detected_message, stacktrace = utils.detect_log_description_and_stacktrace(
+            cleaned_message)
+        test_and_methods = utils.find_test_methods_in_text(cleaned_message)
+        detected_message = utils.replace_text_pieces(detected_message, test_and_methods)
+        stacktrace = utils.sanitize_text(stacktrace)
+        message = utils.first_lines(cleaned_message, -1)
+        message = utils.sanitize_text(message)
+        log_template["_id"] = log.logId
+        log_template["_source"]["cluster_id"] = str(log.clusterId)
+        log_template["_source"]["cluster_message"] = log.clusterMessage
+        log_template["_source"]["log_level"] = log.logLevel
+        log_template["_source"]["original_message_lines"] = utils.calculate_line_number(
+            cleaned_message)
+        log_template["_source"]["original_message_words_number"] = len(
+            utils.split_words(cleaned_message, split_urls=False))
+        detected_message_wo_urls_and_paths = utils.clean_from_urls(detected_message)
+        detected_message_wo_urls_and_paths = utils.clean_from_paths(detected_message_wo_urls_and_paths)
+        detected_message_wo_urls_and_paths = utils.remove_starting_datetime(
+            detected_message_wo_urls_and_paths)
+        log_template["_source"]["message"] = message
+        log_template["_source"]["detected_message"] = detected_message_wo_urls_and_paths
+        log_template["_source"]["detected_message_with_numbers"] = detected_message_wo_urls_and_paths
+        log_template["_source"]["stacktrace"] = stacktrace
+        potential_status_codes = " ".join(
+            utils.get_potential_status_codes(detected_message_wo_urls_and_paths))
+        log_template["_source"]["potential_status_codes"] = potential_status_codes
+        log_template["_source"]["found_exceptions"] = utils.get_found_exceptions(detected_message)
+        log_template["_source"]["whole_message"] = utils.delete_empty_lines(
+            detected_message_wo_urls_and_paths + " \n " + stacktrace)
+        return log_template
+
+    def prepare_logs_for_clustering(self, launch, number_of_lines, clean_numbers, project):
+        log_messages = []
+        log_dict = {}
+        ind = 0
+        full_log_ids_for_merged_logs = {}
+        for test_item in launch.testItems:
+            prepared_logs = []
+            for log in test_item.logs:
+                if log.logLevel < utils.ERROR_LOGGING_LEVEL:
+                    continue
+                prepared_logs.append(
+                    self.prepare_log_clustering_light(launch, test_item, log, clean_numbers, project))
+            merged_logs, log_ids_for_merged_logs = self.log_merger.decompose_logs_merged_and_without_duplicates( # noqa
+                prepared_logs)
+            for _id in log_ids_for_merged_logs:
+                full_log_ids_for_merged_logs[_id] = log_ids_for_merged_logs[_id]
+            for log in merged_logs:
+                number_of_log_lines = number_of_lines
+                if log["_source"]["is_merged"]:
+                    number_of_log_lines = -1
+                log_message = utils.prepare_message_for_clustering(
+                    log["_source"]["whole_message"], number_of_log_lines, clean_numbers)
+                if not log_message.strip():
+                    continue
+                log_messages.append(log_message)
+                log_dict[ind] = log
+                ind += 1
+        return log_messages, log_dict, full_log_ids_for_merged_logs

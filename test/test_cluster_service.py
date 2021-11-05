@@ -18,8 +18,6 @@ import unittest
 from http import HTTPStatus
 import sure # noqa
 import httpretty
-import json
-from unittest.mock import MagicMock
 import commons.launch_objects as launch_objects
 from utils import utils
 from service.cluster_service import ClusterService
@@ -39,10 +37,8 @@ class TestClusterService(TestService):
                                          "uri":            "/1",
                                          "status":         HTTPStatus.OK,
                                          }],
-                "query_logs_result":   {},
                 "launch_info":         launch_objects.LaunchInfoForClustering(
-                    launchId=1,
-                    launchName="Launch name",
+                    launch=launch_objects.Launch(launchId=1, project=1),
                     project=1,
                     forUpdate=False,
                     numberOfLogLines=-1),
@@ -56,10 +52,8 @@ class TestClusterService(TestService):
                                          "uri":            "/1",
                                          "status":         HTTPStatus.NOT_FOUND,
                                          }],
-                "query_logs_result":   {},
                 "launch_info":         launch_objects.LaunchInfoForClustering(
-                    launchId=1,
-                    launchName="Launch name",
+                    launch=launch_objects.Launch(launchId=1, project=1),
                     project=1,
                     forUpdate=False,
                     numberOfLogLines=-1),
@@ -74,8 +68,7 @@ class TestClusterService(TestService):
                                          "status":         HTTPStatus.OK,
                                          }],
                 "launch_info":            launch_objects.LaunchInfoForClustering(
-                    launchId=1,
-                    launchName="Launch name",
+                    launch=launch_objects.Launch(launchId=1, project=2),
                     project=2,
                     forUpdate=False,
                     numberOfLogLines=-1),
@@ -101,7 +94,6 @@ class TestClusterService(TestService):
                     "minioSecretKey":    "",
                     "esProjectIndexPrefix": "rp_"
                 },
-                "query_logs_result":   {},
                 "expected_result":     launch_objects.ClusterResult(
                     project=2,
                     launchId=1,
@@ -131,7 +123,7 @@ class TestClusterService(TestService):
                                              self.no_hits_search_rs),
                                          },
                                         {"method":         httpretty.POST,
-                                         "uri":            "/_bulk?refresh=true",
+                                         "uri":            "/_bulk?refresh=false",
                                          "status":         HTTPStatus.OK,
                                          "content_type":   "application/json",
                                          "rq":             utils.get_fixture(
@@ -140,12 +132,12 @@ class TestClusterService(TestService):
                                              self.index_logs_rs),
                                          }],
                 "launch_info":            launch_objects.LaunchInfoForClustering(
-                    launchId=1,
-                    launchName="Launch name",
+                    launch=launch_objects.Launch(
+                        **(utils.get_fixture(
+                            self.launch_w_items_clustering, to_json=True))),
                     project=2,
                     forUpdate=False,
                     numberOfLogLines=-1),
-                "query_logs_result":   utils.get_fixture(self.launch_w_items_clustering, to_json=True),
                 "expected_result":     launch_objects.ClusterResult(
                     project=2,
                     launchId=1,
@@ -175,7 +167,7 @@ class TestClusterService(TestService):
                                              self.no_hits_search_rs),
                                          },
                                         {"method":         httpretty.POST,
-                                         "uri":            "/_bulk?refresh=true",
+                                         "uri":            "/_bulk?refresh=false",
                                          "status":         HTTPStatus.OK,
                                          "content_type":   "application/json",
                                          "rq":             utils.get_fixture(
@@ -184,12 +176,12 @@ class TestClusterService(TestService):
                                              self.index_logs_rs),
                                          }],
                 "launch_info":            launch_objects.LaunchInfoForClustering(
-                    launchId=1,
-                    launchName="Launch name",
+                    launch=launch_objects.Launch(
+                        **(utils.get_fixture(
+                            self.launch_w_items_clustering, to_json=True))),
                     project=2,
                     forUpdate=False,
                     numberOfLogLines=2),
-                "query_logs_result":   utils.get_fixture(self.launch_w_items_clustering, to_json=True),
                 "expected_result":     launch_objects.ClusterResult(
                     project=2,
                     launchId=1,
@@ -224,7 +216,7 @@ class TestClusterService(TestService):
                                              self.no_hits_search_rs),
                                          },
                                         {"method":         httpretty.POST,
-                                         "uri":            "/_bulk?refresh=true",
+                                         "uri":            "/_bulk?refresh=false",
                                          "status":         HTTPStatus.OK,
                                          "content_type":   "application/json",
                                          "rq":             utils.get_fixture(
@@ -233,12 +225,12 @@ class TestClusterService(TestService):
                                              self.index_logs_rs),
                                          }],
                 "launch_info":            launch_objects.LaunchInfoForClustering(
-                    launchId=1,
-                    launchName="Launch name",
+                    launch=launch_objects.Launch(
+                        **(utils.get_fixture(
+                            self.launch_w_items_clustering, to_json=True))),
                     project=2,
                     forUpdate=True,
                     numberOfLogLines=-1),
-                "query_logs_result":   utils.get_fixture(self.launch_w_items_clustering, to_json=True),
                 "expected_result":     launch_objects.ClusterResult(
                     project=2,
                     launchId=1,
@@ -277,7 +269,7 @@ class TestClusterService(TestService):
                                              self.one_hit_search_rs_clustering)
                                          },
                                         {"method":         httpretty.POST,
-                                         "uri":            "/_bulk?refresh=true",
+                                         "uri":            "/_bulk?refresh=false",
                                          "status":         HTTPStatus.OK,
                                          "content_type":   "application/json",
                                          "rq":             utils.get_fixture(
@@ -286,12 +278,12 @@ class TestClusterService(TestService):
                                              self.index_logs_rs),
                                          }],
                 "launch_info":            launch_objects.LaunchInfoForClustering(
-                    launchId=1,
-                    launchName="Launch name",
+                    launch=launch_objects.Launch(
+                        **(utils.get_fixture(
+                            self.launch_w_items_clustering, to_json=True))),
                     project=2,
                     forUpdate=True,
                     numberOfLogLines=-1),
-                "query_logs_result":   utils.get_fixture(self.launch_w_items_clustering, to_json=True),
                 "expected_result":     launch_objects.ClusterResult(
                     project=2,
                     launchId=1,
@@ -321,7 +313,7 @@ class TestClusterService(TestService):
                                              self.one_hit_search_rs_clustering),
                                          },
                                         {"method":         httpretty.POST,
-                                         "uri":            "/_bulk?refresh=true",
+                                         "uri":            "/_bulk?refresh=false",
                                          "status":         HTTPStatus.OK,
                                          "content_type":   "application/json",
                                          "rq":             utils.get_fixture(
@@ -330,12 +322,12 @@ class TestClusterService(TestService):
                                              self.index_logs_rs),
                                          }],
                 "launch_info":            launch_objects.LaunchInfoForClustering(
-                    launchId=1,
-                    launchName="Launch name",
+                    launch=launch_objects.Launch(
+                        **(utils.get_fixture(
+                            self.launch_w_items_clustering, to_json=True))),
                     project=2,
                     forUpdate=True,
                     numberOfLogLines=2),
-                "query_logs_result":   utils.get_fixture(self.launch_w_items_clustering, to_json=True),
                 "expected_result":     launch_objects.ClusterResult(
                     project=2,
                     launchId=1,
@@ -361,7 +353,7 @@ class TestClusterService(TestService):
                                              self.one_hit_search_rs_clustering),
                                          },
                                         {"method":         httpretty.POST,
-                                         "uri":            "/_bulk?refresh=true",
+                                         "uri":            "/_bulk?refresh=false",
                                          "status":         HTTPStatus.OK,
                                          "content_type":   "application/json",
                                          "rq":             utils.get_fixture(
@@ -370,13 +362,12 @@ class TestClusterService(TestService):
                                              self.index_logs_rs),
                                          }],
                 "launch_info":            launch_objects.LaunchInfoForClustering(
-                    launchId=1,
-                    launchName="Launch name",
+                    launch=launch_objects.Launch(
+                        **(utils.get_fixture(
+                            self.launch_w_items_clustering, to_json=True))),
                     project=2,
                     forUpdate=True,
                     numberOfLogLines=2),
-                "query_logs_result":   utils.get_fixture(
-                    self.launch_w_items_clustering_with_prefix, to_json=True),
                 "app_config": {
                     "esHost": "http://localhost:9200",
                     "esUser": "",
@@ -442,7 +433,7 @@ class TestClusterService(TestService):
                                              self.no_hits_search_rs),
                                          },
                                         {"method":         httpretty.POST,
-                                         "uri":            "/_bulk?refresh=true",
+                                         "uri":            "/_bulk?refresh=false",
                                          "status":         HTTPStatus.OK,
                                          "content_type":   "application/json",
                                          "rq":             utils.get_fixture(
@@ -451,13 +442,12 @@ class TestClusterService(TestService):
                                              self.index_logs_rs),
                                          }],
                 "launch_info":            launch_objects.LaunchInfoForClustering(
-                    launchId=1,
-                    launchName="Launch name",
+                    launch=launch_objects.Launch(
+                        **(utils.get_fixture(
+                            self.launch_w_items_clustering_with_different_errors, to_json=True))),
                     project=2,
                     forUpdate=False,
                     numberOfLogLines=2),
-                "query_logs_result":   utils.get_fixture(
-                    self.launch_w_items_clustering_with_different_errors, to_json=True),
                 "expected_result":     launch_objects.ClusterResult(
                     project=2,
                     launchId=1,
@@ -509,7 +499,7 @@ class TestClusterService(TestService):
                                              self.no_hits_search_rs),
                                          },
                                         {"method":         httpretty.POST,
-                                         "uri":            "/_bulk?refresh=true",
+                                         "uri":            "/_bulk?refresh=false",
                                          "status":         HTTPStatus.OK,
                                          "content_type":   "application/json",
                                          "rq":             utils.get_fixture(
@@ -518,21 +508,20 @@ class TestClusterService(TestService):
                                              self.index_logs_rs),
                                          }],
                 "launch_info":            launch_objects.LaunchInfoForClustering(
-                    launchId=1,
-                    launchName="Launch name",
+                    launch=launch_objects.Launch(
+                        **(utils.get_fixture(
+                            self.launch_w_small_logs_for_clustering, to_json=True))),
                     project=2,
                     forUpdate=False,
                     numberOfLogLines=-1),
-                "query_logs_result":   utils.get_fixture(
-                    self.launch_w_small_logs_for_clustering, to_json=True),
                 "expected_result":     launch_objects.ClusterResult(
                     project=2,
                     launchId=1,
                     clusters=[
                         launch_objects.ClusterInfo(
-                            clusterId="51261785217813611",
-                            clusterMessage="AssertionError error occured \r\n error found\r\nerror occured twice",  # noqa
-                            logIds=[4, 3]),
+                            clusterId="78342974021039661",
+                            clusterMessage="error occured twice \r\nAssertionError error occured \r\n error found",  # noqa
+                            logIds=[3, 4]),
                         launch_objects.ClusterInfo(
                             clusterId="37054331802624341",
                             clusterMessage="AssertionError status code: 500 error occured",
@@ -554,17 +543,11 @@ class TestClusterService(TestService):
                     app_config = test["app_config"]
                 _cluster_service = ClusterService(app_config=app_config,
                                                   search_cfg=config)
-                _cluster_service.es_client.es_client.scroll = MagicMock(return_value=json.loads(
-                    utils.get_fixture(self.no_hits_search_rs)))
-                _cluster_service.query_logs = MagicMock(return_value=test["query_logs_result"])
 
                 response = _cluster_service.find_clusters(test["launch_info"])
 
                 response.clusters.should.have.length_of(len(test["expected_result"].clusters))
-
-                for i in range(len(response.clusters)):
-                    test["expected_result"].clusters[i].should.equal(
-                        response.clusters[i])
+                test["expected_result"].should.equal(response)
 
                 TestClusterService.shutdown_server(test["test_calls"])
 

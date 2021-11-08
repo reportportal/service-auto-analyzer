@@ -82,6 +82,7 @@ index_data = [{
     "launchId": 1,
     "project": 34,
     "launchName": "dsfdsf",
+    "launchStartTime": [2021, 11, 8, 11, 23, 13],
     "analyzerConfig": {
         "minDocFreq": 1.0,
         "minTermFreq": 1.0,
@@ -118,6 +119,7 @@ index_data = [{
     "launchId": 2,
     "project": 34,
     "launchName": "dsfdsf",
+    "launchStartTime": [2021, 9, 8, 11, 23, 13],
     "analyzerConfig": {
         "minDocFreq": 1.0,
         "minTermFreq": 1.0,
@@ -180,6 +182,7 @@ index_data = [{
     "launchId": 1,
     "project": 34,
     "launchName": "dsfdsf",
+    "launchStartTime": [2021, 11, 8, 11, 23, 13],
     "analyzerConfig": {
         "minDocFreq": 1.0,
         "minTermFreq": 1.0,
@@ -332,6 +335,12 @@ index_suggest_info_items = [{
     "clusterId": 2202462168660536
 }]
 
+remove_by_launch_start_time_data = {
+    "project": 34,
+    "interval_start_date": "2021-08-18 00:30:10",
+    "interval_end_date": "2021-10-05 00:30:10",
+}
+
 used_method = sys.argv[1] if len(sys.argv) > 1 else "index"
 for_update = False
 if len(sys.argv) > 2:
@@ -362,6 +371,8 @@ elif used_method.strip() in ["launch_remove"]:
     response = rpc.call(json.dumps(delete_launches), used_method)
 elif used_method.strip() in ["index_suggest_info"]:
     response = rpc.call(json.dumps(index_suggest_info_items), used_method)
+elif used_method.strip() in ["remove_by_launch_start_time"]:
+    response = rpc.call(json.dumps(remove_by_launch_start_time_data), used_method)
 elif used_method.strip() in ["cluster"]:
     if not for_update:
         response = rpc.call(json.dumps({"launchId": 1,

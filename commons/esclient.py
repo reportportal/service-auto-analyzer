@@ -546,6 +546,20 @@ class EsClient:
                 deleted_logs += result["deleted"]
         return deleted_logs
 
+    def __time_range_query(
+            self, time_field: str, gte_time: str, lte_time: str
+    ) -> dict:
+        return {
+            "query": {
+                "range": {
+                    time_field: {
+                        "gte": gte_time,
+                        "lte": lte_time
+                    }
+                }
+            }
+        }
+
     @utils.ignore_warnings
     def get_launch_ids_by_start_time_range(
             self, project: int, start_date: str, end_date: str
@@ -553,16 +567,7 @@ class EsClient:
         index_name = utils.unite_project_name(
             str(project), self.app_config["esProjectIndexPrefix"]
         )
-        query = {
-            "query": {
-                "range": {
-                    "launch_start_time": {
-                        "gte": start_date,
-                        "lte": end_date
-                    }
-                }
-            }
-        }
+        query = self.__time_range_query("launch_start_time", start_date, end_date)
         launch_ids = set()
         for log in elasticsearch.helpers.scan(self.es_client, query=query, index=index_name):
             launch_ids.add(log["_source"]["launch_id"])
@@ -575,15 +580,6 @@ class EsClient:
         index_name = utils.unite_project_name(
             str(project), self.app_config["esProjectIndexPrefix"]
         )
-        query = {
-            "query": {
-                "range": {
-                    "launch_start_time": {
-                        "gte": start_date,
-                        "lte": end_date
-                    }
-                }
-            }
-        }
+        query = self.__time_range_query("launch_start_time", start_date, end_date)
         delete_response = self.es_client.delete_by_query(index_name, body=query)
         return delete_response["deleted"]

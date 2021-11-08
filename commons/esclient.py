@@ -596,3 +596,14 @@ class EsClient:
         for log in elasticsearch.helpers.scan(self.es_client, query=query, index=index_name):
             log_ids.add(log["_id"])
         return list(log_ids)
+
+    @utils.ignore_warnings
+    def remove_by_log_time_range(
+            self, project: int, start_date: str, end_date: str
+    ) -> int:
+        index_name = utils.unite_project_name(
+            str(project), self.app_config["esProjectIndexPrefix"]
+        )
+        query = self.__time_range_query("log_time", start_date, end_date)
+        delete_response = self.es_client.delete_by_query(index_name, body=query)
+        return delete_response["deleted"]

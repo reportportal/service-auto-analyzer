@@ -61,7 +61,7 @@ class CleanIndexService:
         return deleted_logs_cnt
 
     @utils.ignore_warnings
-    def remove_by_launch_start_time(self, remove_by_launch_start_time_info: dict):
+    def remove_by_launch_start_time(self, remove_by_launch_start_time_info: dict) -> int:
         project: int = remove_by_launch_start_time_info["project"]
         start_date: str = remove_by_launch_start_time_info["interval_start_date"]
         end_date: str = remove_by_launch_start_time_info["interval_end_date"]
@@ -84,7 +84,7 @@ class CleanIndexService:
         return deleted_logs_cnt
 
     @utils.ignore_warnings
-    def remove_by_log_time(self, remove_by_log_time_info: dict):
+    def remove_by_log_time(self, remove_by_log_time_info: dict) -> int:
         project: int = remove_by_log_time_info["project"]
         start_date: str = remove_by_log_time_info["interval_start_date"]
         end_date: str = remove_by_log_time_info["interval_end_date"]

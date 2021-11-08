@@ -146,6 +146,12 @@ class CleanIndex(BaseModel):
     project: int
 
 
+class CleanIndexStrIds(BaseModel):
+    """Clean index object that supports string ids"""
+    ids: List[str]
+    project: int
+
+
 class SearchLogs(BaseModel):
     """Search logs object"""
     launchId: int

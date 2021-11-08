@@ -18,6 +18,7 @@ import logging
 import utils.utils as utils
 from time import time
 from commons.esclient import EsClient
+from commons.launch_objects import CleanIndex
 from service import suggest_info_service
 
 logger = logging.getLogger("analyzerApp.cleanIndexService")
@@ -79,5 +80,25 @@ class CleanIndexService:
         self.suggest_info_service.clean_suggest_info_logs_by_launch_id(launch_remove_info)
         logger.info(
             "Finished removing logs by launch start time %.2f s", time() - t_start
+        )
+        return deleted_logs_cnt
+
+    @utils.ignore_warnings
+    def remove_by_log_time(self, remove_by_log_time_info: dict):
+        project: int = remove_by_log_time_info["project"]
+        start_date: str = remove_by_log_time_info["interval_start_date"]
+        end_date: str = remove_by_log_time_info["interval_end_date"]
+        logger.info("Started removing logs by log time range")
+        t_start = time()
+        log_ids = self.es_client.get_log_ids_by_log_time_range(
+            project, start_date, end_date
+        )
+        deleted_logs_cnt = self.es_client.remove_by_log_time_range(
+            project, start_date, end_date
+        )
+        clean_index = CleanIndex(ids=log_ids, project=project)
+        self.suggest_info_service.clean_suggest_info_logs(clean_index)
+        logger.info(
+            "Finished removing logs by log time range %.2f s", time() - t_start
         )
         return deleted_logs_cnt

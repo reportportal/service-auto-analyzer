@@ -547,18 +547,16 @@ class EsClient:
         return deleted_logs
 
     def __time_range_query(
-            self, time_field: str, gte_time: str, lte_time: str
+            self,
+            time_field: str,
+            gte_time: str,
+            lte_time: str,
+            for_scan: bool = False,
     ) -> dict:
-        return {
-            "query": {
-                "range": {
-                    time_field: {
-                        "gte": gte_time,
-                        "lte": lte_time
-                    }
-                }
-            }
-        }
+        query = {"query": {"range": {time_field: {"gte": gte_time, "lte": lte_time}}}}
+        if for_scan:
+            query["size"] = self.app_config["esChunkNumber"]
+        return query
 
     @utils.ignore_warnings
     def get_launch_ids_by_start_time_range(
@@ -567,9 +565,13 @@ class EsClient:
         index_name = utils.unite_project_name(
             str(project), self.app_config["esProjectIndexPrefix"]
         )
-        query = self.__time_range_query("launch_start_time", start_date, end_date)
+        query = self.__time_range_query(
+            "launch_start_time", start_date, end_date, for_scan=True
+        )
         launch_ids = set()
-        for log in elasticsearch.helpers.scan(self.es_client, query=query, index=index_name):
+        for log in elasticsearch.helpers.scan(
+            self.es_client, query=query, index=index_name
+        ):
             launch_ids.add(log["_source"]["launch_id"])
         return list(launch_ids)
 
@@ -591,9 +593,11 @@ class EsClient:
         index_name = utils.unite_project_name(
             str(project), self.app_config["esProjectIndexPrefix"]
         )
-        query = self.__time_range_query("log_time", start_date, end_date)
+        query = self.__time_range_query("log_time", start_date, end_date, for_scan=True)
         log_ids = set()
-        for log in elasticsearch.helpers.scan(self.es_client, query=query, index=index_name):
+        for log in elasticsearch.helpers.scan(
+            self.es_client, query=query, index=index_name
+        ):
             log_ids.add(log["_id"])
         return list(log_ids)
 

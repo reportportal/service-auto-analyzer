@@ -115,6 +115,7 @@ index_data = [{
                    "logs": [
                        {"logId": 5,
                         "logLevel": 40000,
+                        "logTime": [2021, 11, 10, 11, 23, 13],
                         "message": "assertionError occured \r\n error found \r\n error mined"}, ]
                    }, ],
 }, {
@@ -143,6 +144,7 @@ index_data = [{
                         "message": "assertionError occured"},
                        {"logId": 8,
                         "logLevel": 40000,
+                        "logTime": [2021, 9, 9, 11, 23, 13],
                         "message": "assertionError occured \r\n error found \r\n error mined"}, ]
                    },
                   {"testItemId": 78,
@@ -153,11 +155,11 @@ index_data = [{
                    "logs": [
                        {"logId": 45,
                         "logLevel": 40000,
-                        "logTime": [2021, 9, 9, 11, 23, 13],
+                        "logTime": [2021, 9, 10, 11, 23, 13],
                         "message": "assertionError occured"},
                        {"logId": 81,
                         "logLevel": 40000,
-                        "logTime": [2021, 9, 10, 11, 23, 13],
+                        "logTime": [2021, 9, 11, 11, 23, 13],
                         "message": "assertionError occured \r\n error found \r\n error mined"}, ]
                    },
                   {"testItemId": 10,
@@ -168,7 +170,7 @@ index_data = [{
                    "logs": [
                        {"logId": 38,
                         "logLevel": 40000,
-                        "logTime": [2021, 9, 11, 11, 23, 13],
+                        "logTime": [2021, 9, 12, 11, 23, 13],
                         "message": "assertionError occured \r\n error found \r\n error mined"}]
                    },
                   {"testItemId": 15,
@@ -179,11 +181,11 @@ index_data = [{
                    "logs": [
                        {"logId": 555,
                         "logLevel": 40000,
-                        "logTime": [2021, 9, 12, 11, 23, 13],
+                        "logTime": [2021, 9, 13, 11, 23, 13],
                         "message": "assertionError occured"},
                        {"logId": 556,
                         "logLevel": 40000,
-                        "logTime": [2021, 9, 13, 11, 23, 13],
+                        "logTime": [2021, 9, 14, 11, 23, 13],
                         "message": "nullpointerException occured"}]
                    }],
 }, {
@@ -212,6 +214,7 @@ index_data = [{
                         "message": "assertionError occured"},
                        {"logId": 46,
                         "logLevel": 40000,
+                        "logTime": [2021, 11, 11, 11, 23, 13],
                         "message": "assertionError occured \r\n error found \r\n error mined"}, ]
                    },
                   {"testItemId": 13,
@@ -222,11 +225,11 @@ index_data = [{
                    "logs": [
                        {"logId": 78,
                         "logLevel": 40000,
-                        "logTime": [2021, 11, 11, 11, 23, 13],
+                        "logTime": [2021, 11, 12, 11, 23, 13],
                         "message": "assertionError occured \r\n error found \r\n error mined"},
                        {"logId": 113,
                         "logLevel": 40000,
-                        "logTime": [2021, 11, 8, 12, 23, 13],
+                        "logTime": [2021, 11, 13, 12, 23, 13],
                         "message": "nullpointerException occured \r\n error occurred \r\n error mined"}]
                    },
                   {"testItemId": 14,
@@ -237,11 +240,11 @@ index_data = [{
                    "logs": [
                        {"logId": 111,
                         "logLevel": 40000,
-                        "logTime": [2021, 11, 13, 11, 23, 13],
+                        "logTime": [2021, 11, 14, 11, 23, 13],
                         "message": "assertionError occured"},
                        {"logId": 112,
                         "logLevel": 40000,
-                        "logTime": [2021, 11, 14, 11, 23, 13],
+                        "logTime": [2021, 11, 15, 11, 23, 13],
                         "message": "nullpointerException occured"}]
                    }]}]
 

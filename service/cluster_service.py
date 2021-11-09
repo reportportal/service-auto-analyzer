@@ -14,8 +14,6 @@
 * limitations under the License.
 """
 from commons.esclient import EsClient
-import elasticsearch
-import elasticsearch.helpers
 from commons import clusterizer
 from utils import utils
 from commons.launch_objects import ClusterResult, ClusterInfo
@@ -81,7 +79,7 @@ class ClusterService:
         query["query"]["bool"]["filter"].append(
             {"term": {"cluster_with_numbers": not launch_info.cleanNumbers}})
         query["query"]["bool"]["should"].append(
-            {"term": {"launch_name": launch_info.launchName}})
+            {"term": {"launch_name": launch_info.launch.launchName}})
         if queried_log["_source"]["found_exceptions"].strip():
             query["query"]["bool"]["must"].append(
                 utils.build_more_like_this_query(
@@ -196,7 +194,7 @@ class ClusterService:
                     for ind in groups_part[group]:
                         if ind == 0:
                             continue
-                        if log_dict_part[ind]["_source"]["launch_id"] != launch_info.launchId:
+                        if log_dict_part[ind]["_source"]["launch_id"] != launch_info.launch.launchId:
                             continue
                         log_ids.add(str(log_dict_part[ind]["_id"]))
                         new_group_log_ids.append(str(log_dict_part[ind]["_id"]))
@@ -248,8 +246,9 @@ class ClusterService:
     def gather_cluster_results(
             self, groups, additional_results, log_dict, log_messages,
             log_ids_for_merged_logs, launch_info):
-        results_to_return = []
         merged_logs_to_update = {}
+        clusters_found = {}
+        cluster_message_by_id = {}
         for group in groups:
             cnt_items = len(groups[group])
             cluster_id = 0
@@ -275,10 +274,17 @@ class ClusterService:
                     if str(utils.extract_real_id(log_id)) != str(log_id):
                         continue
                     log_ids.append(log_id)
+            if cluster_id not in clusters_found:
+                clusters_found[cluster_id] = log_ids
+            else:
+                clusters_found[cluster_id].extend(log_ids)
+            cluster_message_by_id[cluster_id] = cluster_message
+        results_to_return = []
+        for cluster_id in clusters_found:
             results_to_return.append(ClusterInfo(
                 clusterId=cluster_id,
-                clusterMessage=cluster_message,
-                logIds=log_ids))
+                clusterMessage=cluster_message_by_id[cluster_id],
+                logIds=clusters_found[cluster_id]))
         return results_to_return, len(results_to_return), merged_logs_to_update
 
     def regroup_by_error_ans_status_codes(self, log_messages, log_dict):
@@ -319,131 +325,6 @@ class ClusterService:
             start_group_id = start_group_id + max_group_id + 1
         return all_groups
 
-    def get_all_logs_for_clustering_query(self, launch_info):
-        return {
-            "_source": ["whole_message", "test_item",
-                        "detected_message", "stacktrace", "launch_id", "cluster_id",
-                        "cluster_message", "message", "log_level", "original_message_lines",
-                        "original_message_words_number", "potential_status_codes", "found_exceptions"],
-            "size": self.app_config["esChunkNumberGetLogsCluster"],
-            "query": {
-                "bool": {
-                    "filter": [
-                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
-                        {"exists": {"field": "issue_type"}},
-                        {"term": {"is_merged": False}},
-                    ],
-                    "must_not": [],
-                    "should": [],
-                    "must": [{"term": {"launch_id": launch_info.launchId}}]}}}
-
-    def query_all_logs(self, launch_info, index_name):
-        logs_by_test_item = {}
-        for log in elasticsearch.helpers.scan(self.es_client.es_client,
-                                              query=self.get_all_logs_for_clustering_query(launch_info),
-                                              index=index_name):
-            if log["_source"]["test_item"] not in logs_by_test_item:
-                logs_by_test_item[log["_source"]["test_item"]] = []
-            logs_by_test_item[log["_source"]["test_item"]].append(log)
-        return logs_by_test_item
-
-    def get_test_items_for_clustering_for_update_query(self, launch_info):
-        return {
-            "_source": ["test_item"],
-            "size": self.app_config["esChunkNumberGetLogsCluster"],
-            "query": {
-                "bool": {
-                    "filter": [
-                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
-                        {"exists": {"field": "issue_type"}},
-                        {"term": {"is_merged": False}},
-                    ],
-                    "must_not": [{"wildcard": {"cluster_message": "*"}}],
-                    "should": [],
-                    "must": [{"term": {"launch_id": launch_info.launchId}}]}}}
-
-    def get_logs_by_test_items(self, test_item_ids, launch_id):
-        return {
-            "_source": ["whole_message", "test_item",
-                        "detected_message", "stacktrace", "launch_id", "cluster_id",
-                        "cluster_message", "message", "log_level", "original_message_lines",
-                        "original_message_words_number", "potential_status_codes", "found_exceptions"],
-            "size": self.app_config["esChunkNumberGetLogsCluster"],
-            "query": {
-                "bool": {
-                    "filter": [
-                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
-                        {"exists": {"field": "issue_type"}},
-                        {"term": {"is_merged": False}},
-                        {"terms": {"test_item": test_item_ids}}
-                    ],
-                    "must_not": [],
-                    "should": [],
-                    "must": [{"term": {"launch_id": launch_id}}]}}}
-
-    def query_logs_for_update(self, launch_info, index_name):
-        test_items_to_query = set()
-        for log in elasticsearch.helpers.scan(self.es_client.es_client,
-                                              query=self.get_test_items_for_clustering_for_update_query(
-                                                  launch_info),
-                                              index=index_name):
-            test_items_to_query.add(log["_source"]["test_item"])
-        test_items_to_query = list(test_items_to_query)
-        logs_by_test_item = {}
-        batch_size = 1000
-        for i in range(int(len(test_items_to_query) / batch_size) + 1):
-            sub_test_item_ids = test_items_to_query[i * batch_size: (i + 1) * batch_size]
-            if not sub_test_item_ids:
-                continue
-            for log in elasticsearch.helpers.scan(self.es_client.es_client,
-                                                  query=self.get_logs_by_test_items(
-                                                      sub_test_item_ids, launch_info.launchId),
-                                                  index=index_name):
-                if log["_source"]["test_item"] not in logs_by_test_item:
-                    logs_by_test_item[log["_source"]["test_item"]] = []
-                logs_by_test_item[log["_source"]["test_item"]].append(log)
-        return logs_by_test_item
-
-    def query_logs(self, launch_info, index_name):
-        start_time = time()
-        all_logs = []
-        if launch_info.forUpdate:
-            all_logs = self.query_logs_for_update(launch_info, index_name)
-        else:
-            all_logs = self.query_all_logs(launch_info, index_name)
-        logger.info("Time spent for loading data: %.2f sec.", time() - start_time)
-        return all_logs
-
-    def find_logs_to_cluster(self, launch_info, index_name):
-        logs_by_test_item = self.query_logs(launch_info, index_name)
-        log_messages = []
-        log_dict = {}
-        ind = 0
-        full_log_ids_for_merged_logs = {}
-        for test_item in logs_by_test_item:
-            merged_logs, log_ids_for_merged_logs = self.log_merger.decompose_logs_merged_and_without_duplicates( # noqa
-                logs_by_test_item[test_item])
-            logs_with_clusters = 0
-            for log in merged_logs:
-                if log["_source"]["cluster_message"].strip():
-                    logs_with_clusters += 1
-            if launch_info.forUpdate and (len(merged_logs) == logs_with_clusters):
-                continue
-            for _id in log_ids_for_merged_logs:
-                full_log_ids_for_merged_logs[_id] = log_ids_for_merged_logs[_id]
-            for log in merged_logs:
-                number_of_log_lines = launch_info.numberOfLogLines
-                if log["_source"]["is_merged"]:
-                    number_of_log_lines = -1
-                log_message = utils.prepare_message_for_clustering(
-                    log["_source"]["whole_message"], number_of_log_lines, launch_info.cleanNumbers)
-                if not log_message.strip():
-                    continue
-                log_messages.append(log_message)
-                log_dict[ind] = log
-                ind += 1
-        return log_messages, log_dict, full_log_ids_for_merged_logs
-
     @utils.ignore_warnings
     def find_clusters(self, launch_info):
         logger.info("Started clusterizing logs")
@@ -454,7 +335,7 @@ class ClusterService:
             logger.info("Finished clustering log with 0 clusters.")
             return ClusterResult(
                 project=launch_info.project,
-                launchId=launch_info.launchId,
+                launchId=launch_info.launch.launchId,
                 clusters=[])
         t_start = time()
         errors_found = []
@@ -463,8 +344,9 @@ class ClusterService:
         clusters = []
         log_ids = []
         try:
-            log_messages, log_dict, log_ids_for_merged_logs = self.find_logs_to_cluster(
-                launch_info, index_name)
+            log_messages, log_dict, log_ids_for_merged_logs = self.log_preparation.prepare_logs_for_clustering( # noqa
+                launch_info.launch, launch_info.numberOfLogLines,
+                launch_info.cleanNumbers, index_name)
             log_ids = set([str(log["_id"]) for log in log_dict.values()])
 
             groups = self.cluster_messages_with_groupping_by_error(log_messages, log_dict)
@@ -501,14 +383,15 @@ class ClusterService:
                                 "cluster_with_numbers": not launch_info.cleanNumbers}})
                 self.es_client._bulk_index(bodies)
         except Exception as err:
+            print(err)
             logger.error(err)
             errors_found.append(utils.extract_exception(err))
             errors_count += 1
 
-        results_to_share = {launch_info.launchId: {
+        results_to_share = {launch_info.launch.launchId: {
             "not_found": int(cluster_num == 0), "items_to_process": len(log_ids),
             "processed_time": time() - t_start, "found_clusters": cluster_num,
-            "launch_id": launch_info.launchId, "launch_name": launch_info.launchName,
+            "launch_id": launch_info.launch.launchId, "launch_name": launch_info.launch.launchName,
             "project_id": launch_info.project, "method": "find_clusters",
             "gather_date": datetime.now().strftime("%Y-%m-%d"),
             "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -525,5 +408,5 @@ class ClusterService:
         logger.info("Finished clustering for the launch with %d clusters.", cluster_num)
         return ClusterResult(
             project=launch_info.project,
-            launchId=launch_info.launchId,
+            launchId=launch_info.launch.launchId,
             clusters=clusters)

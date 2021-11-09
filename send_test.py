@@ -364,14 +364,12 @@ elif used_method.strip() in ["index_suggest_info"]:
     response = rpc.call(json.dumps(index_suggest_info_items), used_method)
 elif used_method.strip() in ["cluster"]:
     if not for_update:
-        response = rpc.call(json.dumps({"launchId": 1,
-                                        "launchName": "Launch name",
+        response = rpc.call(json.dumps({"launch": index_data[0],
                                         "project": 34,
                                         "forUpdate": for_update,
                                         "numberOfLogLines": number_lines}), used_method)
     else:
-        response = rpc.call(json.dumps({"launchId": 2,
-                                        "launchName": "Launch name",
+        response = rpc.call(json.dumps({"launch": index_data[1],
                                         "project": 34,
                                         "forUpdate": for_update,
                                         "numberOfLogLines": number_lines}), used_method)

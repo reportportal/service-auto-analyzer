@@ -102,6 +102,7 @@ class ClusterInfo(BaseModel):
     clusterId: int
     clusterMessage: str
     logIds: List[int]
+    itemIds: List[int]
 
 
 class ClusterResult(BaseModel):

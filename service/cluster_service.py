@@ -191,6 +191,7 @@ class ClusterService:
                             if log_dict_part[ind]["_source"]["cluster_message"].strip():
                                 cluster_message = log_dict_part[ind]["_source"]["cluster_message"]
                     new_group_log_ids = []
+                    new_test_items = set()
                     for ind in groups_part[group]:
                         if ind == 0:
                             continue
@@ -198,10 +199,12 @@ class ClusterService:
                             continue
                         log_ids.add(str(log_dict_part[ind]["_id"]))
                         new_group_log_ids.append(str(log_dict_part[ind]["_id"]))
+                        new_test_items.add(int(log_dict_part[ind]["_source"]["test_item"]))
                     if not cluster_id or not cluster_message:
                         continue
                     new_group = ClusterInfo(
                         logIds=new_group_log_ids,
+                        itemIds=list(new_test_items),
                         clusterMessage=cluster_message,
                         clusterId=cluster_id)
                     logger.debug("ES found cluster Id: %s log ids %s cluster message: % s",
@@ -212,6 +215,7 @@ class ClusterService:
         for group in new_clusters:
             if group in additional_results:
                 additional_results[group].logIds.extend(new_clusters[group].logIds)
+                additional_results[group].itemIds.extend(new_clusters[group].itemIds)
             else:
                 additional_results[group] = new_clusters[group]
         return additional_results
@@ -261,6 +265,7 @@ class ClusterService:
                 cluster_id, cluster_message = self.calculate_hash(
                     groups[group], log_dict, log_messages, launch_info)
             log_ids = []
+            test_item_ids = []
             for ind in groups[group]:
                 if str(utils.extract_real_id(log_dict[ind]["_id"])) != str(log_dict[ind]["_id"]):
                     merged_logs_to_update[log_dict[ind]["_id"]] = (cluster_id, cluster_message)
@@ -269,22 +274,27 @@ class ClusterService:
                             log_ids.append(_id)
                 else:
                     log_ids.append(log_dict[ind]["_id"])
+                test_item_ids.append(int(log_dict[ind]["_source"]["test_item"]))
             if group in additional_results:
                 for log_id in additional_results[group].logIds:
                     if str(utils.extract_real_id(log_id)) != str(log_id):
                         continue
                     log_ids.append(log_id)
             if cluster_id not in clusters_found:
-                clusters_found[cluster_id] = log_ids
+                clusters_found[cluster_id] = (log_ids, test_item_ids)
             else:
-                clusters_found[cluster_id].extend(log_ids)
+                cluster_log_ids, cluster_test_items = clusters_found[cluster_id]
+                cluster_log_ids.extend(log_ids)
+                cluster_test_items.extend(test_item_ids)
+                clusters_found[cluster_id] = (cluster_log_ids, cluster_test_items)
             cluster_message_by_id[cluster_id] = cluster_message
         results_to_return = []
         for cluster_id in clusters_found:
             results_to_return.append(ClusterInfo(
                 clusterId=cluster_id,
                 clusterMessage=cluster_message_by_id[cluster_id],
-                logIds=clusters_found[cluster_id]))
+                logIds=clusters_found[cluster_id][0],
+                itemIds=list(set(clusters_found[cluster_id][1]))))
         return results_to_return, len(results_to_return), merged_logs_to_update
 
     def regroup_by_error_ans_status_codes(self, log_messages, log_dict):
@@ -383,7 +393,6 @@ class ClusterService:
                                 "cluster_with_numbers": not launch_info.cleanNumbers}})
                 self.es_client._bulk_index(bodies)
         except Exception as err:
-            print(err)
             logger.error(err)
             errors_found.append(utils.extract_exception(err))
             errors_count += 1

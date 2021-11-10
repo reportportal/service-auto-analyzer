@@ -41,6 +41,7 @@ class Log(BaseModel):
     """Log object"""
     logId: int
     logLevel: int = 0
+    logTime: List[int] = list(datetime.now().timetuple())[:7]
     message: str
     clusterId: int = 0
     clusterMessage: str = ""
@@ -78,6 +79,7 @@ class Launch(BaseModel):
     launchId: int
     project: int
     launchName: str = ""
+    launchStartTime: List[int] = list(datetime.now().timetuple())[:7]
     analyzerConfig: AnalyzerConf = AnalyzerConf()
     testItems: List[TestItem] = []
     clusters: dict = {}
@@ -141,6 +143,12 @@ class SuggestAnalysisResult(BaseModel):
 class CleanIndex(BaseModel):
     """Clean index object"""
     ids: List[int]
+    project: int
+
+
+class CleanIndexStrIds(BaseModel):
+    """Clean index object that supports string ids"""
+    ids: List[str]
     project: int
 
 

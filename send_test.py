@@ -82,6 +82,7 @@ index_data = [{
     "launchId": 1,
     "project": 34,
     "launchName": "dsfdsf",
+    "launchStartTime": [2021, 11, 8, 11, 23, 13],
     "analyzerConfig": {
         "minDocFreq": 1.0,
         "minTermFreq": 1.0,
@@ -99,9 +100,11 @@ index_data = [{
                    "logs": [
                        {"logId": 3,
                         "logLevel": 40000,
+                        "logTime": [2021, 11, 8, 11, 23, 13],
                         "message": "assertionError occured"},
                        {"logId": 4,
                         "logLevel": 40000,
+                        "logTime": [2021, 11, 9, 11, 23, 13],
                         "message": "assertionError occured \r\n error found \r\n error mined \r\n"}, ]
                    },
                   {"testItemId": 5,
@@ -112,12 +115,14 @@ index_data = [{
                    "logs": [
                        {"logId": 5,
                         "logLevel": 40000,
+                        "logTime": [2021, 11, 10, 11, 23, 13],
                         "message": "assertionError occured \r\n error found \r\n error mined"}, ]
                    }, ],
 }, {
     "launchId": 2,
     "project": 34,
     "launchName": "dsfdsf",
+    "launchStartTime": [2021, 9, 8, 11, 23, 13],
     "analyzerConfig": {
         "minDocFreq": 1.0,
         "minTermFreq": 1.0,
@@ -135,9 +140,11 @@ index_data = [{
                    "logs": [
                        {"logId": 6,
                         "logLevel": 40000,
+                        "logTime": [2021, 9, 8, 11, 23, 13],
                         "message": "assertionError occured"},
                        {"logId": 8,
                         "logLevel": 40000,
+                        "logTime": [2021, 9, 9, 11, 23, 13],
                         "message": "assertionError occured \r\n error found \r\n error mined"}, ]
                    },
                   {"testItemId": 78,
@@ -148,9 +155,11 @@ index_data = [{
                    "logs": [
                        {"logId": 45,
                         "logLevel": 40000,
+                        "logTime": [2021, 9, 10, 11, 23, 13],
                         "message": "assertionError occured"},
                        {"logId": 81,
                         "logLevel": 40000,
+                        "logTime": [2021, 9, 11, 11, 23, 13],
                         "message": "assertionError occured \r\n error found \r\n error mined"}, ]
                    },
                   {"testItemId": 10,
@@ -161,6 +170,7 @@ index_data = [{
                    "logs": [
                        {"logId": 38,
                         "logLevel": 40000,
+                        "logTime": [2021, 9, 12, 11, 23, 13],
                         "message": "assertionError occured \r\n error found \r\n error mined"}]
                    },
                   {"testItemId": 15,
@@ -171,15 +181,18 @@ index_data = [{
                    "logs": [
                        {"logId": 555,
                         "logLevel": 40000,
+                        "logTime": [2021, 9, 13, 11, 23, 13],
                         "message": "assertionError occured"},
                        {"logId": 556,
                         "logLevel": 40000,
+                        "logTime": [2021, 9, 14, 11, 23, 13],
                         "message": "nullpointerException occured"}]
                    }],
 }, {
     "launchId": 1,
     "project": 34,
     "launchName": "dsfdsf",
+    "launchStartTime": [2021, 11, 8, 11, 23, 13],
     "analyzerConfig": {
         "minDocFreq": 1.0,
         "minTermFreq": 1.0,
@@ -197,9 +210,11 @@ index_data = [{
                    "logs": [
                        {"logId": 32,
                         "logLevel": 40000,
+                        "logTime": [2021, 11, 10, 11, 23, 13],
                         "message": "assertionError occured"},
                        {"logId": 46,
                         "logLevel": 40000,
+                        "logTime": [2021, 11, 11, 11, 23, 13],
                         "message": "assertionError occured \r\n error found \r\n error mined"}, ]
                    },
                   {"testItemId": 13,
@@ -210,9 +225,11 @@ index_data = [{
                    "logs": [
                        {"logId": 78,
                         "logLevel": 40000,
+                        "logTime": [2021, 11, 12, 11, 23, 13],
                         "message": "assertionError occured \r\n error found \r\n error mined"},
                        {"logId": 113,
                         "logLevel": 40000,
+                        "logTime": [2021, 11, 13, 12, 23, 13],
                         "message": "nullpointerException occured \r\n error occurred \r\n error mined"}]
                    },
                   {"testItemId": 14,
@@ -223,9 +240,11 @@ index_data = [{
                    "logs": [
                        {"logId": 111,
                         "logLevel": 40000,
+                        "logTime": [2021, 11, 14, 11, 23, 13],
                         "message": "assertionError occured"},
                        {"logId": 112,
                         "logLevel": 40000,
+                        "logTime": [2021, 11, 15, 11, 23, 13],
                         "message": "nullpointerException occured"}]
                    }]}]
 
@@ -332,6 +351,18 @@ index_suggest_info_items = [{
     "clusterId": 2202462168660536
 }]
 
+remove_by_launch_start_time_data = {
+    "project": 34,
+    "interval_start_date": "2021-08-18 00:30:10",
+    "interval_end_date": "2021-10-05 00:30:10",
+}
+
+remove_by_log_time_data = {
+    "project": 34,
+    "interval_start_date": "2021-09-11 00:30:10",
+    "interval_end_date": "2021-11-09 00:30:10",
+}
+
 used_method = sys.argv[1] if len(sys.argv) > 1 else "index"
 for_update = False
 if len(sys.argv) > 2:
@@ -362,6 +393,10 @@ elif used_method.strip() in ["launch_remove"]:
     response = rpc.call(json.dumps(delete_launches), used_method)
 elif used_method.strip() in ["index_suggest_info"]:
     response = rpc.call(json.dumps(index_suggest_info_items), used_method)
+elif used_method.strip() in ["remove_by_launch_start_time"]:
+    response = rpc.call(json.dumps(remove_by_launch_start_time_data), used_method)
+elif used_method.strip() in ["remove_by_log_time"]:
+    response = rpc.call(json.dumps(remove_by_log_time_data), used_method)
 elif used_method.strip() in ["cluster"]:
     if not for_update:
         response = rpc.call(json.dumps({"launch": index_data[0],

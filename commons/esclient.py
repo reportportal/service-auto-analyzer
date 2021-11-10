@@ -29,6 +29,7 @@ from commons.log_merger import LogMerger
 from queue import Queue
 from commons.log_preparation import LogPreparation
 from amqp.amqp import AmqpClient
+from typing import List
 
 logger = logging.getLogger("analyzerApp.esclient")
 
@@ -544,3 +545,69 @@ class EsClient:
             if "deleted" in result:
                 deleted_logs += result["deleted"]
         return deleted_logs
+
+    def __time_range_query(
+            self,
+            time_field: str,
+            gte_time: str,
+            lte_time: str,
+            for_scan: bool = False,
+    ) -> dict:
+        query = {"query": {"range": {time_field: {"gte": gte_time, "lte": lte_time}}}}
+        if for_scan:
+            query["size"] = self.app_config["esChunkNumber"]
+        return query
+
+    @utils.ignore_warnings
+    def get_launch_ids_by_start_time_range(
+            self, project: int, start_date: str, end_date: str
+    ) -> List[str]:
+        index_name = utils.unite_project_name(
+            str(project), self.app_config["esProjectIndexPrefix"]
+        )
+        query = self.__time_range_query(
+            "launch_start_time", start_date, end_date, for_scan=True
+        )
+        launch_ids = set()
+        for log in elasticsearch.helpers.scan(
+            self.es_client, query=query, index=index_name
+        ):
+            launch_ids.add(log["_source"]["launch_id"])
+        return list(launch_ids)
+
+    @utils.ignore_warnings
+    def remove_by_launch_start_time_range(
+            self, project: int, start_date: str, end_date: str
+    ) -> int:
+        index_name = utils.unite_project_name(
+            str(project), self.app_config["esProjectIndexPrefix"]
+        )
+        query = self.__time_range_query("launch_start_time", start_date, end_date)
+        delete_response = self.es_client.delete_by_query(index_name, body=query)
+        return delete_response["deleted"]
+
+    @utils.ignore_warnings
+    def get_log_ids_by_log_time_range(
+            self, project: int, start_date: str, end_date: str
+    ) -> List[str]:
+        index_name = utils.unite_project_name(
+            str(project), self.app_config["esProjectIndexPrefix"]
+        )
+        query = self.__time_range_query("log_time", start_date, end_date, for_scan=True)
+        log_ids = set()
+        for log in elasticsearch.helpers.scan(
+            self.es_client, query=query, index=index_name
+        ):
+            log_ids.add(log["_id"])
+        return list(log_ids)
+
+    @utils.ignore_warnings
+    def remove_by_log_time_range(
+            self, project: int, start_date: str, end_date: str
+    ) -> int:
+        index_name = utils.unite_project_name(
+            str(project), self.app_config["esProjectIndexPrefix"]
+        )
+        query = self.__time_range_query("log_time", start_date, end_date)
+        delete_response = self.es_client.delete_by_query(index_name, body=query)
+        return delete_response["deleted"]

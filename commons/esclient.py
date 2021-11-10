@@ -41,6 +41,7 @@ class EsClient:
         self.search_cfg = search_cfg
         self.es_client = self.create_es_client(app_config)
         self.log_preparation = LogPreparation()
+        self.log_merger = LogMerger()
         self.tables_to_recreate = ["rp_aa_stats", "rp_model_train_stats",
                                    "rp_suggestions_info_metrics"]
 
@@ -74,11 +75,6 @@ class EsClient:
         """Build test item query"""
         if full_log:
             return {
-                "_source": ["message", "test_item", "log_level", "found_exceptions",
-                            "potential_status_codes", "original_message_lines",
-                            "original_message_words_number", "issue_type", "launch_id",
-                            "launch_name", "unique_id", "test_case_hash", "start_time",
-                            "is_auto_analyzed", "cluster_id", "cluster_message", "found_tests_and_methods"],
                 "size": self.app_config["esChunkNumber"],
                 "query": {
                     "bool": {
@@ -268,7 +264,7 @@ class EsClient:
                     test_items_dict[test_item_id] = []
                 test_items_dict[test_item_id].append(r)
             for test_item_id in test_items_dict:
-                merged_logs = LogMerger.decompose_logs_merged_and_without_duplicates(
+                merged_logs = self.log_merger.decompose_logs_merged_and_without_duplicates(
                     test_items_dict[test_item_id])
                 for log in merged_logs:
                     if log["_source"]["is_merged"]:

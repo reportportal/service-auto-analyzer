@@ -20,6 +20,7 @@ import logging
 import sure # noqa
 import httpretty
 from utils import utils
+from commons import model_chooser
 
 
 class TestService(unittest.TestCase):
@@ -53,6 +54,7 @@ class TestService(unittest.TestCase):
         self.one_hit_search_rs = "one_hit_search_rs.json"
         self.one_hit_search_rs_search_logs = "one_hit_search_rs_search_logs.json"
         self.two_hits_search_rs = "two_hits_search_rs.json"
+        self.two_hits_search_rs_second_message = "two_hits_search_rs_second_message.json"
         self.two_hits_search_rs_search_logs = "two_hits_search_rs_search_logs.json"
         self.three_hits_search_rs = "three_hits_search_rs.json"
         self.launch_w_test_items_w_logs_different_log_level =\
@@ -117,6 +119,22 @@ class TestService(unittest.TestCase):
         self.suggest_info_test_items_by_id_2 = "suggest_info_test_items_by_id_2.json"
         self.suggest_index_test_item_update = "suggest_index_test_item_update.json"
         self.suggest_index_test_item_update_2 = "suggest_index_test_item_update_2.json"
+        self.launch_w_items_clustering_with_different_errors =\
+            "launch_w_items_clustering_with_different_errors.json"
+        self.cluster_update_all_the_same_es_with_different_errors =\
+            "cluster_update_all_the_same_es_with_different_errors.json"
+        self.search_logs_rq_first_group_assertion_error = \
+            "search_logs_rq_first_group_assertion_error.json"
+        self.search_logs_rq_first_group_assertion_error_status_code = \
+            "search_logs_rq_first_group_assertion_error_status_code.json"
+        self.search_logs_rq_first_group_no_such_element = \
+            "search_logs_rq_first_group_no_such_element.json"
+        self.search_logs_rq_with_status_codes = \
+            "search_logs_rq_with_status_codes.json"
+        self.two_hits_search_rs_search_logs_with_status_codes = \
+            "two_hits_search_rs_search_logs_with_status_codes.json"
+        self.search_not_merged_logs_by_test_item = \
+            "search_not_merged_logs_by_test_item.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
             "esUser": "",
@@ -140,6 +158,7 @@ class TestService(unittest.TestCase):
             "esProjectIndexPrefix": ""
         }
         self.model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
+        self.model_chooser = model_chooser.ModelChooser(self.app_config, self.get_default_search_config())
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings
@@ -157,10 +176,11 @@ class TestService(unittest.TestCase):
             "BoostLaunch":    2,
             "BoostUniqueID":  2,
             "MaxQueryTerms":  50,
-            "SearchLogsMinShouldMatch": "98%",
-            "SearchLogsMinSimilarity": 0.9,
-            "NoDefectMinSimilarity": 0.98,
+            "SearchLogsMinShouldMatch": "95%",
+            "SearchLogsMinSimilarity": 0.95,
+            "ClusterLogsMinSimilarity": 0.95,
             "MinWordLength":  0,
+            "TimeWeightDecay": 0.95,
             "PatternLabelMinPercentToSuggest": 0.5,
             "PatternLabelMinCountToSuggest":   5,
             "PatternMinCountToSuggest":        10,
@@ -177,7 +197,8 @@ class TestService(unittest.TestCase):
             "RetrainSuggestBoostModelConfig":
                 self.model_settings["RETRAIN_SUGGEST_BOOST_MODEL_CONFIG"],
             "RetrainAutoBoostModelConfig":
-                self.model_settings["RETRAIN_AUTO_BOOST_MODEL_CONFIG"]
+                self.model_settings["RETRAIN_AUTO_BOOST_MODEL_CONFIG"],
+            "MaxSuggestionsNumber": 3
         }
 
     @utils.ignore_warnings

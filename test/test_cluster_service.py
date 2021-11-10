@@ -465,6 +465,71 @@ class TestClusterService(TestService):
                             clusterMessage="error occured \n error found \n error mined",
                             logIds=[4, 5, 9, 111])
                     ])
+            },
+            {
+                "test_calls":          [{"method":         httpretty.GET,
+                                         "uri":            "/2",
+                                         "status":         HTTPStatus.OK,
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/2/_search",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             utils.get_fixture(
+                                             self.search_logs_rq_first_group_assertion_error),
+                                         "rs":             utils.get_fixture(
+                                             self.no_hits_search_rs),
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/2/_search",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             utils.get_fixture(
+                                             self.search_logs_rq_first_group_assertion_error_status_code),
+                                         "rs":             utils.get_fixture(
+                                             self.no_hits_search_rs),
+                                         },
+                                        {"method":         httpretty.GET,
+                                         "uri":            "/2/_search",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             utils.get_fixture(
+                                             self.search_logs_rq_first_group_no_such_element),
+                                         "rs":             utils.get_fixture(
+                                             self.no_hits_search_rs),
+                                         },
+                                        {"method":         httpretty.POST,
+                                         "uri":            "/_bulk?refresh=true",
+                                         "status":         HTTPStatus.OK,
+                                         "content_type":   "application/json",
+                                         "rq":             utils.get_fixture(
+                                             self.cluster_update_all_the_same_es_with_different_errors),
+                                         "rs":             utils.get_fixture(
+                                             self.index_logs_rs),
+                                         }],
+                "launch_info":            launch_objects.LaunchInfoForClustering(
+                    launch=launch_objects.Launch(
+                        **utils.get_fixture(
+                            self.launch_w_items_clustering_with_different_errors, to_json=True)),
+                    forUpdate=False,
+                    numberOfLogLines=2),
+                "expected_result":     launch_objects.ClusterResult(
+                    project=2,
+                    launchId=1,
+                    clusters=[
+                        launch_objects.ClusterInfo(
+                            clusterId="6653850107754598",
+                            clusterMessage="AssertionError error occured \r\n error found",
+                            logIds=[4]),
+                        launch_objects.ClusterInfo(
+                            clusterId="3007109971644807",
+                            clusterMessage="AssertionError status code: 500 error occured \r\n error found",
+                            logIds=[5]),
+                        launch_objects.ClusterInfo(
+                            clusterId="5952168702333922",
+                            clusterMessage="NoSuchElementException error occured \r\n error found",
+                            logIds=[9]),
+                    ])
             }
         ]
 

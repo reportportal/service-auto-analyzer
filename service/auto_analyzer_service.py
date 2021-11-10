@@ -18,7 +18,6 @@ from commons.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandida
 from boosting_decision_making import boosting_featurizer
 from service.analyzer_service import AnalyzerService
 from amqp.amqp import AmqpClient
-from commons.log_merger import LogMerger
 from commons.similarity_calculator import SimilarityCalculator
 import json
 import logging
@@ -33,8 +32,9 @@ EARLY_FINISH = False
 
 class AutoAnalyzerService(AnalyzerService):
 
-    def __init__(self, app_config={}, search_cfg={}):
-        super(AutoAnalyzerService, self).__init__(app_config=app_config, search_cfg=search_cfg)
+    def __init__(self, model_chooser, app_config={}, search_cfg={}):
+        super(AutoAnalyzerService, self).__init__(
+            model_chooser, app_config=app_config, search_cfg=search_cfg)
 
     def get_config_for_boosting(self, analyzer_config):
         min_should_match = self.find_min_should_match_threshold(analyzer_config) / 100
@@ -47,7 +47,9 @@ class AutoAnalyzerService(AnalyzerService):
                 analyzer_config.numberOfLogLines, min_should_match),
             "number_of_log_lines": analyzer_config.numberOfLogLines,
             "filter_by_unique_id": True,
-            "boosting_model": self.search_cfg["BoostModelFolder"]
+            "boosting_model": self.search_cfg["BoostModelFolder"],
+            "filter_by_all_logs_should_be_similar": analyzer_config.allMessagesShouldMatch,
+            "time_weight_decay": self.search_cfg["TimeWeightDecay"]
         }
 
     def choose_fields_to_filter_strict(self, log_lines, min_should_match):
@@ -57,25 +59,6 @@ class AutoAnalyzerService(AnalyzerService):
         if min_should_match > 0.99:
             fields.append("found_tests_and_methods")
         return fields
-
-    def add_constraints_for_launches_into_query(self, query, launch):
-        if launch.analyzerConfig.analyzerMode in ["LAUNCH_NAME"]:
-            query["query"]["bool"]["must"].append(
-                {"term": {
-                    "launch_name": {
-                        "value": launch.launchName}}})
-        elif launch.analyzerConfig.analyzerMode in ["CURRENT_LAUNCH"]:
-            query["query"]["bool"]["must"].append(
-                {"term": {
-                    "launch_id": {
-                        "value": launch.launchId}}})
-        else:
-            query["query"]["bool"]["should"].append(
-                {"term": {
-                    "launch_name": {
-                        "value": launch.launchName,
-                        "boost": abs(self.search_cfg["BoostLaunch"])}}})
-        return query
 
     def get_min_should_match_setting(self, launch):
         return "{}%".format(launch.analyzerConfig.minShouldMatch)\
@@ -126,12 +109,6 @@ class AutoAnalyzerService(AnalyzerService):
                                                 log["_source"]["merged_small_logs"],
                                                 field_name="merged_small_logs",
                                                 boost=0.5))
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["only_numbers"],
-                                                field_name="only_numbers",
-                                                boost=4.0,
-                                                override_min_should_match="1"))
         else:
             query["query"]["bool"]["filter"].append({"term": {"is_merged": True}})
             query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
@@ -140,29 +117,27 @@ class AutoAnalyzerService(AnalyzerService):
                                                 log["_source"]["merged_small_logs"],
                                                 field_name="merged_small_logs",
                                                 boost=2.0))
+
         if log["_source"]["found_exceptions"].strip():
             query["query"]["bool"]["must"].append(
                 self.build_more_like_this_query("1",
                                                 log["_source"]["found_exceptions"],
                                                 field_name="found_exceptions",
-                                                boost=4.0,
+                                                boost=8.0,
                                                 override_min_should_match="1"))
-        if log["_source"]["potential_status_codes"].strip():
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["potential_status_codes"],
-                                                field_name="potential_status_codes",
-                                                boost=4.0,
-                                                override_min_should_match="1"))
-        if log["_source"]["found_tests_and_methods"].strip():
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["found_tests_and_methods"],
-                                                field_name="found_tests_and_methods",
-                                                boost=4.0,
-                                                override_min_should_match="1"))
+        for field, boost_score in [
+                ("detected_message_without_params_extended", 2.0),
+                ("only_numbers", 2.0), ("potential_status_codes", 8.0),
+                ("found_tests_and_methods", 2), ("test_item_name", 2.0)]:
+            if log["_source"][field].strip():
+                query["query"]["bool"]["should"].append(
+                    self.build_more_like_this_query("1",
+                                                    log["_source"][field],
+                                                    field_name=field,
+                                                    boost=boost_score,
+                                                    override_min_should_match="1"))
 
-        return query
+        return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
     def build_query_with_no_defect(self, launch, log, size=10):
         min_should_match = self.get_min_should_match_setting(launch)
@@ -200,14 +175,31 @@ class AutoAnalyzerService(AnalyzerService):
                 self.build_more_like_this_query(min_should_match,
                                                 log["_source"]["merged_small_logs"],
                                                 field_name="merged_small_logs"))
-        return query
+        if log["_source"]["found_exceptions"].strip():
+            query["query"]["bool"]["must"].append(
+                self.build_more_like_this_query("1",
+                                                log["_source"]["found_exceptions"],
+                                                field_name="found_exceptions",
+                                                boost=8.0,
+                                                override_min_should_match="1"))
+        if log["_source"]["potential_status_codes"].strip():
+            number_of_status_codes = str(len(set(log["_source"]["potential_status_codes"].split())))
+            query["query"]["bool"]["must"].append(
+                self.build_more_like_this_query("1",
+                                                log["_source"]["potential_status_codes"],
+                                                field_name="potential_status_codes",
+                                                boost=8.0,
+                                                override_min_should_match=number_of_status_codes))
+        return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
-    def find_relevant_with_no_defect(self, candidates_with_no_defect, boosting_config):
+    def leave_only_similar_logs(self, candidates_with_no_defect, boosting_config):
+        new_results = []
         for log_info, search_res in candidates_with_no_defect:
             no_defect_candidate_exists = False
             for log in search_res["hits"]["hits"]:
                 if log["_source"]["issue_type"][:2].lower() in ["nd", "ti"]:
                     no_defect_candidate_exists = True
+            new_search_res = []
             _similarity_calculator = SimilarityCalculator(
                 boosting_config,
                 weighted_similarity_calculator=self.weighted_log_similarity_calculator)
@@ -215,21 +207,57 @@ class AutoAnalyzerService(AnalyzerService):
                 _similarity_calculator.find_similarity(
                     [(log_info, search_res)],
                     ["message", "merged_small_logs"])
-                latest_type = None
-                latest_item = None
-                for obj in reversed(search_res["hits"]["hits"]):
+                for obj in search_res["hits"]["hits"]:
                     group_id = (obj["_id"], log_info["_id"])
                     if group_id in _similarity_calculator.similarity_dict["message"]:
                         sim_val = _similarity_calculator.similarity_dict["message"][group_id]
                         if sim_val["both_empty"]:
                             sim_val = _similarity_calculator.similarity_dict["merged_small_logs"][group_id]
-                        threshold = self.search_cfg["NoDefectMinSimilarity"]
+                        threshold = boosting_config["min_should_match"]
                         if not sim_val["both_empty"] and sim_val["similarity"] >= threshold:
-                            latest_type = obj["_source"]["issue_type"]
-                            latest_item = obj
-                if latest_type and latest_type[:2].lower() in ["nd", "ti"]:
-                    return latest_item
-        return None
+                            new_search_res.append(obj)
+            new_results.append((log_info, {"hits": {"hits": new_search_res}}))
+        return new_results
+
+    def filter_by_all_logs_should_be_similar(self, candidates_with_no_defect, boosting_config):
+        if boosting_config["filter_by_all_logs_should_be_similar"]:
+            test_item_stats = {}
+            for log_info, search_res in candidates_with_no_defect:
+                for log in search_res["hits"]["hits"]:
+                    if log["_source"]["test_item"] not in test_item_stats:
+                        test_item_stats[log["_source"]["test_item"]] = 0
+                    test_item_stats[log["_source"]["test_item"]] += 1
+            new_results = []
+            for log_info, search_res in candidates_with_no_defect:
+                new_search_res = []
+                for log in search_res["hits"]["hits"]:
+                    if log["_source"]["test_item"] in test_item_stats:
+                        if test_item_stats[log["_source"]["test_item"]] == len(candidates_with_no_defect):
+                            new_search_res.append(log)
+                new_results.append((log_info, {"hits": {"hits": new_search_res}}))
+            return new_results
+        return candidates_with_no_defect
+
+    def find_relevant_with_no_defect(self, candidates_with_no_defect, boosting_config):
+        candidates_with_no_defect = self.leave_only_similar_logs(
+            candidates_with_no_defect, boosting_config)
+        candidates_with_no_defect = self.filter_by_all_logs_should_be_similar(
+            candidates_with_no_defect, boosting_config)
+        for log_info, search_res in candidates_with_no_defect:
+            latest_type = None
+            latest_item = None
+            latest_date = None
+            for obj in search_res["hits"]["hits"]:
+                logger.debug("%s %s %s", obj["_source"]["start_time"], obj["_source"]["issue_type"],
+                             obj["_source"]["test_item"])
+                start_time = datetime.strptime(obj["_source"]["start_time"], '%Y-%m-%d %H:%M:%S')
+                if latest_date is None or latest_date < start_time:
+                    latest_type = obj["_source"]["issue_type"]
+                    latest_item = obj
+                    latest_date = start_time
+            if latest_type and latest_type[:2].lower() in ["nd", "ti"]:
+                return [(log_info, {"hits": {"hits": [latest_item]}})]
+        return []
 
     def _send_result_to_queue(self, test_item_dict, batches, batch_logs):
         t_start = time()
@@ -290,7 +318,7 @@ class AutoAnalyzerService(AnalyzerService):
                     unique_logs = utils.leave_only_unique_logs(test_item.logs)
                     prepared_logs = [self.log_preparation._prepare_log(launch, test_item, log, index_name)
                                      for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
-                    results = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+                    results = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
 
                     for log in results:
                         message = log["_source"]["message"].strip()
@@ -392,17 +420,6 @@ class AutoAnalyzerService(AnalyzerService):
                     results_to_share[launch_id]["processed_time"] += analyzer_candidates.timeProcessed
                     boosting_config = self.get_config_for_boosting(analyzer_candidates.analyzerConfig)
 
-                    relevant_with_no_defect = self.find_relevant_with_no_defect(
-                        analyzer_candidates.candidatesWithNoDefect, boosting_config)
-                    if relevant_with_no_defect is not None:
-                        analysis_result = AnalysisResult(
-                            testItem=analyzer_candidates.testItemId,
-                            issueType=relevant_with_no_defect["_source"]["issue_type"],
-                            relevantItem=relevant_with_no_defect["_source"]["test_item"])
-                        results.append(analysis_result)
-                        logger.debug("Found relevant item with No defect %s", analysis_result)
-                        continue
-
                     if project_id not in chosen_namespaces:
                         chosen_namespaces[project_id] = self.namespace_finder.get_chosen_namespaces(
                             project_id)
@@ -410,90 +427,109 @@ class AutoAnalyzerService(AnalyzerService):
                     _boosting_decision_maker = self.model_chooser.choose_model(
                         project_id, "auto_analysis_model/",
                         custom_model_prob=self.search_cfg["ProbabilityForCustomModelAutoAnalysis"])
-
-                    boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
-                        analyzer_candidates.candidates,
-                        boosting_config,
-                        feature_ids=_boosting_decision_maker.get_feature_ids(),
-                        weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
+                    features_dict_objects = _boosting_decision_maker.features_dict_with_saved_objects
                     if project_id not in defect_type_model_to_use:
                         defect_type_model_to_use[project_id] = self.model_chooser.choose_model(
                             project_id, "defect_type_model/")
-                    boosting_data_gatherer.set_defect_type_model(defect_type_model_to_use[project_id])
-                    feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
-                    model_info_tags = boosting_data_gatherer.get_used_model_info() +\
-                        _boosting_decision_maker.get_model_info()
-                    results_to_share[launch_id]["model_info"].update(model_info_tags)
 
-                    if len(feature_data) > 0:
+                    relevant_with_no_defect_candidate = self.find_relevant_with_no_defect(
+                        analyzer_candidates.candidatesWithNoDefect, boosting_config)
 
-                        predicted_labels, predicted_labels_probability =\
-                            _boosting_decision_maker.predict(feature_data)
+                    candidates_to_check = []
+                    if relevant_with_no_defect_candidate:
+                        candidates_to_check.append(relevant_with_no_defect_candidate)
+                    candidates_to_check.append(analyzer_candidates.candidates)
 
-                        scores_by_issue_type = boosting_data_gatherer.scores_by_issue_type
+                    found_result = False
 
-                        for i in range(len(issue_type_names)):
-                            logger.debug("Most relevant item with issue type %s has id %s",
-                                         issue_type_names[i],
-                                         boosting_data_gatherer.
-                                         scores_by_issue_type[issue_type_names[i]]["mrHit"]["_id"])
-                            logger.debug("Issue type %s has label %d and probability %.3f for features %s",
-                                         issue_type_names[i],
-                                         predicted_labels[i],
-                                         predicted_labels_probability[i][1],
-                                         feature_data[i])
+                    for candidates in candidates_to_check:
+                        boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
+                            candidates,
+                            boosting_config,
+                            feature_ids=_boosting_decision_maker.get_feature_ids(),
+                            weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
+                            features_dict_with_saved_objects=features_dict_objects)
+                        boosting_data_gatherer.set_defect_type_model(defect_type_model_to_use[project_id])
+                        feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
+                        model_info_tags = boosting_data_gatherer.get_used_model_info() +\
+                            _boosting_decision_maker.get_model_info()
+                        results_to_share[launch_id]["model_info"].update(model_info_tags)
 
-                        predicted_issue_type, prob, global_idx = utils.choose_issue_type(
-                            predicted_labels,
-                            predicted_labels_probability,
-                            issue_type_names,
-                            boosting_data_gatherer.scores_by_issue_type)
+                        if len(feature_data) > 0:
 
-                        if predicted_issue_type:
-                            chosen_type = scores_by_issue_type[predicted_issue_type]
-                            relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
-                            analysis_result = AnalysisResult(testItem=analyzer_candidates.testItemId,
-                                                             issueType=predicted_issue_type,
-                                                             relevantItem=relevant_item)
-                            feature_names = ";".join(
-                                [str(f_) for f_ in _boosting_decision_maker.get_feature_ids()])
-                            relevant_log_id = utils.extract_real_id(chosen_type["mrHit"]["_id"])
-                            test_item_log_id = utils.extract_real_id(chosen_type["compared_log"]["_id"])
-                            analyzed_results_for_index.append(SuggestAnalysisResult(
-                                project=analyzer_candidates.project,
-                                testItem=analyzer_candidates.testItemId,
-                                testItemLogId=test_item_log_id,
-                                launchId=analyzer_candidates.launchId,
-                                launchName=analyzer_candidates.launchName,
-                                issueType=predicted_issue_type,
-                                relevantItem=relevant_item,
-                                relevantLogId=relevant_log_id,
-                                isMergedLog=chosen_type["compared_log"]["_source"]["is_merged"],
-                                matchScore=round(prob * 100, 2),
-                                esScore=round(chosen_type["mrHit"]["_score"], 2),
-                                esPosition=chosen_type["mrHit"]["es_pos"],
-                                modelFeatureNames=feature_names,
-                                modelFeatureValues=";".join(
-                                    [str(feature) for feature in feature_data[global_idx]]),
-                                modelInfo=";".join(model_info_tags),
-                                resultPosition=0,
-                                usedLogLines=analyzer_candidates.analyzerConfig.numberOfLogLines,
-                                minShouldMatch=self.find_min_should_match_threshold(
-                                    analyzer_candidates.analyzerConfig),
-                                processedTime=time() - t_start_item,
-                                methodName="auto_analysis",
-                                userChoice=1))  # default choice in AA, user will change via defect change
+                            predicted_labels, predicted_labels_probability =\
+                                _boosting_decision_maker.predict(feature_data)
 
-                            results.append(analysis_result)
-                            logger.debug(analysis_result)
+                            scores_by_issue_type = boosting_data_gatherer.scores_by_issue_type
+
+                            for i in range(len(issue_type_names)):
+                                logger.debug(
+                                    "Most relevant item with issue type %s has id %s",
+                                    issue_type_names[i],
+                                    boosting_data_gatherer.
+                                    scores_by_issue_type[issue_type_names[i]]["mrHit"]["_id"])
+                                logger.debug(
+                                    "Issue type %s has label %d and probability %.3f for features %s",
+                                    issue_type_names[i],
+                                    predicted_labels[i],
+                                    predicted_labels_probability[i][1],
+                                    feature_data[i])
+
+                            predicted_issue_type, prob, global_idx = utils.choose_issue_type(
+                                predicted_labels,
+                                predicted_labels_probability,
+                                issue_type_names,
+                                boosting_data_gatherer.scores_by_issue_type)
+
+                            if predicted_issue_type:
+                                chosen_type = scores_by_issue_type[predicted_issue_type]
+                                relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
+                                analysis_result = AnalysisResult(testItem=analyzer_candidates.testItemId,
+                                                                 issueType=predicted_issue_type,
+                                                                 relevantItem=relevant_item)
+                                relevant_log_id = utils.extract_real_id(chosen_type["mrHit"]["_id"])
+                                test_item_log_id = utils.extract_real_id(chosen_type["compared_log"]["_id"])
+                                analyzed_results_for_index.append(SuggestAnalysisResult(
+                                    project=analyzer_candidates.project,
+                                    testItem=analyzer_candidates.testItemId,
+                                    testItemLogId=test_item_log_id,
+                                    launchId=analyzer_candidates.launchId,
+                                    launchName=analyzer_candidates.launchName,
+                                    issueType=predicted_issue_type,
+                                    relevantItem=relevant_item,
+                                    relevantLogId=relevant_log_id,
+                                    isMergedLog=chosen_type["compared_log"]["_source"]["is_merged"],
+                                    matchScore=round(prob * 100, 2),
+                                    esScore=round(chosen_type["mrHit"]["_score"], 2),
+                                    esPosition=chosen_type["mrHit"]["es_pos"],
+                                    modelFeatureNames=";".join(_boosting_decision_maker.get_feature_names()),
+                                    modelFeatureValues=";".join(
+                                        [str(feature) for feature in feature_data[global_idx]]),
+                                    modelInfo=";".join(model_info_tags),
+                                    resultPosition=0,
+                                    usedLogLines=analyzer_candidates.analyzerConfig.numberOfLogLines,
+                                    minShouldMatch=self.find_min_should_match_threshold(
+                                        analyzer_candidates.analyzerConfig),
+                                    processedTime=time() - t_start_item,
+                                    methodName="auto_analysis",
+                                    userChoice=1))  # default choice in AA, user will change via defect change
+
+                                results.append(analysis_result)
+                                found_result = True
+                                logger.debug(analysis_result)
+                            else:
+                                logger.debug("Test item %s has no relevant items",
+                                             analyzer_candidates.testItemId)
                         else:
-                            results_to_share[launch_id]["not_found"] += 1
-                            logger.debug("Test item %s has no relevant items", analyzer_candidates.testItemId)
-                    else:
+                            logger.debug("There are no results for test item %s",
+                                         analyzer_candidates.testItemId)
+
+                        if found_result:
+                            break
+
+                    if not found_result:
                         results_to_share[launch_id]["not_found"] += 1
-                        logger.debug("There are no results for test item %s", analyzer_candidates.testItemId)
-                    results_to_share[launch_id]["processed_time"] += (
-                        time() - t_start_item)
+                    results_to_share[launch_id]["processed_time"] += (time() - t_start_item)
                 except Exception as err:
                     logger.error(err)
                     if launch_id in results_to_share:

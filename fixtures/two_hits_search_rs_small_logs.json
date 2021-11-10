@@ -19,6 +19,7 @@
                 "_id": "1",
                 "_score": 158.08437,
                 "_source": {
+                    "start_time": "2021-07-31 18:34:55",
                     "issue_type": "AB001",
                     "launch_name": "Launch 1",
                     "launch_id": 13,
@@ -27,6 +28,7 @@
                     "original_message_words_number": 6,
                     "message": "",
                     "test_item": 1,
+                    "test_item_name": "first test",
                     "unique_id": "unique1",
                     "merged_small_logs": "report portal returned error found screenshot",
                     "detected_message": "",
@@ -55,6 +57,7 @@
                 "_id": "2",
                 "_score": 77.53298,
                 "_source": {
+                    "start_time": "2021-07-31 18:34:55",
                     "issue_type": "PB001",
                     "launch_name": "Launch 1",
                     "launch_id": 13,
@@ -63,6 +66,7 @@
                     "original_message_words_number": 7,
                     "message": "",
                     "test_item": 2,
+                    "test_item_name": "first test 2",
                     "unique_id": "unique2",
                     "merged_small_logs": "report portal returned first assertionerror found screenshot",
                     "detected_message": "",

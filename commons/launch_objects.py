@@ -26,12 +26,15 @@ class AnalyzerConf(BaseModel):
     numberOfLogLines: int = -1
     isAutoAnalyzerEnabled: bool = True
     indexingRunning: bool = True
+    allMessagesShouldMatch: bool = False
+    searchLogsMinShouldMatch: int = 95
 
 
 class SearchLogInfo(BaseModel):
     """Search log info"""
     logId: int
     testItemId: int
+    matchScore: float
 
 
 class Log(BaseModel):
@@ -52,6 +55,7 @@ class TestItem(BaseModel):
     originalIssueType: str = ""
     startTime: List[int] = list(datetime.now().timetuple())[:7]
     testCaseHash: int = 0
+    testItemName: str = ""
     logs: List[Log] = []
 
 
@@ -62,6 +66,7 @@ class TestItemInfo(BaseModel):
     testCaseHash: int = 0
     launchId: int
     launchName: str = ""
+    testItemName: str = ""
     project: int
     analyzerConfig: AnalyzerConf = AnalyzerConf()
     logs: List[Log] = []
@@ -142,6 +147,7 @@ class SearchLogs(BaseModel):
     projectId: int
     filteredLaunchIds: List[int]
     logMessages: List[str]
+    analyzerConfig: AnalyzerConf = AnalyzerConf()
     logLines: int
 
 

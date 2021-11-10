@@ -1,0 +1,59 @@
+{
+    "_scroll_id":"DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAADl8Wa1lLdFBYRHlRanF6V3BoS1lpRjhQQQ==",
+    "took": 13,
+    "timed_out": false,
+    "_shards": {
+        "total": 1,
+        "successful": 1,
+        "failed": 0
+    },
+    "hits": {
+        "total": {
+            "value": 2,
+            "relation": "eq"
+        },
+        "max_score": 15,
+        "hits": [
+            {
+                "_index": "idx3",
+                "_type": "log",
+                "_id": "1_m",
+                "_score": 15,
+                "_source": {
+                    "issue_type": "AB001",
+                    "launch_name": "Launch 1",
+                    "log_level": 40000,
+                    "merged_small_logs": "error occured once status code: but got",
+                    "message": "",
+                    "test_item": 3,
+                    "unique_id": "unique1",
+                    "stacktrace": "",
+                    "detected_message": "error occured once",
+                    "detected_message_with_numbers": "error occured once",
+                    "only_numbers": "",
+                    "potential_status_codes": "500 204"
+                }
+            },
+            {
+                "_index": "idx3",
+                "_type": "log",
+                "_id": "2_m",
+                "_score": 10,
+                "_source": {
+                    "issue_type": "PB001",
+                    "launch_name": "Launch 1",
+                    "log_level": 40000,
+                    "merged_small_logs": "error occured once status code: but got",
+                    "message": "",
+                    "test_item": 1,
+                    "unique_id": "unique1",
+                    "stacktrace": "",
+                    "detected_message": "error occured twice",
+                    "detected_message_with_numbers": "error occured twice",
+                    "only_numbers": "",
+                    "potential_status_codes": "500 200"
+                }
+            }
+        ]
+    }
+}

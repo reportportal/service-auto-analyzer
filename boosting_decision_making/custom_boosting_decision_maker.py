@@ -39,6 +39,15 @@ class CustomBoostingDecisionMaker(BoostingDecisionMaker):
             self.project_id, os.path.join(folder, "data_features_config"),
             using_json=False)
         assert len(self.full_config) > 0
+        if self.object_saver.does_object_exists(
+                self.project_id, os.path.join(folder, "features_dict_with_saved_objects")):
+            features_dict_with_saved_objects = self.object_saver.get_project_object(
+                self.project_id, os.path.join(folder, "features_dict_with_saved_objects"),
+                using_json=False)
+            self.features_dict_with_saved_objects = self.transform_feature_encoders_to_objects(
+                features_dict_with_saved_objects)
+        else:
+            self.features_dict_with_saved_objects = {}
 
     def save_model(self, folder):
         self.object_saver.put_project_object(
@@ -48,4 +57,8 @@ class CustomBoostingDecisionMaker(BoostingDecisionMaker):
         self.object_saver.put_project_object(
             [self.full_config, self.feature_ids, self.monotonous_features],
             self.project_id, os.path.join(folder, "data_features_config"),
+            using_json=False)
+        self.object_saver.put_project_object(
+            self.transform_feature_encoders_to_dict(),
+            self.project_id, os.path.join(folder, "features_dict_with_saved_objects"),
             using_json=False)

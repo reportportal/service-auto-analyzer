@@ -20,11 +20,13 @@ from boosting_decision_making import boosting_featurizer
 class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
 
     def __init__(self, all_results, config, feature_ids,
-                 weighted_log_similarity_calculator=None):
+                 weighted_log_similarity_calculator=None,
+                 features_dict_with_saved_objects=None):
         boosting_featurizer.BoostingFeaturizer.__init__(
             self,
             all_results, config, feature_ids=feature_ids,
-            weighted_log_similarity_calculator=weighted_log_similarity_calculator)
+            weighted_log_similarity_calculator=weighted_log_similarity_calculator,
+            features_dict_with_saved_objects=features_dict_with_saved_objects)
 
     def _calculate_percent_issue_types(self):
         scores_by_issue_type = self.find_most_relevant_by_type()

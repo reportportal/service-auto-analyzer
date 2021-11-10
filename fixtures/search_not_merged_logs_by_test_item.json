@@ -1,0 +1,1 @@
+{"_source": ["test_item"], "query": {"bool": {"filter": [{"terms": {"test_item": ["1"]}}, {"term": {"is_merged": false}}]}}, "size": 1000, "sort": "_doc"}

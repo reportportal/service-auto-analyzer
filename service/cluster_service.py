@@ -38,7 +38,9 @@ class ClusterService:
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
         self.log_preparation = LogPreparation()
 
-    def build_search_similar_items_query(self, launch_id, test_item, message, same_launch=False):
+    def build_search_similar_items_query(self, queried_log, message,
+                                         same_launch=False,
+                                         min_should_match="95%"):
         """Build search query"""
         query = {
             "_source": ["whole_message", "test_item",
@@ -53,40 +55,60 @@ class ClusterService:
                         {"term": {"is_merged": False}},
                     ],
                     "must_not": {
-                        "term": {"test_item": {"value": test_item, "boost": 1.0}}
+                        "term": {"test_item": {"value": queried_log["_source"]["test_item"],
+                                               "boost": 1.0}}
                     },
                     "must": [
-                        {"more_like_this": {
-                            "fields":               ["whole_message"],
-                            "like":                 message,
-                            "min_doc_freq":         1,
-                            "min_term_freq":        1,
-                            "minimum_should_match": "5<98%",
-                            "max_query_terms":      self.search_cfg["MaxQueryTerms"],
-                            "boost": 1.0
-                        }}
+                        utils.build_more_like_this_query(
+                            min_should_match, message,
+                            field_name="whole_message", boost=1.0,
+                            override_min_should_match=None,
+                            max_query_terms=self.search_cfg["MaxQueryTerms"])
                     ]}}}
         if same_launch:
             query["query"]["bool"]["must"].append(
-                {"term": {"launch_id": launch_id}})
+                {"term": {"launch_id": queried_log["_source"]["launch_id"]}})
             query["query"]["bool"]["should"] = [{"wildcard": {"cluster_message": "*"}}]
         else:
             query["query"]["bool"]["must"].append({"wildcard": {"cluster_message": "*"}})
+        if queried_log["_source"]["found_exceptions"].strip():
+            query["query"]["bool"]["must"].append(
+                utils.build_more_like_this_query(
+                    "1",
+                    queried_log["_source"]["found_exceptions"],
+                    field_name="found_exceptions", boost=1.0,
+                    override_min_should_match="1",
+                    max_query_terms=self.search_cfg["MaxQueryTerms"]))
+        if queried_log["_source"]["potential_status_codes"].strip():
+            number_of_status_codes = str(len(set(
+                queried_log["_source"]["potential_status_codes"].split())))
+            query["query"]["bool"]["must"].append(
+                utils.build_more_like_this_query(
+                    "1",
+                    queried_log["_source"]["potential_status_codes"],
+                    field_name="potential_status_codes", boost=1.0,
+                    override_min_should_match=number_of_status_codes,
+                    max_query_terms=self.search_cfg["MaxQueryTerms"]))
         return query
 
     def find_similar_items_from_es(
-            self, groups, log_dict, log_messages, log_ids, number_of_lines,
+            self, groups, log_dict,
+            log_messages, log_ids, number_of_lines,
             additional_results,
             same_launch=False):
         new_clusters = {}
         _clusterizer = clusterizer.Clusterizer()
         for global_group in groups:
             first_item_ind = groups[global_group][0]
-            query = self.build_search_similar_items_query(
-                log_dict[first_item_ind]["_source"]["launch_id"],
-                log_dict[first_item_ind]["_source"]["test_item"],
+            min_should_match = utils.calculate_threshold_for_text(
                 log_messages[first_item_ind],
-                same_launch=same_launch)
+                self.search_cfg["ClusterLogsMinSimilarity"])
+            query = self.build_search_similar_items_query(
+                log_dict[first_item_ind],
+                log_messages[first_item_ind],
+                same_launch=same_launch,
+                min_should_match=utils.prepare_es_min_should_match(
+                    min_should_match))
             search_results = self.es_client.es_client.search(
                 index=log_dict[first_item_ind]["_index"],
                 body=query)
@@ -103,7 +125,7 @@ class ClusterService:
                     continue
                 log_messages_part.append(log_message)
                 ind += 1
-            groups_part = _clusterizer.find_clusters(log_messages_part)
+            groups_part = _clusterizer.find_clusters(log_messages_part, threshold=min_should_match)
             new_group = None
             for group in groups_part:
                 if 0 in groups_part[group] and len(groups_part[group]) > 1:
@@ -184,6 +206,44 @@ class ClusterService:
                 logIds=log_ids))
         return results_to_return, cluster_num
 
+    def regroup_by_error_ans_status_codes(self, log_messages, log_dict):
+        regroupped_by_error = {}
+        for i in range(len(log_messages)):
+            found_exceptions = " ".join(
+                sorted(log_dict[i]["_source"]["found_exceptions"].split()))
+            potential_status_codes = " ".join(
+                sorted(log_dict[i]["_source"]["potential_status_codes"].split()))
+            group_key = (found_exceptions, potential_status_codes)
+            if group_key not in regroupped_by_error:
+                regroupped_by_error[group_key] = []
+            regroupped_by_error[group_key].append(i)
+        return regroupped_by_error
+
+    def cluster_messages_with_groupping_by_error(self, log_messages, log_dict):
+        regroupped_by_error = self.regroup_by_error_ans_status_codes(
+            log_messages, log_dict)
+        _clusterizer = clusterizer.Clusterizer()
+        all_groups = {}
+        start_group_id = 0
+        for group_key in regroupped_by_error:
+            log_messages_part = []
+            log_messages_idx_dict = {}
+            for i, idx in enumerate(regroupped_by_error[group_key]):
+                log_messages_part.append(log_messages[idx])
+                log_messages_idx_dict[i] = idx
+            groups = _clusterizer.find_clusters(
+                log_messages_part,
+                threshold=self.search_cfg["ClusterLogsMinSimilarity"])
+            max_group_id = max(groups.keys())
+            for group_id in groups:
+                global_idx = start_group_id + group_id
+                if global_idx not in all_groups:
+                    all_groups[global_idx] = []
+                for i in groups[group_id]:
+                    all_groups[global_idx].append(log_messages_idx_dict[i])
+            start_group_id = start_group_id + max_group_id + 1
+        return all_groups
+
     @utils.ignore_warnings
     def find_clusters(self, launch_info):
         logger.info("Started clusterizing logs")
@@ -198,18 +258,22 @@ class ClusterService:
         errors_count = 0
         cluster_num = 0
         clusters = []
+        log_ids = []
         try:
-            _clusterizer = clusterizer.Clusterizer()
             log_messages, log_dict = self.log_preparation.prepare_logs_for_clustering(
                 launch_info.launch, launch_info.numberOfLogLines, launch_info.cleanNumbers, index_name)
             log_ids = set([int(log["_id"]) for log in log_dict.values()])
-            groups = _clusterizer.find_clusters(log_messages)
+
+            groups = self.cluster_messages_with_groupping_by_error(log_messages, log_dict)
             additional_results = self.find_similar_items_from_es(
-                groups, log_dict, log_messages, log_ids, launch_info.numberOfLogLines,
+                groups, log_dict, log_messages,
+                log_ids, launch_info.numberOfLogLines,
                 {}, same_launch=False)
+
             if launch_info.forUpdate:
                 additional_results = self.find_similar_items_from_es(
-                    groups, log_dict, log_messages, log_ids, launch_info.numberOfLogLines,
+                    groups, log_dict, log_messages,
+                    log_ids, launch_info.numberOfLogLines,
                     additional_results, same_launch=True)
 
             clusters, cluster_num = self.gather_cluster_results(

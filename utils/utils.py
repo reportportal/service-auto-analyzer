@@ -562,20 +562,25 @@ def clean_from_brackets(text):
 
 def get_potential_status_codes(text):
     potential_codes = set()
+    potential_codes_list = []
     for line in text.split("\n"):
         line = clean_from_brackets(line)
-        patterns_to_check = [r"\bcode[^\w\d\.]+(\d+)[^\d;\.]*(\d*)|\bcode[^\w\d\.]+(\d+?)$",
-                             r"\w+_code[^\w\d\.]+(\d+)[^\d;\.]*(\d*)|\w+_code[^\w\d\.]+(\d+?)$"]
+        patterns_to_check = [r"\bcode[^\w\d\.]+(\d+)[^\d]*(\d*)|\bcode[^\w\d\.]+(\d+?)$",
+                             r"\w+_code[^\w\d\.]+(\d+)[^\d]*(\d*)|\w+_code[^\w\d\.]+(\d+?)$",
+                             r"\bstatus[^\w\d\.]+(\d+)[^\d]*(\d*)|\bstatus[^\w\d\.]+(\d+?)$",
+                             r"\w+_status[^\w\d\.]+(\d+)[^\d]*(\d*)|\w+_status[^\w\d\.]+(\d+?)$"]
         for pattern in patterns_to_check:
             result = re.search(pattern, line, flags=re.IGNORECASE)
             for i in range(1, 4):
                 try:
                     found_code = result.group(i)
                     if found_code and found_code.strip():
-                        potential_codes.add(found_code)
+                        if found_code not in potential_codes:
+                            potential_codes.add(found_code)
+                            potential_codes_list.append(found_code)
                 except: # noqa
                     pass
-    return list(potential_codes)
+    return potential_codes_list
 
 
 def choose_issue_type(predicted_labels, predicted_labels_probability,
@@ -583,15 +588,17 @@ def choose_issue_type(predicted_labels, predicted_labels_probability,
     predicted_issue_type = ""
     max_prob = 0.0
     max_val_start_time = None
+    global_idx = 0
     for i in range(len(predicted_labels)):
         if predicted_labels[i] == 1:
             issue_type = issue_type_names[i]
             chosen_type = scores_by_issue_type[issue_type]
             start_time = chosen_type["mrHit"]["_source"]["start_time"]
-            if (predicted_labels_probability[i][1] > max_prob) or\
-                    ((predicted_labels_probability[i][1] == max_prob) and # noqa
+            predicted_prob = round(predicted_labels_probability[i][1], 4)
+            if (predicted_prob > max_prob) or\
+                    ((predicted_prob == max_prob) and # noqa
                         (max_val_start_time is None or start_time > max_val_start_time)):
-                max_prob = predicted_labels_probability[i][1]
+                max_prob = predicted_prob
                 predicted_issue_type = issue_type
                 global_idx = i
                 max_val_start_time = start_time
@@ -727,12 +734,13 @@ def topological_sort(feature_graph):
 
 def to_number_list(features_list):
     feature_numbers_list = []
-    for res in features_list.split(";"):
+    for feature_name in features_list.split(";"):
+        feature_name = feature_name.split("_")[0]
         try:
-            feature_numbers_list.append(int(res))
+            feature_numbers_list.append(int(feature_name))
         except: # noqa
             try:
-                feature_numbers_list.append(float(res))
+                feature_numbers_list.append(float(feature_name))
             except: # noqa
                 pass
     return feature_numbers_list
@@ -747,22 +755,27 @@ def fill_prevously_gathered_features(feature_list, feature_ids):
             for idx, feature in enumerate(feature_ids):
                 if feature not in previously_gathered_features:
                     previously_gathered_features[feature] = []
-                previously_gathered_features[feature].append(feature_list[i][idx])
+                if len(previously_gathered_features[feature]) <= i:
+                    previously_gathered_features[feature].append([])
+                previously_gathered_features[feature][i].append(feature_list[i][idx])
     except Exception as err:
         logger.error(err)
     return previously_gathered_features
 
 
 def gather_feature_list(gathered_data_dict, feature_ids, to_list=False):
-    len_data = 0
-    for feature in feature_ids:
-        len_data = len(gathered_data_dict[feature])
-        break
-    gathered_data = np.zeros((len_data, len(feature_ids)))
+    features_array = None
+    axis_x_size = max(map(lambda x: len(x), gathered_data_dict.values()))
+    if axis_x_size <= 0:
+        return []
     for idx, feature in enumerate(feature_ids):
-        for j in range(len(gathered_data_dict[feature])):
-            gathered_data[j][idx] = round(gathered_data_dict[feature][j], 2)
-    return gathered_data.tolist() if to_list else gathered_data
+        if feature not in gathered_data_dict or len(gathered_data_dict[feature]) == 0:
+            gathered_data_dict[feature] = [[0.0] for i in range(axis_x_size)]
+        if features_array is None:
+            features_array = np.asarray(gathered_data_dict[feature])
+        else:
+            features_array = np.concatenate([features_array, gathered_data_dict[feature]], axis=1)
+    return features_array.tolist() if to_list else features_array
 
 
 def unite_project_name(project_id, prefix):
@@ -811,7 +824,8 @@ def split_and_filter_empty_words(text):
 def remove_guid_uids_from_text(text):
     for pattern in [
             r"[0-9a-fA-F]{16,48}|[0-9a-fA-F]{10,48}\.\.\.",
-            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" # noqa
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", # noqa
+            r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-\w+" # noqa
             ]:
         strings_to_replace = set()
         for m in re.findall(pattern, text):
@@ -820,3 +834,81 @@ def remove_guid_uids_from_text(text):
         for _str in sorted(strings_to_replace, key=lambda x: (len(x), x), reverse=True):
             text = text.replace(_str, " ")
     return text
+
+
+def preprocess_test_item_name(text):
+    text = text.replace("-", " ").replace("_", " ")
+    all_words = []
+    words = split_words(text, to_lower=False, only_unique=False)
+    for w in words:
+        if "." not in w:
+            all_words.extend([s.strip() for s in re.split("([A-Z][^A-Z]+)", w) if s.strip()])
+        else:
+            all_words.extend(
+                [s.strip() for s in enrich_text_with_method_and_classes(w).split(" ") if s.strip()])
+            all_words.extend(
+                [s.strip() for s in re.split("([A-Z][^A-Z]+)", w.split(".")[-1]) if s.strip()])
+    return " ".join(all_words)
+
+
+def preprocess_found_test_methods(text):
+    all_words = []
+    words = split_words(text, to_lower=False, only_unique=False)
+    for w in words:
+        if "." not in w:
+            all_words.extend([s.strip() for s in re.split("([A-Z][^A-Z]+)", w) if s.strip()])
+        else:
+            all_words.append(w)
+    return " ".join(all_words)
+
+
+def get_allowed_number_of_missed(cur_threshold):
+    if cur_threshold >= 0.95 and cur_threshold <= 0.99:
+        return 1
+    if cur_threshold >= 0.9 and cur_threshold < 0.95:
+        return 2
+    if cur_threshold >= 0.8 and cur_threshold < 0.9:
+        return 3
+    return 0
+
+
+def calculate_threshold(
+        text_size, cur_threshold, min_recalculated_threshold=0.8):
+    if not text_size:
+        return cur_threshold
+    allowed_words_missed = get_allowed_number_of_missed(cur_threshold)
+    new_threshold = cur_threshold
+    for words_num in range(allowed_words_missed, 0, -1):
+        threshold = (text_size - allowed_words_missed) / text_size
+        if threshold >= min_recalculated_threshold:
+            new_threshold = round(threshold, 2)
+            break
+    return min(new_threshold, cur_threshold)
+
+
+def calculate_threshold_for_text(text, cur_threshold, min_recalculated_threshold=0.8):
+    text_size = len(split_words(text, only_unique=True))
+    return calculate_threshold(
+        text_size, cur_threshold,
+        min_recalculated_threshold=min_recalculated_threshold)
+
+
+def prepare_es_min_should_match(min_should_match):
+    return str(int(min_should_match * 100)) + "%"
+
+
+def build_more_like_this_query(min_should_match, log_message,
+                               field_name="message", boost=1.0,
+                               override_min_should_match=None,
+                               max_query_terms=50):
+    min_should_match_settings = override_min_should_match
+    if not override_min_should_match:
+        min_should_match_settings = "5<" + min_should_match
+    return {"more_like_this": {
+        "fields":               [field_name],
+        "like":                 log_message,
+        "min_doc_freq":         1,
+        "min_term_freq":        1,
+        "minimum_should_match": min_should_match_settings,
+        "max_query_terms":      max_query_terms,
+        "boost": boost}}

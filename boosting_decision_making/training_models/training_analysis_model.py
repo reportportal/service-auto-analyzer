@@ -17,10 +17,10 @@
 from boosting_decision_making import boosting_decision_maker, custom_boosting_decision_maker
 from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from boosting_decision_making import weighted_similarity_calculator
+from boosting_decision_making.feature_encoding_configurer import FeatureEncodingConfigurer
 from sklearn.model_selection import train_test_split
 import elasticsearch
 import elasticsearch.helpers
-from commons import model_chooser
 from commons.esclient import EsClient
 from commons import namespace_finder
 from imblearn.over_sampling import SMOTE
@@ -38,7 +38,7 @@ logger = logging.getLogger("analyzerApp.trainingAnalysisModel")
 
 class AnalysisModelTraining:
 
-    def __init__(self, app_config, search_cfg):
+    def __init__(self, model_chooser, app_config, search_cfg):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.due_proportion = 0.05
@@ -55,7 +55,7 @@ class AnalysisModelTraining:
             self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
                 WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
-        self.model_chooser = model_chooser.ModelChooser(app_config=app_config, search_cfg=search_cfg)
+        self.model_chooser = model_chooser
         self.metrics_calculations = {
             "F1": self.calculate_F1,
             "Mean Reciprocal Rank": self.calculate_MRR
@@ -105,7 +105,8 @@ class AnalysisModelTraining:
             "filter_by_unique_id": False,
             "boosting_model": self.baseline_folders[boosting_model_name],
             "chosen_namespaces": namespaces,
-            "calculate_similarities": False}
+            "calculate_similarities": False,
+            "time_weight_decay": self.search_cfg["TimeWeightDecay"]}
 
     def get_info_template(self, project_info, baseline_model, model_name, metric_name):
         return {"method": "training", "sub_model_type": "all", "model_type": project_info["model_type"],
@@ -195,22 +196,22 @@ class AnalysisModelTraining:
         log_id_dict = {}
         for i in range(int(len(log_ids_to_find) / batch_size) + 1):
             log_ids = log_ids_to_find[i * batch_size: (i + 1) * batch_size]
+            if not log_ids:
+                continue
             ids_query = {
                 "size": self.app_config["esChunkNumber"],
                 "query": {
                     "bool": {
                         "filter": [
-                            {"terms": {"_id": [str(_id) for _id in log_ids]}}
+                            {"terms": {"_id": log_ids}}
                         ]
                     }
                 }}
-            if not log_ids:
-                continue
             for r in elasticsearch.helpers.scan(self.es_client.es_client,
                                                 query=ids_query,
                                                 index=project_index_name,
                                                 scroll="5m"):
-                log_id_dict[r["_id"]] = r
+                log_id_dict[str(r["_id"])] = r
         return log_id_dict
 
     def get_search_query_suggest(self):
@@ -283,7 +284,7 @@ class AnalysisModelTraining:
                     continue
                 log_id_pairs_set.add(log_ids_pair)
                 for col in ["testItemLogId", "relevantLogId"]:
-                    log_id = res["_source"][col]
+                    log_id = str(res["_source"][col])
                     if res["_source"]["isMergedLog"]:
                         log_id = log_id + "_m"
                     log_ids_to_find.add(log_id)
@@ -301,9 +302,17 @@ class AnalysisModelTraining:
         log_id_dict = self.query_logs(project_id, log_ids_to_find)
         return gathered_suggested_data, log_id_dict
 
-    def gather_data(self, model_type, project_id, features, defect_type_model_to_use):
+    def prepare_encoders(self, features_encoding_config, logs_found):
+        _feature_encoding_configurer = FeatureEncodingConfigurer()
+        _feature_encoding_configurer.initialize_encoders_from_config(features_encoding_config)
+        _feature_encoding_configurer.prepare_encoders(logs_found)
+        return _feature_encoding_configurer.feature_dict_with_encodings
+
+    def gather_data(self, model_type, project_id, features, defect_type_model_to_use, full_config):
         namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
         gathered_suggested_data, log_id_dict = self.query_es_for_suggest_info(project_id)
+        features_dict_with_saved_objects = self.prepare_encoders(
+            full_config["features_encoding_config"], list(log_id_dict.values()))
         full_data_features, labels, test_item_ids_with_pos = [], [], []
         for _suggest_res in gathered_suggested_data:
             searched_res = []
@@ -325,7 +334,8 @@ class AnalysisModelTraining:
                     self.get_config_for_boosting(
                         _suggest_res["_source"]["usedLogLines"], model_type, namespaces),
                     feature_ids=features,
-                    weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
+                    weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
+                    features_dict_with_saved_objects=features_dict_with_saved_objects)
                 _boosting_data_gatherer.set_defect_type_model(defect_type_model_to_use)
                 _boosting_data_gatherer.fill_prevously_gathered_features(
                     [utils.to_number_list(_suggest_res["_source"]["modelFeatureValues"])],
@@ -335,7 +345,8 @@ class AnalysisModelTraining:
                     full_data_features.extend(feature_data)
                     labels.append(_suggest_res["_source"]["userChoice"])
                     test_item_ids_with_pos.append(_suggest_res["_source"]["testItem"])
-        return np.asarray(full_data_features), np.asarray(labels), test_item_ids_with_pos
+        return np.asarray(full_data_features), np.asarray(labels),\
+            test_item_ids_with_pos, features_dict_with_saved_objects
 
     def train(self, project_info):
         time_training = time()
@@ -356,22 +367,26 @@ class AnalysisModelTraining:
         defect_type_model_to_use = self.model_chooser.choose_model(
             project_info["project_id"], "defect_type_model/")
 
-        logger.debug("Initialized training model '%s'", project_info["model_type"])
-        train_data, labels, test_item_ids_with_pos = self.gather_data(
-            project_info["model_type"], project_info["project_id"],
-            self.new_model.get_feature_ids(), defect_type_model_to_use)
-
         metrics_to_gather = ["F1", "Mean Reciprocal Rank"]
         train_log_info = {}
         for metric in metrics_to_gather:
             train_log_info[metric] = self.get_info_template(
                 project_info, baseline_model_folder, model_name, metric)
-            train_log_info[metric]["data_size"] = len(labels)
-            train_log_info[metric]["data_proportion"] = utils.calculate_proportions_for_labels(labels)
 
         errors = []
         errors_count = 0
+        train_data = []
         try:
+            logger.debug("Initialized training model '%s'", project_info["model_type"])
+            train_data, labels, test_item_ids_with_pos, features_dict_with_saved_objects = self.gather_data(
+                project_info["model_type"], project_info["project_id"],
+                self.new_model.get_feature_ids(), defect_type_model_to_use, full_config)
+            self.new_model.features_dict_with_saved_objects = features_dict_with_saved_objects
+
+            for metric in metrics_to_gather:
+                train_log_info[metric]["data_size"] = len(labels)
+                train_log_info[metric]["data_proportion"] = utils.calculate_proportions_for_labels(labels)
+
             logger.debug("Loaded data for training model '%s'", project_info["model_type"])
             baseline_model_results, new_model_results, bad_data = self.train_several_times(
                 train_data, labels, self.new_model.get_feature_ids(),

@@ -23,6 +23,7 @@ from service.search_service import SearchService
 from service.suggest_service import SuggestService
 from service.auto_analyzer_service import AutoAnalyzerService
 from utils import utils
+from commons import model_chooser
 
 
 class TestEsQuery(unittest.TestCase):
@@ -63,15 +64,16 @@ class TestEsQuery(unittest.TestCase):
             "appVersion":        "",
             "esChunkNumber":     1000
         }
+        self.model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
+        self.model_chooser = model_chooser.ModelChooser(self.app_config, self.get_default_search_config())
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings
     def tearDown(self):
         logging.disable(logging.DEBUG)
 
-    @staticmethod
     @utils.ignore_warnings
-    def get_default_search_config():
+    def get_default_search_config(self):
         """Get default search config"""
         return {
             "MinShouldMatch": "80%",
@@ -84,16 +86,25 @@ class TestEsQuery(unittest.TestCase):
             "SearchLogsMinShouldMatch": "90%",
             "SearchLogsMinSimilarity": 0.9,
             "MinWordLength":  0,
-            "BoostModelFolder":    "",
-            "SimilarityWeightsFolder":     "",
-            "GlobalDefectTypeModelFolder": "",
-            "SuggestBoostModelFolder":     ""
+            "BoostModelFolder":
+                self.model_settings["BOOST_MODEL_FOLDER"],
+            "SimilarityWeightsFolder":
+                self.model_settings["SIMILARITY_WEIGHTS_FOLDER"],
+            "SuggestBoostModelFolder":
+                self.model_settings["SUGGEST_BOOST_MODEL_FOLDER"],
+            "GlobalDefectTypeModelFolder":
+                self.model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"],
+            "TimeWeightDecay": 0.95,
+            "RetrainSuggestBoostModelConfig":
+                self.model_settings["RETRAIN_SUGGEST_BOOST_MODEL_CONFIG"],
+            "RetrainAutoBoostModelConfig":
+                self.model_settings["RETRAIN_AUTO_BOOST_MODEL_CONFIG"]
         }
 
     @utils.ignore_warnings
     def test_build_analyze_query_all_logs_empty_stacktrace(self):
         """Tests building analyze query"""
-        search_cfg = TestEsQuery.get_default_search_config()
+        search_cfg = self.get_default_search_config()
 
         launch = launch_objects.Launch(**{
             "analyzerConfig": {"analyzerMode": "ALL", "numberOfLogLines": -1},
@@ -104,20 +115,23 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
+                "test_item_name":   "test item Common Query",
                 "message":          "hello world",
                 "merged_small_logs":  "",
                 "detected_message": "hello world",
                 "detected_message_with_numbers": "hello world 1",
+                "detected_message_without_params_extended": "hello world",
                 "stacktrace": "",
                 "only_numbers": "1",
                 "found_exceptions": "AssertionError",
                 "potential_status_codes": "",
                 "found_tests_and_methods": ""}}
         query_from_service = AutoAnalyzerService(
-            self.app_config, search_cfg).build_analyze_query(launch, log)
+            self.model_chooser, self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(self.query_all_logs_empty_stacktrace, to_json=True)
 
         query_from_service.should.equal(demo_query)
@@ -125,7 +139,7 @@ class TestEsQuery(unittest.TestCase):
     @utils.ignore_warnings
     def test_build_analyze_query_two_log_lines(self):
         """Tests building analyze query"""
-        search_cfg = TestEsQuery.get_default_search_config()
+        search_cfg = self.get_default_search_config()
 
         launch = launch_objects.Launch(**{
             "analyzerConfig": {"analyzerMode": "ALL", "numberOfLogLines": 2},
@@ -136,20 +150,23 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
+                "test_item_name":   "test item Common Query",
                 "message":          "hello world",
                 "merged_small_logs":  "",
                 "detected_message": "hello world",
                 "detected_message_with_numbers": "hello world 1",
+                "detected_message_without_params_extended": "hello world",
                 "stacktrace": "",
                 "only_numbers": "1",
                 "found_exceptions": "AssertionError",
                 "potential_status_codes": "",
                 "found_tests_and_methods": ""}}
         query_from_service = AutoAnalyzerService(
-            self.app_config, search_cfg).build_analyze_query(launch, log)
+            self.model_chooser, self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(self.query_two_log_lines, to_json=True)
 
         query_from_service.should.equal(demo_query)
@@ -157,7 +174,7 @@ class TestEsQuery(unittest.TestCase):
     @utils.ignore_warnings
     def test_build_analyze_query_two_log_lines_only_current_launch(self):
         """Tests building analyze query"""
-        search_cfg = TestEsQuery.get_default_search_config()
+        search_cfg = self.get_default_search_config()
 
         launch = launch_objects.Launch(**{
             "analyzerConfig": {"analyzerMode": "CURRENT_LAUNCH", "numberOfLogLines": 2},
@@ -168,20 +185,23 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
+                "test_item_name":   "test item Common Query",
                 "message":          "hello world",
                 "merged_small_logs":  "",
                 "detected_message": "hello world",
                 "detected_message_with_numbers": "hello world 1",
+                "detected_message_without_params_extended": "hello world",
                 "stacktrace": "",
                 "only_numbers": "1",
                 "found_exceptions": "AssertionError",
                 "potential_status_codes": "",
                 "found_tests_and_methods": "FindAllMessagesTest.findMessage"}}
         query_from_service = AutoAnalyzerService(
-            self.app_config, search_cfg).build_analyze_query(launch, log)
+            self.model_chooser, self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(
             self.query_two_log_lines_only_current_launch, to_json=True)
 
@@ -190,7 +210,7 @@ class TestEsQuery(unittest.TestCase):
     @utils.ignore_warnings
     def test_build_analyze_query_two_log_lines_only_current_launch_wo_exceptions(self):
         """Tests building analyze query"""
-        search_cfg = TestEsQuery.get_default_search_config()
+        search_cfg = self.get_default_search_config()
 
         launch = launch_objects.Launch(**{
             "analyzerConfig": {"analyzerMode": "CURRENT_LAUNCH", "numberOfLogLines": 2},
@@ -201,20 +221,23 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
+                "test_item_name":   "test item Common Query",
                 "message":          "hello world",
                 "merged_small_logs":  "",
                 "detected_message": "hello world",
                 "detected_message_with_numbers": "hello world 1",
+                "detected_message_without_params_extended": "hello world",
                 "stacktrace": "",
                 "only_numbers": "1",
                 "found_exceptions": "",
                 "potential_status_codes": "",
                 "found_tests_and_methods": ""}}
         query_from_service = AutoAnalyzerService(
-            self.app_config, search_cfg).build_analyze_query(launch, log)
+            self.model_chooser, self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(
             self.query_two_log_lines_only_current_launch_wo_exceptions, to_json=True)
 
@@ -223,7 +246,7 @@ class TestEsQuery(unittest.TestCase):
     @utils.ignore_warnings
     def test_build_analyze_query_all_logs_nonempty_stacktrace(self):
         """Tests building analyze query"""
-        search_cfg = TestEsQuery.get_default_search_config()
+        search_cfg = self.get_default_search_config()
 
         launch = launch_objects.Launch(**{
             "analyzerConfig": {"analyzerMode": "ALL", "numberOfLogLines": -1},
@@ -234,20 +257,23 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
+                "test_item_name":   "test item Common Query",
                 "message":          "hello world",
                 "merged_small_logs":  "",
                 "detected_message": "hello world",
                 "detected_message_with_numbers": "hello world 1",
+                "detected_message_without_params_extended": "hello world",
                 "stacktrace": "invoke.method(arg)",
                 "only_numbers": "1",
                 "found_exceptions": "AssertionError",
                 "potential_status_codes": "",
                 "found_tests_and_methods": ""}}
         query_from_service = AutoAnalyzerService(
-            self.app_config, search_cfg).build_analyze_query(launch, log)
+            self.model_chooser, self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(self.query_all_logs_nonempty_stacktrace, to_json=True)
 
         query_from_service.should.equal(demo_query)
@@ -255,7 +281,7 @@ class TestEsQuery(unittest.TestCase):
     @utils.ignore_warnings
     def test_build_analyze_query_all_logs_nonempty_stacktrace_launches_with_the_same_name(self):
         """Tests building analyze query"""
-        search_cfg = TestEsQuery.get_default_search_config()
+        search_cfg = self.get_default_search_config()
 
         launch = launch_objects.Launch(**{
             "analyzerConfig": {"analyzerMode": "LAUNCH_NAME", "numberOfLogLines": -1},
@@ -266,20 +292,23 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
+                "test_item_name":   "test item Common Query",
                 "message":          "hello world",
                 "merged_small_logs":  "",
                 "detected_message": "hello world",
                 "detected_message_with_numbers": "hello world 1",
+                "detected_message_without_params_extended": "hello world",
                 "stacktrace": "invoke.method(arg)",
                 "only_numbers": "1",
                 "found_exceptions": "AssertionError",
                 "potential_status_codes": "300 401",
                 "found_tests_and_methods": ""}}
         query_from_service = AutoAnalyzerService(
-            self.app_config, search_cfg).build_analyze_query(launch, log)
+            self.model_chooser, self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(
             self.query_all_logs_nonempty_stacktrace_launches_with_the_same_name, to_json=True)
 
@@ -288,7 +317,7 @@ class TestEsQuery(unittest.TestCase):
     @utils.ignore_warnings
     def test_build_analyze_query_merged_small_logs_search(self):
         """Tests building analyze query"""
-        search_cfg = TestEsQuery.get_default_search_config()
+        search_cfg = self.get_default_search_config()
 
         launch = launch_objects.Launch(**{
             "analyzerConfig": {"analyzerMode": "ALL", "numberOfLogLines": -1},
@@ -299,20 +328,23 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
+                "test_item_name":   "test item Common Query",
                 "message":          "",
                 "merged_small_logs":  "hello world",
                 "detected_message": "",
                 "detected_message_with_numbers": "",
+                "detected_message_without_params_extended": "hello world",
                 "stacktrace": "",
                 "only_numbers": "",
                 "found_exceptions": "AssertionError",
                 "potential_status_codes": "",
                 "found_tests_and_methods": ""}}
         query_from_service = AutoAnalyzerService(
-            self.app_config, search_cfg).build_analyze_query(launch, log)
+            self.model_chooser, self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(self.query_merged_small_logs_search, to_json=True)
 
         query_from_service.should.equal(demo_query)
@@ -320,7 +352,7 @@ class TestEsQuery(unittest.TestCase):
     @utils.ignore_warnings
     def test_build_search_query(self):
         """Tests building analyze query"""
-        search_cfg = TestEsQuery.get_default_search_config()
+        search_cfg = self.get_default_search_config()
 
         search_req = launch_objects.SearchLogs(**{
             "launchId": 1,
@@ -330,36 +362,20 @@ class TestEsQuery(unittest.TestCase):
             "filteredLaunchIds": [1, 2, 3],
             "logMessages": ["log message 1"],
             "logLines": -1})
-        query_from_service = SearchService(self.app_config, search_cfg).build_search_query(
-            search_req, "log message 1")
-        demo_query = utils.get_fixture(self.query_search_logs, to_json=True)
-
-        query_from_service.should.equal(demo_query)
-
-    @utils.ignore_warnings
-    def test_build_suggest_query_all_logs_empty_stacktrace(self):
-        """Tests building analyze query"""
-        search_cfg = TestEsQuery.get_default_search_config()
-
-        test_item_info = launch_objects.TestItemInfo(**{
-            "analyzerConfig": {"analyzerMode": "ALL", "numberOfLogLines": -1},
-            "launchId": 12,
-            "launchName": "Launch name",
-            "project": 1,
-            "testCaseHash": 1,
-            "uniqueId": "unique",
-            "testItemId": 2})
         log = {
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
+                "test_item_name":   "test item Common Query",
                 "message":          "hello world 'sdf'",
                 "merged_small_logs":  "",
                 "detected_message": "hello world 'sdf'",
                 "detected_message_with_numbers": "hello world 1 'sdf'",
+                "detected_message_without_params_extended": "hello world",
                 "stacktrace": "",
                 "only_numbers": "1",
                 "found_exceptions": "AssertionError",
@@ -368,14 +384,62 @@ class TestEsQuery(unittest.TestCase):
                 "urls": "",
                 "paths": "",
                 "message_without_params_extended": "hello world",
+                "stacktrace_extended": "",
+                "message_extended": "hello world 'sdf'",
+                "detected_message_extended": "hello world 'sdf'",
+                "potential_status_codes": "300 500",
+                "found_tests_and_methods": "FindAllMessagesTest.findMessage"
+            }}
+        query_from_service = SearchService(self.app_config, search_cfg).build_search_query(
+            search_req, log)
+        demo_query = utils.get_fixture(self.query_search_logs, to_json=True)
+
+        query_from_service.should.equal(demo_query)
+
+    @utils.ignore_warnings
+    def test_build_suggest_query_all_logs_empty_stacktrace(self):
+        """Tests building analyze query"""
+        search_cfg = self.get_default_search_config()
+
+        test_item_info = launch_objects.TestItemInfo(**{
+            "analyzerConfig": {"analyzerMode": "ALL", "numberOfLogLines": -1},
+            "launchId": 12,
+            "launchName": "Launch name",
+            "project": 1,
+            "test_item_name":   "test item Common Query",
+            "testCaseHash": 1,
+            "uniqueId": "unique",
+            "testItemId": 2})
+        log = {
+            "_id":    1,
+            "_index": 1,
+            "_source": {
+                "start_time": "2021-08-30 08:11:23",
+                "unique_id":        "unique",
+                "test_case_hash":   1,
+                "test_item":        "123",
+                "test_item_name":   "test item Common Query",
+                "message":          "hello world 'sdf'",
+                "merged_small_logs":  "",
+                "detected_message": "hello world 'sdf'",
+                "detected_message_with_numbers": "hello world 1 'sdf'",
                 "detected_message_without_params_extended": "hello world",
+                "stacktrace": "",
+                "only_numbers": "1",
+                "found_exceptions": "AssertionError",
+                "found_exceptions_extended": "AssertionError",
+                "message_params": "sdf",
+                "urls": "",
+                "paths": "",
+                "message_without_params_extended": "hello world",
                 "stacktrace_extended": "",
                 "message_extended": "hello world 'sdf'",
                 "detected_message_extended": "hello world 'sdf'",
                 "potential_status_codes": "",
                 "found_tests_and_methods": "FindAllMessagesTest.findMessage"
             }}
-        query_from_service = SuggestService(self.app_config, search_cfg).build_suggest_query(
+        query_from_service = SuggestService(
+            self.model_chooser, self.app_config, search_cfg).build_suggest_query(
             test_item_info, log,
             message_field="message_extended", det_mes_field="detected_message_extended",
             stacktrace_field="stacktrace_extended")
@@ -386,13 +450,14 @@ class TestEsQuery(unittest.TestCase):
     @utils.ignore_warnings
     def test_build_suggest_query_two_log_lines(self):
         """Tests building analyze query"""
-        search_cfg = TestEsQuery.get_default_search_config()
+        search_cfg = self.get_default_search_config()
 
         test_item_info = launch_objects.TestItemInfo(**{
             "analyzerConfig": {"analyzerMode": "ALL", "numberOfLogLines": 2},
             "launchId": 12,
             "launchName": "Launch name",
             "project": 1,
+            "test_item_name":   "test item Common Query",
             "testCaseHash": 1,
             "uniqueId": "unique",
             "testItemId": 2})
@@ -400,9 +465,11 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
+                "test_item_name":   "test item Common Query",
                 "message":          "hello world 'sdf'",
                 "merged_small_logs":  "",
                 "detected_message": "hello world 'sdf'",
@@ -422,7 +489,8 @@ class TestEsQuery(unittest.TestCase):
                 "potential_status_codes": "400 200",
                 "found_tests_and_methods": ""
             }}
-        query_from_service = SuggestService(self.app_config, search_cfg).build_suggest_query(
+        query_from_service = SuggestService(
+            self.model_chooser, self.app_config, search_cfg).build_suggest_query(
             test_item_info, log,
             message_field="message_extended", det_mes_field="detected_message_extended",
             stacktrace_field="stacktrace_extended")
@@ -433,13 +501,14 @@ class TestEsQuery(unittest.TestCase):
     @utils.ignore_warnings
     def test_build_suggest_query_all_logs_nonempty_stacktrace(self):
         """Tests building analyze query"""
-        search_cfg = TestEsQuery.get_default_search_config()
+        search_cfg = self.get_default_search_config()
 
         test_item_info = launch_objects.TestItemInfo(**{
             "analyzerConfig": {"analyzerMode": "ALL", "numberOfLogLines": -1},
             "launchId": 12,
             "launchName": "Launch name",
             "project": 1,
+            "test_item_name": "test item Common Query",
             "testCaseHash": 1,
             "uniqueId": "unique",
             "testItemId": 2})
@@ -447,9 +516,11 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
+                "test_item_name":   "test item Common Query",
                 "message":          "hello world 'sdf'",
                 "merged_small_logs":  "",
                 "detected_message": "hello world 'sdf'",
@@ -469,7 +540,8 @@ class TestEsQuery(unittest.TestCase):
                 "potential_status_codes": "",
                 "found_tests_and_methods": ""
             }}
-        query_from_service = SuggestService(self.app_config, search_cfg).build_suggest_query(
+        query_from_service = SuggestService(
+            self.model_chooser, self.app_config, search_cfg).build_suggest_query(
             test_item_info, log,
             message_field="message_extended", det_mes_field="detected_message_extended",
             stacktrace_field="stacktrace_extended")
@@ -480,13 +552,14 @@ class TestEsQuery(unittest.TestCase):
     @utils.ignore_warnings
     def test_build_suggest_query_all_logs_nonempty_stacktrace_launches_with_the_same_name(self):
         """Tests building analyze query"""
-        search_cfg = TestEsQuery.get_default_search_config()
+        search_cfg = self.get_default_search_config()
 
         test_item_info = launch_objects.TestItemInfo(**{
             "analyzerConfig": {"analyzerMode": "LAUNCH_NAME", "numberOfLogLines": -1},
             "launchId": 12,
             "launchName": "Launch name",
             "project": 1,
+            "test_item_name": "test item Common Query",
             "testCaseHash": 1,
             "uniqueId": "unique",
             "testItemId": 2})
@@ -494,9 +567,11 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
+                "test_item_name":   "test item Common Query",
                 "message":          "hello world 'sdf'",
                 "merged_small_logs":  "",
                 "detected_message": "hello world 'sdf'",
@@ -516,7 +591,8 @@ class TestEsQuery(unittest.TestCase):
                 "potential_status_codes": "200 401",
                 "found_tests_and_methods": ""
             }}
-        query_from_service = SuggestService(self.app_config, search_cfg).build_suggest_query(
+        query_from_service = SuggestService(
+            self.model_chooser, self.app_config, search_cfg).build_suggest_query(
             test_item_info, log,
             message_field="message_without_params_extended",
             det_mes_field="detected_message_without_params_extended",
@@ -529,13 +605,14 @@ class TestEsQuery(unittest.TestCase):
     @utils.ignore_warnings
     def test_build_suggest_query_merged_small_logs_search(self):
         """Tests building analyze query"""
-        search_cfg = TestEsQuery.get_default_search_config()
+        search_cfg = self.get_default_search_config()
 
         test_item_info = launch_objects.TestItemInfo(**{
             "analyzerConfig": {"analyzerMode": "ALL", "numberOfLogLines": -1},
             "launchId": 12,
             "launchName": "Launch name",
             "project": 1,
+            "test_item_name":   "test item Common Query",
             "testCaseHash": 1,
             "uniqueId": "unique",
             "testItemId": 2})
@@ -543,9 +620,11 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
+                "test_item_name":   "test item Common Query",
                 "message":          "",
                 "merged_small_logs":  "hello world",
                 "detected_message": "",
@@ -558,13 +637,14 @@ class TestEsQuery(unittest.TestCase):
                 "urls": "",
                 "paths": "",
                 "message_without_params_extended": "",
-                "detected_message_without_params_extended": "",
+                "detected_message_without_params_extended": "hello world",
                 "stacktrace_extended": "",
                 "message_extended": "",
                 "detected_message_extended": "",
                 "potential_status_codes": "200 400",
                 "found_tests_and_methods": "FindAllMessagesTest.findMessage"}}
-        query_from_service = SuggestService(self.app_config, search_cfg).build_suggest_query(
+        query_from_service = SuggestService(
+            self.model_chooser, self.app_config, search_cfg).build_suggest_query(
             test_item_info, log,
             message_field="message_extended", det_mes_field="detected_message_extended",
             stacktrace_field="stacktrace_extended")
@@ -575,7 +655,7 @@ class TestEsQuery(unittest.TestCase):
     @utils.ignore_warnings
     def test_build_query_with_no_defect(self):
         """Tests building analyze query with finding No defect"""
-        search_cfg = TestEsQuery.get_default_search_config()
+        search_cfg = self.get_default_search_config()
 
         launch = launch_objects.Launch(**{
             "analyzerConfig": {"analyzerMode": "LAUNCH_NAME", "numberOfLogLines": -1},
@@ -586,9 +666,11 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
+                "test_item_name":   "test item Common Query",
                 "message":          "hello world",
                 "merged_small_logs":  "",
                 "detected_message": "hello world",
@@ -599,7 +681,7 @@ class TestEsQuery(unittest.TestCase):
                 "potential_status_codes": "300 401",
                 "found_tests_and_methods": ""}}
         query_from_service = AutoAnalyzerService(
-            self.app_config, search_cfg).build_query_with_no_defect(launch, log)
+            self.model_chooser, self.app_config, search_cfg).build_query_with_no_defect(launch, log)
         demo_query = utils.get_fixture(self.query_analyze_items_including_no_defect, to_json=True)
 
         query_from_service.should.equal(demo_query)
@@ -607,7 +689,7 @@ class TestEsQuery(unittest.TestCase):
     @utils.ignore_warnings
     def test_build_query_with_no_defect_small_logs(self):
         """Tests building analyze query with finding No defect for small logs"""
-        search_cfg = TestEsQuery.get_default_search_config()
+        search_cfg = self.get_default_search_config()
 
         launch = launch_objects.Launch(**{
             "analyzerConfig": {"analyzerMode": "LAUNCH_NAME", "numberOfLogLines": -1},
@@ -618,9 +700,11 @@ class TestEsQuery(unittest.TestCase):
             "_id":    1,
             "_index": 1,
             "_source": {
+                "start_time": "2021-08-30 08:11:23",
                 "unique_id":        "unique",
                 "test_case_hash":   1,
                 "test_item":        "123",
+                "test_item_name":   "test item Common Query",
                 "message":          "",
                 "merged_small_logs":  "hello world",
                 "detected_message": "",
@@ -631,7 +715,7 @@ class TestEsQuery(unittest.TestCase):
                 "potential_status_codes": "300 401",
                 "found_tests_and_methods": ""}}
         query_from_service = AutoAnalyzerService(
-            self.app_config, search_cfg).build_query_with_no_defect(launch, log)
+            self.model_chooser, self.app_config, search_cfg).build_query_with_no_defect(launch, log)
         demo_query = utils.get_fixture(
             self.query_analyze_items_including_no_defect_small_logs, to_json=True)
 

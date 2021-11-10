@@ -187,7 +187,7 @@ class TestAutoAnalyzerService(TestService):
                     self.launch_w_test_items_w_logs),
                 "expected_count": 1,
                 "expected_issue_type": "AB001",
-                "boost_predict":       ([1], [[0.2, 0.8]])
+                "boost_predict":       ([1, 0], [[0.2, 0.8], [0.7, 0.3]])
             },
             {
                 "test_calls":     [{"method":         httpretty.GET,
@@ -225,7 +225,7 @@ class TestAutoAnalyzerService(TestService):
                     "minioSecretKey":    "",
                     "esProjectIndexPrefix": "rp_"
                 },
-                "boost_predict":       ([1], [[0.2, 0.8]])
+                "boost_predict":       ([1, 0], [[0.2, 0.8], [0.7, 0.3]])
             },
             {
                 "test_calls":     [{"method":         httpretty.GET,
@@ -242,7 +242,23 @@ class TestAutoAnalyzerService(TestService):
                 "expected_count": 1,
                 "expected_id": 34,
                 "expected_issue_type": "ND001",
-                "boost_predict":       ([], [])
+                "boost_predict":       ([1], [[0.1, 0.9]])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.OK,
+                                    }],
+                "msearch_results": [
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.two_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.two_hits_with_no_defect, to_json=True)],
+                "index_rq":       utils.get_fixture(
+                    self.launch_w_test_items_w_logs),
+                "expected_count": 0,
+                "expected_issue_type": "",
+                "boost_predict":       ([0], [[0.9, 0.1]])
             },
             {
                 "test_calls":     [{"method":         httpretty.GET,
@@ -260,6 +276,57 @@ class TestAutoAnalyzerService(TestService):
                 "expected_id": 2,
                 "expected_issue_type": "PB001",
                 "boost_predict":       ([0, 1], [[0.8, 0.2], [0.3, 0.7]])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.OK,
+                                    }],
+                "msearch_results": [
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.three_hits_search_rs_with_one_unique_id, to_json=True),
+                    utils.get_fixture(self.three_hits_search_rs_with_one_unique_id, to_json=True)],
+                "index_rq":       utils.get_fixture(
+                    self.launch_w_test_items_w_logs),
+                "expected_count": 0,
+                "expected_issue_type": "",
+                "analyzer_config":     launch_objects.AnalyzerConf(allMessagesShouldMatch=True),
+                "boost_predict":       ([], [])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.OK,
+                                    }],
+                "msearch_results": [
+                    utils.get_fixture(self.two_hits_search_rs_second_message, to_json=True),
+                    utils.get_fixture(self.two_hits_search_rs_second_message, to_json=True),
+                    utils.get_fixture(self.two_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.two_hits_search_rs, to_json=True)],
+                "index_rq":       utils.get_fixture(
+                    self.launch_w_test_items_w_logs),
+                "expected_count": 1,
+                "expected_issue_type": "AB001",
+                "analyzer_config":     launch_objects.AnalyzerConf(allMessagesShouldMatch=True),
+                "boost_predict":       ([1], [[0.3, 0.7]])
+            },
+            {
+                "test_calls":     [{"method":         httpretty.GET,
+                                    "uri":            "/2",
+                                    "status":         HTTPStatus.OK,
+                                    }],
+                "msearch_results": [
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.two_hits_search_rs, to_json=True),
+                    utils.get_fixture(self.two_hits_with_no_defect, to_json=True)],
+                "index_rq":       utils.get_fixture(
+                    self.launch_w_test_items_w_logs),
+                "expected_count": 0,
+                "expected_issue_type": "",
+                "analyzer_config":     launch_objects.AnalyzerConf(allMessagesShouldMatch=True),
+                "boost_predict":       ([], [])
             }
         ]
 
@@ -270,10 +337,12 @@ class TestAutoAnalyzerService(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                analyzer_service = AutoAnalyzerService(app_config=app_config,
+                analyzer_service = AutoAnalyzerService(self.model_chooser,
+                                                       app_config=app_config,
                                                        search_cfg=config)
                 _boosting_decision_maker = BoostingDecisionMaker()
                 _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
+                _boosting_decision_maker.get_feature_names = MagicMock(return_value=["0"])
                 _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])
                 if "msearch_results" in test:
                     analyzer_service.es_client.es_client.msearch = MagicMock(
@@ -283,6 +352,9 @@ class TestAutoAnalyzerService(TestService):
 
                 launches = [launch_objects.Launch(**launch)
                             for launch in json.loads(test["index_rq"])]
+                if "analyzer_config" in test:
+                    for launch in launches:
+                        launch.analyzerConfig = test["analyzer_config"]
                 response = analyzer_service.analyze_logs(launches)
 
                 response.should.have.length_of(test["expected_count"])

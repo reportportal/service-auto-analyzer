@@ -17,256 +17,23 @@ from utils import utils
 from commons.launch_objects import SuggestAnalysisResult
 from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from amqp.amqp import AmqpClient
-from commons.log_merger import LogMerger
 from service.analyzer_service import AnalyzerService
 from commons import similarity_calculator
 import json
 import logging
 from time import time
 from datetime import datetime
-import elasticsearch
-import elasticsearch.helpers
 
 logger = logging.getLogger("analyzerApp.suggestService")
 
 
 class SuggestService(AnalyzerService):
 
-    def __init__(self, app_config={}, search_cfg={}):
-        super(SuggestService, self).__init__(app_config=app_config, search_cfg=search_cfg)
+    def __init__(self, model_chooser, app_config={}, search_cfg={}):
+        super(SuggestService, self).__init__(model_chooser, app_config=app_config, search_cfg=search_cfg)
         self.suggest_threshold = 0.4
         self.rp_suggest_index_template = "rp_suggestions_info"
         self.rp_suggest_metrics_index_template = "rp_suggestions_info_metrics"
-
-    def build_index_name(self, project_id):
-        return str(project_id) + "_suggest"
-
-    @utils.ignore_warnings
-    def index_suggest_info(self, suggest_info_list):
-        logger.info("Started saving suggest_info_list")
-        t_start = time()
-        bodies = []
-        project_index_names = set()
-        if len(suggest_info_list):
-            self.es_client.create_index_for_stats_info(
-                self.rp_suggest_metrics_index_template)
-        metrics_data_by_test_item = {}
-        for obj in suggest_info_list:
-            obj_info = json.loads(obj.json())
-            obj_info["savedDate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            obj_info["modelInfo"] = [obj.strip() for obj in obj_info["modelInfo"].split(";") if obj.strip()]
-            obj_info["module_version"] = [self.app_config["appVersion"]]
-            if obj_info["testItem"] not in metrics_data_by_test_item:
-                metrics_data_by_test_item[obj_info["testItem"]] = []
-            metrics_data_by_test_item[obj_info["testItem"]].append(obj_info)
-            project_index_name = self.build_index_name(obj_info["project"])
-            project_index_name = utils.unite_project_name(
-                project_index_name, self.app_config["esProjectIndexPrefix"])
-            if project_index_name not in project_index_names:
-                self.es_client.create_index_for_stats_info(
-                    self.rp_suggest_index_template,
-                    override_index_name=project_index_name)
-                project_index_names.add(project_index_name)
-            bodies.append({
-                "_index": project_index_name,
-                "_source": obj_info
-            })
-        bulk_result = self.es_client._bulk_index(bodies)
-        self.index_data_for_metrics(metrics_data_by_test_item)
-        logger.info("Finished saving %.2f s", time() - t_start)
-        return bulk_result
-
-    def index_data_for_metrics(self, metrics_data_by_test_item):
-        bodies = []
-        for test_item in metrics_data_by_test_item:
-            sorted_metrics_data = sorted(
-                metrics_data_by_test_item[test_item], key=lambda x: x["resultPosition"])
-            chosen_data = sorted_metrics_data[0]
-            for result in sorted_metrics_data:
-                if result["userChoice"] == 1:
-                    chosen_data = result
-                    break
-            if chosen_data["methodName"] == "auto_analysis":
-                continue
-            chosen_data["notFoundResults"] = 0
-            if chosen_data["userChoice"] == 1:
-                chosen_data["reciprocalRank"] = 1 / (chosen_data["resultPosition"] + 1)
-            else:
-                chosen_data["reciprocalRank"] = 0.0
-            chosen_data["reciprocalRank"] = int(chosen_data["reciprocalRank"] * 100)
-            bodies.append({
-                "_index": self.rp_suggest_metrics_index_template,
-                "_source": chosen_data
-            })
-        self.es_client._bulk_index(bodies)
-
-    def remove_suggest_info(self, project_id):
-        logger.info("Removing suggest_info index")
-        project_index_name = self.build_index_name(project_id)
-        project_index_name = utils.unite_project_name(
-            project_index_name, self.app_config["esProjectIndexPrefix"])
-        return self.es_client.delete_index(project_index_name)
-
-    def build_suggest_info_ids_query(self, log_ids):
-        return {
-            "_source": ["testItem"],
-            "size": self.app_config["esChunkNumber"],
-            "query": {
-                "bool": {
-                    "should": [
-                        {"terms": {"testItemLogId": log_ids}},
-                        {"terms": {"relevantLogId": log_ids}}
-                    ]
-                }
-            }}
-
-    def build_suggest_info_ids_query_by_test_item(self, test_item_ids):
-        return {
-            "query": {
-                "bool": {
-                    "should": [
-                        {"terms": {"testItem": test_item_ids}},
-                        {"terms": {"relevantItem": test_item_ids}}
-                    ]
-                }
-            }}
-
-    def build_suggest_info_ids_query_by_launch_ids(self, launch_ids):
-        return {"query": {"bool": {"filter": [{"terms": {"launchId": launch_ids}}]}}}
-
-    def clean_suggest_info_logs(self, clean_index):
-        """Delete logs from elasticsearch"""
-        index_name = self.build_index_name(clean_index.project)
-        index_name = utils.unite_project_name(
-            index_name, self.app_config["esProjectIndexPrefix"])
-        logger.info("Delete logs %s for the index %s",
-                    clean_index.ids, index_name)
-        t_start = time()
-        if not self.es_client.index_exists(index_name, print_error=False):
-            logger.info("Didn't find index '%s'", index_name)
-            return 0
-        sugggest_log_ids = set()
-        try:
-            search_query = self.build_suggest_info_ids_query(
-                clean_index.ids)
-            for res in elasticsearch.helpers.scan(self.es_client.es_client,
-                                                  query=search_query,
-                                                  index=index_name,
-                                                  scroll="5m"):
-                sugggest_log_ids.add(res["_id"])
-        except Exception as err:
-            logger.error("Couldn't find logs with specified ids")
-            logger.error(err)
-        bodies = []
-        for _id in sugggest_log_ids:
-            bodies.append({
-                "_op_type": "delete",
-                "_id":      _id,
-                "_index":   index_name,
-            })
-        result = self.es_client._bulk_index(bodies)
-        logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
-                    clean_index.ids, index_name, time() - t_start)
-        return result.took
-
-    def clean_suggest_info_logs_by_test_item(self, remove_items_info):
-        """Delete logs from elasticsearch"""
-        index_name = self.build_index_name(remove_items_info["project"])
-        index_name = utils.unite_project_name(
-            index_name, self.app_config["esProjectIndexPrefix"])
-        logger.info("Delete test items %s for the index %s",
-                    remove_items_info["itemsToDelete"], index_name)
-        t_start = time()
-        deleted_logs = self.es_client.delete_by_query(
-            index_name, remove_items_info["itemsToDelete"],
-            self.build_suggest_info_ids_query_by_test_item)
-        logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
-                    remove_items_info["itemsToDelete"], index_name, time() - t_start)
-        return deleted_logs
-
-    def clean_suggest_info_logs_by_launch_id(self, launch_remove_info):
-        """Delete logs with specified launch ids from elasticsearch"""
-        project = launch_remove_info["project"]
-        launch_ids = launch_remove_info["launch_ids"]
-        index_name = self.build_index_name(project)
-        index_name = utils.unite_project_name(
-            index_name, self.app_config["esProjectIndexPrefix"]
-        )
-        logger.info("Delete launches %s for the index %s", launch_ids, index_name)
-        t_start = time()
-        deleted_logs = self.es_client.delete_by_query(
-            index_name, launch_ids, self.build_suggest_info_ids_query_by_launch_ids
-        )
-        logger.info(
-            "Finished deleting launches %s for the project %s. It took %.2f sec. "
-            "%s logs deleted",
-            launch_ids,
-            index_name,
-            time() - t_start,
-            deleted_logs
-        )
-        return deleted_logs
-
-    def build_query_for_getting_suggest_info(self, test_item_ids):
-        return {
-            "_source": ["testItem", "issueType"],
-            "size": self.app_config["esChunkNumber"],
-            "query": {
-                "bool": {
-                    "must": [
-                        {"terms": {"testItem": test_item_ids}},
-                        {"term": {"methodName": "auto_analysis"}},
-                        {"term": {"userChoice": 1}}
-                    ]
-                }
-            }}
-
-    def update_suggest_info(self, defect_update_info):
-        logger.info("Started updating suggest info")
-        t_start = time()
-        test_item_ids = [int(key_) for key_ in defect_update_info["itemsToUpdate"].keys()]
-        defect_update_info["itemsToUpdate"] = {
-            int(key_): val for key_, val in defect_update_info["itemsToUpdate"].items()}
-        index_name = self.build_index_name(defect_update_info["project"])
-        index_name = utils.unite_project_name(index_name, self.app_config["esProjectIndexPrefix"])
-        if not self.es_client.index_exists(index_name):
-            return 0
-        batch_size = 1000
-        log_update_queries = []
-        for i in range(int(len(test_item_ids) / batch_size) + 1):
-            sub_test_item_ids = test_item_ids[i * batch_size: (i + 1) * batch_size]
-            if not sub_test_item_ids:
-                continue
-            for res in elasticsearch.helpers.scan(self.es_client.es_client,
-                                                  query=self.build_query_for_getting_suggest_info(
-                                                      sub_test_item_ids),
-                                                  index=index_name):
-                issue_type = ""
-                try:
-                    test_item_id = int(res["_source"]["testItem"])
-                    issue_type = defect_update_info["itemsToUpdate"][test_item_id]
-                except: # noqa
-                    pass
-                if issue_type.strip() and issue_type != res["_source"]["issueType"]:
-                    log_update_queries.append({
-                        "_op_type": "update",
-                        "_id": res["_id"],
-                        "_index": index_name,
-                        "doc": {
-                            "userChoice": 0
-                        }
-                    })
-        result = self.es_client._bulk_index(log_update_queries)
-        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
-            for model_type in ["suggestion", "auto_analysis"]:
-                AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
-                    self.app_config["exchangeName"], "train_models", json.dumps({
-                        "model_type": model_type,
-                        "project_id": defect_update_info["project"],
-                        "gathered_metric_total": result.took
-                    }))
-        logger.info("Finished updating suggest info for %.2f sec.", time() - t_start)
-        return result.took
 
     def get_config_for_boosting_suggests(self, analyzerConfig):
         return {
@@ -278,7 +45,9 @@ class SuggestService(AnalyzerService):
                 analyzerConfig.numberOfLogLines),
             "number_of_log_lines": analyzerConfig.numberOfLogLines,
             "filter_by_unique_id": True,
-            "boosting_model": self.search_cfg["SuggestBoostModelFolder"]}
+            "boosting_model": self.search_cfg["SuggestBoostModelFolder"],
+            "time_weight_decay": self.search_cfg["TimeWeightDecay"]
+        }
 
     def choose_fields_to_filter_suggests(self, log_lines_num):
         if log_lines_num == -1:
@@ -298,23 +67,7 @@ class SuggestService(AnalyzerService):
         log_lines = test_item_info.analyzerConfig.numberOfLogLines
 
         query = self.build_common_query(log, size=size, filter_no_defect=False)
-
-        if test_item_info.analyzerConfig.analyzerMode in ["LAUNCH_NAME"]:
-            query["query"]["bool"]["must"].append(
-                {"term": {
-                    "launch_name": {
-                        "value": test_item_info.launchName}}})
-        elif test_item_info.analyzerConfig.analyzerMode in ["CURRENT_LAUNCH"]:
-            query["query"]["bool"]["must"].append(
-                {"term": {
-                    "launch_id": {
-                        "value": test_item_info.launchId}}})
-        else:
-            query["query"]["bool"]["should"].append(
-                {"term": {
-                    "launch_name": {
-                        "value": test_item_info.launchName,
-                        "boost": abs(self.search_cfg["BoostLaunch"])}}})
+        query = self.add_constraints_for_launches_into_query(query, test_item_info)
 
         if log["_source"]["message"].strip():
             query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
@@ -343,41 +96,11 @@ class SuggestService(AnalyzerService):
                                                     log["_source"][stacktrace_field],
                                                     field_name=stacktrace_field,
                                                     boost=1.0))
-                query["query"]["bool"]["should"].append(
-                    self.build_more_like_this_query(
-                        "60%",
-                        log["_source"]["detected_message_without_params_extended"],
-                        field_name="detected_message_without_params_extended",
-                        boost=1.0))
             query["query"]["bool"]["should"].append(
                 self.build_more_like_this_query("80%",
                                                 log["_source"]["merged_small_logs"],
                                                 field_name="merged_small_logs",
                                                 boost=0.5))
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["only_numbers"],
-                                                field_name="only_numbers",
-                                                boost=4.0,
-                                                override_min_should_match="1"))
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["message_params"],
-                                                field_name="message_params",
-                                                boost=4.0,
-                                                override_min_should_match="1"))
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["urls"],
-                                                field_name="urls",
-                                                boost=4.0,
-                                                override_min_should_match="1"))
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["paths"],
-                                                field_name="paths",
-                                                boost=4.0,
-                                                override_min_should_match="1"))
         else:
             query["query"]["bool"]["filter"].append({"term": {"is_merged": True}})
             query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
@@ -386,28 +109,20 @@ class SuggestService(AnalyzerService):
                                                 log["_source"]["merged_small_logs"],
                                                 field_name="merged_small_logs",
                                                 boost=2.0))
+        for field, boost_score in [
+                ("detected_message_without_params_extended", 2.0),
+                ("only_numbers", 2.0), ("message_params", 2.0), ("urls", 2.0),
+                ("paths", 2.0), ("found_exceptions_extended", 8.0), ("potential_status_codes", 8.0),
+                ("found_tests_and_methods", 2.0), ("test_item_name", 2.0)]:
+            if log["_source"][field].strip():
+                query["query"]["bool"]["should"].append(
+                    self.build_more_like_this_query("1",
+                                                    log["_source"][field],
+                                                    field_name=field,
+                                                    boost=boost_score,
+                                                    override_min_should_match="1"))
 
-        query["query"]["bool"]["should"].append(
-            self.build_more_like_this_query("1",
-                                            log["_source"]["found_exceptions_extended"],
-                                            field_name="found_exceptions_extended",
-                                            boost=4.0,
-                                            override_min_should_match="1"))
-        query["query"]["bool"]["should"].append(
-            self.build_more_like_this_query("1",
-                                            log["_source"]["potential_status_codes"],
-                                            field_name="potential_status_codes",
-                                            boost=4.0,
-                                            override_min_should_match="1"))
-        if log["_source"]["found_tests_and_methods"].strip():
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["found_tests_and_methods"],
-                                                field_name="found_tests_and_methods",
-                                                boost=4.0,
-                                                override_min_should_match="1"))
-
-        return query
+        return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
     def query_es_for_suggested_items(self, test_item_info, logs):
         full_results = []
@@ -420,30 +135,29 @@ class SuggestService(AnalyzerService):
             if log["_source"]["log_level"] < utils.ERROR_LOGGING_LEVEL or\
                     (not message and not merged_small_logs):
                 continue
+            queries = []
 
-            query = self.build_suggest_query(
-                test_item_info, log,
-                message_field="message_extended",
-                det_mes_field="detected_message_extended",
-                stacktrace_field="stacktrace_extended")
-            es_res = self.es_client.es_client.search(index=index_name, body=query)
-            full_results.append((log, es_res))
+            for query in [
+                    self.build_suggest_query(
+                        test_item_info, log,
+                        message_field="message_extended",
+                        det_mes_field="detected_message_extended",
+                        stacktrace_field="stacktrace_extended"),
+                    self.build_suggest_query(
+                        test_item_info, log,
+                        message_field="message_without_params_extended",
+                        det_mes_field="detected_message_without_params_extended",
+                        stacktrace_field="stacktrace_extended"),
+                    self.build_suggest_query(
+                        test_item_info, log,
+                        message_field="message_without_params_and_brackets",
+                        det_mes_field="detected_message_without_params_and_brackets",
+                        stacktrace_field="stacktrace_extended")]:
+                queries.append("{}\n{}".format(json.dumps({"index": index_name}), json.dumps(query)))
 
-            query = self.build_suggest_query(
-                test_item_info, log,
-                message_field="message_without_params_extended",
-                det_mes_field="detected_message_without_params_extended",
-                stacktrace_field="stacktrace_extended")
-            es_res = self.es_client.es_client.search(index=index_name, body=query)
-            full_results.append((log, es_res))
-
-            query = self.build_suggest_query(
-                test_item_info, log,
-                message_field="message_without_params_and_brackets",
-                det_mes_field="detected_message_without_params_and_brackets",
-                stacktrace_field="stacktrace_extended")
-            es_res = self.es_client.es_client.search(index=index_name, body=query)
-            full_results.append((log, es_res))
+            partial_res = self.es_client.es_client.msearch("\n".join(queries) + "\n")["responses"]
+            for ind in range(len(partial_res)):
+                full_results.append((log, partial_res[ind]))
         return full_results
 
     def deduplicate_results(self, gathered_results, scores_by_test_items, test_item_ids):
@@ -499,7 +213,7 @@ class SuggestService(AnalyzerService):
             test_item_id = test_item_ids[idx]
             gathered_results.append(
                 (idx,
-                 round(prob[1], 2),
+                 round(prob[1], 4),
                  scores_by_test_items[test_item_id]["mrHit"]["_source"]["start_time"]))
 
         gathered_results = sorted(gathered_results, key=lambda x: (x[1], x[2]), reverse=True)
@@ -534,13 +248,13 @@ class SuggestService(AnalyzerService):
         }
 
     @utils.ignore_warnings
-    def suggest_items(self, test_item_info, num_items=5):
+    def suggest_items(self, test_item_info):
         logger.info("Started suggesting test items")
         logger.info("ES Url %s", utils.remove_credentials_from_url(self.es_client.host))
         index_name = utils.unite_project_name(
             str(test_item_info.project), self.app_config["esProjectIndexPrefix"])
         if not self.es_client.index_exists(index_name):
-            logger.info("Project %d doesn't exist", index_name)
+            logger.info("Project %s doesn't exist", index_name)
             logger.info("Finished suggesting for test item with 0 results.")
             return []
 
@@ -554,7 +268,7 @@ class SuggestService(AnalyzerService):
             unique_logs = utils.leave_only_unique_logs(test_item_info.logs)
             prepared_logs = [self.log_preparation._prepare_log_for_suggests(test_item_info, log, index_name)
                              for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
-            logs = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+            logs = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
             searched_res = self.query_es_for_suggested_items(test_item_info, logs)
 
             boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
@@ -563,20 +277,21 @@ class SuggestService(AnalyzerService):
             _suggest_decision_maker_to_use = self.model_chooser.choose_model(
                 test_item_info.project, "suggestion_model/",
                 custom_model_prob=self.search_cfg["ProbabilityForCustomModelSuggestions"])
+            features_dict_objects = _suggest_decision_maker_to_use.features_dict_with_saved_objects
 
             _boosting_data_gatherer = SuggestBoostingFeaturizer(
                 searched_res,
                 boosting_config,
                 feature_ids=_suggest_decision_maker_to_use.get_feature_ids(),
-                weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
+                weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
+                features_dict_with_saved_objects=features_dict_objects)
             _boosting_data_gatherer.set_defect_type_model(self.model_chooser.choose_model(
                 test_item_info.project, "defect_type_model/"))
             feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
             scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
             model_info_tags = _boosting_data_gatherer.get_used_model_info() +\
                 _suggest_decision_maker_to_use.get_model_info()
-            feature_names = ";".join(
-                [str(feature) for feature in _suggest_decision_maker_to_use.get_feature_ids()])
+            feature_names = ";".join(_suggest_decision_maker_to_use.get_feature_names())
             if feature_data:
                 predicted_labels, predicted_labels_probability = _suggest_decision_maker_to_use.predict(
                     feature_data)
@@ -591,7 +306,7 @@ class SuggestService(AnalyzerService):
                                  test_item_id, issue_type, prob)
                 processed_time = time() - t_start
                 global_idx = 0
-                for idx, prob, _ in sorted_results[:num_items]:
+                for idx, prob, _ in sorted_results[:self.search_cfg["MaxSuggestionsNumber"]]:
                     if prob >= self.suggest_threshold:
                         test_item_id = test_item_ids[idx]
                         issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
@@ -611,7 +326,7 @@ class SuggestService(AnalyzerService):
                             relevantItem=test_item_id,
                             relevantLogId=relevant_log_id,
                             isMergedLog=is_merged,
-                            matchScore=round(prob * 100, 2),
+                            matchScore=round(prob, 2) * 100,
                             esScore=round(scores_by_test_items[test_item_id]["mrHit"]["_score"], 2),
                             esPosition=scores_by_test_items[test_item_id]["mrHit"]["es_pos"],
                             modelFeatureNames=feature_names,

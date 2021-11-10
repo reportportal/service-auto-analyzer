@@ -24,22 +24,22 @@ logger = logging.getLogger("analyzerApp.triggerManager")
 
 class TriggerManager:
 
-    def __init__(self, app_config={}, search_cfg={}):
+    def __init__(self, model_chooser, app_config={}, search_cfg={}):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.model_training_triggering = {
             "defect_type": (RetrainingTriggering(app_config, "defect_type_trigger_info",
                                                  start_number=100, accumulated_difference=100),
                             training_defect_type_model.DefectTypeModelTraining(
-                                app_config, search_cfg)),
+                                model_chooser, app_config, search_cfg)),
             "suggestion": (RetrainingTriggering(app_config, "suggestion_trigger_info",
                                                 start_number=100, accumulated_difference=50),
                            training_analysis_model.AnalysisModelTraining(
-                               app_config, search_cfg)),
+                               model_chooser, app_config, search_cfg)),
             "auto_analysis": (RetrainingTriggering(app_config, "auto_analysis_trigger_info",
                                                    start_number=300, accumulated_difference=100),
                               training_analysis_model.AnalysisModelTraining(
-                                  app_config, search_cfg))
+                                  model_chooser, app_config, search_cfg))
         }
 
     def does_trigger_exist(self, name):

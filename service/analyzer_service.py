@@ -15,10 +15,9 @@
 """
 from commons.esclient import EsClient
 from utils import utils
-from commons.log_preparation import LogPreparation
+from commons.log_preparation import LogPreparation, LogMerger
 from boosting_decision_making import weighted_similarity_calculator
 from commons import namespace_finder
-from commons import model_chooser
 import logging
 import re
 
@@ -27,13 +26,14 @@ logger = logging.getLogger("analyzerApp.analyzerService")
 
 class AnalyzerService:
 
-    def __init__(self, app_config={}, search_cfg={}):
+    def __init__(self, model_chooser, app_config={}, search_cfg={}):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
         self.log_preparation = LogPreparation()
+        self.log_merger = LogMerger()
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
-        self.model_chooser = model_chooser.ModelChooser(app_config=app_config, search_cfg=search_cfg)
+        self.model_chooser = model_chooser
         self.weighted_log_similarity_calculator = None
         if self.search_cfg["SimilarityWeightsFolder"].strip():
             self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
@@ -43,10 +43,30 @@ class AnalyzerService:
         return analyzer_config.minShouldMatch if analyzer_config.minShouldMatch > 0 else\
             int(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0))
 
+    def add_constraints_for_launches_into_query(self, query, launch):
+        if launch.analyzerConfig.analyzerMode in ["LAUNCH_NAME"]:
+            query["query"]["bool"]["must"].append(
+                {"term": {
+                    "launch_name": {
+                        "value": launch.launchName}}})
+        elif launch.analyzerConfig.analyzerMode in ["CURRENT_LAUNCH"]:
+            query["query"]["bool"]["must"].append(
+                {"term": {
+                    "launch_id": {
+                        "value": launch.launchId}}})
+        else:
+            query["query"]["bool"]["should"].append(
+                {"term": {
+                    "launch_name": {
+                        "value": launch.launchName,
+                        "boost": abs(self.search_cfg["BoostLaunch"])}}})
+        return query
+
     def build_more_like_this_query(self,
                                    min_should_match, log_message,
                                    field_name="message", boost=1.0,
-                                   override_min_should_match=None):
+                                   override_min_should_match=None,
+                                   max_query_terms=50):
         """Build more like this query"""
         return {"more_like_this": {
             "fields":               [field_name],
@@ -92,6 +112,33 @@ class AnalyzerService:
                                 "value": str(self.search_cfg["BoostAA"] > 0).lower(),
                                 "boost": abs(self.search_cfg["BoostAA"]), }}},
                         ]}}}
+
+    def add_query_with_start_time_decay(self, main_query, start_time):
+        return {
+            "size": main_query["size"],
+            "sort": main_query["sort"],
+            "query": {
+                "function_score": {
+                    "query": main_query["query"],
+                    "functions": [
+                        {
+                            "exp": {
+                                "start_time": {
+                                    "origin": start_time,
+                                    "scale": "7d",
+                                    "offset": "1d",
+                                    "decay": self.search_cfg["TimeWeightDecay"]
+                                }
+                            }
+                        },
+                        {
+                            "script_score": {"script": {"source": "0.6"}}
+                        }],
+                    "score_mode": "max",
+                    "boost_mode": "multiply"
+                }
+            }
+        }
 
     def remove_models(self, model_info):
         try:

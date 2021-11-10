@@ -8,6 +8,7 @@
             "testItemId": 1,
             "issueType": "ti001",
             "startTime": [2020,1,15,10,57,43],
+            "testItemName": "first test",
             "isAutoAnalyzed": false,
             "logs": [
                 {

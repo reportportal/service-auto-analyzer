@@ -316,7 +316,7 @@ class TestCleanIndexService(TestService):
                     search_cfg=self.get_default_search_config())
                 _clean_index_service.es_client.es_client.scroll = MagicMock(
                     return_value=json.loads(utils.get_fixture(self.no_hits_search_rs)))
-                _clean_index_service.suggest_service.es_client.es_client.scroll = MagicMock(
+                _clean_index_service.suggest_info_service.es_client.es_client.scroll = MagicMock(
                     return_value=json.loads(utils.get_fixture(self.no_hits_search_rs)))
 
                 response = _clean_index_service.delete_logs(test["rq"])

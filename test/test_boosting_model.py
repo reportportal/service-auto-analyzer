@@ -67,7 +67,8 @@ class TestBoostingModel(unittest.TestCase):
             "number_of_log_lines": number_of_log_lines,
             "chosen_namespaces": {"tv.horizon": 25, "sun.reflect": 10},
             "boosting_model": utils.read_json_file(
-                "", "model_settings.json", to_json=True)["BOOST_MODEL_FOLDER"]
+                "", "model_settings.json", to_json=True)["BOOST_MODEL_FOLDER"],
+            "time_weight_decay": 0.95
         }
 
     @utils.ignore_warnings
@@ -78,7 +79,7 @@ class TestBoostingModel(unittest.TestCase):
             print("Boost model folder ", folder)
             decision_maker = BoostingDecisionMaker(folder)
             test_data_size = 5
-            random_data = np.random.rand(test_data_size, len(decision_maker.get_feature_ids()))
+            random_data = np.random.rand(test_data_size, len(decision_maker.get_feature_names()))
             result, result_probability = decision_maker.predict(random_data)
             result.should.have.length_of(test_data_size)
             result_probability.should.have.length_of(test_data_size)
@@ -134,6 +135,7 @@ class TestBoostingModel(unittest.TestCase):
 
         for idx, test in enumerate(tests):
             feature_ids = test["decision_maker"].get_feature_ids()
+            feature_dict_objects = test["decision_maker"].features_dict_with_saved_objects
             weight_log_sim = None
             if self.weights_folder.strip():
                 weight_log_sim = weighted_similarity_calculator.\
@@ -141,7 +143,8 @@ class TestBoostingModel(unittest.TestCase):
             _boosting_featurizer = BoostingFeaturizer(test["elastic_results"],
                                                       test["config"],
                                                       feature_ids,
-                                                      weighted_log_similarity_calculator=weight_log_sim)
+                                                      weighted_log_similarity_calculator=weight_log_sim,
+                                                      features_dict_with_saved_objects=feature_dict_objects)
             if self.global_defect_type_model_folder.strip():
                 _boosting_featurizer.set_defect_type_model(
                     defect_type_model.DefectTypeModel(folder=self.global_defect_type_model_folder))
@@ -224,6 +227,7 @@ class TestBoostingModel(unittest.TestCase):
             ])
         for idx, test in enumerate(tests):
             feature_ids = test["decision_maker"].get_feature_ids()
+            feature_dict_objects = test["decision_maker"].features_dict_with_saved_objects
             weight_log_sim = None
             if self.weights_folder.strip():
                 weight_log_sim = weighted_similarity_calculator.\
@@ -232,7 +236,8 @@ class TestBoostingModel(unittest.TestCase):
                 test["elastic_results"],
                 test["config"],
                 feature_ids,
-                weighted_log_similarity_calculator=weight_log_sim)
+                weighted_log_similarity_calculator=weight_log_sim,
+                features_dict_with_saved_objects=feature_dict_objects)
             if self.global_defect_type_model_folder.strip():
                 _boosting_featurizer.set_defect_type_model(
                     defect_type_model.DefectTypeModel(folder=self.global_defect_type_model_folder))

@@ -68,8 +68,6 @@ volumes:
 
 **ES_LOGS_MIN_SHOULD_MATCH** - by default "0.98", the value of min should match for searching the same to investigate test items
 
-**NO_DEFECT_MIN_SHOULD_MATCH** - by default "0.98", the value of min should match for No defect test items to be equal to be used for setting in Auto-analysis
-
 **PATTERN_LABEL_MIN_PERCENT** - by default "0.9", the value of minimum percent of the same issue type for pattern to be suggested as a pattern with a label
 
 **PATTERN_LABEL_MIN_COUNT** - by default "5", the value of minimum count of pattern occurance to be suggested as a pattern with a label
@@ -77,6 +75,12 @@ volumes:
 **PATTERN_MIN_COUNT** - by default "10", the value of minimum count of pattern occurance to be suggested as a pattern without a label
 
 **MAX_LOGS_FOR_DEFECT_TYPE_MODEL** - by default "10000", the value of maximum count of logs per defect type to add into defect type model training. Default value is chosen in cosideration of having space for analyzer_train docker image setuo of 1GB, if you can give more GB you can linearly allow more logs to be considered.
+
+**PROB_CUSTOM_MODEL_SUGGESTIONS** - by default "0.7", the probability of custom retrained model to be used for running when suggestions are requested. The maximum value is 0.8, because we want at least 20% of requests to process with a global model not to overfit for project too much. The bigger the value of this env varibale the more often custom retrained model will be used.
+
+**PROB_CUSTOM_MODEL_AUTO_ANALYSIS** - by default "0.5", the probability of custom retrained model to be used for running when auto-analysis is performed. The maximum value is 1.0. The bigger the value of this env varibale the more often custom retrained model will be used.
+
+**MAX_SUGGESTIONS_NUMBER** - by default "3", the maximum number of suggestions shown in the ML suggestions area in the defect type editor.
 
 # Instructions for analyzer setup without Docker
 

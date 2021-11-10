@@ -18,8 +18,9 @@ from utils import utils
 from commons import similarity_calculator
 from boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
 import logging
-import textdistance
 import numpy as np
+from datetime import datetime
+from collections import deque
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
@@ -27,10 +28,14 @@ logger = logging.getLogger("analyzerApp.boosting_featurizer")
 class BoostingFeaturizer:
 
     def __init__(self, all_results, config, feature_ids,
-                 weighted_log_similarity_calculator=None):
+                 weighted_log_similarity_calculator=None,
+                 features_dict_with_saved_objects=None):
         self.config = config
         self.previously_gathered_features = {}
         self.models = {}
+        self.features_dict_with_saved_objects = {}
+        if features_dict_with_saved_objects is not None:
+            self.features_dict_with_saved_objects = features_dict_with_saved_objects
         self.similarity_calculator = similarity_calculator.SimilarityCalculator(
             self.config,
             weighted_similarity_calculator=weighted_log_similarity_calculator)
@@ -93,10 +98,28 @@ class BoostingFeaturizer:
                  {"model_folder": self.config["boosting_model"]},
                  self.get_necessary_features(self.config["boosting_model"])),
             59: (self._calculate_similarity_percent, {"field_name": "found_tests_and_methods"}, []),
-            60: (self._calculate_percent_via_levenshtein, {"field_name": "found_tests_and_methods"}, [])
+            61: (self._calculate_similarity_percent, {"field_name": "test_item_name"}, []),
+            64: (self._calculate_decay_function_score, {"field_name": "start_time"}, []),
+            65: (self._calculate_test_item_logs_similar_percent, {}, []),
+            66: (self._count_test_item_logs, {}, []),
+            67: (self._encode_into_vector,
+                 {"field_name": "launch_name", "feature_name": 67, "only_query": True}, []),
+            68: (self._encode_into_vector,
+                 {"field_name": "detected_message", "feature_name": 68, "only_query": False}, []),
+            69: (self._encode_into_vector,
+                 {"field_name": "stacktrace", "feature_name": 69, "only_query": False}, []),
+            70: (self._encode_into_vector,
+                 {"field_name": "launch_name", "feature_name": 70, "only_query": True}, []),
+            71: (self._encode_into_vector,
+                 {"field_name": "test_item_name", "feature_name": 71, "only_query": False}, []),
+            72: (self._encode_into_vector,
+                 {"field_name": "unique_id", "feature_name": 72, "only_query": True}, []),
+            73: (self._encode_into_vector,
+                 {"field_name": "found_exceptions", "feature_name": 73, "only_query": True}, [])
         }
 
         fields_to_calc_similarity = self.find_columns_to_find_similarities_for()
+        all_results = self._perform_additional_text_processing(all_results)
 
         if "filter_min_should_match" in self.config and len(self.config["filter_min_should_match"]) > 0:
             self.similarity_calculator.find_similarity(
@@ -112,6 +135,10 @@ class BoostingFeaturizer:
             all_results = self.filter_by_min_should_match_any(
                 all_results,
                 fields=self.config["filter_min_should_match_any"])
+        self.test_item_log_stats = self._calculate_stats_by_test_item_ids(all_results)
+        if "filter_by_all_logs_should_be_similar" in self.config:
+            if self.config["filter_by_all_logs_should_be_similar"]:
+                all_results = self.filter_by_all_logs_should_be_similar(all_results)
         if "filter_by_unique_id" in self.config and self.config["filter_by_unique_id"]:
             all_results = self.filter_by_unique_id(all_results)
         if "calculate_similarities" not in self.config or self.config["calculate_similarities"]:
@@ -123,7 +150,91 @@ class BoostingFeaturizer:
         self.scores_by_issue_type = None
         self.defect_type_predict_model = None
         self.used_model_info = set()
-        self.features_to_recalculate_always = set([51, 58])
+        self.features_to_recalculate_always = set([51, 58] + list(range(67, 74)))
+
+    def _count_test_item_logs(self):
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        sim_logs_num_scores = {}
+        for issue_type in scores_by_issue_type:
+            sim_logs_num_scores[issue_type] = len(self.all_results)
+        return sim_logs_num_scores
+
+    def _calculate_test_item_logs_similar_percent(self):
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        sim_logs_num_scores = {}
+        for issue_type in scores_by_issue_type:
+            test_item_id = scores_by_issue_type[issue_type]["mrHit"]["_source"]["test_item"]
+            sim_logs_num_scores[issue_type] = 0.0
+            if test_item_id in self.test_item_log_stats:
+                sim_logs_num_scores[issue_type] = self.test_item_log_stats[test_item_id]
+        return sim_logs_num_scores
+
+    def _calculate_stats_by_test_item_ids(self, all_results):
+        test_item_log_stats = {}
+        for log, res in all_results:
+            for r in res["hits"]["hits"]:
+                if r["_source"]["test_item"] not in test_item_log_stats:
+                    test_item_log_stats[r["_source"]["test_item"]] = 0
+                test_item_log_stats[r["_source"]["test_item"]] += 1
+        all_logs = len(all_results)
+        if all_logs:
+            for test_item_id in test_item_log_stats:
+                test_item_log_stats[test_item_id] /= all_logs
+        return test_item_log_stats
+
+    def _perform_additional_text_processing(self, all_results):
+        for log, res in all_results:
+            for r in res["hits"]["hits"]:
+                if "found_tests_and_methods" in r["_source"]:
+                    r["_source"]["found_tests_and_methods"] = utils.preprocess_found_test_methods(
+                        r["_source"]["found_tests_and_methods"])
+        return all_results
+
+    def _calculate_decay_function_score(self, field_name):
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        dates_by_issue_types = {}
+        for issue_type in scores_by_issue_type:
+            field_date = scores_by_issue_type[issue_type]["mrHit"]["_source"][field_name]
+            field_date = datetime.strptime(field_date, '%Y-%m-%d %H:%M:%S')
+            compared_field_date = scores_by_issue_type[issue_type]["compared_log"]["_source"][field_name]
+            compared_field_date = datetime.strptime(compared_field_date, '%Y-%m-%d %H:%M:%S')
+            if compared_field_date < field_date:
+                field_date, compared_field_date = compared_field_date, field_date
+            dates_by_issue_types[issue_type] = np.exp(
+                np.log(self.config["time_weight_decay"]) * ((compared_field_date - field_date).days) / 7)
+        return dates_by_issue_types
+
+    def _encode_into_vector(self, field_name, feature_name, only_query):
+        if feature_name not in self.features_dict_with_saved_objects:
+            logger.error(self.features_dict_with_saved_objects)
+            logger.error("Feature '%s' has no encoder" % feature_name)
+            return []
+        if field_name != self.features_dict_with_saved_objects[feature_name].field_name:
+            logger.error(field_name)
+            logger.error("Field name '%s' is not the same as in the settings '%s'" % (
+                         field_name, self.features_dict_with_saved_objects[feature_name].field_name))
+            return []
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        encodings_by_issue_type = {}
+        issue_types, gathered_data = [], []
+        for issue_type in scores_by_issue_type:
+            field_data = scores_by_issue_type[issue_type]["compared_log"]["_source"][field_name]
+            issue_types.append(issue_type)
+            gathered_data.append(field_data)
+            if not only_query:
+                gathered_data.append(
+                    scores_by_issue_type[issue_type]["mrHit"]["_source"][field_name])
+        if gathered_data:
+            encoded_data = self.features_dict_with_saved_objects[feature_name].transform(
+                gathered_data).toarray()
+            encoded_data[encoded_data != 0.0] = 1.0
+            for idx in range(len(issue_types)):
+                if only_query:
+                    encodings_by_issue_type[issue_types[idx]] = list(encoded_data[idx])
+                else:
+                    encodings_by_issue_type[issue_types[idx]] = list(
+                        (encoded_data[2 * idx] + encoded_data[2 * idx + 1]) / 2)
+        return encodings_by_issue_type
 
     def _calculate_model_probability(self, model_folder=""):
         if not model_folder.strip():
@@ -138,7 +249,7 @@ class BoostingFeaturizer:
         predicted_probability = []
         for res in predicted_labels_probability:
             predicted_probability.append(float(res[1]))
-        return predicted_probability
+        return [[round(r, 2)] for r in predicted_probability]
 
     def get_necessary_features(self, model_folder):
         if not model_folder.strip():
@@ -174,6 +285,8 @@ class BoostingFeaturizer:
             result[issue_type] = 0.0
             try:
                 model_to_use = issue_type_to_compare.lower()[:2]
+                if model_to_use in ["nd", "ti"]:
+                    continue
                 if issue_type_to_compare in self.defect_type_predict_model.models:
                     model_to_use = issue_type_to_compare
                 res, res_prob = self.defect_type_predict_model.predict(
@@ -193,17 +306,43 @@ class BoostingFeaturizer:
             issue_type_stats[issue_type] = int(label_type == rel_item_issue_type.lower()[:2])
         return issue_type_stats
 
-    def filter_by_unique_id(self, all_results):
+    def filter_by_all_logs_should_be_similar(self, all_results):
         new_results = []
         for log, res in all_results:
             new_elastic_res = []
-            unique_ids = set()
+            for r in res["hits"]["hits"]:
+                if r["_source"]["test_item"] in self.test_item_log_stats:
+                    if self.test_item_log_stats[r["_source"]["test_item"]] > 0.99:
+                        new_elastic_res.append(r)
+            new_results.append((log, {"hits": {"hits": new_elastic_res}}))
+        return new_results
+
+    def filter_by_unique_id(self, all_results):
+        new_results = []
+        for log, res in all_results:
+            unique_id_dict = {}
+            for r in res["hits"]["hits"]:
+                if r["_source"]["unique_id"] not in unique_id_dict:
+                    unique_id_dict[r["_source"]["unique_id"]] = []
+                unique_id_dict[r["_source"]["unique_id"]].append(
+                    (r["_id"], int(r["_score"]), datetime.strptime(
+                        r["_source"]["start_time"], '%Y-%m-%d %H:%M:%S')))
+            log_ids_to_take = set()
+            for unique_id in unique_id_dict:
+                unique_id_dict[unique_id] = sorted(
+                    unique_id_dict[unique_id],
+                    key=lambda x: (x[1], x[2]),
+                    reverse=True)
+                scores_used = set()
+                for sorted_score in unique_id_dict[unique_id]:
+                    if sorted_score[1] not in scores_used:
+                        log_ids_to_take.add(sorted_score[0])
+                        scores_used.add(sorted_score[1])
+            new_elastic_res = []
             for elastic_res in res["hits"]["hits"]:
-                if elastic_res["_source"]["unique_id"] not in unique_ids:
-                    unique_ids.add(elastic_res["_source"]["unique_id"])
+                if elastic_res["_id"] in log_ids_to_take:
                     new_elastic_res.append(elastic_res)
-            if new_elastic_res:
-                new_results.append((log, {"hits": {"hits": new_elastic_res}}))
+            new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
 
     def is_launch_id_the_same(self):
@@ -281,8 +420,7 @@ class BoostingFeaturizer:
                     similarity = sim_obj[group_id]["similarity"]
                 if similarity >= self.config["min_should_match"]:
                     new_elastic_res.append(elastic_res)
-            if new_elastic_res:
-                new_results.append((log, {"hits": {"hits": new_elastic_res}}))
+            new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
 
     def filter_by_min_should_match_any(self, all_results, fields=["detected_message"]):
@@ -305,8 +443,7 @@ class BoostingFeaturizer:
                     max_similarity = max(max_similarity, similarity)
                 if max_similarity >= similarity_to_compare:
                     new_elastic_res.append(elastic_res)
-            if len(new_elastic_res) > 0:
-                new_results.append((log, {"hits": {"hits": new_elastic_res}}))
+            new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
 
     def _calculate_percent_issue_types(self):
@@ -454,28 +591,18 @@ class BoostingFeaturizer:
             similarity_percent_by_type[issue_type] = sim_obj["similarity"]
         return similarity_percent_by_type
 
-    def _calculate_percent_via_levenshtein(self, field_name):
-        scores_by_issue_type = self.find_most_relevant_by_type()
-        result = {}
-        for issue_type in scores_by_issue_type:
-            rel_item_field = utils.split_and_filter_empty_words(
-                scores_by_issue_type[issue_type]["mrHit"]["_source"][field_name])
-            queiried_item_field = utils.split_and_filter_empty_words(
-                scores_by_issue_type[issue_type]["compared_log"]["_source"][field_name])
-            if not rel_item_field and not queiried_item_field:
-                result[issue_type] = 1.0
-            elif not rel_item_field or not queiried_item_field:
-                result[issue_type] = 0.0
-            else:
-                sim = []
-                for i in range(len(rel_item_field)):
-                    max_sim = 0.0
-                    for j in range(len(queiried_item_field)):
-                        max_sim = max(max_sim, textdistance.levenshtein.normalized_similarity(
-                            rel_item_field[i], queiried_item_field[j]))
-                    sim.append(max_sim)
-                result[issue_type] = np.mean([s for s in sim if s >= np.mean(sim)])
-        return result
+    def get_ordered_features_to_process(self):
+        feature_graph = {}
+        features_queue = deque(self.feature_ids.copy())
+        while features_queue:
+            cur_feature = features_queue.popleft()
+            if cur_feature in feature_graph:
+                continue
+            _, _, dependants = self.feature_functions[cur_feature]
+            feature_graph[cur_feature] = dependants
+            features_queue.extend(dependants)
+        ordered_features = utils.topological_sort(feature_graph)
+        return ordered_features
 
     @utils.ignore_warnings
     def gather_features_info(self):
@@ -490,13 +617,7 @@ class BoostingFeaturizer:
                 issue_type_by_index[idx] = issue_type
                 issue_type_names.append(issue_type)
 
-            feature_graph = {}
-            for feature in self.feature_ids:
-                _, _, dependants = self.feature_functions[feature]
-                feature_graph[feature] = dependants
-            ordered_features = utils.topological_sort(feature_graph)
-
-            for feature in ordered_features:
+            for feature in self.get_ordered_features_to_process():
                 if feature in self.previously_gathered_features and\
                         feature not in self.features_to_recalculate_always:
                     gathered_data_dict[feature] = self.previously_gathered_features[feature]
@@ -504,14 +625,17 @@ class BoostingFeaturizer:
                     func, args, _ = self.feature_functions[feature]
                     result = func(**args)
                     if type(result) == list:
-                        gathered_data_dict[feature] = [round(r, 2) for r in result]
+                        gathered_data_dict[feature] = result
                     else:
                         gathered_data_dict[feature] = []
                         for idx in sorted(issue_type_by_index.keys()):
                             issue_type = issue_type_by_index[idx]
-                            gathered_data_dict[feature].append(round(result[issue_type], 2))
+                            try:
+                                _ = result[issue_type][0]
+                                gathered_data_dict[feature].append(result[issue_type])
+                            except: # noqa
+                                gathered_data_dict[feature].append([round(result[issue_type], 2)])
                     self.previously_gathered_features[feature] = gathered_data_dict[feature]
-
             gathered_data = utils.gather_feature_list(gathered_data_dict, self.feature_ids, to_list=True)
         except Exception as err:
             logger.error("Errors in boosting features calculation")

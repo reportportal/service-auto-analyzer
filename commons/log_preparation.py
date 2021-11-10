@@ -23,7 +23,7 @@ ERROR_LOGGING_LEVEL = 40000
 class LogPreparation:
 
     def __init__(self):
-        pass
+        self.log_merger = LogMerger()
 
     def clean_message(self, message):
         message = utils.replace_tabs_for_newlines(message)
@@ -43,6 +43,7 @@ class LogPreparation:
                 "launch_id":        "",
                 "launch_name":      "",
                 "test_item":        "",
+                "test_item_name":   "",
                 "unique_id":        "",
                 "cluster_id":       "",
                 "cluster_message":  "",
@@ -76,6 +77,7 @@ class LogPreparation:
         log_template["_source"]["unique_id"] = test_item.uniqueId
         log_template["_source"]["test_case_hash"] = test_item.testCaseHash
         log_template["_source"]["is_auto_analyzed"] = test_item.isAutoAnalyzed
+        log_template["_source"]["test_item_name"] = utils.preprocess_test_item_name(test_item.testItemName)
         log_template["_source"]["issue_type"] = self.transform_issue_type_into_lowercase(
             test_item.issueType)
         log_template["_source"]["start_time"] = datetime(
@@ -94,11 +96,9 @@ class LogPreparation:
         message_without_params = utils.clean_from_urls(message_without_params)
         message_without_params = utils.clean_from_paths(message_without_params)
         message_without_params = utils.clean_from_params(message_without_params)
-        message_without_params_and_brackets = utils.remove_starting_datetime(
-            message_without_params)
-        message_without_params_and_brackets = utils.clean_from_brackets(
-            message_without_params_and_brackets)
+        message_without_params = utils.remove_starting_datetime(message_without_params)
         message_without_params = utils.sanitize_text(message_without_params)
+        message_without_params_and_brackets = utils.clean_from_brackets(message_without_params)
 
         detected_message, stacktrace = utils.detect_log_description_and_stacktrace(cleaned_message)
 
@@ -113,11 +113,10 @@ class LogPreparation:
         detected_message = utils.replace_text_pieces(detected_message, test_and_methods)
         message_params = " ".join(utils.extract_message_params(detected_message_without_params))
         detected_message_without_params = utils.clean_from_params(detected_message_without_params)
-        detected_message_without_params_and_brackets = utils.remove_starting_datetime(
-            detected_message_without_params)
-        detected_message_without_params_and_brackets = utils.clean_from_brackets(
-            detected_message_without_params_and_brackets)
+        detected_message_without_params = utils.remove_starting_datetime(detected_message_without_params)
         detected_message_without_params = utils.sanitize_text(detected_message_without_params)
+        detected_message_without_params_and_brackets = utils.clean_from_brackets(
+            detected_message_without_params)
 
         detected_message_with_numbers = utils.remove_starting_datetime(detected_message)
         detected_message_only_numbers = utils.find_only_numbers(detected_message_with_numbers)
@@ -186,9 +185,11 @@ class LogPreparation:
         log_template["_source"]["test_item"] = test_item_info.testItemId
         log_template["_source"]["unique_id"] = test_item_info.uniqueId
         log_template["_source"]["test_case_hash"] = test_item_info.testCaseHash
+        log_template["_source"]["test_item_name"] = utils.preprocess_test_item_name(
+            test_item_info.testItemName)
         log_template["_source"]["is_auto_analyzed"] = False
         log_template["_source"]["issue_type"] = ""
-        log_template["_source"]["start_time"] = ""
+        log_template["_source"]["start_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         return log_template
 
     def _prepare_log_for_suggests(self, test_item_info, log, project):
@@ -224,6 +225,8 @@ class LogPreparation:
             cleaned_message)
         test_and_methods = utils.find_test_methods_in_text(cleaned_message)
         detected_message = utils.replace_text_pieces(detected_message, test_and_methods)
+        detected_message = utils.clean_from_urls(detected_message)
+        detected_message = utils.clean_from_paths(detected_message)
         stacktrace = utils.sanitize_text(stacktrace)
         message = utils.first_lines(cleaned_message, -1)
         message = utils.sanitize_text(message)
@@ -243,6 +246,7 @@ class LogPreparation:
         log_template["_source"]["stacktrace"] = stacktrace
         potential_status_codes = " ".join(utils.get_potential_status_codes(detected_message_with_numbers))
         log_template["_source"]["potential_status_codes"] = potential_status_codes
+        log_template["_source"]["found_exceptions"] = utils.get_found_exceptions(detected_message)
         if clean_numbers:
             detected_message = detected_message + " " + potential_status_codes
             log_template["_source"]["whole_message"] = utils.delete_empty_lines(
@@ -264,7 +268,7 @@ class LogPreparation:
                     continue
                 prepared_logs.append(
                     self.prepare_log_clustering_light(launch, test_item, log, clean_numbers, project))
-            merged_logs = LogMerger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+            merged_logs = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
             new_merged_logs = []
             for log in merged_logs:
                 if not log["_source"]["stacktrace"].strip():

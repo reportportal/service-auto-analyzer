@@ -119,6 +119,10 @@
         "found_tests_and_methods": {
             "type":     "text",
             "analyzer": "standard_english_analyzer"
+        },
+        "test_item_name":  {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
         }
     }
 }

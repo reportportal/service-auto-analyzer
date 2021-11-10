@@ -317,7 +317,7 @@ class EsClient:
                 self.delete_index(index_name)
                 self.create_index_for_stats_info(index_name)
 
-    def _bulk_index(self, bodies, host=None, es_client=None, refresh=False):
+    def _bulk_index(self, bodies, host=None, es_client=None, refresh=False, chunk_size=None):
         if host is None:
             host = self.host
         if es_client is None:
@@ -327,6 +327,8 @@ class EsClient:
         start_time = time()
         logger.debug("Indexing %d logs...", len(bodies))
         es_chunk_number = self.app_config["esChunkNumber"]
+        if chunk_size is not None:
+            es_chunk_number = chunk_size
         try:
             try:
                 success_count, errors = elasticsearch.helpers.bulk(es_client,

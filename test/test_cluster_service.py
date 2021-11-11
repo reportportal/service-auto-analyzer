@@ -92,7 +92,8 @@ class TestClusterService(TestService):
                     "minioHost":         "",
                     "minioAccessKey":    "",
                     "minioSecretKey":    "",
-                    "esProjectIndexPrefix": "rp_"
+                    "esProjectIndexPrefix": "rp_",
+                    "esChunkNumberUpdateClusters": 500
                 },
                 "expected_result":     launch_objects.ClusterResult(
                     project=2,
@@ -396,7 +397,8 @@ class TestClusterService(TestService):
                     "minioHost":         "",
                     "minioAccessKey":    "",
                     "minioSecretKey":    "",
-                    "esProjectIndexPrefix": "rp_"
+                    "esProjectIndexPrefix": "rp_",
+                    "esChunkNumberUpdateClusters": 500
                 },
                 "expected_result":     launch_objects.ClusterResult(
                     project=2,

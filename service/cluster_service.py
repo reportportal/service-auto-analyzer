@@ -391,7 +391,8 @@ class ClusterService:
                         "doc": {"cluster_id": str(cluster_id),
                                 "cluster_message": cluster_message,
                                 "cluster_with_numbers": not launch_info.cleanNumbers}})
-                self.es_client._bulk_index(bodies, chunk_size=500)
+                self.es_client._bulk_index(
+                    bodies, chunk_size=self.app_config["esChunkNumberUpdateClusters"])
         except Exception as err:
             logger.error(err)
             errors_found.append(utils.extract_exception(err))

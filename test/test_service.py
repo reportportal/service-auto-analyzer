@@ -199,7 +199,6 @@ class TestService(unittest.TestCase):
             "MaxQueryTerms":  50,
             "SearchLogsMinShouldMatch": "95%",
             "SearchLogsMinSimilarity": 0.95,
-            "ClusterLogsMinSimilarity": 0.95,
             "MinWordLength":  0,
             "TimeWeightDecay": 0.95,
             "PatternLabelMinPercentToSuggest": 0.5,

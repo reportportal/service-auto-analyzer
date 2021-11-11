@@ -28,6 +28,7 @@ class AnalyzerConf(BaseModel):
     indexingRunning: bool = True
     allMessagesShouldMatch: bool = False
     searchLogsMinShouldMatch: int = 95
+    uniqueErrorsMinShouldMatch: int = 95
 
 
 class SearchLogInfo(BaseModel):

@@ -129,14 +129,14 @@ class ClusterService:
     def find_similar_items_from_es(
             self, groups, log_dict,
             log_messages, log_ids, launch_info,
-            additional_results):
+            additional_results, unique_errors_min_should_match):
         new_clusters = {}
         _clusterizer = clusterizer.Clusterizer()
         for global_group in groups:
             first_item_ind = groups[global_group][0]
             min_should_match = utils.calculate_threshold_for_text(
                 log_messages[first_item_ind],
-                self.search_cfg["ClusterLogsMinSimilarity"])
+                unique_errors_min_should_match)
             query = self.build_search_similar_items_query(
                 log_dict[first_item_ind],
                 log_messages[first_item_ind],
@@ -310,7 +310,8 @@ class ClusterService:
             regroupped_by_error[group_key].append(i)
         return regroupped_by_error
 
-    def cluster_messages_with_groupping_by_error(self, log_messages, log_dict):
+    def cluster_messages_with_groupping_by_error(self, log_messages, log_dict,
+                                                 unique_errors_min_should_match):
         regroupped_by_error = self.regroup_by_error_ans_status_codes(
             log_messages, log_dict)
         _clusterizer = clusterizer.Clusterizer()
@@ -324,7 +325,7 @@ class ClusterService:
                 log_messages_idx_dict[i] = idx
             groups = _clusterizer.find_clusters(
                 log_messages_part,
-                threshold=self.search_cfg["ClusterLogsMinSimilarity"])
+                threshold=unique_errors_min_should_match)
             max_group_id = max(groups.keys())
             for group_id in groups:
                 global_idx = start_group_id + group_id
@@ -354,17 +355,20 @@ class ClusterService:
         clusters = []
         log_ids = []
         try:
+            unique_errors_min_should_match = launch_info.launch.analyzerConfig.uniqueErrorsMinShouldMatch / 100 # noqa
             log_messages, log_dict, log_ids_for_merged_logs = self.log_preparation.prepare_logs_for_clustering( # noqa
                 launch_info.launch, launch_info.numberOfLogLines,
                 launch_info.cleanNumbers, index_name)
             log_ids = set([str(log["_id"]) for log in log_dict.values()])
 
-            groups = self.cluster_messages_with_groupping_by_error(log_messages, log_dict)
+            groups = self.cluster_messages_with_groupping_by_error(
+                log_messages, log_dict,
+                unique_errors_min_should_match)
             logger.debug("Groups: %s", groups)
             additional_results = self.find_similar_items_from_es(
                 groups, log_dict, log_messages,
                 log_ids, launch_info,
-                {})
+                {}, unique_errors_min_should_match)
             clusters, cluster_num, merged_logs_to_update = self.gather_cluster_results(
                 groups, additional_results, log_dict, log_messages,
                 log_ids_for_merged_logs, launch_info)

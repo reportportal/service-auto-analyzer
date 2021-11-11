@@ -82,7 +82,6 @@ SEARCH_CONFIG = {
     "BoostUniqueID":               float(os.getenv("ES_BOOST_UNIQUE_ID", "8.0")),
     "MaxQueryTerms":               int(os.getenv("ES_MAX_QUERY_TERMS", "50")),
     "SearchLogsMinSimilarity":     float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.95")),
-    "ClusterLogsMinSimilarity":    float(os.getenv("CLUSTER_LOGS_MIN_SHOULD_MATCH", "0.95")),
     "MinWordLength":               int(os.getenv("ES_MIN_WORD_LENGTH", "2")),
     "TimeWeightDecay":                 float(os.getenv("ES_TIME_WEIGHT_DECAY", "0.95")),
     "PatternLabelMinPercentToSuggest": float(os.getenv("PATTERN_LABEL_MIN_PERCENT", "0.9")),

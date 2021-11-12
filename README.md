@@ -96,6 +96,10 @@ volumes:
 
 **MAX_SUGGESTIONS_NUMBER** - by default "3", the maximum number of suggestions shown in the ML suggestions area in the defect type editor.
 
+**ANALYZER_HTTP_PORT** - by default "5001", the http port for checking status of the analyzer. It is used when you run the analyzer without Docker and uwsgi. If you use Docker, you will use the port 5001 and remap it to the port you want. If you use wsqgi for running the analyzer, you can remap the port with --http :5000 parameter in cmd or app.ini.
+
+**ANALYZER_FILE_LOGGING_PATH** - by default "/tmp/config.log", the file for logging what's happeining with the analyzer.
+
 # Instructions for analyzer setup without Docker
 
 Install python with the version 3.7.4. (it is the version on which the service was developed, but it should work on the versions starting from 3.6).

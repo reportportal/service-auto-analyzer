@@ -125,7 +125,7 @@ Perform next steps inside source directory of the analyzer.
 ```
 5. Start the uwsgi server, you can change properties, such as the workers quantity for running the analyzer in the several processes
 ```
-  /venv/bin/uwsgi --ini app.ini --socket :3031 --http :5000 --virtualenv venv
+  /venv/bin/uwsgi --ini app.ini --socket :3031 --http :5000 --virtualenv /venv
   ```
  
 ## For Windows:

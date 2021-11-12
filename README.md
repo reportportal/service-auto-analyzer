@@ -68,6 +68,10 @@ volumes:
 
 **MAX_AUTO_ANALYSIS_ITEMS_TO_PROCESS** - by default 4000, which sets how many test items can be processed for one request, so if analyzer processes more than 4000 items, the analyzer stops processing and returns results to the backend.
 
+**ANALYZER_HTTP_PORT** - by default "5001", the http port for checking status of the analyzer. It is used when you run the analyzer without Docker and uwsgi. If you use Docker, you will use the port 5001 and remap it to the port you want. If you use wsqgi for running the analyzer, you can remap the port with --http :5000 parameter in cmd or app.ini.
+
+**ANALYZER_FILE_LOGGING_PATH** - by default "/tmp/config.log", the file for logging what's happeining with the analyzer.
+
 # Environmental variables for constants, used by algorithms:
 
 **ES_MIN_SHOULD_MATCH** - by default "80%", the global default min should match value for auto-analysis, but it is used only when the project settings are not set up.
@@ -95,10 +99,6 @@ volumes:
 **PROB_CUSTOM_MODEL_AUTO_ANALYSIS** - by default "0.5", the probability of custom retrained model to be used for running when auto-analysis is performed. The maximum value is 1.0. The bigger the value of this env varibale the more often custom retrained model will be used.
 
 **MAX_SUGGESTIONS_NUMBER** - by default "3", the maximum number of suggestions shown in the ML suggestions area in the defect type editor.
-
-**ANALYZER_HTTP_PORT** - by default "5001", the http port for checking status of the analyzer. It is used when you run the analyzer without Docker and uwsgi. If you use Docker, you will use the port 5001 and remap it to the port you want. If you use wsqgi for running the analyzer, you can remap the port with --http :5000 parameter in cmd or app.ini.
-
-**ANALYZER_FILE_LOGGING_PATH** - by default "/tmp/config.log", the file for logging what's happeining with the analyzer.
 
 # Instructions for analyzer setup without Docker
 

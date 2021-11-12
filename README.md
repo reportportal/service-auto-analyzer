@@ -107,27 +107,53 @@ Install python with the version 3.7.4. (it is the version on which the service w
 Perform next steps inside source directory of the analyzer.
 
 ## For Linux:
+
+### Analyzer
+
 1. Create a virtual environment with any name (in the example **/venv**)
-```Shell
-  python -m venv /venv
+```bash
+  python -m venv /analyzer
 ```
 2. Install python libraries
-```
-  /venv/bin/pip install --no-cache-dir -r requirements.txt
+```bash
+  /analyzer/bin/pip install --no-cache-dir -r requirements.txt
 ```
 3. Activate the virtual environment
-```
-  /venv/bin/activate
+```bash
+  /analyzer/bin/activate
 ```
 4. Install stopwords package from the nltk library
-```
-  /venv/bin/python3 -m nltk.downloader -d /usr/share/nltk_data stopwords
+```bash
+  /analyzer/bin/python3 -m nltk.downloader -d /usr/share/nltk_data stopwords
 ```
 5. Start the uwsgi server, you can change properties, such as the workers quantity for running the analyzer in the several processes
+```bash
+  /analyzer/bin/uwsgi --ini analyzer.ini
 ```
-  /venv/bin/uwsgi --ini app.ini
-  ```
  
+### Analyzer Train
+
+1. Create a virtual environment with any name (in the example **/venv**)
+```bash
+  python -m venv /analyzer-train
+```
+2. Install python libraries
+```bash
+  /analyzer-train/bin/pip install --no-cache-dir -r requirements.txt
+```
+3. Activate the virtual environment
+```bash
+  source /analyzer-train/bin/activate
+```
+4. Install stopwords package from the nltk library
+```bash
+  /analyzer-train/bin/python3 -m nltk.downloader -d /usr/share/nltk_data stopwords
+```
+5. Start the uwsgi server, you can change properties, such as the workers quantity for running the analyzer train in the several processes
+```bash
+  /analyzer-train/bin/uwsgi --ini analyzer-train.ini
+```
+
 ## For Windows:
 1. Create a virtual environment with any name (in the example **env**)
 ```

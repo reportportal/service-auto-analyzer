@@ -72,7 +72,9 @@ APP_CONFIG = {
     "filesystemDefaultPath": os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
     "esChunkNumber":         int(os.getenv("ES_CHUNK_NUMBER", "1000")),
     "esChunkNumberUpdateClusters": int(os.getenv("ES_CHUNK_NUMBER_UPDATE_CLUSTERS", "500")),
-    "esProjectIndexPrefix":  os.getenv("ES_PROJECT_INDEX_PREFIX", "").strip()
+    "esProjectIndexPrefix":  os.getenv("ES_PROJECT_INDEX_PREFIX", "").strip(),
+    "analyzerHttpPort":  int(os.getenv("ANALYZER_HTTP_PORT", "5001")),
+    "analyzerPathToLog":  os.getenv("ANALYZER_FILE_LOGGING_PATH", "/tmp/config.log")
 }
 
 SEARCH_CONFIG = {
@@ -375,7 +377,7 @@ def read_model_settings():
 
 
 log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.conf')
-logging.config.fileConfig(log_file_path)
+logging.config.fileConfig(log_file_path, defaults={'logfilename': APP_CONFIG["analyzerPathToLog"]})
 if APP_CONFIG["logLevel"].lower() == "debug":
     logging.disable(logging.NOTSET)
 elif APP_CONFIG["logLevel"].lower() == "info":
@@ -411,7 +413,7 @@ def handler(signal_received, frame):
 def start_http_server():
     application.logger.setLevel(logging.INFO)
     logger.info("Started http server")
-    application.run(host='0.0.0.0', port=5001, use_reloader=False)
+    application.run(host='0.0.0.0', port=APP_CONFIG["analyzerHttpPort"], use_reloader=False)
 
 
 signal(SIGINT, handler)

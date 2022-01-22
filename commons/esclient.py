@@ -53,7 +53,7 @@ class EsClient:
             return elasticsearch.Elasticsearch(
                 [self.host], timeout=30,
                 max_retries=5, retry_on_timeout=True,
-                http_auth=(app_config["esUser"], app_config["esPassword"]),
+                http_auth=(app_config["esUser"], app_config["esPassword"]) if app_config['esUser'] else None,
                 use_ssl=app_config["esUseSsl"],
                 verify_certs=app_config["esVerifyCerts"],
                 ssl_show_warn=app_config["esSslShowWarn"],
@@ -64,7 +64,7 @@ class EsClient:
         return elasticsearch.Elasticsearch(
             [self.host], timeout=30,
             max_retries=5, retry_on_timeout=True,
-            http_auth=(app_config["esUser"], app_config["esPassword"]),
+            http_auth=(app_config["esUser"], app_config["esPassword"]) if app_config['esUser'] else None,
             use_ssl=app_config["esUseSsl"],
             verify_certs=app_config["esVerifyCerts"],
             ssl_show_warn=app_config["esSslShowWarn"],

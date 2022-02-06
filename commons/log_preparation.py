@@ -75,8 +75,7 @@ class LogPreparation:
         log_template["_source"]["launch_id"] = launch.launchId
         log_template["_source"]["launch_name"] = launch.launchName
         log_template["_source"]["launch_start_time"] = datetime(
-            *launch.launchStartTime
-        ).strftime("%Y-%m-%d %H:%M:%S")
+            *launch.launchStartTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
         log_template["_source"]["test_item"] = test_item.testItemId
         log_template["_source"]["unique_id"] = test_item.uniqueId
         log_template["_source"]["test_case_hash"] = test_item.testCaseHash
@@ -133,7 +132,7 @@ class LogPreparation:
         found_test_methods = utils.enrich_text_with_method_and_classes(" ".join(test_and_methods))
 
         log_template["_id"] = log.logId
-        log_template["_source"]["log_time"] = datetime(*log.logTime).strftime("%Y-%m-%d %H:%M:%S")
+        log_template["_source"]["log_time"] = datetime(*log.logTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
         log_template["_source"]["cluster_id"] = str(log.clusterId)
         log_template["_source"]["cluster_message"] = log.clusterMessage
         log_template["_source"]["cluster_with_numbers"] = utils.extract_clustering_setting(log.clusterId)

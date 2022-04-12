@@ -1,8 +1,6 @@
 {"update":{"_index":"rp_2","_id":4}}
-{"doc":{"cluster_id":"123","cluster_message":"error occured \n error found \n error mined"}}
+{"doc":{"cluster_id":"53490850438321651","cluster_message":"error occured \r\n error found","cluster_with_numbers":true}}
 {"update":{"_index":"rp_2","_id":5}}
-{"doc":{"cluster_id":"123","cluster_message":"error occured \n error found \n error mined"}}
+{"doc":{"cluster_id":"53490850438321651","cluster_message":"error occured \r\n error found","cluster_with_numbers":true}}
 {"update":{"_index":"rp_2","_id":9}}
-{"doc":{"cluster_id":"123","cluster_message":"error occured \n error found \n error mined"}}
-{"update":{"_index":"rp_2","_id":111}}
-{"doc":{"cluster_id":"123","cluster_message":"error occured \n error found \n error mined"}}
+{"doc":{"cluster_id":"53490850438321651","cluster_message":"error occured \r\n error found","cluster_with_numbers":true}}

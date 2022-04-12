@@ -135,6 +135,26 @@ class TestService(unittest.TestCase):
             "two_hits_search_rs_search_logs_with_status_codes.json"
         self.search_not_merged_logs_by_test_item = \
             "search_not_merged_logs_by_test_item.json"
+        self.launch_w_items_clustering_with_prefix = \
+            "launch_w_items_clustering_with_prefix.json"
+        self.launch_w_small_logs_for_clustering = \
+            "launch_w_small_logs_for_clustering.json"
+        self.search_logs_rq_first_group_small_logs = \
+            "search_logs_rq_first_group_small_logs.json"
+        self.search_logs_rq_second_group_small_logs = \
+            "search_logs_rq_second_group_small_logs.json"
+        self.cluster_update_small_logs = "cluster_update_small_logs.json"
+        self.search_logs_rq_first_group_no_such_element_all_log_lines = \
+            "search_logs_rq_first_group_no_such_element_all_log_lines.json"
+        self.suggest_test_item_info_cluster = "suggest_test_item_info_cluster.json"
+        self.three_hits_search_rs_for_cluster_suggestions = \
+            "three_hits_search_rs_for_cluster_suggestions.json"
+        self.search_test_item_cluster = "search_test_item_cluster.json"
+        self.search_logs_by_test_item = "search_logs_by_test_item.json"
+        self.one_hit_search_rs_small_logs = "one_hit_search_rs_small_logs.json"
+        self.launch_w_test_items_w_logs_with_clusters = "launch_w_test_items_w_logs_with_clusters.json"
+        self.index_logs_rq_big_messages_with_clusters = \
+            "index_logs_rq_big_messages_with_clusters.json"
         self.app_config = {
             "esHost": "http://localhost:9200",
             "esUser": "",
@@ -155,7 +175,8 @@ class TestService(unittest.TestCase):
             "minioHost":         "",
             "minioAccessKey":    "",
             "minioSecretKey":    "",
-            "esProjectIndexPrefix": ""
+            "esProjectIndexPrefix": "",
+            "esChunkNumberUpdateClusters": 500
         }
         self.model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
         self.model_chooser = model_chooser.ModelChooser(self.app_config, self.get_default_search_config())
@@ -178,7 +199,6 @@ class TestService(unittest.TestCase):
             "MaxQueryTerms":  50,
             "SearchLogsMinShouldMatch": "95%",
             "SearchLogsMinSimilarity": 0.95,
-            "ClusterLogsMinSimilarity": 0.95,
             "MinWordLength":  0,
             "TimeWeightDecay": 0.95,
             "PatternLabelMinPercentToSuggest": 0.5,
@@ -198,7 +218,9 @@ class TestService(unittest.TestCase):
                 self.model_settings["RETRAIN_SUGGEST_BOOST_MODEL_CONFIG"],
             "RetrainAutoBoostModelConfig":
                 self.model_settings["RETRAIN_AUTO_BOOST_MODEL_CONFIG"],
-            "MaxSuggestionsNumber": 3
+            "MaxSuggestionsNumber": 3,
+            "AutoAnalysisTimeout": 300,
+            "MaxAutoAnalysisItemsToProcess": 4000
         }
 
     @utils.ignore_warnings

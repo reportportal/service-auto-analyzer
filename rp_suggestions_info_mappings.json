@@ -71,6 +71,9 @@
         },
         "methodName": {
             "type": "keyword"
+        },
+        "clusterId": {
+            "type": "keyword"
         }
     }
 }

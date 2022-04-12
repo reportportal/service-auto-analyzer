@@ -1,6 +1,6 @@
 {"update":{"_index":"2","_id":4}}
-{"doc":{"cluster_id":"6653850107754598","cluster_message":"AssertionError error occured \r\n error found"}}
+{"doc":{"cluster_id":"66538501077545981","cluster_message":"AssertionError error occured \r\n error found","cluster_with_numbers":true}}
 {"update":{"_index":"2","_id":5}}
-{"doc":{"cluster_id":"3007109971644807","cluster_message":"AssertionError status code: 500 error occured \r\n error found"}}
+{"doc":{"cluster_id":"30071099716448071","cluster_message":"AssertionError status code: 500 error occured \r\n error found","cluster_with_numbers":true}}
 {"update":{"_index":"2","_id":9}}
-{"doc":{"cluster_id":"5952168702333922","cluster_message":"NoSuchElementException error occured \r\n error found"}}
+{"doc":{"cluster_id":"59521687023339221","cluster_message":"NoSuchElementException error occured \r\n error found","cluster_with_numbers":true}}

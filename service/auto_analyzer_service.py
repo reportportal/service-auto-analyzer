@@ -302,15 +302,17 @@ class AutoAnalyzerService(AnalyzerService):
                     str(launch.project), self.app_config["esProjectIndexPrefix"])
                 if not self.es_client.index_exists(index_name):
                     continue
-                if test_items_number_to_process >= 4000:
-                    logger.info("Only first 4000 test items were taken")
+                if test_items_number_to_process >= self.search_cfg["MaxAutoAnalysisItemsToProcess"]:
+                    logger.info("Only first %d test items were taken",
+                                self.search_cfg["MaxAutoAnalysisItemsToProcess"])
                     break
                 if EARLY_FINISH:
                     logger.info("Early finish from analyzer before timeout")
                     break
                 for test_item in launch.testItems:
-                    if test_items_number_to_process >= 4000:
-                        logger.info("Only first 4000 test items were taken")
+                    if test_items_number_to_process >= self.search_cfg["MaxAutoAnalysisItemsToProcess"]:
+                        logger.info("Only first %d test items were taken",
+                                    self.search_cfg["MaxAutoAnalysisItemsToProcess"])
                         break
                     if EARLY_FINISH:
                         logger.info("Early finish from analyzer before timeout")
@@ -318,7 +320,7 @@ class AutoAnalyzerService(AnalyzerService):
                     unique_logs = utils.leave_only_unique_logs(test_item.logs)
                     prepared_logs = [self.log_preparation._prepare_log(launch, test_item, log, index_name)
                                      for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
-                    results = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+                    results, _ = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
 
                     for log in results:
                         message = log["_source"]["message"].strip()
@@ -365,7 +367,7 @@ class AutoAnalyzerService(AnalyzerService):
         logger.info("Es queries finished %.2f s.", time() - t_start)
 
     @utils.ignore_warnings
-    def analyze_logs(self, launches, timeout=300):
+    def analyze_logs(self, launches):
         global EARLY_FINISH
         cnt_launches = len(launches)
         logger.info("Started analysis for %d launches", cnt_launches)
@@ -386,7 +388,7 @@ class AutoAnalyzerService(AnalyzerService):
             results_to_share = {}
             chosen_namespaces = {}
             while self.finished_queue.empty() or not self.queue.empty():
-                if (timeout - (time() - t_start)) <= 5:  # check whether we are running out of time
+                if (self.search_cfg["AutoAnalysisTimeout"] - (time() - t_start)) <= 5:  # check whether we are running out of time # noqa
                     EARLY_FINISH = True
                     break
                 if self.queue.empty():

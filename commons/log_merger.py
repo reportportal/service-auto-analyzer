@@ -30,10 +30,11 @@ class LogMerger:
                                 "detected_message_without_params_and_brackets"]
         self.fields_to_merge = ["message", "found_exceptions", "potential_status_codes",
                                 "found_tests_and_methods", "only_numbers", "urls",
-                                "paths", "message_params", "detected_message_without_params_extended"]
+                                "paths", "message_params", "detected_message_without_params_extended",
+                                "whole_message"]
 
     def merge_big_and_small_logs(self, logs, log_level_ids_to_add,
-                                 log_level_messages, log_level_ids_merged):
+                                 log_level_messages, log_level_ids_merged, logs_ids_in_merged_logs):
         """Merge big message logs with small ones"""
         new_logs = []
         for log in logs:
@@ -46,25 +47,31 @@ class LogMerger:
                 new_logs.append(self.prepare_new_log(
                     log, log["_id"], False, merged_small_logs))
 
+        log_ids_for_merged_logs = {}
         for log_level in log_level_messages["message"]:
 
             if not log_level_ids_to_add[log_level] and\
                log_level_messages["message"][log_level].strip():
                 log = log_level_ids_merged[log_level]
+                merged_logs_id = str(log["_id"]) + "_m"
                 new_log = self.prepare_new_log(
-                    log, str(log["_id"]) + "_m", True,
+                    log, merged_logs_id, True,
                     utils.compress(log_level_messages["message"][log_level]),
                     fields_to_clean=self.fields_to_clean)
+                log_ids_for_merged_logs[merged_logs_id] = logs_ids_in_merged_logs[log_level]
                 for field in log_level_messages:
                     if field in ["message"]:
                         continue
-                    new_log["_source"][field] = utils.compress(
-                        log_level_messages[field][log_level])
+                    if field in ["whole_message"]:
+                        new_log["_source"][field] = log_level_messages[field][log_level]
+                    else:
+                        new_log["_source"][field] = utils.compress(
+                            log_level_messages[field][log_level])
                 new_log["_source"]["found_exceptions_extended"] = utils.compress(
                     utils.enrich_found_exceptions(log_level_messages["found_exceptions"][log_level]))
 
                 new_logs.append(new_log)
-        return new_logs
+        return new_logs, log_ids_for_merged_logs
 
     def decompose_logs_merged_and_without_duplicates(self, logs):
         """Merge big logs with small ones without duplcates"""
@@ -74,6 +81,7 @@ class LogMerger:
         log_level_ids_to_add = {}
         log_level_ids_merged = {}
         logs_unique_log_level = {}
+        logs_ids_in_merged_logs = {}
 
         for log in logs:
             if not log["_source"]["message"].strip():
@@ -93,6 +101,9 @@ class LogMerger:
                     log["_source"]["original_message_words_number"] <= 100:
                 if log_level not in log_level_ids_merged:
                     log_level_ids_merged[log_level] = log
+                if log_level not in logs_ids_in_merged_logs:
+                    logs_ids_in_merged_logs[log_level] = []
+                logs_ids_in_merged_logs[log_level].append(log["_id"])
 
                 log_level_representative = log_level_ids_merged[log_level]
                 current_log_word_num = log["_source"]["original_message_words_number"]
@@ -106,7 +117,7 @@ class LogMerger:
 
                     for field in log_level_messages:
                         if field in log["_source"]:
-                            splitter = "\r\n" if field == "message" else " "
+                            splitter = "\r\n" if field in ["message", "whole_message"] else " "
                             log_level_messages[field][log_level] =\
                                 log_level_messages[field][log_level] + log["_source"][field] + splitter
 
@@ -114,7 +125,8 @@ class LogMerger:
                 log_level_ids_to_add[log_level].append(log["_id"])
 
         return self.merge_big_and_small_logs(logs, log_level_ids_to_add,
-                                             log_level_messages, log_level_ids_merged)
+                                             log_level_messages, log_level_ids_merged,
+                                             logs_ids_in_merged_logs)
 
     def prepare_new_log(self, old_log, new_id, is_merged, merged_small_logs, fields_to_clean=[]):
         """Prepare updated log"""

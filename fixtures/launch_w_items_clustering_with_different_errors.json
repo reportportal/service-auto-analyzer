@@ -1,7 +1,7 @@
 {
     "launchId": 1,
     "project": 2,
-    "launchName": "dsfdsf",
+    "launchName": "Launch name",
     "analyzerConfig": {
         "minDocFreq": 1.0,
         "minTermFreq": 1.0,

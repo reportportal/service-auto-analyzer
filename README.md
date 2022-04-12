@@ -16,6 +16,14 @@
 
 **ANALYZER_PRIORITY** - priority for this analyzer, by default 1
 
+**ANALYZER_INDEX** - default "true", the parameter for rabbitmq exchange params, where the analyzer supports indexing
+
+**ANALYZER_LOG_SEARCH** - default "true", the parameter for rabbitmq exchange params, where the analyzer supports searching logs
+
+**ANALYZER_SUGGEST** - default "true", the parameter for rabbitmq exchange params, where the analyzer supports suggesting
+
+**ANALYZER_CLUSTER** - default "true", the parameter for rabbitmq exchange params, where the analyzer supports clustering
+
 **ES_VERIFY_CERTS** - turn on SSL certificates verification, by default "false"
 
 **ES_USE_SSL** - turn on SSL, by default "false"
@@ -42,6 +50,8 @@
 
 **ANALYZER_BINARYSTORE_MINIO_REGION** - by default None, the region which you can specify for saving in AWS S3.
 
+**INSTANCE_TASK_TYPE** - by default "", if you want to run a standard analyzer instance, leave it as blank. If you want to run an instance for training, set "train" here.
+
 **FILESYSTEM_DEFAULT_PATH** - by default "storage", the path where will be stored all the information connected with analyzer, if ANALYZER_BINARYSTORE_TYPE = "filesystem". If you want to mount this folder to some folder on your machine, you can use this instruction in the docker compose:
 ```
 volumes:
@@ -50,7 +60,17 @@ volumes:
 
 **ES_CHUNK_NUMBER** - by default 1000, the number of objects which is sent to ES while bulk indexing. **NOTE**: AWS Elasticsearch has restrictions for sent data size either 10Mb or 100Mb, so when 10Mb is chosen, make sure you don't get the error "TransportError(413, '{"Message": "Request size exceeded 10485760 bytes"}')" while generating index or indexing the data. If you get this error, please, decrease ES_CHUNK_NUMBER until you stop getting this error.
 
+**ES_CHUNK_NUMBER_UPDATE_CLUSTERS** - by default 500, the number of objects which is sent to ES while bulk updating clusters. **NOTE**: AWS Elasticsearch has restrictions for sent data size either 10Mb or 100Mb, so when 10Mb is chosen, make sure you don't get the error "TransportError(413, '{"Message": "Request size exceeded 10485760 bytes"}')" while generating index or indexing the data. If you get this error, please, decrease ES_CHUNK_NUMBER_UPDATE_CLUSTERS until you stop getting this error.
+
 **ES_PROJECT_INDEX_PREFIX** - by default "", the prefix which is added to the created for each project indices. Our index name is the project id, so if it is 34, then the index "34" will be created. If you set ES_PROJECT_INDEX_PREFIX="rp_", then "rp_34" index will be created. We create several other indices which are sharable between projects, and this perfix won't influence them: rp_aa_stats, rp_stats, rp_model_train_stats, rp_done_tasks, rp_suggestions_info_metrics. **NOTE**: if you change an environmental variable, you'll need to generate index, so that a nex index is created and filled appropriately.
+
+**AUTO_ANALYSIS_TIMEOUT** - by default 300, which sets timeout in seconds for auto-analysis operations to return results after this timeout, so if the request to the analyzer will be running out of time, the analyzer stops processing and returns results to the backend.
+
+**MAX_AUTO_ANALYSIS_ITEMS_TO_PROCESS** - by default 4000, which sets how many test items can be processed for one request, so if analyzer processes more than 4000 items, the analyzer stops processing and returns results to the backend.
+
+**ANALYZER_HTTP_PORT** - by default "5001", the http port for checking status of the analyzer. It is used when you run the analyzer without Docker and uwsgi. If you use Docker, you will use the port 5001 and remap it to the port you want. If you use wsqgi for running the analyzer, you can remap the port with --http :5000 parameter in cmd or app.ini.
+
+**ANALYZER_FILE_LOGGING_PATH** - by default "/tmp/config.log", the file for logging what's happenning with the analyzer.
 
 # Environmental variables for constants, used by algorithms:
 
@@ -65,8 +85,6 @@ volumes:
 **ES_MAX_QUERY_TERMS** - by default "50", the value to use in more like this query while querying for Auto-analysis
 
 **ES_MIN_WORD_LENGTH** - by default "2", the value to use in more like this query while querying for Auto-analysis
-
-**ES_LOGS_MIN_SHOULD_MATCH** - by default "0.98", the value of min should match for searching the same to investigate test items
 
 **PATTERN_LABEL_MIN_PERCENT** - by default "0.9", the value of minimum percent of the same issue type for pattern to be suggested as a pattern with a label
 
@@ -89,27 +107,53 @@ Install python with the version 3.7.4. (it is the version on which the service w
 Perform next steps inside source directory of the analyzer.
 
 ## For Linux:
+
+### Analyzer
+
 1. Create a virtual environment with any name (in the example **/venv**)
-```Shell
-  python -m venv /venv
+```bash
+  python -m venv /analyzer
 ```
 2. Install python libraries
-```
-  /venv/bin/pip install --no-cache-dir -r requirements.txt
+```bash
+  /analyzer/bin/pip install --no-cache-dir -r requirements.txt
 ```
 3. Activate the virtual environment
-```
-  /venv/bin/activate
+```bash
+  /analyzer/bin/activate
 ```
 4. Install stopwords package from the nltk library
-```
-  /venv/bin/python3 -m nltk.downloader -d /usr/share/nltk_data stopwords
+```bash
+  /analyzer/bin/python3 -m nltk.downloader -d /usr/share/nltk_data stopwords
 ```
 5. Start the uwsgi server, you can change properties, such as the workers quantity for running the analyzer in the several processes
+```bash
+  /analyzer/bin/uwsgi --ini analyzer.ini
 ```
-  /venv/bin/uwsgi --ini app.ini
-  ```
  
+### Analyzer Train
+
+1. Create a virtual environment with any name (in the example **/venv**)
+```bash
+  python -m venv /analyzer-train
+```
+2. Install python libraries
+```bash
+  /analyzer-train/bin/pip install --no-cache-dir -r requirements.txt
+```
+3. Activate the virtual environment
+```bash
+  source /analyzer-train/bin/activate
+```
+4. Install stopwords package from the nltk library
+```bash
+  /analyzer-train/bin/python3 -m nltk.downloader -d /usr/share/nltk_data stopwords
+```
+5. Start the uwsgi server, you can change properties, such as the workers quantity for running the analyzer train in the several processes
+```bash
+  /analyzer-train/bin/uwsgi --ini analyzer-train.ini
+```
+
 ## For Windows:
 1. Create a virtual environment with any name (in the example **env**)
 ```

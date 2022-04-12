@@ -48,7 +48,8 @@
                     "detected_message_without_params_extended": "Message  \r\n  java.lang lang.NoClassDefFoundError NoClassDefFoundError ",
                     "message_without_params_extended": "Message  \r\n  java.lang lang.NoClassDefFoundError NoClassDefFoundError ",
                     "message_without_params_and_brackets": "Message  12 \r\n  java.lang lang.NoClassDefFoundError",
-                    "detected_message_without_params_and_brackets": "Message  12 \r\n  java.lang lang.NoClassDefFoundError"
+                    "detected_message_without_params_and_brackets": "Message  12 \r\n  java.lang lang.NoClassDefFoundError",
+                    "whole_message": "Message  12 \r\n  java.lang lang.NoClassDefFoundError"
                 }
             }
         ]

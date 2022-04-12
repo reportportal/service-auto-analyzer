@@ -6,6 +6,10 @@
         "issue_type": {
             "type": "keyword"
         },
+        "log_time": {
+            "type":   "date",
+            "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        },
         "message": {
             "type":     "text",
             "analyzer": "standard_english_analyzer"
@@ -92,6 +96,10 @@
         "launch_id": {
             "type": "keyword"
         },
+        "launch_start_time": {
+            "type":   "date",
+            "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        },
         "unique_id": {
             "type": "keyword"
         },
@@ -111,6 +119,9 @@
         "cluster_message": {
             "type":     "text",
             "analyzer": "standard_english_analyzer"
+        },
+        "cluster_with_numbers": {
+            "type":     "boolean"
         },
         "whole_message": {
             "type":     "text",

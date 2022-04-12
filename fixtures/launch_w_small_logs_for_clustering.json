@@ -20,10 +20,10 @@
                    "logs": [
                        {"logId": 3,
                         "logLevel": 40000,
-                        "message": "error occured"},
+                        "message": "error occured twice"},
                        {"logId": 4,
                         "logLevel": 40000,
-                        "message": "error occured \r\n error found \r\n error mined"}]
+                        "message": "AssertionError error occured \r\n error found"}]
                    },
                   {"testItemId": 5,
                    "uniqueId": "df1",
@@ -34,7 +34,7 @@
                    "logs": [
                        {"logId": 5,
                         "logLevel": 40000,
-                        "message": "error occured \r\n error found \r\n error mined"}]
+                        "message": "AssertionError status code: 500 error occured"}]
                    },
                    {"testItemId": 6,
                    "uniqueId": "df2",
@@ -45,6 +45,6 @@
                    "logs": [
                        {"logId": 9,
                         "logLevel": 40000,
-                        "message": "error occured \r\n error found \r\n assert query"}]
+                        "message": "NoSuchElementException error occured \r\n error found \r\n assert query"}]
                    }]
 }

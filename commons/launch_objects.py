@@ -28,6 +28,7 @@ class AnalyzerConf(BaseModel):
     indexingRunning: bool = True
     allMessagesShouldMatch: bool = False
     searchLogsMinShouldMatch: int = 95
+    uniqueErrorsMinShouldMatch: int = 95
 
 
 class SearchLogInfo(BaseModel):
@@ -41,6 +42,7 @@ class Log(BaseModel):
     """Log object"""
     logId: int
     logLevel: int = 0
+    logTime: List[int] = list(datetime.now().timetuple())[:7]
     message: str
     clusterId: int = 0
     clusterMessage: str = ""
@@ -64,6 +66,7 @@ class TestItemInfo(BaseModel):
     testItemId: int = 0
     uniqueId: str = ""
     testCaseHash: int = 0
+    clusterId: int = 0
     launchId: int
     launchName: str = ""
     testItemName: str = ""
@@ -77,12 +80,15 @@ class Launch(BaseModel):
     launchId: int
     project: int
     launchName: str = ""
+    launchStartTime: List[int] = list(datetime.now().timetuple())[:7]
     analyzerConfig: AnalyzerConf = AnalyzerConf()
     testItems: List[TestItem] = []
+    clusters: dict = {}
 
 
 class LaunchInfoForClustering(BaseModel):
     launch: Launch
+    project: int
     forUpdate: bool = False
     numberOfLogLines: int
     cleanNumbers: bool = False
@@ -99,6 +105,7 @@ class ClusterInfo(BaseModel):
     clusterId: int
     clusterMessage: str
     logIds: List[int]
+    itemIds: List[int]
 
 
 class ClusterResult(BaseModel):
@@ -131,11 +138,18 @@ class SuggestAnalysisResult(BaseModel):
     processedTime: float
     userChoice: int = 0
     methodName: str
+    clusterId: int = 0
 
 
 class CleanIndex(BaseModel):
     """Clean index object"""
     ids: List[int]
+    project: int
+
+
+class CleanIndexStrIds(BaseModel):
+    """Clean index object that supports string ids"""
+    ids: List[str]
     project: int
 
 

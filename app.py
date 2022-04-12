@@ -53,6 +53,7 @@ APP_CONFIG = {
     "analyzerIndex":     json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),
     "analyzerLogSearch": json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower()),
     "analyzerSuggest":   json.loads(os.getenv("ANALYZER_SUGGEST", "true").lower()),
+    "analyzerCluster":   json.loads(os.getenv("ANALYZER_CLUSTER", "true").lower()),
     "turnOffSslVerification": json.loads(os.getenv("ES_TURN_OFF_SSL_VERIFICATION", "false").lower()),
     "esVerifyCerts":     json.loads(os.getenv("ES_VERIFY_CERTS", "false").lower()),
     "esUseSsl":          json.loads(os.getenv("ES_USE_SSL", "false").lower()),
@@ -70,7 +71,10 @@ APP_CONFIG = {
     "instanceTaskType":  os.getenv("INSTANCE_TASK_TYPE", "").strip(),
     "filesystemDefaultPath": os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
     "esChunkNumber":         int(os.getenv("ES_CHUNK_NUMBER", "1000")),
-    "esProjectIndexPrefix":  os.getenv("ES_PROJECT_INDEX_PREFIX", "").strip()
+    "esChunkNumberUpdateClusters": int(os.getenv("ES_CHUNK_NUMBER_UPDATE_CLUSTERS", "500")),
+    "esProjectIndexPrefix":  os.getenv("ES_PROJECT_INDEX_PREFIX", "").strip(),
+    "analyzerHttpPort":  int(os.getenv("ANALYZER_HTTP_PORT", "5001")),
+    "analyzerPathToLog":  os.getenv("ANALYZER_FILE_LOGGING_PATH", "/tmp/config.log")
 }
 
 SEARCH_CONFIG = {
@@ -80,7 +84,6 @@ SEARCH_CONFIG = {
     "BoostUniqueID":               float(os.getenv("ES_BOOST_UNIQUE_ID", "8.0")),
     "MaxQueryTerms":               int(os.getenv("ES_MAX_QUERY_TERMS", "50")),
     "SearchLogsMinSimilarity":     float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.95")),
-    "ClusterLogsMinSimilarity":    float(os.getenv("CLUSTER_LOGS_MIN_SHOULD_MATCH", "0.95")),
     "MinWordLength":               int(os.getenv("ES_MIN_WORD_LENGTH", "2")),
     "TimeWeightDecay":                 float(os.getenv("ES_TIME_WEIGHT_DECAY", "0.95")),
     "PatternLabelMinPercentToSuggest": float(os.getenv("PATTERN_LABEL_MIN_PERCENT", "0.9")),
@@ -97,7 +100,9 @@ SEARCH_CONFIG = {
     "GlobalDefectTypeModelFolder": "",
     "RetrainSuggestBoostModelConfig": "",
     "RetrainAutoBoostModelConfig": "",
-    "MaxSuggestionsNumber": int(os.getenv("MAX_SUGGESTIONS_NUMBER", "3"))
+    "MaxSuggestionsNumber": int(os.getenv("MAX_SUGGESTIONS_NUMBER", "3")),
+    "AutoAnalysisTimeout": int(os.getenv("AUTO_ANALYSIS_TIMEOUT", "300")),
+    "MaxAutoAnalysisItemsToProcess": int(os.getenv("MAX_AUTO_ANALYSIS_ITEMS_TO_PROCESS", "4000"))
 }
 
 
@@ -126,7 +131,8 @@ def declare_exchange(channel, config):
                                      "analyzer_priority":   config["analyzerPriority"],
                                      "analyzer_log_search": config["analyzerLogSearch"],
                                      "analyzer_suggest":    config["analyzerSuggest"],
-                                     "version":             APP_CONFIG["appVersion"], })
+                                     "analyzer_cluster":    config["analyzerCluster"],
+                                     "version":             config["appVersion"], })
     except Exception as err:
         logger.error("Failed to declare exchange")
         logger.error(err)
@@ -306,6 +312,46 @@ def init_amqp(_amqp_client):
                                                         prepare_data_func=lambda x: x,
                                                         prepare_response_data=amqp_handler.
                                                         output_result))))
+        threads.append(
+            create_thread(
+                AmqpClient(APP_CONFIG["amqpUrl"]).receive,
+                (
+                    APP_CONFIG["exchangeName"],
+                    "remove_by_launch_start_time",
+                    True,
+                    False,
+                    lambda channel, method, props, body: amqp_handler.handle_amqp_request(
+                        channel,
+                        method,
+                        props,
+                        body,
+                        _clean_index_service.remove_by_launch_start_time,
+                        prepare_data_func=lambda x: x,
+                        prepare_response_data=amqp_handler.output_result,
+                    ),
+                ),
+            )
+        )
+        threads.append(
+            create_thread(
+                AmqpClient(APP_CONFIG["amqpUrl"]).receive,
+                (
+                    APP_CONFIG["exchangeName"],
+                    "remove_by_log_time",
+                    True,
+                    False,
+                    lambda channel, method, props, body: amqp_handler.handle_amqp_request(
+                        channel,
+                        method,
+                        props,
+                        body,
+                        _clean_index_service.remove_by_log_time,
+                        prepare_data_func=lambda x: x,
+                        prepare_response_data=amqp_handler.output_result,
+                    ),
+                ),
+            )
+        )
 
     return threads
 
@@ -331,7 +377,7 @@ def read_model_settings():
 
 
 log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.conf')
-logging.config.fileConfig(log_file_path)
+logging.config.fileConfig(log_file_path, defaults={'logfilename': APP_CONFIG["analyzerPathToLog"]})
 if APP_CONFIG["logLevel"].lower() == "debug":
     logging.disable(logging.NOTSET)
 elif APP_CONFIG["logLevel"].lower() == "info":
@@ -367,7 +413,7 @@ def handler(signal_received, frame):
 def start_http_server():
     application.logger.setLevel(logging.INFO)
     logger.info("Started http server")
-    application.run(host='0.0.0.0', port=5001, use_reloader=False)
+    application.run(host='0.0.0.0', port=APP_CONFIG["analyzerHttpPort"], use_reloader=False)
 
 
 signal(SIGINT, handler)

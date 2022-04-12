@@ -15,7 +15,8 @@
 """
 from commons.esclient import EsClient
 from utils import utils
-from commons.log_preparation import LogPreparation, LogMerger
+from commons.log_preparation import LogPreparation
+from commons.log_merger import LogMerger
 from boosting_decision_making import weighted_similarity_calculator
 from commons import namespace_finder
 import logging

@@ -12,7 +12,7 @@ bump2version==0.5.11
 flake8==3.7.9
 nltk==3.6.6
 scikit-learn==0.19.2
-numpy==1.16.4
+numpy==1.21.0
 scipy==1.1.0
 xgboost==0.90
 python-dateutil==2.8.1

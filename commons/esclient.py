@@ -49,28 +49,26 @@ class EsClient:
     def create_es_client(self, app_config):
         if not app_config["esVerifyCerts"]:
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        kwargs = {
+            "timeout": 30,
+            "max_retries": 5,
+            "retry_on_timeout": True,
+            "use_ssl": app_config["esUseSsl"],
+            "verify_certs": app_config["esVerifyCerts"],
+            "ssl_show_warn": app_config["esSslShowWarn"],
+            "ca_certs": app_config["esCAcert"],
+            "client_cert": app_config["esClientCert"],
+            "client_key": app_config["esClientKey"],
+        }
+
+        if app_config["esUser"]:
+            kwargs["http_auth"] = (app_config["esUser"],
+                                   app_config["esPassword"])
+
         if app_config["turnOffSslVerification"]:
-            return elasticsearch.Elasticsearch(
-                [self.host], timeout=30,
-                max_retries=5, retry_on_timeout=True,
-                http_auth=(app_config["esUser"], app_config["esPassword"]),
-                use_ssl=app_config["esUseSsl"],
-                verify_certs=app_config["esVerifyCerts"],
-                ssl_show_warn=app_config["esSslShowWarn"],
-                ca_certs=app_config["esCAcert"],
-                client_cert=app_config["esClientCert"],
-                client_key=app_config["esClientKey"],
-                connection_class=RequestsHttpConnection)
-        return elasticsearch.Elasticsearch(
-            [self.host], timeout=30,
-            max_retries=5, retry_on_timeout=True,
-            http_auth=(app_config["esUser"], app_config["esPassword"]),
-            use_ssl=app_config["esUseSsl"],
-            verify_certs=app_config["esVerifyCerts"],
-            ssl_show_warn=app_config["esSslShowWarn"],
-            ca_certs=app_config["esCAcert"],
-            client_cert=app_config["esClientCert"],
-            client_key=app_config["esClientKey"])
+            kwargs["connection_class"] = RequestsHttpConnection
+
+        return elasticsearch.Elasticsearch([self.host], **kwargs)
 
     def get_test_item_query(self, test_item_ids, is_merged, full_log):
         """Build test item query"""

@@ -30,7 +30,7 @@ class AmqpClient:
     @staticmethod
     def create_ampq_connection(amqpUrl):
         """Creates AMQP client"""
-        amqp_full_url = amqpUrl.rstrip("\\").rstrip("/") + "/?heartbeat=600"
+        amqp_full_url = amqpUrl.rstrip("\\").rstrip("/") + "?heartbeat=600"
         logger.info("Try connect to %s" % utils.remove_credentials_from_url(amqp_full_url))
         return pika.BlockingConnection(pika.connection.URLParameters(amqp_full_url))
 

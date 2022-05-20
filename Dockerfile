@@ -24,7 +24,7 @@ RUN make test-all
 RUN if [ "$prod" = "true" ]; then make release v=$version githubtoken=$githubtoken; else if [ "$version" != "" ]; then make build-release v=$version; fi ; fi
 
 # Multistage
-FROM python:3.7.12-slim
+FROM python:3.7.13-slim
 RUN apt-get update && apt-get -y upgrade && apt-get install -y libxml2 libgomp1 curl \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=0 /venv /venv

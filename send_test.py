@@ -28,7 +28,7 @@ class RpcClient():
     def __init__(self):
         self.connection = pika.BlockingConnection(
             pika.connection.
-            URLParameters(os.getenv("AMQP_URL", "") + "/analyzer?heartbeat=600"))
+            URLParameters(os.getenv("AMQP_URL", "") + "?heartbeat=600"))
         self.response = None
         self.corr_id = None
 

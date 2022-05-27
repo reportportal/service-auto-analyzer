@@ -47,7 +47,8 @@ APP_CONFIG = {
     "esUser":            os.getenv("ES_USER", "").strip(),
     "esPassword":        os.getenv("ES_PASSWORD", "").strip(),
     "logLevel":          os.getenv("LOGGING_LEVEL", "DEBUG").strip(),
-    "amqpUrl":           os.getenv("AMQP_URL", "").strip("/").strip("\\"),
+    "amqpUrl":           os.getenv("AMQP_URL", "").strip("/").strip("\\") + "/" + os.getenv(
+        "AMQP_VIRTUAL_HOST", "analyzer"),
     "exchangeName":      os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
     "analyzerPriority":  int(os.getenv("ANALYZER_PRIORITY", "1")),
     "analyzerIndex":     json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),

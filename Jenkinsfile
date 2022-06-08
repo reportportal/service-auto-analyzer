@@ -29,11 +29,9 @@ node {
         }
         
         stage('Cleanup') {
-            docker.withServer("$DOCKER_HOST") {
-                withEnv(["AWS_URI=${AWS_URI}"]) {
-                    sh 'docker rmi ${AWS_URI}/service-auto-analyzer:SNAPSHOT-${BUILD_NUMBER}'
-                    sh 'docker rmi reportportal-dev/service-auto-analyzer:latest'
-                }
+            withEnv(["AWS_URI=${AWS_URI}"]) {
+                sh 'docker rmi ${AWS_URI}/service-auto-analyzer:SNAPSHOT-${BUILD_NUMBER}'
+                sh 'docker rmi reportportal-dev/service-auto-analyzer:latest'
             }
         }
     }

@@ -23,7 +23,7 @@ node {
                 def url = 'https://' + env.AWS_URI
                 def credentials = 'ecr:' + env.AWS_REGION + ':aws_credentials'
                 docker.withRegistry(url, credentials) {
-                    docker.image(image).push('')
+                    docker.image(image).push()
                 }
             }
         }

@@ -16,15 +16,13 @@ node {
         """
     }
     stage('Push to registries') {
-        stage('Push to ECR') {
-            withEnv(["AWS_URI=${AWS_URI}", "AWS_REGION=${AWS_REGION}"]) {
-                sh 'docker tag reportportal-dev/service-auto-analyzer ${AWS_URI}/service-auto-analyzer:SNAPSHOT-${BUILD_NUMBER}'
-                def image = env.AWS_URI + '/service-auto-analyzer'+ ':SNAPSHOT-' + env.BUILD_NUMBER
-                def url = 'https://' + env.AWS_URI
-                def credentials = 'ecr:' + env.AWS_REGION + ':aws_credentials'
-                docker.withRegistry(url, credentials) {
-                    docker.image(image).push()
-                }
+        withEnv(["AWS_URI=${AWS_URI}", "AWS_REGION=${AWS_REGION}"]) {
+            sh 'docker tag reportportal-dev/service-auto-analyzer ${AWS_URI}/service-auto-analyzer:SNAPSHOT-${BUILD_NUMBER}'
+            def image = env.AWS_URI + '/service-auto-analyzer'+ ':SNAPSHOT-' + env.BUILD_NUMBER
+            def url = 'https://' + env.AWS_URI
+            def credentials = 'ecr:' + env.AWS_REGION + ':aws_credentials'
+            docker.withRegistry(url, credentials) {
+                docker.image(image).push()
             }
         }
         

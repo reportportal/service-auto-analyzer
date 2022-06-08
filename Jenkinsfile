@@ -15,7 +15,7 @@ node {
         make build-image-dev v=\$BUILD_VER
         """
     }
-    stage('Deploy Container') {
+    stage('Push to registries') {
         stage('Push to ECR') {
             withEnv(["AWS_URI=${AWS_URI}", "AWS_REGION=${AWS_REGION}"]) {
                 sh 'docker tag reportportal-dev/service-auto-analyzer ${AWS_URI}/service-auto-analyzer:SNAPSHOT-${BUILD_NUMBER}'

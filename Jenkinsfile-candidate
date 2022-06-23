@@ -24,7 +24,7 @@ node {
 
     stage('Build Docker Image') {
         withEnv(["AWS_URI=${AWS_URI}"]) {
-            sh 'make IMAGE_NAME_DEV=$AWS_URI/service-auto-analyzer build-image-dev v=$VERSION-RC-$BUILD_NUMBER'
+            sh 'make IMAGE_NAME_DEV=$AWS_URI/service-auto-analyzer:$VERSION-RC-$BUILD_NUMBER build-image-dev v=$VERSION-RC-$BUILD_NUMBER'
         }
     }
 

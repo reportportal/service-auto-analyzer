@@ -40,7 +40,7 @@
 
 **ANALYZER_BINARYSTORE_TYPE** - you can set either "minio" or "filesystem" here, and this will be used as a strategy where to store information, connected with the analyzer, by default "minio"
 
-**MINIO_SHORT_HOST** - by default "minio:9000", you need to set short host and port to the minio service. **NOTE**: if you don't use Minio, please set this variable with the value "", so analyzer won't try to connect to the Minio instance
+**MINIO_SHORT_HOST** - by default "minio:9000", you need to set short host and port to the minio service. This property is used in case `ANALYZER_BINARYSTORE_TYPE` is set to `minio`.
 
 **MINIO_ACCESS_KEY** - by default "minio", you need to set a minio access key here
 
@@ -52,7 +52,7 @@
 
 **INSTANCE_TASK_TYPE** - by default "", if you want to run a standard analyzer instance, leave it as blank. If you want to run an instance for training, set "train" here.
 
-**FILESYSTEM_DEFAULT_PATH** - by default "storage", the path where will be stored all the information connected with analyzer, if ANALYZER_BINARYSTORE_TYPE = "filesystem". If you want to mount this folder to some folder on your machine, you can use this instruction in the docker compose:
+**FILESYSTEM_DEFAULT_PATH** - by default "storage", the path where will be stored all the information connected with analyzer, if `ANALYZER_BINARYSTORE_TYPE` is set to `filesystem`. If you want to mount this folder to some folder on your machine, you can use this instruction in the docker compose:
 ```
 volumes:
   - ./data/analyzer:/backend/storage

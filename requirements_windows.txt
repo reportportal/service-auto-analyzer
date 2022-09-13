@@ -4,7 +4,7 @@ waitress==2.1.2
 pika==1.1.0
 pydantic==1.6.2
 elasticsearch==7.0.0
-requests==2.22.0
+requests==2.25.1
 httpretty==0.9.7
 sure==1.4.11
 bump2version==0.5.11

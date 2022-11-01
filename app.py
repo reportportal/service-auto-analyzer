@@ -66,7 +66,7 @@ APP_CONFIG = {
     "minioAccessKey":    os.getenv("MINIO_ACCESS_KEY", "minio"),
     "minioSecretKey":    os.getenv("MINIO_SECRET_KEY", "minio123"),
     "appVersion":        "",
-    "binaryStoreType":   os.getenv("ANALYZER_BINARYSTORE_TYPE", "minio"),
+    "binaryStoreType":   os.getenv("ANALYZER_BINARYSTORE_TYPE", "filesystem"),
     "minioBucketPrefix": os.getenv("ANALYZER_BINARYSTORE_BUCKETPREFIX", "prj-"),
     "minioRegion":       os.getenv("ANALYZER_BINARYSTORE_MINIO_REGION", None),
     "instanceTaskType":  os.getenv("INSTANCE_TASK_TYPE", "").strip(),

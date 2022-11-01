@@ -66,9 +66,12 @@ APP_CONFIG = {
     "minioAccessKey":    os.getenv("MINIO_ACCESS_KEY", "minio"),
     "minioSecretKey":    os.getenv("MINIO_SECRET_KEY", "minio123"),
     "appVersion":        "",
-    "binaryStoreType":   os.getenv("ANALYZER_BINARYSTORE_TYPE", "filesystem"),
-    "minioBucketPrefix": os.getenv("ANALYZER_BINARYSTORE_BUCKETPREFIX", "prj-"),
-    "minioRegion":       os.getenv("ANALYZER_BINARYSTORE_MINIO_REGION", None),
+    "binaryStoreType": os.getenv("ANALYZER_BINSTORE_TYPE",
+                                 os.getenv("ANALYZER_BINARYSTORE_TYPE", "filesystem")),
+    "minioBucketPrefix": os.getenv("ANALYZER_BINSTORE_BUCKETPREFIX",
+                                   os.getenv("ANALYZER_BINARYSTORE_BUCKETPREFIX", "prj-")),
+    "minioRegion": os.getenv("ANALYZER_BINSTORE_MINIO_REGION",
+                             os.getenv("ANALYZER_BINARYSTORE_MINIO_REGION", None)),
     "instanceTaskType":  os.getenv("INSTANCE_TASK_TYPE", "").strip(),
     "filesystemDefaultPath": os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
     "esChunkNumber":         int(os.getenv("ES_CHUNK_NUMBER", "1000")),
@@ -103,7 +106,8 @@ SEARCH_CONFIG = {
     "RetrainAutoBoostModelConfig": "",
     "MaxSuggestionsNumber": int(os.getenv("MAX_SUGGESTIONS_NUMBER", "3")),
     "AutoAnalysisTimeout": int(os.getenv("AUTO_ANALYSIS_TIMEOUT", "300")),
-    "MaxAutoAnalysisItemsToProcess": int(os.getenv("MAX_AUTO_ANALYSIS_ITEMS_TO_PROCESS", "4000"))
+    "MaxAutoAnalysisItemsToProcess": int(
+        os.getenv("ANALYZER_MAX_ITEMS_TO_PROCESS", os.getenv("MAX_AUTO_ANALYSIS_ITEMS_TO_PROCESS", "4000")))
 }
 
 

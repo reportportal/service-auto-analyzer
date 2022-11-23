@@ -404,7 +404,7 @@ threads = []
 @application.route('/', methods=['GET'])
 def get_health_status():
     status = ""
-    if not es_client.is_healthy(APP_CONFIG["esHost"]):
+    if not es_client.is_healthy():
         status += "Elasticsearch is not healthy;"
     if status:
         logger.error("Analyzer health check status failed: %s", status)

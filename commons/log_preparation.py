@@ -5,7 +5,7 @@
 * you may not use this file except in compliance with the License.
 * You may obtain a copy of the License at
 *
-* http://www.apache.org/licenses/LICENSE-2.0
+* https://www.apache.org/licenses/LICENSE-2.0
 *
 * Unless required by applicable law or agreed to in writing, software
 * distributed under the License is distributed on an "AS IS" BASIS,
@@ -224,7 +224,7 @@ class LogPreparation:
                             log_words[word] = 1
         return log_words, project
 
-    def prepare_log_clustering_light(self, launch, test_item, log, clean_numbers, project):
+    def prepare_log_clustering_light(self, launch, test_item, log, project):
         log_template = self._create_log_template()
         log_template = self._fill_launch_test_item_fields(log_template, launch, test_item, project)
         cleaned_message = self.clean_message(log.message)
@@ -270,7 +270,7 @@ class LogPreparation:
                 if log.logLevel < utils.ERROR_LOGGING_LEVEL:
                     continue
                 prepared_logs.append(
-                    self.prepare_log_clustering_light(launch, test_item, log, clean_numbers, project))
+                    self.prepare_log_clustering_light(launch, test_item, log, project))
             merged_logs, log_ids_for_merged_logs = self.log_merger.decompose_logs_merged_and_without_duplicates( # noqa
                 prepared_logs)
             for _id in log_ids_for_merged_logs:

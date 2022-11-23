@@ -5,7 +5,7 @@
 * you may not use this file except in compliance with the License.
 * You may obtain a copy of the License at
 *
-* http://www.apache.org/licenses/LICENSE-2.0
+* https://www.apache.org/licenses/LICENSE-2.0
 *
 * Unless required by applicable law or agreed to in writing, software
 * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,6 +24,7 @@ import elasticsearch.helpers
 import commons.launch_objects
 from elasticsearch import RequestsHttpConnection
 import utils.utils as utils
+from urllib3.exceptions import InsecureRequestWarning
 from time import time
 from commons.log_merger import LogMerger
 from queue import Queue
@@ -36,7 +37,11 @@ logger = logging.getLogger("analyzerApp.esclient")
 
 class EsClient:
     """Elasticsearch client implementation"""
-    def __init__(self, app_config={}, search_cfg={}):
+    def __init__(self, app_config=None, search_cfg=None):
+        if not app_config:
+            app_config = {}
+        if not search_cfg:
+            search_cfg = {}
         self.app_config = app_config
         self.host = app_config["esHost"]
         self.search_cfg = search_cfg
@@ -48,7 +53,7 @@ class EsClient:
 
     def create_es_client(self, app_config):
         if not app_config["esVerifyCerts"]:
-            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            urllib3.disable_warnings(InsecureRequestWarning)
         kwargs = {
             "timeout": 30,
             "max_retries": 5,
@@ -112,7 +117,7 @@ class EsClient:
                 }
             }}
 
-    def is_healthy(self, es_host_name):
+    def is_healthy(self):
         """Check whether elasticsearch is healthy"""
         try:
             url = utils.build_url(self.host, ["_cluster/health"])

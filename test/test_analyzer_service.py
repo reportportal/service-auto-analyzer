@@ -18,7 +18,7 @@ import unittest
 from unittest.mock import MagicMock
 import json
 from http import HTTPStatus
-import sure # noqa
+# import sure # noqa
 import httpretty
 
 import commons.launch_objects as launch_objects
@@ -331,7 +331,8 @@ class TestAutoAnalyzerService(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            try:
+            # with sure.ensure('Error in the test case number: {0}', idx):
                 self._start_server(test["test_calls"])
                 config = self.get_default_search_config()
                 app_config = self.app_config
@@ -357,16 +358,20 @@ class TestAutoAnalyzerService(TestService):
                         launch.analyzerConfig = test["analyzer_config"]
                 response = analyzer_service.analyze_logs(launches)
 
-                response.should.have.length_of(test["expected_count"])
+                # response.should.have.length_of(test["expected_count"])
+                assert len(response) == test["expected_count"]
 
                 if test["expected_issue_type"] != "":
-                    test["expected_issue_type"].should.equal(response[0].issueType)
+                    # test["expected_issue_type"].should.equal(response[0].issueType)
+                    assert response[0].issueType == test["expected_issue_type"]
 
                 if "expected_id" in test:
-                    test["expected_id"].should.equal(response[0].relevantItem)
+                    # test["expected_id"].should.equal(response[0].relevantItem)
+                    assert response[0].relevantItem == test["expected_id"]
 
                 TestAutoAnalyzerService.shutdown_server(test["test_calls"])
-
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
 
 if __name__ == '__main__':
     unittest.main()

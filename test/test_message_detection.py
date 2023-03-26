@@ -16,7 +16,7 @@
 
 import unittest
 import logging
-import sure # noqa
+# import sure # noqa
 from utils import utils
 
 
@@ -37,6 +37,11 @@ class TestMessageDetection(unittest.TestCase):
             det_message, stacktrace =\
                 utils.detect_log_description_and_stacktrace(example["log"])
 
-            with sure.ensure('Error in the test case number: {0}', idx):
-                det_message.should.equal(example["detected_message"])
-                stacktrace.should.equal(example["stacktrace"])
+            # with sure.ensure('Error in the test case number: {0}', idx):
+            try:
+                # det_message.should.equal(example["detected_message"])
+                assert det_message == example["detected_message"]
+                # stacktrace.should.equal(example["stacktrace"])
+                assert stacktrace == example["stacktrace"]
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)

@@ -1,23 +1,24 @@
-flask==2.1.1
-flask-cors==3.0.9
+flask==2.2.2
+flask-cors==3.0.10
 waitress==2.1.2
-pika==1.1.0
-pydantic==1.6.2
-elasticsearch==7.0.0
-requests==2.25.1
-httpretty==0.9.7
-sure==1.4.11
-bump2version==0.5.11
-flake8==3.7.9
-nltk==3.6.6
-scikit-learn==0.19.2
-numpy==1.21.6
-scipy==1.1.0
-xgboost==0.90
-python-dateutil==2.8.1
+pika==1.2.1
+pydantic==1.10.4
+elasticsearch==7.0.0 # ????
+requests==2.28.2
+httpretty==1.1.4
+sure==2.0.1 #
+assertpy==1.1
+bump2version==1.0.1
+flake8==5.0.4 #
+nltk==3.8.1 # latest
+scikit-learn==0.21.3 #latest stable 1.2.1, but I've used 0.21.3 because of load
+numpy==1.23.5 #supported by p3.11
+scipy==1.9.3 #latest stable
+xgboost==1.7.3 #latest stable
+python-dateutil==2.8.2 #latest
 minio==6.0.0
-gensim==3.5.0
-pandas==1.1.4
-imbalanced-learn==0.3.0
-freezegun==1.1.0
-urllib3==1.26.5
+gensim==4.3.0
+pandas==1.5.3 # latest stable
+imbalanced-learn==0.5.0 # 0.9.1 is the latest stable but requires updated sklearn
+freezegun==1.1.0 #ok
+urllib3==1.26.5 #ok

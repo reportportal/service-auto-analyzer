@@ -58,16 +58,20 @@ class TestEsClient(TestService):
             },
         ]
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            # with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 self._start_server(test["test_calls"])
 
                 es_client = esclient.EsClient(app_config=self.app_config,
                                               search_cfg=self.get_default_search_config())
 
                 response = es_client.list_indices()
-                response.should.have.length_of(test["expected_count"])
+                # response.should.have.length_of(test["expected_count"])
+                assert test["expected_count"] == response
 
                 TestEsClient.shutdown_server(test["test_calls"])
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_create_index(self):
@@ -96,7 +100,8 @@ class TestEsClient(TestService):
             },
         ]
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            # with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 self._start_server(test["test_calls"])
 
                 es_client = esclient.EsClient(app_config=self.app_config,
@@ -104,8 +109,11 @@ class TestEsClient(TestService):
 
                 response = es_client.create_index(test["index"])
                 response.acknowledged.should.equal(test["acknowledged"])
+                assert test["acknowledged"] == response.acknowledged
 
                 TestEsClient.shutdown_server(test["test_calls"])
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_exists_index(self):
@@ -129,16 +137,20 @@ class TestEsClient(TestService):
             },
         ]
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            # with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 self._start_server(test["test_calls"])
 
                 es_client = esclient.EsClient(app_config=self.app_config,
                                               search_cfg=self.get_default_search_config())
 
                 response = es_client.index_exists(test["index"])
-                response.should.equal(test["exists"])
+                # response.should.equal(test["exists"])
+                assert test["exists"] == response
 
                 TestEsClient.shutdown_server(test["test_calls"])
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_delete_index(self):
@@ -166,7 +178,8 @@ class TestEsClient(TestService):
             },
         ]
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            # with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 self._start_server(test["test_calls"])
 
                 es_client = esclient.EsClient(app_config=self.app_config,
@@ -174,9 +187,12 @@ class TestEsClient(TestService):
 
                 response = es_client.delete_index(test["index"])
 
-                test["result"].should.equal(response)
+                # test["result"].should.equal(response)
+                assert test["expected_count"] == response
 
                 TestEsClient.shutdown_server(test["test_calls"])
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_clean_index(self):
@@ -350,7 +366,8 @@ class TestEsClient(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            # with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 self._start_server(test["test_calls"])
                 app_config = self.app_config
                 if "app_config" in test:
@@ -362,9 +379,12 @@ class TestEsClient(TestService):
 
                 response = es_client.delete_logs(test["rq"])
 
-                test["expected_count"].should.equal(response)
+                # test["expected_count"].should.equal(response)
+                assert test["expected_count"] == response
 
                 TestEsClient.shutdown_server(test["test_calls"])
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_index_logs(self):
@@ -668,7 +688,8 @@ class TestEsClient(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            # with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 self._start_server(test["test_calls"])
                 app_config = self.app_config
                 if "app_config" in test:
@@ -681,11 +702,16 @@ class TestEsClient(TestService):
                             for launch in json.loads(test["index_rq"])]
                 response = es_client.index_logs(launches)
 
-                test["has_errors"].should.equal(response.errors)
-                test["expected_count"].should.equal(response.took)
-                test["expected_log_exceptions"].should.equal(response.logResults)
+                # test["has_errors"].should.equal(response.errors)
+                assert test["has_errors"] == response.errors
+                # test["expected_count"].should.equal(response.took)
+                assert test["expected_count"] == response.took
+                # test["expected_log_exceptions"].should.equal(response.logResults)
+                assert test["expected_log_exceptions"] == response.logResults
 
                 TestEsClient.shutdown_server(test["test_calls"])
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
 
     def test_defect_update(self):
         tests = [
@@ -761,7 +787,8 @@ class TestEsClient(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            # with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 self._start_server(test["test_calls"])
                 app_config = self.app_config
                 if "app_config" in test:
@@ -772,9 +799,12 @@ class TestEsClient(TestService):
                     utils.get_fixture(self.no_hits_search_rs)))
                 response = es_client.defect_update(test["defect_update_info"])
 
-                test["result"].should.equal(response)
+                # test["result"].should.equal(response)
+                assert test["result"] == response
 
                 TestEsClient.shutdown_server(test["test_calls"])
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
 
     def test_remove_test_items(self):
         tests = [
@@ -850,7 +880,8 @@ class TestEsClient(TestService):
             }
         ]
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            # with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 self._start_server(test["test_calls"])
                 app_config = self.app_config
                 if "app_config" in test:
@@ -861,9 +892,12 @@ class TestEsClient(TestService):
                     utils.get_fixture(self.no_hits_search_rs)))
                 response = es_client.remove_test_items(test["item_remove_info"])
 
-                test["result"].should.equal(response)
+                # test["result"].should.equal(response)
+                assert test["result"] == response
 
                 TestEsClient.shutdown_server(test["test_calls"])
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
 
     def test_launches(self):
         tests = [
@@ -939,7 +973,8 @@ class TestEsClient(TestService):
             }
         ]
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            # with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 self._start_server(test["test_calls"])
                 app_config = self.app_config
                 if "app_config" in test:
@@ -950,10 +985,12 @@ class TestEsClient(TestService):
                     utils.get_fixture(self.no_hits_search_rs)))
                 response = es_client.remove_launches(test["launch_remove_info"])
 
-                test["result"].should.equal(response)
+                # test["result"].should.equal(response)
+                assert test["result"] == response
 
                 TestEsClient.shutdown_server(test["test_calls"])
-
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
 
 if __name__ == '__main__':
     unittest.main()

@@ -124,7 +124,8 @@ class TestSuggestInfoService(TestService):
                 suggest_info_service.es_client.es_client.scroll = MagicMock(
                     return_value=json.loads(utils.get_fixture(self.no_hits_search_rs)))
                 response = suggest_info_service.clean_suggest_info_logs(test["rq"])
-                test["expected_count"].should.equal(response)
+                # test["expected_count"].should.equal(response)
+                assert test["expected_count"] == response
                 TestSuggestInfoService.shutdown_server(test["test_calls"])
 
     @utils.ignore_warnings
@@ -195,7 +196,8 @@ class TestSuggestInfoService(TestService):
 
                 response = suggest_info_service.remove_suggest_info(test["index"])
 
-                test["result"].should.equal(response)
+                # test["result"].should.equal(response)
+                assert test["result"] == response
 
                 TestSuggestInfoService.shutdown_server(test["test_calls"])
 
@@ -349,8 +351,10 @@ class TestSuggestInfoService(TestService):
                 response = suggest_info_service.index_suggest_info(
                     [launch_objects.SuggestAnalysisResult(**res) for res in json.loads(test["index_rq"])])
 
-                test["has_errors"].should.equal(response.errors)
-                test["expected_count"].should.equal(response.took)
+                # test["has_errors"].should.equal(response.errors)
+                assert test["has_errors"] == response.errors
+                # test["expected_count"].should.equal(response.took)
+                assert test["expected_count"] == response.took
 
                 TestSuggestInfoService.shutdown_server(test["test_calls"])
 
@@ -429,7 +433,8 @@ class TestSuggestInfoService(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            # with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 self._start_server(test["test_calls"])
                 app_config = self.app_config
                 if "app_config" in test:
@@ -439,9 +444,12 @@ class TestSuggestInfoService(TestService):
                 response = suggest_info_service.clean_suggest_info_logs_by_test_item(
                     test["item_remove_info"])
 
-                test["result"].should.equal(response)
+                # test["result"].should.equal(response)
+                assert test["result"] == response
 
                 TestSuggestInfoService.shutdown_server(test["test_calls"])
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
 
     def test_remove_launches_suggests(self):
         tests = [
@@ -518,7 +526,8 @@ class TestSuggestInfoService(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            # with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 self._start_server(test["test_calls"])
                 app_config = self.app_config
                 if "app_config" in test:
@@ -528,9 +537,12 @@ class TestSuggestInfoService(TestService):
                 response = suggest_info_service.clean_suggest_info_logs_by_launch_id(
                     test["launch_remove_info"])
 
-                test["result"].should.equal(response)
+                # test["result"].should.equal(response)
+                assert test["result"] == response
 
                 TestSuggestInfoService.shutdown_server(test["test_calls"])
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
 
     def test_suggest_info_update(self):
         tests = [
@@ -606,7 +618,8 @@ class TestSuggestInfoService(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            # with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 self._start_server(test["test_calls"])
                 app_config = self.app_config
                 if "app_config" in test:
@@ -617,9 +630,12 @@ class TestSuggestInfoService(TestService):
                     utils.get_fixture(self.no_hits_search_rs)))
                 response = suggest_info_service.update_suggest_info(test["defect_update_info"])
 
-                test["result"].should.equal(response)
+                # test["result"].should.equal(response)
+                assert test["result"] == response
 
                 TestSuggestInfoService.shutdown_server(test["test_calls"])
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
 
 
 if __name__ == '__main__':

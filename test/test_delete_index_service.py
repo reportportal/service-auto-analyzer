@@ -16,7 +16,6 @@
 
 import unittest
 from http import HTTPStatus
-# import sure # noqa
 import httpretty
 
 from service.delete_index_service import DeleteIndexService

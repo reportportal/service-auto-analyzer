@@ -3,22 +3,21 @@ flask-cors==3.0.10
 waitress==2.1.2
 pika==1.2.1
 pydantic==1.10.4
-elasticsearch==7.0.0 # ????
+elasticsearch==7.0.0
 requests==2.28.2
 httpretty==1.1.4
-sure==2.0.1 #
 assertpy==1.1
 bump2version==1.0.1
-flake8==5.0.4 #
-nltk==3.8.1 # latest
-scikit-learn==0.21.3 #latest stable 1.2.1, but I've used 0.21.3 because of load
-numpy==1.23.5 #supported by p3.11
-scipy==1.9.3 #latest stable
-xgboost==1.7.3 #latest stable
-python-dateutil==2.8.2 #latest
+flake8==5.0.4
+nltk==3.8.1
+scikit-learn==1.21.1
+numpy==1.23.5
+scipy==1.9.3
+xgboost==1.7.3
+python-dateutil==2.8.2
 minio==6.0.0
 gensim==4.3.0
-pandas==1.5.3 # latest stable
-imbalanced-learn==0.5.0 # 0.9.1 is the latest stable but requires updated sklearn
-freezegun==1.1.0 #ok
-urllib3==1.26.5 #ok
+pandas==1.5.3
+imbalanced-learn==0.9.1
+freezegun==1.1.0
+urllib3==1.26.5

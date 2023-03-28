@@ -15,7 +15,6 @@
 """
 
 import unittest
-# import sure # noqa
 import logging
 
 import commons.launch_objects as launch_objects
@@ -134,7 +133,8 @@ class TestEsQuery(unittest.TestCase):
             self.model_chooser, self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(self.query_all_logs_empty_stacktrace, to_json=True)
 
-        query_from_service.should.equal(demo_query)
+        # query_from_service.should.equal(demo_query)
+        assert query_from_service == demo_query
 
     @utils.ignore_warnings
     def test_build_analyze_query_two_log_lines(self):

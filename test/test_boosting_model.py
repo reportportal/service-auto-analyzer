@@ -16,7 +16,6 @@
 
 import unittest
 import logging
-# import sure # noqa
 import numpy as np
 from boosting_decision_making.boosting_featurizer import BoostingFeaturizer
 from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
@@ -155,6 +154,8 @@ class TestBoostingModel(unittest.TestCase):
                 gathered_data, issue_type_names = _boosting_featurizer.gather_features_info()
                 # gathered_data.should.equal(boost_model_results[str(idx)][0],
                 #                            epsilon=self.epsilon)
+                print(gathered_data)
+                print(boost_model_results[str(idx)][0])
                 assert utils.compare_different_types_equality(gathered_data, boost_model_results[str(idx)][0],
                                                               epsilon=self.epsilon)
                 predict_label, predict_probability = test["decision_maker"].predict(
@@ -170,7 +171,7 @@ class TestBoostingModel(unittest.TestCase):
                                                               boost_model_results[str(idx)][2],
                                                               epsilon=self.epsilon)
             except AssertionError as err:
-                raise AssertionError('Error in the test case number: {0}', idx).with_traceback(err.__traceback__)
+                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_full_data_check_suggests(self):

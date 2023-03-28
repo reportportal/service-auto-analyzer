@@ -16,7 +16,6 @@
 
 import unittest
 import logging
-# import sure # noqa
 from boosting_decision_making.boosting_featurizer import BoostingFeaturizer
 from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from boosting_decision_making import weighted_similarity_calculator

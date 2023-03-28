@@ -18,7 +18,6 @@ import unittest
 from unittest.mock import MagicMock
 import json
 from http import HTTPStatus
-# import sure # noqa
 import httpretty
 
 import commons.launch_objects as launch_objects

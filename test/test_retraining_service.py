@@ -15,7 +15,6 @@
 """
 
 import unittest
-# import sure # noqa
 from unittest.mock import MagicMock
 from service.retraining_service import RetrainingService
 from test.test_service import TestService

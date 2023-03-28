@@ -16,7 +16,6 @@
 
 import unittest
 from http import HTTPStatus
-# import sure # noqa
 import httpretty
 import commons.launch_objects as launch_objects
 from utils import utils
@@ -565,8 +564,6 @@ class TestClusterService(TestService):
                 response = _cluster_service.find_clusters(test["launch_info"])
 
                 # response.clusters.should.have.length_of(len(test["expected_result"].clusters))
-                print(response.clusters)
-                print(test["expected_result"].clusters)
                 assert len(response.clusters) == len(test["expected_result"].clusters)
                 # test["expected_result"].should.equal(response)
                 assert test["expected_result"] == response
@@ -574,7 +571,6 @@ class TestClusterService(TestService):
                 TestClusterService.shutdown_server(test["test_calls"])
             except AssertionError as err:
                 raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
-
 
 
 if __name__ == '__main__':

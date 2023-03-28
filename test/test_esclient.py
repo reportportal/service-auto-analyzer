@@ -18,7 +18,6 @@ import unittest
 from unittest.mock import MagicMock
 import json
 from http import HTTPStatus
-import sure # noqa
 import httpretty
 
 import commons.launch_objects as launch_objects
@@ -67,7 +66,7 @@ class TestEsClient(TestService):
 
                 response = es_client.list_indices()
                 # response.should.have.length_of(test["expected_count"])
-                assert test["expected_count"] == response
+                assert test["expected_count"] == len(response)
 
                 TestEsClient.shutdown_server(test["test_calls"])
             except AssertionError as err:
@@ -108,7 +107,7 @@ class TestEsClient(TestService):
                                               search_cfg=self.get_default_search_config())
 
                 response = es_client.create_index(test["index"])
-                response.acknowledged.should.equal(test["acknowledged"])
+                # response.acknowledged.should.equal(test["acknowledged"])
                 assert test["acknowledged"] == response.acknowledged
 
                 TestEsClient.shutdown_server(test["test_calls"])
@@ -188,7 +187,7 @@ class TestEsClient(TestService):
                 response = es_client.delete_index(test["index"])
 
                 # test["result"].should.equal(response)
-                assert test["expected_count"] == response
+                assert test["result"] == response
 
                 TestEsClient.shutdown_server(test["test_calls"])
             except AssertionError as err:

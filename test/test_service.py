@@ -17,7 +17,6 @@
 import unittest
 import json
 import logging
-# import sure # noqa
 import httpretty
 from utils import utils
 from commons import model_chooser
@@ -249,9 +248,8 @@ class TestService(unittest.TestCase):
     def shutdown_server(test_calls):
         """Shutdown server and test request calls"""
         # httpretty.latest_requests().should.have.length_of(len(test_calls))
-        print(httpretty.latest_requests())
-        print(test_calls)
-        print(len(httpretty.latest_requests()))
+        # print(len(httpretty.latest_requests()))
+        # print(len(test_calls))
         assert len(httpretty.latest_requests()) == len(test_calls)
         for expected_test_call, test_call in zip(test_calls, httpretty.latest_requests()):
             # expected_test_call["method"].should.equal(test_call.method)

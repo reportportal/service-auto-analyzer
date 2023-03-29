@@ -305,7 +305,6 @@ class TestCleanIndexService(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            # with sure.ensure('Error in the test case number: {0}', idx):
             try:
                 self._start_server(test["test_calls"])
                 app_config = self.app_config
@@ -321,7 +320,6 @@ class TestCleanIndexService(TestService):
 
                 response = _clean_index_service.delete_logs(test["rq"])
 
-                # test["expected_count"].should.equal(response)
                 assert test["expected_count"] == response
 
                 TestCleanIndexService.shutdown_server(test["test_calls"])

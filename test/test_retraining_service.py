@@ -173,7 +173,6 @@ class TestRetrainingService(TestService):
             }
         ]
         for idx, test in enumerate(tests):
-            # with sure.ensure('Error in the test case number: {0}', idx):
             try:
                 _retraining_service = RetrainingService(self.model_chooser,
                                                         app_config=self.app_config,
@@ -185,7 +184,6 @@ class TestRetrainingService(TestService):
                 model_triggering[1].train = MagicMock(
                     return_value=test["train_result"])
                 response = _retraining_service.train_models(test["train_info"])
-                # test["is_model_trained"].should.equal(response)
                 assert test["is_model_trained"] == response
             except AssertionError as err:
                 raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)

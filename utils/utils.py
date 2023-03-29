@@ -936,7 +936,18 @@ def extract_clustering_setting(cluster_id):
     return (last_bit % 2) == 1
 
 
-def compare_different_types_equality(a, b, epsilon=0.0001):
+def compare_different_types_equality(a, b, epsilon=0.0001) -> bool:
+    """Function is supposed to compare different object types such as dict(), list(), set(), tuple() on equality
+    taking into consideration that it can contain float which should be compared with epsilon approximation.
+
+    Args:
+        a: The first object.
+        b: The second object.
+        epsilon: Approximation parameter to compare floats.
+
+    Returns:
+        True for the equality, False otherwise.
+    """
     if isinstance(a, (int, str, bool)):
         return a == b
     elif isinstance(a, float):

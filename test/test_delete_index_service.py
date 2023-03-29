@@ -83,7 +83,6 @@ class TestDeleteIndexService(TestService):
             },
         ]
         for idx, test in enumerate(tests):
-            # with sure.ensure('Error in the test case number: {0}', idx):
             try:
                 self._start_server(test["test_calls"])
                 app_config = self.app_config
@@ -95,7 +94,6 @@ class TestDeleteIndexService(TestService):
 
                 response = _delete_index_service.delete_index(test["index"])
 
-                # test["result"].should.equal(response)
                 assert test["result"] == response
 
                 TestDeleteIndexService.shutdown_server(test["test_calls"])

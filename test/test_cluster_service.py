@@ -551,7 +551,6 @@ class TestClusterService(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            # with sure.ensure('Error in the test case number: {0}', idx):
             try:
                 self._start_server(test["test_calls"])
                 config = self.get_default_search_config()
@@ -563,9 +562,7 @@ class TestClusterService(TestService):
 
                 response = _cluster_service.find_clusters(test["launch_info"])
 
-                # response.clusters.should.have.length_of(len(test["expected_result"].clusters))
                 assert len(response.clusters) == len(test["expected_result"].clusters)
-                # test["expected_result"].should.equal(response)
                 assert test["expected_result"] == response
 
                 TestClusterService.shutdown_server(test["test_calls"])

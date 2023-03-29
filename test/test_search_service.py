@@ -293,7 +293,6 @@ class TestSearchService(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            # with sure.ensure('Error in the test case number: {0}', idx):
             try:
                 self._start_server(test["test_calls"])
                 app_config = self.app_config
@@ -306,10 +305,8 @@ class TestSearchService(TestService):
                     utils.get_fixture(self.no_hits_search_rs)))
 
                 response = search_service.search_logs(test["rq"])
-                # response.should.have.length_of(test["expected_count"])
                 assert len(response) == test["expected_count"]
                 if "response" in test:
-                    # response.should.equal(test["response"])
                     assert response == test["response"]
 
                 TestSearchService.shutdown_server(test["test_calls"])

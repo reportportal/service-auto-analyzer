@@ -133,7 +133,6 @@ class TestEsQuery(unittest.TestCase):
             self.model_chooser, self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(self.query_all_logs_empty_stacktrace, to_json=True)
 
-        # query_from_service.should.equal(demo_query)
         assert query_from_service == demo_query
 
     @utils.ignore_warnings
@@ -169,7 +168,6 @@ class TestEsQuery(unittest.TestCase):
             self.model_chooser, self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(self.query_two_log_lines, to_json=True)
 
-        # query_from_service.should.equal(demo_query)
         assert query_from_service == demo_query
 
     @utils.ignore_warnings
@@ -206,7 +204,6 @@ class TestEsQuery(unittest.TestCase):
         demo_query = utils.get_fixture(
             self.query_two_log_lines_only_current_launch, to_json=True)
 
-        # query_from_service.should.equal(demo_query)
         assert query_from_service == demo_query
 
     @utils.ignore_warnings
@@ -243,7 +240,6 @@ class TestEsQuery(unittest.TestCase):
         demo_query = utils.get_fixture(
             self.query_two_log_lines_only_current_launch_wo_exceptions, to_json=True)
 
-        # query_from_service.should.equal(demo_query)
         assert query_from_service == demo_query
 
     @utils.ignore_warnings
@@ -279,7 +275,6 @@ class TestEsQuery(unittest.TestCase):
             self.model_chooser, self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(self.query_all_logs_nonempty_stacktrace, to_json=True)
 
-        # query_from_service.should.equal(demo_query)
         assert query_from_service == demo_query
 
     @utils.ignore_warnings
@@ -316,7 +311,6 @@ class TestEsQuery(unittest.TestCase):
         demo_query = utils.get_fixture(
             self.query_all_logs_nonempty_stacktrace_launches_with_the_same_name, to_json=True)
 
-        # query_from_service.should.equal(demo_query)
         assert query_from_service == demo_query
 
     @utils.ignore_warnings
@@ -352,7 +346,6 @@ class TestEsQuery(unittest.TestCase):
             self.model_chooser, self.app_config, search_cfg).build_analyze_query(launch, log)
         demo_query = utils.get_fixture(self.query_merged_small_logs_search, to_json=True)
 
-        # query_from_service.should.equal(demo_query)
         assert query_from_service == demo_query
 
     @utils.ignore_warnings
@@ -400,7 +393,6 @@ class TestEsQuery(unittest.TestCase):
             search_req, log)
         demo_query = utils.get_fixture(self.query_search_logs, to_json=True)
 
-        # query_from_service.should.equal(demo_query)
         assert query_from_service == demo_query
 
     @utils.ignore_warnings
@@ -452,7 +444,6 @@ class TestEsQuery(unittest.TestCase):
             stacktrace_field="stacktrace_extended")
         demo_query = utils.get_fixture(self.suggest_query_all_logs_empty_stacktrace, to_json=True)
 
-        # query_from_service.should.equal(demo_query)
         assert query_from_service == demo_query
 
     @utils.ignore_warnings
@@ -504,7 +495,6 @@ class TestEsQuery(unittest.TestCase):
             stacktrace_field="stacktrace_extended")
         demo_query = utils.get_fixture(self.suggest_query_two_log_lines, to_json=True)
 
-        # query_from_service.should.equal(demo_query)
         assert query_from_service == demo_query
 
     @utils.ignore_warnings
@@ -556,7 +546,6 @@ class TestEsQuery(unittest.TestCase):
             stacktrace_field="stacktrace_extended")
         demo_query = utils.get_fixture(self.suggest_query_all_logs_nonempty_stacktrace, to_json=True)
 
-        # query_from_service.should.equal(demo_query)
         assert query_from_service == demo_query
 
     @utils.ignore_warnings
@@ -610,7 +599,6 @@ class TestEsQuery(unittest.TestCase):
         demo_query = utils.get_fixture(
             self.suggest_query_all_logs_nonempty_stacktrace_launches_with_the_same_name, to_json=True)
 
-        # query_from_service.should.equal(demo_query)
         assert query_from_service == demo_query
 
     @utils.ignore_warnings
@@ -661,7 +649,6 @@ class TestEsQuery(unittest.TestCase):
             stacktrace_field="stacktrace_extended")
         demo_query = utils.get_fixture(self.suggest_query_merged_small_logs_search, to_json=True)
 
-        # query_from_service.should.equal(demo_query)
         assert query_from_service == demo_query
 
     @utils.ignore_warnings
@@ -696,7 +683,6 @@ class TestEsQuery(unittest.TestCase):
             self.model_chooser, self.app_config, search_cfg).build_query_with_no_defect(launch, log)
         demo_query = utils.get_fixture(self.query_analyze_items_including_no_defect, to_json=True)
 
-        # query_from_service.should.equal(demo_query)
         assert query_from_service == demo_query
 
     @utils.ignore_warnings
@@ -732,7 +718,6 @@ class TestEsQuery(unittest.TestCase):
         demo_query = utils.get_fixture(
             self.query_analyze_items_including_no_defect_small_logs, to_json=True)
 
-        # query_from_service.should.equal(demo_query)
         assert query_from_service == demo_query
 
 

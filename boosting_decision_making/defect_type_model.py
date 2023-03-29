@@ -67,7 +67,7 @@ class DefectTypeModel:
         model = RandomForestClassifier(class_weight="balanced")
         x_train_values = pd.DataFrame(
             transformed_values.toarray(),
-            columns=self.count_vectorizer_models[name].get_feature_names())
+            columns=self.count_vectorizer_models[name].get_feature_names_out())
         model.fit(x_train_values, labels)
         self.models[name] = model
 
@@ -106,7 +106,7 @@ class DefectTypeModel:
         transformed_values = self.count_vectorizer_models[model_name].transform(data)
         x_test_values = pd.DataFrame(
             transformed_values.toarray(),
-            columns=self.count_vectorizer_models[model_name].get_feature_names())
+            columns=self.count_vectorizer_models[model_name].get_feature_names_out())
         predicted_labels = self.models[model_name].predict(x_test_values)
         predicted_probs = self.models[model_name].predict_proba(x_test_values)
         return predicted_labels, predicted_probs

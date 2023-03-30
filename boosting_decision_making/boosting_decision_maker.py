@@ -14,7 +14,7 @@
 * limitations under the License.
 """
 
-from xgboost import XGBClassifier, DMatrix
+from xgboost import XGBClassifier
 from sklearn.metrics import classification_report, confusion_matrix
 import os
 import pickle

@@ -126,7 +126,8 @@ class TestSuggestInfoService(TestService):
                 assert test["expected_count"] == response
                 TestSuggestInfoService.shutdown_server(test["test_calls"])
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_delete_suggest_info_index(self):
@@ -200,7 +201,8 @@ class TestSuggestInfoService(TestService):
 
                 TestSuggestInfoService.shutdown_server(test["test_calls"])
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_index_suggest_info_logs(self):
@@ -357,7 +359,8 @@ class TestSuggestInfoService(TestService):
 
                 TestSuggestInfoService.shutdown_server(test["test_calls"])
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
     def test_remove_test_items_suggests(self):
         tests = [
@@ -448,7 +451,8 @@ class TestSuggestInfoService(TestService):
 
                 TestSuggestInfoService.shutdown_server(test["test_calls"])
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
     def test_remove_launches_suggests(self):
         tests = [
@@ -539,7 +543,8 @@ class TestSuggestInfoService(TestService):
 
                 TestSuggestInfoService.shutdown_server(test["test_calls"])
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
     def test_suggest_info_update(self):
         tests = [
@@ -630,7 +635,8 @@ class TestSuggestInfoService(TestService):
 
                 TestSuggestInfoService.shutdown_server(test["test_calls"])
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
 
 if __name__ == '__main__':

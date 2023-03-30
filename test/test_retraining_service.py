@@ -186,7 +186,8 @@ class TestRetrainingService(TestService):
                 response = _retraining_service.train_models(test["train_info"])
                 assert test["is_model_trained"] == response
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
 
 if __name__ == '__main__':

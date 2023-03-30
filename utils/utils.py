@@ -840,8 +840,7 @@ def remove_guid_uids_from_text(text):
     for pattern in [
             r"[0-9a-fA-F]{16,48}|[0-9a-fA-F]{10,48}\.\.\.",
             "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", # noqa
-            r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-\w+" # noqa
-            ]:
+            r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-\w+"]:
         strings_to_replace = set()
         for m in re.findall(pattern, text):
             if not m.isdigit() and m.strip():
@@ -937,8 +936,9 @@ def extract_clustering_setting(cluster_id):
 
 
 def compare_different_types_equality(a, b, epsilon=0.0001) -> bool:
-    """Function is supposed to compare different object types such as dict(), list(), set(), tuple() on equality
-    taking into consideration that it can contain float which should be compared with epsilon approximation.
+    """Function is supposed to compare different object types such as dict(), list(), set(), tuple()
+    on equality taking into consideration that it can contain float
+    which should be compared with epsilon approximation.
 
     Args:
         a: The first object.
@@ -951,7 +951,7 @@ def compare_different_types_equality(a, b, epsilon=0.0001) -> bool:
     if isinstance(a, (int, str, bool)):
         return a == b
     elif isinstance(a, float):
-        return abs(a-b) < epsilon
+        return abs(a - b) < epsilon
     elif isinstance(a, (list, tuple)):
         if len(a) != len(b):
             return False

@@ -105,9 +105,11 @@ class TestBoostingFeaturizer(unittest.TestCase):
                         for field in test["result"][i][j]:
                             elastic_res = _boosting_featurizer.all_results[i][1][j]
                             assert utils.compare_different_types_equality(elastic_res[field],
-                                                                          test["result"][i][j][field], self.epsilon)
+                                                                          test["result"][i][j][field],
+                                                                          self.epsilon)
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_find_most_relevant_by_type(self):
@@ -187,9 +189,11 @@ class TestBoostingFeaturizer(unittest.TestCase):
                             for field_dict in test["result"][issue_type][field]:
                                 result_field_dict = test["result"][issue_type][field][field_dict]
                                 assert utils.compare_different_types_equality(elastic_res[field][field_dict],
-                                                                              result_field_dict, self.epsilon)
+                                                                              result_field_dict,
+                                                                              self.epsilon)
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_filter_by_min_should_match(self):
@@ -279,12 +283,13 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 for field in test["config"]["filter_min_should_match"]:
                     all_results = _boosting_featurizer.filter_by_min_should_match(all_results, field=field)
                 assert len(all_results) == len(test["result"])
-                for idx, (log, hits) in enumerate(all_results):
-                    assert log["_id"] == test["result"][idx][0]["_id"]
+                for idx_res, (log, hits) in enumerate(all_results):
+                    assert log["_id"] == test["result"][idx_res][0]["_id"]
                     for i, hit in enumerate(hits["hits"]["hits"]):
-                        assert hit["_id"] == test["result"][idx][1]["hits"]["hits"][i]["_id"]
+                        assert hit["_id"] == test["result"][idx_res][1]["hits"]["hits"][i]["_id"]
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_find_most_relevant_by_type_for_suggests(self):
@@ -360,7 +365,8 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                 assert utils.compare_different_types_equality(elastic_res[field][field_dict],
                                                                               result_field_dict, self.epsilon)
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_filter_by_min_should_match_any(self):
@@ -453,9 +459,10 @@ class TestBoostingFeaturizer(unittest.TestCase):
                     all_results,
                     fields=test["config"]["filter_min_should_match_any"])
                 assert len(all_results) == len(test["result"])
-                for idx, (log, hits) in enumerate(all_results):
-                    assert log["_id"] == test["result"][idx][0]["_id"]
+                for idx_res, (log, hits) in enumerate(all_results):
+                    assert log["_id"] == test["result"][idx_res][0]["_id"]
                     for i, hit in enumerate(hits["hits"]["hits"]):
-                        assert hit["_id"] == test["result"][idx][1]["hits"]["hits"][i]["_id"]
+                        assert hit["_id"] == test["result"][idx_res][1]["hits"]["hits"][i]["_id"]
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)

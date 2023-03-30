@@ -160,7 +160,8 @@ class TestBoostingModel(unittest.TestCase):
                                                               boost_model_results[str(idx)][2],
                                                               epsilon=self.epsilon)
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_full_data_check_suggests(self):
@@ -257,4 +258,5 @@ class TestBoostingModel(unittest.TestCase):
                                                               boost_model_results[str(idx)][2],
                                                               epsilon=self.epsilon)
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)

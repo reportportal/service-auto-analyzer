@@ -40,4 +40,5 @@ class TestMessageDetection(unittest.TestCase):
                 assert det_message == example["detected_message"]
                 assert stacktrace == example["stacktrace"]
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').with_traceback(err.__traceback__)
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)

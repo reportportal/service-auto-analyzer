@@ -5,7 +5,7 @@
 * you may not use this file except in compliance with the License.
 * You may obtain a copy of the License at
 *
-* http://www.apache.org/licenses/LICENSE-2.0
+* https://www.apache.org/licenses/LICENSE-2.0
 *
 * Unless required by applicable law or agreed to in writing, software
 * distributed under the License is distributed on an "AS IS" BASIS,
@@ -49,9 +49,13 @@ class TestBoostingFeaturizer(unittest.TestCase):
     @staticmethod
     @utils.ignore_warnings
     def get_default_config(
-            filter_fields=["detected_message", "stacktrace"],
-            filter_fields_any=[]):
+            filter_fields=None,
+            filter_fields_any=None):
         """Get default config"""
+        if filter_fields is None:
+            filter_fields = ["detected_message", "stacktrace"]
+        if filter_fields_any is None:
+            filter_fields_any = []
         return {
             "max_query_terms":  50,
             "min_should_match": 0.8,
@@ -110,6 +114,24 @@ class TestBoostingFeaturizer(unittest.TestCase):
             except AssertionError as err:
                 raise AssertionError(f'Error in the test case number: {idx}').\
                     with_traceback(err.__traceback__)
+
+    def assert_scores_by_issue_type(self, boosting_featurizer, test):
+        scores_by_issue_type = boosting_featurizer.find_most_relevant_by_type()
+        assert len(scores_by_issue_type) == len(test["result"])
+        for issue_type in test["result"]:
+            assert issue_type in scores_by_issue_type.keys()
+            elastic_res = scores_by_issue_type[issue_type]
+            for field in test["result"][issue_type]:
+                if type(test["result"][issue_type][field]) != dict:
+                    assert utils.compare_different_types_equality(elastic_res[field],
+                                                                  test["result"][issue_type][field],
+                                                                  self.epsilon)
+                else:
+                    for field_dict in test["result"][issue_type][field]:
+                        result_field_dict = test["result"][issue_type][field][field_dict]
+                        assert utils.compare_different_types_equality(elastic_res[field][field_dict],
+                                                                      result_field_dict,
+                                                                      self.epsilon)
 
     @utils.ignore_warnings
     def test_find_most_relevant_by_type(self):
@@ -175,25 +197,17 @@ class TestBoostingFeaturizer(unittest.TestCase):
                     test["config"],
                     [],
                     weighted_log_similarity_calculator=weight_log_sim)
-                scores_by_issue_type = _boosting_featurizer.find_most_relevant_by_type()
-                assert len(scores_by_issue_type) == len(test["result"])
-                for issue_type in test["result"]:
-                    assert issue_type in scores_by_issue_type
-                    elastic_res = scores_by_issue_type[issue_type]
-                    for field in test["result"][issue_type]:
-                        if type(test["result"][issue_type][field]) != dict:
-                            assert utils.compare_different_types_equality(elastic_res[field],
-                                                                          test["result"][issue_type][field],
-                                                                          self.epsilon)
-                        else:
-                            for field_dict in test["result"][issue_type][field]:
-                                result_field_dict = test["result"][issue_type][field][field_dict]
-                                assert utils.compare_different_types_equality(elastic_res[field][field_dict],
-                                                                              result_field_dict,
-                                                                              self.epsilon)
+                self.assert_scores_by_issue_type(_boosting_featurizer, test)
             except AssertionError as err:
                 raise AssertionError(f'Error in the test case number: {idx}').\
                     with_traceback(err.__traceback__)
+
+    def assert_elastic_results(self, results, test):
+        assert len(results) == len(test["result"])
+        for idx_res, (log, hits) in enumerate(results):
+            assert log["_id"] == test["result"][idx_res][0]["_id"]
+            for i, hit in enumerate(hits["hits"]["hits"]):
+                assert hit["_id"] == test["result"][idx_res][1]["hits"]["hits"][i]["_id"]
 
     @utils.ignore_warnings
     def test_filter_by_min_should_match(self):
@@ -282,11 +296,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 all_results = test["elastic_results"]
                 for field in test["config"]["filter_min_should_match"]:
                     all_results = _boosting_featurizer.filter_by_min_should_match(all_results, field=field)
-                assert len(all_results) == len(test["result"])
-                for idx_res, (log, hits) in enumerate(all_results):
-                    assert log["_id"] == test["result"][idx_res][0]["_id"]
-                    for i, hit in enumerate(hits["hits"]["hits"]):
-                        assert hit["_id"] == test["result"][idx_res][1]["hits"]["hits"][i]["_id"]
+                self.assert_elastic_results(all_results, test)
             except AssertionError as err:
                 raise AssertionError(f'Error in the test case number: {idx}').\
                     with_traceback(err.__traceback__)
@@ -349,21 +359,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
                     test["config"],
                     [],
                     weighted_log_similarity_calculator=weight_log_sim)
-                scores_by_issue_type = _boosting_featurizer.find_most_relevant_by_type()
-                assert len(scores_by_issue_type) == len(test["result"])
-                for issue_type in test["result"]:
-                    assert issue_type in scores_by_issue_type.keys()
-                    elastic_res = scores_by_issue_type[issue_type]
-                    for field in test["result"][issue_type]:
-                        if type(test["result"][issue_type][field]) != dict:
-                            assert utils.compare_different_types_equality(elastic_res[field],
-                                                                          test["result"][issue_type][field],
-                                                                          self.epsilon)
-                        else:
-                            for field_dict in test["result"][issue_type][field]:
-                                result_field_dict = test["result"][issue_type][field][field_dict]
-                                assert utils.compare_different_types_equality(elastic_res[field][field_dict],
-                                                                              result_field_dict, self.epsilon)
+                self.assert_scores_by_issue_type(_boosting_featurizer, test)
             except AssertionError as err:
                 raise AssertionError(f'Error in the test case number: {idx}').\
                     with_traceback(err.__traceback__)
@@ -458,11 +454,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 all_results = _boosting_featurizer.filter_by_min_should_match_any(
                     all_results,
                     fields=test["config"]["filter_min_should_match_any"])
-                assert len(all_results) == len(test["result"])
-                for idx_res, (log, hits) in enumerate(all_results):
-                    assert log["_id"] == test["result"][idx_res][0]["_id"]
-                    for i, hit in enumerate(hits["hits"]["hits"]):
-                        assert hit["_id"] == test["result"][idx_res][1]["hits"]["hits"][i]["_id"]
+                self.assert_elastic_results(all_results, test)
             except AssertionError as err:
                 raise AssertionError(f'Error in the test case number: {idx}').\
                     with_traceback(err.__traceback__)

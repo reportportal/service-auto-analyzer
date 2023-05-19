@@ -17,7 +17,6 @@
 import unittest
 import json
 import logging
-import sure # noqa
 import httpretty
 from utils import utils
 from commons import model_chooser
@@ -248,15 +247,15 @@ class TestService(unittest.TestCase):
     @utils.ignore_warnings
     def shutdown_server(test_calls):
         """Shutdown server and test request calls"""
-        httpretty.latest_requests().should.have.length_of(len(test_calls))
+        assert len(httpretty.latest_requests()) == len(test_calls)
         for expected_test_call, test_call in zip(test_calls, httpretty.latest_requests()):
-            expected_test_call["method"].should.equal(test_call.method)
-            expected_test_call["uri"].should.equal(test_call.path)
+            assert expected_test_call["method"] == test_call.method
+            assert expected_test_call["uri"] == test_call.path
             if "rq" in expected_test_call:
                 expected_body = expected_test_call["rq"]
                 real_body = test_call.parse_request_body(test_call.body)
                 if type(expected_body) == str and type(real_body) != str:
                     expected_body = json.loads(expected_body)
-                expected_body.should.equal(real_body)
+                assert expected_body == real_body
         httpretty.disable()
         httpretty.reset()

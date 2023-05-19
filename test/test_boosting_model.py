@@ -16,7 +16,6 @@
 
 import unittest
 import logging
-import sure # noqa
 import numpy as np
 from boosting_decision_making.boosting_featurizer import BoostingFeaturizer
 from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
@@ -81,8 +80,8 @@ class TestBoostingModel(unittest.TestCase):
             test_data_size = 5
             random_data = np.random.rand(test_data_size, len(decision_maker.get_feature_names()))
             result, result_probability = decision_maker.predict(random_data)
-            result.should.have.length_of(test_data_size)
-            result_probability.should.have.length_of(test_data_size)
+            assert len(result) == test_data_size
+            assert len(result_probability) == test_data_size
 
     @utils.ignore_warnings
     def test_full_data_check(self):
@@ -148,16 +147,21 @@ class TestBoostingModel(unittest.TestCase):
             if self.global_defect_type_model_folder.strip():
                 _boosting_featurizer.set_defect_type_model(
                     defect_type_model.DefectTypeModel(folder=self.global_defect_type_model_folder))
-            with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 gathered_data, issue_type_names = _boosting_featurizer.gather_features_info()
-                gathered_data.should.equal(boost_model_results[str(idx)][0],
-                                           epsilon=self.epsilon)
+                assert utils.compare_different_types_equality(gathered_data, boost_model_results[str(idx)][0],
+                                                              epsilon=self.epsilon)
                 predict_label, predict_probability = test["decision_maker"].predict(
                     gathered_data)
-                predict_label.tolist().should.equal(boost_model_results[str(idx)][1],
-                                                    epsilon=self.epsilon)
-                predict_probability.tolist().should.equal(boost_model_results[str(idx)][2],
-                                                          epsilon=self.epsilon)
+                assert utils.compare_different_types_equality(predict_label.tolist(),
+                                                              boost_model_results[str(idx)][1],
+                                                              epsilon=self.epsilon)
+                assert utils.compare_different_types_equality(predict_probability.tolist(),
+                                                              boost_model_results[str(idx)][2],
+                                                              epsilon=self.epsilon)
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_full_data_check_suggests(self):
@@ -241,13 +245,18 @@ class TestBoostingModel(unittest.TestCase):
             if self.global_defect_type_model_folder.strip():
                 _boosting_featurizer.set_defect_type_model(
                     defect_type_model.DefectTypeModel(folder=self.global_defect_type_model_folder))
-            with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 gathered_data, test_item_ids = _boosting_featurizer.gather_features_info()
                 predict_label, predict_probability = test["decision_maker"].predict(gathered_data)
-                gathered_data.should.equal(boost_model_results[str(idx)][0],
-                                           epsilon=self.epsilon)
-
-                predict_label.tolist().should.equal(boost_model_results[str(idx)][1],
-                                                    epsilon=self.epsilon)
-                predict_probability.tolist().should.equal(boost_model_results[str(idx)][2],
-                                                          epsilon=self.epsilon)
+                assert utils.compare_different_types_equality(gathered_data,
+                                                              boost_model_results[str(idx)][0],
+                                                              epsilon=self.epsilon)
+                assert utils.compare_different_types_equality(predict_label.tolist(),
+                                                              boost_model_results[str(idx)][1],
+                                                              epsilon=self.epsilon)
+                assert utils.compare_different_types_equality(predict_probability.tolist(),
+                                                              boost_model_results[str(idx)][2],
+                                                              epsilon=self.epsilon)
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)

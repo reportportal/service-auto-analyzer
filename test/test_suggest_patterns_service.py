@@ -16,7 +16,6 @@
 
 import unittest
 from http import HTTPStatus
-import sure # noqa
 import httpretty
 from unittest.mock import MagicMock
 import commons.launch_objects as launch_objects
@@ -165,7 +164,7 @@ class TestSearchService(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 self._start_server(test["test_calls"])
                 app_config = self.app_config
                 if "app_config" in test:
@@ -175,21 +174,22 @@ class TestSearchService(TestService):
                 search_service.query_data = MagicMock(return_value=test["query_data"])
 
                 response = search_service.suggest_patterns(test["rq"])
-                response.suggestionsWithLabels.should.have.length_of(
-                    len(test["expected_count_with_labels"]))
+                assert len(response.suggestionsWithLabels) == len(test["expected_count_with_labels"])
 
                 for real_resp, expected_resp in zip(
                         response.suggestionsWithLabels, test["expected_count_with_labels"]):
-                    real_resp.should.equal(expected_resp)
+                    assert real_resp == expected_resp
 
-                response.suggestionsWithoutLabels.should.have.length_of(
-                    len(test["expected_count_without_labels"]))
+                assert len(response.suggestionsWithLabels) == len(test["expected_count_with_labels"])
 
                 for real_resp, expected_resp in zip(
                         response.suggestionsWithoutLabels, test["expected_count_without_labels"]):
-                    real_resp.should.equal(expected_resp)
+                    assert real_resp == expected_resp
 
                 TestSearchService.shutdown_server(test["test_calls"])
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
 
 if __name__ == '__main__':

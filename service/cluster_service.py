@@ -239,7 +239,7 @@ class ClusterService:
         group_res = _cnt_vectorizer.fit_transform(group_logs).astype(np.int8)
         res_bitwise = np.bitwise_and.reduce(group_res.toarray(), axis=0)
         bigrams_list = []
-        for i, feature_name in enumerate(_cnt_vectorizer.get_feature_names()):
+        for i, feature_name in enumerate(_cnt_vectorizer.get_feature_names_out()):
             if res_bitwise[i] == 1:
                 bigrams_list.append(feature_name)
         hash_message = int(

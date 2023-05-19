@@ -5,7 +5,7 @@
 * you may not use this file except in compliance with the License.
 * You may obtain a copy of the License at
 *
-* http://www.apache.org/licenses/LICENSE-2.0
+* https://www.apache.org/licenses/LICENSE-2.0
 *
 * Unless required by applicable law or agreed to in writing, software
 * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,6 @@
 
 import unittest
 import logging
-import sure # noqa
 from boosting_decision_making.boosting_featurizer import BoostingFeaturizer
 from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from boosting_decision_making import weighted_similarity_calculator
@@ -50,9 +49,13 @@ class TestBoostingFeaturizer(unittest.TestCase):
     @staticmethod
     @utils.ignore_warnings
     def get_default_config(
-            filter_fields=["detected_message", "stacktrace"],
-            filter_fields_any=[]):
+            filter_fields=None,
+            filter_fields_any=None):
         """Get default config"""
+        if filter_fields is None:
+            filter_fields = ["detected_message", "stacktrace"]
+        if filter_fields_any is None:
+            filter_fields_any = []
         return {
             "max_query_terms":  50,
             "min_should_match": 0.8,
@@ -94,19 +97,41 @@ class TestBoostingFeaturizer(unittest.TestCase):
         weight_log_sim = weighted_similarity_calculator.\
             WeightedSimilarityCalculator(folder=self.weights_folder)
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 _boosting_featurizer = BoostingFeaturizer(
                     test["elastic_results"],
                     test["config"],
                     [],
                     weighted_log_similarity_calculator=weight_log_sim)
-                _boosting_featurizer.all_results.should.have.length_of(len(test["result"]))
+                assert len(_boosting_featurizer.all_results) == len(test["result"])
                 for i in range(len(test["result"])):
                     for j in range(len(test["result"][i])):
                         for field in test["result"][i][j]:
                             elastic_res = _boosting_featurizer.all_results[i][1][j]
-                            elastic_res[field].should.equal(test["result"][i][j][field],
-                                                            epsilon=self.epsilon)
+                            assert utils.compare_different_types_equality(elastic_res[field],
+                                                                          test["result"][i][j][field],
+                                                                          self.epsilon)
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
+
+    def assert_scores_by_issue_type(self, boosting_featurizer, test):
+        scores_by_issue_type = boosting_featurizer.find_most_relevant_by_type()
+        assert len(scores_by_issue_type) == len(test["result"])
+        for issue_type in test["result"]:
+            assert issue_type in scores_by_issue_type.keys()
+            elastic_res = scores_by_issue_type[issue_type]
+            for field in test["result"][issue_type]:
+                if type(test["result"][issue_type][field]) != dict:
+                    assert utils.compare_different_types_equality(elastic_res[field],
+                                                                  test["result"][issue_type][field],
+                                                                  self.epsilon)
+                else:
+                    for field_dict in test["result"][issue_type][field]:
+                        result_field_dict = test["result"][issue_type][field][field_dict]
+                        assert utils.compare_different_types_equality(elastic_res[field][field_dict],
+                                                                      result_field_dict,
+                                                                      self.epsilon)
 
     @utils.ignore_warnings
     def test_find_most_relevant_by_type(self):
@@ -166,26 +191,23 @@ class TestBoostingFeaturizer(unittest.TestCase):
         weight_log_sim = weighted_similarity_calculator.\
             WeightedSimilarityCalculator(folder=self.weights_folder)
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 _boosting_featurizer = BoostingFeaturizer(
                     test["elastic_results"],
                     test["config"],
                     [],
                     weighted_log_similarity_calculator=weight_log_sim)
-                scores_by_issue_type = _boosting_featurizer.find_most_relevant_by_type()
-                scores_by_issue_type.should.have.length_of(len(test["result"]))
-                for issue_type in test["result"]:
-                    scores_by_issue_type.keys().should.contain(issue_type)
-                    elastic_res = scores_by_issue_type[issue_type]
-                    for field in test["result"][issue_type]:
-                        if type(test["result"][issue_type][field]) != dict:
-                            elastic_res[field].should.equal(test["result"][issue_type][field],
-                                                            epsilon=self.epsilon)
-                        else:
-                            for field_dict in test["result"][issue_type][field]:
-                                result_field_dict = test["result"][issue_type][field][field_dict]
-                                elastic_res[field][field_dict].should.equal(result_field_dict,
-                                                                            epsilon=self.epsilon)
+                self.assert_scores_by_issue_type(_boosting_featurizer, test)
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
+
+    def assert_elastic_results(self, results, test):
+        assert len(results) == len(test["result"])
+        for idx_res, (log, hits) in enumerate(results):
+            assert log["_id"] == test["result"][idx_res][0]["_id"]
+            for i, hit in enumerate(hits["hits"]["hits"]):
+                assert hit["_id"] == test["result"][idx_res][1]["hits"]["hits"][i]["_id"]
 
     @utils.ignore_warnings
     def test_filter_by_min_should_match(self):
@@ -265,7 +287,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
         weight_log_sim = weighted_similarity_calculator.\
             WeightedSimilarityCalculator(folder=self.weights_folder)
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 _boosting_featurizer = BoostingFeaturizer(
                     test["elastic_results"],
                     test["config"],
@@ -274,11 +296,10 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 all_results = test["elastic_results"]
                 for field in test["config"]["filter_min_should_match"]:
                     all_results = _boosting_featurizer.filter_by_min_should_match(all_results, field=field)
-                all_results.should.have.length_of(len(test["result"]))
-                for idx, (log, hits) in enumerate(all_results):
-                    log["_id"].should.equal(test["result"][idx][0]["_id"])
-                    for i, hit in enumerate(hits["hits"]["hits"]):
-                        hit["_id"].should.equal(test["result"][idx][1]["hits"]["hits"][i]["_id"])
+                self.assert_elastic_results(all_results, test)
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_find_most_relevant_by_type_for_suggests(self):
@@ -332,26 +353,16 @@ class TestBoostingFeaturizer(unittest.TestCase):
         weight_log_sim = weighted_similarity_calculator.\
             WeightedSimilarityCalculator(folder=self.weights_folder)
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 _boosting_featurizer = SuggestBoostingFeaturizer(
                     test["elastic_results"],
                     test["config"],
                     [],
                     weighted_log_similarity_calculator=weight_log_sim)
-                scores_by_issue_type = _boosting_featurizer.find_most_relevant_by_type()
-                scores_by_issue_type.should.have.length_of(len(test["result"]))
-                for issue_type in test["result"]:
-                    scores_by_issue_type.keys().should.contain(issue_type)
-                    elastic_res = scores_by_issue_type[issue_type]
-                    for field in test["result"][issue_type]:
-                        if type(test["result"][issue_type][field]) != dict:
-                            elastic_res[field].should.equal(test["result"][issue_type][field],
-                                                            epsilon=self.epsilon)
-                        else:
-                            for field_dict in test["result"][issue_type][field]:
-                                result_field_dict = test["result"][issue_type][field][field_dict]
-                                elastic_res[field][field_dict].should.equal(result_field_dict,
-                                                                            epsilon=self.epsilon)
+                self.assert_scores_by_issue_type(_boosting_featurizer, test)
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_filter_by_min_should_match_any(self):
@@ -433,7 +444,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
         weight_log_sim = weighted_similarity_calculator.\
             WeightedSimilarityCalculator(folder=self.weights_folder)
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 _boosting_featurizer = SuggestBoostingFeaturizer(
                     test["elastic_results"],
                     test["config"],
@@ -443,8 +454,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 all_results = _boosting_featurizer.filter_by_min_should_match_any(
                     all_results,
                     fields=test["config"]["filter_min_should_match_any"])
-                all_results.should.have.length_of(len(test["result"]))
-                for idx, (log, hits) in enumerate(all_results):
-                    log["_id"].should.equal(test["result"][idx][0]["_id"])
-                    for i, hit in enumerate(hits["hits"]["hits"]):
-                        hit["_id"].should.equal(test["result"][idx][1]["hits"]["hits"][i]["_id"])
+                self.assert_elastic_results(all_results, test)
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)

@@ -1,0 +1,9 @@
+[run]
+include =
+    ./app.py
+    ./**/*.py
+omit =
+    # omit tests
+    test/*
+    # omit virtual environment
+    venv/*

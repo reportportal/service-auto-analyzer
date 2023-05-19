@@ -15,7 +15,6 @@
 """
 
 import unittest
-import sure # noqa
 from unittest.mock import MagicMock
 from service.retraining_service import RetrainingService
 from test.test_service import TestService
@@ -174,8 +173,7 @@ class TestRetrainingService(TestService):
             }
         ]
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
-
+            try:
                 _retraining_service = RetrainingService(self.model_chooser,
                                                         app_config=self.app_config,
                                                         search_cfg=self.get_default_search_config())
@@ -186,7 +184,10 @@ class TestRetrainingService(TestService):
                 model_triggering[1].train = MagicMock(
                     return_value=test["train_result"])
                 response = _retraining_service.train_models(test["train_info"])
-                test["is_model_trained"].should.equal(response)
+                assert test["is_model_trained"] == response
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
 
 if __name__ == '__main__':

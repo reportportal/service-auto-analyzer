@@ -18,7 +18,6 @@ import unittest
 from unittest.mock import MagicMock
 import json
 from http import HTTPStatus
-import sure # noqa
 import httpretty
 
 import commons.launch_objects as launch_objects
@@ -306,7 +305,7 @@ class TestCleanIndexService(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 self._start_server(test["test_calls"])
                 app_config = self.app_config
                 if "app_config" in test:
@@ -321,9 +320,12 @@ class TestCleanIndexService(TestService):
 
                 response = _clean_index_service.delete_logs(test["rq"])
 
-                test["expected_count"].should.equal(response)
+                assert test["expected_count"] == response
 
                 TestCleanIndexService.shutdown_server(test["test_calls"])
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
 
 if __name__ == '__main__':

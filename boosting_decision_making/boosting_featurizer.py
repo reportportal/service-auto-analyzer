@@ -253,7 +253,7 @@ class BoostingFeaturizer:
 
     def get_necessary_features(self, model_folder):
         if not model_folder.strip():
-            return[]
+            return []
         if model_folder not in self.models:
             try:
                 self.models[model_folder] = BoostingDecisionMaker(folder=model_folder)

@@ -17,7 +17,6 @@
 import unittest
 from unittest.mock import MagicMock
 from http import HTTPStatus
-import sure # noqa
 import httpretty
 import json
 import commons.launch_objects as launch_objects
@@ -775,7 +774,7 @@ class TestSuggestService(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case number: {0}', idx):
+            try:
                 self._start_server(test["test_calls"])
                 config = self.get_default_search_config()
                 app_config = self.app_config
@@ -797,12 +796,15 @@ class TestSuggestService(TestService):
                     return_value=_boosting_decision_maker)
                 response = suggest_service.suggest_items(test["test_item_info"])
 
-                response.should.have.length_of(len(test["expected_result"]))
+                assert len(response) == len(test["expected_result"])
                 for real_resp, expected_resp in zip(response, test["expected_result"]):
                     real_resp.processedTime = 10.0
-                    real_resp.should.equal(expected_resp)
+                    assert real_resp == expected_resp
 
                 TestSuggestService.shutdown_server(test["test_calls"])
+            except AssertionError as err:
+                raise AssertionError(f'Error in the test case number: {idx}').\
+                    with_traceback(err.__traceback__)
 
 
 if __name__ == '__main__':

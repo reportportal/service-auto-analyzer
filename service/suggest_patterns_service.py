@@ -5,7 +5,7 @@
 * you may not use this file except in compliance with the License.
 * You may obtain a copy of the License at
 *
-* http://www.apache.org/licenses/LICENSE-2.0
+* https://www.apache.org/licenses/LICENSE-2.0
 *
 * Unless required by applicable law or agreed to in writing, software
 * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,10 +27,10 @@ logger = logging.getLogger("analyzerApp.suggestPatternsService")
 
 class SuggestPatternsService:
 
-    def __init__(self, app_config={}, search_cfg={}):
-        self.app_config = app_config
-        self.search_cfg = search_cfg
-        self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
+    def __init__(self, app_config=None, search_cfg=None):
+        self.app_config = app_config or {}
+        self.search_cfg = search_cfg or {}
+        self.es_client = EsClient(app_config=self.app_config, search_cfg=self.search_cfg)
 
     def query_data(self, project, label):
         data = []

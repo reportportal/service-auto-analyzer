@@ -5,7 +5,7 @@
 * you may not use this file except in compliance with the License.
 * You may obtain a copy of the License at
 *
-* http://www.apache.org/licenses/LICENSE-2.0
+* https://www.apache.org/licenses/LICENSE-2.0
 *
 * Unless required by applicable law or agreed to in writing, software
 * distributed under the License is distributed on an "AS IS" BASIS,
@@ -915,17 +915,30 @@ def build_more_like_this_query(min_should_match, log_message,
                                field_name="message", boost=1.0,
                                override_min_should_match=None,
                                max_query_terms=50):
-    min_should_match_settings = override_min_should_match
-    if not override_min_should_match:
-        min_should_match_settings = "5<" + min_should_match
     return {"more_like_this": {
-        "fields":               [field_name],
-        "like":                 log_message,
-        "min_doc_freq":         1,
-        "min_term_freq":        1,
-        "minimum_should_match": min_should_match_settings,
-        "max_query_terms":      max_query_terms,
+        "fields": [field_name],
+        "like": log_message,
+        "min_doc_freq": 1,
+        "min_term_freq": 1,
+        "minimum_should_match": override_min_should_match or "5<" + min_should_match,
+        "max_query_terms": max_query_terms,
         "boost": boost}}
+
+
+def append_potential_status_codes(query, log, *, boost=8.0, max_query_terms=50):
+    potential_status_codes = log["_source"]["potential_status_codes"].strip()
+    if potential_status_codes:
+        number_of_status_codes = str(len(set(potential_status_codes.split())))
+        query["query"]["bool"]["must"].append(
+            build_more_like_this_query(
+                "1",
+                potential_status_codes,
+                field_name="potential_status_codes",
+                boost=boost,
+                override_min_should_match=number_of_status_codes,
+                max_query_terms=max_query_terms
+            )
+        )
 
 
 def extract_clustering_setting(cluster_id):

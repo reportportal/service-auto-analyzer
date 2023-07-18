@@ -5,7 +5,7 @@
 * you may not use this file except in compliance with the License.
 * You may obtain a copy of the License at
 *
-* http://www.apache.org/licenses/LICENSE-2.0
+* https://www.apache.org/licenses/LICENSE-2.0
 *
 * Unless required by applicable law or agreed to in writing, software
 * distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,10 +33,10 @@ logger = logging.getLogger("analyzerApp.clusterService")
 
 class ClusterService:
 
-    def __init__(self, app_config={}, search_cfg={}):
-        self.app_config = app_config
-        self.search_cfg = search_cfg
-        self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
+    def __init__(self, app_config=None, search_cfg=None):
+        self.app_config = app_config or {}
+        self.search_cfg = search_cfg or {}
+        self.es_client = EsClient(app_config=self.app_config, search_cfg=self.search_cfg)
         self.log_preparation = LogPreparation()
         self.log_merger = LogMerger()
 
@@ -88,16 +88,8 @@ class ClusterService:
                     field_name="found_exceptions", boost=1.0,
                     override_min_should_match="1",
                     max_query_terms=self.search_cfg["MaxQueryTerms"]))
-        if queried_log["_source"]["potential_status_codes"].strip():
-            number_of_status_codes = str(len(set(
-                queried_log["_source"]["potential_status_codes"].split())))
-            query["query"]["bool"]["must"].append(
-                utils.build_more_like_this_query(
-                    "1",
-                    queried_log["_source"]["potential_status_codes"],
-                    field_name="potential_status_codes", boost=1.0,
-                    override_min_should_match=number_of_status_codes,
-                    max_query_terms=self.search_cfg["MaxQueryTerms"]))
+        utils.append_potential_status_codes(query, queried_log, boost=1.0,
+                                            max_query_terms=self.search_cfg["MaxQueryTerms"])
         return self.add_query_with_start_time_decay(query)
 
     def add_query_with_start_time_decay(self, main_query):

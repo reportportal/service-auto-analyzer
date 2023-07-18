@@ -5,7 +5,7 @@
 * you may not use this file except in compliance with the License.
 * You may obtain a copy of the License at
 *
-* http://www.apache.org/licenses/LICENSE-2.0
+* https://www.apache.org/licenses/LICENSE-2.0
 *
 * Unless required by applicable law or agreed to in writing, software
 * distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,8 +30,10 @@ logger = logging.getLogger("analyzerApp.suggestService")
 
 class SuggestService(AnalyzerService):
 
-    def __init__(self, model_chooser, app_config={}, search_cfg={}):
-        super(SuggestService, self).__init__(model_chooser, app_config=app_config, search_cfg=search_cfg)
+    def __init__(self, model_chooser, app_config=None, search_cfg=None):
+        self.app_config = app_config or {}
+        self.search_cfg = search_cfg or {}
+        super(SuggestService, self).__init__(model_chooser, app_config=self.app_config, search_cfg=self.search_cfg)
         self.suggest_threshold = 0.4
         self.rp_suggest_index_template = "rp_suggestions_info"
         self.rp_suggest_metrics_index_template = "rp_suggestions_info_metrics"
@@ -111,15 +113,7 @@ class SuggestService(AnalyzerService):
                                                 field_name="merged_small_logs",
                                                 boost=2.0))
 
-        if log["_source"]["potential_status_codes"].strip():
-            number_of_status_codes = str(len(set(
-                log["_source"]["potential_status_codes"].split())))
-            query["query"]["bool"]["must"].append(
-                self.build_more_like_this_query(
-                    "1",
-                    log["_source"]["potential_status_codes"],
-                    field_name="potential_status_codes", boost=8.0,
-                    override_min_should_match=number_of_status_codes))
+        utils.append_potential_status_codes(query, log, max_query_terms=self.search_cfg["MaxQueryTerms"])
 
         for field, boost_score in [
                 ("detected_message_without_params_extended", 2.0),

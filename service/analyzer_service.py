@@ -68,15 +68,14 @@ class AnalyzerService:
                                    field_name="message", boost=1.0,
                                    override_min_should_match=None):
         """Build more like this query"""
-        return {"more_like_this": {
-            "fields":               [field_name],
-            "like":                 log_message,
-            "min_doc_freq":         1,
-            "min_term_freq":        1,
-            "minimum_should_match":
-                ("5<" + min_should_match) if override_min_should_match is None else override_min_should_match,
-            "max_query_terms":      self.search_cfg["MaxQueryTerms"],
-            "boost": boost, }}
+        return utils.build_more_like_this_query(
+            min_should_match=min_should_match,
+            log_message=log_message,
+            field_name=field_name,
+            boost=boost,
+            override_min_should_match=override_min_should_match,
+            max_query_terms=self.search_cfg["MaxQueryTerms"]
+        )
 
     def prepare_restrictions_by_issue_type(self, filter_no_defect=True):
         if filter_no_defect:

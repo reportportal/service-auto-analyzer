@@ -5,7 +5,7 @@
 * you may not use this file except in compliance with the License.
 * You may obtain a copy of the License at
 *
-* http://www.apache.org/licenses/LICENSE-2.0
+* https://www.apache.org/licenses/LICENSE-2.0
 *
 * Unless required by applicable law or agreed to in writing, software
 * distributed under the License is distributed on an "AS IS" BASIS,
@@ -184,14 +184,7 @@ class AutoAnalyzerService(AnalyzerService):
                                                 field_name="found_exceptions",
                                                 boost=8.0,
                                                 override_min_should_match="1"))
-        if log["_source"]["potential_status_codes"].strip():
-            number_of_status_codes = str(len(set(log["_source"]["potential_status_codes"].split())))
-            query["query"]["bool"]["must"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["potential_status_codes"],
-                                                field_name="potential_status_codes",
-                                                boost=8.0,
-                                                override_min_should_match=number_of_status_codes))
+        utils.append_potential_status_codes(query, log, max_query_terms=self.search_cfg["MaxQueryTerms"])
         return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
     def leave_only_similar_logs(self, candidates_with_no_defect, boosting_config):

@@ -16,6 +16,8 @@
 
 import re
 import string
+from functools import wraps
+
 import nltk
 import logging
 from dateutil.parser import parse
@@ -37,12 +39,14 @@ stopwords = set(nltk.corpus.stopwords.words("english"))
 ERROR_LOGGING_LEVEL = 40000
 
 
-def ignore_warnings(method):
+def ignore_warnings(func):
     """Decorator for ignoring warnings"""
+
+    @wraps(func)
     def _inner(*args, **kwargs):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            result = method(*args, **kwargs)
+            result = func(*args, **kwargs)
         return result
     return _inner
 

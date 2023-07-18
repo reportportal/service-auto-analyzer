@@ -5,7 +5,7 @@
 * you may not use this file except in compliance with the License.
 * You may obtain a copy of the License at
 *
-* http://www.apache.org/licenses/LICENSE-2.0
+* https://www.apache.org/licenses/LICENSE-2.0
 *
 * Unless required by applicable law or agreed to in writing, software
 * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,10 +27,10 @@ logger = logging.getLogger("analyzerApp.analyzerService")
 
 class AnalyzerService:
 
-    def __init__(self, model_chooser, app_config={}, search_cfg={}):
-        self.app_config = app_config
-        self.search_cfg = search_cfg
-        self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
+    def __init__(self, model_chooser, app_config=None, search_cfg=None):
+        self.app_config = app_config or {}
+        self.search_cfg = search_cfg or {}
+        self.es_client = EsClient(app_config=self.app_config, search_cfg=self.search_cfg)
         self.log_preparation = LogPreparation()
         self.log_merger = LogMerger()
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
@@ -66,8 +66,7 @@ class AnalyzerService:
     def build_more_like_this_query(self,
                                    min_should_match, log_message,
                                    field_name="message", boost=1.0,
-                                   override_min_should_match=None,
-                                   max_query_terms=50):
+                                   override_min_should_match=None):
         """Build more like this query"""
         return {"more_like_this": {
             "fields":               [field_name],

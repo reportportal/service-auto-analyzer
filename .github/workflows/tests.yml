@@ -34,6 +34,9 @@ jobs:
           python -m pip install -r ./requirements_dev.txt
           python -m nltk.downloader stopwords
 
+      - name: Checkstyle
+        run: python -m flake8
+
       - name: Test
         run: pytest --cov-config=.coveragerc --cov --cov-report=xml test/ -s -vv
 

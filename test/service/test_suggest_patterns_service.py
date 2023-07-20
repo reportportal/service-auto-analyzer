@@ -18,10 +18,10 @@ import unittest
 from http import HTTPStatus
 import httpretty
 from unittest.mock import MagicMock
-import commons.launch_objects as launch_objects
-from service.suggest_patterns_service import SuggestPatternsService
-from test.test_service import TestService
-from utils import utils
+from app.commons import launch_objects
+from app.service import SuggestPatternsService
+from test.mock_service import TestService
+from app.utils import utils
 
 
 class TestSearchService(TestService):

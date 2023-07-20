@@ -18,11 +18,11 @@ import json
 from http import HTTPStatus
 import httpretty
 
-import commons.launch_objects as launch_objects
-from boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
-from service.auto_analyzer_service import AutoAnalyzerService
-from test.test_service import TestService
-from utils import utils
+from app.commons import launch_objects
+from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
+from app.service import AutoAnalyzerService
+from test.mock_service import TestService
+from app.utils import utils
 
 
 class TestAutoAnalyzerService(TestService):

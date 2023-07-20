@@ -20,10 +20,10 @@ import json
 from http import HTTPStatus
 import httpretty
 
-import commons.launch_objects as launch_objects
-from service.search_service import SearchService
-from test.test_service import TestService
-from utils import utils
+from app.commons import launch_objects
+from app.service import SearchService
+from test.mock_service import TestService
+from app.utils import utils
 
 
 class TestSearchService(TestService):

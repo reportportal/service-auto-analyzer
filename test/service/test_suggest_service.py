@@ -19,11 +19,11 @@ from unittest.mock import MagicMock
 from http import HTTPStatus
 import httpretty
 import json
-import commons.launch_objects as launch_objects
-from boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
-from service.suggest_service import SuggestService
-from test.test_service import TestService
-from utils import utils
+from app.commons import launch_objects
+from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
+from app.service import SuggestService
+from test.mock_service import TestService
+from app.utils import utils
 
 
 class TestSuggestService(TestService):

@@ -20,10 +20,10 @@ from unittest.mock import MagicMock
 from http import HTTPStatus
 import httpretty
 
-import commons.launch_objects as launch_objects
-from service.suggest_info_service import SuggestInfoService
-from test.test_service import TestService
-from utils import utils
+from app.commons import launch_objects
+from app.service import SuggestInfoService
+from test.mock_service import TestService
+from app.utils import utils
 
 
 class TestSuggestInfoService(TestService):

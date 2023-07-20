@@ -16,9 +16,9 @@ import unittest
 from http import HTTPStatus
 import httpretty
 
-from service.delete_index_service import DeleteIndexService
-from test.test_service import TestService
-from utils import utils
+from app.service import DeleteIndexService
+from test.mock_service import TestService
+from app.utils import utils
 
 
 class TestDeleteIndexService(TestService):

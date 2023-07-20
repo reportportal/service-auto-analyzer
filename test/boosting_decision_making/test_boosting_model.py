@@ -15,12 +15,12 @@
 import unittest
 import logging
 import numpy as np
-from boosting_decision_making.boosting_featurizer import BoostingFeaturizer
-from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
-from boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
-from boosting_decision_making import weighted_similarity_calculator
-from boosting_decision_making import defect_type_model
-from utils import utils
+from app.boosting_decision_making.boosting_featurizer import BoostingFeaturizer
+from app.boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
+from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
+from app.boosting_decision_making import weighted_similarity_calculator
+from app.boosting_decision_making import defect_type_model
+from app.utils import utils
 
 
 class TestBoostingModel(unittest.TestCase):
@@ -36,7 +36,7 @@ class TestBoostingModel(unittest.TestCase):
         self.boost_model_results = "boost_model_results.json"
         self.suggest_boost_model_results = "suggest_boost_model_results.json"
         self.epsilon = 0.0001
-        model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
+        model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
         self.boost_model_folder = model_settings["BOOST_MODEL_FOLDER"]
         self.suggest_boost_model_folder =\
             model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
@@ -64,7 +64,7 @@ class TestBoostingModel(unittest.TestCase):
             "number_of_log_lines": number_of_log_lines,
             "chosen_namespaces": {"tv.horizon": 25, "sun.reflect": 10},
             "boosting_model": utils.read_json_file(
-                "", "model_settings.json", to_json=True)["BOOST_MODEL_FOLDER"],
+                "res", "model_settings.json", to_json=True)["BOOST_MODEL_FOLDER"],
             "time_weight_decay": 0.95
         }
 

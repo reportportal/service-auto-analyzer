@@ -14,10 +14,10 @@
 
 import unittest
 import logging
-from boosting_decision_making.boosting_featurizer import BoostingFeaturizer
-from boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
-from boosting_decision_making import weighted_similarity_calculator
-from utils import utils
+from app.boosting_decision_making.boosting_featurizer import BoostingFeaturizer
+from app.boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
+from app.boosting_decision_making import weighted_similarity_calculator
+from app.utils import utils
 
 
 class TestBoostingFeaturizer(unittest.TestCase):
@@ -36,7 +36,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
         self.three_hits_search_rs_explained = "three_hits_search_rs_explained.json"
         self.one_hit_search_rs_explained_wo_params = "one_hit_search_rs_explained_wo_params.json"
         self.epsilon = 0.0001
-        model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
+        model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
         self.weights_folder = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
         logging.disable(logging.CRITICAL)
 

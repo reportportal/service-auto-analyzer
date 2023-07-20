@@ -15,10 +15,10 @@
 import unittest
 from http import HTTPStatus
 import httpretty
-import commons.launch_objects as launch_objects
-from utils import utils
-from service.cluster_service import ClusterService
-from test.test_service import TestService
+from app.commons import launch_objects
+from app.utils import utils
+from app.service import ClusterService
+from test.mock_service import TestService
 from freezegun import freeze_time
 
 

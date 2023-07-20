@@ -1,28 +1,26 @@
-"""
-* Copyright 2019 EPAM Systems
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-* http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-"""
+#  Copyright 2023 EPAM Systems
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#  https://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
 
 import unittest
 import logging
 
-import commons.launch_objects as launch_objects
-from service.search_service import SearchService
-from service.suggest_service import SuggestService
-from service.auto_analyzer_service import AutoAnalyzerService
-from utils import utils
-from commons import model_chooser
+from app.commons import launch_objects
+from app.service import SearchService
+from app.service import SuggestService
+from app.service import AutoAnalyzerService
+from app.utils import utils
+from app.commons import model_chooser
 
 
 class TestEsQuery(unittest.TestCase):
@@ -63,7 +61,7 @@ class TestEsQuery(unittest.TestCase):
             "appVersion":        "",
             "esChunkNumber":     1000
         }
-        self.model_settings = utils.read_json_file("", "model_settings.json", to_json=True)
+        self.model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
         self.model_chooser = model_chooser.ModelChooser(self.app_config, self.get_default_search_config())
         logging.disable(logging.CRITICAL)
 

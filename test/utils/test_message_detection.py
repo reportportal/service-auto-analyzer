@@ -16,7 +16,7 @@
 
 import unittest
 import logging
-from utils import utils
+from app.utils import utils
 
 
 class TestMessageDetection(unittest.TestCase):

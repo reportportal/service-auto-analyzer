@@ -16,7 +16,7 @@ venv:
 	touch $(VENV_PATH)/bin/activate
 
 test: venv
-	${PYTHON} -m unittest
+	${PYTHON} -m unittest discover -s test
 
 checkstyle: venv
 	${PYTHON} -m flake8

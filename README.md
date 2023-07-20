@@ -90,7 +90,7 @@ Perform next steps inside source directory of the analyzer.
 ```
 5. Start the uwsgi server, you can change properties, such as the workers quantity for running the analyzer in the several processes
 ```bash
-  /analyzer/bin/uwsgi --ini analyzer.ini
+  /analyzer/bin/uwsgi --ini res/analyzer.ini
 ```
  
 #### Analyzer Train
@@ -113,7 +113,7 @@ Perform next steps inside source directory of the analyzer.
 ```
 5. Start the uwsgi server, you can change properties, such as the workers quantity for running the analyzer train in the several processes
 ```bash
-  /analyzer-train/bin/uwsgi --ini analyzer-train.ini
+  /analyzer-train/bin/uwsgi --ini res/analyzer-train.ini
 ```
 
 ### For Windows:
@@ -135,5 +135,5 @@ python -m nltk.downloader stopwords
 ```
 5. Start the program.
 ```
-python app.py
+python app/app.py
 ```

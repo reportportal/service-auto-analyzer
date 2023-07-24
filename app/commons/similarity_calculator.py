@@ -12,10 +12,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.utils import text_processing
-from scipy import spatial
 import numpy as np
+from scipy import spatial
 from sklearn.feature_extraction.text import CountVectorizer
+
+from app.utils import text_processing
 
 
 class SimilarityCalculator:
@@ -51,7 +52,7 @@ class SimilarityCalculator:
                         else:
                             text = []
                             needs_reweighting = 0
-                            if self.config["number_of_log_lines"] == -1 and\
+                            if self.config["number_of_log_lines"] == -1 and \
                                     field in self.fields_mapping_for_weighting:
                                 fields_to_use = self.fields_mapping_for_weighting[field]
                                 text = self.weighted_similarity_calculator.message_to_array(
@@ -89,8 +90,8 @@ class SimilarityCalculator:
                             else:
                                 text = text_processing.filter_empty_lines([" ".join(
                                     text_processing.split_words(
-                                    obj["_source"][field],
-                                    min_word_length=self.config["min_word_length"]))])
+                                        obj["_source"][field],
+                                        min_word_length=self.config["min_word_length"]))])
                             if not text:
                                 log_field_ids[obj["_id"]] = -1
                             else:
@@ -100,8 +101,8 @@ class SimilarityCalculator:
                                                              len(all_messages) - 1]
                                 index_in_message_array += len(text)
             if all_messages:
-                needs_reweighting_wc = all_messages_needs_reweighting and\
-                    sum(all_messages_needs_reweighting) == len(all_messages_needs_reweighting)
+                needs_reweighting_wc = all_messages_needs_reweighting and \
+                                       sum(all_messages_needs_reweighting) == len(all_messages_needs_reweighting)
                 vectorizer = CountVectorizer(
                     binary=not needs_reweighting_wc,
                     analyzer="word", token_pattern="[^ ]+")
@@ -137,10 +138,10 @@ class SimilarityCalculator:
             group_id = (obj["_id"], log["_id"])
             index_query_message = log_field_ids[log["_id"]]
             index_log_message = log_field_ids[obj["_id"]]
-            if (isinstance(index_query_message, int) and index_query_message < 0) and\
+            if (isinstance(index_query_message, int) and index_query_message < 0) and \
                     (isinstance(index_log_message, int) and index_log_message < 0):
                 all_results_similarity[group_id] = {"similarity": 1.0, "both_empty": True}
-            elif (isinstance(index_query_message, int) and index_query_message < 0) or\
+            elif (isinstance(index_query_message, int) and index_query_message < 0) or \
                     (isinstance(index_log_message, int) and index_log_message < 0):
                 all_results_similarity[group_id] = {"similarity": 0.0, "both_empty": False}
             else:
@@ -160,8 +161,7 @@ class SimilarityCalculator:
                     if needs_reweighting_wc:
                         query_vector *= 2
                         log_vector *= 2
-                similarity =\
-                    round(1 - spatial.distance.cosine(query_vector, log_vector), 2)
+                similarity = round(1 - spatial.distance.cosine(query_vector, log_vector), 2)
                 all_results_similarity[group_id] = {"similarity": similarity, "both_empty": False}
 
         return all_results_similarity

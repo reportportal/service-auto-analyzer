@@ -18,7 +18,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.preprocessing import OneHotEncoder
 import re
-from app.utils import utils
+
+from app.utils import text_processing
 
 logger = logging.getLogger("analyzerApp.feature_encoder")
 
@@ -46,13 +47,13 @@ class FeatureEncoder:
 
     @staticmethod
     def prepare_text_message(data):
-        messages = [" ".join(utils.split_words(text)).replace(".", "_") for text in data]
+        messages = [" ".join(text_processing.split_words(text)).replace(".", "_") for text in data]
         return FeatureEncoder.add_default_value(messages, "nomessage")
 
     @staticmethod
     def prepare_stacktrace(data):
         stacktraces = [
-            " ".join([w for w in utils.split_words(text) if "." in w]).replace(".", "_") for text in data]
+            " ".join([w for w in text_processing.split_words(text) if "." in w]).replace(".", "_") for text in data]
         return FeatureEncoder.add_default_value(stacktraces, "nostacktrace")
 
     @staticmethod

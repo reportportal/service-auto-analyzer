@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.utils import utils
+from app.utils import text_processing
 import copy
 
 
@@ -41,7 +41,7 @@ class LogMerger:
             log_level = log["_source"]["log_level"]
 
             if log["_id"] in log_level_ids_to_add[log_level]:
-                merged_small_logs = utils.compress(log_level_messages["message"][log_level])
+                merged_small_logs = text_processing.compress(log_level_messages["message"][log_level])
                 new_logs.append(self.prepare_new_log(
                     log, log["_id"], False, merged_small_logs))
 
@@ -54,7 +54,7 @@ class LogMerger:
                 merged_logs_id = str(log["_id"]) + "_m"
                 new_log = self.prepare_new_log(
                     log, merged_logs_id, True,
-                    utils.compress(log_level_messages["message"][log_level]),
+                    text_processing.compress(log_level_messages["message"][log_level]),
                     fields_to_clean=self.fields_to_clean)
                 log_ids_for_merged_logs[merged_logs_id] = logs_ids_in_merged_logs[log_level]
                 for field in log_level_messages:
@@ -63,10 +63,10 @@ class LogMerger:
                     if field in ["whole_message"]:
                         new_log["_source"][field] = log_level_messages[field][log_level]
                     else:
-                        new_log["_source"][field] = utils.compress(
+                        new_log["_source"][field] = text_processing.compress(
                             log_level_messages[field][log_level])
-                new_log["_source"]["found_exceptions_extended"] = utils.compress(
-                    utils.enrich_found_exceptions(log_level_messages["found_exceptions"][log_level]))
+                new_log["_source"]["found_exceptions_extended"] = text_processing.compress(
+                    text_processing.enrich_found_exceptions(log_level_messages["found_exceptions"][log_level]))
 
                 new_logs.append(new_log)
         return new_logs, log_ids_for_merged_logs

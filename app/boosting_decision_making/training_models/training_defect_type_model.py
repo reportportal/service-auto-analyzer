@@ -15,7 +15,7 @@
 from app.boosting_decision_making import defect_type_model, custom_defect_type_model
 from sklearn.model_selection import train_test_split
 from app.commons.esclient import EsClient
-from app.utils import utils
+from app.utils import utils, text_processing
 from time import time
 import scipy.stats as stats
 import numpy as np
@@ -108,7 +108,7 @@ class DefectTypeModelTraining:
 
     def query_data(self, project, label):
         message_launch_dict = set()
-        project_index_name = utils.unite_project_name(
+        project_index_name = text_processing.unite_project_name(
             str(project), self.app_config["esProjectIndexPrefix"])
         data = []
         for r in elasticsearch.helpers.scan(self.es_client.es_client,
@@ -117,7 +117,7 @@ class DefectTypeModelTraining:
                                             index=project_index_name):
             detected_message = r["_source"]["detected_message_without_params_extended"]
             text_message_normalized = " ".join(sorted(
-                utils.split_words(detected_message, to_lower=True)))
+                text_processing.split_words(detected_message, to_lower=True)))
             message_info = (text_message_normalized,
                             r["_source"]["launch_id"],
                             r["_source"]["issue_type"])
@@ -135,7 +135,7 @@ class DefectTypeModelTraining:
         for idx, text_message_data in enumerate(data):
             text_message = text_message_data[0]
             text_message_normalized = " ".join(sorted(
-                utils.split_words(text_message, to_lower=True)))
+                text_processing.split_words(text_message, to_lower=True)))
             if text_message_normalized not in text_messages_set:
                 logs_to_train_idx.append(idx)
                 text_messages_set[text_message_normalized] = idx

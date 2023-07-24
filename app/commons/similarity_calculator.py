@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.utils import utils
+from app.utils import text_processing
 from scipy import spatial
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
@@ -61,7 +61,7 @@ class SimilarityCalculator:
                                 gathered_lines = []
                                 weights = []
                                 for line in obj["_source"]["stacktrace"].split("\n"):
-                                    line_words = utils.split_words(
+                                    line_words = text_processing.split_words(
                                         line,
                                         min_word_length=self.config["min_word_length"])
                                     for word in line_words:
@@ -76,18 +76,19 @@ class SimilarityCalculator:
                                 else:
                                     text = []
                                     for line in obj["_source"]["stacktrace"].split("\n"):
-                                        text.append(" ".join(utils.split_words(
-                                            utils.clean_from_brackets(line),
+                                        text.append(" ".join(text_processing.split_words(
+                                            text_processing.clean_from_brackets(line),
                                             min_word_length=self.config["min_word_length"])))
-                                    text = utils.filter_empty_lines(text)
+                                    text = text_processing.filter_empty_lines(text)
                                     self.object_id_weights[obj["_id"]] = [1] * len(text)
                             elif field.startswith("stacktrace"):
-                                if utils.does_stacktrace_need_words_reweighting(obj["_source"][field]):
+                                if text_processing.does_stacktrace_need_words_reweighting(obj["_source"][field]):
                                     needs_reweighting = 1
                                 text = self.weighted_similarity_calculator.message_to_array(
                                     "", obj["_source"][field])
                             else:
-                                text = utils.filter_empty_lines([" ".join(utils.split_words(
+                                text = text_processing.filter_empty_lines([" ".join(
+                                    text_processing.split_words(
                                     obj["_source"][field],
                                     min_word_length=self.config["min_word_length"]))])
                             if not text:

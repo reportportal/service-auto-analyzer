@@ -15,7 +15,8 @@
 import logging
 import os
 import pika
-from app.utils import utils
+
+from app.utils import text_processing
 
 logger = logging.getLogger("analyzerApp.amqp")
 
@@ -29,7 +30,7 @@ class AmqpClient:
     def create_ampq_connection(amqpUrl):
         """Creates AMQP client"""
         amqp_full_url = amqpUrl.rstrip("\\").rstrip("/") + "?heartbeat=600"
-        logger.info("Try connect to %s" % utils.remove_credentials_from_url(amqp_full_url))
+        logger.info("Try connect to %s" % text_processing.remove_credentials_from_url(amqp_full_url))
         return pika.BlockingConnection(pika.connection.URLParameters(amqp_full_url))
 
     @staticmethod

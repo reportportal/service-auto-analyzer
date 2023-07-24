@@ -19,7 +19,8 @@ import numpy as np
 import sklearn
 from sklearn.feature_extraction.text import CountVectorizer
 from time import time
-from app.utils import utils
+
+from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.clusterizer")
 
@@ -130,7 +131,7 @@ class Clusterizer:
         new_id = 0
         for idx, text_message in enumerate(messages):
             text_message_normalized = " ".join(sorted(
-                utils.split_words(text_message, to_lower=True)))
+                text_processing.split_words(text_message, to_lower=True)))
             if text_message_normalized not in text_messages_set:
                 messages_to_cluster.append(text_message)
                 text_messages_set[text_message_normalized] = new_id

@@ -13,7 +13,8 @@
 #  limitations under the License.
 
 import logging
-from app.utils import utils
+
+from app.utils import utils, text_processing
 from time import time
 from app.commons import namespace_finder
 from app.commons.esclient import EsClient
@@ -37,7 +38,7 @@ class DeleteIndexService:
     def delete_index(self, index_name):
         logger.info("Started deleting index")
         t_start = time()
-        is_index_deleted = self.es_client.delete_index(utils.unite_project_name(
+        is_index_deleted = self.es_client.delete_index(text_processing.unite_project_name(
             str(index_name), self.app_config["esProjectIndexPrefix"]))
         self.namespace_finder.remove_namespaces(index_name)
         self.trigger_manager.delete_triggers(index_name)

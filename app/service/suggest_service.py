@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.utils import utils
+from app.utils import utils, text_processing
 from app.commons.launch_objects import SuggestAnalysisResult
 from app.boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.amqp.amqp import AmqpClient
@@ -131,7 +131,7 @@ class SuggestService(AnalyzerService):
 
     def query_es_for_suggested_items(self, test_item_info, logs):
         full_results = []
-        index_name = utils.unite_project_name(
+        index_name = text_processing.unite_project_name(
             str(test_item_info.project), self.app_config["esProjectIndexPrefix"])
 
         for log in logs:
@@ -309,7 +309,7 @@ class SuggestService(AnalyzerService):
         if test_item_info.clusterId != 0:
             prepared_logs, test_item_id_for_suggest = self.query_logs_for_cluster(test_item_info, index_name)
         else:
-            unique_logs = utils.leave_only_unique_logs(test_item_info.logs)
+            unique_logs = text_processing.leave_only_unique_logs(test_item_info.logs)
             prepared_logs = [self.log_preparation._prepare_log_for_suggests(test_item_info, log, index_name)
                              for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
         logs, _ = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
@@ -318,8 +318,8 @@ class SuggestService(AnalyzerService):
     @utils.ignore_warnings
     def suggest_items(self, test_item_info):
         logger.info("Started suggesting test items")
-        logger.info("ES Url %s", utils.remove_credentials_from_url(self.es_client.host))
-        index_name = utils.unite_project_name(
+        logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))
+        index_name = text_processing.unite_project_name(
             str(test_item_info.project), self.app_config["esProjectIndexPrefix"])
         if not self.es_client.index_exists(index_name):
             logger.info("Project %s doesn't exist", index_name)

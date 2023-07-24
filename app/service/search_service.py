@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 from app.commons.esclient import EsClient
-from app.utils import utils
+from app.utils import utils, text_processing
 from app.commons.launch_objects import SearchLogInfo, Log
 from app.commons.log_preparation import LogPreparation
 from app.commons.log_merger import LogMerger
@@ -159,7 +159,7 @@ class SearchService:
                 Log(logId=global_id, message=message),
                 search_req.logLines)
 
-            msg_words = " ".join(utils.split_words(queried_log["_source"]["message"]))
+            msg_words = " ".join(text_processing.split_words(queried_log["_source"]["message"]))
             if not msg_words.strip() or msg_words in searched_logs:
                 continue
             searched_logs.add(msg_words)
@@ -174,7 +174,7 @@ class SearchService:
         query = self.build_search_query(
             search_req,
             queried_log,
-            search_min_should_match=utils.prepare_es_min_should_match(
+            search_min_should_match=text_processing.prepare_es_min_should_match(
                 search_min_should_match))
         res = []
         for r in elasticsearch.helpers.scan(self.es_client.es_client,
@@ -190,8 +190,8 @@ class SearchService:
         """Get all logs similar to given logs"""
         similar_log_ids = {}
         logger.info("Started searching by request %s", search_req.json())
-        logger.info("ES Url %s", utils.remove_credentials_from_url(self.es_client.host))
-        index_name = utils.unite_project_name(
+        logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))
+        index_name = text_processing.unite_project_name(
             str(search_req.projectId), self.app_config["esProjectIndexPrefix"])
         t_start = time()
         if not self.es_client.index_exists(index_name):

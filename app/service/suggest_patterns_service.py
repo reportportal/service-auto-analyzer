@@ -13,7 +13,8 @@
 #  limitations under the License.
 
 import logging
-from app.utils import utils
+
+from app.utils import utils, text_processing
 import elasticsearch
 import elasticsearch.helpers
 from time import time
@@ -89,7 +90,7 @@ class SuggestPatternsService:
 
     @utils.ignore_warnings
     def suggest_patterns(self, project_id):
-        index_name = utils.unite_project_name(
+        index_name = text_processing.unite_project_name(
             str(project_id), self.app_config["esProjectIndexPrefix"])
         logger.info("Started suggesting patterns for project '%s'", index_name)
         t_start = time()
@@ -103,7 +104,7 @@ class SuggestPatternsService:
         for label in ["ab", "pb", "si", "ti"]:
             found_data.extend(self.query_data(index_name, label))
         for log, label in found_data:
-            for exception in utils.get_found_exceptions(log).split(" "):
+            for exception in text_processing.get_found_exceptions(log).split(" "):
                 if exception.strip():
                     if exception not in all_exceptions:
                         all_exceptions[exception] = 0

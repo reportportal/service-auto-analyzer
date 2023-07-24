@@ -14,7 +14,7 @@
 
 from app.commons.esclient import EsClient
 from app.commons import clusterizer
-from app.utils import utils
+from app.utils import utils, text_processing
 from app.commons.launch_objects import ClusterResult, ClusterInfo
 from app.commons.log_preparation import LogPreparation
 from app.commons.log_merger import LogMerger
@@ -132,7 +132,7 @@ class ClusterService:
                 log_dict[first_item_ind],
                 log_messages[first_item_ind],
                 launch_info,
-                min_should_match=utils.prepare_es_min_should_match(
+                min_should_match=text_processing.prepare_es_min_should_match(
                     min_should_match))
             search_results = self.es_client.es_client.search(
                 index=log_dict[first_item_ind]["_index"],
@@ -147,9 +147,9 @@ class ClusterService:
                 number_of_log_lines = launch_info.numberOfLogLines
                 if res["_source"]["is_merged"]:
                     number_of_log_lines = -1
-                log_message = utils.prepare_message_for_clustering(
+                log_message = text_processing.prepare_message_for_clustering(
                     res["_source"]["whole_message"], number_of_log_lines, launch_info.cleanNumbers)
-                cluster_message_processed = utils.prepare_message_for_clustering(
+                cluster_message_processed = text_processing.prepare_message_for_clustering(
                     res["_source"]["cluster_message"], number_of_log_lines, launch_info.cleanNumbers,
                     leave_log_structure=True).strip()
                 cluster_message_original = res["_source"]["cluster_message"].strip()
@@ -221,7 +221,7 @@ class ClusterService:
                 number_of_log_lines = launch_info.numberOfLogLines
                 if log_dict[ind]["_source"]["is_merged"]:
                     number_of_log_lines = -1
-                log_message = utils.prepare_message_for_clustering(
+                log_message = text_processing.prepare_message_for_clustering(
                     log_dict[ind]["_source"]["whole_message"],
                     number_of_log_lines, launch_info.cleanNumbers,
                     leave_log_structure=True).strip()
@@ -330,7 +330,7 @@ class ClusterService:
     @utils.ignore_warnings
     def find_clusters(self, launch_info):
         logger.info("Started clusterizing logs")
-        index_name = utils.unite_project_name(
+        index_name = text_processing.unite_project_name(
             str(launch_info.project), self.app_config["esProjectIndexPrefix"])
         if not self.es_client.index_exists(index_name):
             logger.info("Project %s doesn't exist", index_name)

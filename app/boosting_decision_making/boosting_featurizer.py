@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.utils import utils
+from app.utils import utils, text_processing
 from app.commons import similarity_calculator
 from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
 import logging
@@ -38,7 +38,7 @@ class BoostingFeaturizer:
             self.config,
             weighted_similarity_calculator=weighted_log_similarity_calculator)
         if type(feature_ids) == str:
-            self.feature_ids = utils.transform_string_feature_range_into_list(feature_ids)
+            self.feature_ids = text_processing.transform_string_feature_range_into_list(feature_ids)
         else:
             self.feature_ids = feature_ids
         self.fields_to_replace_with_merged_logs = [
@@ -184,7 +184,7 @@ class BoostingFeaturizer:
         for log, res in all_results:
             for r in res["hits"]["hits"]:
                 if "found_tests_and_methods" in r["_source"]:
-                    r["_source"]["found_tests_and_methods"] = utils.preprocess_found_test_methods(
+                    r["_source"]["found_tests_and_methods"] = text_processing.preprocess_found_test_methods(
                         r["_source"]["found_tests_and_methods"])
         return all_results
 
@@ -279,7 +279,7 @@ class BoostingFeaturizer:
             det_message = compared_log["_source"]["detected_message_without_params_extended"]
             mr_hit = scores_by_issue_type[issue_type]["mrHit"]
             issue_type_to_compare = mr_hit["_source"]["issue_type"]
-            det_message = utils.clean_from_brackets(det_message)
+            det_message = text_processing.clean_from_brackets(det_message)
             result[issue_type] = 0.0
             try:
                 model_to_use = issue_type_to_compare.lower()[:2]

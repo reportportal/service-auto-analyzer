@@ -19,9 +19,10 @@ import urllib3
 import traceback
 import elasticsearch
 import elasticsearch.helpers
+
 from app.commons import launch_objects
 from elasticsearch import RequestsHttpConnection
-from app.utils import utils
+from app.utils import utils, text_processing
 from urllib3.exceptions import InsecureRequestWarning
 from time import time
 from app.commons.log_merger import LogMerger
@@ -118,7 +119,7 @@ class EsClient:
     def is_healthy(self):
         """Check whether elasticsearch is healthy"""
         try:
-            url = utils.build_url(self.host, ["_cluster/health"])
+            url = text_processing.build_url(self.host, ["_cluster/health"])
             res = utils.send_request(url, "GET", self.app_config["esUser"], self.app_config["esPassword"])
             return res["status"] in ["green", "yellow"]
         except Exception as err:
@@ -142,7 +143,7 @@ class EsClient:
     def create_index(self, index_name):
         """Create index in elasticsearch"""
         logger.debug("Creating '%s' Elasticsearch index", str(index_name))
-        logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
+        logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.host))
         try:
             response = self.es_client.indices.create(index=str(index_name), body={
                 'settings': utils.read_json_file("res", "index_settings.json", to_json=True),
@@ -152,13 +153,13 @@ class EsClient:
             return launch_objects.Response(**response)
         except Exception as err:
             logger.error("Couldn't create index")
-            logger.error("ES Url %s", utils.remove_credentials_from_url(self.host))
+            logger.error("ES Url %s", text_processing.remove_credentials_from_url(self.host))
             logger.error(err)
             return launch_objects.Response()
 
     def list_indices(self):
         """Get all indices from elasticsearch"""
-        url = utils.build_url(self.host, ["_cat", "indices?format=json"])
+        url = text_processing.build_url(self.host, ["_cat", "indices?format=json"])
         res = utils.send_request(url, "GET", self.app_config["esUser"], self.app_config["esPassword"])
         return res
 
@@ -178,12 +179,12 @@ class EsClient:
         """Delete the whole index"""
         try:
             self.es_client.indices.delete(index=str(index_name))
-            logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
+            logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.host))
             logger.debug("Deleted index %s", str(index_name))
             return True
         except Exception as err:
             logger.error("Not found %s for deleting", str(index_name))
-            logger.error("ES Url %s", utils.remove_credentials_from_url(self.host))
+            logger.error("ES Url %s", text_processing.remove_credentials_from_url(self.host))
             logger.error(err)
             return False
 
@@ -197,7 +198,7 @@ class EsClient:
         """Index launches to the index with project name"""
         launch_ids = set()
         logger.info("Indexing logs for %d launches", len(launches))
-        logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
+        logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.host))
         t_start = time()
         bodies = []
         test_item_ids = []
@@ -216,7 +217,7 @@ class EsClient:
         del launches
         if project is None:
             return launch_objects.BulkResponse(took=0, errors=False)
-        project_with_prefix = utils.unite_project_name(
+        project_with_prefix = text_processing.unite_project_name(
             project, self.app_config["esProjectIndexPrefix"])
         self.create_index_if_not_exists(project_with_prefix)
         while not test_item_queue.empty():
@@ -353,17 +354,17 @@ class EsClient:
             return launch_objects.BulkResponse(took=success_count, errors=len(errors) > 0)
         except Exception as err:
             logger.error("Error in bulk")
-            logger.error("ES Url %s", utils.remove_credentials_from_url(host))
+            logger.error("ES Url %s", text_processing.remove_credentials_from_url(host))
             logger.error(err)
             return launch_objects.BulkResponse(took=0, errors=True)
 
     def delete_logs(self, clean_index):
         """Delete logs from elasticsearch"""
-        index_name = utils.unite_project_name(
+        index_name = text_processing.unite_project_name(
             str(clean_index.project), self.app_config["esProjectIndexPrefix"])
         logger.info("Delete logs %s for the project %s",
                     clean_index.ids, index_name)
-        logger.info("ES Url %s", utils.remove_credentials_from_url(self.host))
+        logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.host))
         t_start = time()
         if not self.index_exists(index_name):
             return 0
@@ -452,7 +453,7 @@ class EsClient:
         test_item_ids = [int(key_) for key_ in defect_update_info["itemsToUpdate"].keys()]
         defect_update_info["itemsToUpdate"] = {
             int(key_): val for key_, val in defect_update_info["itemsToUpdate"].items()}
-        index_name = utils.unite_project_name(
+        index_name = text_processing.unite_project_name(
             str(defect_update_info["project"]), self.app_config["esProjectIndexPrefix"])
         if not self.index_exists(index_name):
             return test_item_ids
@@ -507,7 +508,7 @@ class EsClient:
     def remove_test_items(self, remove_items_info):
         logger.info("Started removing test items")
         t_start = time()
-        index_name = utils.unite_project_name(
+        index_name = text_processing.unite_project_name(
             str(remove_items_info["project"]), self.app_config["esProjectIndexPrefix"])
         deleted_logs = self.delete_by_query(
             index_name, remove_items_info["itemsToDelete"], self.build_delete_query_by_test_items)
@@ -521,7 +522,7 @@ class EsClient:
         launch_ids = remove_launches_info["launch_ids"]
         logger.info("Started removing launches")
         t_start = time()
-        index_name = utils.unite_project_name(
+        index_name = text_processing.unite_project_name(
             str(project), self.app_config["esProjectIndexPrefix"]
         )
         deleted_logs = self.delete_by_query(
@@ -565,7 +566,7 @@ class EsClient:
     def get_launch_ids_by_start_time_range(
             self, project: int, start_date: str, end_date: str
     ) -> List[str]:
-        index_name = utils.unite_project_name(
+        index_name = text_processing.unite_project_name(
             str(project), self.app_config["esProjectIndexPrefix"]
         )
         query = self.__time_range_query(
@@ -582,7 +583,7 @@ class EsClient:
     def remove_by_launch_start_time_range(
             self, project: int, start_date: str, end_date: str
     ) -> int:
-        index_name = utils.unite_project_name(
+        index_name = text_processing.unite_project_name(
             str(project), self.app_config["esProjectIndexPrefix"]
         )
         query = self.__time_range_query("launch_start_time", start_date, end_date)
@@ -593,7 +594,7 @@ class EsClient:
     def get_log_ids_by_log_time_range(
             self, project: int, start_date: str, end_date: str
     ) -> List[str]:
-        index_name = utils.unite_project_name(
+        index_name = text_processing.unite_project_name(
             str(project), self.app_config["esProjectIndexPrefix"]
         )
         query = self.__time_range_query("log_time", start_date, end_date, for_scan=True)
@@ -608,7 +609,7 @@ class EsClient:
     def remove_by_log_time_range(
             self, project: int, start_date: str, end_date: str
     ) -> int:
-        index_name = utils.unite_project_name(
+        index_name = text_processing.unite_project_name(
             str(project), self.app_config["esProjectIndexPrefix"]
         )
         query = self.__time_range_query("log_time", start_date, end_date)

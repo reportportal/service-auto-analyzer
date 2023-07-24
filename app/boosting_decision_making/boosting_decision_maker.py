@@ -17,7 +17,8 @@ from sklearn.metrics import classification_report, confusion_matrix
 import os
 import pickle
 import logging
-from app.utils import utils
+
+from app.utils import text_processing
 from app.boosting_decision_making import feature_encoder
 
 logger = logging.getLogger("analyzerApp.boosting_decision_maker")
@@ -30,7 +31,7 @@ class BoostingDecisionMaker:
         self.n_estimators = n_estimators
         self.max_depth = max_depth
         self.folder = folder
-        self.monotonous_features = utils.transform_string_feature_range_into_list(
+        self.monotonous_features = text_processing.transform_string_feature_range_into_list(
             monotonous_features)
         self.is_global = is_global
         self.features_dict_with_saved_objects = {}
@@ -51,7 +52,7 @@ class BoostingDecisionMaker:
         return []
 
     def get_feature_ids(self):
-        return utils.transform_string_feature_range_into_list(self.feature_ids)\
+        return text_processing.transform_string_feature_range_into_list(self.feature_ids)\
             if isinstance(self.feature_ids, str) else self.feature_ids
 
     def get_feature_names(self):

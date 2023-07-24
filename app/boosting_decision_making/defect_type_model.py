@@ -16,7 +16,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score, accuracy_score
 from sklearn.metrics import classification_report, confusion_matrix
-from app.utils import utils
+
+from app.utils import utils, text_processing
 import pandas as pd
 import os
 import pickle
@@ -58,7 +59,7 @@ class DefectTypeModel:
     def train_model(self, name, train_data_x, labels):
         self.count_vectorizer_models[name] = TfidfVectorizer(
             binary=True, stop_words="english", min_df=5,
-            token_pattern=r"[\w\._]+", analyzer=utils.preprocess_words)
+            token_pattern=r"[\w\._]+", analyzer=text_processing.preprocess_words)
         transformed_values = self.count_vectorizer_models[name].fit_transform(train_data_x)
         print("Length of train data: ", len(labels))
         print("Label distribution:", Counter(labels))

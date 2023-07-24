@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.utils import utils
+from app.utils import utils, text_processing
 from app.amqp.amqp import AmqpClient
 import json
 import logging
@@ -56,7 +56,7 @@ class SuggestInfoService:
                 metrics_data_by_test_item[obj_info["testItem"]] = []
             metrics_data_by_test_item[obj_info["testItem"]].append(obj_info)
             project_index_name = self.build_index_name(obj_info["project"])
-            project_index_name = utils.unite_project_name(
+            project_index_name = text_processing.unite_project_name(
                 project_index_name, self.app_config["esProjectIndexPrefix"])
             if project_index_name not in project_index_names:
                 self.es_client.create_index_for_stats_info(
@@ -99,7 +99,7 @@ class SuggestInfoService:
     def remove_suggest_info(self, project_id):
         logger.info("Removing suggest_info index")
         project_index_name = self.build_index_name(project_id)
-        project_index_name = utils.unite_project_name(
+        project_index_name = text_processing.unite_project_name(
             project_index_name, self.app_config["esProjectIndexPrefix"])
         return self.es_client.delete_index(project_index_name)
 
@@ -133,7 +133,7 @@ class SuggestInfoService:
     def clean_suggest_info_logs(self, clean_index):
         """Delete logs from elasticsearch"""
         index_name = self.build_index_name(clean_index.project)
-        index_name = utils.unite_project_name(
+        index_name = text_processing.unite_project_name(
             index_name, self.app_config["esProjectIndexPrefix"])
         logger.info("Delete logs %s for the index %s",
                     clean_index.ids, index_name)
@@ -168,7 +168,7 @@ class SuggestInfoService:
     def clean_suggest_info_logs_by_test_item(self, remove_items_info):
         """Delete logs from elasticsearch"""
         index_name = self.build_index_name(remove_items_info["project"])
-        index_name = utils.unite_project_name(
+        index_name = text_processing.unite_project_name(
             index_name, self.app_config["esProjectIndexPrefix"])
         logger.info("Delete test items %s for the index %s",
                     remove_items_info["itemsToDelete"], index_name)
@@ -185,7 +185,7 @@ class SuggestInfoService:
         project = launch_remove_info["project"]
         launch_ids = launch_remove_info["launch_ids"]
         index_name = self.build_index_name(project)
-        index_name = utils.unite_project_name(
+        index_name = text_processing.unite_project_name(
             index_name, self.app_config["esProjectIndexPrefix"]
         )
         logger.info("Delete launches %s for the index %s", launch_ids, index_name)
@@ -224,7 +224,7 @@ class SuggestInfoService:
         defect_update_info["itemsToUpdate"] = {
             int(key_): val for key_, val in defect_update_info["itemsToUpdate"].items()}
         index_name = self.build_index_name(defect_update_info["project"])
-        index_name = utils.unite_project_name(index_name, self.app_config["esProjectIndexPrefix"])
+        index_name = text_processing.unite_project_name(index_name, self.app_config["esProjectIndexPrefix"])
         if not self.es_client.index_exists(index_name):
             return 0
         batch_size = 1000

@@ -16,7 +16,8 @@ import os
 import numpy as np
 import pickle
 import math
-from app.utils import utils
+
+from app.utils import text_processing
 
 
 class WeightedSimilarityCalculator:
@@ -63,9 +64,9 @@ class WeightedSimilarityCalculator:
                 pass
 
     def message_to_array(self, detected_message_res, stacktrace_res):
-        all_lines = [" ".join(utils.split_words(detected_message_res))]
-        split_log_lines = utils.filter_empty_lines(
-            [" ".join(utils.split_words(line)) for line in stacktrace_res.split("\n")])
+        all_lines = [" ".join(text_processing.split_words(detected_message_res))]
+        split_log_lines = text_processing.filter_empty_lines(
+            [" ".join(text_processing.split_words(line)) for line in stacktrace_res.split("\n")])
         split_log_lines_num = len(split_log_lines)
         data_in_block = max(self.min_log_number_in_block,
                             math.ceil(split_log_lines_num / self.block_to_split))

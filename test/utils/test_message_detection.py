@@ -14,7 +14,8 @@
 
 import unittest
 import logging
-from app.utils import utils
+
+from app.utils import utils, text_processing
 
 
 class TestMessageDetection(unittest.TestCase):
@@ -32,7 +33,7 @@ class TestMessageDetection(unittest.TestCase):
         example_logs = utils.get_fixture("example_logs.json", to_json=True)
         for idx, example in enumerate(example_logs):
             det_message, stacktrace =\
-                utils.detect_log_description_and_stacktrace(example["log"])
+                text_processing.detect_log_description_and_stacktrace(example["log"])
 
             try:
                 assert det_message == example["detected_message"]

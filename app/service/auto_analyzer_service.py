@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.utils import utils
+from app.utils import utils, text_processing
 from app.commons.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult
 from app.boosting_decision_making import boosting_featurizer
 from app.service.analyzer_service import AnalyzerService
@@ -292,7 +292,7 @@ class AutoAnalyzerService(AnalyzerService):
         test_items_number_to_process = 0
         try:
             for launch in launches:
-                index_name = utils.unite_project_name(
+                index_name = text_processing.unite_project_name(
                     str(launch.project), self.app_config["esProjectIndexPrefix"])
                 if not self.es_client.index_exists(index_name):
                     continue
@@ -311,7 +311,7 @@ class AutoAnalyzerService(AnalyzerService):
                     if EARLY_FINISH:
                         logger.info("Early finish from analyzer before timeout")
                         break
-                    unique_logs = utils.leave_only_unique_logs(test_item.logs)
+                    unique_logs = text_processing.leave_only_unique_logs(test_item.logs)
                     prepared_logs = [self.log_preparation._prepare_log(launch, test_item, log, index_name)
                                      for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
                     results, _ = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
@@ -365,7 +365,7 @@ class AutoAnalyzerService(AnalyzerService):
         global EARLY_FINISH
         cnt_launches = len(launches)
         logger.info("Started analysis for %d launches", cnt_launches)
-        logger.info("ES Url %s", utils.remove_credentials_from_url(self.es_client.host))
+        logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))
         self.queue = Queue()
         self.finished_queue = Queue()
         defect_type_model_to_use = {}

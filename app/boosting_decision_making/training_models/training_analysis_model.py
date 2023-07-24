@@ -22,7 +22,7 @@ import elasticsearch.helpers
 from app.commons.esclient import EsClient
 from app.commons import namespace_finder
 from imblearn.over_sampling import SMOTE
-from app.utils import utils
+from app.utils import utils, text_processing
 from time import time
 import scipy.stats as stats
 import numpy as np
@@ -188,7 +188,7 @@ class AnalysisModelTraining:
 
     def query_logs(self, project_id, log_ids_to_find):
         log_ids_to_find = list(log_ids_to_find)
-        project_index_name = utils.unite_project_name(
+        project_index_name = text_processing.unite_project_name(
             str(project_id), self.app_config["esProjectIndexPrefix"])
         batch_size = 1000
         log_id_dict = {}
@@ -252,7 +252,7 @@ class AnalysisModelTraining:
         log_ids_to_find = set()
         gathered_suggested_data = []
         log_id_pairs_set = set()
-        index_name = utils.unite_project_name(
+        index_name = text_processing.unite_project_name(
             str(project_id) + "_suggest", self.app_config["esProjectIndexPrefix"])
         max_number_of_logs = 30000
         cur_number_of_logs = 0

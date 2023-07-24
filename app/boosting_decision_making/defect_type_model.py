@@ -17,7 +17,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score, accuracy_score
 from sklearn.metrics import classification_report, confusion_matrix
 
-from app.utils import utils, text_processing
+from app.utils import text_processing
 import pandas as pd
 import os
 import pickle

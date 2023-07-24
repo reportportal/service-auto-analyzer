@@ -23,8 +23,9 @@ class LogPreparation:
         self.log_merger = LogMerger()
 
     def clean_message(self, message):
-        cleaned_message = text_processing.unify_line_endings(message)
-        cleaned_message = text_processing.replace_tabs_for_newlines(cleaned_message)
+        # FIXME: unify line endings to '\n' to apply optimizations
+        # cleaned_message = text_processing.unify_line_endings(message)
+        cleaned_message = text_processing.replace_tabs_for_newlines(message)
         cleaned_message = text_processing.fix_big_encoded_urls(cleaned_message)
         cleaned_message = text_processing.remove_generated_parts(cleaned_message)
         cleaned_message = text_processing.remove_guid_uids_from_text(cleaned_message)

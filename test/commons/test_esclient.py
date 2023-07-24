@@ -425,51 +425,41 @@ class TestEsClient(TestService):
                                {"method": httpretty.PUT,
                                 "uri": "/2",
                                 "status": HTTPStatus.OK,
-                                "rs": get_fixture(
-                                    self.index_created_rs),
+                                "rs": get_fixture(self.index_created_rs),
                                 },
                                {"method": httpretty.POST,
                                 "uri": "/_bulk?refresh=true",
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.index_logs_rq_big_messages),
-                                "rs": get_fixture(
-                                    self.index_logs_rs),
+                                "rq": get_fixture(self.index_logs_rq_big_messages),
+                                "rs": get_fixture(self.index_logs_rs),
                                 },
                                {"method": httpretty.GET,
                                 "uri": "/2/_search?scroll=5m&size=1000",
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.search_merged_logs),
-                                "rs": get_fixture(
-                                    self.two_hits_search_with_big_messages_rs),
+                                "rq": get_fixture(self.search_merged_logs),
+                                "rs": get_fixture(self.two_hits_search_with_big_messages_rs),
                                 },
                                {"method": httpretty.POST,
                                 "uri": "/_bulk?refresh=true",
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
-                                "rs": get_fixture(
-                                    self.delete_logs_rs),
+                                "rs": get_fixture(self.delete_logs_rs),
                                 },
                                {"method": httpretty.GET,
                                 "uri": "/2/_search?scroll=5m&size=1000",
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.search_not_merged_logs),
-                                "rs": get_fixture(
-                                    self.two_hits_search_with_big_messages_rs),
+                                "rq": get_fixture(self.search_not_merged_logs),
+                                "rs": get_fixture(self.two_hits_search_with_big_messages_rs),
                                 },
                                {"method": httpretty.POST,
                                 "uri": "/_bulk?refresh=true",
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.index_logs_rq_merged_logs),
-                                "rs": get_fixture(
-                                    self.index_logs_rs),
+                                "rq": get_fixture(self.index_logs_rq_merged_logs),
+                                "rs": get_fixture(self.index_logs_rs),
                                 }, ],
                 "index_rq": get_fixture(self.launch_w_test_items_w_logs),
                 "has_errors": False,
@@ -488,25 +478,21 @@ class TestEsClient(TestService):
                                {"method": httpretty.PUT,
                                 "uri": "/2",
                                 "status": HTTPStatus.OK,
-                                "rs": get_fixture(
-                                    self.index_created_rs),
+                                "rs": get_fixture(self.index_created_rs),
                                 },
                                {"method": httpretty.POST,
                                 "uri": "/_bulk?refresh=true",
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.index_logs_rq_different_log_level),
-                                "rs": get_fixture(
-                                    self.index_logs_rs_different_log_level),
+                                "rq": get_fixture(self.index_logs_rq_different_log_level),
+                                "rs": get_fixture(self.index_logs_rs_different_log_level),
                                 },
                                {"method": httpretty.GET,
                                 "uri": "/2/_search?scroll=5m&size=1000",
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
                                 "rq": get_fixture(self.search_merged_logs),
-                                "rs": get_fixture(
-                                    self.one_hit_search_rs),
+                                "rs": get_fixture(self.one_hit_search_rs),
                                 },
                                {"method": httpretty.POST,
                                 "uri": "/_bulk?refresh=true",
@@ -519,20 +505,16 @@ class TestEsClient(TestService):
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
                                 "rq": get_fixture(self.search_not_merged_logs),
-                                "rs": get_fixture(
-                                    self.one_hit_search_rs),
+                                "rs": get_fixture(self.one_hit_search_rs),
                                 },
                                {"method": httpretty.POST,
                                 "uri": "/_bulk?refresh=true",
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.index_logs_rq_different_log_level_merged),
-                                "rs": get_fixture(
-                                    self.index_logs_rs_different_log_level),
+                                "rq": get_fixture(self.index_logs_rq_different_log_level_merged),
+                                "rs": get_fixture(self.index_logs_rs_different_log_level),
                                 }, ],
-                "index_rq": get_fixture(
-                    self.launch_w_test_items_w_logs_different_log_level),
+                "index_rq": get_fixture(self.launch_w_test_items_w_logs_different_log_level),
                 "has_errors": False,
                 "expected_count": 1,
                 "expected_log_exceptions": [launch_objects.LogExceptionResult(logId=1, foundExceptions=[])]
@@ -545,25 +527,21 @@ class TestEsClient(TestService):
                                {"method": httpretty.PUT,
                                 "uri": "/rp_2",
                                 "status": HTTPStatus.OK,
-                                "rs": get_fixture(
-                                    self.index_created_rs),
+                                "rs": get_fixture(self.index_created_rs),
                                 },
                                {"method": httpretty.POST,
                                 "uri": "/_bulk?refresh=true",
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.index_logs_rq_different_log_level_with_prefix),
-                                "rs": get_fixture(
-                                    self.index_logs_rs_different_log_level),
+                                "rq": get_fixture(self.index_logs_rq_different_log_level_with_prefix),
+                                "rs": get_fixture(self.index_logs_rs_different_log_level),
                                 },
                                {"method": httpretty.GET,
                                 "uri": "/rp_2/_search?scroll=5m&size=1000",
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
                                 "rq": get_fixture(self.search_merged_logs),
-                                "rs": get_fixture(
-                                    self.one_hit_search_rs),
+                                "rs": get_fixture(self.one_hit_search_rs),
                                 },
                                {"method": httpretty.POST,
                                 "uri": "/_bulk?refresh=true",
@@ -576,20 +554,16 @@ class TestEsClient(TestService):
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
                                 "rq": get_fixture(self.search_not_merged_logs),
-                                "rs": get_fixture(
-                                    self.one_hit_search_rs),
+                                "rs": get_fixture(self.one_hit_search_rs),
                                 },
                                {"method": httpretty.POST,
                                 "uri": "/_bulk?refresh=true",
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.index_logs_rq_different_log_level_merged),
-                                "rs": get_fixture(
-                                    self.index_logs_rs_different_log_level),
+                                "rq": get_fixture(self.index_logs_rq_different_log_level_merged),
+                                "rs": get_fixture(self.index_logs_rs_different_log_level),
                                 }, ],
-                "index_rq": get_fixture(
-                    self.launch_w_test_items_w_logs_different_log_level),
+                "index_rq": get_fixture(self.launch_w_test_items_w_logs_different_log_level),
                 "has_errors": False,
                 "expected_count": 1,
                 "app_config": {
@@ -624,51 +598,41 @@ class TestEsClient(TestService):
                                {"method": httpretty.PUT,
                                 "uri": "/2",
                                 "status": HTTPStatus.OK,
-                                "rs": get_fixture(
-                                    self.index_created_rs),
+                                "rs": get_fixture(self.index_created_rs),
                                 },
                                {"method": httpretty.POST,
                                 "uri": "/_bulk?refresh=true",
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.index_logs_rq_big_messages_with_clusters),
-                                "rs": get_fixture(
-                                    self.index_logs_rs),
+                                "rq": get_fixture(self.index_logs_rq_big_messages_with_clusters),
+                                "rs": get_fixture(self.index_logs_rs),
                                 },
                                {"method": httpretty.GET,
                                 "uri": "/2/_search?scroll=5m&size=1000",
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.search_merged_logs),
-                                "rs": get_fixture(
-                                    self.two_hits_search_with_big_messages_rs),
+                                "rq": get_fixture(self.search_merged_logs),
+                                "rs": get_fixture(self.two_hits_search_with_big_messages_rs),
                                 },
                                {"method": httpretty.POST,
                                 "uri": "/_bulk?refresh=true",
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
-                                "rs": get_fixture(
-                                    self.delete_logs_rs),
+                                "rs": get_fixture(self.delete_logs_rs),
                                 },
                                {"method": httpretty.GET,
                                 "uri": "/2/_search?scroll=5m&size=1000",
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.search_not_merged_logs),
-                                "rs": get_fixture(
-                                    self.two_hits_search_with_big_messages_rs),
+                                "rq": get_fixture(self.search_not_merged_logs),
+                                "rs": get_fixture(self.two_hits_search_with_big_messages_rs),
                                 },
                                {"method": httpretty.POST,
                                 "uri": "/_bulk?refresh=true",
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.index_logs_rq_merged_logs),
-                                "rs": get_fixture(
-                                    self.index_logs_rs),
+                                "rq": get_fixture(self.index_logs_rq_merged_logs),
+                                "rs": get_fixture(self.index_logs_rs),
                                 }, ],
                 "index_rq": get_fixture(self.launch_w_test_items_w_logs_with_clusters),
                 "has_errors": False,
@@ -687,12 +651,9 @@ class TestEsClient(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                es_client = esclient.EsClient(app_config=app_config,
-                                              search_cfg=self.get_default_search_config())
-                es_client.es_client.scroll = MagicMock(return_value=json.loads(
-                    get_fixture(self.no_hits_search_rs)))
-                launches = [launch_objects.Launch(**launch)
-                            for launch in json.loads(test["index_rq"])]
+                es_client = esclient.EsClient(app_config=app_config, search_cfg=self.get_default_search_config())
+                es_client.es_client.scroll = MagicMock(return_value=json.loads(get_fixture(self.no_hits_search_rs)))
+                launches = [launch_objects.Launch(**launch) for launch in json.loads(test["index_rq"])]
                 response = es_client.index_logs(launches)
 
                 assert test["has_errors"] == response.errors
@@ -929,8 +890,7 @@ class TestEsClient(TestService):
                                 "uri": "/rp_1/_delete_by_query",
                                 "status": HTTPStatus.OK,
                                 "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.delete_by_query_2),
+                                "rq": get_fixture(self.delete_by_query_2),
                                 "rs": json.dumps({"deleted": 3}),
                                 }],
                 "app_config": {

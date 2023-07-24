@@ -95,7 +95,8 @@ class TestBoostingModel(unittest.TestCase):
         tests = []
         for log_lines, filter_fields, _decision_maker in [
             (-1, ["detected_message", "stacktrace"], decision_maker),
-            (2, ["message"], decision_maker)]:
+            (2, ["message"], decision_maker)
+        ]:
             tests.extend([
                 {
                     "elastic_results": [(get_fixture(self.log_message, to_json=True),

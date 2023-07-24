@@ -49,10 +49,6 @@ def read_json_file(folder, filename, to_json=False):
         return file.read() if not to_json else json.loads(file.read())
 
 
-def get_fixture(fixture_name, to_json=False):
-    return read_json_file("res/fixtures", fixture_name, to_json)
-
-
 def extract_real_id(elastic_id):
     real_id = str(elastic_id)
     if real_id[-2:] == "_m":

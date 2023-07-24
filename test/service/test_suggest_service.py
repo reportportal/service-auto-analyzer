@@ -14,16 +14,19 @@
 * limitations under the License.
 """
 
-import unittest
-from unittest.mock import MagicMock
-from http import HTTPStatus
-import httpretty
 import json
-from app.commons import launch_objects
+import unittest
+from http import HTTPStatus
+from unittest.mock import MagicMock
+
+import httpretty
+
 from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
+from app.commons import launch_objects
 from app.service import SuggestService
-from test.mock_service import TestService
 from app.utils import utils
+from test import get_fixture
+from test.mock_service import TestService
 
 
 class TestSuggestService(TestService):
@@ -33,40 +36,40 @@ class TestSuggestService(TestService):
         """Test suggesting test items"""
         tests = [
             {
-                "test_calls":          [{"method":         httpretty.GET,
-                                         "uri":            "/1",
-                                         "status":         HTTPStatus.OK,
-                                         },
-                                        {"method":         httpretty.GET,
-                                         "uri":            "/rp_suggestions_info_metrics",
-                                         "status":         HTTPStatus.OK
-                                         },
-                                        {"method":         httpretty.PUT,
-                                         "uri":            "/rp_suggestions_info_metrics/_mapping",
-                                         "status":         HTTPStatus.OK,
-                                         "rs":             utils.get_fixture(self.index_created_rs),
-                                         },
-                                        {"method":         httpretty.POST,
-                                         "uri":            "/_bulk?refresh=true",
-                                         "status":         HTTPStatus.OK,
-                                         "content_type":   "application/json",
-                                         "rs":             utils.get_fixture(self.index_logs_rs),
-                                         }],
-                "test_item_info":      launch_objects.TestItemInfo(testItemId=1,
-                                                                   uniqueId="341",
-                                                                   testCaseHash=123,
-                                                                   launchId=1,
-                                                                   launchName="Launch",
-                                                                   project=1,
-                                                                   logs=[]),
-                "expected_result":     [],
-                "boost_predict":       ([], [])
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/1",
+                                "status": HTTPStatus.OK,
+                                },
+                               {"method": httpretty.GET,
+                                "uri": "/rp_suggestions_info_metrics",
+                                "status": HTTPStatus.OK
+                                },
+                               {"method": httpretty.PUT,
+                                "uri": "/rp_suggestions_info_metrics/_mapping",
+                                "status": HTTPStatus.OK,
+                                "rs": get_fixture(self.index_created_rs),
+                                },
+                               {"method": httpretty.POST,
+                                "uri": "/_bulk?refresh=true",
+                                "status": HTTPStatus.OK,
+                                "content_type": "application/json",
+                                "rs": get_fixture(self.index_logs_rs),
+                                }],
+                "test_item_info": launch_objects.TestItemInfo(testItemId=1,
+                                                              uniqueId="341",
+                                                              testCaseHash=123,
+                                                              launchId=1,
+                                                              launchName="Launch",
+                                                              project=1,
+                                                              logs=[]),
+                "expected_result": [],
+                "boost_predict": ([], [])
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/2",
-                                    "status":         HTTPStatus.NOT_FOUND,
-                                    }],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/2",
+                                "status": HTTPStatus.NOT_FOUND,
+                                }],
                 "test_item_info": launch_objects.TestItemInfo(testItemId=1,
                                                               uniqueId="341",
                                                               testCaseHash=123,
@@ -74,118 +77,118 @@ class TestSuggestService(TestService):
                                                               launchName="Launch",
                                                               project=2,
                                                               logs=[launch_objects.Log(
-                                                                    logId=1,
-                                                                    message="error found",
-                                                                    logLevel=40000)]),
-                "expected_result":     [],
-                "boost_predict":       ([], [])
+                                                                  logId=1,
+                                                                  message="error found",
+                                                                  logLevel=40000)]),
+                "expected_result": [],
+                "boost_predict": ([], [])
             },
             {
-                "test_calls":          [{"method":         httpretty.GET,
-                                         "uri":            "/1",
-                                         "status":         HTTPStatus.OK,
-                                         },
-                                        {"method":         httpretty.GET,
-                                         "uri":            "/rp_suggestions_info_metrics",
-                                         "status":         HTTPStatus.OK
-                                         },
-                                        {"method":         httpretty.PUT,
-                                         "uri":            "/rp_suggestions_info_metrics/_mapping",
-                                         "status":         HTTPStatus.OK,
-                                         "rs":             utils.get_fixture(self.index_created_rs),
-                                         },
-                                        {"method":         httpretty.POST,
-                                         "uri":            "/_bulk?refresh=true",
-                                         "status":         HTTPStatus.OK,
-                                         "content_type":   "application/json",
-                                         "rs":             utils.get_fixture(self.index_logs_rs),
-                                         }],
-                "test_item_info":      launch_objects.TestItemInfo(testItemId=1,
-                                                                   uniqueId="341",
-                                                                   testCaseHash=123,
-                                                                   launchId=1,
-                                                                   launchName="Launch",
-                                                                   project=1,
-                                                                   logs=[launch_objects.Log(
-                                                                         logId=1,
-                                                                         message=" ",
-                                                                         logLevel=40000)]),
-                "expected_result":     [],
-                "boost_predict":       ([], [])
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/1",
+                                "status": HTTPStatus.OK,
+                                },
+                               {"method": httpretty.GET,
+                                "uri": "/rp_suggestions_info_metrics",
+                                "status": HTTPStatus.OK
+                                },
+                               {"method": httpretty.PUT,
+                                "uri": "/rp_suggestions_info_metrics/_mapping",
+                                "status": HTTPStatus.OK,
+                                "rs": get_fixture(self.index_created_rs),
+                                },
+                               {"method": httpretty.POST,
+                                "uri": "/_bulk?refresh=true",
+                                "status": HTTPStatus.OK,
+                                "content_type": "application/json",
+                                "rs": get_fixture(self.index_logs_rs),
+                                }],
+                "test_item_info": launch_objects.TestItemInfo(testItemId=1,
+                                                              uniqueId="341",
+                                                              testCaseHash=123,
+                                                              launchId=1,
+                                                              launchName="Launch",
+                                                              project=1,
+                                                              logs=[launch_objects.Log(
+                                                                  logId=1,
+                                                                  message=" ",
+                                                                  logLevel=40000)]),
+                "expected_result": [],
+                "boost_predict": ([], [])
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/1",
-                                    "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":         httpretty.GET,
-                                    "uri":            "/rp_suggestions_info_metrics",
-                                    "status":         HTTPStatus.OK
-                                    },
-                                   {"method":         httpretty.PUT,
-                                    "uri":            "/rp_suggestions_info_metrics/_mapping",
-                                    "status":         HTTPStatus.OK,
-                                    "rs":             utils.get_fixture(self.index_created_rs),
-                                    },
-                                   {"method":         httpretty.POST,
-                                    "uri":            "/_bulk?refresh=true",
-                                    "status":         HTTPStatus.OK,
-                                    "content_type":   "application/json",
-                                    "rs":             utils.get_fixture(self.index_logs_rs),
-                                    }],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/1",
+                                "status": HTTPStatus.OK,
+                                },
+                               {"method": httpretty.GET,
+                                "uri": "/rp_suggestions_info_metrics",
+                                "status": HTTPStatus.OK
+                                },
+                               {"method": httpretty.PUT,
+                                "uri": "/rp_suggestions_info_metrics/_mapping",
+                                "status": HTTPStatus.OK,
+                                "rs": get_fixture(self.index_created_rs),
+                                },
+                               {"method": httpretty.POST,
+                                "uri": "/_bulk?refresh=true",
+                                "status": HTTPStatus.OK,
+                                "content_type": "application/json",
+                                "rs": get_fixture(self.index_logs_rs),
+                                }],
                 "msearch_results": [
-                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
-                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
-                    utils.get_fixture(self.no_hits_search_rs, to_json=True)
+                    get_fixture(self.no_hits_search_rs, to_json=True),
+                    get_fixture(self.no_hits_search_rs, to_json=True),
+                    get_fixture(self.no_hits_search_rs, to_json=True)
                 ],
-                "test_item_info":      launch_objects.TestItemInfo(
-                    **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
-                "expected_result":     [],
-                "boost_predict":       ([], [])
+                "test_item_info": launch_objects.TestItemInfo(
+                    **get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
+                "expected_result": [],
+                "boost_predict": ([], [])
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/1",
-                                    "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":         httpretty.GET,
-                                    "uri":            "/rp_suggestions_info_metrics",
-                                    "status":         HTTPStatus.OK
-                                    },
-                                   {"method":         httpretty.PUT,
-                                    "uri":            "/rp_suggestions_info_metrics/_mapping",
-                                    "status":         HTTPStatus.OK,
-                                    "rs":             utils.get_fixture(self.index_created_rs),
-                                    },
-                                   {"method":         httpretty.POST,
-                                    "uri":            "/_bulk?refresh=true",
-                                    "status":         HTTPStatus.OK,
-                                    "content_type":   "application/json",
-                                    "rs":             utils.get_fixture(self.index_logs_rs),
-                                    }],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/1",
+                                "status": HTTPStatus.OK,
+                                },
+                               {"method": httpretty.GET,
+                                "uri": "/rp_suggestions_info_metrics",
+                                "status": HTTPStatus.OK
+                                },
+                               {"method": httpretty.PUT,
+                                "uri": "/rp_suggestions_info_metrics/_mapping",
+                                "status": HTTPStatus.OK,
+                                "rs": get_fixture(self.index_created_rs),
+                                },
+                               {"method": httpretty.POST,
+                                "uri": "/_bulk?refresh=true",
+                                "status": HTTPStatus.OK,
+                                "content_type": "application/json",
+                                "rs": get_fixture(self.index_logs_rs),
+                                }],
                 "msearch_results": [
-                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
-                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
-                    utils.get_fixture(self.no_hits_search_rs, to_json=True)
+                    get_fixture(self.no_hits_search_rs, to_json=True),
+                    get_fixture(self.no_hits_search_rs, to_json=True),
+                    get_fixture(self.no_hits_search_rs, to_json=True)
                 ],
-                "test_item_info":      launch_objects.TestItemInfo(
-                    **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
-                "expected_result":     [],
-                "boost_predict":       ([], [])
+                "test_item_info": launch_objects.TestItemInfo(
+                    **get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
+                "expected_result": [],
+                "boost_predict": ([], [])
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/1",
-                                    "status":         HTTPStatus.OK,
-                                    }],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/1",
+                                "status": HTTPStatus.OK,
+                                }],
                 "msearch_results": [
-                    utils.get_fixture(self.no_hits_search_rs, to_json=True),
-                    utils.get_fixture(self.one_hit_search_rs, to_json=True),
-                    utils.get_fixture(self.one_hit_search_rs, to_json=True)
+                    get_fixture(self.no_hits_search_rs, to_json=True),
+                    get_fixture(self.one_hit_search_rs, to_json=True),
+                    get_fixture(self.one_hit_search_rs, to_json=True)
                 ],
-                "test_item_info":      launch_objects.TestItemInfo(
-                    **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
-                "expected_result":     [
+                "test_item_info": launch_objects.TestItemInfo(
+                    **get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
+                "expected_result": [
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=123,
                                                          testItemLogId=178,
@@ -205,21 +208,21 @@ class TestSuggestService(TestService):
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
                                                          methodName="suggestion")],
-                "boost_predict":       ([1], [[0.2, 0.8]])
+                "boost_predict": ([1], [[0.2, 0.8]])
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/1",
-                                    "status":         HTTPStatus.OK,
-                                    }],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/1",
+                                "status": HTTPStatus.OK,
+                                }],
                 "msearch_results": [
-                    utils.get_fixture(self.one_hit_search_rs, to_json=True),
-                    utils.get_fixture(self.one_hit_search_rs, to_json=True),
-                    utils.get_fixture(self.one_hit_search_rs, to_json=True)
+                    get_fixture(self.one_hit_search_rs, to_json=True),
+                    get_fixture(self.one_hit_search_rs, to_json=True),
+                    get_fixture(self.one_hit_search_rs, to_json=True)
                 ],
-                "test_item_info":      launch_objects.TestItemInfo(
-                    **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
-                "expected_result":     [
+                "test_item_info": launch_objects.TestItemInfo(
+                    **get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
+                "expected_result": [
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=123,
                                                          testItemLogId=178,
@@ -239,21 +242,21 @@ class TestSuggestService(TestService):
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
                                                          methodName="suggestion")],
-                "boost_predict":       ([1], [[0.3, 0.7]])
+                "boost_predict": ([1], [[0.3, 0.7]])
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/1",
-                                    "status":         HTTPStatus.OK,
-                                    }],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/1",
+                                "status": HTTPStatus.OK,
+                                }],
                 "msearch_results": [
-                    utils.get_fixture(self.one_hit_search_rs, to_json=True),
-                    utils.get_fixture(self.two_hits_search_rs, to_json=True),
-                    utils.get_fixture(self.two_hits_search_rs, to_json=True)
+                    get_fixture(self.one_hit_search_rs, to_json=True),
+                    get_fixture(self.two_hits_search_rs, to_json=True),
+                    get_fixture(self.two_hits_search_rs, to_json=True)
                 ],
-                "test_item_info":      launch_objects.TestItemInfo(
-                    **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
-                "expected_result":     [
+                "test_item_info": launch_objects.TestItemInfo(
+                    **get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
+                "expected_result": [
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=123,
                                                          testItemLogId=178,
@@ -273,21 +276,21 @@ class TestSuggestService(TestService):
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
                                                          methodName="suggestion")],
-                "boost_predict":       ([1, 0], [[0.3, 0.7], [0.9, 0.1]])
+                "boost_predict": ([1, 0], [[0.3, 0.7], [0.9, 0.1]])
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/1",
-                                    "status":         HTTPStatus.OK,
-                                    }],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/1",
+                                "status": HTTPStatus.OK,
+                                }],
                 "msearch_results": [
-                    utils.get_fixture(self.one_hit_search_rs, to_json=True),
-                    utils.get_fixture(self.two_hits_search_rs, to_json=True),
-                    utils.get_fixture(self.no_hits_search_rs, to_json=True)
+                    get_fixture(self.one_hit_search_rs, to_json=True),
+                    get_fixture(self.two_hits_search_rs, to_json=True),
+                    get_fixture(self.no_hits_search_rs, to_json=True)
                 ],
-                "test_item_info":      launch_objects.TestItemInfo(
-                    **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
-                "expected_result":     [
+                "test_item_info": launch_objects.TestItemInfo(
+                    **get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
+                "expected_result": [
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=123,
                                                          testItemLogId=178,
@@ -326,21 +329,21 @@ class TestSuggestService(TestService):
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
                                                          methodName="suggestion")],
-                "boost_predict":       ([1, 0], [[0.3, 0.7], [0.55, 0.45]])
+                "boost_predict": ([1, 0], [[0.3, 0.7], [0.55, 0.45]])
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/1",
-                                    "status":         HTTPStatus.OK,
-                                    }],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/1",
+                                "status": HTTPStatus.OK,
+                                }],
                 "msearch_results": [
-                    utils.get_fixture(self.two_hits_search_rs, to_json=True),
-                    utils.get_fixture(self.three_hits_search_rs, to_json=True),
-                    utils.get_fixture(self.no_hits_search_rs, to_json=True)
+                    get_fixture(self.two_hits_search_rs, to_json=True),
+                    get_fixture(self.three_hits_search_rs, to_json=True),
+                    get_fixture(self.no_hits_search_rs, to_json=True)
                 ],
-                "test_item_info":      launch_objects.TestItemInfo(
-                    **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
-                "expected_result":     [
+                "test_item_info": launch_objects.TestItemInfo(
+                    **get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
+                "expected_result": [
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=123,
                                                          testItemLogId=178,
@@ -398,21 +401,21 @@ class TestSuggestService(TestService):
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
                                                          methodName="suggestion")],
-                "boost_predict":       ([1, 0, 1], [[0.3, 0.7], [0.55, 0.45], [0.2, 0.8]])
+                "boost_predict": ([1, 0, 1], [[0.3, 0.7], [0.55, 0.45], [0.2, 0.8]])
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/1",
-                                    "status":         HTTPStatus.OK,
-                                    }],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/1",
+                                "status": HTTPStatus.OK,
+                                }],
                 "msearch_results": [
-                    utils.get_fixture(self.two_hits_search_rs, to_json=True),
-                    utils.get_fixture(self.three_hits_search_rs_with_duplicate, to_json=True),
-                    utils.get_fixture(self.no_hits_search_rs, to_json=True)
+                    get_fixture(self.two_hits_search_rs, to_json=True),
+                    get_fixture(self.three_hits_search_rs_with_duplicate, to_json=True),
+                    get_fixture(self.no_hits_search_rs, to_json=True)
                 ],
-                "test_item_info":      launch_objects.TestItemInfo(
-                    **utils.get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
-                "expected_result":     [
+                "test_item_info": launch_objects.TestItemInfo(
+                    **get_fixture(self.suggest_test_item_info_w_logs, to_json=True)),
+                "expected_result": [
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=123,
                                                          testItemLogId=178,
@@ -470,21 +473,21 @@ class TestSuggestService(TestService):
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
                                                          methodName="suggestion")],
-                "boost_predict":       ([1, 1, 1], [[0.3, 0.7], [0.3, 0.7], [0.3, 0.7]])
+                "boost_predict": ([1, 1, 1], [[0.3, 0.7], [0.3, 0.7], [0.3, 0.7]])
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/1",
-                                    "status":         HTTPStatus.OK,
-                                    }],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/1",
+                                "status": HTTPStatus.OK,
+                                }],
                 "msearch_results": [
-                    utils.get_fixture(self.one_hit_search_rs_merged, to_json=True),
-                    utils.get_fixture(self.one_hit_search_rs_merged, to_json=True),
-                    utils.get_fixture(self.one_hit_search_rs_merged, to_json=True)
+                    get_fixture(self.one_hit_search_rs_merged, to_json=True),
+                    get_fixture(self.one_hit_search_rs_merged, to_json=True),
+                    get_fixture(self.one_hit_search_rs_merged, to_json=True)
                 ],
-                "test_item_info":      launch_objects.TestItemInfo(
-                    **utils.get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
-                "expected_result":     [
+                "test_item_info": launch_objects.TestItemInfo(
+                    **get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
+                "expected_result": [
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=123,
                                                          testItemLogId=178,
@@ -505,43 +508,43 @@ class TestSuggestService(TestService):
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
                                                          methodName="suggestion")],
-                "boost_predict":       ([1], [[0.1, 0.9]])
+                "boost_predict": ([1], [[0.1, 0.9]])
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/rp_1",
-                                    "status":         HTTPStatus.OK,
-                                    }],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/rp_1",
+                                "status": HTTPStatus.OK,
+                                }],
                 "app_config": {
                     "esHost": "http://localhost:9200",
                     "esUser": "",
                     "esPassword": "",
-                    "esVerifyCerts":     False,
-                    "esUseSsl":          False,
-                    "esSslShowWarn":     False,
+                    "esVerifyCerts": False,
+                    "esUseSsl": False,
+                    "esSslShowWarn": False,
                     "turnOffSslVerification": True,
-                    "esCAcert":          "",
-                    "esClientCert":      "",
-                    "esClientKey":       "",
-                    "appVersion":        "",
-                    "minioRegion":       "",
+                    "esCAcert": "",
+                    "esClientCert": "",
+                    "esClientKey": "",
+                    "appVersion": "",
+                    "minioRegion": "",
                     "minioBucketPrefix": "",
                     "filesystemDefaultPath": "",
-                    "esChunkNumber":     1000,
-                    "binaryStoreType":   "minio",
-                    "minioHost":         "",
-                    "minioAccessKey":    "",
-                    "minioSecretKey":    "",
+                    "esChunkNumber": 1000,
+                    "binaryStoreType": "minio",
+                    "minioHost": "",
+                    "minioAccessKey": "",
+                    "minioSecretKey": "",
                     "esProjectIndexPrefix": "rp_"
                 },
                 "msearch_results": [
-                    utils.get_fixture(self.one_hit_search_rs_merged, to_json=True),
-                    utils.get_fixture(self.one_hit_search_rs_merged, to_json=True),
-                    utils.get_fixture(self.one_hit_search_rs_merged, to_json=True)
+                    get_fixture(self.one_hit_search_rs_merged, to_json=True),
+                    get_fixture(self.one_hit_search_rs_merged, to_json=True),
+                    get_fixture(self.one_hit_search_rs_merged, to_json=True)
                 ],
-                "test_item_info":      launch_objects.TestItemInfo(
-                    **utils.get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
-                "expected_result":     [
+                "test_item_info": launch_objects.TestItemInfo(
+                    **get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
+                "expected_result": [
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=123,
                                                          testItemLogId=178,
@@ -562,119 +565,119 @@ class TestSuggestService(TestService):
                                                          minShouldMatch=80,
                                                          processedTime=10.0,
                                                          methodName="suggestion")],
-                "boost_predict":       ([1], [[0.1, 0.9]])
+                "boost_predict": ([1], [[0.1, 0.9]])
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/1",
-                                    "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":         httpretty.GET,
-                                    "uri":            "/rp_suggestions_info_metrics",
-                                    "status":         HTTPStatus.OK
-                                    },
-                                   {"method":         httpretty.PUT,
-                                    "uri":            "/rp_suggestions_info_metrics/_mapping",
-                                    "status":         HTTPStatus.OK,
-                                    "rs":             utils.get_fixture(self.index_created_rs),
-                                    },
-                                   {"method":         httpretty.POST,
-                                    "uri":            "/_bulk?refresh=true",
-                                    "status":         HTTPStatus.OK,
-                                    "content_type":   "application/json",
-                                    "rs":             utils.get_fixture(self.index_logs_rs),
-                                    }],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/1",
+                                "status": HTTPStatus.OK,
+                                },
+                               {"method": httpretty.GET,
+                                "uri": "/rp_suggestions_info_metrics",
+                                "status": HTTPStatus.OK
+                                },
+                               {"method": httpretty.PUT,
+                                "uri": "/rp_suggestions_info_metrics/_mapping",
+                                "status": HTTPStatus.OK,
+                                "rs": get_fixture(self.index_created_rs),
+                                },
+                               {"method": httpretty.POST,
+                                "uri": "/_bulk?refresh=true",
+                                "status": HTTPStatus.OK,
+                                "content_type": "application/json",
+                                "rs": get_fixture(self.index_logs_rs),
+                                }],
                 "msearch_results": [
-                    utils.get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True),
-                    utils.get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True),
-                    utils.get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True)
+                    get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True),
+                    get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True),
+                    get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True)
                 ],
-                "test_item_info":      launch_objects.TestItemInfo(
-                    **utils.get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
-                "expected_result":     [],
-                "boost_predict":       ([], [])
+                "test_item_info": launch_objects.TestItemInfo(
+                    **get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
+                "expected_result": [],
+                "boost_predict": ([], [])
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/rp_1",
-                                    "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":         httpretty.GET,
-                                    "uri":            "/rp_suggestions_info_metrics",
-                                    "status":         HTTPStatus.OK
-                                    },
-                                   {"method":         httpretty.PUT,
-                                    "uri":            "/rp_suggestions_info_metrics/_mapping",
-                                    "status":         HTTPStatus.OK,
-                                    "rs":             utils.get_fixture(self.index_created_rs),
-                                    },
-                                   {"method":         httpretty.POST,
-                                    "uri":            "/_bulk?refresh=true",
-                                    "status":         HTTPStatus.OK,
-                                    "content_type":   "application/json",
-                                    "rs":             utils.get_fixture(self.index_logs_rs),
-                                    }],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/rp_1",
+                                "status": HTTPStatus.OK,
+                                },
+                               {"method": httpretty.GET,
+                                "uri": "/rp_suggestions_info_metrics",
+                                "status": HTTPStatus.OK
+                                },
+                               {"method": httpretty.PUT,
+                                "uri": "/rp_suggestions_info_metrics/_mapping",
+                                "status": HTTPStatus.OK,
+                                "rs": get_fixture(self.index_created_rs),
+                                },
+                               {"method": httpretty.POST,
+                                "uri": "/_bulk?refresh=true",
+                                "status": HTTPStatus.OK,
+                                "content_type": "application/json",
+                                "rs": get_fixture(self.index_logs_rs),
+                                }],
                 "app_config": {
                     "esHost": "http://localhost:9200",
                     "esUser": "",
                     "esPassword": "",
-                    "esVerifyCerts":     False,
-                    "esUseSsl":          False,
-                    "esSslShowWarn":     False,
+                    "esVerifyCerts": False,
+                    "esUseSsl": False,
+                    "esSslShowWarn": False,
                     "turnOffSslVerification": True,
-                    "esCAcert":          "",
-                    "esClientCert":      "",
-                    "esClientKey":       "",
-                    "appVersion":        "",
-                    "minioRegion":       "",
+                    "esCAcert": "",
+                    "esClientCert": "",
+                    "esClientKey": "",
+                    "appVersion": "",
+                    "minioRegion": "",
                     "minioBucketPrefix": "",
                     "filesystemDefaultPath": "",
-                    "esChunkNumber":     1000,
-                    "binaryStoreType":   "minio",
-                    "minioHost":         "",
-                    "minioAccessKey":    "",
-                    "minioSecretKey":    "",
+                    "esChunkNumber": 1000,
+                    "binaryStoreType": "minio",
+                    "minioHost": "",
+                    "minioAccessKey": "",
+                    "minioSecretKey": "",
                     "esProjectIndexPrefix": "rp_"
                 },
                 "msearch_results": [
-                    utils.get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True),
-                    utils.get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True),
-                    utils.get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True)
+                    get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True),
+                    get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True),
+                    get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True)
                 ],
-                "test_item_info":      launch_objects.TestItemInfo(
-                    **utils.get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
-                "expected_result":     [],
-                "boost_predict":       ([], [])
+                "test_item_info": launch_objects.TestItemInfo(
+                    **get_fixture(self.suggest_test_item_info_w_merged_logs, to_json=True)),
+                "expected_result": [],
+                "boost_predict": ([], [])
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/1",
-                                    "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":         httpretty.GET,
-                                    "uri":            "/1/_search",
-                                    "status":         HTTPStatus.OK,
-                                    "content_type":   "application/json",
-                                    "rq":             utils.get_fixture(self.search_test_item_cluster),
-                                    "rs":             utils.get_fixture(
-                                        self.three_hits_search_rs),
-                                    },
-                                   {"method":         httpretty.GET,
-                                    "uri":            "/1/_search?scroll=5m&size=1000",
-                                    "status":         HTTPStatus.OK,
-                                    "content_type":   "application/json",
-                                    "rq":             utils.get_fixture(self.search_logs_by_test_item),
-                                    "rs":             utils.get_fixture(
-                                        self.three_hits_search_rs),
-                                    }],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/1",
+                                "status": HTTPStatus.OK,
+                                },
+                               {"method": httpretty.GET,
+                                "uri": "/1/_search",
+                                "status": HTTPStatus.OK,
+                                "content_type": "application/json",
+                                "rq": get_fixture(self.search_test_item_cluster),
+                                "rs": get_fixture(
+                                    self.three_hits_search_rs),
+                                },
+                               {"method": httpretty.GET,
+                                "uri": "/1/_search?scroll=5m&size=1000",
+                                "status": HTTPStatus.OK,
+                                "content_type": "application/json",
+                                "rq": get_fixture(self.search_logs_by_test_item),
+                                "rs": get_fixture(
+                                    self.three_hits_search_rs),
+                                }],
                 "msearch_results": [
-                    utils.get_fixture(self.one_hit_search_rs, to_json=True),
-                    utils.get_fixture(self.two_hits_search_rs, to_json=True),
-                    utils.get_fixture(self.no_hits_search_rs, to_json=True)
+                    get_fixture(self.one_hit_search_rs, to_json=True),
+                    get_fixture(self.two_hits_search_rs, to_json=True),
+                    get_fixture(self.no_hits_search_rs, to_json=True)
                 ],
-                "test_item_info":      launch_objects.TestItemInfo(
-                    **utils.get_fixture(self.suggest_test_item_info_cluster, to_json=True)),
-                "expected_result":     [
+                "test_item_info": launch_objects.TestItemInfo(
+                    **get_fixture(self.suggest_test_item_info_cluster, to_json=True)),
+                "expected_result": [
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=1,
                                                          testItemLogId=1,
@@ -717,37 +720,37 @@ class TestSuggestService(TestService):
                                                          processedTime=10.0,
                                                          methodName="suggestion",
                                                          clusterId=5349085043832165)],
-                "boost_predict":       ([1, 0], [[0.3, 0.7], [0.55, 0.45]])
+                "boost_predict": ([1, 0], [[0.3, 0.7], [0.55, 0.45]])
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/1",
-                                    "status":         HTTPStatus.OK,
-                                    },
-                                   {"method":         httpretty.GET,
-                                    "uri":            "/1/_search",
-                                    "status":         HTTPStatus.OK,
-                                    "content_type":   "application/json",
-                                    "rq":             utils.get_fixture(self.search_test_item_cluster),
-                                    "rs":             utils.get_fixture(
-                                        self.one_hit_search_rs_small_logs),
-                                    },
-                                   {"method":         httpretty.GET,
-                                    "uri":            "/1/_search?scroll=5m&size=1000",
-                                    "status":         HTTPStatus.OK,
-                                    "content_type":   "application/json",
-                                    "rq":             utils.get_fixture(self.search_logs_by_test_item),
-                                    "rs":             utils.get_fixture(
-                                        self.one_hit_search_rs_small_logs),
-                                    }],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/1",
+                                "status": HTTPStatus.OK,
+                                },
+                               {"method": httpretty.GET,
+                                "uri": "/1/_search",
+                                "status": HTTPStatus.OK,
+                                "content_type": "application/json",
+                                "rq": get_fixture(self.search_test_item_cluster),
+                                "rs": get_fixture(
+                                    self.one_hit_search_rs_small_logs),
+                                },
+                               {"method": httpretty.GET,
+                                "uri": "/1/_search?scroll=5m&size=1000",
+                                "status": HTTPStatus.OK,
+                                "content_type": "application/json",
+                                "rq": get_fixture(self.search_logs_by_test_item),
+                                "rs": get_fixture(
+                                    self.one_hit_search_rs_small_logs),
+                                }],
                 "msearch_results": [
-                    utils.get_fixture(self.one_hit_search_rs_merged, to_json=True),
-                    utils.get_fixture(self.one_hit_search_rs_merged, to_json=True),
-                    utils.get_fixture(self.one_hit_search_rs_merged, to_json=True)
+                    get_fixture(self.one_hit_search_rs_merged, to_json=True),
+                    get_fixture(self.one_hit_search_rs_merged, to_json=True),
+                    get_fixture(self.one_hit_search_rs_merged, to_json=True)
                 ],
-                "test_item_info":      launch_objects.TestItemInfo(
-                    **utils.get_fixture(self.suggest_test_item_info_cluster, to_json=True)),
-                "expected_result":     [
+                "test_item_info": launch_objects.TestItemInfo(
+                    **get_fixture(self.suggest_test_item_info_cluster, to_json=True)),
+                "expected_result": [
                     launch_objects.SuggestAnalysisResult(project=1,
                                                          testItem=1,
                                                          testItemLogId=1,
@@ -769,7 +772,7 @@ class TestSuggestService(TestService):
                                                          processedTime=10.0,
                                                          methodName="suggestion",
                                                          clusterId=5349085043832165)],
-                "boost_predict":       ([1], [[0.25, 0.75]])
+                "boost_predict": ([1], [[0.25, 0.75]])
             }
         ]
 
@@ -784,7 +787,7 @@ class TestSuggestService(TestService):
                                                  app_config=app_config,
                                                  search_cfg=config)
                 suggest_service.es_client.es_client.scroll = MagicMock(return_value=json.loads(
-                    utils.get_fixture(self.no_hits_search_rs)))
+                    get_fixture(self.no_hits_search_rs)))
                 if "msearch_results" in test:
                     suggest_service.es_client.es_client.msearch = MagicMock(
                         return_value={"responses": test["msearch_results"]})
@@ -803,7 +806,7 @@ class TestSuggestService(TestService):
 
                 TestSuggestService.shutdown_server(test["test_calls"])
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').\
+                raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)
 
 

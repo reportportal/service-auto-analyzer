@@ -14,9 +14,10 @@
 
 import unittest
 from unittest.mock import MagicMock
+
 from app.service import RetrainingService
-from test.mock_service import TestService
 from app.utils import utils
+from test.mock_service import TestService
 
 
 class TestRetrainingService(TestService):
@@ -184,7 +185,7 @@ class TestRetrainingService(TestService):
                 response = _retraining_service.train_models(test["train_info"])
                 assert test["is_model_trained"] == response
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').\
+                raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)
 
 

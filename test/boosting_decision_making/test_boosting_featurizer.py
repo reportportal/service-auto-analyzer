@@ -12,23 +12,26 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import unittest
 import logging
+import unittest
+
+from app.boosting_decision_making import weighted_similarity_calculator
 from app.boosting_decision_making.boosting_featurizer import BoostingFeaturizer
 from app.boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
-from app.boosting_decision_making import weighted_similarity_calculator
 from app.utils import utils
+from test import get_fixture
 
 
 class TestBoostingFeaturizer(unittest.TestCase):
     """Tests boosting feature creation functionality"""
+
     @utils.ignore_warnings
     def setUp(self):
         self.one_hit_search_rs_explained = "one_hit_search_rs_explained.json"
         self.two_hits_search_rs_explained = "two_hits_search_rs_explained.json"
         self.log_message = "log_message.json"
         self.log_message_wo_stacktrace = "log_message_wo_stacktrace.json"
-        self.one_hit_search_rs_explained_wo_stacktrace =\
+        self.one_hit_search_rs_explained_wo_stacktrace = \
             "one_hit_search_rs_explained_wo_stacktrace.json"
         self.log_message_only_small_logs = "log_message_only_small_logs.json"
         self.one_hit_search_rs_small_logs = "one_hit_search_rs_small_logs.json"
@@ -55,9 +58,9 @@ class TestBoostingFeaturizer(unittest.TestCase):
         if filter_fields_any is None:
             filter_fields_any = []
         return {
-            "max_query_terms":  50,
+            "max_query_terms": 50,
             "min_should_match": 0.8,
-            "min_word_length":  0,
+            "min_word_length": 0,
             "filter_min_should_match": filter_fields,
             "filter_min_should_match_any": filter_fields_any,
             "number_of_log_lines": -1,
@@ -70,29 +73,29 @@ class TestBoostingFeaturizer(unittest.TestCase):
         tests = [
             {
                 "elastic_results": [],
-                "config":          TestBoostingFeaturizer.get_default_config(),
-                "result":          [],
+                "config": TestBoostingFeaturizer.get_default_config(),
+                "result": [],
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True))],
-                "config":          TestBoostingFeaturizer.get_default_config(),
-                "result":          [[{"_score": 158.08437,
-                                      "normalized_score": 1.0, }]],
+                "elastic_results": [(get_fixture(self.log_message, to_json=True),
+                                     get_fixture(self.one_hit_search_rs_explained, to_json=True))],
+                "config": TestBoostingFeaturizer.get_default_config(),
+                "result": [[{"_score": 158.08437,
+                             "normalized_score": 1.0, }]],
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.two_hits_search_rs_explained, to_json=True))],
-                "config":          TestBoostingFeaturizer.get_default_config(),
-                "result":          [[{"_score": 158.08437,
-                                      "normalized_score": 1.0,
-                                      },
-                                     {"_score": 77.53298,
-                                      "normalized_score": 0.4904,
-                                      }, ]],
+                "elastic_results": [(get_fixture(self.log_message, to_json=True),
+                                     get_fixture(self.two_hits_search_rs_explained, to_json=True))],
+                "config": TestBoostingFeaturizer.get_default_config(),
+                "result": [[{"_score": 158.08437,
+                             "normalized_score": 1.0,
+                             },
+                            {"_score": 77.53298,
+                             "normalized_score": 0.4904,
+                             }, ]],
             },
         ]
-        weight_log_sim = weighted_similarity_calculator.\
+        weight_log_sim = weighted_similarity_calculator. \
             WeightedSimilarityCalculator(folder=self.weights_folder)
         for idx, test in enumerate(tests):
             try:
@@ -110,7 +113,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                                                           test["result"][i][j][field],
                                                                           self.epsilon)
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').\
+                raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)
 
     def assert_scores_by_issue_type(self, boosting_featurizer, test):
@@ -136,57 +139,57 @@ class TestBoostingFeaturizer(unittest.TestCase):
         tests = [
             {
                 "elastic_results": [],
-                "config":          TestBoostingFeaturizer.get_default_config(),
-                "result":          {},
+                "config": TestBoostingFeaturizer.get_default_config(),
+                "result": {},
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(
+                "elastic_results": [(get_fixture(self.log_message, to_json=True),
+                                     get_fixture(
                                          self.one_hit_search_rs_explained, to_json=True))],
-                "config":          TestBoostingFeaturizer.get_default_config(),
-                "result":          {"AB001": {"mrHit": {"_score": 158.08437,
-                                                        "_id": "1"},
-                                              "compared_log": utils.get_fixture(
-                                                  self.log_message, to_json=True),
-                                              "score": 1.0, },
-                                    }
+                "config": TestBoostingFeaturizer.get_default_config(),
+                "result": {"AB001": {"mrHit": {"_score": 158.08437,
+                                               "_id": "1"},
+                                     "compared_log": get_fixture(
+                                         self.log_message, to_json=True),
+                                     "score": 1.0, },
+                           }
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.two_hits_search_rs_explained, to_json=True))],
-                "config":          TestBoostingFeaturizer.get_default_config(),
-                "result":          {"AB001": {"mrHit": {"_score": 158.08437,
-                                                        "_id": "1"},
-                                              "compared_log": utils.get_fixture(
-                                                  self.log_message, to_json=True),
-                                              "score": 0.6709, },
-                                    "PB001": {"mrHit": {"_score": 77.53298,
-                                                        "_id": "2"},
-                                              "compared_log": utils.get_fixture(
-                                                  self.log_message, to_json=True),
-                                              "score": 0.3291, },
-                                    }
+                "elastic_results": [(get_fixture(self.log_message, to_json=True),
+                                     get_fixture(self.two_hits_search_rs_explained, to_json=True))],
+                "config": TestBoostingFeaturizer.get_default_config(),
+                "result": {"AB001": {"mrHit": {"_score": 158.08437,
+                                               "_id": "1"},
+                                     "compared_log": get_fixture(
+                                         self.log_message, to_json=True),
+                                     "score": 0.6709, },
+                           "PB001": {"mrHit": {"_score": 77.53298,
+                                               "_id": "2"},
+                                     "compared_log": get_fixture(
+                                         self.log_message, to_json=True),
+                                     "score": 0.3291, },
+                           }
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.two_hits_search_rs_explained, to_json=True)),
-                                    (utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True))],
-                "config":          TestBoostingFeaturizer.get_default_config(),
-                "result":          {"AB001": {"mrHit": {"_score": 158.08437,
-                                                        "_id": "1"},
-                                              "compared_log": utils.get_fixture(
-                                                  self.log_message, to_json=True),
-                                              "score": 0.8031, },
-                                    "PB001": {"mrHit": {"_score": 77.53298,
-                                                        "_id": "2"},
-                                              "compared_log": utils.get_fixture(
-                                                  self.log_message, to_json=True),
-                                              "score": 0.1969, },
-                                    }
+                "elastic_results": [(get_fixture(self.log_message, to_json=True),
+                                     get_fixture(self.two_hits_search_rs_explained, to_json=True)),
+                                    (get_fixture(self.log_message, to_json=True),
+                                     get_fixture(self.one_hit_search_rs_explained, to_json=True))],
+                "config": TestBoostingFeaturizer.get_default_config(),
+                "result": {"AB001": {"mrHit": {"_score": 158.08437,
+                                               "_id": "1"},
+                                     "compared_log": get_fixture(
+                                         self.log_message, to_json=True),
+                                     "score": 0.8031, },
+                           "PB001": {"mrHit": {"_score": 77.53298,
+                                               "_id": "2"},
+                                     "compared_log": get_fixture(
+                                         self.log_message, to_json=True),
+                                     "score": 0.1969, },
+                           }
             },
         ]
-        weight_log_sim = weighted_similarity_calculator.\
+        weight_log_sim = weighted_similarity_calculator. \
             WeightedSimilarityCalculator(folder=self.weights_folder)
         for idx, test in enumerate(tests):
             try:
@@ -197,7 +200,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
                     weighted_log_similarity_calculator=weight_log_sim)
                 self.assert_scores_by_issue_type(_boosting_featurizer, test)
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').\
+                raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)
 
     def assert_elastic_results(self, results, test):
@@ -212,77 +215,77 @@ class TestBoostingFeaturizer(unittest.TestCase):
         tests = [
             {
                 "elastic_results": [],
-                "config":           TestBoostingFeaturizer.get_default_config(filter_fields=[]),
-                "result":          [],
+                "config": TestBoostingFeaturizer.get_default_config(filter_fields=[]),
+                "result": [],
             },
             {
                 "elastic_results": [],
-                "config":           TestBoostingFeaturizer.get_default_config(filter_fields=[
+                "config": TestBoostingFeaturizer.get_default_config(filter_fields=[
                     "detected_message", "stacktrace"]),
-                "result":          [],
+                "result": [],
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True))],
-                "config":           TestBoostingFeaturizer.get_default_config(filter_fields=[
+                "elastic_results": [(get_fixture(self.log_message, to_json=True),
+                                     get_fixture(self.one_hit_search_rs_explained, to_json=True))],
+                "config": TestBoostingFeaturizer.get_default_config(filter_fields=[
                     "detected_message", "stacktrace"]),
-                "result":          [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True))],
+                "result": [(get_fixture(self.log_message, to_json=True),
+                            get_fixture(self.one_hit_search_rs_explained, to_json=True))],
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True))],
-                "config":           TestBoostingFeaturizer.get_default_config(filter_fields=[
+                "elastic_results": [(get_fixture(self.log_message, to_json=True),
+                                     get_fixture(self.one_hit_search_rs_explained, to_json=True))],
+                "config": TestBoostingFeaturizer.get_default_config(filter_fields=[
                     "message"]),
-                "result":          [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True))],
+                "result": [(get_fixture(self.log_message, to_json=True),
+                            get_fixture(self.one_hit_search_rs_explained, to_json=True))],
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True)),
-                                    (utils.get_fixture(self.log_message_wo_stacktrace, to_json=True),
-                                     utils.get_fixture(
-                                        self.one_hit_search_rs_explained_wo_stacktrace, to_json=True))],
-                "config":           TestBoostingFeaturizer.get_default_config(filter_fields=[
+                "elastic_results": [(get_fixture(self.log_message, to_json=True),
+                                     get_fixture(self.one_hit_search_rs_explained, to_json=True)),
+                                    (get_fixture(self.log_message_wo_stacktrace, to_json=True),
+                                     get_fixture(
+                                         self.one_hit_search_rs_explained_wo_stacktrace, to_json=True))],
+                "config": TestBoostingFeaturizer.get_default_config(filter_fields=[
                     "message"]),
-                "result":          [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True)),
-                                    (utils.get_fixture(self.log_message_wo_stacktrace, to_json=True),
-                                     utils.get_fixture(
-                                        self.one_hit_search_rs_explained_wo_stacktrace, to_json=True))]
+                "result": [(get_fixture(self.log_message, to_json=True),
+                            get_fixture(self.one_hit_search_rs_explained, to_json=True)),
+                           (get_fixture(self.log_message_wo_stacktrace, to_json=True),
+                            get_fixture(
+                                self.one_hit_search_rs_explained_wo_stacktrace, to_json=True))]
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True)),
-                                    (utils.get_fixture(self.log_message_wo_stacktrace, to_json=True),
-                                     utils.get_fixture(
-                                        self.one_hit_search_rs_explained_wo_stacktrace, to_json=True))],
-                "config":           TestBoostingFeaturizer.get_default_config(filter_fields=[
+                "elastic_results": [(get_fixture(self.log_message, to_json=True),
+                                     get_fixture(self.one_hit_search_rs_explained, to_json=True)),
+                                    (get_fixture(self.log_message_wo_stacktrace, to_json=True),
+                                     get_fixture(
+                                         self.one_hit_search_rs_explained_wo_stacktrace, to_json=True))],
+                "config": TestBoostingFeaturizer.get_default_config(filter_fields=[
                     "detected_message", "stacktrace"]),
-                "result":          [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True)),
-                                    (utils.get_fixture(self.log_message_wo_stacktrace, to_json=True),
-                                     utils.get_fixture(
-                                        self.one_hit_search_rs_explained_wo_stacktrace, to_json=True))]
+                "result": [(get_fixture(self.log_message, to_json=True),
+                            get_fixture(self.one_hit_search_rs_explained, to_json=True)),
+                           (get_fixture(self.log_message_wo_stacktrace, to_json=True),
+                            get_fixture(
+                                self.one_hit_search_rs_explained_wo_stacktrace, to_json=True))]
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message_only_small_logs, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_small_logs, to_json=True))],
-                "config":           TestBoostingFeaturizer.get_default_config(filter_fields=[
+                "elastic_results": [(get_fixture(self.log_message_only_small_logs, to_json=True),
+                                     get_fixture(self.one_hit_search_rs_small_logs, to_json=True))],
+                "config": TestBoostingFeaturizer.get_default_config(filter_fields=[
                     "detected_message", "stacktrace"]),
-                "result":          [(utils.get_fixture(self.log_message_only_small_logs, to_json=True),
-                                     {"hits": {"hits": []}})]
+                "result": [(get_fixture(self.log_message_only_small_logs, to_json=True),
+                            {"hits": {"hits": []}})]
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message_only_small_logs, to_json=True),
-                                     utils.get_fixture(self.two_hits_search_rs_small_logs, to_json=True))],
-                "config":           TestBoostingFeaturizer.get_default_config(filter_fields=[
+                "elastic_results": [(get_fixture(self.log_message_only_small_logs, to_json=True),
+                                     get_fixture(self.two_hits_search_rs_small_logs, to_json=True))],
+                "config": TestBoostingFeaturizer.get_default_config(filter_fields=[
                     "detected_message", "stacktrace"]),
-                "result":          [(utils.get_fixture(self.log_message_only_small_logs, to_json=True),
-                                     utils.get_fixture(self.two_hits_search_rs_small_logs, to_json=True))]
+                "result": [(get_fixture(self.log_message_only_small_logs, to_json=True),
+                            get_fixture(self.two_hits_search_rs_small_logs, to_json=True))]
             },
         ]
-        weight_log_sim = weighted_similarity_calculator.\
+        weight_log_sim = weighted_similarity_calculator. \
             WeightedSimilarityCalculator(folder=self.weights_folder)
         for idx, test in enumerate(tests):
             try:
@@ -296,7 +299,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
                     all_results = _boosting_featurizer.filter_by_min_should_match(all_results, field=field)
                 self.assert_elastic_results(all_results, test)
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').\
+                raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
@@ -304,51 +307,51 @@ class TestBoostingFeaturizer(unittest.TestCase):
         tests = [
             {
                 "elastic_results": [],
-                "config":          TestBoostingFeaturizer.get_default_config(),
-                "result":          {},
+                "config": TestBoostingFeaturizer.get_default_config(),
+                "result": {},
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True))],
-                "config":          TestBoostingFeaturizer.get_default_config(),
-                "result":          {1: {"mrHit": {"_score": 158.08437,
-                                                  "_id": "1"},
-                                        "compared_log": utils.get_fixture(self.log_message, to_json=True),
-                                        "score": 1.0, },
-                                    }
+                "elastic_results": [(get_fixture(self.log_message, to_json=True),
+                                     get_fixture(self.one_hit_search_rs_explained, to_json=True))],
+                "config": TestBoostingFeaturizer.get_default_config(),
+                "result": {1: {"mrHit": {"_score": 158.08437,
+                                         "_id": "1"},
+                               "compared_log": get_fixture(self.log_message, to_json=True),
+                               "score": 1.0, },
+                           }
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.two_hits_search_rs_explained, to_json=True))],
-                "config":          TestBoostingFeaturizer.get_default_config(),
-                "result":          {1: {"mrHit": {"_score": 158.08437,
-                                                  "_id": "1"},
-                                        "compared_log": utils.get_fixture(self.log_message, to_json=True),
-                                        "score": 1.0, },
-                                    2: {"mrHit": {"_score": 77.53298,
-                                                  "_id": "2"},
-                                        "compared_log": utils.get_fixture(self.log_message, to_json=True),
-                                        "score": 0.4905, },
-                                    }
+                "elastic_results": [(get_fixture(self.log_message, to_json=True),
+                                     get_fixture(self.two_hits_search_rs_explained, to_json=True))],
+                "config": TestBoostingFeaturizer.get_default_config(),
+                "result": {1: {"mrHit": {"_score": 158.08437,
+                                         "_id": "1"},
+                               "compared_log": get_fixture(self.log_message, to_json=True),
+                               "score": 1.0, },
+                           2: {"mrHit": {"_score": 77.53298,
+                                         "_id": "2"},
+                               "compared_log": get_fixture(self.log_message, to_json=True),
+                               "score": 0.4905, },
+                           }
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.two_hits_search_rs_explained, to_json=True)),
-                                    (utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.three_hits_search_rs_explained, to_json=True))],
-                "config":          TestBoostingFeaturizer.get_default_config(),
-                "result":          {1: {"mrHit": {"_score": 158.08437,
-                                                  "_id": "1"},
-                                        "compared_log": utils.get_fixture(self.log_message, to_json=True),
-                                        "score": 0.9392, },
-                                    2: {"mrHit": {"_score": 168.31,
-                                                  "_id": "2"},
-                                        "compared_log": utils.get_fixture(self.log_message, to_json=True),
-                                        "score": 1.0, }
-                                    }
+                "elastic_results": [(get_fixture(self.log_message, to_json=True),
+                                     get_fixture(self.two_hits_search_rs_explained, to_json=True)),
+                                    (get_fixture(self.log_message, to_json=True),
+                                     get_fixture(self.three_hits_search_rs_explained, to_json=True))],
+                "config": TestBoostingFeaturizer.get_default_config(),
+                "result": {1: {"mrHit": {"_score": 158.08437,
+                                         "_id": "1"},
+                               "compared_log": get_fixture(self.log_message, to_json=True),
+                               "score": 0.9392, },
+                           2: {"mrHit": {"_score": 168.31,
+                                         "_id": "2"},
+                               "compared_log": get_fixture(self.log_message, to_json=True),
+                               "score": 1.0, }
+                           }
             },
         ]
-        weight_log_sim = weighted_similarity_calculator.\
+        weight_log_sim = weighted_similarity_calculator. \
             WeightedSimilarityCalculator(folder=self.weights_folder)
         for idx, test in enumerate(tests):
             try:
@@ -359,7 +362,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
                     weighted_log_similarity_calculator=weight_log_sim)
                 self.assert_scores_by_issue_type(_boosting_featurizer, test)
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').\
+                raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
@@ -367,79 +370,79 @@ class TestBoostingFeaturizer(unittest.TestCase):
         tests = [
             {
                 "elastic_results": [],
-                "config":           TestBoostingFeaturizer.get_default_config(filter_fields=[],
-                                                                              filter_fields_any=[]),
-                "result":          [],
+                "config": TestBoostingFeaturizer.get_default_config(filter_fields=[],
+                                                                    filter_fields_any=[]),
+                "result": [],
             },
             {
                 "elastic_results": [],
-                "config":           TestBoostingFeaturizer.get_default_config(
+                "config": TestBoostingFeaturizer.get_default_config(
                     filter_fields=[],
                     filter_fields_any=["detected_message"]),
-                "result":          [],
+                "result": [],
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True))],
-                "config":           TestBoostingFeaturizer.get_default_config(
+                "elastic_results": [(get_fixture(self.log_message, to_json=True),
+                                     get_fixture(self.one_hit_search_rs_explained, to_json=True))],
+                "config": TestBoostingFeaturizer.get_default_config(
                     filter_fields=[],
                     filter_fields_any=["detected_message",
                                        "detected_message_without_params_extended"]),
-                "result":          [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True))],
+                "result": [(get_fixture(self.log_message, to_json=True),
+                            get_fixture(self.one_hit_search_rs_explained, to_json=True))],
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True)),
-                                    (utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(
-                                        self.one_hit_search_rs_explained_wo_params, to_json=True))],
-                "config":           TestBoostingFeaturizer.get_default_config(
+                "elastic_results": [(get_fixture(self.log_message, to_json=True),
+                                     get_fixture(self.one_hit_search_rs_explained, to_json=True)),
+                                    (get_fixture(self.log_message, to_json=True),
+                                     get_fixture(
+                                         self.one_hit_search_rs_explained_wo_params, to_json=True))],
+                "config": TestBoostingFeaturizer.get_default_config(
                     filter_fields=[],
                     filter_fields_any=["detected_message",
                                        "detected_message_without_params_extended"]),
-                "result":          [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True)),
-                                    (utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(
-                                        self.one_hit_search_rs_explained_wo_params, to_json=True))]
+                "result": [(get_fixture(self.log_message, to_json=True),
+                            get_fixture(self.one_hit_search_rs_explained, to_json=True)),
+                           (get_fixture(self.log_message, to_json=True),
+                            get_fixture(
+                                self.one_hit_search_rs_explained_wo_params, to_json=True))]
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True)),
-                                    (utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(
-                                        self.one_hit_search_rs_explained_wo_params, to_json=True))],
-                "config":           TestBoostingFeaturizer.get_default_config(
+                "elastic_results": [(get_fixture(self.log_message, to_json=True),
+                                     get_fixture(self.one_hit_search_rs_explained, to_json=True)),
+                                    (get_fixture(self.log_message, to_json=True),
+                                     get_fixture(
+                                         self.one_hit_search_rs_explained_wo_params, to_json=True))],
+                "config": TestBoostingFeaturizer.get_default_config(
                     filter_fields=[],
                     filter_fields_any=["detected_message"]),
-                "result":          [(utils.get_fixture(self.log_message, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_explained, to_json=True)),
-                                    (utils.get_fixture(self.log_message, to_json=True),
-                                     {"hits": {"hits": []}})]
+                "result": [(get_fixture(self.log_message, to_json=True),
+                            get_fixture(self.one_hit_search_rs_explained, to_json=True)),
+                           (get_fixture(self.log_message, to_json=True),
+                            {"hits": {"hits": []}})]
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message_only_small_logs, to_json=True),
-                                     utils.get_fixture(self.one_hit_search_rs_small_logs, to_json=True))],
-                "config":           TestBoostingFeaturizer.get_default_config(
+                "elastic_results": [(get_fixture(self.log_message_only_small_logs, to_json=True),
+                                     get_fixture(self.one_hit_search_rs_small_logs, to_json=True))],
+                "config": TestBoostingFeaturizer.get_default_config(
                     filter_fields=[],
                     filter_fields_any=["detected_message",
                                        "detected_message_without_params_extended"]),
-                "result":          [(utils.get_fixture(self.log_message_only_small_logs, to_json=True),
-                                     {"hits": {"hits": []}})]
+                "result": [(get_fixture(self.log_message_only_small_logs, to_json=True),
+                            {"hits": {"hits": []}})]
             },
             {
-                "elastic_results": [(utils.get_fixture(self.log_message_only_small_logs, to_json=True),
-                                     utils.get_fixture(self.two_hits_search_rs_small_logs, to_json=True))],
-                "config":           TestBoostingFeaturizer.get_default_config(
+                "elastic_results": [(get_fixture(self.log_message_only_small_logs, to_json=True),
+                                     get_fixture(self.two_hits_search_rs_small_logs, to_json=True))],
+                "config": TestBoostingFeaturizer.get_default_config(
                     filter_fields=[],
                     filter_fields_any=["detected_message",
                                        "detected_message_without_params_extended"]),
-                "result":          [(utils.get_fixture(self.log_message_only_small_logs, to_json=True),
-                                     utils.get_fixture(self.two_hits_search_rs_small_logs, to_json=True))]
+                "result": [(get_fixture(self.log_message_only_small_logs, to_json=True),
+                            get_fixture(self.two_hits_search_rs_small_logs, to_json=True))]
             },
         ]
-        weight_log_sim = weighted_similarity_calculator.\
+        weight_log_sim = weighted_similarity_calculator. \
             WeightedSimilarityCalculator(folder=self.weights_folder)
         for idx, test in enumerate(tests):
             try:
@@ -454,5 +457,5 @@ class TestBoostingFeaturizer(unittest.TestCase):
                     fields=test["config"]["filter_min_should_match_any"])
                 self.assert_elastic_results(all_results, test)
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').\
+                raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)

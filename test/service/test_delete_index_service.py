@@ -14,11 +14,13 @@
 
 import unittest
 from http import HTTPStatus
+
 import httpretty
 
 from app.service import DeleteIndexService
-from test.mock_service import TestService
 from app.utils import utils
+from test import get_fixture
+from test.mock_service import TestService
 
 
 class TestDeleteIndexService(TestService):
@@ -28,56 +30,56 @@ class TestDeleteIndexService(TestService):
         """Test deleting index"""
         tests = [
             {
-                "test_calls": [{"method":         httpretty.DELETE,
-                                "uri":            "/1",
-                                "status":         HTTPStatus.OK,
-                                "content_type":   "application/json",
-                                "rs":             utils.get_fixture(self.index_deleted_rs),
+                "test_calls": [{"method": httpretty.DELETE,
+                                "uri": "/1",
+                                "status": HTTPStatus.OK,
+                                "content_type": "application/json",
+                                "rs": get_fixture(self.index_deleted_rs),
                                 }, ],
-                "index":      1,
-                "result":     True,
+                "index": 1,
+                "result": True,
             },
             {
-                "test_calls": [{"method":         httpretty.DELETE,
-                                "uri":            "/2",
-                                "status":         HTTPStatus.NOT_FOUND,
-                                "content_type":   "application/json",
-                                "rs":             utils.get_fixture(self.index_not_found_rs),
+                "test_calls": [{"method": httpretty.DELETE,
+                                "uri": "/2",
+                                "status": HTTPStatus.NOT_FOUND,
+                                "content_type": "application/json",
+                                "rs": get_fixture(self.index_not_found_rs),
                                 }, ],
-                "index":      2,
-                "result":     False,
+                "index": 2,
+                "result": False,
             },
             {
-                "test_calls": [{"method":         httpretty.DELETE,
-                                "uri":            "/rp_2",
-                                "status":         HTTPStatus.NOT_FOUND,
-                                "content_type":   "application/json",
-                                "rs":             utils.get_fixture(self.index_not_found_rs),
+                "test_calls": [{"method": httpretty.DELETE,
+                                "uri": "/rp_2",
+                                "status": HTTPStatus.NOT_FOUND,
+                                "content_type": "application/json",
+                                "rs": get_fixture(self.index_not_found_rs),
                                 }, ],
-                "index":      2,
+                "index": 2,
                 "app_config": {
                     "esHost": "http://localhost:9200",
                     "esUser": "",
                     "esPassword": "",
-                    "esVerifyCerts":     False,
-                    "esUseSsl":          False,
-                    "esSslShowWarn":     False,
+                    "esVerifyCerts": False,
+                    "esUseSsl": False,
+                    "esSslShowWarn": False,
                     "turnOffSslVerification": True,
-                    "esCAcert":          "",
-                    "esClientCert":      "",
-                    "esClientKey":       "",
-                    "appVersion":        "",
-                    "minioRegion":       "",
+                    "esCAcert": "",
+                    "esClientCert": "",
+                    "esClientKey": "",
+                    "appVersion": "",
+                    "minioRegion": "",
                     "minioBucketPrefix": "",
                     "filesystemDefaultPath": "",
-                    "esChunkNumber":     1000,
-                    "binaryStoreType":   "minio",
-                    "minioHost":         "",
-                    "minioAccessKey":    "",
-                    "minioSecretKey":    "",
+                    "esChunkNumber": 1000,
+                    "binaryStoreType": "minio",
+                    "minioHost": "",
+                    "minioAccessKey": "",
+                    "minioSecretKey": "",
                     "esProjectIndexPrefix": "rp_"
                 },
-                "result":     False,
+                "result": False,
             },
         ]
         for idx, test in enumerate(tests):
@@ -96,7 +98,7 @@ class TestDeleteIndexService(TestService):
 
                 TestDeleteIndexService.shutdown_server(test["test_calls"])
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').\
+                raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)
 
 

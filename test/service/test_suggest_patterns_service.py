@@ -16,12 +16,14 @@
 
 import unittest
 from http import HTTPStatus
-import httpretty
 from unittest.mock import MagicMock
+
+import httpretty
+
 from app.commons import launch_objects
 from app.service import SuggestPatternsService
-from test.mock_service import TestService
 from app.utils import utils
+from test.mock_service import TestService
 
 
 class TestSearchService(TestService):
@@ -31,74 +33,74 @@ class TestSearchService(TestService):
         """Test suggest patterns"""
         tests = [
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/1",
-                                    "status":         HTTPStatus.NOT_FOUND,
-                                    },
-                                   ],
-                "rq":             1,
-                "query_data":     [],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/1",
+                                "status": HTTPStatus.NOT_FOUND,
+                                },
+                               ],
+                "rq": 1,
+                "query_data": [],
                 "expected_count_with_labels": [],
                 "expected_count_without_labels": []
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/1",
-                                    "status":         HTTPStatus.OK,
-                                    },
-                                   ],
-                "rq":             1,
-                "query_data":     [],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/1",
+                                "status": HTTPStatus.OK,
+                                },
+                               ],
+                "rq": 1,
+                "query_data": [],
                 "expected_count_with_labels": [],
                 "expected_count_without_labels": []
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/rp_1",
-                                    "status":         HTTPStatus.OK,
-                                    },
-                                   ],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/rp_1",
+                                "status": HTTPStatus.OK,
+                                },
+                               ],
                 "app_config": {
                     "esHost": "http://localhost:9200",
                     "esUser": "",
                     "esPassword": "",
-                    "esVerifyCerts":     False,
-                    "esUseSsl":          False,
-                    "esSslShowWarn":     False,
+                    "esVerifyCerts": False,
+                    "esUseSsl": False,
+                    "esSslShowWarn": False,
                     "turnOffSslVerification": True,
-                    "esCAcert":          "",
-                    "esClientCert":      "",
-                    "esClientKey":       "",
-                    "appVersion":        "",
-                    "minioRegion":       "",
+                    "esCAcert": "",
+                    "esClientCert": "",
+                    "esClientKey": "",
+                    "appVersion": "",
+                    "minioRegion": "",
                     "minioBucketPrefix": "",
                     "filesystemDefaultPath": "",
-                    "esChunkNumber":     1000,
-                    "binaryStoreType":   "minio",
-                    "minioHost":         "",
-                    "minioAccessKey":    "",
-                    "minioSecretKey":    "",
+                    "esChunkNumber": 1000,
+                    "binaryStoreType": "minio",
+                    "minioHost": "",
+                    "minioAccessKey": "",
+                    "minioSecretKey": "",
                     "esProjectIndexPrefix": "rp_"
                 },
-                "rq":             1,
-                "query_data":     [],
+                "rq": 1,
+                "query_data": [],
                 "expected_count_with_labels": [],
                 "expected_count_without_labels": []
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/1",
-                                    "status":         HTTPStatus.OK,
-                                    },
-                                   ],
-                "rq":             1,
-                "query_data":     [("assertionError notFoundError", "ab001"),
-                                   ("assertionError ifElseError", "pb001"),
-                                   ("assertionError commonError", "ab001"),
-                                   ("assertionError commonError", "ab001"),
-                                   ("assertionError", "ab001"),
-                                   ("assertionError commonError", "ab001"),
-                                   ("assertionError commonError", "ti001")],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/1",
+                                "status": HTTPStatus.OK,
+                                },
+                               ],
+                "rq": 1,
+                "query_data": [("assertionError notFoundError", "ab001"),
+                               ("assertionError ifElseError", "pb001"),
+                               ("assertionError commonError", "ab001"),
+                               ("assertionError commonError", "ab001"),
+                               ("assertionError", "ab001"),
+                               ("assertionError commonError", "ab001"),
+                               ("assertionError commonError", "ti001")],
                 "expected_count_with_labels": [
                     launch_objects.SuggestPatternLabel(
                         pattern='assertionError', totalCount=24,
@@ -113,41 +115,41 @@ class TestSearchService(TestService):
                         pattern='commonError', totalCount=16, percentTestItemsWithLabel=0.0, label='')]
             },
             {
-                "test_calls":     [{"method":         httpretty.GET,
-                                    "uri":            "/rp_1",
-                                    "status":         HTTPStatus.OK,
-                                    },
-                                   ],
+                "test_calls": [{"method": httpretty.GET,
+                                "uri": "/rp_1",
+                                "status": HTTPStatus.OK,
+                                },
+                               ],
                 "app_config": {
                     "esHost": "http://localhost:9200",
                     "esUser": "",
                     "esPassword": "",
-                    "esVerifyCerts":     False,
-                    "esUseSsl":          False,
-                    "esSslShowWarn":     False,
+                    "esVerifyCerts": False,
+                    "esUseSsl": False,
+                    "esSslShowWarn": False,
                     "turnOffSslVerification": True,
-                    "esCAcert":          "",
-                    "esClientCert":      "",
-                    "esClientKey":       "",
-                    "appVersion":        "",
-                    "minioRegion":       "",
+                    "esCAcert": "",
+                    "esClientCert": "",
+                    "esClientKey": "",
+                    "appVersion": "",
+                    "minioRegion": "",
                     "minioBucketPrefix": "",
                     "filesystemDefaultPath": "",
-                    "esChunkNumber":     1000,
-                    "binaryStoreType":   "minio",
-                    "minioHost":         "",
-                    "minioAccessKey":    "",
-                    "minioSecretKey":    "",
+                    "esChunkNumber": 1000,
+                    "binaryStoreType": "minio",
+                    "minioHost": "",
+                    "minioAccessKey": "",
+                    "minioSecretKey": "",
                     "esProjectIndexPrefix": "rp_"
                 },
-                "rq":             1,
-                "query_data":     [("assertionError notFoundError", "ab001"),
-                                   ("assertionError ifElseError", "pb001"),
-                                   ("assertionError commonError", "ab001"),
-                                   ("assertionError commonError", "ab001"),
-                                   ("assertionError", "ab001"),
-                                   ("assertionError commonError", "ab001"),
-                                   ("assertionError commonError", "ti001")],
+                "rq": 1,
+                "query_data": [("assertionError notFoundError", "ab001"),
+                               ("assertionError ifElseError", "pb001"),
+                               ("assertionError commonError", "ab001"),
+                               ("assertionError commonError", "ab001"),
+                               ("assertionError", "ab001"),
+                               ("assertionError commonError", "ab001"),
+                               ("assertionError commonError", "ti001")],
                 "expected_count_with_labels": [
                     launch_objects.SuggestPatternLabel(
                         pattern='assertionError', totalCount=24,
@@ -188,7 +190,7 @@ class TestSearchService(TestService):
 
                 TestSearchService.shutdown_server(test["test_calls"])
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}').\
+                raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)
 
 

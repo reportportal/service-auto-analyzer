@@ -11,3 +11,9 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
+
+from app.utils.utils import read_json_file
+
+
+def get_fixture(fixture_name, to_json=False):
+    return read_json_file("test_res/fixtures", fixture_name, to_json)

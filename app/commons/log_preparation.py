@@ -23,14 +23,15 @@ class LogPreparation:
         self.log_merger = LogMerger()
 
     def clean_message(self, message):
-        message = text_processing.replace_tabs_for_newlines(message)
-        message = text_processing.fix_big_encoded_urls(message)
-        message = text_processing.remove_generated_parts(message)
-        message = text_processing.remove_guid_uids_from_text(message)
-        message = text_processing.clean_html(message)
-        message = text_processing.delete_empty_lines(message)
-        message = text_processing.leave_only_unique_lines(message)
-        return message
+        cleaned_message = text_processing.unify_line_endings(message)
+        cleaned_message = text_processing.replace_tabs_for_newlines(cleaned_message)
+        cleaned_message = text_processing.fix_big_encoded_urls(cleaned_message)
+        cleaned_message = text_processing.remove_generated_parts(cleaned_message)
+        cleaned_message = text_processing.remove_guid_uids_from_text(cleaned_message)
+        cleaned_message = text_processing.clean_html(cleaned_message)
+        cleaned_message = text_processing.delete_empty_lines(cleaned_message)
+        cleaned_message = text_processing.leave_only_unique_lines(cleaned_message)
+        return cleaned_message
 
     def _create_log_template(self):
         return {

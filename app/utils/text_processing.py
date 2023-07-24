@@ -445,6 +445,10 @@ def replace_tabs_for_newlines(message):
     return message.replace("\t", "\n")
 
 
+def unify_line_endings(message):
+    return message.replace("\r\n", "\n")
+
+
 def fix_big_encoded_urls(message):
     """Decodes urls encoded with %12, etc. and removes brackets to separate url"""
     new_message = message

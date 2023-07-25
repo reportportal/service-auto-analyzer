@@ -29,7 +29,7 @@ STOPWORDS = set(nltk.corpus.stopwords.words("english"))
 FILE_EXTENSIONS = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
 
 
-def remove_starting_datetime(text):
+def remove_starting_datetime(text: str) -> str:
     """Removes datetime at the beginning of the text"""
     log_date = ""
     idx_text_start = 0

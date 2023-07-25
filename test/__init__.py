@@ -12,8 +12,16 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import os
+from typing import List
+
 from app.utils.utils import read_json_file
 
 
 def get_fixture(fixture_name, to_json=False):
     return read_json_file("test_res/fixtures", fixture_name, to_json)
+
+
+def read_file_lines(folder: str, filename: str) -> List[str]:
+    with open(os.path.join(folder, filename), "r") as file:
+        return file.readlines()

@@ -18,6 +18,8 @@ import logging
 import warnings
 import os
 import json
+from typing import Union, Any
+
 import requests
 from app.commons import launch_objects
 from collections import Counter
@@ -43,10 +45,16 @@ def ignore_warnings(func):
     return _inner
 
 
-def read_json_file(folder, filename, to_json=False):
-    """Read fixture from file"""
+def read_file(folder: str, filename: str) -> str:
+    """Read file content as string (UTF-8)"""
     with open(os.path.join(folder, filename), "r") as file:
-        return file.read() if not to_json else json.loads(file.read())
+        return file.read()
+
+
+def read_json_file(folder: str, filename: str, to_json=False) -> Union[str, Any]:
+    """Read fixture from file"""
+    content = read_file(folder, filename)
+    return content if not to_json else json.loads(content)
 
 
 def extract_real_id(elastic_id):
@@ -213,7 +221,7 @@ def gather_feature_list(gathered_data_dict, feature_ids, to_list=False):
         return []
     for idx, feature in enumerate(feature_ids):
         if feature not in gathered_data_dict or len(gathered_data_dict[feature]) == 0:
-            gathered_data_dict[feature] = [[0.0] for i in range(axis_x_size)]
+            gathered_data_dict[feature] = [[0.0] for _ in range(axis_x_size)]
         if features_array is None:
             features_array = np.asarray(gathered_data_dict[feature])
         else:

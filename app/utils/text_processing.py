@@ -16,6 +16,7 @@ import logging
 import re
 import string
 import urllib.parse
+from typing import List
 from urllib.parse import urlparse
 
 import nltk
@@ -28,13 +29,14 @@ STOPWORDS = set(nltk.corpus.stopwords.words("english"))
 FILE_EXTENSIONS = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
 
 
-def remove_starting_datetime(text, remove_first_digits=False):
+def remove_starting_datetime(text):
     """Removes datetime at the beginning of the text"""
     log_date = ""
     idx_text_start = 0
-    for idx, str_part in enumerate(text.split(" ")):
+    tokenized_text = text.split(" ")
+    for idx, str_part in enumerate(tokenized_text):
         try:
-            parsed_info = re.sub(r"[\[\]\{\},;!#\"$%&\'\(\)*<=>?@^_`|~]", "", log_date + " " + str_part)
+            parsed_info = re.sub(r"[\[\]{},;!#\"$%&'()*<=>?@^_`|~]", "", log_date + " " + str_part)
             parse(parsed_info)
             log_date = parsed_info
             log_date = log_date.strip()
@@ -46,23 +48,14 @@ def remove_starting_datetime(text, remove_first_digits=False):
     if found_regex_log_date and found_regex_log_date.group(0) == log_date:
         idx_text_start = 0
 
-    text_split = text.split(" ")
-    if remove_first_digits:
-        if idx_text_start == 0:
-            for idx in range(len(text_split)):
-                rs = text_split[idx].translate(text_split[idx].maketrans("", "", string.punctuation))
-                if not re.search(r"\d+", rs.strip()):
-                    idx_text_start = idx
-                    break
-
-    return " ".join(text_split[idx_text_start:])
+    return " ".join(tokenized_text[idx_text_start:])
 
 
-def filter_empty_lines(log_lines):
+def filter_empty_lines(log_lines: List[str]) -> List[str]:
     return [line for line in log_lines if line.strip()]
 
 
-def delete_empty_lines(log):
+def delete_empty_lines(log: str) -> str:
     """Delete empty lines"""
     return "\n".join(filter_empty_lines(log.split("\n")))
 

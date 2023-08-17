@@ -47,7 +47,7 @@ class AutoAnalyzerService(AnalyzerService):
             "filter_min_should_match": self.choose_fields_to_filter_strict(
                 analyzer_config.numberOfLogLines, min_should_match),
             "number_of_log_lines": analyzer_config.numberOfLogLines,
-            "filter_by_unique_id": True,
+            "filter_by_test_case_hash": True,
             "boosting_model": self.search_cfg["BoostModelFolder"],
             "filter_by_all_logs_should_be_similar": analyzer_config.allMessagesShouldMatch,
             "time_weight_decay": self.search_cfg["TimeWeightDecay"]

@@ -46,7 +46,7 @@ class SuggestService(AnalyzerService):
             "filter_min_should_match_any": self.choose_fields_to_filter_suggests(
                 analyzerConfig.numberOfLogLines),
             "number_of_log_lines": analyzerConfig.numberOfLogLines,
-            "filter_by_unique_id": True,
+            "filter_by_test_case_hash": True,
             "boosting_model": self.search_cfg["SuggestBoostModelFolder"],
             "time_weight_decay": self.search_cfg["TimeWeightDecay"]
         }

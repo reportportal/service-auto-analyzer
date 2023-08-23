@@ -422,8 +422,9 @@ def preprocess_words(text):
 def remove_guid_uids_from_text(text):
     for pattern in [
         r"[0-9a-fA-F]{16,48}|[0-9a-fA-F]{10,48}\.\.\.",
-        "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",  # noqa
-        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-\w+"]:
+        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-\w+"
+    ]:
         strings_to_replace = set()
         for m in re.findall(pattern, text):
             if not m.isdigit() and m.strip():

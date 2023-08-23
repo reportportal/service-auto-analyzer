@@ -22,7 +22,6 @@ from urllib.parse import urlparse
 import nltk
 from dateutil.parser import parse
 
-
 logger = logging.getLogger("analyzerApp.utils.textProcessing")
 
 STOPWORDS = set(nltk.corpus.stopwords.words("english"))
@@ -40,7 +39,7 @@ def remove_starting_datetime(text: str) -> str:
             parse(parsed_info)
             log_date = parsed_info
             log_date = log_date.strip()
-        except Exception as e: # noqa
+        except Exception as e:  # noqa
             idx_text_start = idx
             break
     log_date = log_date.replace("'", "").replace("\"", "")
@@ -222,7 +221,7 @@ def get_potential_status_codes(text):
                         if found_code not in potential_codes:
                             potential_codes.add(found_code)
                             potential_codes_list.append(found_code)
-                except: # noqa
+                except:  # noqa
                     pass
     return potential_codes_list
 
@@ -422,9 +421,9 @@ def preprocess_words(text):
 
 def remove_guid_uids_from_text(text):
     for pattern in [
-            r"[0-9a-fA-F]{16,48}|[0-9a-fA-F]{10,48}\.\.\.",
-            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", # noqa
-            r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-\w+"]:
+        r"[0-9a-fA-F]{16,48}|[0-9a-fA-F]{10,48}\.\.\.",
+        "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",  # noqa
+        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-\w+"]:
         strings_to_replace = set()
         for m in re.findall(pattern, text):
             if not m.isdigit() and m.strip():
@@ -447,7 +446,7 @@ def fix_big_encoded_urls(message):
     new_message = message
     try:
         new_message = urllib.parse.unquote(message)
-    except: # noqa
+    except:  # noqa
         pass
     if new_message != message:
         return re.sub(r"[\(\)\{\}#%]", " ", new_message)
@@ -504,7 +503,7 @@ def remove_generated_parts(message):
                     part_to_replace = ".%s" % found_part
                 try:
                     line = re.sub(whole_found_part, part_to_replace, line)
-                except: # noqa
+                except:  # noqa
                     pass
 
         line = re.sub(r"\.+", ".", line)

@@ -157,7 +157,6 @@ class AutoAnalyzerService(AnalyzerService):
                         {"term": {"test_item": log["_source"]["test_item"]}}
                     ],
                     "must": [
-                        {"term": {"unique_id": log["_source"]["unique_id"]}},
                         {"term": {"test_case_hash": log["_source"]["test_case_hash"]}}
                     ],
                     "should": []

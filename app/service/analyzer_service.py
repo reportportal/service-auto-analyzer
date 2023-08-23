@@ -100,12 +100,9 @@ class AnalyzerService:
                         ],
                         "must": [],
                         "should": [
-                            {"term": {"unique_id": {
-                                "value": log["_source"]["unique_id"],
-                                "boost": abs(self.search_cfg["BoostUniqueID"])}}},
                             {"term": {"test_case_hash": {
                                 "value": log["_source"]["test_case_hash"],
-                                "boost": abs(self.search_cfg["BoostUniqueID"])}}},
+                                "boost": abs(self.search_cfg["BoostTestCaseHash"])}}},
                             {"term": {"is_auto_analyzed": {
                                 "value": str(self.search_cfg["BoostAA"] > 0).lower(),
                                 "boost": abs(self.search_cfg["BoostAA"]), }}},

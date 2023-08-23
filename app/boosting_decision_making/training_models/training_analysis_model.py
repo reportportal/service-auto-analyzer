@@ -100,7 +100,7 @@ class AnalysisModelTraining:
             "filter_min_should_match": [],
             "filter_min_should_match_any": [],
             "number_of_log_lines": numberOfLogLines,
-            "filter_by_unique_id": False,
+            "filter_by_test_case_hash": False,
             "boosting_model": self.baseline_folders[boosting_model_name],
             "chosen_namespaces": namespaces,
             "calculate_similarities": False,

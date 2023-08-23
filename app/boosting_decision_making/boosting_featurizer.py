@@ -12,13 +12,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.utils import utils, text_processing
-from app.commons import similarity_calculator
-from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
 import logging
-import numpy as np
-from datetime import datetime
 from collections import deque
+from datetime import datetime
+
+import numpy as np
+
+from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
+from app.commons import similarity_calculator
+from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
@@ -90,8 +92,8 @@ class BoostingFeaturizer:
                  {"field_name": "detected_message_without_params_and_brackets"}, []),
             55: (self._calculate_similarity_percent,
                  {"field_name": "potential_status_codes"}, []),
-            56: (self._calculate_similarity_percent, {"field_name": "launch_name"}, []),
-            57: (self.is_launch_id_the_same, {}, []),
+            56: (self.is_the_same_launch, {}, []),
+            57: (self.is_the_same_launch_id, {}, []),
             58: (self._calculate_model_probability,
                  {"model_folder": self.config["boosting_model"]},
                  self.get_necessary_features(self.config["boosting_model"])),
@@ -111,7 +113,7 @@ class BoostingFeaturizer:
             71: (self._encode_into_vector,
                  {"field_name": "test_item_name", "feature_name": 71, "only_query": False}, []),
             72: (self._encode_into_vector,
-                 {"field_name": "unique_id", "feature_name": 72, "only_query": True}, []),
+                 {"field_name": "test_case_hash", "feature_name": 72, "only_query": True}, []),
             73: (self._encode_into_vector,
                  {"field_name": "found_exceptions", "feature_name": 73, "only_query": True}, [])
         }
@@ -125,7 +127,7 @@ class BoostingFeaturizer:
                 self.config["filter_min_should_match"] + ["merged_small_logs"])
             for field in self.config["filter_min_should_match"]:
                 all_results = self.filter_by_min_should_match(all_results, field=field)
-        if "filter_min_should_match_any" in self.config and\
+        if "filter_min_should_match_any" in self.config and \
                 len(self.config["filter_min_should_match_any"]) > 0:
             self.similarity_calculator.find_similarity(
                 all_results,
@@ -137,8 +139,9 @@ class BoostingFeaturizer:
         if "filter_by_all_logs_should_be_similar" in self.config:
             if self.config["filter_by_all_logs_should_be_similar"]:
                 all_results = self.filter_by_all_logs_should_be_similar(all_results)
-        if "filter_by_unique_id" in self.config and self.config["filter_by_unique_id"]:
-            all_results = self.filter_by_unique_id(all_results)
+        if "filter_by_test_case_hash" in self.config \
+                and self.config["filter_by_test_case_hash"]:
+            all_results = self.filter_by_test_case_hash(all_results)
         if "calculate_similarities" not in self.config or self.config["calculate_similarities"]:
             self.similarity_calculator.find_similarity(
                 all_results,
@@ -199,7 +202,7 @@ class BoostingFeaturizer:
             if compared_field_date < field_date:
                 field_date, compared_field_date = compared_field_date, field_date
             dates_by_issue_types[issue_type] = np.exp(
-                np.log(self.config["time_weight_decay"]) * ((compared_field_date - field_date).days) / 7)
+                np.log(self.config["time_weight_decay"]) * (compared_field_date - field_date).days / 7)
         return dates_by_issue_types
 
     def _encode_into_vector(self, field_name, feature_name, only_query):
@@ -210,7 +213,7 @@ class BoostingFeaturizer:
         if field_name != self.features_dict_with_saved_objects[feature_name].field_name:
             logger.error(field_name)
             logger.error("Field name '%s' is not the same as in the settings '%s'" % (
-                         field_name, self.features_dict_with_saved_objects[feature_name].field_name))
+                field_name, self.features_dict_with_saved_objects[feature_name].field_name))
             return []
         scores_by_issue_type = self.find_most_relevant_by_type()
         encodings_by_issue_type = {}
@@ -315,24 +318,25 @@ class BoostingFeaturizer:
             new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
 
-    def filter_by_unique_id(self, all_results):
+    def filter_by_test_case_hash(self, all_results):
         new_results = []
         for log, res in all_results:
-            unique_id_dict = {}
+            test_case_hash_dict = {}
             for r in res["hits"]["hits"]:
-                if r["_source"]["unique_id"] not in unique_id_dict:
-                    unique_id_dict[r["_source"]["unique_id"]] = []
-                unique_id_dict[r["_source"]["unique_id"]].append(
+                test_case_hash = r["_source"]["test_case_hash"]
+                if test_case_hash not in test_case_hash_dict:
+                    test_case_hash_dict[test_case_hash] = []
+                test_case_hash_dict[test_case_hash].append(
                     (r["_id"], int(r["_score"]), datetime.strptime(
                         r["_source"]["start_time"], '%Y-%m-%d %H:%M:%S')))
             log_ids_to_take = set()
-            for unique_id in unique_id_dict:
-                unique_id_dict[unique_id] = sorted(
-                    unique_id_dict[unique_id],
+            for test_case_hash in test_case_hash_dict:
+                test_case_hash_dict[test_case_hash] = sorted(
+                    test_case_hash_dict[test_case_hash],
                     key=lambda x: (x[1], x[2]),
                     reverse=True)
                 scores_used = set()
-                for sorted_score in unique_id_dict[unique_id]:
+                for sorted_score in test_case_hash_dict[test_case_hash]:
                     if sorted_score[1] not in scores_used:
                         log_ids_to_take.add(sorted_score[0])
                         scores_used.add(sorted_score[1])
@@ -343,37 +347,49 @@ class BoostingFeaturizer:
             new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
 
-    def is_launch_id_the_same(self):
+    def is_the_same_field(self, field_name: str) -> dict[str, int]:
         scores_by_issue_type = self.find_most_relevant_by_type()
         num_of_logs_issue_type = {}
         for issue_type in scores_by_issue_type:
-            rel_item_launch_id = scores_by_issue_type[issue_type]["mrHit"]["_source"]["launch_id"]
-            queiried_item_launch_id = scores_by_issue_type[issue_type]["compared_log"]["_source"]["launch_id"]
-            num_of_logs_issue_type[issue_type] = int(rel_item_launch_id == queiried_item_launch_id)
+            rel_item_value = scores_by_issue_type[issue_type]["mrHit"]["_source"][field_name]
+            queried_item_value = scores_by_issue_type[issue_type]["compared_log"]["_source"][field_name]
+
+            if rel_item_value is None and queried_item_value is None:
+                num_of_logs_issue_type[issue_type] = 0
+                continue
+
+            if type(queried_item_value) == str:
+                queried_item_value = queried_item_value.strip().lower()
+            if type(rel_item_value) == str:
+                rel_item_value = rel_item_value.strip().lower()
+
+            if rel_item_value == '' and queried_item_value == '':
+                num_of_logs_issue_type[issue_type] = 0
+                continue
+
+            num_of_logs_issue_type[issue_type] = int(rel_item_value == queried_item_value)
         return num_of_logs_issue_type
 
-    def is_the_same_test_case(self):
-        scores_by_issue_type = self.find_most_relevant_by_type()
-        num_of_logs_issue_type = {}
-        for issue_type in scores_by_issue_type:
-            rel_item_unique_id = scores_by_issue_type[issue_type]["mrHit"]["_source"]["unique_id"]
-            queiried_item_unique_id = scores_by_issue_type[issue_type]["compared_log"]["_source"]["unique_id"]
-            if not rel_item_unique_id.strip() and not queiried_item_unique_id.strip():
-                num_of_logs_issue_type[issue_type] = 0
-            else:
-                num_of_logs_issue_type[issue_type] = int(rel_item_unique_id == queiried_item_unique_id)
-        return num_of_logs_issue_type
+    def is_the_same_test_case(self) -> dict[str, int]:
+        return self.is_the_same_field('test_case_hash')
+
+    def is_the_same_launch(self) -> dict[str, int]:
+        return self.is_the_same_field('launch_name')
+
+    def is_the_same_launch_id(self) -> dict[str, int]:
+        return self.is_the_same_field('launch_id')
 
     def has_the_same_test_case_in_all_results(self):
         scores_by_issue_type = self.find_most_relevant_by_type()
         num_of_logs_issue_type = {}
         has_the_same_test_case = 0
         for issue_type in scores_by_issue_type:
-            rel_item_unique_id = scores_by_issue_type[issue_type]["mrHit"]["_source"]["unique_id"]
-            queiried_item_unique_id = scores_by_issue_type[issue_type]["compared_log"]["_source"]["unique_id"]
-            if not rel_item_unique_id.strip():
+            rel_item_test_case_hash = scores_by_issue_type[issue_type]["mrHit"]["_source"]["test_case_hash"]
+            queried_item_test_case_hash = \
+                scores_by_issue_type[issue_type]["compared_log"]["_source"]["test_case_hash"]
+            if not rel_item_test_case_hash:
                 continue
-            if rel_item_unique_id == queiried_item_unique_id:
+            if rel_item_test_case_hash == queried_item_test_case_hash:
                 has_the_same_test_case = 1
                 break
         for issue_type in scores_by_issue_type:
@@ -448,7 +464,7 @@ class BoostingFeaturizer:
         scores_by_issue_type = self._calculate_score()
         percent_by_issue_type = {}
         for issue_type in scores_by_issue_type:
-            percent_by_issue_type[issue_type] = 1 / len(scores_by_issue_type)\
+            percent_by_issue_type[issue_type] = 1 / len(scores_by_issue_type) \
                 if len(scores_by_issue_type) else 0
         return percent_by_issue_type
 
@@ -456,7 +472,7 @@ class BoostingFeaturizer:
         scores_by_issue_type = self.find_most_relevant_by_type()
         has_several_logs_by_type = {}
         for issue_type in scores_by_issue_type:
-            merged_small_logs =\
+            merged_small_logs = \
                 scores_by_issue_type[issue_type]["mrHit"]["_source"]["merged_small_logs"]
             has_several_logs_by_type[issue_type] = int(merged_small_logs.strip() != "")
         return has_several_logs_by_type
@@ -465,7 +481,7 @@ class BoostingFeaturizer:
         scores_by_issue_type = self.find_most_relevant_by_type()
         has_several_logs_by_type = {}
         for issue_type in scores_by_issue_type:
-            merged_small_logs =\
+            merged_small_logs = \
                 scores_by_issue_type[issue_type]["compared_log"]["_source"]["merged_small_logs"]
             has_several_logs_by_type[issue_type] = int(merged_small_logs.strip() != "")
         return has_several_logs_by_type
@@ -492,7 +508,7 @@ class BoostingFeaturizer:
 
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
-                self.scores_by_issue_type[issue_type]["score"] +=\
+                self.scores_by_issue_type[issue_type]["score"] += \
                     (hit["normalized_score"] / self.total_normalized)
         return self.scores_by_issue_type
 
@@ -515,7 +531,7 @@ class BoostingFeaturizer:
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
 
-                if issue_type not in max_scores_by_issue_type or\
+                if issue_type not in max_scores_by_issue_type or \
                         hit["normalized_score"] > max_scores_by_issue_type[issue_type]["max_score"]:
                     max_scores_by_issue_type[issue_type] = {"max_score": hit["normalized_score"],
                                                             "max_score_pos": 1 / (1 + idx), }
@@ -529,7 +545,7 @@ class BoostingFeaturizer:
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
 
-                if issue_type not in min_scores_by_issue_type or\
+                if issue_type not in min_scores_by_issue_type or \
                         hit["normalized_score"] < min_scores_by_issue_type[issue_type]["min_score"]:
                     min_scores_by_issue_type[issue_type] = {"min_score": hit["normalized_score"],
                                                             "min_score_pos": 1 / (1 + idx), }
@@ -548,13 +564,13 @@ class BoostingFeaturizer:
 
                 if issue_type not in cnt_items_by_issue_type:
                     cnt_items_by_issue_type[issue_type] = {"mean_score": 0,
-                                                           "cnt_items_percent":  0, }
+                                                           "cnt_items_percent": 0, }
 
                 cnt_items_by_issue_type[issue_type]["cnt_items_percent"] += 1
                 cnt_items_by_issue_type[issue_type]["mean_score"] += hit["normalized_score"]
 
         for issue_type in cnt_items_by_issue_type:
-            cnt_items_by_issue_type[issue_type]["mean_score"] /=\
+            cnt_items_by_issue_type[issue_type]["mean_score"] /= \
                 cnt_items_by_issue_type[issue_type]["cnt_items_percent"]
             cnt_items_by_issue_type[issue_type]["cnt_items_percent"] /= cnt_items_glob
         return {item: cnt_items_by_issue_type[item][return_val_name]
@@ -616,7 +632,7 @@ class BoostingFeaturizer:
                 issue_type_names.append(issue_type)
 
             for feature in self.get_ordered_features_to_process():
-                if feature in self.previously_gathered_features and\
+                if feature in self.previously_gathered_features and \
                         feature not in self.features_to_recalculate_always:
                     gathered_data_dict[feature] = self.previously_gathered_features[feature]
                 else:
@@ -631,7 +647,7 @@ class BoostingFeaturizer:
                             try:
                                 _ = result[issue_type][0]
                                 gathered_data_dict[feature].append(result[issue_type])
-                            except: # noqa
+                            except:  # noqa
                                 gathered_data_dict[feature].append([round(result[issue_type], 2)])
                     self.previously_gathered_features[feature] = gathered_data_dict[feature]
             gathered_data = utils.gather_feature_list(gathered_data_dict, self.feature_ids, to_list=True)

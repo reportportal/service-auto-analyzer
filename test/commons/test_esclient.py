@@ -18,6 +18,7 @@ from http import HTTPStatus
 from unittest.mock import MagicMock
 
 import httpretty
+import sure
 
 import app.commons.launch_objects as launch_objects
 from app.commons import esclient
@@ -361,7 +362,7 @@ class TestEsClient(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            try:
+            with sure.ensure('Error in the test case index: {0}', idx):
                 self._start_server(test["test_calls"])
                 app_config = self.app_config
                 if "app_config" in test:
@@ -373,12 +374,9 @@ class TestEsClient(TestService):
 
                 response = es_client.delete_logs(test["rq"])
 
-                assert test["expected_count"] == response
+                test["expected_count"].should.equal(response)
 
                 TestEsClient.shutdown_server(test["test_calls"])
-            except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}'). \
-                    with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_index_logs(self):
@@ -646,7 +644,7 @@ class TestEsClient(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            try:
+            with sure.ensure('Error in the test case index: {0}', idx):
                 self._start_server(test["test_calls"])
                 app_config = self.app_config
                 if "app_config" in test:
@@ -656,14 +654,11 @@ class TestEsClient(TestService):
                 launches = [launch_objects.Launch(**launch) for launch in json.loads(test["index_rq"])]
                 response = es_client.index_logs(launches)
 
-                assert test["has_errors"] == response.errors
-                assert test["expected_count"] == response.took
-                assert test["expected_log_exceptions"] == response.logResults
+                test["has_errors"].should.equal(response.errors)
+                test["expected_count"].should.equal(response.took)
+                test["expected_log_exceptions"].should.equal(response.logResults)
 
                 TestEsClient.shutdown_server(test["test_calls"])
-            except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}'). \
-                    with_traceback(err.__traceback__)
 
     def test_defect_update(self):
         tests = [

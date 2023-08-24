@@ -6,7 +6,7 @@
   "testItems": [
       {
           "uniqueId": "unique1",
-          "test_case_hash": -1126886180,
+          "testCaseHash": -1126886180,
           "testItemId": 1,
           "issueType": "ti001",
           "startTime": [2020,1,15,10,57,43],

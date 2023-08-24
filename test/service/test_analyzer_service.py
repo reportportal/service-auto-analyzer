@@ -18,6 +18,7 @@ from http import HTTPStatus
 from unittest.mock import MagicMock
 
 import httpretty
+import sure
 
 from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
 from app.commons import launch_objects
@@ -330,7 +331,7 @@ class TestAutoAnalyzerService(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            try:
+            with sure.ensure('Error in the test case index: {0}', idx):
                 self._start_server(test["test_calls"])
                 config = self.get_default_search_config()
                 app_config = self.app_config
@@ -356,18 +357,15 @@ class TestAutoAnalyzerService(TestService):
                         launch.analyzerConfig = test["analyzer_config"]
                 response = analyzer_service.analyze_logs(launches)
 
-                assert len(response) == test["expected_count"]
+                response.should.have.length_of(test["expected_count"])
 
                 if test["expected_issue_type"] != "":
-                    assert response[0].issueType == test["expected_issue_type"]
+                    response[0].issueType.should.equal(test["expected_issue_type"])
 
                 if "expected_id" in test:
-                    assert response[0].relevantItem == test["expected_id"]
+                    response[0].relevantItem.should.equal(test["expected_id"])
 
                 TestAutoAnalyzerService.shutdown_server(test["test_calls"])
-            except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}'). \
-                    with_traceback(err.__traceback__)
 
 
 if __name__ == '__main__':

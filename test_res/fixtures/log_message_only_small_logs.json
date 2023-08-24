@@ -6,6 +6,7 @@
 		"launch_name": "launch test",
 		"launch_id": 12,
 		"unique_id": "unique1",
+		"test_case_hash": -1126886180,
 		"test_item": 43,
 		"test_item_name": "first test",
 		"merged_small_logs": "report portal returned error first assertionerror found screenshot",

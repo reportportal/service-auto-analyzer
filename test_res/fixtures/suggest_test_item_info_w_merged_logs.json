@@ -1,7 +1,7 @@
 {
 	"testItemId": 123,
     "uniqueId": "unique1",
-    "testCaseHash": 0,
+    "testCaseHash": -1126886180,
     "launchId": 145,
     "launchName": "Launch with test items with logs",
     "project": 1,

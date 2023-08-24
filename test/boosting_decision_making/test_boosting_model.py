@@ -16,6 +16,7 @@ import logging
 import unittest
 
 import numpy as np
+import sure
 
 from app.boosting_decision_making import defect_type_model
 from app.boosting_decision_making import weighted_similarity_calculator
@@ -57,7 +58,7 @@ class TestBoostingModel(unittest.TestCase):
             number_of_log_lines,
             filter_fields=["detected_message", "stacktrace"],
             filter_fields_any=[],
-            min_should_match=0.8):
+            min_should_match=0.0):
         """Get default config"""
         return {
             "max_query_terms": 50,
@@ -150,21 +151,14 @@ class TestBoostingModel(unittest.TestCase):
             if self.global_defect_type_model_folder.strip():
                 _boosting_featurizer.set_defect_type_model(
                     defect_type_model.DefectTypeModel(folder=self.global_defect_type_model_folder))
-            try:
+            with sure.ensure('Error in the test case index: {0}', idx):
                 gathered_data, issue_type_names = _boosting_featurizer.gather_features_info()
-                assert utils.compare_different_types_equality(gathered_data, boost_model_results[str(idx)][0],
-                                                              epsilon=self.epsilon)
                 predict_label, predict_probability = test["decision_maker"].predict(
                     gathered_data)
-                assert utils.compare_different_types_equality(predict_label.tolist(),
-                                                              boost_model_results[str(idx)][1],
-                                                              epsilon=self.epsilon)
-                assert utils.compare_different_types_equality(predict_probability.tolist(),
-                                                              boost_model_results[str(idx)][2],
-                                                              epsilon=self.epsilon)
-            except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}'). \
-                    with_traceback(err.__traceback__)
+                gathered_data.should.equal(boost_model_results[str(idx)][0], epsilon=self.epsilon)
+                predict_label.tolist().should.equal(boost_model_results[str(idx)][1], epsilon=self.epsilon)
+                predict_probability.tolist().should.equal(boost_model_results[str(idx)][2],
+                                                          epsilon=self.epsilon)
 
     @utils.ignore_warnings
     def test_full_data_check_suggests(self):
@@ -248,18 +242,12 @@ class TestBoostingModel(unittest.TestCase):
             if self.global_defect_type_model_folder.strip():
                 _boosting_featurizer.set_defect_type_model(
                     defect_type_model.DefectTypeModel(folder=self.global_defect_type_model_folder))
-            try:
+            with sure.ensure('Error in the test case index: {0}', idx):
                 gathered_data, test_item_ids = _boosting_featurizer.gather_features_info()
                 predict_label, predict_probability = test["decision_maker"].predict(gathered_data)
-                assert utils.compare_different_types_equality(gathered_data,
-                                                              boost_model_results[str(idx)][0],
-                                                              epsilon=self.epsilon)
-                assert utils.compare_different_types_equality(predict_label.tolist(),
-                                                              boost_model_results[str(idx)][1],
-                                                              epsilon=self.epsilon)
-                assert utils.compare_different_types_equality(predict_probability.tolist(),
-                                                              boost_model_results[str(idx)][2],
-                                                              epsilon=self.epsilon)
-            except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}'). \
-                    with_traceback(err.__traceback__)
+                gathered_data.should.equal(boost_model_results[str(idx)][0],
+                                           epsilon=self.epsilon)
+                predict_label.tolist().should.equal(boost_model_results[str(idx)][1],
+                                                    epsilon=self.epsilon)
+                predict_probability.tolist().should.equal(boost_model_results[str(idx)][2],
+                                                          epsilon=self.epsilon)

@@ -3,3 +3,4 @@ httpretty==1.0.5
 pytest==7.4.0
 pytest-cov==4.1.0
 flake8==5.0.4
+sure==2.0.1

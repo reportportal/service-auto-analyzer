@@ -28,6 +28,7 @@
                     "message": "message",
                     "test_item": 1,
                     "unique_id": "unique1",
+                    "test_case_hash": -1126886180,
                     "merged_small_logs": "",
                     "detected_message": "message",
                     "stacktrace": "",

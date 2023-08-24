@@ -30,6 +30,7 @@
                     "test_item_name": "first test",
                     "start_time": "2020-01-15 10:57:43",
                     "unique_id": "unique1",
+                    "test_case_hash": -1126886180,
                     "detected_message": "Message http : localhost/admin \r\n java.lang.NoClassDefFoundError\r",
                     "detected_message_with_numbers": "Message 12 http : localhost/admin \r\n java.lang.NoClassDefFoundError\r",
                     "only_numbers": "12",

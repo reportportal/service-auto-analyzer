@@ -7,6 +7,7 @@
         {
             "uniqueId": "unique1",
             "testItemId": 1,
+            "test_case_hash": -1126886180,
             "issueType": "ti001",
             "startTime": [2020,1,15,10,57,43],
             "testItemName": "first test",

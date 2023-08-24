@@ -27,6 +27,7 @@
                     "message": "java.lang.NullPointerException",
                     "test_item": 1,
                     "unique_id": "unique1",
+                    "test_case_hash": -1126886180,
                     "merged_small_logs": "not empty merged small logs",
                     "detected_message": "java.lang.NullPointerException",
                     "detected_message_with_numbers": "java.lang.NullPointerException",

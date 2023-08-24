@@ -6,6 +6,7 @@
         {
           "testItemId": 1,
             "uniqueId": "unique1",
+            "test_case_hash": -1126886180,
             "issueType": "ti001",
             "isAutoAnalyzed": false,
             "logs": []

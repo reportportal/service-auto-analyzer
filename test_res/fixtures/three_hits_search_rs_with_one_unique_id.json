@@ -96,6 +96,7 @@
                     "test_item": 3,
                     "start_time": "2020-01-13 10:57:43",
                     "unique_id": "unique4",
+                    "test_case_hash": 4,
                     "detected_message": "Message http : localhost/admin \r\n java.lang.NoClassDefFoundError\r",
                     "detected_message_with_numbers": "Message 45 http : localhost/admin \r\n java.lang.NoClassDefFoundError\r",
                     "only_numbers": "45",

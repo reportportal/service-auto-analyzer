@@ -205,7 +205,7 @@ class TestService(unittest.TestCase):
             "MinDocFreq": 1,
             "BoostAA": -2,
             "BoostLaunch": 2,
-            "BoostUniqueID": 2,
+            "BoostTestCaseHash": 2,
             "MaxQueryTerms": 50,
             "SearchLogsMinShouldMatch": "95%",
             "SearchLogsMinSimilarity": 0.95,

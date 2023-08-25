@@ -80,7 +80,7 @@ class TestEsQuery(unittest.TestCase):
             "MinDocFreq": 1,
             "BoostAA": -10,
             "BoostLaunch": 5,
-            "BoostUniqueID": 3,
+            "BoostTestCaseHash": 3,
             "MaxQueryTerms": 50,
             "SearchLogsMinShouldMatch": "90%",
             "SearchLogsMinSimilarity": 0.9,

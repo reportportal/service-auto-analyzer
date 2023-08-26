@@ -29,12 +29,6 @@
                     ],
                     "should": [
                         {"term": {
-                            "unique_id": {
-                                "value": "unique",
-                                "boost": 3
-                            }
-                        }},
-                        {"term": {
                             "test_case_hash": {
                                 "value": 1,
                                 "boost": 3

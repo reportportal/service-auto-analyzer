@@ -18,9 +18,6 @@
                     ],
                     "must": [
                         {"term": {
-                            "unique_id": "unique"
-                        }},
-                        {"term": {
                             "test_case_hash": 1
                         }},
                         {"term": {

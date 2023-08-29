@@ -446,16 +446,14 @@ class BoostingFeaturizer:
             for elastic_res in res["hits"]["hits"]:
                 group_id = (elastic_res["_id"], log["_id"])
                 max_similarity = 0.0
-                similarity_to_compare = self.config["min_should_match"]
                 for field in fields:
                     sim_obj = self.similarity_calculator.similarity_dict[field][group_id]
                     similarity = sim_obj["similarity"]
                     if sim_obj["both_empty"] and field in self.fields_to_replace_with_merged_logs:
                         sim_obj = self.similarity_calculator.similarity_dict["merged_small_logs"]
                         similarity = sim_obj[group_id]["similarity"]
-                        similarity_to_compare = max(0.8, self.config["min_should_match"])
                     max_similarity = max(max_similarity, similarity)
-                if max_similarity >= similarity_to_compare:
+                if max_similarity >= self.config["min_should_match"]:
                     new_elastic_res.append(elastic_res)
             new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results

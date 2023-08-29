@@ -1,0 +1,54 @@
+{
+    "_scroll_id":"DXF1ZXJ5QW5kRmV0Y2gBAAAAAAAADl8Wa1lLdFBYRHlRanF6V3BoS1lpRjhQQQ==",
+    "took": 13,
+    "timed_out": false,
+    "_shards": {
+        "total": 1,
+        "successful": 1,
+        "failed": 0
+    },
+    "hits": {
+        "total": {
+            "value": 1,
+            "relation": "eq"
+        },
+        "max_score": 10,
+        "hits": [
+            {
+                "_index": "idx2",
+                "_type": "log",
+                "_id": "1",
+                "_score": 10,
+                "_source": {
+                    "issue_type": "AB001",
+                    "launch_name": "Launch 1",
+                    "log_level": 40000,
+                    "original_message_lines": 1,
+                    "original_message_words_number": 2,
+                    "message": "",
+                    "test_item": 1,
+                    "start_time": "2020-01-15 10:57:43",
+                    "unique_id": "unique1",
+                    "test_case_hash": -1126886180,
+                    "detected_message": "",
+                    "detected_message_with_numbers": "",
+                    "only_numbers": "",
+                    "merged_small_logs": "message error found",
+                    "stacktrace": "",
+                    "urls": "",
+                    "paths": "",
+                    "message_params": "",
+                    "found_exceptions": "",
+                    "found_exceptions_extended": "",
+                    "stacktrace_extended": "",
+                    "message_extended": "",
+                    "detected_message_extended": "",
+                    "detected_message_without_params_extended": "",
+                    "message_without_params_extended": "",
+                    "detected_message_without_params_and_brackets": "",
+                    "message_without_params_and_brackets": ""
+                }
+            }
+        ]
+    }
+}

@@ -1,0 +1,139 @@
+{
+    "properties": {
+        "test_item": {
+            "type": "keyword"
+        },
+        "issue_type": {
+            "type": "keyword"
+        },
+        "log_time": {
+            "type":   "date",
+            "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        },
+        "message": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "merged_small_logs": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "detected_message": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "detected_message_with_numbers": {
+            "type":     "text",
+            "index":    false
+        },
+        "stacktrace": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "only_numbers": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "found_exceptions": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "found_exceptions_extended": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "message_params": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "message_without_params_extended": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "urls": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "paths": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "detected_message_extended": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "detected_message_without_params_extended": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "potential_status_codes": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "stacktrace_extended": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "message_extended": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "original_message_lines": {
+            "type": "integer"
+        },
+        "original_message_words_number": {
+            "type": "integer"
+        },
+        "log_level": {
+            "type": "integer"
+        },
+        "test_case_hash": {
+            "type": "integer"
+        },
+        "launch_name": {
+            "type": "keyword"
+        },
+        "launch_id": {
+            "type": "keyword"
+        },
+        "launch_start_time": {
+            "type":   "date",
+            "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        },
+        "unique_id": {
+            "type": "keyword"
+        },
+        "is_auto_analyzed": {
+            "type": "keyword"
+        },
+        "is_merged": {
+            "type": "boolean"
+        },
+        "start_time": {
+            "type":   "date",
+            "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        },
+        "cluster_id": {
+            "type": "keyword"
+        },
+        "cluster_message": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "cluster_with_numbers": {
+            "type":     "boolean"
+        },
+        "whole_message": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "found_tests_and_methods": {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        },
+        "test_item_name":  {
+            "type":     "text",
+            "analyzer": "standard_english_analyzer"
+        }
+    }
+}

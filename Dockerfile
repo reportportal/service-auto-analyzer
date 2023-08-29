@@ -72,4 +72,4 @@ ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend \
 
 # Start uWSGI
 CMD ["/venv/bin/uwsgi", "--http-auto-chunked", "--http-keepalive"]
-HEALTHCHECK --interval=1m --timeout=5s --retries=2 CMD ["curl","-s", "-f", "--show-error","http://localhost:5001/"]
+HEALTHCHECK --interval=1m --timeout=5s --retries=2 CMD ["curl", "-s", "-f", "--show-error", "http://localhost:5001/"]

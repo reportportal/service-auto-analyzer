@@ -589,8 +589,8 @@ def extract_message_params(text):
     return all_params
 
 
-def build_url(main_url, url_params):
-    """Build url by concating url and url_params"""
+def build_url(main_url: str, url_params: list) -> str:
+    """Build url by concatenating url and url_params"""
     return main_url + "/" + "/".join(url_params)
 
 
@@ -640,7 +640,7 @@ def transform_string_feature_range_into_list(text):
     return values
 
 
-def unite_project_name(project_id, prefix):
+def unite_project_name(project_id: str, prefix: str) -> str:
     return prefix + project_id
 
 

@@ -18,4 +18,4 @@ gensim==4.3.0
 pandas==1.5.3
 imbalanced-learn==0.9.1
 urllib3==1.26.5
-certifi==2023.7.22
+certifi>=2023.7.22

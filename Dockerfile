@@ -1,4 +1,4 @@
-FROM --platform=${BUILDPLATFORM} python:3.10.12 as test
+FROM --platform=${BUILDPLATFORM} python:3.10.13 as test
 RUN apt-get update && apt-get install -y build-essential \
     && rm -rf /var/lib/apt/lists/* \
     && python -m venv /venv \
@@ -36,7 +36,7 @@ RUN mkdir /backend \
     && cp -r /build/res /backend/
 
 
-FROM --platform=${BUILDPLATFORM} python:3.10.12-slim
+FROM --platform=${BUILDPLATFORM} python:3.10.13-slim
 RUN apt-get update && apt-get -y upgrade \
     && apt-get install -y libxml2 libgomp1 curl \
     && rm -rf /var/lib/apt/lists/*

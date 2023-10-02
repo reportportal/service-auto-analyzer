@@ -1,0 +1,13 @@
+{
+	"testItemId": 123,
+    "uniqueId": "unique1",
+    "testCaseHash": -1126886180,
+    "launchId": 145,
+    "launchName": "Launch with test items with logs",
+    "project": 1,
+    "logs": [{
+    			"logId": 178,
+                "message": "Message  1\r\n Message  2",
+                "logLevel": 40000
+            }]
+}

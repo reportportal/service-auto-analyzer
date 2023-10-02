@@ -1,0 +1,26 @@
+[{
+  "launchId": 1234567892,
+  "project": 2,
+    "launchName": "Launch with test items with empty logs",
+    "testItems": [
+        {
+            "uniqueId": "unique1",
+            "testCaseHash": -1126886180,
+            "testItemId": 2,
+            "issueType": "ti001",
+            "isAutoAnalyzed": false,
+            "logs": [
+                {
+                  "logId": 1,
+                    "logLevel": 40000,
+                    "message": ""
+                },
+                {
+                  "logId": 2,
+                    "logLevel": 40000,
+                    "message": ""
+                }
+            ]
+        }
+    ]
+}]

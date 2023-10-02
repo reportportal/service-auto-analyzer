@@ -1,8 +1,0 @@
-{
-	"BOOST_MODEL_FOLDER": "model/auto_21.03.23",
-	"SUGGEST_BOOST_MODEL_FOLDER": "model/suggest_24.03.23",
-	"SIMILARITY_WEIGHTS_FOLDER": "model/weights_24.11.20",
-	"GLOBAL_DEFECT_TYPE_MODEL_FOLDER": "model/global_defect_type_model_12.03.23",
-	"RETRAIN_SUGGEST_BOOST_MODEL_CONFIG": "model/suggest_retrain_data_features_config.pickle",
-	"RETRAIN_AUTO_BOOST_MODEL_CONFIG": "model/auto_retrain_data_features_config.pickle"
-}

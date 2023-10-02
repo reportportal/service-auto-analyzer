@@ -1,0 +1,11 @@
+{
+    "number_of_shards": 1,
+    "analysis": {
+        "analyzer": {
+            "standard_english_analyzer": {
+                "type": "standard",
+                "stopwords": "_english_"
+            }
+        }
+    }
+}

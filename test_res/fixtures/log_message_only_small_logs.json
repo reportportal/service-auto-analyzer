@@ -1,0 +1,33 @@
+{
+	"_id": 1,
+	"_source": {
+		"start_time": "2021-07-31 18:34:55",
+		"log_level": 40000,
+		"launch_name": "launch test",
+		"launch_id": 12,
+		"unique_id": "unique1",
+		"test_case_hash": -1126886180,
+		"test_item": 43,
+		"test_item_name": "first test",
+		"merged_small_logs": "report portal returned error found screenshot",
+		"detected_message": "",
+		"detected_message_with_numbers": "",
+		"only_numbers": "",
+		"stacktrace": "",
+		"message": "",
+		"detected_message_without_params_extended": "",
+		"detected_message_extended": "",
+		"found_exceptions": "AssertionError",
+		"found_exceptions_extended": "AssertionError",
+		"message_params": "",
+		"urls": "",
+		"paths": "",
+		"stacktrace_extended": "",
+		"message_without_params_extended": "",
+		"message_extended": "",
+		"detected_message_without_params_and_brackets": "",
+		"message_without_params_and_brackets": "",
+		"potential_status_codes": "200",
+		"found_tests_and_methods": ""
+	}
+}

@@ -51,7 +51,7 @@
 | ES_MIN_SHOULD_MATCH             | string   | 80%               | the global default min should match value for auto-analysis, but it is used only when the project settings are not set up.                                                                                                                                                                                                            |
 | ES_BOOST_AA                     | float    | -8.0              | the value to boost auto-analyzed items while querying for Auto-analysis                                                                                                                                                                                                                                                               |
 | ES_BOOST_LAUNCH                 | float    | 4.0               | the value to boost items with the same launch while querying for Auto-analysis                                                                                                                                                                                                                                                        |
-| ES_BOOST_UNIQUE_ID              | float    | 8.0               | the value to boost items with the same unique id while querying for Auto-analysis                                                                                                                                                                                                                                                     |
+| ES_BOOST_TEST_CASE_HASH         | float    | 8.0               | the value to boost items with the same test case hash while querying for Auto-analysis                                                                                                                                                                                                                                                |
 | ES_MAX_QUERY_TERMS              | integer  | 50                | the value to use in more like this query while querying for Auto-analysis                                                                                                                                                                                                                                                             |
 | ES_MIN_WORD_LENGTH              | integer  | 2                 | the value to use in more like this query while querying for Auto-analysis                                                                                                                                                                                                                                                             |
 | PATTERN_LABEL_MIN_PERCENT       | float    | 0.9               | the value of minimum percent of the same issue type for pattern to be suggested as a pattern with a label                                                                                                                                                                                                                             |
@@ -90,7 +90,7 @@ Perform next steps inside source directory of the analyzer.
 ```
 5. Start the uwsgi server, you can change properties, such as the workers quantity for running the analyzer in the several processes
 ```bash
-  /analyzer/bin/uwsgi --ini analyzer.ini
+  /analyzer/bin/uwsgi --ini res/analyzer.ini
 ```
  
 #### Analyzer Train
@@ -113,7 +113,7 @@ Perform next steps inside source directory of the analyzer.
 ```
 5. Start the uwsgi server, you can change properties, such as the workers quantity for running the analyzer train in the several processes
 ```bash
-  /analyzer-train/bin/uwsgi --ini analyzer-train.ini
+  /analyzer-train/bin/uwsgi --ini res/analyzer-train.ini
 ```
 
 ### For Windows:
@@ -135,5 +135,5 @@ python -m nltk.downloader stopwords
 ```
 5. Start the program.
 ```
-python app.py
+python app/app.py
 ```

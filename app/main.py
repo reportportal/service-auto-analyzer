@@ -42,9 +42,9 @@ from app.service import SuggestService
 from app.utils import utils
 
 APP_CONFIG = {
-    "esHost": os.getenv("ES_HOSTS", "http://elasticsearch:9200").strip("/").strip("\\"),
-    "esUser": os.getenv("ES_USER", "").strip(),
-    "esPassword": os.getenv("ES_PASSWORD", "").strip(),
+    "esHost": os.getenv("RP_ES_HOST", "http://elasticsearch:9200").strip("/").strip("\\"),
+    "esUser": os.getenv("RP_ES_USER", "").strip(),
+    "esPassword": os.getenv("RP_ES_PASSWORD", "").strip(),
     "logLevel": os.getenv("LOGGING_LEVEL", "DEBUG").strip(),
     "amqpUrl": os.getenv("AMQP_URL", "").strip("/").strip("\\") + "/" + os.getenv(
         "AMQP_VIRTUAL_HOST", "analyzer"),
@@ -75,7 +75,7 @@ APP_CONFIG = {
     "filesystemDefaultPath": os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
     "esChunkNumber": int(os.getenv("ES_CHUNK_NUMBER", "1000")),
     "esChunkNumberUpdateClusters": int(os.getenv("ES_CHUNK_NUMBER_UPDATE_CLUSTERS", "500")),
-    "esProjectIndexPrefix": os.getenv("ES_PROJECT_INDEX_PREFIX", "").strip(),
+    "esProjectIndexPrefix": os.getenv("ES_PROJECT_INDEX_PREFIX", "rp_").strip(),
     "analyzerHttpPort": int(os.getenv("ANALYZER_HTTP_PORT", "5001")),
     "analyzerPathToLog": os.getenv("ANALYZER_FILE_LOGGING_PATH", "/tmp/config.log")
 }

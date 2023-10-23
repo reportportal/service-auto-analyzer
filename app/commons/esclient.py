@@ -189,7 +189,7 @@ class EsClient:
             return False
 
     def create_index_if_not_exists(self, index_name):
-        """Creates index if it doesn't not exist"""
+        """Creates index if it doesn't exist"""
         if not self.index_exists(index_name, print_error=False):
             return self.create_index(index_name)
         return True

@@ -44,9 +44,8 @@ class AnalyzerService:
             int(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0))
 
     def add_constraints_for_launches_into_query(self, query, launch):
-        launch_number = getattr(launch, 'launchNumber', None)
-        if launch_number is not None:
-            launch_number = int(launch_number)
+        launch_number = getattr(launch, 'launchNumber', 0) or 0
+        launch_number = int(launch_number)
         analyzer_mode = launch.analyzerConfig.analyzerMode
         if analyzer_mode in {'LAUNCH_NAME', 'CURRENT_AND_THE_SAME_NAME'}:
             query['query']['bool']['must'].append(
@@ -68,7 +67,7 @@ class AnalyzerService:
                     }
                 }
             )
-        elif launch_number and analyzer_mode == 'PREVIOUS_LAUNCH':
+        elif analyzer_mode == 'PREVIOUS_LAUNCH':
             query['query']['bool']['must'].append(
                 {
                     'term': {

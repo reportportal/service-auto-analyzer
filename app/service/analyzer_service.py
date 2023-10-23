@@ -44,22 +44,51 @@ class AnalyzerService:
             int(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0))
 
     def add_constraints_for_launches_into_query(self, query, launch):
-        if launch.analyzerConfig.analyzerMode in ["LAUNCH_NAME"]:
-            query["query"]["bool"]["must"].append(
-                {"term": {
-                    "launch_name": {
-                        "value": launch.launchName}}})
-        elif launch.analyzerConfig.analyzerMode in ["CURRENT_LAUNCH"]:
-            query["query"]["bool"]["must"].append(
-                {"term": {
-                    "launch_id": {
-                        "value": launch.launchId}}})
+        launch_number = getattr(launch, 'launchNumber', None)
+        if launch_number is not None:
+            launch_number = int(launch_number)
+        analyzer_mode = launch.analyzerConfig.analyzerMode
+        if analyzer_mode in {'LAUNCH_NAME', 'CURRENT_AND_THE_SAME_NAME'}:
+            query['query']['bool']['must'].append(
+                {
+                    'term': {
+                        'launch_name': {
+                            'value': launch.launchName
+                        }
+                    }
+                }
+            )
+        elif analyzer_mode == 'CURRENT_LAUNCH':
+            query['query']['bool']['must'].append(
+                {
+                    'term': {
+                        'launch_id': {
+                            'value': launch.launchId
+                        }
+                    }
+                }
+            )
+        elif launch_number and analyzer_mode == 'PREVIOUS_LAUNCH':
+            query['query']['bool']['must'].append(
+                {
+                    'term': {
+                        'launch_number': {
+                            'value': launch_number - 1
+                        }
+                    }
+                }
+            )
         else:
-            query["query"]["bool"]["should"].append(
-                {"term": {
-                    "launch_name": {
-                        "value": launch.launchName,
-                        "boost": abs(self.search_cfg["BoostLaunch"])}}})
+            query['query']['bool']['should'].append(
+                {
+                    'term': {
+                        'launch_name': {
+                            'value': launch.launchName,
+                            'boost': abs(self.search_cfg['BoostLaunch'])
+                        }
+                    }
+                }
+            )
         return query
 
     def build_more_like_this_query(self,

@@ -14,29 +14,31 @@
 
 import json
 import logging
-import requests
-import urllib3
 import traceback
+from collections import deque
+from time import time
+from typing import List, Tuple, Set
+
 import elasticsearch
 import elasticsearch.helpers
-
-from app.commons import launch_objects
+import requests
+import urllib3
 from elasticsearch import RequestsHttpConnection
-from app.utils import utils, text_processing
 from urllib3.exceptions import InsecureRequestWarning
-from time import time
-from app.commons.log_merger import LogMerger
-from queue import Queue
-from app.commons.log_preparation import LogPreparation
+
 from app.amqp.amqp import AmqpClient
-from typing import List
+from app.commons import launch_objects
+from app.commons.log_merger import LogMerger
+from app.commons.log_preparation import LogPreparation
+from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.esclient")
 
 
 class EsClient:
     """Elasticsearch client implementation"""
-    def __init__(self, app_config=None, search_cfg=None):
+
+    def __init__(self, app_config=None, search_cfg=None, es_client: elasticsearch.Elasticsearch = None):
         if not app_config:
             app_config = {}
         if not search_cfg:
@@ -44,13 +46,13 @@ class EsClient:
         self.app_config = app_config
         self.host = app_config["esHost"]
         self.search_cfg = search_cfg
-        self.es_client = self.create_es_client(app_config)
+        self.es_client = es_client or self.create_es_client(app_config)
         self.log_preparation = LogPreparation()
         self.log_merger = LogMerger()
         self.tables_to_recreate = ["rp_aa_stats", "rp_model_train_stats",
                                    "rp_suggestions_info_metrics"]
 
-    def create_es_client(self, app_config):
+    def create_es_client(self, app_config) -> elasticsearch.Elasticsearch:
         if not app_config["esVerifyCerts"]:
             urllib3.disable_warnings(InsecureRequestWarning)
         kwargs = {
@@ -194,45 +196,57 @@ class EsClient:
             return self.create_index(index_name)
         return True
 
-    def index_logs(self, launches):
-        """Index launches to the index with project name"""
+    def _to_launch_test_item_list(
+            self,
+            launches: List[launch_objects.Launch]
+    ) -> Tuple[Set[int], deque[Tuple[launch_objects.Launch, launch_objects.TestItem]]]:
         launch_ids = set()
-        logger.info("Indexing logs for %d launches", len(launches))
-        logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.host))
-        t_start = time()
-        bodies = []
-        test_item_ids = []
-        project = None
-        test_item_queue = Queue()
+        test_item_queue = deque()
         for launch in launches:
-            project = str(launch.project)
             test_items = launch.testItems
             launch.testItems = []
+            launch_ids.add(launch.launchId)
             for test_item in test_items:
                 for log in test_item.logs:
                     if str(log.clusterId) in launch.clusters:
                         log.clusterMessage = launch.clusters[str(log.clusterId)]
-                test_item_queue.put((launch, test_item))
-                launch_ids.add(launch.launchId)
-        del launches
-        if project is None:
-            return launch_objects.BulkResponse(took=0, errors=False)
-        project_with_prefix = text_processing.unite_project_name(
-            project, self.app_config["esProjectIndexPrefix"])
-        self.create_index_if_not_exists(project_with_prefix)
-        while not test_item_queue.empty():
-            launch, test_item = test_item_queue.get()
+                test_item_queue.append((launch, test_item))
+        return launch_ids, test_item_queue
+
+    def _to_index_bodies(
+            self,
+            project_with_prefix: str,
+            test_item_queue: deque[Tuple[launch_objects.Launch, launch_objects.TestItem]]
+    ) -> tuple[list[str], list[dict]]:
+        bodies = []
+        test_item_ids = []
+        while len(test_item_queue) > 0:
+            launch, test_item = test_item_queue.popleft()
             logs_added = False
             for log in test_item.logs:
                 if log.logLevel < utils.ERROR_LOGGING_LEVEL or not log.message.strip():
                     continue
 
-                bodies.append(self.log_preparation._prepare_log(
-                    launch, test_item, log, project_with_prefix))
+                bodies.append(self.log_preparation._prepare_log(launch, test_item, log, project_with_prefix))
                 logs_added = True
             if logs_added:
                 test_item_ids.append(str(test_item.testItemId))
+        return test_item_ids, bodies
 
+    def index_logs(self, launches):
+        """Index launches to the index with project name"""
+        logger.info("Indexing logs for %d launches", len(launches))
+        logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.host))
+        t_start = time()
+        project = str(next(map(lambda launch_obj: launch_obj.project, launches)))
+        launch_ids, test_item_queue = self._to_launch_test_item_list(launches)
+        del launches
+        if project is None:
+            return launch_objects.BulkResponse(took=0, errors=False)
+
+        project_with_prefix = text_processing.unite_project_name(project, self.app_config["esProjectIndexPrefix"])
+        self.create_index_if_not_exists(project_with_prefix)
+        test_item_ids, bodies = self._to_index_bodies(project_with_prefix, test_item_queue)
         logs_with_exceptions = utils.extract_all_exceptions(bodies)
         result = self._bulk_index(bodies)
         result.logResults = logs_with_exceptions
@@ -313,17 +327,13 @@ class EsClient:
             index_name = bodies[0]["_index"]
         if not index_name.strip():
             return
-        if "'type': 'mapper_parsing_exception'" in formatted_exception or\
+        if "'type': 'mapper_parsing_exception'" in formatted_exception or \
                 "RequestError(400, 'illegal_argument_exception'" in formatted_exception:
             if index_name in self.tables_to_recreate:
                 self.delete_index(index_name)
                 self.create_index_for_stats_info(index_name)
 
-    def _bulk_index(self, bodies, host=None, es_client=None, refresh=True, chunk_size=None):
-        if host is None:
-            host = self.host
-        if es_client is None:
-            es_client = self.es_client
+    def _bulk_index(self, bodies, refresh=True, chunk_size=None):
         if not bodies:
             return launch_objects.BulkResponse(took=0, errors=False)
         start_time = time()
@@ -333,16 +343,16 @@ class EsClient:
             es_chunk_number = chunk_size
         try:
             try:
-                success_count, errors = elasticsearch.helpers.bulk(es_client,
+                success_count, errors = elasticsearch.helpers.bulk(self.es_client,
                                                                    bodies,
                                                                    chunk_size=es_chunk_number,
                                                                    request_timeout=30,
                                                                    refresh=refresh)
-            except: # noqa
+            except:  # noqa
                 formatted_exception = traceback.format_exc()
                 self._recreate_index_if_needed(bodies, formatted_exception)
-                self.update_settings_after_read_only(host)
-                success_count, errors = elasticsearch.helpers.bulk(es_client,
+                self.update_settings_after_read_only(self.host)
+                success_count, errors = elasticsearch.helpers.bulk(self.es_client,
                                                                    bodies,
                                                                    chunk_size=es_chunk_number,
                                                                    request_timeout=30,
@@ -354,7 +364,7 @@ class EsClient:
             return launch_objects.BulkResponse(took=success_count, errors=len(errors) > 0)
         except Exception as err:
             logger.error("Error in bulk")
-            logger.error("ES Url %s", text_processing.remove_credentials_from_url(host))
+            logger.error("ES Url %s", text_processing.remove_credentials_from_url(self.host))
             logger.error(err)
             return launch_objects.BulkResponse(took=0, errors=True)
 
@@ -385,8 +395,8 @@ class EsClient:
         for _id in clean_index.ids:
             bodies.append({
                 "_op_type": "delete",
-                "_id":      _id,
-                "_index":   index_name,
+                "_id": _id,
+                "_index": index_name,
             })
         result = self._bulk_index(bodies)
         self._merge_logs(list(test_item_ids), index_name)
@@ -414,7 +424,7 @@ class EsClient:
                 self.es_client.indices.put_mapping(
                     index=index_name,
                     body=utils.read_json_file("res", "%s_mappings.json" % rp_aa_stats_index, to_json=True))
-            except: # noqa
+            except:  # noqa
                 formatted_exception = traceback.format_exc()
                 self._recreate_index_if_needed([{"_index": index_name}], formatted_exception)
 
@@ -472,7 +482,7 @@ class EsClient:
                     test_item_id = int(log["_source"]["test_item"])
                     found_test_items.add(test_item_id)
                     issue_type = defect_update_info["itemsToUpdate"][test_item_id]
-                except: # noqa
+                except:  # noqa
                     pass
                 if issue_type.strip():
                     log_update_queries.append({
@@ -494,12 +504,11 @@ class EsClient:
         return items_not_updated
 
     def build_delete_query_by_test_items(self, sub_test_item_ids):
-        return {"query": {
+        return {
+            "query": {
                 "bool": {
                     "filter": [
-                        {"terms": {"test_item": sub_test_item_ids}}
-                    ]
-                }}}
+                        {"terms": {"test_item": sub_test_item_ids}}]}}}
 
     def build_delete_query_by_launch_ids(self, launch_ids):
         return {"query": {"bool": {"filter": [{"terms": {"launch_id": launch_ids}}]}}}
@@ -574,7 +583,7 @@ class EsClient:
         )
         launch_ids = set()
         for log in elasticsearch.helpers.scan(
-            self.es_client, query=query, index=index_name
+                self.es_client, query=query, index=index_name
         ):
             launch_ids.add(log["_source"]["launch_id"])
         return list(launch_ids)
@@ -600,7 +609,7 @@ class EsClient:
         query = self.__time_range_query("log_time", start_date, end_date, for_scan=True)
         log_ids = set()
         for log in elasticsearch.helpers.scan(
-            self.es_client, query=query, index=index_name
+                self.es_client, query=query, index=index_name
         ):
             log_ids.add(log["_id"])
         return list(log_ids)

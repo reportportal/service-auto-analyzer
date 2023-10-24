@@ -78,6 +78,7 @@ class Launch(BaseModel):
     launchId: int
     project: int
     launchName: str = ""
+    launchNumber: int = 0
     launchStartTime: List[int] = list(datetime.now().timetuple())[:7]
     analyzerConfig: AnalyzerConf = AnalyzerConf()
     testItems: List[TestItem] = []

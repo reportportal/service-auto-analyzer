@@ -34,7 +34,7 @@ class LogPreparation:
         cleaned_message = text_processing.leave_only_unique_lines(cleaned_message)
         return cleaned_message
 
-    def _create_log_template(self):
+    def _create_log_template(self) -> dict:
         return {
             "_id":    "",
             "_index": "",
@@ -183,7 +183,7 @@ class LogPreparation:
             log_template["_source"][field] = text_processing.clean_colon_stacking(log_template["_source"][field])
         return log_template
 
-    def _prepare_log(self, launch, test_item, log, project):
+    def _prepare_log(self, launch, test_item, log, project) -> dict:
         log_template = self._create_log_template()
         log_template = self._fill_launch_test_item_fields(log_template, launch, test_item, project)
         log_template = self._fill_log_fields(log_template, log, launch.analyzerConfig.numberOfLogLines)

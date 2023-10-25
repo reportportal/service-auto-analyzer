@@ -64,6 +64,7 @@ APP_CONFIG = {
     "minioHost": os.getenv("MINIO_SHORT_HOST", "minio:9000"),
     "minioAccessKey": os.getenv("MINIO_ACCESS_KEY", "minio"),
     "minioSecretKey": os.getenv("MINIO_SECRET_KEY", "minio123"),
+    "minioUseTls": json.loads(os.getenv("MINIO_USE_TLS", "false").lower()),
     "appVersion": "",
     "binaryStoreType": os.getenv("ANALYZER_BINSTORE_TYPE",
                                  os.getenv("ANALYZER_BINARYSTORE_TYPE", "filesystem")),

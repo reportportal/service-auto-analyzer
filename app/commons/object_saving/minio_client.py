@@ -28,14 +28,15 @@ class MinioClient:
         self.app_config = app_config
         self.minioClient = None
         try:
+            minio_host = app_config['minioHost']
             self.minioClient = Minio(
-                app_config["minioHost"],
-                access_key=app_config["minioAccessKey"],
-                secret_key=app_config["minioSecretKey"],
-                secure=False,
-                region=app_config["minioRegion"]
+                minio_host,
+                access_key=app_config['minioAccessKey'],
+                secret_key=app_config['minioSecretKey'],
+                secure=app_config['minioUseTls'],
+                region=app_config['minioRegion']
             )
-            logger.info("Minio intialized %s" % app_config["minioHost"])
+            logger.info(f'Minio initialized {minio_host}')
         except Exception as err:
             logger.error(err)
 

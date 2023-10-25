@@ -22,6 +22,7 @@
                 "_source": {
                     "issue_type": "AB001",
                     "launch_name": "Launch 1",
+                    "launch_number": 0,
                     "log_level": 40000,
                     "original_message_lines": 1,
                     "original_message_words_number": 2,

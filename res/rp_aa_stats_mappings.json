@@ -15,6 +15,9 @@
         "launch_name": {
             "type": "keyword"
         },
+        "launch_number": {
+            "type": "integer"
+        },
         "project_id": {
             "type": "keyword"
         },

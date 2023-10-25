@@ -258,8 +258,9 @@ class TestService(unittest.TestCase):
     @utils.ignore_warnings
     def shutdown_server(test_calls):
         """Shutdown server and test request calls"""
-        assert len(httpretty.latest_requests()) == len(test_calls)
-        for expected_test_call, test_call in zip(test_calls, httpretty.latest_requests()):
+        actual_calls = httpretty.latest_requests()
+        assert len(actual_calls) == len(test_calls)
+        for expected_test_call, test_call in zip(test_calls, actual_calls):
             assert expected_test_call["method"] == test_call.method
             assert expected_test_call["uri"] == test_call.path
             if "rq" in expected_test_call:

@@ -64,6 +64,7 @@ APP_CONFIG = {
     "minioHost": os.getenv("MINIO_SHORT_HOST", "minio:9000"),
     "minioAccessKey": os.getenv("MINIO_ACCESS_KEY", "minio"),
     "minioSecretKey": os.getenv("MINIO_SECRET_KEY", "minio123"),
+    "minioUseTls": json.loads(os.getenv("MINIO_USE_TLS", "false").lower()),
     "appVersion": "",
     "binaryStoreType": os.getenv("ANALYZER_BINSTORE_TYPE",
                                  os.getenv("ANALYZER_BINARYSTORE_TYPE", "filesystem")),
@@ -118,7 +119,7 @@ def create_application():
 
 def create_thread(func, args):
     """Creates a thread with specified function and arguments"""
-    thread = threading.Thread(target=func, args=args)
+    thread = threading.Thread(target=func, args=args, daemon=True)
     thread.start()
     return thread
 

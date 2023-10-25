@@ -34,13 +34,14 @@ class LogPreparation:
         cleaned_message = text_processing.leave_only_unique_lines(cleaned_message)
         return cleaned_message
 
-    def _create_log_template(self):
+    def _create_log_template(self) -> dict:
         return {
             "_id":    "",
             "_index": "",
             "_source": {
                 "launch_id":        "",
                 "launch_name":      "",
+                "launch_number":    0,
                 "launch_start_time": "",
                 "test_item":        "",
                 "test_item_name":   "",
@@ -75,6 +76,7 @@ class LogPreparation:
         log_template["_index"] = project
         log_template["_source"]["launch_id"] = launch.launchId
         log_template["_source"]["launch_name"] = launch.launchName
+        log_template["_source"]["launch_number"] = getattr(launch, 'launchNumber', 0)
         log_template["_source"]["launch_start_time"] = datetime(
             *launch.launchStartTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
         log_template["_source"]["test_item"] = test_item.testItemId
@@ -181,7 +183,7 @@ class LogPreparation:
             log_template["_source"][field] = text_processing.clean_colon_stacking(log_template["_source"][field])
         return log_template
 
-    def _prepare_log(self, launch, test_item, log, project):
+    def _prepare_log(self, launch, test_item, log, project) -> dict:
         log_template = self._create_log_template()
         log_template = self._fill_launch_test_item_fields(log_template, launch, test_item, project)
         log_template = self._fill_log_fields(log_template, log, launch.analyzerConfig.numberOfLogLines)
@@ -191,6 +193,7 @@ class LogPreparation:
         log_template["_index"] = project
         log_template["_source"]["launch_id"] = test_item_info.launchId
         log_template["_source"]["launch_name"] = test_item_info.launchName
+        log_template["_source"]["launch_number"] = getattr(test_item_info, 'launchNumber', 0)
         log_template["_source"]["test_item"] = test_item_info.testItemId
         log_template["_source"]["unique_id"] = test_item_info.uniqueId
         log_template["_source"]["test_case_hash"] = test_item_info.testCaseHash

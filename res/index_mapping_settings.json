@@ -97,7 +97,7 @@
             "type": "integer"
         },
         "launch_id": {
-            "type": "integer"
+            "type": "keyword"
         },
         "launch_start_time": {
             "type":   "date",

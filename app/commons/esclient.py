@@ -17,7 +17,6 @@ import logging
 import traceback
 from collections import deque
 from time import time
-from typing import List, Tuple, Set
 
 import elasticsearch
 import elasticsearch.helpers
@@ -198,25 +197,23 @@ class EsClient:
 
     def _to_launch_test_item_list(
             self,
-            launches: List[launch_objects.Launch]
-    ) -> Tuple[Set[int], deque[Tuple[launch_objects.Launch, launch_objects.TestItem]]]:
-        launch_ids = set()
+            launches: list[launch_objects.Launch]
+    ) -> deque[tuple[launch_objects.Launch, launch_objects.TestItem]]:
         test_item_queue = deque()
         for launch in launches:
             test_items = launch.testItems
             launch.testItems = []
-            launch_ids.add(launch.launchId)
             for test_item in test_items:
                 for log in test_item.logs:
                     if str(log.clusterId) in launch.clusters:
                         log.clusterMessage = launch.clusters[str(log.clusterId)]
                 test_item_queue.append((launch, test_item))
-        return launch_ids, test_item_queue
+        return test_item_queue
 
     def _to_index_bodies(
             self,
             project_with_prefix: str,
-            test_item_queue: deque[Tuple[launch_objects.Launch, launch_objects.TestItem]]
+            test_item_queue: deque[tuple[launch_objects.Launch, launch_objects.TestItem]]
     ) -> tuple[list[str], list[dict]]:
         bodies = []
         test_item_ids = []
@@ -238,8 +235,9 @@ class EsClient:
         logger.info("Indexing logs for %d launches", len(launches))
         logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.host))
         t_start = time()
+        launch_ids = set(map(lambda launch_obj: launch_obj.launchId, launches))
         project = str(next(map(lambda launch_obj: launch_obj.project, launches)))
-        launch_ids, test_item_queue = self._to_launch_test_item_list(launches)
+        test_item_queue = self._to_launch_test_item_list(launches)
         del launches
         if project is None:
             return launch_objects.BulkResponse(took=0, errors=False)
@@ -574,7 +572,7 @@ class EsClient:
     @utils.ignore_warnings
     def get_launch_ids_by_start_time_range(
             self, project: int, start_date: str, end_date: str
-    ) -> List[str]:
+    ) -> list[str]:
         index_name = text_processing.unite_project_name(
             str(project), self.app_config["esProjectIndexPrefix"]
         )
@@ -602,7 +600,7 @@ class EsClient:
     @utils.ignore_warnings
     def get_log_ids_by_log_time_range(
             self, project: int, start_date: str, end_date: str
-    ) -> List[str]:
+    ) -> list[str]:
         index_name = text_processing.unite_project_name(
             str(project), self.app_config["esProjectIndexPrefix"]
         )

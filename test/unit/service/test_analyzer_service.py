@@ -16,13 +16,10 @@ from unittest import mock
 
 import pytest
 
+from test import DEFAULT_ES_CONFIG, DEFAULT_SEARCH_CONFIG, DEFAULT_BOOST_LAUNCH
 from app.service.analyzer_service import AnalyzerService
 
-DEFAULT_ES_CONFIG = {'esHost': 'http://localhost:9200', 'esVerifyCerts': False, 'esUseSsl': False,
-                     'esSslShowWarn': False, 'esCAcert': None, 'esClientCert': None, 'esClientKey': None,
-                     'esUser': None, 'turnOffSslVerification': True}
 
-DEFAULT_BOOST_LAUNCH = 8.0
 DEFAULT_LAUNCH_NAME = 'Test Launch'
 DEFAULT_LAUNCH_ID = 3
 
@@ -60,7 +57,6 @@ def test_add_constraints_for_launches_into_query(launch_number, launch_mode, exp
     launch.launchNumber = launch_number
     launch.launchName = DEFAULT_LAUNCH_NAME
     launch.analyzerConfig.analyzerMode = launch_mode
-    analyzer = AnalyzerService(None, DEFAULT_ES_CONFIG, {'SimilarityWeightsFolder': '',
-                                                         'BoostLaunch': DEFAULT_BOOST_LAUNCH})
+    analyzer = AnalyzerService(None, DEFAULT_ES_CONFIG, DEFAULT_SEARCH_CONFIG)
     result = analyzer.add_constraints_for_launches_into_query(get_empty_bool_query(), launch)
     assert result['query']['bool'] == expected_query

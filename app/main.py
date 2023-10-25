@@ -119,7 +119,7 @@ def create_application():
 
 def create_thread(func, args):
     """Creates a thread with specified function and arguments"""
-    thread = threading.Thread(target=func, args=args)
+    thread = threading.Thread(target=func, args=args, daemon=True)
     thread.start()
     return thread
 

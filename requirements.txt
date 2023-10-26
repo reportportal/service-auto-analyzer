@@ -3,7 +3,7 @@ flask-cors==3.0.10
 waitress==2.1.2
 uWSGI==2.0.22
 pika==1.2.1
-pydantic==1.10.4
+pydantic==1.10.13
 elasticsearch==7.0.0
 requests==2.31.0
 bump2version==1.0.1

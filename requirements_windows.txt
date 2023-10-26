@@ -18,5 +18,4 @@ minio==6.0.0
 gensim==4.3.0
 pandas==1.5.3
 imbalanced-learn==0.9.1
-freezegun==1.1.0
 urllib3==1.26.18

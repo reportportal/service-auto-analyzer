@@ -12,17 +12,19 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.utils import utils, text_processing
-from app.commons.launch_objects import SuggestAnalysisResult
-from app.boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
-from app.amqp.amqp import AmqpClient
-from app.service.analyzer_service import AnalyzerService
-from app.commons import similarity_calculator
 import json
 import logging
-from time import time
 from datetime import datetime
+from time import time
+
 import elasticsearch.helpers
+
+from app.amqp.amqp import AmqpClient
+from app.boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
+from app.commons import similarity_calculator
+from app.commons.launch_objects import SuggestAnalysisResult
+from app.service.analyzer_service import AnalyzerService
+from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.suggestService")
 
@@ -63,8 +65,8 @@ class SuggestService(AnalyzerService):
     def build_suggest_query(self, test_item_info, log, size=10,
                             message_field="message", det_mes_field="detected_message",
                             stacktrace_field="stacktrace"):
-        min_should_match = "{}%".format(test_item_info.analyzerConfig.minShouldMatch)\
-            if test_item_info.analyzerConfig.minShouldMatch > 0\
+        min_should_match = "{}%".format(test_item_info.analyzerConfig.minShouldMatch) \
+            if test_item_info.analyzerConfig.minShouldMatch > 0 \
             else self.search_cfg["MinShouldMatch"]
         log_lines = test_item_info.analyzerConfig.numberOfLogLines
 
@@ -115,10 +117,10 @@ class SuggestService(AnalyzerService):
         utils.append_potential_status_codes(query, log, max_query_terms=self.search_cfg["MaxQueryTerms"])
 
         for field, boost_score in [
-                ("detected_message_without_params_extended", 2.0),
-                ("only_numbers", 2.0), ("message_params", 2.0), ("urls", 2.0),
-                ("paths", 2.0), ("found_exceptions_extended", 8.0),
-                ("found_tests_and_methods", 2.0), ("test_item_name", 2.0)]:
+            ("detected_message_without_params_extended", 2.0),
+            ("only_numbers", 2.0), ("message_params", 2.0), ("urls", 2.0),
+            ("paths", 2.0), ("found_exceptions_extended", 8.0),
+            ("found_tests_and_methods", 2.0), ("test_item_name", 2.0)]:
             if log["_source"][field].strip():
                 query["query"]["bool"]["should"].append(
                     self.build_more_like_this_query("1",
@@ -137,27 +139,27 @@ class SuggestService(AnalyzerService):
         for log in logs:
             message = log["_source"]["message"].strip()
             merged_small_logs = log["_source"]["merged_small_logs"].strip()
-            if log["_source"]["log_level"] < utils.ERROR_LOGGING_LEVEL or\
+            if log["_source"]["log_level"] < utils.ERROR_LOGGING_LEVEL or \
                     (not message and not merged_small_logs):
                 continue
             queries = []
 
             for query in [
-                    self.build_suggest_query(
-                        test_item_info, log,
-                        message_field="message_extended",
-                        det_mes_field="detected_message_extended",
-                        stacktrace_field="stacktrace_extended"),
-                    self.build_suggest_query(
-                        test_item_info, log,
-                        message_field="message_without_params_extended",
-                        det_mes_field="detected_message_without_params_extended",
-                        stacktrace_field="stacktrace_extended"),
-                    self.build_suggest_query(
-                        test_item_info, log,
-                        message_field="message_without_params_and_brackets",
-                        det_mes_field="detected_message_without_params_and_brackets",
-                        stacktrace_field="stacktrace_extended")]:
+                self.build_suggest_query(
+                    test_item_info, log,
+                    message_field="message_extended",
+                    det_mes_field="detected_message_extended",
+                    stacktrace_field="stacktrace_extended"),
+                self.build_suggest_query(
+                    test_item_info, log,
+                    message_field="message_without_params_extended",
+                    det_mes_field="detected_message_without_params_extended",
+                    stacktrace_field="stacktrace_extended"),
+                self.build_suggest_query(
+                    test_item_info, log,
+                    message_field="message_without_params_and_brackets",
+                    det_mes_field="detected_message_without_params_and_brackets",
+                    stacktrace_field="stacktrace_extended")]:
                 queries.append("{}\n{}".format(json.dumps({"index": index_name}), json.dumps(query)))
 
             partial_res = self.es_client.es_client.msearch("\n".join(queries) + "\n")["responses"]
@@ -206,7 +208,7 @@ class SuggestService(AnalyzerService):
                 detected_message_sim = det_message[group_id]
                 stacktrace_sim = _similarity_calculator.similarity_dict["stacktrace"][group_id]
                 merged_logs_sim = _similarity_calculator.similarity_dict["merged_small_logs"][group_id]
-                if detected_message_sim["similarity"] >= 0.98 and\
+                if detected_message_sim["similarity"] >= 0.98 and \
                         stacktrace_sim["similarity"] >= 0.98 and merged_logs_sim["similarity"] >= 0.98:
                     deleted_indices.add(j)
             filtered_results.append(gathered_results[i])
@@ -304,7 +306,6 @@ class SuggestService(AnalyzerService):
         return logs, test_item_id
 
     def prepare_logs_for_suggestions(self, test_item_info, index_name):
-        prepared_logs = []
         test_item_id_for_suggest = test_item_info.testItemId
         if test_item_info.clusterId != 0:
             prepared_logs, test_item_id_for_suggest = self.query_logs_for_cluster(test_item_info, index_name)
@@ -334,7 +335,8 @@ class SuggestService(AnalyzerService):
         feature_names = ""
         try:
             logs, test_item_id_for_suggest = self.prepare_logs_for_suggestions(test_item_info, index_name)
-            logger.info("Number of logs for suggestions: %d", len(logs))
+            logger.info(f'Number of logs for suggestions: {len(logs)}')
+            logger.debug(f'Logs for suggestions: {json.dumps(logs)}')
             searched_res = self.query_es_for_suggested_items(test_item_info, logs)
 
             boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
@@ -355,8 +357,8 @@ class SuggestService(AnalyzerService):
                 test_item_info.project, "defect_type_model/"))
             feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
             scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
-            model_info_tags = _boosting_data_gatherer.get_used_model_info() +\
-                _suggest_decision_maker_to_use.get_model_info()
+            model_info_tags = _boosting_data_gatherer.get_used_model_info() + \
+                              _suggest_decision_maker_to_use.get_model_info()
             feature_names = ";".join(_suggest_decision_maker_to_use.get_feature_names())
             if feature_data:
                 predicted_labels, predicted_labels_probability = _suggest_decision_maker_to_use.predict(

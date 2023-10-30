@@ -317,7 +317,7 @@ class SuggestService(AnalyzerService):
 
     @utils.ignore_warnings
     def suggest_items(self, test_item_info):
-        logger.info("Started suggesting test items")
+        logger.info("Started suggesting test items by request %s", test_item_info.json())
         logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))
         index_name = text_processing.unite_project_name(
             str(test_item_info.project), self.app_config["esProjectIndexPrefix"])
@@ -412,7 +412,7 @@ class SuggestService(AnalyzerService):
             else:
                 logger.debug("There are no results for test item %s", test_item_info.testItemId)
         except Exception as err:
-            logger.error(err)
+            logger.exception(err)
             errors_found.append(utils.extract_exception(err))
             errors_count += 1
         results_to_share = {test_item_info.launchId: {

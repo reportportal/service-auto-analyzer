@@ -27,6 +27,12 @@ from app.service.analyzer_service import AnalyzerService
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.suggestService")
+SPECIAL_FIELDS_BOOST_SCORES = [
+    ("detected_message_without_params_extended", 2.0),
+    ("only_numbers", 2.0), ("message_params", 2.0), ("urls", 2.0),
+    ("paths", 2.0), ("found_exceptions_extended", 8.0),
+    ("found_tests_and_methods", 2.0), ("test_item_name", 2.0)
+]
 
 
 class SuggestService(AnalyzerService):
@@ -116,11 +122,7 @@ class SuggestService(AnalyzerService):
 
         utils.append_potential_status_codes(query, log, max_query_terms=self.search_cfg["MaxQueryTerms"])
 
-        for field, boost_score in [
-            ("detected_message_without_params_extended", 2.0),
-            ("only_numbers", 2.0), ("message_params", 2.0), ("urls", 2.0),
-            ("paths", 2.0), ("found_exceptions_extended", 8.0),
-            ("found_tests_and_methods", 2.0), ("test_item_name", 2.0)]:
+        for field, boost_score in SPECIAL_FIELDS_BOOST_SCORES:
             if log["_source"][field].strip():
                 query["query"]["bool"]["should"].append(
                     self.build_more_like_this_query("1",
@@ -357,8 +359,8 @@ class SuggestService(AnalyzerService):
                 test_item_info.project, "defect_type_model/"))
             feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
             scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
-            model_info_tags = _boosting_data_gatherer.get_used_model_info() + \
-                              _suggest_decision_maker_to_use.get_model_info()
+            model_info_tags = (_boosting_data_gatherer.get_used_model_info() +
+                               _suggest_decision_maker_to_use.get_model_info())
             feature_names = ";".join(_suggest_decision_maker_to_use.get_feature_names())
             if feature_data:
                 predicted_labels, predicted_labels_probability = _suggest_decision_maker_to_use.predict(

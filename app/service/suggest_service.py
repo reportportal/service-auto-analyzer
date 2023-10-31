@@ -340,6 +340,7 @@ class SuggestService(AnalyzerService):
             logger.info(f'Number of logs for suggestions: {len(logs)}')
             logger.debug(f'Logs for suggestions: {json.dumps(logs)}')
             searched_res = self.query_es_for_suggested_items(test_item_info, logs)
+            logger.debug(f'Suggested items by FTS (KNN): {json.dumps(searched_res)}')
 
             boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
             boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(

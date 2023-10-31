@@ -27,8 +27,7 @@ logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
 class BoostingFeaturizer:
 
-    def __init__(self, all_results, config, feature_ids,
-                 weighted_log_similarity_calculator=None,
+    def __init__(self, all_results, config, feature_ids, weighted_log_similarity_calculator=None,
                  features_dict_with_saved_objects=None):
         self.config = config
         self.previously_gathered_features = {}
@@ -39,7 +38,7 @@ class BoostingFeaturizer:
         self.similarity_calculator = similarity_calculator.SimilarityCalculator(
             self.config,
             weighted_similarity_calculator=weighted_log_similarity_calculator)
-        if type(feature_ids) == str:
+        if type(feature_ids) is str:
             self.feature_ids = text_processing.transform_string_feature_range_into_list(feature_ids)
         else:
             self.feature_ids = feature_ids

@@ -16,9 +16,8 @@ from unittest import mock
 
 import pytest
 
-from test import DEFAULT_ES_CONFIG, DEFAULT_SEARCH_CONFIG, DEFAULT_BOOST_LAUNCH
 from app.service.analyzer_service import AnalyzerService
-
+from test import DEFAULT_ES_CONFIG, DEFAULT_SEARCH_CONFIG, DEFAULT_BOOST_LAUNCH
 
 DEFAULT_LAUNCH_NAME = 'Test Launch'
 DEFAULT_LAUNCH_ID = 3
@@ -44,9 +43,12 @@ DEFAULT_LAUNCH_NAME_SEARCH = {'must': [{'term': {'launch_name': {'value': DEFAUL
         (2, 'LAUNCH_NAME', DEFAULT_LAUNCH_NAME_SEARCH),
         (2, 'CURRENT_AND_THE_SAME_NAME', DEFAULT_LAUNCH_NAME_SEARCH),
         (2, 'CURRENT_LAUNCH', {'must': [{'term': {'launch_id': {'value': DEFAULT_LAUNCH_ID}}}], 'should': []}),
-        (2, 'PREVIOUS_LAUNCH', {'must': [{'term': {'launch_number': {'value': 1}}}], 'should': []}),
-        (None, 'PREVIOUS_LAUNCH', {'must': [{'term': {'launch_number': {'value': -1}}}], 'should': []}),
-        ('3', 'PREVIOUS_LAUNCH', {'must': [{'term': {'launch_number': {'value': 2}}}], 'should': []}),
+        (2, 'PREVIOUS_LAUNCH', {'must': [{'term': {'launch_number': {'value': 1}}},
+                                         {'term': {'launch_name': {'value': DEFAULT_LAUNCH_NAME}}}], 'should': []}),
+        (None, 'PREVIOUS_LAUNCH', {'must': [{'term': {'launch_number': {'value': -1}}},
+                                            {'term': {'launch_name': {'value': DEFAULT_LAUNCH_NAME}}}], 'should': []}),
+        ('3', 'PREVIOUS_LAUNCH', {'must': [{'term': {'launch_number': {'value': 2}}},
+                                           {'term': {'launch_name': {'value': DEFAULT_LAUNCH_NAME}}}], 'should': []}),
         (2, None, {'must': [], 'should': [{'term': {'launch_name': {'value': DEFAULT_LAUNCH_NAME,
                                                                     'boost': DEFAULT_BOOST_LAUNCH}}}]})
     ]

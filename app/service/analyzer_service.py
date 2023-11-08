@@ -68,11 +68,21 @@ class AnalyzerService:
                 }
             )
         elif analyzer_mode == 'PREVIOUS_LAUNCH':
-            query['query']['bool']['must'].append(
+            must_clause = query['query']['bool']['must']
+            must_clause.append(
                 {
                     'term': {
                         'launch_number': {
                             'value': launch_number - 1
+                        }
+                    }
+                }
+            )
+            must_clause.append(
+                {
+                    'term': {
+                        'launch_name': {
+                            'value': launch.launchName
                         }
                     }
                 }

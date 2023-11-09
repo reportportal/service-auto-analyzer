@@ -22,6 +22,7 @@ import elasticsearch.helpers
 from app.amqp.amqp import AmqpClient
 from app.boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.commons import similarity_calculator
+from app.commons.esclient import EsClient
 from app.commons.launch_objects import SuggestAnalysisResult
 from app.service.analyzer_service import AnalyzerService
 from app.utils import utils, text_processing
@@ -37,10 +38,13 @@ SPECIAL_FIELDS_BOOST_SCORES = [
 
 class SuggestService(AnalyzerService):
 
-    def __init__(self, model_chooser, app_config=None, search_cfg=None):
+    es_client: EsClient
+
+    def __init__(self, model_chooser, app_config=None, search_cfg=None, es_client: EsClient = None):
         self.app_config = app_config or {}
         self.search_cfg = search_cfg or {}
-        super(SuggestService, self).__init__(model_chooser, app_config=self.app_config, search_cfg=self.search_cfg)
+        super().__init__(model_chooser, app_config=self.app_config, search_cfg=self.search_cfg)
+        self.es_client = es_client or EsClient(app_config=self.app_config, search_cfg=self.search_cfg)
         self.suggest_threshold = 0.4
         self.rp_suggest_index_template = "rp_suggestions_info"
         self.rp_suggest_metrics_index_template = "rp_suggestions_info_metrics"
@@ -320,7 +324,8 @@ class SuggestService(AnalyzerService):
 
     @utils.ignore_warnings
     def suggest_items(self, test_item_info):
-        logger.info("Started suggesting test items by request %s", test_item_info.json())
+        logger.info(f'Started suggesting for test item with id: {test_item_info.testItemId}')
+        logger.debug(f'Started suggesting items by request: {test_item_info.json()}')
         logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))
         index_name = text_processing.unite_project_name(
             str(test_item_info.project), self.app_config["esProjectIndexPrefix"])

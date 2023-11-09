@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.commons.esclient import EsClient
 from app.utils import utils
 from app.commons.log_preparation import LogPreparation
 from app.commons.log_merger import LogMerger
@@ -29,7 +28,6 @@ class AnalyzerService:
     def __init__(self, model_chooser, app_config=None, search_cfg=None):
         self.app_config = app_config or {}
         self.search_cfg = search_cfg or {}
-        self.es_client = EsClient(app_config=self.app_config, search_cfg=self.search_cfg)
         self.log_preparation = LogPreparation()
         self.log_merger = LogMerger()
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)

@@ -67,6 +67,7 @@ class TestItemInfo(BaseModel):
     clusterId: int = 0
     launchId: int
     launchName: str = ""
+    launchNumber: int = 0
     testItemName: str = ""
     project: int
     analyzerConfig: AnalyzerConf = AnalyzerConf()

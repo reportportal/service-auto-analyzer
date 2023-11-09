@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from app.utils import utils, text_processing
+from app.commons.esclient import EsClient
 from app.commons.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult
 from app.boosting_decision_making import boosting_featurizer
 from app.service.analyzer_service import AnalyzerService
@@ -31,11 +32,13 @@ EARLY_FINISH = False
 
 class AutoAnalyzerService(AnalyzerService):
 
-    def __init__(self, model_chooser, app_config=None, search_cfg=None):
+    es_client: EsClient
+
+    def __init__(self, model_chooser, app_config=None, search_cfg=None, es_client: EsClient = None):
         self.app_config = app_config or {}
         self.search_cfg = search_cfg or {}
-        super(AutoAnalyzerService, self).__init__(
-            model_chooser, app_config=self.app_config, search_cfg=self.search_cfg)
+        super().__init__(model_chooser, app_config=self.app_config, search_cfg=self.search_cfg)
+        self.es_client = es_client or EsClient(app_config=self.app_config, search_cfg=self.search_cfg)
 
     def get_config_for_boosting(self, analyzer_config):
         min_should_match = self.find_min_should_match_threshold(analyzer_config) / 100

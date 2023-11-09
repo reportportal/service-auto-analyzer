@@ -15,6 +15,7 @@
 import json
 import logging
 from datetime import datetime
+from functools import reduce
 from time import time
 
 import elasticsearch.helpers
@@ -342,10 +343,12 @@ class SuggestService(AnalyzerService):
         feature_names = ""
         try:
             logs, test_item_id_for_suggest = self.prepare_logs_for_suggestions(test_item_info, index_name)
-            logger.info(f'Number of logs for suggestions: {len(logs)}')
-            logger.debug(f'Logs for suggestions: {json.dumps(logs)}')
+            logger.info(f'Number of prepared log search requests for suggestions: {len(logs)}')
+            logger.debug(f'Log search requests for suggestions: {json.dumps(logs)}')
             searched_res = self.query_es_for_suggested_items(test_item_info, logs)
-            logger.debug(f'Suggested items by FTS (KNN): {json.dumps(searched_res)}')
+            res_num = reduce(lambda a, b: a + b, [len(res[1]['hits']['hits']) for res in searched_res])
+            logger.info(f'Found {res_num} items by FTS (KNN)')
+            logger.debug(f'Items for suggestions by FTS (KNN): {json.dumps(searched_res)}')
 
             boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
             boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(

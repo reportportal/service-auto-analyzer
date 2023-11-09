@@ -143,7 +143,7 @@ class EsClient:
 
     def create_index(self, index_name):
         """Create index in elasticsearch"""
-        logger.debug("Creating '%s' Elasticsearch index", str(index_name))
+        logger.info("Creating '%s' Elasticsearch index", str(index_name))
         logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.host))
         try:
             response = self.es_client.indices.create(index=str(index_name), body={

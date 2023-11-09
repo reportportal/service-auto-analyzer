@@ -38,6 +38,7 @@ SPECIAL_FIELDS_BOOST_SCORES = [
 
 
 class SuggestService(AnalyzerService):
+    """The service serves suggestion lists in Make Decision modal."""
 
     es_client: EsClient
 
@@ -401,6 +402,7 @@ class SuggestService(AnalyzerService):
                             testItemLogId=test_item_log_id,
                             launchId=test_item_info.launchId,
                             launchName=test_item_info.launchName,
+                            launchNumber=test_item_info.launchNumber,
                             issueType=issue_type,
                             relevantItem=test_item_id,
                             relevantLogId=relevant_log_id,

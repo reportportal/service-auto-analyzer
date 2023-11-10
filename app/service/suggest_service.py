@@ -347,7 +347,7 @@ class SuggestService(AnalyzerService):
             logger.info(f'Number of prepared log search requests for suggestions: {len(logs)}')
             logger.debug(f'Log search requests for suggestions: {json.dumps(logs)}')
             searched_res = self.query_es_for_suggested_items(test_item_info, logs)
-            res_num = reduce(lambda a, b: a + b, [len(res[1]['hits']['hits']) for res in searched_res])
+            res_num = reduce(lambda a, b: a + b, [len(res[1]['hits']['hits']) for res in searched_res], 0)
             logger.info(f'Found {res_num} items by FTS (KNN)')
             logger.debug(f'Items for suggestions by FTS (KNN): {json.dumps(searched_res)}')
 

@@ -122,6 +122,7 @@ class SuggestAnalysisResult(BaseModel):
     testItemLogId: int
     launchId: int
     launchName: str
+    launchNumber: int
     issueType: str
     relevantItem: int
     relevantLogId: int
@@ -209,6 +210,7 @@ class BatchLogInfo(BaseModel):
     project: int
     launchId: int
     launchName: str
+    launchNumber: int = 0
 
 
 class AnalysisCandidate(BaseModel):
@@ -220,3 +222,4 @@ class AnalysisCandidate(BaseModel):
     project: int
     launchId: int
     launchName: str
+    launchNumber: int = 0

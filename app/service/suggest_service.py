@@ -429,9 +429,9 @@ class SuggestService(AnalyzerService):
                         global_idx += 1
             else:
                 logger.debug("There are no results for test item %s", test_item_info.testItemId)
-        except Exception as err:
-            logger.exception(err)
-            errors_found.append(utils.extract_exception(err))
+        except Exception as exc:
+            logger.exception(exc)
+            errors_found.append(utils.extract_exception(exc))
             errors_count += 1
         results_to_share = {test_item_info.launchId: {
             "not_found": int(len(results) == 0), "items_to_process": 1,
@@ -456,18 +456,20 @@ class SuggestService(AnalyzerService):
                     feature_names,
                     model_info_tags)
             }])
-        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
-            AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
-                self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
-            if results:
-                for model_type in ["suggestion", "auto_analysis"]:
-                    AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
-                        self.app_config["exchangeName"], "train_models", json.dumps({
-                            "model_type": model_type,
-                            "project_id": test_item_info.project,
-                            "gathered_metric_total": len(results)
-                        }))
-
+        try:
+            if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+                AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                    self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
+                if results:
+                    for model_type in ["suggestion", "auto_analysis"]:
+                        AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                            self.app_config["exchangeName"], "train_models", json.dumps({
+                                "model_type": model_type,
+                                "project_id": test_item_info.project,
+                                "gathered_metric_total": len(results)
+                            }))
+        except Exception as exc:
+            logger.exception(exc)
         logger.debug("Stats info %s", results_to_share)
         logger.info("Processed the test item. It took %.2f sec.", time() - t_start)
         logger.info("Finished suggesting for test item with %d results.", len(results))

@@ -257,8 +257,8 @@ class EsClient:
                         "project_id": project,
                         "gathered_metric_total": num_logs_with_defect_types
                     }))
-        except Exception as err:
-            logger.error(err)
+        except Exception as exc:
+            logger.exception(exc)
         logger.info("Finished indexing logs for %d launches %s. It took %.2f sec.",
                     len(launch_ids), launch_ids, time() - t_start)
         return result
@@ -360,10 +360,10 @@ class EsClient:
                 logger.debug("Occured errors %s", errors)
             logger.debug("Finished indexing for %.2f s", time() - start_time)
             return launch_objects.BulkResponse(took=success_count, errors=len(errors) > 0)
-        except Exception as err:
+        except Exception as exc:
             logger.error("Error in bulk")
             logger.error("ES Url %s", text_processing.remove_credentials_from_url(self.host))
-            logger.error(err)
+            logger.exception(exc)
             return launch_objects.BulkResponse(took=0, errors=True)
 
     def delete_logs(self, clean_index):

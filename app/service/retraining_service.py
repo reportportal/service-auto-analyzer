@@ -50,9 +50,9 @@ class RetrainingService:
                     AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
                         self.app_config["exchangeName"], "stats_info", json.dumps(training_log_info))
                 is_model_trained = 1
-            except Exception as err:
+            except Exception as exc:
                 logger.error("Training finished with errors")
-                logger.error(err)
+                logger.exception(exc)
                 is_model_trained = 0
         logger.info("Finished training %.2f s", time() - t_start)
         return is_model_trained

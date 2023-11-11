@@ -343,8 +343,8 @@ class AnalysisModelTraining:
                     full_data_features.extend(feature_data)
                     labels.append(_suggest_res["_source"]["userChoice"])
                     test_item_ids_with_pos.append(_suggest_res["_source"]["testItem"])
-        return np.asarray(full_data_features), np.asarray(labels),\
-            test_item_ids_with_pos, features_dict_with_saved_objects
+        return (np.asarray(full_data_features), np.asarray(labels), test_item_ids_with_pos,
+                features_dict_with_saved_objects)
 
     def train(self, project_info):
         time_training = time()
@@ -362,8 +362,7 @@ class AnalysisModelTraining:
             self.app_config, project_info["project_id"])
         self.new_model.add_config_info(full_config, features, monotonous_features)
 
-        defect_type_model_to_use = self.model_chooser.choose_model(
-            project_info["project_id"], "defect_type_model/")
+        defect_type_model_to_use = self.model_chooser.choose_model(project_info["project_id"], "defect_type_model/")
 
         metrics_to_gather = ["F1", "Mean Reciprocal Rank"]
         train_log_info = {}

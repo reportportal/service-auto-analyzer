@@ -357,9 +357,9 @@ class BoostingFeaturizer:
                 num_of_logs_issue_type[issue_type] = 0
                 continue
 
-            if type(queried_item_value) == str:
+            if type(queried_item_value) is str:
                 queried_item_value = queried_item_value.strip().lower()
-            if type(rel_item_value) == str:
+            if type(rel_item_value) is str:
                 rel_item_value = rel_item_value.strip().lower()
 
             if rel_item_value == '' and queried_item_value == '':
@@ -635,7 +635,7 @@ class BoostingFeaturizer:
                 else:
                     func, args, _ = self.feature_functions[feature]
                     result = func(**args)
-                    if type(result) == list:
+                    if type(result) is list:
                         gathered_data_dict[feature] = result
                     else:
                         gathered_data_dict[feature] = []

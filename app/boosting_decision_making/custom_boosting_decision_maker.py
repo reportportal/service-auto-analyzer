@@ -25,7 +25,7 @@ class CustomBoostingDecisionMaker(BoostingDecisionMaker):
     def __init__(self, app_config, project_id, folder=""):
         self.project_id = project_id
         self.object_saver = ObjectSaver(app_config)
-        super(CustomBoostingDecisionMaker, self).__init__(folder=folder)
+        super().__init__(folder=folder)
         self.is_global = False
 
     def load_model(self, folder):

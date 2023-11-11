@@ -112,9 +112,7 @@ class BoostingFeaturizer:
             71: (self._encode_into_vector,
                  {"field_name": "test_item_name", "feature_name": 71, "only_query": False}, []),
             72: (self._encode_into_vector,
-                 {"field_name": "test_case_hash", "feature_name": 72, "only_query": True}, []),
-            73: (self._encode_into_vector,
-                 {"field_name": "found_exceptions", "feature_name": 73, "only_query": True}, [])
+                 {"field_name": "found_exceptions", "feature_name": 72, "only_query": True}, [])
         }
 
         fields_to_calc_similarity = self.find_columns_to_find_similarities_for()

@@ -17,7 +17,7 @@ from unittest import mock
 import pytest
 
 from app.service.analyzer_service import AnalyzerService
-from test import DEFAULT_ES_CONFIG, DEFAULT_SEARCH_CONFIG, DEFAULT_BOOST_LAUNCH
+from test import DEFAULT_SEARCH_CONFIG, DEFAULT_BOOST_LAUNCH
 
 DEFAULT_LAUNCH_NAME = 'Test Launch'
 DEFAULT_LAUNCH_ID = 3
@@ -59,6 +59,6 @@ def test_add_constraints_for_launches_into_query(launch_number, launch_mode, exp
     launch.launchNumber = launch_number
     launch.launchName = DEFAULT_LAUNCH_NAME
     launch.analyzerConfig.analyzerMode = launch_mode
-    analyzer = AnalyzerService(None, DEFAULT_ES_CONFIG, DEFAULT_SEARCH_CONFIG)
+    analyzer = AnalyzerService(None, DEFAULT_SEARCH_CONFIG)
     result = analyzer.add_constraints_for_launches_into_query(get_empty_bool_query(), launch)
     assert result['query']['bool'] == expected_query

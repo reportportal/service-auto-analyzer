@@ -12,33 +12,31 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.utils import utils
-from app.commons.log_preparation import LogPreparation
-from app.commons.log_merger import LogMerger
-from app.boosting_decision_making import weighted_similarity_calculator
-from app.commons import namespace_finder
 import logging
 import re
+
+from app.boosting_decision_making import weighted_similarity_calculator
+from app.commons.log_merger import LogMerger
+from app.commons.log_preparation import LogPreparation
+from app.utils import utils
 
 logger = logging.getLogger("analyzerApp.analyzerService")
 
 
 class AnalyzerService:
 
-    def __init__(self, model_chooser, app_config=None, search_cfg=None):
-        self.app_config = app_config or {}
+    def __init__(self, model_chooser, search_cfg=None):
         self.search_cfg = search_cfg or {}
         self.log_preparation = LogPreparation()
         self.log_merger = LogMerger()
-        self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.model_chooser = model_chooser
         self.weighted_log_similarity_calculator = None
         if self.search_cfg["SimilarityWeightsFolder"].strip():
-            self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
+            self.weighted_log_similarity_calculator = weighted_similarity_calculator. \
                 WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
 
     def find_min_should_match_threshold(self, analyzer_config):
-        return analyzer_config.minShouldMatch if analyzer_config.minShouldMatch > 0 else\
+        return analyzer_config.minShouldMatch if analyzer_config.minShouldMatch > 0 else \
             int(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0))
 
     def add_constraints_for_launches_into_query(self, query, launch):

@@ -25,6 +25,7 @@ from app.boosting_decision_making.suggest_boosting_featurizer import SuggestBoos
 from app.commons import similarity_calculator
 from app.commons.esclient import EsClient
 from app.commons.launch_objects import SuggestAnalysisResult
+from app.commons.namespace_finder import NamespaceFinder
 from app.service.analyzer_service import AnalyzerService
 from app.utils import utils, text_processing
 
@@ -41,15 +42,17 @@ class SuggestService(AnalyzerService):
     """The service serves suggestion lists in Make Decision modal."""
 
     es_client: EsClient
+    namespace_finder: NamespaceFinder
 
     def __init__(self, model_chooser, app_config=None, search_cfg=None, es_client: EsClient = None):
         self.app_config = app_config or {}
         self.search_cfg = search_cfg or {}
-        super().__init__(model_chooser, app_config=self.app_config, search_cfg=self.search_cfg)
+        super().__init__(model_chooser, search_cfg=self.search_cfg)
         self.es_client = es_client or EsClient(app_config=self.app_config, search_cfg=self.search_cfg)
         self.suggest_threshold = 0.4
         self.rp_suggest_index_template = "rp_suggestions_info"
         self.rp_suggest_metrics_index_template = "rp_suggestions_info_metrics"
+        self.namespace_finder = NamespaceFinder(app_config)
 
     def get_config_for_boosting_suggests(self, analyzerConfig):
         return {

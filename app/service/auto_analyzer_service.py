@@ -19,6 +19,7 @@ from app.boosting_decision_making import boosting_featurizer
 from app.service.analyzer_service import AnalyzerService
 from app.amqp.amqp import AmqpClient
 from app.commons.similarity_calculator import SimilarityCalculator
+from app.commons.namespace_finder import NamespaceFinder
 import json
 import logging
 from time import time, sleep
@@ -33,12 +34,14 @@ EARLY_FINISH = False
 class AutoAnalyzerService(AnalyzerService):
 
     es_client: EsClient
+    namespace_finder: NamespaceFinder
 
     def __init__(self, model_chooser, app_config=None, search_cfg=None, es_client: EsClient = None):
         self.app_config = app_config or {}
         self.search_cfg = search_cfg or {}
-        super().__init__(model_chooser, app_config=self.app_config, search_cfg=self.search_cfg)
+        super().__init__(model_chooser, search_cfg=self.search_cfg)
         self.es_client = es_client or EsClient(app_config=self.app_config, search_cfg=self.search_cfg)
+        self.namespace_finder = NamespaceFinder(app_config)
 
     def get_config_for_boosting(self, analyzer_config):
         min_should_match = self.find_min_should_match_threshold(analyzer_config) / 100

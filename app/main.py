@@ -114,6 +114,7 @@ SEARCH_CONFIG = {
 def create_application():
     """Creates a Flask application"""
     _application = Flask(__name__)
+    CORS(_application)
     return _application
 
 
@@ -396,7 +397,6 @@ es_client = EsClient(APP_CONFIG, SEARCH_CONFIG)
 read_model_settings()
 
 application = create_application()
-CORS(application)
 threads = []
 
 

@@ -322,10 +322,10 @@ class AnalysisModelTraining:
                 if log_id in log_id_dict:
                     found_logs[col] = log_id_dict[log_id]
             if len(found_logs) == 2:
-                log_relevent = found_logs["relevantLogId"]
-                log_relevent["_score"] = _suggest_res["_source"]["esScore"]
+                log_relevant = found_logs["relevantLogId"]
+                log_relevant["_score"] = _suggest_res["_source"]["esScore"]
                 searched_res = [
-                    (found_logs["testItemLogId"], {"hits": {"hits": [log_relevent]}})]
+                    (found_logs["testItemLogId"], {"hits": {"hits": [log_relevant]}})]
             if searched_res:
                 _boosting_data_gatherer = SuggestBoostingFeaturizer(
                     searched_res,

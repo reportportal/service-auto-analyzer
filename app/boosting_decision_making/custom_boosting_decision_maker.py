@@ -28,19 +28,19 @@ class CustomBoostingDecisionMaker(BoostingDecisionMaker):
         super().__init__(folder=folder)
         self.is_global = False
 
-    def load_model(self, folder):
+    def load_model(self):
         self.n_estimators, self.max_depth, self.xg_boost = self.object_saver.get_project_object(
-            self.project_id, os.path.join(folder, "boost_model"),
+            self.project_id, os.path.join(self.folder, "boost_model"),
             using_json=False)
         assert self.xg_boost is not None
         self.full_config, self.feature_ids, self.monotonous_features = self.object_saver.get_project_object(
-            self.project_id, os.path.join(folder, "data_features_config"),
+            self.project_id, os.path.join(self.folder, "data_features_config"),
             using_json=False)
         assert len(self.full_config) > 0
         if self.object_saver.does_object_exists(
-                self.project_id, os.path.join(folder, "features_dict_with_saved_objects")):
+                self.project_id, os.path.join(self.folder, "features_dict_with_saved_objects")):
             features_dict_with_saved_objects = self.object_saver.get_project_object(
-                self.project_id, os.path.join(folder, "features_dict_with_saved_objects"),
+                self.project_id, os.path.join(self.folder, "features_dict_with_saved_objects"),
                 using_json=False)
             self.features_dict_with_saved_objects = self.transform_feature_encoders_to_objects(
                 features_dict_with_saved_objects)

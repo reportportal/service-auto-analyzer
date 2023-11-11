@@ -26,8 +26,7 @@ logger = logging.getLogger("analyzerApp.boosting_decision_maker")
 
 class BoostingDecisionMaker:
 
-    def __init__(self, folder="", n_estimators=75, max_depth=5,
-                 monotonous_features="", is_global=True):
+    def __init__(self, folder="", n_estimators=75, max_depth=5, monotonous_features="", is_global=True):
         self.n_estimators = n_estimators
         self.max_depth = max_depth
         self.folder = folder
@@ -35,12 +34,10 @@ class BoostingDecisionMaker:
             monotonous_features)
         self.is_global = is_global
         self.features_dict_with_saved_objects = {}
-        if not folder.strip():
-            self.xg_boost = XGBClassifier(n_estimators=n_estimators,
-                                          max_depth=max_depth,
-                                          random_state=43)
+        if folder.strip():
+            self.load_model()
         else:
-            self.load_model(folder)
+            self.xg_boost = XGBClassifier(n_estimators=n_estimators, max_depth=max_depth, random_state=43)
 
     def get_model_info(self):
         folder_name = os.path.basename(self.folder.strip("/").strip("\\")).strip()
@@ -87,15 +84,14 @@ class BoostingDecisionMaker:
             _features_dict_with_saved_objects[feature] = _feature_encoder
         return _features_dict_with_saved_objects
 
-    def load_model(self, folder):
-        self.folder = folder
-        with open(os.path.join(folder, "boost_model.pickle"), "rb") as f:
+    def load_model(self):
+        with open(os.path.join(self.folder, "boost_model.pickle"), "rb") as f:
             self.n_estimators, self.max_depth, self.xg_boost = pickle.load(f)
-        with open(os.path.join(folder, "data_features_config.pickle"), "rb") as f:
+        with open(os.path.join(self.folder, "data_features_config.pickle"), "rb") as f:
             self.full_config, self.feature_ids, self.monotonous_features = pickle.load(f)
-        if os.path.exists(os.path.join(folder, "features_dict_with_saved_objects.pickle")):
+        if os.path.exists(os.path.join(self.folder, "features_dict_with_saved_objects.pickle")):
             features_dict_with_saved_objects = {}
-            with open(os.path.join(folder, "features_dict_with_saved_objects.pickle"), "rb") as f:
+            with open(os.path.join(self.folder, "features_dict_with_saved_objects.pickle"), "rb") as f:
                 features_dict_with_saved_objects = pickle.load(f)
             self.features_dict_with_saved_objects = self.transform_feature_encoders_to_objects(
                 features_dict_with_saved_objects)

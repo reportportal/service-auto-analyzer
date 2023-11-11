@@ -26,6 +26,10 @@ logger = logging.getLogger("analyzerApp.suggestInfoService")
 
 
 class SuggestInfoService:
+    """This service saves `SuggestAnalysisResult` entities to {project_id}_suggest ES/OS index.
+
+     This is necessary for further use in custom model training.
+     """
 
     def __init__(self, app_config=None, search_cfg=None):
         self.app_config = app_config or {}

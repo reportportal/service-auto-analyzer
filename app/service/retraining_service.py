@@ -44,8 +44,7 @@ class RetrainingService:
             logger.debug("Should be trained ", train_info)
             try:
                 gathered_data, training_log_info = _retraining.train(train_info)
-                _retraining_triggering.clean_triggering_info(
-                    train_info, gathered_data)
+                _retraining_triggering.clean_triggering_info(train_info, gathered_data)
                 logger.debug(training_log_info)
                 if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
                     AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(

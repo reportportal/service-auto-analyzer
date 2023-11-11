@@ -26,6 +26,7 @@ from app.commons import similarity_calculator
 from app.commons.esclient import EsClient
 from app.commons.launch_objects import SuggestAnalysisResult
 from app.commons.namespace_finder import NamespaceFinder
+from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
 from app.service.analyzer_service import AnalyzerService
 from app.utils import utils, text_processing
 
@@ -466,7 +467,7 @@ class SuggestService(AnalyzerService):
                             self.app_config["exchangeName"], "train_models", json.dumps({
                                 "model_type": model_type,
                                 "project_id": test_item_info.project,
-                                "gathered_metric_total": len(results)
+                                GATHERED_METRIC_TOTAL: len(results)
                             }))
         except Exception as exc:
             logger.exception(exc)

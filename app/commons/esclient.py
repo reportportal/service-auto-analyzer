@@ -29,6 +29,7 @@ from app.amqp.amqp import AmqpClient
 from app.commons import launch_objects
 from app.commons.log_merger import LogMerger
 from app.commons.log_preparation import LogPreparation
+from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.esclient")
@@ -255,7 +256,7 @@ class EsClient:
                     self.app_config["exchangeName"], "train_models", json.dumps({
                         "model_type": "defect_type",
                         "project_id": project,
-                        "gathered_metric_total": num_logs_with_defect_types
+                        GATHERED_METRIC_TOTAL: num_logs_with_defect_types
                     }))
         except Exception as exc:
             logger.exception(exc)

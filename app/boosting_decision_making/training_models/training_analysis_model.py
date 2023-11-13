@@ -12,24 +12,27 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.boosting_decision_making import boosting_decision_maker, custom_boosting_decision_maker
-from app.boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
-from app.boosting_decision_making import weighted_similarity_calculator
-from app.boosting_decision_making.feature_encoding_configurer import FeatureEncodingConfigurer
-from sklearn.model_selection import train_test_split
-import elasticsearch
-import elasticsearch.helpers
-from app.commons.esclient import EsClient
-from app.commons import namespace_finder
-from imblearn.over_sampling import SMOTE
-from app.utils import utils, text_processing
-from time import time
-import scipy.stats as stats
-import numpy as np
 import logging
-from datetime import datetime
 import os
 import pickle
+from datetime import datetime
+from time import time
+
+import elasticsearch
+import elasticsearch.helpers
+import numpy as np
+import scipy.stats as stats
+from imblearn.over_sampling import SMOTE
+from sklearn.model_selection import train_test_split
+
+from app.boosting_decision_making import boosting_decision_maker, custom_boosting_decision_maker
+from app.boosting_decision_making import weighted_similarity_calculator
+from app.boosting_decision_making.feature_encoding_configurer import FeatureEncodingConfigurer
+from app.boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
+from app.commons import namespace_finder
+from app.commons.esclient import EsClient
+from app.commons.model_chooser import ModelType
+from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.trainingAnalysisModel")
 
@@ -50,7 +53,7 @@ class AnalysisModelTraining:
             "auto_analysis": self.search_cfg["RetrainAutoBoostModelConfig"]}
         self.weighted_log_similarity_calculator = None
         if self.search_cfg["SimilarityWeightsFolder"].strip():
-            self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
+            self.weighted_log_similarity_calculator = weighted_similarity_calculator. \
                 WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.model_chooser = model_chooser
@@ -260,9 +263,10 @@ class AnalysisModelTraining:
         cur_number_of_logs_1 = 0
         unique_saved_features = set()
         for query_name, query in [
-                ("auto_analysis 0s", self.get_search_query_aa(0)),
-                ("suggestion", self.get_search_query_suggest()),
-                ("auto_analysis 1s", self.get_search_query_aa(1))]:
+            ("auto_analysis 0s", self.get_search_query_aa(0)),
+            ("suggestion", self.get_search_query_suggest()),
+            ("auto_analysis 1s", self.get_search_query_aa(1))
+        ]:
             if cur_number_of_logs >= max_number_of_logs:
                 break
             for res in elasticsearch.helpers.scan(self.es_client.es_client,
@@ -362,7 +366,8 @@ class AnalysisModelTraining:
             self.app_config, project_info["project_id"])
         self.new_model.add_config_info(full_config, features, monotonous_features)
 
-        defect_type_model_to_use = self.model_chooser.choose_model(project_info["project_id"], "defect_type_model/")
+        defect_type_model_to_use = self.model_chooser.choose_model(project_info["project_id"],
+                                                                   ModelType.DEFECT_TYPE_MODEL)
 
         metrics_to_gather = ["F1", "Mean Reciprocal Rank"]
         train_log_info = {}

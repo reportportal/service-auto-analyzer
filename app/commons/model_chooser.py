@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import enum
 
 from app.boosting_decision_making import (defect_type_model, custom_defect_type_model, custom_boosting_decision_maker,
                                           boosting_decision_maker)
@@ -20,6 +21,12 @@ import numpy as np
 import os
 
 logger = logging.getLogger("analyzerApp.modelChooser")
+
+
+class ModelType(enum.Enum):
+    DEFECT_TYPE_MODEL = 'defect_type_model/'
+    SUGGESTION_MODEL = 'suggestion_model/'
+    AUTO_ANALYSIS_MODEL = 'auto_analysis_model/'
 
 
 class ModelChooser:
@@ -37,27 +44,27 @@ class ModelChooser:
 
     def initialize_global_models(self):
         self.global_models = {}
-        for model_name, folder, class_to_use in [
-            ("defect_type_model/",
+        for model_type, folder, class_to_use in [
+            (ModelType.DEFECT_TYPE_MODEL,
              self.search_cfg["GlobalDefectTypeModelFolder"], defect_type_model.DefectTypeModel),
-            ("suggestion_model/",
+            (ModelType.SUGGESTION_MODEL,
              self.search_cfg["SuggestBoostModelFolder"], boosting_decision_maker.BoostingDecisionMaker),
-            ("auto_analysis_model/",
+            (ModelType.AUTO_ANALYSIS_MODEL,
              self.search_cfg["BoostModelFolder"], boosting_decision_maker.BoostingDecisionMaker)]:
             if folder.strip():
-                self.global_models[model_name] = class_to_use(folder=folder)
+                self.global_models[model_type] = class_to_use(folder=folder)
             else:
-                self.global_models[model_name] = None
+                self.global_models[model_type] = None
 
-    def choose_model(self, project_id, model_name_folder, custom_model_prob=1.0):
-        model = self.global_models[model_name_folder]
+    def choose_model(self, project_id: int, model_type: ModelType, custom_model_prob: float = 1.0):
+        model = self.global_models[model_type]
         prob_for_model = np.random.uniform()
         if prob_for_model > custom_model_prob:
             return model
-        folders = self.object_saver.get_folder_objects(project_id, model_name_folder)
+        folders = self.object_saver.get_folder_objects(project_id, model_type)
         if len(folders):
             try:
-                model = self.model_folder_mapping[model_name_folder](
+                model = self.model_folder_mapping[model_type](
                     self.app_config, project_id, folder=folders[0])
             except Exception as err:
                 logger.error(err)

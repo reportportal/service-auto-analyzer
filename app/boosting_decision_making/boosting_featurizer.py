@@ -189,6 +189,7 @@ class BoostingFeaturizer:
         return all_results
 
     def _calculate_decay_function_score(self, field_name):
+        decay_speed = np.log(self.config["time_weight_decay"])
         scores_by_issue_type = self.find_most_relevant_by_type()
         dates_by_issue_types = {}
         for issue_type in scores_by_issue_type:
@@ -198,8 +199,7 @@ class BoostingFeaturizer:
             compared_field_date = datetime.strptime(compared_field_date, '%Y-%m-%d %H:%M:%S')
             if compared_field_date < field_date:
                 field_date, compared_field_date = compared_field_date, field_date
-            dates_by_issue_types[issue_type] = np.exp(
-                np.log(self.config["time_weight_decay"]) * (compared_field_date - field_date).days / 7)
+            dates_by_issue_types[issue_type] = np.exp(decay_speed * (compared_field_date - field_date).days / 7)
         return dates_by_issue_types
 
     def _encode_into_vector(self, field_name, feature_name, only_query):

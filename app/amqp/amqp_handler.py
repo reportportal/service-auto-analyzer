@@ -128,7 +128,7 @@ def handle_amqp_request(channel: BlockingChannel, method: Basic.Deliver, props: 
             logger.error('Failed to publish result')
             logger.exception(exc)
             return
-    logger.debug(f'Finished processing message')
+    logger.debug('Finished processing message')
 
 
 def handle_inner_amqp_request(channel, method, props, body, request_handler):
@@ -148,4 +148,4 @@ def handle_inner_amqp_request(channel, method, props, body, request_handler):
         logger.error('Failed to handle message')
         logger.exception(exc)
         return
-    logger.debug(f'Finished processing message')
+    logger.debug('Finished processing message')

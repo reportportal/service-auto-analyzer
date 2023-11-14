@@ -232,9 +232,8 @@ class DefectTypeModelTraining:
                          353, 4561, 5417, 6427, 2029]
         bad_data = False
 
-        logs_to_train_idx, labels_filtered, data_to_train, \
-            additional_logs, proportion_binary_labels = self.creating_binary_target_data(
-            label, data, found_sub_categories)
+        logs_to_train_idx, labels_filtered, data_to_train, additional_logs, proportion_binary_labels = \
+            self.creating_binary_target_data(label, data, found_sub_categories)
 
         if proportion_binary_labels < self.due_proportion:
             logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
@@ -309,9 +308,8 @@ class DefectTypeModelTraining:
                 if use_custom_model:
                     logger.debug("Custom model '%s' should be saved" % label)
 
-                    logs_to_train_idx, labels_filtered, data_to_train, \
-                        additional_logs, proportion_binary_labels = self.creating_binary_target_data(
-                        label, data, found_sub_categories)
+                    logs_to_train_idx, labels_filtered, data_to_train, additional_logs, proportion_binary_labels = \
+                        self.creating_binary_target_data(label, data, found_sub_categories)
                     if proportion_binary_labels < self.due_proportion:
                         logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
                         bad_data = True

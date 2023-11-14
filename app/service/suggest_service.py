@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 import json
-import logging
 from datetime import datetime
 from functools import reduce
 from time import time
@@ -22,7 +21,7 @@ import elasticsearch.helpers
 
 from app.amqp.amqp import AmqpClient
 from app.boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
-from app.commons import similarity_calculator
+from app.commons import logging, similarity_calculator
 from app.commons.esclient import EsClient
 from app.commons.launch_objects import SuggestAnalysisResult
 from app.commons.model_chooser import ModelType

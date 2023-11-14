@@ -12,19 +12,20 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from minio import Minio
-import json
 import io
-import logging
+import json
 import pickle
 
+from minio import Minio
+
+from app.commons import logging
 
 logger = logging.getLogger("analyzerApp.minioClient")
 
 
 class MinioClient:
 
-    def __init__(self, app_config):
+    def __init__(self, app_config: dict) -> None:
         self.app_config = app_config
         self.minioClient = None
         try:
@@ -37,8 +38,8 @@ class MinioClient:
                 region=app_config['minioRegion']
             )
             logger.info(f'Minio initialized {minio_host}')
-        except Exception as err:
-            logger.error(err)
+        except Exception as exc:
+            logger.exception(exc)
 
     def remove_project_objects(self, project_id, object_names):
         if self.minioClient is None:
@@ -50,8 +51,8 @@ class MinioClient:
             for object_name in object_names:
                 self.minioClient.remove_object(
                     bucket_name=bucket_name, object_name=object_name)
-        except Exception as err:
-            logger.error(err)
+        except Exception as exc:
+            logger.exception(exc)
 
     def put_project_object(self, data, project_id, object_name, using_json=False):
         if self.minioClient is None:
@@ -74,8 +75,8 @@ class MinioClient:
                 data=data_stream, length=len(data_to_save))
             logger.debug(
                 "Saved into bucket '%s' with name '%s': %s", bucket_name, object_name, data)
-        except Exception as err:
-            logger.error(err)
+        except Exception as exc:
+            logger.exception(exc)
 
     def get_project_object(self, project_id, object_name, using_json=False):
         if self.minioClient is None:
@@ -121,6 +122,6 @@ class MinioClient:
                 self.minioClient.remove_object(
                     bucket_name=project_id, object_name=obj.object_name)
             return 1
-        except Exception as err:
-            logger.error(err)
+        except Exception as exc:
+            logger.exception(exc)
             return 0

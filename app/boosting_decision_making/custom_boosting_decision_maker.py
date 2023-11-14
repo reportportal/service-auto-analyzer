@@ -12,10 +12,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
-from app.commons.object_saving.object_saver import ObjectSaver
 import os
-import logging
+
+from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
+from app.commons import logging
+from app.commons.object_saving.object_saver import ObjectSaver
 
 logger = logging.getLogger("analyzerApp.custom_boosting_decision_maker")
 

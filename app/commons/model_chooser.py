@@ -12,18 +12,19 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import enum
+import os
+
+import numpy as np
 
 from app.boosting_decision_making import (defect_type_model, custom_defect_type_model, custom_boosting_decision_maker,
                                           boosting_decision_maker)
+from app.commons import logging
 from app.commons.object_saving.object_saver import ObjectSaver
-import logging
-import numpy as np
-import os
 
 logger = logging.getLogger("analyzerApp.modelChooser")
 
 
-class ModelType(enum.Enum):
+class ModelType(str, enum.Enum):
     DEFECT_TYPE_MODEL = 'defect_type_model/'
     SUGGESTION_MODEL = 'suggestion_model/'
     AUTO_ANALYSIS_MODEL = 'auto_analysis_model/'
@@ -36,9 +37,9 @@ class ModelChooser:
         self.search_cfg = search_cfg or {}
         self.object_saver = ObjectSaver(self.app_config)
         self.model_folder_mapping = {
-            "defect_type_model/": custom_defect_type_model.CustomDefectTypeModel,
-            "suggestion_model/": custom_boosting_decision_maker.CustomBoostingDecisionMaker,
-            "auto_analysis_model/": custom_boosting_decision_maker.CustomBoostingDecisionMaker
+            ModelType.DEFECT_TYPE_MODEL: custom_defect_type_model.CustomDefectTypeModel,
+            ModelType.SUGGESTION_MODEL: custom_boosting_decision_maker.CustomBoostingDecisionMaker,
+            ModelType.AUTO_ANALYSIS_MODEL: custom_boosting_decision_maker.CustomBoostingDecisionMaker
         }
         self.initialize_global_models()
 
@@ -50,7 +51,8 @@ class ModelChooser:
             (ModelType.SUGGESTION_MODEL,
              self.search_cfg["SuggestBoostModelFolder"], boosting_decision_maker.BoostingDecisionMaker),
             (ModelType.AUTO_ANALYSIS_MODEL,
-             self.search_cfg["BoostModelFolder"], boosting_decision_maker.BoostingDecisionMaker)]:
+             self.search_cfg["BoostModelFolder"], boosting_decision_maker.BoostingDecisionMaker)
+        ]:
             if folder.strip():
                 self.global_models[model_type] = class_to_use(folder=folder)
             else:
@@ -64,10 +66,9 @@ class ModelChooser:
         folders = self.object_saver.get_folder_objects(project_id, model_type)
         if len(folders):
             try:
-                model = self.model_folder_mapping[model_type](
-                    self.app_config, project_id, folder=folders[0])
+                model = self.model_folder_mapping[model_type](self.app_config, project_id, folder=folders[0])
             except Exception as err:
-                logger.error(err)
+                logger.exception(err)
         return model
 
     def delete_old_model(self, model_name, project_id):
@@ -75,8 +76,7 @@ class ModelChooser:
             project_id, "%s/" % model_name)
         deleted_models = 0
         for folder in all_folders:
-            if os.path.basename(
-                    folder.strip("/").strip("\\")).startswith(model_name):
+            if os.path.basename(folder.strip("/").strip("\\")).startswith(model_name):
                 deleted_models += self.object_saver.remove_folder_objects(project_id, folder)
         return deleted_models
 
@@ -85,6 +85,5 @@ class ModelChooser:
             self.delete_old_model(model_name_folder.strip("/").strip("\\"), project_id)
 
     def get_model_info(self, model_name, project_id):
-        all_folders = self.object_saver.get_folder_objects(
-            project_id, "%s/" % model_name)
+        all_folders = self.object_saver.get_folder_objects(project_id, "%s/" % model_name)
         return all_folders[0] if len(all_folders) else ""

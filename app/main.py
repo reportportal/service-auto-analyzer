@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import json
+
 import logging
 import logging.config
 import os
@@ -26,7 +27,7 @@ from flask_cors import CORS
 
 from app.amqp import amqp_handler
 from app.amqp.amqp import AmqpClient
-from app.commons import model_chooser
+from app.commons import model_chooser, logging as my_logging
 from app.commons.esclient import EsClient
 from app.service import AnalyzerService
 from app.service import AutoAnalyzerService
@@ -391,7 +392,7 @@ elif APP_CONFIG["logLevel"].lower() == "info":
     logging.disable(logging.DEBUG)
 else:
     logging.disable(logging.INFO)
-logger = logging.getLogger("analyzerApp")
+logger = my_logging.getLogger("analyzerApp")
 APP_CONFIG["appVersion"] = read_version()
 es_client = EsClient(APP_CONFIG, SEARCH_CONFIG)
 read_model_settings()
@@ -432,7 +433,7 @@ while True:
             amqp_client = AmqpClient(APP_CONFIG["amqpUrl"])
         except Exception as exc:
             logger.error("Amqp connection was not established")
-            logger.error(exc)
+            logger.exception(exc)
             time.sleep(10)
             continue
         threads = init_amqp(amqp_client)
@@ -440,7 +441,7 @@ while True:
         break
     except Exception as exc:
         logger.error("The analyzer has failed")
-        logger.error(exc)
+        logger.exception(exc)
 
 if __name__ == '__main__':
     logger.info("Program started")

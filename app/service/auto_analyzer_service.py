@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 import json
-import logging
 from datetime import datetime
 from queue import Queue
 from threading import Thread
@@ -21,6 +20,7 @@ from time import time, sleep
 
 from app.amqp.amqp import AmqpClient
 from app.boosting_decision_making import boosting_featurizer
+from app.commons import logging
 from app.commons.esclient import EsClient
 from app.commons.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult
 from app.commons.model_chooser import ModelType

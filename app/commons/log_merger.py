@@ -12,8 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.utils import text_processing
 import copy
+
+from app.utils import text_processing
 
 
 class LogMerger:
@@ -48,8 +49,8 @@ class LogMerger:
         log_ids_for_merged_logs = {}
         for log_level in log_level_messages["message"]:
 
-            if not log_level_ids_to_add[log_level] and\
-               log_level_messages["message"][log_level].strip():
+            if not log_level_ids_to_add[log_level] and \
+                    log_level_messages["message"][log_level].strip():
                 log = log_level_ids_merged[log_level]
                 merged_logs_id = str(log["_id"]) + "_m"
                 new_log = self.prepare_new_log(
@@ -95,7 +96,7 @@ class LogMerger:
             if log_level not in logs_unique_log_level:
                 logs_unique_log_level[log_level] = set()
 
-            if log["_source"]["original_message_lines"] <= 2 and\
+            if log["_source"]["original_message_lines"] <= 2 and \
                     log["_source"]["original_message_words_number"] <= 100:
                 if log_level not in log_level_ids_merged:
                     log_level_ids_merged[log_level] = log
@@ -116,7 +117,7 @@ class LogMerger:
                     for field in log_level_messages:
                         if field in log["_source"]:
                             splitter = "\r\n" if field in ["message", "whole_message"] else " "
-                            log_level_messages[field][log_level] =\
+                            log_level_messages[field][log_level] = \
                                 log_level_messages[field][log_level] + log["_source"][field] + splitter
 
             else:

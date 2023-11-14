@@ -12,17 +12,18 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.commons.esclient import EsClient
-from app.utils import utils, text_processing
-from app.commons.launch_objects import SearchLogInfo, Log
-from app.commons.log_preparation import LogPreparation
-from app.commons.log_merger import LogMerger
-from app.boosting_decision_making import weighted_similarity_calculator
-from app.commons import similarity_calculator
+from time import time
+
 import elasticsearch
 import elasticsearch.helpers
-import logging
-from time import time
+
+from app.boosting_decision_making import weighted_similarity_calculator
+from app.commons import logging, similarity_calculator
+from app.commons.esclient import EsClient
+from app.commons.launch_objects import SearchLogInfo, Log
+from app.commons.log_merger import LogMerger
+from app.commons.log_preparation import LogPreparation
+from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.searchService")
 
@@ -37,7 +38,7 @@ class SearchService:
         self.log_merger = LogMerger()
         self.weighted_log_similarity_calculator = None
         if self.search_cfg["SimilarityWeightsFolder"].strip():
-            self.weighted_log_similarity_calculator = weighted_similarity_calculator.\
+            self.weighted_log_similarity_calculator = weighted_similarity_calculator. \
                 WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
 
     def build_search_query(self, search_req, queried_log, search_min_should_match="95%"):

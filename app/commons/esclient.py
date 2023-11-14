@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 import json
-import logging
 import traceback
 from collections import deque
 from time import time
@@ -26,7 +25,7 @@ from elasticsearch import RequestsHttpConnection
 from urllib3.exceptions import InsecureRequestWarning
 
 from app.amqp.amqp import AmqpClient
-from app.commons import launch_objects
+from app.commons import launch_objects, logging
 from app.commons.log_merger import LogMerger
 from app.commons.log_preparation import LogPreparation
 from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL

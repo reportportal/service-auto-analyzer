@@ -12,9 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
-from app.commons.triggering_training.retraining_triggering import RetrainingTriggering
 from app.boosting_decision_making.training_models import training_defect_type_model, training_analysis_model
+from app.commons import logging
+from app.commons.triggering_training.retraining_triggering import RetrainingTriggering
 
 logger = logging.getLogger("analyzerApp.triggerManager")
 

@@ -12,13 +12,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
 import json
-from app.utils import utils
 from time import time
-from app.commons.esclient import EsClient
-from app.commons import trigger_manager
+
 from app.amqp.amqp import AmqpClient
+from app.commons import logging, trigger_manager
+from app.commons.esclient import EsClient
+from app.utils import utils
 
 logger = logging.getLogger("analyzerApp.retrainingService")
 

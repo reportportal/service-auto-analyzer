@@ -12,11 +12,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
-from app.utils import utils
 from time import time
-from app.commons import namespace_finder
+
+from app.commons import logging, namespace_finder
 from app.commons.log_preparation import LogPreparation
+from app.utils import utils
 
 logger = logging.getLogger("analyzerApp.namespaceFinderService")
 

@@ -12,20 +12,21 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.commons.esclient import EsClient
-from app.commons import clusterizer
-from app.utils import utils, text_processing
-from app.commons.launch_objects import ClusterResult, ClusterInfo
-from app.commons.log_preparation import LogPreparation
-from app.commons.log_merger import LogMerger
-from sklearn.feature_extraction.text import CountVectorizer
-import numpy as np
-from app.amqp.amqp import AmqpClient
-import json
-import logging
-from time import time
-from datetime import datetime
 import hashlib
+import json
+from datetime import datetime
+from time import time
+
+import numpy as np
+from sklearn.feature_extraction.text import CountVectorizer
+
+from app.amqp.amqp import AmqpClient
+from app.commons import clusterizer, logging
+from app.commons.esclient import EsClient
+from app.commons.launch_objects import ClusterResult, ClusterInfo
+from app.commons.log_merger import LogMerger
+from app.commons.log_preparation import LogPreparation
+from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.clusterService")
 
@@ -346,8 +347,8 @@ class ClusterService:
         clusters = []
         log_ids = []
         try:
-            unique_errors_min_should_match = launch_info.launch.analyzerConfig.uniqueErrorsMinShouldMatch / 100 # noqa
-            log_messages, log_dict, log_ids_for_merged_logs = self.log_preparation.prepare_logs_for_clustering( # noqa
+            unique_errors_min_should_match = launch_info.launch.analyzerConfig.uniqueErrorsMinShouldMatch / 100  # noqa
+            log_messages, log_dict, log_ids_for_merged_logs = self.log_preparation.prepare_logs_for_clustering(  # noqa
                 launch_info.launch, launch_info.numberOfLogLines,
                 launch_info.cleanNumbers, index_name)
             log_ids = set([str(log["_id"]) for log in log_dict.values()])

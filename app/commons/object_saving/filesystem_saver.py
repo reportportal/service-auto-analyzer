@@ -12,11 +12,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
-import pickle
-import os
-import shutil
 import json
+import os
+import pickle
+import shutil
+
+from app.commons import logging
 
 logger = logging.getLogger("analyzerApp.filesystemSaver")
 

@@ -12,27 +12,28 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import f1_score, accuracy_score
-from sklearn.metrics import classification_report, confusion_matrix
-
-from app.utils import text_processing
-import pandas as pd
 import os
 import pickle
 from collections import Counter
 
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import f1_score, accuracy_score
+
+from app.utils import text_processing, utils
+
 
 class DefectTypeModel:
+    folder: str
 
-    def __init__(self, folder=""):
+    def __init__(self, folder: str) -> None:
         self.folder = folder
         self.count_vectorizer_models = {}
         self.models = {}
         self.is_global = True
-        if self.folder:
-            self.load_model(folder)
+        self.load_model()
 
     def get_model_info(self):
         folder_name = os.path.basename(self.folder.strip("/").strip("\\")).strip()
@@ -43,10 +44,18 @@ class DefectTypeModel:
             return tags + ["global defect type model"]
         return []
 
-    def load_model(self, folder):
-        with open(os.path.join(folder, "count_vectorizer_models.pickle"), "rb") as f:
+    def load_model(self):
+        if not utils.validate_folder(self.folder):
+            raise ValueError(f'Invalid model folder path: {self.folder}')
+
+        count_vectorizer_models_file = os.path.join(self.folder, "count_vectorizer_models.pickle")
+        models_file = os.path.join(self.folder, "models.pickle")
+        if not utils.validate_file(count_vectorizer_models_file) or not utils.validate_file(models_file):
+            raise ValueError(f'Model folder path does not contains necessary files: {self.folder}')
+
+        with open(count_vectorizer_models_file, "rb") as f:
             self.count_vectorizer_models = pickle.load(f)
-        with open(os.path.join(folder, "models.pickle"), "rb") as f:
+        with open(models_file, "rb") as f:
             self.models = pickle.load(f)
 
     def save_model(self, folder):

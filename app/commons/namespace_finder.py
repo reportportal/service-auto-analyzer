@@ -12,9 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
-from app.commons.object_saving.object_saver import ObjectSaver
 from gensim.models.phrases import Phrases
+
+from app.commons import logging
+from app.commons.object_saving.object_saver import ObjectSaver
 
 logger = logging.getLogger("analyzerApp.namespace_finder")
 

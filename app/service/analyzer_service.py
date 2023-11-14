@@ -12,10 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
 import re
 
 from app.boosting_decision_making import weighted_similarity_calculator
+from app.commons import logging
 from app.commons.log_merger import LogMerger
 from app.commons.log_preparation import LogPreparation
 from app.utils import utils

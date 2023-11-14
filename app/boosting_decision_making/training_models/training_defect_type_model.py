@@ -12,19 +12,21 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.boosting_decision_making import defect_type_model, custom_defect_type_model
-from sklearn.model_selection import train_test_split
-from app.commons.esclient import EsClient
-from app.utils import utils, text_processing
-from time import time
-import scipy.stats as stats
-import numpy as np
-import logging
-from datetime import datetime
 import os
 import re
+from datetime import datetime
 from queue import Queue
+from time import time
+
 import elasticsearch.helpers
+import numpy as np
+import scipy.stats as stats
+from sklearn.model_selection import train_test_split
+
+from app.boosting_decision_making import defect_type_model, custom_defect_type_model
+from app.commons import logging
+from app.commons.esclient import EsClient
+from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.trainingDefectTypeModel")
 
@@ -230,9 +232,9 @@ class DefectTypeModelTraining:
                          353, 4561, 5417, 6427, 2029]
         bad_data = False
 
-        logs_to_train_idx, labels_filtered, data_to_train,\
+        logs_to_train_idx, labels_filtered, data_to_train, \
             additional_logs, proportion_binary_labels = self.creating_binary_target_data(
-                label, data, found_sub_categories)
+            label, data, found_sub_categories)
 
         if proportion_binary_labels < self.due_proportion:
             logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
@@ -307,9 +309,9 @@ class DefectTypeModelTraining:
                 if use_custom_model:
                     logger.debug("Custom model '%s' should be saved" % label)
 
-                    logs_to_train_idx, labels_filtered, data_to_train,\
+                    logs_to_train_idx, labels_filtered, data_to_train, \
                         additional_logs, proportion_binary_labels = self.creating_binary_target_data(
-                            label, data, found_sub_categories)
+                        label, data, found_sub_categories)
                     if proportion_binary_labels < self.due_proportion:
                         logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
                         bad_data = True

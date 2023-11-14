@@ -12,10 +12,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import os
-import numpy as np
-import pickle
 import math
+import os
+import pickle
+
+import numpy as np
 
 from app.utils import text_processing
 
@@ -36,14 +37,14 @@ class WeightedSimilarityCalculator:
         if not os.path.exists(os.path.join(folder, "weights.pickle")):
             return
         with open(os.path.join(folder, "weights.pickle"), "rb") as f:
-            self.block_to_split, self.min_log_number_in_block, self.weights, self.softmax_weights =\
+            self.block_to_split, self.min_log_number_in_block, self.weights, self.softmax_weights = \
                 pickle.load(f)
         if not os.path.exists(os.path.join(folder, "config.pickle")):
             return
         try:
             with open(os.path.join(folder, "config.pickle"), "wb") as f:
                 self.config = pickle.load(f)
-        except: # noqa
+        except:  # noqa
             pass
 
     def add_config_info(self, config):
@@ -60,7 +61,7 @@ class WeightedSimilarityCalculator:
                 if self.config:
                     with open(os.path.join(folder, "config.pickle"), "wb") as f:
                         pickle.dump(self.config, f)
-            except: # noqa
+            except:  # noqa
                 pass
 
     def message_to_array(self, detected_message_res, stacktrace_res):
@@ -82,7 +83,7 @@ class WeightedSimilarityCalculator:
     def weigh_data_rows(self, data_rows, use_softmax=False):
         padded_data_rows = np.concatenate([data_rows,
                                            np.zeros((max(0, self.block_to_split + 1 - len(data_rows)),
-                                                    data_rows.shape[1]))], axis=0)
+                                                     data_rows.shape[1]))], axis=0)
         result = None
         if use_softmax:
             result = np.dot(np.reshape(self.softmax_weights, [-1]), padded_data_rows)

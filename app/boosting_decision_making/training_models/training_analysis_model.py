@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
 import os
 import pickle
 from datetime import datetime
@@ -29,7 +28,7 @@ from app.boosting_decision_making import boosting_decision_maker, custom_boostin
 from app.boosting_decision_making import weighted_similarity_calculator
 from app.boosting_decision_making.feature_encoding_configurer import FeatureEncodingConfigurer
 from app.boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
-from app.commons import namespace_finder
+from app.commons import logging, namespace_finder
 from app.commons.esclient import EsClient
 from app.commons.model_chooser import ModelType
 from app.utils import utils, text_processing

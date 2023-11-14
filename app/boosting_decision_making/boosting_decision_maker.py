@@ -12,14 +12,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from xgboost import XGBClassifier
-from sklearn.metrics import classification_report, confusion_matrix
 import os
 import pickle
-import logging
 
-from app.utils import text_processing
+from sklearn.metrics import classification_report, confusion_matrix
+from xgboost import XGBClassifier
+
 from app.boosting_decision_making import feature_encoder
+from app.commons import logging
+from app.utils import text_processing
 
 logger = logging.getLogger("analyzerApp.boosting_decision_maker")
 
@@ -49,7 +50,7 @@ class BoostingDecisionMaker:
         return []
 
     def get_feature_ids(self):
-        return text_processing.transform_string_feature_range_into_list(self.feature_ids)\
+        return text_processing.transform_string_feature_range_into_list(self.feature_ids) \
             if isinstance(self.feature_ids, str) else self.feature_ids
 
     def get_feature_names(self):

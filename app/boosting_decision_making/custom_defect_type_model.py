@@ -12,26 +12,27 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import os
+
 from app.boosting_decision_making.defect_type_model import DefectTypeModel
 from app.commons.object_saving.object_saver import ObjectSaver
-import os
 
 
 class CustomDefectTypeModel(DefectTypeModel):
 
     def __init__(self, app_config, project_id, folder=""):
+        super().__init__(folder)
         self.project_id = project_id
         self.object_saver = ObjectSaver(app_config)
-        super(CustomDefectTypeModel, self).__init__(folder=folder)
         self.is_global = False
 
-    def load_model(self, folder):
+    def load_model(self):
         self.count_vectorizer_models = self.object_saver.get_project_object(
-            self.project_id, os.path.join(folder, "count_vectorizer_models"),
+            self.project_id, os.path.join(self.folder, "count_vectorizer_models"),
             using_json=False)
         assert len(self.count_vectorizer_models) > 0
         self.models = self.object_saver.get_project_object(
-            self.project_id, os.path.join(folder, "models"),
+            self.project_id, os.path.join(self.folder, "models"),
             using_json=False)
         assert len(self.models) > 0
 

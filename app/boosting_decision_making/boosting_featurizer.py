@@ -12,14 +12,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
 from collections import deque
 from datetime import datetime
 
 import numpy as np
 
 from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
-from app.commons import similarity_calculator
+from app.commons import logging, similarity_calculator
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")

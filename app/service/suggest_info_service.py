@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 import json
-import logging
 from datetime import datetime
 from time import time
 
@@ -21,6 +20,7 @@ import elasticsearch
 import elasticsearch.helpers
 
 from app.amqp.amqp import AmqpClient
+from app.commons import logging
 from app.commons.esclient import EsClient
 from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
 from app.utils import utils, text_processing

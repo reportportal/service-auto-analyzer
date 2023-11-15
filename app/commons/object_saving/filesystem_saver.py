@@ -29,63 +29,40 @@ class FilesystemSaver:
         self.folder_storage = self.app_config["filesystemDefaultPath"]
 
     def remove_project_objects(self, project_id, object_names):
-        try:
-            for filename in object_names:
-                object_name_full = os.path.join(
-                    self.folder_storage, project_id, filename).replace("\\", "/")
-                if os.path.exists(object_name_full):
-                    os.remove(object_name_full)
-        except Exception as err:
-            logger.error(err)
+        for filename in object_names:
+            object_name_full = os.path.join(self.folder_storage, project_id, filename).replace("\\", "/")
+            if os.path.exists(object_name_full):
+                os.remove(object_name_full)
 
     def put_project_object(self, data, project_id, object_name, using_json=False):
-        try:
-            folder_to_save = os.path.join(
-                self.folder_storage, project_id, os.path.dirname(object_name)).replace("\\", "/")
-            filename = os.path.join(
-                self.folder_storage, project_id, object_name).replace("\\", "/")
-            os.makedirs(folder_to_save, exist_ok=True)
-            with open(filename, "wb") as f:
-                if using_json:
-                    f.write(json.dumps(data).encode("utf-8"))
-                else:
-                    pickle.dump(data, f)
-            logger.debug(
-                "Saved into folder '%s' with name '%s': %s", project_id, object_name, data)
-        except Exception as err:
-            logger.error(err)
+        folder_to_save = os.path.join(self.folder_storage, project_id, os.path.dirname(object_name)).replace("\\", "/")
+        filename = os.path.join(self.folder_storage, project_id, object_name).replace("\\", "/")
+        os.makedirs(folder_to_save, exist_ok=True)
+        with open(filename, "wb") as f:
+            if using_json:
+                f.write(json.dumps(data).encode("utf-8"))
+            else:
+                pickle.dump(data, f)
+        logger.debug("Saved into folder '%s' with name '%s': %s", project_id, object_name, data)
 
     def get_project_object(self, project_id, object_name, using_json=False):
-        try:
-            filename = os.path.join(
-                self.folder_storage, project_id, object_name).replace("\\", "/")
-            if os.path.exists(filename):
-                with open(filename, "rb") as f:
-                    return json.loads(f.read()) if using_json else pickle.load(f)
-        except Exception as err:
-            logger.error(err)
-        return {}
+        filename = os.path.join(self.folder_storage, project_id, object_name).replace("\\", "/")
+        if os.path.exists(filename):
+            with open(filename, "rb") as f:
+                return json.loads(f.read()) if using_json else pickle.load(f)
 
     def does_object_exists(self, project_id, object_name):
-        return os.path.exists(
-            os.path.join(self.folder_storage, project_id, object_name).replace("\\", "/"))
+        return os.path.exists(os.path.join(self.folder_storage, project_id, object_name).replace("\\", "/"))
 
     def get_folder_objects(self, project_id, folder):
-        folder_to_check = os.path.join(
-            self.folder_storage, project_id, folder).replace("\\", "/")
+        folder_to_check = os.path.join(self.folder_storage, project_id, folder).replace("\\", "/")
         if os.path.exists(folder_to_check):
-            return [
-                os.path.join(folder, file_name) for file_name in os.listdir(folder_to_check)]
+            return [os.path.join(folder, file_name) for file_name in os.listdir(folder_to_check)]
         return []
 
     def remove_folder_objects(self, project_id, folder):
-        try:
-            folder_name = os.path.join(self.folder_storage,
-                                       project_id, folder).replace("\\", "/")
-            if os.path.exists(folder_name):
-                shutil.rmtree(folder_name, ignore_errors=True)
-                return 1
-            return 0
-        except Exception as err:
-            logger.error(err)
-            return 0
+        folder_name = os.path.join(self.folder_storage, project_id, folder).replace("\\", "/")
+        if os.path.exists(folder_name):
+            shutil.rmtree(folder_name, ignore_errors=True)
+            return 1
+        return 0

@@ -28,79 +28,62 @@ class MinioClient:
     def __init__(self, app_config: dict) -> None:
         self.app_config = app_config
         self.minioClient = None
-        try:
-            minio_host = app_config['minioHost']
-            self.minioClient = Minio(
-                minio_host,
-                access_key=app_config['minioAccessKey'],
-                secret_key=app_config['minioSecretKey'],
-                secure=app_config['minioUseTls'],
-                region=app_config['minioRegion']
-            )
-            logger.info(f'Minio initialized {minio_host}')
-        except Exception as exc:
-            logger.exception(exc)
+        minio_host = app_config['minioHost']
+        self.minioClient = Minio(
+            minio_host,
+            access_key=app_config['minioAccessKey'],
+            secret_key=app_config['minioSecretKey'],
+            secure=app_config['minioUseTls'],
+            region=app_config['minioRegion']
+        )
+        logger.info(f'Minio initialized {minio_host}')
 
     def remove_project_objects(self, project_id, object_names):
         if self.minioClient is None:
             return
-        try:
-            bucket_name = project_id
-            if not self.minioClient.bucket_exists(bucket_name):
-                return
-            for object_name in object_names:
-                self.minioClient.remove_object(
-                    bucket_name=bucket_name, object_name=object_name)
-        except Exception as exc:
-            logger.exception(exc)
+        bucket_name = project_id
+        if not self.minioClient.bucket_exists(bucket_name):
+            return
+        for object_name in object_names:
+            self.minioClient.remove_object(bucket_name=bucket_name, object_name=object_name)
 
     def put_project_object(self, data, project_id, object_name, using_json=False):
         if self.minioClient is None:
             return
-        try:
-            bucket_name = project_id
-            if not self.minioClient.bucket_exists(bucket_name):
-                logger.debug("Creating minio bucket %s" % bucket_name)
-                self.minioClient.make_bucket(
-                    bucket_name=bucket_name, location=self.app_config["minioRegion"])
-                logger.debug("Created minio bucket %s" % bucket_name)
-            if using_json:
-                data_to_save = json.dumps(data).encode("utf-8")
-            else:
-                data_to_save = pickle.dumps(data)
-            data_stream = io.BytesIO(data_to_save)
-            data_stream.seek(0)
-            self.minioClient.put_object(
-                bucket_name=bucket_name, object_name=object_name,
-                data=data_stream, length=len(data_to_save))
-            logger.debug(
-                "Saved into bucket '%s' with name '%s': %s", bucket_name, object_name, data)
-        except Exception as exc:
-            logger.exception(exc)
+
+        bucket_name = project_id
+        if not self.minioClient.bucket_exists(bucket_name):
+            logger.debug("Creating minio bucket %s" % bucket_name)
+            self.minioClient.make_bucket(bucket_name=bucket_name, location=self.app_config["minioRegion"])
+            logger.debug("Created minio bucket %s" % bucket_name)
+        if using_json:
+            data_to_save = json.dumps(data).encode("utf-8")
+        else:
+            data_to_save = pickle.dumps(data)
+        data_stream = io.BytesIO(data_to_save)
+        data_stream.seek(0)
+        self.minioClient.put_object(
+            bucket_name=bucket_name, object_name=object_name,
+            data=data_stream, length=len(data_to_save))
+        logger.debug("Saved into bucket '%s' with name '%s': %s", bucket_name, object_name, data)
 
     def get_project_object(self, project_id, object_name, using_json=False):
         if self.minioClient is None:
             return {}
-        try:
-            if not self.minioClient.bucket_exists(project_id):
-                return {}
-            obj = self.minioClient.get_object(
-                bucket_name=project_id, object_name=object_name)
-            return json.loads(obj.data) if using_json else pickle.loads(obj.data)
-        except Exception:
+        if not self.minioClient.bucket_exists(project_id):
             return {}
+        obj = self.minioClient.get_object(
+            bucket_name=project_id, object_name=object_name)
+        return json.loads(obj.data) if using_json else pickle.loads(obj.data)
 
     def does_object_exists(self, project_id, object_name):
         if self.minioClient is None:
             return False
-        try:
-            if not self.minioClient.bucket_exists(project_id):
-                return False
-            self.minioClient.get_object(
-                bucket_name=project_id, object_name=object_name)
-            return True
-        except Exception:
+        if not self.minioClient.bucket_exists(project_id):
             return False
+        self.minioClient.get_object(
+            bucket_name=project_id, object_name=object_name)
+        return True
 
     def get_folder_objects(self, project_id, folder):
         if self.minioClient is None:
@@ -117,11 +100,6 @@ class MinioClient:
             return 0
         if not self.minioClient.bucket_exists(project_id):
             return 0
-        try:
-            for obj in self.minioClient.list_objects(project_id, prefix=folder):
-                self.minioClient.remove_object(
-                    bucket_name=project_id, object_name=obj.object_name)
-            return 1
-        except Exception as exc:
-            logger.exception(exc)
-            return 0
+        for obj in self.minioClient.list_objects(project_id, prefix=folder):
+            self.minioClient.remove_object(bucket_name=project_id, object_name=obj.object_name)
+        return 1

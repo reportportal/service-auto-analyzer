@@ -389,9 +389,9 @@ class ClusterService:
                                 "cluster_with_numbers": not launch_info.cleanNumbers}})
                 self.es_client._bulk_index(
                     bodies, refresh=False, chunk_size=self.app_config["esChunkNumberUpdateClusters"])
-        except Exception as err:
-            logger.error(err)
-            errors_found.append(utils.extract_exception(err))
+        except Exception as exc:
+            logger.exception(exc)
+            errors_found.append(utils.extract_exception(exc))
             errors_count += 1
 
         results_to_share = {launch_info.launch.launchId: {

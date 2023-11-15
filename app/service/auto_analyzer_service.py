@@ -365,9 +365,9 @@ class AutoAnalyzerService(AnalyzerService):
             if len(batches) > 0:
                 self._send_result_to_queue(test_item_dict, batches, batch_logs)
 
-        except Exception as err:
+        except Exception as exc:
             logger.error("Error in ES query")
-            logger.error(err)
+            logger.exception(exc)
         self.finished_queue.put("Finished")
         logger.info("Es queries finished %.2f s.", time() - t_start)
 
@@ -539,11 +539,11 @@ class AutoAnalyzerService(AnalyzerService):
                     if not found_result:
                         results_to_share[launch_id]["not_found"] += 1
                     results_to_share[launch_id]["processed_time"] += (time() - t_start_item)
-                except Exception as err:
-                    logger.error(err)
+                except Exception as exc:
+                    logger.exception(exc)
                     if launch_id in results_to_share:
                         results_to_share[launch_id]["errors"].append(
-                            utils.extract_exception(err))
+                            utils.extract_exception(exc))
                         results_to_share[launch_id]["errors_count"] += 1
             if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip() and analyzed_results_for_index:
                 AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
@@ -554,8 +554,8 @@ class AutoAnalyzerService(AnalyzerService):
                         results_to_share[launch_id]["model_info"])
                 AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
                     self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
-        except Exception as err:
-            logger.error(err)
+        except Exception as exc:
+            logger.exception(exc)
         es_query_thread.join()
         EARLY_FINISH = False
         self.queue = Queue()

@@ -31,33 +31,26 @@ class CustomBoostingDecisionMaker(BoostingDecisionMaker):
 
     def load_model(self):
         self.n_estimators, self.max_depth, self.xg_boost = self.object_saver.get_project_object(
-            self.project_id, os.path.join(self.folder, "boost_model"),
-            using_json=False)
+            os.path.join(self.folder, "boost_model"), self.project_id, using_json=False)
         assert self.xg_boost is not None
         self.full_config, self.feature_ids, self.monotonous_features = self.object_saver.get_project_object(
-            self.project_id, os.path.join(self.folder, "data_features_config"),
-            using_json=False)
+            os.path.join(self.folder, "data_features_config"), self.project_id, using_json=False)
         assert len(self.full_config) > 0
-        if self.object_saver.does_object_exists(
-                self.project_id, os.path.join(self.folder, "features_dict_with_saved_objects")):
+        if self.object_saver.does_object_exists(os.path.join(self.folder, "features_dict_with_saved_objects"),
+                                                self.project_id):
             features_dict_with_saved_objects = self.object_saver.get_project_object(
-                self.project_id, os.path.join(self.folder, "features_dict_with_saved_objects"),
-                using_json=False)
+                os.path.join(self.folder, "features_dict_with_saved_objects"), self.project_id, using_json=False)
             self.features_dict_with_saved_objects = self.transform_feature_encoders_to_objects(
                 features_dict_with_saved_objects)
         else:
             self.features_dict_with_saved_objects = {}
 
     def save_model(self, folder):
-        self.object_saver.put_project_object(
-            [self.n_estimators, self.max_depth, self.xg_boost],
-            self.project_id, os.path.join(folder, "boost_model"),
-            using_json=False)
-        self.object_saver.put_project_object(
-            [self.full_config, self.feature_ids, self.monotonous_features],
-            self.project_id, os.path.join(folder, "data_features_config"),
-            using_json=False)
-        self.object_saver.put_project_object(
-            self.transform_feature_encoders_to_dict(),
-            self.project_id, os.path.join(folder, "features_dict_with_saved_objects"),
-            using_json=False)
+        self.object_saver.put_project_object([self.n_estimators, self.max_depth, self.xg_boost],
+                                             os.path.join(folder, "boost_model"), self.project_id, using_json=False)
+        self.object_saver.put_project_object([self.full_config, self.feature_ids, self.monotonous_features],
+                                             os.path.join(folder, "data_features_config"), self.project_id,
+                                             using_json=False)
+        self.object_saver.put_project_object(self.transform_feature_encoders_to_dict(),
+                                             os.path.join(folder, "features_dict_with_saved_objects"), self.project_id,
+                                             using_json=False)

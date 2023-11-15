@@ -22,11 +22,11 @@ from app.commons.protocols import Storage
 logger = logging.getLogger("analyzerApp.objectSaver")
 
 
-def create_minio_client(app_config) -> Storage:
+def create_minio_client(app_config: dict) -> Storage:
     return MinioClient(app_config)
 
 
-def create_filesystem_client(app_config) -> Storage:
+def create_filesystem_client(app_config: dict) -> Storage:
     return FilesystemSaver(app_config)
 
 
@@ -35,33 +35,51 @@ STORAGE_FACTORIES: dict[str, Callable[[dict], Storage]] = {
     'filesystem': create_filesystem_client
 }
 
+CONFIG_KEY = 'binaryStoreType'
+
 
 class ObjectSaver:
     storage: Storage
+    project_id: str | int | None = None
 
-    def __init__(self, app_config: dict) -> None:
+    def __init__(self, app_config: dict, project_id: str | int | None = None) -> None:
         self.app_config = app_config
-        if "binaryStoreType" in self.app_config and self.app_config["binaryStoreType"] in STORAGE_FACTORIES:
-            self.storage = STORAGE_FACTORIES[self.app_config["binaryStoreType"]](app_config)
+        self.project_id = project_id
+        if CONFIG_KEY in self.app_config and self.app_config[CONFIG_KEY] in STORAGE_FACTORIES:
+            self.storage = STORAGE_FACTORIES[self.app_config[CONFIG_KEY]](app_config)
+        else:
+            raise ValueError(
+                f'Storage "{self.app_config.get(CONFIG_KEY, None)}" is not supported, possible types are: '
+                + str(STORAGE_FACTORIES.keys())
+            )
 
-    def get_bucket_name(self, project_id):
-        return self.app_config["minioBucketPrefix"] + str(project_id)
+    def get_bucket_name(self, project_id: str | int | None = None) -> str:
+        id_str = ''
+        if project_id is None:
+            if self.project_id is None:
+                return id_str
+            else:
+                id_str = str(self.project_id)
+        else:
+            id_str = str(project_id)
+        return self.app_config['minioBucketPrefix'] + id_str
 
-    def remove_project_objects(self, project_id, object_names):
-        self.storage.remove_project_objects(
-            self.get_bucket_name(project_id), object_names)
+    def remove_project_objects(self, object_names: list[str], project_id: str | int | None = None) -> None:
+        self.storage.remove_project_objects(self.get_bucket_name(project_id), object_names)
 
-    def put_project_object(self, data, project_id, object_name, using_json=False):
+    def put_project_object(self, data: object, object_name: str, project_id: str | int | None = None,
+                           using_json: bool = False) -> None:
         self.storage.put_project_object(data, self.get_bucket_name(project_id), object_name, using_json=using_json)
 
-    def get_project_object(self, project_id, object_name, using_json=False):
+    def get_project_object(self, object_name: str, project_id: str | int | None = None,
+                           using_json: bool = False) -> object:
         return self.storage.get_project_object(self.get_bucket_name(project_id), object_name, using_json=using_json)
 
-    def does_object_exists(self, project_id, object_name):
+    def does_object_exists(self, object_name: str, project_id: str | int | None = None) -> bool:
         return self.storage.does_object_exists(self.get_bucket_name(project_id), object_name)
 
-    def get_folder_objects(self, project_id, folder):
+    def get_folder_objects(self, folder: str, project_id: str | int | None = None) -> list:
         return self.storage.get_folder_objects(self.get_bucket_name(project_id), folder)
 
-    def remove_folder_objects(self, project_id, folder):
+    def remove_folder_objects(self, folder: str, project_id: str | int | None = None) -> bool:
         return self.storage.remove_folder_objects(self.get_bucket_name(project_id), folder)

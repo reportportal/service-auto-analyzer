@@ -28,13 +28,13 @@ class FilesystemSaver:
         self.app_config = app_config
         self.folder_storage = self.app_config["filesystemDefaultPath"]
 
-    def remove_project_objects(self, project_id, object_names):
+    def remove_project_objects(self, project_id, object_names) -> None:
         for filename in object_names:
             object_name_full = os.path.join(self.folder_storage, project_id, filename).replace("\\", "/")
             if os.path.exists(object_name_full):
                 os.remove(object_name_full)
 
-    def put_project_object(self, data, project_id, object_name, using_json=False):
+    def put_project_object(self, data, project_id, object_name, using_json=False) -> None:
         folder_to_save = os.path.join(self.folder_storage, project_id, os.path.dirname(object_name)).replace("\\", "/")
         filename = os.path.join(self.folder_storage, project_id, object_name).replace("\\", "/")
         os.makedirs(folder_to_save, exist_ok=True)
@@ -45,24 +45,24 @@ class FilesystemSaver:
                 pickle.dump(data, f)
         logger.debug("Saved into folder '%s' with name '%s': %s", project_id, object_name, data)
 
-    def get_project_object(self, project_id, object_name, using_json=False):
+    def get_project_object(self, project_id, object_name, using_json=False) -> object | None:
         filename = os.path.join(self.folder_storage, project_id, object_name).replace("\\", "/")
         if os.path.exists(filename):
             with open(filename, "rb") as f:
                 return json.loads(f.read()) if using_json else pickle.load(f)
 
-    def does_object_exists(self, project_id, object_name):
+    def does_object_exists(self, project_id, object_name) -> bool:
         return os.path.exists(os.path.join(self.folder_storage, project_id, object_name).replace("\\", "/"))
 
-    def get_folder_objects(self, project_id, folder):
+    def get_folder_objects(self, project_id, folder) -> list[str]:
         folder_to_check = os.path.join(self.folder_storage, project_id, folder).replace("\\", "/")
         if os.path.exists(folder_to_check):
             return [os.path.join(folder, file_name) for file_name in os.listdir(folder_to_check)]
         return []
 
-    def remove_folder_objects(self, project_id, folder):
+    def remove_folder_objects(self, project_id, folder) -> bool:
         folder_name = os.path.join(self.folder_storage, project_id, folder).replace("\\", "/")
         if os.path.exists(folder_name):
             shutil.rmtree(folder_name, ignore_errors=True)
-            return 1
-        return 0
+            return True
+        return False

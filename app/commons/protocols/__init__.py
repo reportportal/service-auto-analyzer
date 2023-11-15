@@ -19,19 +19,19 @@ class Storage(Protocol):
     def remove_project_objects(self, project_id, object_names) -> None:
         ...
 
-    def put_project_object(self, data, project_id, object_name, using_json=False) -> None:
+    def put_project_object(self, data, project_id, object_name, using_json: bool = False) -> None:
         ...
 
-    def get_project_object(self, project_id, object_name, using_json=False):
+    def get_project_object(self, project_id, object_name, using_json: bool = False) -> object | None:
         ...
 
-    def does_object_exists(self, project_id, object_name):
+    def does_object_exists(self, project_id, object_name) -> bool:
         ...
 
-    def get_folder_objects(self, project_id, folder):
+    def get_folder_objects(self, project_id, folder) -> list[str]:
         ...
 
-    def remove_folder_objects(self, project_id, folder):
+    def remove_folder_objects(self, project_id, folder) -> bool:
         ...
 
 

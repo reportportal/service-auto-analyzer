@@ -32,18 +32,17 @@ class RetrainingTriggering:
         self.required_fields = [METRIC_SINCE_TRAINING, GATHERED_METRIC_TOTAL]
 
     def remove_triggering_info(self, train_info):
-        self.object_saver.remove_project_objects(
-            train_info["project_id"], [self.trigger_saving_name])
+        self.object_saver.remove_project_objects([self.trigger_saving_name], train_info["project_id"])
 
     def get_triggering_info(self, train_info):
-        obj = self.object_saver.get_project_object(train_info["project_id"], self.trigger_saving_name, using_json=True)
+        obj = self.object_saver.get_project_object(self.trigger_saving_name, train_info["project_id"], using_json=True)
         for required_field in self.required_fields:
             if required_field not in obj:
                 return {}
         return obj
 
     def save_triggering_info(self, trigger_info, train_info):
-        self.object_saver.put_project_object(trigger_info, train_info["project_id"], self.trigger_saving_name,
+        self.object_saver.put_project_object(trigger_info, self.trigger_saving_name, train_info["project_id"],
                                              using_json=True)
 
     def clean_triggering_info(self, train_info, gathered_metric_total):

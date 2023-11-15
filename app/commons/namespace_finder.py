@@ -26,20 +26,16 @@ class NamespaceFinder:
         self.object_saver = ObjectSaver(app_config)
 
     def remove_namespaces(self, project_id):
-        self.object_saver.remove_project_objects(
-            project_id, ["project_log_unique_words", "chosen_namespaces"])
+        self.object_saver.remove_project_objects(["project_log_unique_words", "chosen_namespaces"], project_id)
 
     def get_chosen_namespaces(self, project_id):
-        return self.object_saver.get_project_object(
-            project_id, "chosen_namespaces", using_json=True)
+        return self.object_saver.get_project_object("chosen_namespaces", project_id, using_json=True)
 
     def update_namespaces(self, project_id, log_words):
-        all_words = self.object_saver.get_project_object(
-            project_id, "project_log_unique_words", using_json=True)
+        all_words = self.object_saver.get_project_object("project_log_unique_words", project_id, using_json=True)
         for word in log_words:
             all_words[word] = 1
-        self.object_saver.put_project_object(
-            all_words, project_id, "project_log_unique_words", using_json=True)
+        self.object_saver.put_project_object(all_words, "project_log_unique_words", project_id, using_json=True)
         phrases = Phrases([w.split(".") for w in all_words], min_count=1, threshold=1)
         potential_project_namespaces = {}
         for word in all_words:
@@ -54,5 +50,4 @@ class NamespaceFinder:
             if cnt > 10:
                 chosen_namespaces[item.replace("_", ".")] = cnt
         logger.debug("Chosen namespaces %s", chosen_namespaces)
-        self.object_saver.put_project_object(
-            chosen_namespaces, project_id, "chosen_namespaces", using_json=True)
+        self.object_saver.put_project_object(chosen_namespaces, "chosen_namespaces", project_id, using_json=True)

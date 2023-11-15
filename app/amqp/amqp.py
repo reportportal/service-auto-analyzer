@@ -25,6 +25,8 @@ logger = logging.getLogger("analyzerApp.amqp")
 class AmqpClient:
     """AmqpClient handles communication with rabbitmq"""
 
+    connection: pika.BlockingConnection
+
     def __init__(self, amqp_url):
         self.connection = AmqpClient.create_ampq_connection(amqp_url)
 
@@ -85,13 +87,10 @@ class AmqpClient:
             logger.exception(exc)
             os.kill(os.getpid(), 9)
 
-    def send_to_inner_queue(self, exchange_name, queue, data):
+    def send_to_inner_queue(self, exchange_name: str, queue: str, data: str) -> None:
         try:
             channel = self.connection.channel()
-            channel.basic_publish(
-                exchange=exchange_name,
-                routing_key=queue,
-                body=data)
+            channel.basic_publish(exchange=exchange_name, routing_key=queue, body=bytes(data, 'utf-8'))
         except Exception as exc:
             logger.error("Failed to publish messages in queue %s", queue)
             logger.exception(exc)

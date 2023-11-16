@@ -15,15 +15,19 @@
 import io
 import json
 import pickle
+from typing import Any
 
 from minio import Minio
 
 from app.commons import logging
+from app.commons.interfaces.storage import Storage
 
 logger = logging.getLogger("analyzerApp.minioClient")
 
 
-class MinioClient:
+class MinioClient(Storage):
+    app_config: dict[str, Any]
+    folder_storage: str
 
     def __init__(self, app_config: dict) -> None:
         self.app_config = app_config

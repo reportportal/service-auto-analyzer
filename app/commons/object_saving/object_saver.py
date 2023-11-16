@@ -12,21 +12,21 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Callable
+from typing import Any, Callable
 
 from app.commons import logging
+from app.commons.interfaces.storage import Storage
 from app.commons.object_saving.filesystem_saver import FilesystemSaver
 from app.commons.object_saving.minio_client import MinioClient
-from app.commons.protocols import Storage
 
 logger = logging.getLogger("analyzerApp.objectSaver")
 
 
-def create_minio_client(app_config: dict) -> Storage:
+def create_minio_client(app_config: dict[str, Any]) -> Storage:
     return MinioClient(app_config)
 
 
-def create_filesystem_client(app_config: dict) -> Storage:
+def create_filesystem_client(app_config: dict[str, Any]) -> Storage:
     return FilesystemSaver(app_config)
 
 
@@ -39,10 +39,11 @@ CONFIG_KEY = 'binaryStoreType'
 
 
 class ObjectSaver:
+    app_config: dict[str, Any]
     storage: Storage
     project_id: str | int | None = None
 
-    def __init__(self, app_config: dict, project_id: str | int | None = None) -> None:
+    def __init__(self, app_config: dict[str, Any], project_id: str | int | None = None) -> None:
         self.app_config = app_config
         self.project_id = project_id
         if CONFIG_KEY in self.app_config and self.app_config[CONFIG_KEY] in STORAGE_FACTORIES:

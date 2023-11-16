@@ -22,27 +22,17 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.metrics import f1_score, accuracy_score
 
+from app.commons.interfaces import MlModel
 from app.utils import text_processing, utils
 
 
-class DefectTypeModel:
-    folder: str
+class DefectTypeModel(MlModel):
 
-    def __init__(self, folder: str) -> None:
-        self.folder = folder
+    def __init__(self, folder: str, tags: str = 'global boosting model') -> None:
+        super().__init__(folder, tags)
         self.count_vectorizer_models = {}
         self.models = {}
-        self.is_global = True
         self.load_model()
-
-    def get_model_info(self):
-        folder_name = os.path.basename(self.folder.strip("/").strip("\\")).strip()
-        if folder_name:
-            tags = [folder_name]
-            if not self.is_global:
-                return tags + ["custom defect type model"]
-            return tags + ["global defect type model"]
-        return []
 
     def load_model(self):
         if not utils.validate_folder(self.folder):
@@ -58,11 +48,11 @@ class DefectTypeModel:
         with open(models_file, "rb") as f:
             self.models = pickle.load(f)
 
-    def save_model(self, folder):
-        os.makedirs(folder, exist_ok=True)
-        with open(os.path.join(folder, "count_vectorizer_models.pickle"), "wb") as f:
+    def save_model(self):
+        os.makedirs(self.folder, exist_ok=True)
+        with open(os.path.join(self.folder, "count_vectorizer_models.pickle"), "wb") as f:
             pickle.dump(self.count_vectorizer_models, f)
-        with open(os.path.join(folder, "models.pickle"), "wb") as f:
+        with open(os.path.join(self.folder, "models.pickle"), "wb") as f:
             pickle.dump(self.models, f)
 
     def train_model(self, name, train_data_x, labels):

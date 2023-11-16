@@ -21,7 +21,7 @@ from app.commons.object_saving.object_saver import ObjectSaver
 class CustomDefectTypeModel(DefectTypeModel):
 
     def __init__(self, app_config, project_id, folder=""):
-        super().__init__(folder)
+        super().__init__(folder, tags='custom boosting model')
         self.project_id = project_id
         self.object_saver = ObjectSaver(app_config)
         self.is_global = False

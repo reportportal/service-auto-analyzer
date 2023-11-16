@@ -24,10 +24,9 @@ logger = logging.getLogger("analyzerApp.custom_boosting_decision_maker")
 class CustomBoostingDecisionMaker(BoostingDecisionMaker):
 
     def __init__(self, app_config, project_id, folder=""):
+        super().__init__(folder=folder, tags='custom boosting model')
         self.project_id = project_id
         self.object_saver = ObjectSaver(app_config)
-        super().__init__(folder=folder)
-        self.is_global = False
 
     def load_model(self):
         self.n_estimators, self.max_depth, self.xg_boost = self.object_saver.get_project_object(

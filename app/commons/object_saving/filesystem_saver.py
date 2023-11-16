@@ -16,15 +16,19 @@ import json
 import os
 import pickle
 import shutil
+from typing import Any
 
 from app.commons import logging
+from app.commons.interfaces.storage import Storage
 
 logger = logging.getLogger("analyzerApp.filesystemSaver")
 
 
-class FilesystemSaver:
+class FilesystemSaver(Storage):
+    app_config: dict[str, Any]
+    folder_storage: str
 
-    def __init__(self, app_config):
+    def __init__(self, app_config: dict[str, Any]) -> None:
         self.app_config = app_config
         self.folder_storage = self.app_config["filesystemDefaultPath"]
 

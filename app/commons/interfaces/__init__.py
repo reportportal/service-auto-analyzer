@@ -16,7 +16,7 @@ import os
 from abc import ABCMeta, abstractmethod
 from typing import Any
 
-from app.commons.object_saving.object_saver import ObjectSaver
+from app.commons.object_saving.object_saver import ObjectSaver, CONFIG_KEY
 
 
 class MlModel(metaclass=ABCMeta):
@@ -25,11 +25,18 @@ class MlModel(metaclass=ABCMeta):
     folder: str
     object_saver: ObjectSaver
 
-    def __init__(self, folder: str, tags: str, app_config: dict[str, Any], object_saver: ObjectSaver = None) -> None:
+    def __init__(self, folder: str, tags: str, *, object_saver: ObjectSaver = None,
+                 app_config: dict[str, Any] = None) -> None:
         self.folder = folder
         self.tags = [tag.strip() for tag in tags.split(',')]
         self.app_config = app_config
-        self.object_saver = object_saver or ObjectSaver(app_config)
+        if object_saver:
+            self.object_saver = object_saver
+        else:
+            if app_config:
+                self.object_saver = ObjectSaver(app_config)
+            else:
+                self.object_saver = ObjectSaver({CONFIG_KEY: 'filesystem', 'filesystemDefaultPath': folder})
 
     def get_model_info(self):
         folder_name = os.path.basename(self.folder.strip("/").strip("\\")).strip()

@@ -362,7 +362,8 @@ class AnalysisModelTraining:
         full_config, features, monotonous_features = pickle.load(
             open(self.model_config[project_info["model_type"]], "rb"))
         self.new_model = custom_boosting_decision_maker.CustomBoostingDecisionMaker(
-            self.app_config, project_info["project_id"])
+            "%s_model/%s/" % (project_info["model_type"], model_name), self.app_config, project_info["project_id"]
+        )
         self.new_model.add_config_info(full_config, features, monotonous_features)
 
         defect_type_model_to_use = self.model_chooser.choose_model(project_info["project_id"],
@@ -436,8 +437,7 @@ class AnalysisModelTraining:
                         train_log_info[metric]["model_saved"] = 0
                 self.model_chooser.delete_old_model(
                     "%s_model" % project_info["model_type"], project_info["project_id"])
-                self.new_model.save_model(
-                    "%s_model/%s/" % (project_info["model_type"], model_name))
+                self.new_model.save_model()
         except Exception as err:
             logger.error(err)
             errors.append(utils.extract_exception(err))

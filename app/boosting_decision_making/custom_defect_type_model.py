@@ -13,18 +13,19 @@
 #  limitations under the License.
 
 import os
+from typing import Any
 
 from app.boosting_decision_making.defect_type_model import DefectTypeModel
 from app.commons.object_saving.object_saver import ObjectSaver
 
 
 class CustomDefectTypeModel(DefectTypeModel):
+    project_id: int | str
 
-    def __init__(self, app_config, project_id, folder=""):
+    def __init__(self, folder: str, app_config: dict[str, Any], project_id: int | str):
         super().__init__(folder, tags='custom boosting model')
         self.project_id = project_id
         self.object_saver = ObjectSaver(app_config)
-        self.is_global = False
 
     def load_model(self):
         self.count_vectorizer_models = self.object_saver.get_project_object(
@@ -34,9 +35,9 @@ class CustomDefectTypeModel(DefectTypeModel):
                                                            using_json=False)
         assert len(self.models) > 0
 
-    def save_model(self, folder):
+    def save_model(self):
         self.object_saver.put_project_object(self.count_vectorizer_models,
-                                             os.path.join(folder, "count_vectorizer_models"), self.project_id,
+                                             os.path.join(self.folder, "count_vectorizer_models"), self.project_id,
                                              using_json=False)
-        self.object_saver.put_project_object(self.models, os.path.join(folder, "models"), self.project_id,
+        self.object_saver.put_project_object(self.models, os.path.join(self.folder, "models"), self.project_id,
                                              using_json=False)

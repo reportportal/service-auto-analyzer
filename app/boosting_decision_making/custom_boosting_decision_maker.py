@@ -13,20 +13,20 @@
 #  limitations under the License.
 
 import os
+from typing import Any
 
 from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
 from app.commons import logging
-from app.commons.object_saving.object_saver import ObjectSaver
 
 logger = logging.getLogger("analyzerApp.custom_boosting_decision_maker")
 
 
 class CustomBoostingDecisionMaker(BoostingDecisionMaker):
+    project_id: int | str
 
-    def __init__(self, app_config, project_id, folder=""):
-        super().__init__(folder=folder, tags='custom boosting model')
+    def __init__(self, folder: str, app_config: dict[str, Any], project_id: int | str):
+        super().__init__(folder=folder, tags='custom boosting model', app_config=app_config)
         self.project_id = project_id
-        self.object_saver = ObjectSaver(app_config)
 
     def load_model(self):
         self.n_estimators, self.max_depth, self.xg_boost = self.object_saver.get_project_object(
@@ -44,12 +44,13 @@ class CustomBoostingDecisionMaker(BoostingDecisionMaker):
         else:
             self.features_dict_with_saved_objects = {}
 
-    def save_model(self, folder):
+    def save_model(self):
         self.object_saver.put_project_object([self.n_estimators, self.max_depth, self.xg_boost],
-                                             os.path.join(folder, "boost_model"), self.project_id, using_json=False)
+                                             os.path.join(self.folder, "boost_model"), self.project_id,
+                                             using_json=False)
         self.object_saver.put_project_object([self.full_config, self.feature_ids, self.monotonous_features],
-                                             os.path.join(folder, "data_features_config"), self.project_id,
+                                             os.path.join(self.folder, "data_features_config"), self.project_id,
                                              using_json=False)
         self.object_saver.put_project_object(self.transform_feature_encoders_to_dict(),
-                                             os.path.join(folder, "features_dict_with_saved_objects"), self.project_id,
-                                             using_json=False)
+                                             os.path.join(self.folder, "features_dict_with_saved_objects"),
+                                             self.project_id, using_json=False)

@@ -14,6 +14,7 @@
 
 import os
 import pickle
+from typing import Any
 
 from sklearn.metrics import classification_report, confusion_matrix
 from xgboost import XGBClassifier
@@ -21,6 +22,7 @@ from xgboost import XGBClassifier
 from app.boosting_decision_making import feature_encoder
 from app.commons import logging
 from app.commons.interfaces import MlModel
+from app.commons.object_saving.object_saver import ObjectSaver
 from app.utils import text_processing
 
 logger = logging.getLogger("analyzerApp.boosting_decision_maker")
@@ -28,16 +30,16 @@ logger = logging.getLogger("analyzerApp.boosting_decision_maker")
 
 class BoostingDecisionMaker(MlModel):
 
-    def __init__(self, folder="", n_estimators=75, max_depth=5, monotonous_features='',
-                 tags: str = 'global boosting model') -> None:
-        super().__init__(folder, tags)
+    def __init__(self, folder: str, n_estimators: int = 75, max_depth: int = 5, monotonous_features: str = '',
+                 tags: str = 'global boosting model', object_saver: ObjectSaver = None,
+                 app_config: dict[str, Any] = None) -> None:
+        super().__init__(folder, tags, object_saver=object_saver, app_config=app_config)
         self.n_estimators = n_estimators
         self.max_depth = max_depth
-        self.folder = folder
         self.monotonous_features = text_processing.transform_string_feature_range_into_list(
             monotonous_features)
         self.features_dict_with_saved_objects = {}
-        if folder.strip():
+        if folder and folder.strip():
             self.load_model()
         else:
             self.xg_boost = XGBClassifier(n_estimators=n_estimators, max_depth=max_depth, random_state=43)

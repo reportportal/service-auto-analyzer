@@ -39,8 +39,7 @@ class DefectTypeModelTraining:
         self.label2inds = {"ab": 0, "pb": 1, "si": 2}
         self.due_proportion = 0.2
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
-        self.baseline_model = defect_type_model.DefectTypeModel(
-            folder=search_cfg["GlobalDefectTypeModelFolder"])
+        self.baseline_model = defect_type_model.DefectTypeModel(search_cfg["GlobalDefectTypeModelFolder"])
         self.model_chooser = model_chooser
 
     def return_similar_objects_into_sample(self, x_train_ind, y_train, data, additional_logs, label):
@@ -262,8 +261,8 @@ class DefectTypeModelTraining:
         model_name = "defect_type_model_%s" % datetime.now().strftime("%d.%m.%y")
         baseline_model = os.path.basename(
             self.search_cfg["GlobalDefectTypeModelFolder"].strip("/").strip("\\"))
-        self.new_model = custom_defect_type_model.CustomDefectTypeModel(
-            self.app_config, project_info["project_id"])
+        self.new_model = custom_defect_type_model.CustomDefectTypeModel("defect_type_model/%s/" % model_name,
+                                                                        self.app_config, project_info["project_id"])
 
         data, found_sub_categories, train_log_info = self.load_data_for_training(
             project_info, baseline_model, model_name)
@@ -348,8 +347,7 @@ class DefectTypeModelTraining:
             train_log_info["all"]["model_saved"] = 1
             train_log_info["all"]["p_value"] = p_value_max
             self.model_chooser.delete_old_model("defect_type_model", project_info["project_id"])
-            self.new_model.save_model(
-                "defect_type_model/%s/" % model_name)
+            self.new_model.save_model()
 
         time_spent = time() - start_time
         logger.info("Finished for %d s", time_spent)

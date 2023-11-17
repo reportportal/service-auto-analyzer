@@ -15,6 +15,7 @@
 import os
 import pickle
 from collections import Counter
+from typing import Any
 
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -23,13 +24,15 @@ from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.metrics import f1_score, accuracy_score
 
 from app.commons.interfaces import MlModel
+from app.commons.object_saving.object_saver import ObjectSaver
 from app.utils import text_processing, utils
 
 
 class DefectTypeModel(MlModel):
 
-    def __init__(self, folder: str, tags: str = 'global boosting model') -> None:
-        super().__init__(folder, tags)
+    def __init__(self, folder: str, tags: str = 'global boosting model', object_saver: ObjectSaver = None,
+                 app_config: dict[str, Any] = None) -> None:
+        super().__init__(folder, tags, object_saver=object_saver, app_config=app_config)
         self.count_vectorizer_models = {}
         self.models = {}
         self.load_model()

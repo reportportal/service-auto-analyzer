@@ -66,7 +66,7 @@ class ModelChooser:
         folders = self.object_saver.get_folder_objects(model_type, project_id)
         if len(folders):
             try:
-                model = self.model_folder_mapping[model_type](self.app_config, project_id, folder=folders[0])
+                model = self.model_folder_mapping[model_type](folders[0], self.app_config, project_id)
             except Exception as err:
                 logger.exception(err)
         return model

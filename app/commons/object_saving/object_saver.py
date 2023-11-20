@@ -15,9 +15,9 @@
 from typing import Any, Callable
 
 from app.commons import logging
+from app.commons.object_saving import Storage
 from app.commons.object_saving.filesystem_saver import FilesystemSaver
 from app.commons.object_saving.minio_client import MinioClient
-from commons.object_saving import Storage
 
 logger = logging.getLogger("analyzerApp.objectSaver")
 

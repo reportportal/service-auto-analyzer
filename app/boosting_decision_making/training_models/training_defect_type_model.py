@@ -183,9 +183,9 @@ class DefectTypeModelTraining:
                 logger.debug("Finished quering for %d s", time_spent)
                 train_log_info[label]["time_spent"] = time_spent
                 train_log_info[label]["data_size"] = len(found_data)
-            except Exception as err:
-                logger.error(err)
-                errors.append(utils.extract_exception(err))
+            except Exception as exc:
+                logger.exception(exc)
+                errors.append(utils.extract_exception(exc))
                 errors_count += 1
             labels_to_find_queue.task_done()
         logger.debug("Data gathered: %d" % len(data))
@@ -333,11 +333,11 @@ class DefectTypeModelTraining:
                         f1_baseline_models.append(train_log_info[label]["baseline_mean_metric"])
                         f1_chosen_models.append(train_log_info[label]["baseline_mean_metric"])
                 train_log_info[label]["time_spent"] += (time() - time_training)
-            except Exception as err:
-                logger.error(err)
+            except Exception as exc:
+                logger.exception(exc)
                 train_log_info[label]["errors_count"] += 1
-                train_log_info[label]["errors"].append(utils.extract_exception(err))
-                errors.append(utils.extract_exception(err))
+                train_log_info[label]["errors"].append(utils.extract_exception(exc))
+                errors.append(utils.extract_exception(exc))
                 errors_count += 1
                 self.copy_model_part_from_baseline(label)
 

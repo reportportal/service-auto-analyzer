@@ -11,15 +11,16 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
 import enum
 import os
 
 import numpy as np
 
-from app.boosting_decision_making import (defect_type_model, custom_defect_type_model, custom_boosting_decision_maker,
-                                          boosting_decision_maker)
 from app.commons import logging
 from app.commons.object_saving.object_saver import ObjectSaver
+from app.machine_learning.models import (defect_type_model, custom_defect_type_model, custom_boosting_decision_maker,
+                                         boosting_decision_maker)
 
 logger = logging.getLogger("analyzerApp.modelChooser")
 

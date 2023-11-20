@@ -18,31 +18,30 @@ import pickle
 
 import numpy as np
 
+from app.machine_learning.models import MlModel
 from app.utils import text_processing
 
 
-class LogSimilarityCalculator:
+class WeightedSimilarityCalculator(MlModel):
 
-    def __init__(self, block_to_split=10, min_log_number_in_block=1, folder=""):
+    def __init__(self, folder, block_to_split=10, min_log_number_in_block=1):
+        super().__init__(folder, 'global similarity model')
         self.block_to_split = block_to_split
         self.min_log_number_in_block = min_log_number_in_block
-        self.folder = folder
         self.weights = None
         self.softmax_weights = None
-        if folder.strip() != "":
-            self.load_model(folder)
+        self.load_model()
 
-    def load_model(self, folder):
-        self.folder = folder
-        if not os.path.exists(os.path.join(folder, "weights.pickle")):
+    def load_model(self):
+        if not os.path.exists(os.path.join(self.folder, "weights.pickle")):
             return
-        with open(os.path.join(folder, "weights.pickle"), "rb") as f:
+        with open(os.path.join(self.folder, "weights.pickle"), "rb") as f:
             self.block_to_split, self.min_log_number_in_block, self.weights, self.softmax_weights = \
                 pickle.load(f)
-        if not os.path.exists(os.path.join(folder, "config.pickle")):
+        if not os.path.exists(os.path.join(self.folder, "config.pickle")):
             return
         try:
-            with open(os.path.join(folder, "config.pickle"), "wb") as f:
+            with open(os.path.join(self.folder, "config.pickle"), "wb") as f:
                 self.config = pickle.load(f)
         except:  # noqa
             pass
@@ -50,16 +49,16 @@ class LogSimilarityCalculator:
     def add_config_info(self, config):
         self.config = config
 
-    def save_model(self, folder):
-        if not os.path.exists(folder):
-            os.makedirs(folder)
+    def save_model(self):
+        if not os.path.exists(self.folder):
+            os.makedirs(self.folder)
         if self.weights is not None:
-            with open(os.path.join(folder, "weights.pickle"), "wb") as f:
+            with open(os.path.join(self.folder, "weights.pickle"), "wb") as f:
                 pickle.dump([self.block_to_split, self.min_log_number_in_block,
                              self.weights, self.softmax_weights], f)
             try:
                 if self.config:
-                    with open(os.path.join(folder, "config.pickle"), "wb") as f:
+                    with open(os.path.join(self.folder, "config.pickle"), "wb") as f:
                         pickle.dump(self.config, f)
             except:  # noqa
                 pass
@@ -76,7 +75,7 @@ class LogSimilarityCalculator:
         for block in range(blocks_num):
             all_lines.append("\n".join(
                 split_log_lines[block * data_in_block: (block + 1) * data_in_block]))
-        if len([line for line in all_lines if line.strip() != ""]) == 0:
+        if len([line for line in all_lines if line.strip()]) == 0:
             return []
         return all_lines
 

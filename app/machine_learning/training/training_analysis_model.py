@@ -24,13 +24,13 @@ import scipy.stats as stats
 from imblearn.over_sampling import SMOTE
 from sklearn.model_selection import train_test_split
 
-from app.boosting_decision_making import boosting_decision_maker, custom_boosting_decision_maker
-from app.boosting_decision_making import weighted_similarity_calculator
-from app.boosting_decision_making.feature_encoding_configurer import FeatureEncodingConfigurer
-from app.boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.commons import logging, namespace_finder
 from app.commons.esclient import EsClient
 from app.commons.model_chooser import ModelType
+from app.machine_learning.feature_encoding_configurer import FeatureEncodingConfigurer
+from app.machine_learning.models import (boosting_decision_maker, custom_boosting_decision_maker,
+                                         weighted_similarity_calculator)
+from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.trainingAnalysisModel")

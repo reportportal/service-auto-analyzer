@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.boosting_decision_making import feature_encoder
+from app.machine_learning import feature_encoder
 
 
 class FeatureEncodingConfigurer:

@@ -18,11 +18,10 @@ import unittest
 import numpy as np
 import sure
 
-from app.boosting_decision_making import defect_type_model
-from app.boosting_decision_making import weighted_similarity_calculator
-from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
-from app.boosting_decision_making.boosting_featurizer import BoostingFeaturizer
-from app.boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
+from app.machine_learning.models import defect_type_model, weighted_similarity_calculator
+from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
+from app.machine_learning.boosting_featurizer import BoostingFeaturizer
+from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import utils
 from test import get_fixture
 

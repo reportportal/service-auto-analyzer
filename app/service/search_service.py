@@ -17,12 +17,12 @@ from time import time
 import elasticsearch
 import elasticsearch.helpers
 
-from app.boosting_decision_making import weighted_similarity_calculator
 from app.commons import logging, similarity_calculator
 from app.commons.esclient import EsClient
 from app.commons.launch_objects import SearchLogInfo, Log
 from app.commons.log_merger import LogMerger
 from app.commons.log_preparation import LogPreparation
+from app.machine_learning.models import weighted_similarity_calculator
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.searchService")

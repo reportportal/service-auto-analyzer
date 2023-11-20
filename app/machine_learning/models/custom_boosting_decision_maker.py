@@ -15,8 +15,8 @@
 import os
 from typing import Any
 
-from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
 from app.commons import logging
+from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 
 logger = logging.getLogger("analyzerApp.custom_boosting_decision_maker")
 

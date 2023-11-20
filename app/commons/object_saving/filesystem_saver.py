@@ -19,7 +19,7 @@ import shutil
 from typing import Any
 
 from app.commons import logging
-from app.commons.interfaces.storage import Storage
+from commons.object_saving import Storage
 
 logger = logging.getLogger("analyzerApp.filesystemSaver")
 

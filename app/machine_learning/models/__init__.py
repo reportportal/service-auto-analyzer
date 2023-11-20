@@ -12,11 +12,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+"""Common package for ML models."""
+
 import os
 from abc import ABCMeta, abstractmethod
 from typing import Any
 
-from app.commons.object_saving.object_saver import ObjectSaver, CONFIG_KEY
+from commons.object_saving.object_saver import ObjectSaver, CONFIG_KEY
 
 
 class MlModel(metaclass=ABCMeta):

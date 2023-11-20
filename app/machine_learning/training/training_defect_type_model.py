@@ -23,9 +23,9 @@ import numpy as np
 import scipy.stats as stats
 from sklearn.model_selection import train_test_split
 
-from app.boosting_decision_making import defect_type_model, custom_defect_type_model
 from app.commons import logging
 from app.commons.esclient import EsClient
+from app.machine_learning.models import defect_type_model, custom_defect_type_model
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.trainingDefectTypeModel")

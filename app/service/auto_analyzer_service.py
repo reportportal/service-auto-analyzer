@@ -19,13 +19,13 @@ from threading import Thread
 from time import time, sleep
 
 from app.amqp.amqp import AmqpClient
-from app.boosting_decision_making import boosting_featurizer
 from app.commons import logging
 from app.commons.esclient import EsClient
 from app.commons.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult
 from app.commons.model_chooser import ModelType
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.similarity_calculator import SimilarityCalculator
+from app.machine_learning import boosting_featurizer
 from app.service.analyzer_service import AnalyzerService
 from app.utils import utils, text_processing
 

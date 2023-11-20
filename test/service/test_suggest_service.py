@@ -21,8 +21,8 @@ from unittest.mock import MagicMock
 
 import httpretty
 
-from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
 from app.commons import launch_objects
+from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.service import SuggestService
 from app.utils import utils
 from test import get_fixture

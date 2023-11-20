@@ -15,15 +15,15 @@
 import os
 from typing import Any
 
-from app.boosting_decision_making.defect_type_model import DefectTypeModel
 from app.commons.object_saving.object_saver import ObjectSaver
+from app.machine_learning.models.defect_type_model import DefectTypeModel
 
 
 class CustomDefectTypeModel(DefectTypeModel):
     project_id: int | str
 
     def __init__(self, folder: str, app_config: dict[str, Any], project_id: int | str):
-        super().__init__(folder, tags='custom boosting model')
+        super().__init__(folder, 'custom defect type model')
         self.project_id = project_id
         self.object_saver = ObjectSaver(app_config)
 

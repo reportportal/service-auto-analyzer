@@ -19,10 +19,10 @@ from typing import Any
 from sklearn.metrics import classification_report, confusion_matrix
 from xgboost import XGBClassifier
 
-from app.boosting_decision_making import feature_encoder
 from app.commons import logging
-from app.commons.interfaces import MlModel
 from app.commons.object_saving.object_saver import ObjectSaver
+from app.machine_learning import feature_encoder
+from app.machine_learning.models import MlModel
 from app.utils import text_processing
 
 logger = logging.getLogger("analyzerApp.boosting_decision_maker")

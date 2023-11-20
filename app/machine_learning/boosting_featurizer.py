@@ -17,7 +17,7 @@ from datetime import datetime
 
 import numpy as np
 
-from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
+from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.commons import logging, similarity_calculator
 from app.utils import utils, text_processing
 

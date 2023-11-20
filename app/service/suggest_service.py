@@ -20,13 +20,13 @@ from time import time
 import elasticsearch.helpers
 
 from app.amqp.amqp import AmqpClient
-from app.boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.commons import logging, similarity_calculator
 from app.commons.esclient import EsClient
 from app.commons.launch_objects import SuggestAnalysisResult
 from app.commons.model_chooser import ModelType
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
+from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.service.analyzer_service import AnalyzerService
 from app.utils import utils, text_processing
 

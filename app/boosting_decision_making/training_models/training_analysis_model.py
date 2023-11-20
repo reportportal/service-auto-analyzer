@@ -167,7 +167,7 @@ class AnalysisModelTraining:
                 proportion_binary_labels = utils.calculate_proportions_for_labels(y_train)
                 if proportion_binary_labels < self.due_proportion_to_smote:
                     oversample = SMOTE(ratio="minority")
-                    x_train, y_train = oversample.fit_sample(x_train, y_train)
+                    x_train, y_train = oversample.fit_resample(x_train, y_train)
                 self.new_model.train_model(x_train, y_train)
                 logger.debug("New model results")
                 new_model_results = self.calculate_metrics(
@@ -322,10 +322,10 @@ class AnalysisModelTraining:
                 if log_id in log_id_dict:
                     found_logs[col] = log_id_dict[log_id]
             if len(found_logs) == 2:
-                log_relevent = found_logs["relevantLogId"]
-                log_relevent["_score"] = _suggest_res["_source"]["esScore"]
+                log_relevant = found_logs["relevantLogId"]
+                log_relevant["_score"] = _suggest_res["_source"]["esScore"]
                 searched_res = [
-                    (found_logs["testItemLogId"], {"hits": {"hits": [log_relevent]}})]
+                    (found_logs["testItemLogId"], {"hits": {"hits": [log_relevant]}})]
             if searched_res:
                 _boosting_data_gatherer = SuggestBoostingFeaturizer(
                     searched_res,
@@ -343,8 +343,8 @@ class AnalysisModelTraining:
                     full_data_features.extend(feature_data)
                     labels.append(_suggest_res["_source"]["userChoice"])
                     test_item_ids_with_pos.append(_suggest_res["_source"]["testItem"])
-        return np.asarray(full_data_features), np.asarray(labels),\
-            test_item_ids_with_pos, features_dict_with_saved_objects
+        return (np.asarray(full_data_features), np.asarray(labels), test_item_ids_with_pos,
+                features_dict_with_saved_objects)
 
     def train(self, project_info):
         time_training = time()
@@ -362,8 +362,7 @@ class AnalysisModelTraining:
             self.app_config, project_info["project_id"])
         self.new_model.add_config_info(full_config, features, monotonous_features)
 
-        defect_type_model_to_use = self.model_chooser.choose_model(
-            project_info["project_id"], "defect_type_model/")
+        defect_type_model_to_use = self.model_chooser.choose_model(project_info["project_id"], "defect_type_model/")
 
         metrics_to_gather = ["F1", "Mean Reciprocal Rank"]
         train_log_info = {}
@@ -397,19 +396,19 @@ class AnalysisModelTraining:
                 for metric in metrics_to_gather:
                     logger.debug("Baseline test results %s", baseline_model_results[metric])
                     logger.debug("New model test results %s", new_model_results[metric])
-                    pvalue = stats.f_oneway(baseline_model_results[metric], new_model_results[metric]).pvalue
-                    if pvalue != pvalue:
-                        pvalue = 1.0
-                    train_log_info[metric]["p_value"] = pvalue
+                    f_value, p_value = stats.f_oneway(baseline_model_results[metric], new_model_results[metric])
+                    if p_value is None:
+                        p_value = 1.0
+                    train_log_info[metric]["p_value"] = p_value
                     mean_f1 = np.mean(new_model_results[metric])
                     train_log_info[metric]["baseline_mean_metric"] = np.mean(baseline_model_results[metric])
                     train_log_info[metric]["new_model_mean_metric"] = mean_f1
-                    if pvalue < 0.05 and mean_f1 > np.mean(baseline_model_results[metric]) and mean_f1 >= 0.4:
+                    if p_value < 0.05 and mean_f1 > np.mean(baseline_model_results[metric]) and mean_f1 >= 0.4:
                         use_custom_model = True
                     logger.debug(
                         """Model training validation results:
                             p-value=%.3f mean baseline=%.3f mean new model=%.3f""",
-                        pvalue, np.mean(baseline_model_results[metric]), np.mean(new_model_results[metric]))
+                        p_value, np.mean(baseline_model_results[metric]), np.mean(new_model_results[metric]))
 
             if use_custom_model:
                 logger.debug("Custom model should be saved")
@@ -417,7 +416,7 @@ class AnalysisModelTraining:
                 proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
                 if proportion_binary_labels < self.due_proportion_to_smote:
                     oversample = SMOTE(ratio="minority")
-                    train_data, labels = oversample.fit_sample(train_data, labels)
+                    train_data, labels = oversample.fit_resample(train_data, labels)
                     proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
                 if proportion_binary_labels < self.due_proportion:
                     logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)

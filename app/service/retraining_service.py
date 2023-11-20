@@ -44,16 +44,15 @@ class RetrainingService:
             logger.debug("Should be trained ", train_info)
             try:
                 gathered_data, training_log_info = _retraining.train(train_info)
-                _retraining_triggering.clean_triggering_info(
-                    train_info, gathered_data)
+                _retraining_triggering.clean_triggering_info(train_info, gathered_data)
                 logger.debug(training_log_info)
                 if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
                     AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
                         self.app_config["exchangeName"], "stats_info", json.dumps(training_log_info))
                 is_model_trained = 1
-            except Exception as err:
+            except Exception as exc:
                 logger.error("Training finished with errors")
-                logger.error(err)
+                logger.exception(exc)
                 is_model_trained = 0
         logger.info("Finished training %.2f s", time() - t_start)
         return is_model_trained

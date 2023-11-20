@@ -287,21 +287,21 @@ class DefectTypeModelTraining:
                 if not bad_data:
                     logger.debug("Baseline test results %s", baseline_model_results)
                     logger.debug("New model test results %s", new_model_results)
-                    pvalue = stats.f_oneway(baseline_model_results, new_model_results).pvalue
-                    if pvalue != pvalue:
-                        pvalue = 1.0
-                    train_log_info[label]["p_value"] = pvalue
+                    f_value, p_value = stats.f_oneway(baseline_model_results, new_model_results)
+                    if p_value is None:
+                        p_value = 1.0
+                    train_log_info[label]["p_value"] = p_value
                     mean_f1 = np.mean(new_model_results)
                     train_log_info[label]["baseline_mean_metric"] = np.mean(baseline_model_results)
                     train_log_info[label]["new_model_mean_metric"] = mean_f1
-                    if pvalue < 0.05 and mean_f1 > np.mean(baseline_model_results) and mean_f1 >= 0.4:
-                        p_value_max = max(p_value_max, pvalue)
+                    if p_value < 0.05 and mean_f1 > np.mean(baseline_model_results) and mean_f1 >= 0.4:
+                        p_value_max = max(p_value_max, p_value)
                         use_custom_model = True
                     all_bad_data = 0
                     logger.debug(
                         """Model training validation results:
                             p-value=%.3f mean baseline=%.3f mean new model=%.3f""",
-                        pvalue, np.mean(baseline_model_results), np.mean(new_model_results))
+                        p_value, np.mean(baseline_model_results), np.mean(new_model_results))
                 train_log_info[label]["bad_data_proportion"] = int(bad_data)
 
                 if use_custom_model:

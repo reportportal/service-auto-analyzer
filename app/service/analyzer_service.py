@@ -44,56 +44,16 @@ class AnalyzerService:
         launch_number = int(launch_number)
         analyzer_mode = launch.analyzerConfig.analyzerMode
         if analyzer_mode in {'LAUNCH_NAME', 'CURRENT_AND_THE_SAME_NAME'}:
-            query['query']['bool']['must'].append(
-                {
-                    'term': {
-                        'launch_name': {
-                            'value': launch.launchName
-                        }
-                    }
-                }
-            )
+            query['query']['bool']['must'].append({'term': {'launch_name': {'value': launch.launchName}}})
         elif analyzer_mode == 'CURRENT_LAUNCH':
-            query['query']['bool']['must'].append(
-                {
-                    'term': {
-                        'launch_id': {
-                            'value': launch.launchId
-                        }
-                    }
-                }
-            )
+            query['query']['bool']['must'].append({'term': {'launch_id': {'value': launch.launchId}}})
         elif analyzer_mode == 'PREVIOUS_LAUNCH':
             must_clause = query['query']['bool']['must']
-            must_clause.append(
-                {
-                    'term': {
-                        'launch_number': {
-                            'value': launch_number - 1
-                        }
-                    }
-                }
-            )
-            must_clause.append(
-                {
-                    'term': {
-                        'launch_name': {
-                            'value': launch.launchName
-                        }
-                    }
-                }
-            )
+            must_clause.append({'term': {'launch_number': {'value': launch_number - 1}}})
+            must_clause.append({'term': {'launch_name': {'value': launch.launchName}}})
         else:
             query['query']['bool']['should'].append(
-                {
-                    'term': {
-                        'launch_name': {
-                            'value': launch.launchName,
-                            'boost': abs(self.search_cfg['BoostLaunch'])
-                        }
-                    }
-                }
-            )
+                {'term': {'launch_name': {'value': launch.launchName, 'boost': abs(self.search_cfg['BoostLaunch'])}}})
         return query
 
     def build_more_like_this_query(self,

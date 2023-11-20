@@ -12,20 +12,27 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.utils import utils, text_processing
-from app.amqp.amqp import AmqpClient
 import json
 import logging
-from time import time
 from datetime import datetime
+from time import time
+
 import elasticsearch
 import elasticsearch.helpers
+
+from app.amqp.amqp import AmqpClient
 from app.commons.esclient import EsClient
+from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
+from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.suggestInfoService")
 
 
 class SuggestInfoService:
+    """This service saves `SuggestAnalysisResult` entities to {project_id}_suggest ES/OS index.
+
+     This is necessary for further use in custom model training.
+     """
 
     def __init__(self, app_config=None, search_cfg=None):
         self.app_config = app_config or {}
@@ -157,8 +164,8 @@ class SuggestInfoService:
         for _id in sugggest_log_ids:
             bodies.append({
                 "_op_type": "delete",
-                "_id":      _id,
-                "_index":   index_name,
+                "_id": _id,
+                "_index": index_name,
             })
         result = self.es_client._bulk_index(bodies)
         logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
@@ -241,7 +248,7 @@ class SuggestInfoService:
                 try:
                     test_item_id = int(res["_source"]["testItem"])
                     issue_type = defect_update_info["itemsToUpdate"][test_item_id]
-                except: # noqa
+                except:  # noqa
                     pass
                 if issue_type.strip() and issue_type != res["_source"]["issueType"]:
                     log_update_queries.append({
@@ -253,13 +260,16 @@ class SuggestInfoService:
                         }
                     })
         result = self.es_client._bulk_index(log_update_queries)
-        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
-            for model_type in ["suggestion", "auto_analysis"]:
-                AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
-                    self.app_config["exchangeName"], "train_models", json.dumps({
-                        "model_type": model_type,
-                        "project_id": defect_update_info["project"],
-                        "gathered_metric_total": result.took
-                    }))
+        try:
+            if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+                for model_type in ["suggestion", "auto_analysis"]:
+                    AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                        self.app_config["exchangeName"], "train_models", json.dumps({
+                            "model_type": model_type,
+                            "project_id": defect_update_info["project"],
+                            GATHERED_METRIC_TOTAL: result.took
+                        }))
+        except Exception as exc:
+            logger.exception(exc)
         logger.info("Finished updating suggest info for %.2f sec.", time() - t_start)
         return result.took

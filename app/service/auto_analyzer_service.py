@@ -542,8 +542,7 @@ class AutoAnalyzerService(AnalyzerService):
                         results_to_share[launch_id]["errors"].append(
                             utils.extract_exception(err))
                         results_to_share[launch_id]["errors_count"] += 1
-            if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip() and len(
-                    analyzed_results_for_index) > 0:
+            if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip() and analyzed_results_for_index:
                 AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
                     self.app_config["exchangeName"], "index_suggest_info",
                     json.dumps([_info.dict() for _info in analyzed_results_for_index]))

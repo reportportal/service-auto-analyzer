@@ -38,7 +38,7 @@ class MlModel(metaclass=ABCMeta):
             if app_config:
                 self.object_saver = ObjectSaver(app_config)
             else:
-                self.object_saver = ObjectSaver({CONFIG_KEY: 'filesystem', 'filesystemDefaultPath': folder})
+                self.object_saver = ObjectSaver({CONFIG_KEY: 'filesystem', 'filesystemDefaultPath': ''})
 
     def load_models(self, model_files: list[str]) -> list[Any]:
         result = []

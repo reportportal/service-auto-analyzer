@@ -20,6 +20,6 @@ from app.machine_learning.models.boosting_decision_maker import BoostingDecision
 
 class CustomBoostingDecisionMaker(BoostingDecisionMaker):
 
-    def __init__(self, folder: str, app_config: dict[str, Any], project_id: int | str):
-        super().__init__(folder=folder, tags='custom boosting model', app_config=app_config,
-                         object_saver=ObjectSaver(app_config, project_id))
+    def __init__(self, folder: str, *, app_config: dict[str, Any], project_id: int | str):
+        super().__init__(folder, 'custom boosting model',
+                         object_saver=ObjectSaver(app_config, project_id), app_config=app_config)

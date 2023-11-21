@@ -13,13 +13,14 @@
 #  limitations under the License.
 
 import math
+from typing import Any
 
 import numpy as np
 
 from app.machine_learning.models import MlModel
 from app.utils import text_processing
 
-MODEL_FILES: list[str] = ['weights.pickle', 'config.pickle']
+MODEL_FILES: list[str] = ['weights.pickle']
 
 
 class WeightedSimilarityCalculator(MlModel):
@@ -28,19 +29,16 @@ class WeightedSimilarityCalculator(MlModel):
         super().__init__(folder, 'global similarity model')
         self.block_to_split = block_to_split
         self.min_log_number_in_block = min_log_number_in_block
-        weights, self.config = self.load_model()
-        self.block_to_split, self.min_log_number_in_block, self.weights, self.softmax_weights = weights
+        weights = self.load_model()
+        self.block_to_split, self.min_log_number_in_block, self.weights, self.softmax_weights = tuple(*weights)
 
-    def load_model(self):
+    def load_model(self) -> list[Any]:
         return self.load_models(MODEL_FILES)
-
-    def add_config_info(self, config):
-        self.config = config
 
     def save_model(self):
         self.save_models(zip(
             MODEL_FILES,
-            [[self.block_to_split, self.min_log_number_in_block, self.weights, self.softmax_weights], self.config]))
+            [[self.block_to_split, self.min_log_number_in_block, self.weights, self.softmax_weights]]))
 
     def message_to_array(self, detected_message_res, stacktrace_res):
         all_lines = [" ".join(text_processing.split_words(detected_message_res))]

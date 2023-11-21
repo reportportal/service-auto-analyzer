@@ -31,8 +31,8 @@ MODEL_FILES: list[str] = ['boost_model.pickle', 'data_features_config.pickle',
 
 class BoostingDecisionMaker(MlModel):
 
-    def __init__(self, folder: str, n_estimators: int = 75, max_depth: int = 5, monotonous_features: str = '',
-                 tags: str = 'global boosting model', object_saver: ObjectSaver = None,
+    def __init__(self, folder: str, tags: str = 'global boosting model', *, n_estimators: int = 75, max_depth: int = 5,
+                 monotonous_features: str = '', object_saver: ObjectSaver = None,
                  app_config: dict[str, Any] = None) -> None:
         super().__init__(folder, tags, object_saver=object_saver, app_config=app_config)
         self.n_estimators = n_estimators

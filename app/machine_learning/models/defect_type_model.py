@@ -38,7 +38,7 @@ class DefectTypeModel(MlModel):
 
     def load_model(self) -> None:
         model = self._load_models(MODEL_FILES)
-        self.count_vectorizer_models, self.models = tuple(*model)
+        self.count_vectorizer_models, self.models = model
 
     def save_model(self):
         self._save_models(zip(MODEL_FILES, self.count_vectorizer_models, self.models))

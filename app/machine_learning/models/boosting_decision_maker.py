@@ -82,8 +82,8 @@ class BoostingDecisionMaker(MlModel):
 
     def load_model(self) -> None:
         boost_model, features_config, features_dict = self._load_models(MODEL_FILES)
-        self.n_estimators, self.max_depth, self.xg_boost = tuple(*boost_model)
-        self.full_config, self.feature_ids, self.monotonous_features = tuple(*features_config)
+        self.n_estimators, self.max_depth, self.xg_boost = boost_model
+        self.full_config, self.feature_ids, self.monotonous_features = features_config
         self.features_dict_with_saved_objects = self.transform_feature_encoders_to_objects(features_dict)
 
     def save_model(self):

@@ -32,8 +32,8 @@ class WeightedSimilarityCalculator(MlModel):
         self.softmax_weights = np.array([])
 
     def load_model(self) -> None:
-        weights = self._load_models(MODEL_FILES)
-        self.block_to_split, self.min_log_number_in_block, self.weights, self.softmax_weights = tuple(*weights)
+        weights = self._load_models(MODEL_FILES)[0]
+        self.block_to_split, self.min_log_number_in_block, self.weights, self.softmax_weights = weights
 
     def save_model(self):
         self._save_models(zip(

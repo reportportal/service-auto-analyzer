@@ -54,6 +54,7 @@ class AnalysisModelTraining:
         if self.search_cfg["SimilarityWeightsFolder"].strip():
             self.weighted_log_similarity_calculator = weighted_similarity_calculator. \
                 WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
+            self.weighted_log_similarity_calculator.load_model()
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.model_chooser = model_chooser
         self.metrics_calculations = {
@@ -358,11 +359,13 @@ class AnalysisModelTraining:
             self.baseline_folders[project_info["model_type"]].strip("/").strip("\\"))
         self.baseline_model = boosting_decision_maker.BoostingDecisionMaker(
             folder=self.baseline_folders[project_info["model_type"]])
+        self.baseline_model.load_model()
 
         full_config, features, monotonous_features = pickle.load(
             open(self.model_config[project_info["model_type"]], "rb"))
         self.new_model = custom_boosting_decision_maker.CustomBoostingDecisionMaker(
-            "%s_model/%s/" % (project_info["model_type"], model_name), self.app_config, project_info["project_id"]
+            "%s_model/%s/" % (project_info["model_type"], model_name), app_config=self.app_config,
+            project_id=project_info["project_id"]
         )
         self.new_model.add_config_info(full_config, features, monotonous_features)
 

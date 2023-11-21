@@ -34,6 +34,7 @@ class AnalyzerService:
         if self.search_cfg["SimilarityWeightsFolder"].strip():
             self.weighted_log_similarity_calculator = weighted_similarity_calculator. \
                 WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
+            self.weighted_log_similarity_calculator.load_model()
 
     def find_min_should_match_threshold(self, analyzer_config):
         return analyzer_config.minShouldMatch if analyzer_config.minShouldMatch > 0 else \

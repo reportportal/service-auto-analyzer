@@ -99,6 +99,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
         ]
         weight_log_sim = weighted_similarity_calculator. \
             WeightedSimilarityCalculator(folder=self.weights_folder)
+        weight_log_sim.load_model()
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case index: {0}', idx):
                 _boosting_featurizer = BoostingFeaturizer(
@@ -185,6 +186,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
         ]
         weight_log_sim = weighted_similarity_calculator. \
             WeightedSimilarityCalculator(folder=self.weights_folder)
+        weight_log_sim.load_model()
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case index: {0}', idx):
                 _boosting_featurizer = BoostingFeaturizer(
@@ -278,6 +280,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
         ]
         weight_log_sim = weighted_similarity_calculator. \
             WeightedSimilarityCalculator(folder=self.weights_folder)
+        weight_log_sim.load_model()
         for idx, test in enumerate(tests):
             try:
                 _boosting_featurizer = BoostingFeaturizer(
@@ -344,6 +347,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
         ]
         weight_log_sim = weighted_similarity_calculator. \
             WeightedSimilarityCalculator(folder=self.weights_folder)
+        weight_log_sim.load_model()
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case index: {0}', idx):
                 _boosting_featurizer = SuggestBoostingFeaturizer(
@@ -432,6 +436,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
         ]
         weight_log_sim = weighted_similarity_calculator. \
             WeightedSimilarityCalculator(folder=self.weights_folder)
+        weight_log_sim.load_model()
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case index: {0}', idx):
                 _boosting_featurizer = SuggestBoostingFeaturizer(

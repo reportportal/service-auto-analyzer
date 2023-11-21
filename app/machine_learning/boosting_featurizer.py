@@ -253,10 +253,11 @@ class BoostingFeaturizer:
             return []
         if model_folder not in self.models:
             try:
-                self.models[model_folder] = BoostingDecisionMaker(folder=model_folder)
-                return self.models[model_folder].get_feature_ids()
-            except Exception as err:
-                logger.debug(err)
+                model = BoostingDecisionMaker(folder=model_folder)
+                model.load_model()
+                self.models[model_folder] = model
+            except Exception as exc:
+                logger.exception(exc)
                 return []
         return self.models[model_folder].get_feature_ids()
 

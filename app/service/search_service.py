@@ -40,6 +40,7 @@ class SearchService:
         if self.search_cfg["SimilarityWeightsFolder"].strip():
             self.weighted_log_similarity_calculator = weighted_similarity_calculator. \
                 WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
+            self.weighted_log_similarity_calculator.load_model()
 
     def build_search_query(self, search_req, queried_log, search_min_should_match="95%"):
         """Build search query"""

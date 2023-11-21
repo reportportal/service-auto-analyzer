@@ -37,16 +37,12 @@ class BoostingDecisionMaker(MlModel):
         super().__init__(folder, tags, object_saver=object_saver, app_config=app_config)
         self.n_estimators = n_estimators
         self.max_depth = max_depth
+        self.xg_boost = XGBClassifier(n_estimators=n_estimators, max_depth=max_depth, random_state=43)
         self.monotonous_features = text_processing.transform_string_feature_range_into_list(
             monotonous_features)
         self.features_dict_with_saved_objects = {}
-        if folder and folder.strip():
-            boost_model, features_config, features_dict = self.load_model()
-            self.n_estimators, self.max_depth, self.xg_boost = boost_model
-            self.full_config, self.feature_ids, self.monotonous_features = features_config
-            self.features_dict_with_saved_objects = self.transform_feature_encoders_to_objects(features_dict)
-        else:
-            self.xg_boost = XGBClassifier(n_estimators=n_estimators, max_depth=max_depth, random_state=43)
+        self.full_config = {}
+        self.feature_ids = []
 
     def get_feature_ids(self):
         return text_processing.transform_string_feature_range_into_list(self.feature_ids) \
@@ -84,13 +80,16 @@ class BoostingDecisionMaker(MlModel):
             _features_dict_with_saved_objects[feature] = _feature_encoder
         return _features_dict_with_saved_objects
 
-    def load_model(self):
-        return self.load_models(MODEL_FILES)
+    def load_model(self) -> None:
+        boost_model, features_config, features_dict = self._load_models(MODEL_FILES)
+        self.n_estimators, self.max_depth, self.xg_boost = tuple(*boost_model)
+        self.full_config, self.feature_ids, self.monotonous_features = tuple(*features_config)
+        self.features_dict_with_saved_objects = self.transform_feature_encoders_to_objects(features_dict)
 
     def save_model(self):
-        self.save_models(zip(MODEL_FILES, [[self.n_estimators, self.max_depth, self.xg_boost],
-                                           [self.full_config, self.feature_ids, self.monotonous_features],
-                                           self.transform_feature_encoders_to_dict()]))
+        self._save_models(zip(MODEL_FILES, [[self.n_estimators, self.max_depth, self.xg_boost],
+                                            [self.full_config, self.feature_ids, self.monotonous_features],
+                                            self.transform_feature_encoders_to_dict()]))
 
     def train_model(self, train_data, labels):
         mon_features = [

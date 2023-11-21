@@ -42,10 +42,10 @@ class ModelChooser:
             ModelType.SUGGESTION_MODEL: custom_boosting_decision_maker.CustomBoostingDecisionMaker,
             ModelType.AUTO_ANALYSIS_MODEL: custom_boosting_decision_maker.CustomBoostingDecisionMaker
         }
+        self.global_models = {}
         self.initialize_global_models()
 
     def initialize_global_models(self):
-        self.global_models = {}
         for model_type, folder, class_to_use in [
             (ModelType.DEFECT_TYPE_MODEL,
              self.search_cfg["GlobalDefectTypeModelFolder"], defect_type_model.DefectTypeModel),
@@ -55,7 +55,9 @@ class ModelChooser:
              self.search_cfg["BoostModelFolder"], boosting_decision_maker.BoostingDecisionMaker)
         ]:
             if folder.strip():
-                self.global_models[model_type] = class_to_use(folder=folder)
+                model = class_to_use(folder=folder)
+                model.load_model()
+                self.global_models[model_type] = model
             else:
                 self.global_models[model_type] = None
 
@@ -67,7 +69,9 @@ class ModelChooser:
         folders = self.object_saver.get_folder_objects(model_type, project_id)
         if len(folders):
             try:
-                model = self.model_folder_mapping[model_type](folders[0], self.app_config, project_id)
+                model = self.model_folder_mapping[model_type](folders[0], app_config=self.app_config,
+                                                              project_id=project_id)
+                model.load_model()
             except Exception as err:
                 logger.exception(err)
         return model

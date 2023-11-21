@@ -40,6 +40,7 @@ class DefectTypeModelTraining:
         self.due_proportion = 0.2
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
         self.baseline_model = defect_type_model.DefectTypeModel(search_cfg["GlobalDefectTypeModelFolder"])
+        self.baseline_model.load_model()
         self.model_chooser = model_chooser
 
     def return_similar_objects_into_sample(self, x_train_ind, y_train, data, additional_logs, label):

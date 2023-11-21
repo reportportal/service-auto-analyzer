@@ -40,7 +40,7 @@ class MlModel(metaclass=ABCMeta):
             else:
                 self.object_saver = ObjectSaver({CONFIG_KEY: 'filesystem', 'filesystemDefaultPath': ''})
 
-    def load_models(self, model_files: list[str]) -> list[Any]:
+    def _load_models(self, model_files: list[str]) -> list[Any]:
         result = []
         for file in model_files:
             model = self.object_saver.get_project_object(os.path.join(self.folder, file), using_json=False)
@@ -49,7 +49,7 @@ class MlModel(metaclass=ABCMeta):
             result.append(model)
         return result
 
-    def save_models(self, data: dict[str, Any] | list[tuple[str, Any]]) -> None:
+    def _save_models(self, data: dict[str, Any] | list[tuple[str, Any]]) -> None:
         if isinstance(data, dict):
             items = data.items()
         else:
@@ -66,7 +66,7 @@ class MlModel(metaclass=ABCMeta):
         return tags
 
     @abstractmethod
-    def load_model(self) -> list[Any]:
+    def load_model(self) -> None:
         raise NotImplementedError('"load_model" method is not implemented!')
 
     @abstractmethod

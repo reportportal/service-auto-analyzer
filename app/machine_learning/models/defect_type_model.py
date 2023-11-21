@@ -35,13 +35,13 @@ class DefectTypeModel(MlModel):
     def __init__(self, folder: str, tags: str = 'global defect type model', object_saver: ObjectSaver = None,
                  app_config: dict[str, Any] = None) -> None:
         super().__init__(folder, tags, object_saver=object_saver, app_config=app_config)
-        self.count_vectorizer_models, self.models = self.load_model()
 
-    def load_model(self) -> list[Any]:
-        return self.load_models(MODEL_FILES)
+    def load_model(self) -> None:
+        model = self._load_models(MODEL_FILES)
+        self.count_vectorizer_models, self.models = tuple(*model)
 
     def save_model(self):
-        self.save_models(zip(MODEL_FILES, self.count_vectorizer_models, self.models))
+        self._save_models(zip(MODEL_FILES, self.count_vectorizer_models, self.models))
 
     def train_model(self, name, train_data_x, labels):
         self.count_vectorizer_models[name] = TfidfVectorizer(

@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import os
-import pickle
 from collections import Counter
 from typing import Any
 
@@ -27,21 +25,23 @@ from app.commons.object_saving.object_saver import ObjectSaver
 from app.machine_learning.models import MlModel
 from app.utils import text_processing
 
+MODEL_FILES: list[str] = ['count_vectorizer_models.pickle', 'models.pickle']
+
 
 class DefectTypeModel(MlModel):
+    count_vectorizer_models: dict
+    models: dict
 
     def __init__(self, folder: str, tags: str = 'global defect type model', object_saver: ObjectSaver = None,
                  app_config: dict[str, Any] = None) -> None:
         super().__init__(folder, tags, object_saver=object_saver, app_config=app_config)
-        self.count_vectorizer_models, self.models = self.load_model(
-            ['count_vectorizer_models.pickle', 'models.pickle'])
+        self.count_vectorizer_models, self.models = self.load_model()
+
+    def load_model(self) -> list[Any]:
+        return self.load_models(MODEL_FILES)
 
     def save_model(self):
-        os.makedirs(self.folder, exist_ok=True)
-        with open(os.path.join(self.folder, "count_vectorizer_models.pickle"), "wb") as f:
-            pickle.dump(self.count_vectorizer_models, f)
-        with open(os.path.join(self.folder, "models.pickle"), "wb") as f:
-            pickle.dump(self.models, f)
+        self.save_models(zip(MODEL_FILES, self.count_vectorizer_models, self.models))
 
     def train_model(self, name, train_data_x, labels):
         self.count_vectorizer_models[name] = TfidfVectorizer(

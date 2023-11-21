@@ -13,13 +13,13 @@
 #  limitations under the License.
 
 import math
-import os
-import pickle
 
 import numpy as np
 
 from app.machine_learning.models import MlModel
 from app.utils import text_processing
+
+MODEL_FILES: list[str] = ['weights.pickle', 'config.pickle']
 
 
 class WeightedSimilarityCalculator(MlModel):
@@ -28,40 +28,19 @@ class WeightedSimilarityCalculator(MlModel):
         super().__init__(folder, 'global similarity model')
         self.block_to_split = block_to_split
         self.min_log_number_in_block = min_log_number_in_block
-        self.weights = None
-        self.softmax_weights = None
-        self.load_model()
+        weights, self.config = self.load_model()
+        self.block_to_split, self.min_log_number_in_block, self.weights, self.softmax_weights = weights
 
     def load_model(self):
-        if not os.path.exists(os.path.join(self.folder, "weights.pickle")):
-            return
-        with open(os.path.join(self.folder, "weights.pickle"), "rb") as f:
-            self.block_to_split, self.min_log_number_in_block, self.weights, self.softmax_weights = \
-                pickle.load(f)
-        if not os.path.exists(os.path.join(self.folder, "config.pickle")):
-            return
-        try:
-            with open(os.path.join(self.folder, "config.pickle"), "wb") as f:
-                self.config = pickle.load(f)
-        except:  # noqa
-            pass
+        return self.load_models(MODEL_FILES)
 
     def add_config_info(self, config):
         self.config = config
 
     def save_model(self):
-        if not os.path.exists(self.folder):
-            os.makedirs(self.folder)
-        if self.weights is not None:
-            with open(os.path.join(self.folder, "weights.pickle"), "wb") as f:
-                pickle.dump([self.block_to_split, self.min_log_number_in_block,
-                             self.weights, self.softmax_weights], f)
-            try:
-                if self.config:
-                    with open(os.path.join(self.folder, "config.pickle"), "wb") as f:
-                        pickle.dump(self.config, f)
-            except:  # noqa
-                pass
+        self.save_models(zip(
+            MODEL_FILES,
+            [[self.block_to_split, self.min_log_number_in_block, self.weights, self.softmax_weights], self.config]))
 
     def message_to_array(self, detected_message_res, stacktrace_res):
         all_lines = [" ".join(text_processing.split_words(detected_message_res))]

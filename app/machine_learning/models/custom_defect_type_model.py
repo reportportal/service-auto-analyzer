@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import os
 from typing import Any
 
 from app.commons.object_saving.object_saver import ObjectSaver
@@ -22,9 +21,5 @@ from app.machine_learning.models.defect_type_model import DefectTypeModel
 class CustomDefectTypeModel(DefectTypeModel):
 
     def __init__(self, folder: str, app_config: dict[str, Any], project_id: int | str):
-        super().__init__(folder, 'custom defect type model', object_saver=ObjectSaver(app_config, project_id))
-
-    def save_model(self):
-        self.object_saver.put_project_object(self.count_vectorizer_models,
-                                             os.path.join(self.folder, "count_vectorizer_models"), using_json=False)
-        self.object_saver.put_project_object(self.models, os.path.join(self.folder, "models"), using_json=False)
+        super().__init__(folder, 'custom defect type model', app_config=app_config,
+                         object_saver=ObjectSaver(app_config, project_id))

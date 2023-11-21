@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import os
-import pickle
 from typing import Any
 
 from sklearn.metrics import classification_report, confusion_matrix
@@ -26,6 +24,9 @@ from app.machine_learning.models import MlModel
 from app.utils import text_processing
 
 logger = logging.getLogger("analyzerApp.boosting_decision_maker")
+
+MODEL_FILES: list[str] = ['boost_model.pickle', 'data_features_config.pickle',
+                          'features_dict_with_saved_objects.pickle']
 
 
 class BoostingDecisionMaker(MlModel):
@@ -40,7 +41,10 @@ class BoostingDecisionMaker(MlModel):
             monotonous_features)
         self.features_dict_with_saved_objects = {}
         if folder and folder.strip():
-            self.load_model()
+            boost_model, features_config, features_dict = self.load_model()
+            self.n_estimators, self.max_depth, self.xg_boost = boost_model
+            self.full_config, self.feature_ids, self.monotonous_features = features_config
+            self.features_dict_with_saved_objects = self.transform_feature_encoders_to_objects(features_dict)
         else:
             self.xg_boost = XGBClassifier(n_estimators=n_estimators, max_depth=max_depth, random_state=43)
 
@@ -81,28 +85,12 @@ class BoostingDecisionMaker(MlModel):
         return _features_dict_with_saved_objects
 
     def load_model(self):
-        with open(os.path.join(self.folder, "boost_model.pickle"), "rb") as f:
-            self.n_estimators, self.max_depth, self.xg_boost = pickle.load(f)
-        with open(os.path.join(self.folder, "data_features_config.pickle"), "rb") as f:
-            self.full_config, self.feature_ids, self.monotonous_features = pickle.load(f)
-        if os.path.exists(os.path.join(self.folder, "features_dict_with_saved_objects.pickle")):
-            features_dict_with_saved_objects = {}
-            with open(os.path.join(self.folder, "features_dict_with_saved_objects.pickle"), "rb") as f:
-                features_dict_with_saved_objects = pickle.load(f)
-            self.features_dict_with_saved_objects = self.transform_feature_encoders_to_objects(
-                features_dict_with_saved_objects)
-        else:
-            self.features_dict_with_saved_objects = {}
+        return self.load_models(MODEL_FILES)
 
     def save_model(self):
-        if not os.path.exists(self.folder):
-            os.makedirs(self.folder)
-        with open(os.path.join(self.folder, "boost_model.pickle"), "wb") as f:
-            pickle.dump([self.n_estimators, self.max_depth, self.xg_boost], f)
-        with open(os.path.join(self.folder, "data_features_config.pickle"), "wb") as f:
-            pickle.dump([self.full_config, self.feature_ids, self.monotonous_features], f)
-        with open(os.path.join(self.folder, "features_dict_with_saved_objects.pickle"), "wb") as f:
-            pickle.dump(self.transform_feature_encoders_to_dict(), f)
+        self.save_models(zip(MODEL_FILES, [[self.n_estimators, self.max_depth, self.xg_boost],
+                                           [self.full_config, self.feature_ids, self.monotonous_features],
+                                           self.transform_feature_encoders_to_dict()]))
 
     def train_model(self, train_data, labels):
         mon_features = [

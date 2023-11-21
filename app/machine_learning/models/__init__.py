@@ -50,11 +50,7 @@ class MlModel(metaclass=ABCMeta):
         return result
 
     def _save_models(self, data: dict[str, Any] | list[tuple[str, Any]]) -> None:
-        if isinstance(data, dict):
-            items = data.items()
-        else:
-            items = data
-        for file_name, object_to_save in items:
+        for file_name, object_to_save in dict(data).items():
             self.object_saver.put_project_object(object_to_save, os.path.join(self.folder, file_name),
                                                  using_json=False)
 

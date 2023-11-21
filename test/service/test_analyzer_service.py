@@ -340,7 +340,7 @@ class TestAutoAnalyzerService(TestService):
                 analyzer_service = AutoAnalyzerService(self.model_chooser,
                                                        app_config=app_config,
                                                        search_cfg=config)
-                _boosting_decision_maker = BoostingDecisionMaker()
+                _boosting_decision_maker = BoostingDecisionMaker("")
                 _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
                 _boosting_decision_maker.get_feature_names = MagicMock(return_value=["0"])
                 _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])

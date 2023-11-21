@@ -61,7 +61,9 @@ class TestEsQuery(unittest.TestCase):
             "esClientCert": "",
             "esClientKey": "",
             "appVersion": "",
-            "esChunkNumber": 1000
+            "esChunkNumber": 1000,
+            'binaryStoreType': 'filesystem',
+            'filesystemDefaultPath': ''
         }
         self.model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
         self.model_chooser = model_chooser.ModelChooser(self.app_config, self.get_default_search_config())

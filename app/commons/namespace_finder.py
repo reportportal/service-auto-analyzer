@@ -28,11 +28,17 @@ class NamespaceFinder:
     def remove_namespaces(self, project_id):
         self.object_saver.remove_project_objects(["project_log_unique_words", "chosen_namespaces"], project_id)
 
-    def get_chosen_namespaces(self, project_id):
-        return self.object_saver.get_project_object("chosen_namespaces", project_id, using_json=True)
+    def get_chosen_namespaces(self, project_id) -> dict:
+        if self.object_saver.does_object_exists("chosen_namespaces", project_id):
+            return self.object_saver.get_project_object("chosen_namespaces", project_id, using_json=True)
+        else:
+            return {}
 
-    def update_namespaces(self, project_id, log_words):
-        all_words = self.object_saver.get_project_object("project_log_unique_words", project_id, using_json=True)
+    def update_namespaces(self, project_id, log_words) -> None:
+        if self.object_saver.does_object_exists("project_log_unique_words", project_id):
+            all_words = self.object_saver.get_project_object("project_log_unique_words", project_id, using_json=True)
+        else:
+            all_words = {}
         for word in log_words:
             all_words[word] = 1
         self.object_saver.put_project_object(all_words, "project_log_unique_words", project_id, using_json=True)

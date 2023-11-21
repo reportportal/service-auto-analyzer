@@ -68,12 +68,12 @@ class ObjectSaver:
     def remove_project_objects(self, object_names: list[str], project_id: str | int | None = None) -> None:
         self.storage.remove_project_objects(self.get_bucket_name(project_id), object_names)
 
-    def put_project_object(self, data: object, object_name: str, project_id: str | int | None = None,
+    def put_project_object(self, data: Any, object_name: str, project_id: str | int | None = None,
                            using_json: bool = False) -> None:
         self.storage.put_project_object(data, self.get_bucket_name(project_id), object_name, using_json=using_json)
 
     def get_project_object(self, object_name: str, project_id: str | int | None = None,
-                           using_json: bool = False) -> object:
+                           using_json: bool = False) -> Any:
         return self.storage.get_project_object(self.get_bucket_name(project_id), object_name, using_json=using_json)
 
     def does_object_exists(self, object_name: str, project_id: str | int | None = None) -> bool:

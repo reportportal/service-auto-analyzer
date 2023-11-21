@@ -25,7 +25,7 @@ from sklearn.metrics import f1_score, accuracy_score
 
 from app.commons.object_saving.object_saver import ObjectSaver
 from app.machine_learning.models import MlModel
-from app.utils import text_processing, utils
+from app.utils import text_processing
 
 
 class DefectTypeModel(MlModel):
@@ -33,23 +33,8 @@ class DefectTypeModel(MlModel):
     def __init__(self, folder: str, tags: str = 'global defect type model', object_saver: ObjectSaver = None,
                  app_config: dict[str, Any] = None) -> None:
         super().__init__(folder, tags, object_saver=object_saver, app_config=app_config)
-        self.count_vectorizer_models = {}
-        self.models = {}
-        self.load_model()
-
-    def load_model(self):
-        if not utils.validate_folder(self.folder):
-            raise ValueError(f'Invalid model folder path: {self.folder}')
-
-        count_vectorizer_models_file = os.path.join(self.folder, "count_vectorizer_models.pickle")
-        models_file = os.path.join(self.folder, "models.pickle")
-        if not utils.validate_file(count_vectorizer_models_file) or not utils.validate_file(models_file):
-            raise ValueError(f'Model folder path does not contains necessary files: {self.folder}')
-
-        with open(count_vectorizer_models_file, "rb") as f:
-            self.count_vectorizer_models = pickle.load(f)
-        with open(models_file, "rb") as f:
-            self.models = pickle.load(f)
+        self.count_vectorizer_models, self.models = self.load_model(
+            ['count_vectorizer_models.pickle', 'models.pickle'])
 
     def save_model(self):
         os.makedirs(self.folder, exist_ok=True)

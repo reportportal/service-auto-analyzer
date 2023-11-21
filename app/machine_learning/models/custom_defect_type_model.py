@@ -20,24 +20,11 @@ from app.machine_learning.models.defect_type_model import DefectTypeModel
 
 
 class CustomDefectTypeModel(DefectTypeModel):
-    project_id: int | str
 
     def __init__(self, folder: str, app_config: dict[str, Any], project_id: int | str):
-        super().__init__(folder, 'custom defect type model')
-        self.project_id = project_id
-        self.object_saver = ObjectSaver(app_config)
-
-    def load_model(self):
-        self.count_vectorizer_models = self.object_saver.get_project_object(
-            os.path.join(self.folder, "count_vectorizer_models"), self.project_id, using_json=False)
-        assert len(self.count_vectorizer_models) > 0
-        self.models = self.object_saver.get_project_object(os.path.join(self.folder, "models"), self.project_id,
-                                                           using_json=False)
-        assert len(self.models) > 0
+        super().__init__(folder, 'custom defect type model', object_saver=ObjectSaver(app_config, project_id))
 
     def save_model(self):
         self.object_saver.put_project_object(self.count_vectorizer_models,
-                                             os.path.join(self.folder, "count_vectorizer_models"), self.project_id,
-                                             using_json=False)
-        self.object_saver.put_project_object(self.models, os.path.join(self.folder, "models"), self.project_id,
-                                             using_json=False)
+                                             os.path.join(self.folder, "count_vectorizer_models"), using_json=False)
+        self.object_saver.put_project_object(self.models, os.path.join(self.folder, "models"), using_json=False)

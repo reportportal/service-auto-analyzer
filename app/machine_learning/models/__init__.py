@@ -40,16 +40,21 @@ class MlModel(metaclass=ABCMeta):
             else:
                 self.object_saver = ObjectSaver({CONFIG_KEY: 'filesystem', 'filesystemDefaultPath': folder})
 
+    def load_model(self, model_files: list[str]) -> list[Any]:
+        result = []
+        for file in model_files:
+            model = self.object_saver.get_project_object(os.path.join(self.folder, file), using_json=False)
+            if model is None:
+                raise ValueError(f'Unable to load model "{file}".')
+            result.append(model)
+        return result
+
     def get_model_info(self):
         folder_name = os.path.basename(self.folder.strip("/").strip("\\")).strip()
         tags = self.tags
         if folder_name:
             tags = [folder_name] + self.tags
         return tags
-
-    @abstractmethod
-    def load_model(self):
-        raise NotImplementedError('"load_model" method is not implemented!')
 
     @abstractmethod
     def save_model(self):

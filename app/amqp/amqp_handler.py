@@ -131,10 +131,11 @@ def handle_amqp_request(channel: BlockingChannel, method: Basic.Deliver, props: 
     logger.debug('Finished processing message')
 
 
-def handle_inner_amqp_request(channel, method, props, body, request_handler):
+def handle_inner_amqp_request(_: BlockingChannel, method: Basic.Deliver, props: BasicProperties, body: bytes,
+                              request_handler: Callable[[Any], Any]):
     """Function for handling inner amqp requests."""
     logging.new_correlation_id()
-    logger.debug(f'Started message processing.\n--Method: {method}\n'
+    logger.debug(f'Started inner message processing.\n--Method: {method}\n'
                  f'--Properties: {props}\n--Body: {body}')
     try:
         message = json.loads(body, strict=False)

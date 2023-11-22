@@ -82,7 +82,7 @@ class FeatureEncoder:
                 encoded_data.append([0])
         return encoded_data
 
-    def get_feature_names(self):
+    def get_feature_names(self) -> list[str]:
         feature_names = []
         if self.encoding_type == "one_hot":
             for _key in sorted(self.additional_info.items(), key=lambda x: x[1]):
@@ -90,7 +90,7 @@ class FeatureEncoder:
         elif self.encoding_type == "hashing":
             feature_names = [str(x_) for x_ in range(self.max_features)]
         else:
-            feature_names = self.encoder.get_feature_names()
+            feature_names = self.encoder.get_feature_names_out().tolist()
         return feature_names
 
     def extract_data(self, logs):

@@ -12,14 +12,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Any
-
 from app.commons.object_saving.object_saver import ObjectSaver
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 
 
 class CustomBoostingDecisionMaker(BoostingDecisionMaker):
 
-    def __init__(self, folder: str, *, app_config: dict[str, Any], project_id: int | str):
-        super().__init__(folder, 'custom boosting model',
-                         object_saver=ObjectSaver(app_config, project_id), app_config=app_config)
+    def __init__(self, object_saver: ObjectSaver):
+        super().__init__(object_saver, 'custom boosting model')

@@ -14,30 +14,18 @@
 
 """Common package for different Storage services (Minio, Filesystem, etc.)."""
 
-from abc import ABCMeta, abstractmethod
+from typing import Any
+
+from app.commons.object_saving.object_saver import ObjectSaver, CONFIG_KEY
 
 
-class Storage(metaclass=ABCMeta):
-    @abstractmethod
-    def remove_project_objects(self, project_id: str, object_names: list[str]) -> None:
-        raise NotImplementedError('"remove_project_objects" method is not implemented!')
+def create(app_config: dict[str, Any], project_id: str | int | None = None, path: str | None = None) -> ObjectSaver:
+    return ObjectSaver(app_config=app_config, project_id=project_id, path=path)
 
-    @abstractmethod
-    def put_project_object(self, data, project_id: str, object_name: str, using_json: bool = False) -> None:
-        raise NotImplementedError('"put_project_object" method is not implemented!')
 
-    @abstractmethod
-    def get_project_object(self, project_id: str, object_name: str, using_json: bool = False) -> object | None:
-        raise NotImplementedError('"get_project_object" method is not implemented!')
-
-    @abstractmethod
-    def does_object_exists(self, project_id: str, object_name: str) -> bool:
-        raise NotImplementedError('"does_object_exists" method is not implemented!')
-
-    @abstractmethod
-    def get_folder_objects(self, project_id: str, folder: str) -> list[str]:
-        raise NotImplementedError('"get_folder_objects" method is not implemented!')
-
-    @abstractmethod
-    def remove_folder_objects(self, project_id: str, folder: str) -> bool:
-        raise NotImplementedError('"remove_folder_objects" method is not implemented!')
+def create_filesystem(base_path: str, project_id: str | int | None = None, path: str | None = None) -> ObjectSaver:
+    return ObjectSaver(
+        app_config={CONFIG_KEY: 'filesystem', 'filesystemDefaultPath': base_path, 'minioBucketPrefix': ''},
+        project_id=project_id,
+        path=path
+    )

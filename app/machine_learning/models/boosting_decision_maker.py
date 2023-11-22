@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Any
-
 from sklearn.metrics import classification_report, confusion_matrix
 from xgboost import XGBClassifier
 
@@ -31,10 +29,9 @@ MODEL_FILES: list[str] = ['boost_model.pickle', 'data_features_config.pickle',
 
 class BoostingDecisionMaker(MlModel):
 
-    def __init__(self, folder: str, tags: str = 'global boosting model', *, n_estimators: int = 75, max_depth: int = 5,
-                 monotonous_features: str = '', object_saver: ObjectSaver = None,
-                 app_config: dict[str, Any] = None) -> None:
-        super().__init__(folder, tags, object_saver=object_saver, app_config=app_config)
+    def __init__(self, object_saver: ObjectSaver, tags: str = 'global boosting model', *, n_estimators: int = 75,
+                 max_depth: int = 5, monotonous_features: str = '') -> None:
+        super().__init__(object_saver, tags)
         self.n_estimators = n_estimators
         self.max_depth = max_depth
         self.xg_boost = XGBClassifier(n_estimators=n_estimators, max_depth=max_depth, random_state=43)

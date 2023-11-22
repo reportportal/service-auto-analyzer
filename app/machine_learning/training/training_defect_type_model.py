@@ -23,7 +23,7 @@ import numpy as np
 import scipy.stats as stats
 from sklearn.model_selection import train_test_split
 
-from app.commons import logging
+from app.commons import logging, object_saving
 from app.commons.esclient import EsClient
 from app.machine_learning.models import defect_type_model, custom_defect_type_model
 from app.utils import utils, text_processing
@@ -39,7 +39,8 @@ class DefectTypeModelTraining:
         self.label2inds = {"ab": 0, "pb": 1, "si": 2}
         self.due_proportion = 0.2
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
-        self.baseline_model = defect_type_model.DefectTypeModel(search_cfg["GlobalDefectTypeModelFolder"])
+        self.baseline_model = defect_type_model.DefectTypeModel(
+            object_saving.create_filesystem(search_cfg["GlobalDefectTypeModelFolder"]))
         self.baseline_model.load_model()
         self.model_chooser = model_chooser
 
@@ -262,8 +263,9 @@ class DefectTypeModelTraining:
         model_name = "defect_type_model_%s" % datetime.now().strftime("%d.%m.%y")
         baseline_model = os.path.basename(
             self.search_cfg["GlobalDefectTypeModelFolder"].strip("/").strip("\\"))
-        self.new_model = custom_defect_type_model.CustomDefectTypeModel("defect_type_model/%s/" % model_name,
-                                                                        self.app_config, project_info["project_id"])
+        new_model_folder = 'defect_type_model/%s/' % model_name
+        self.new_model = custom_defect_type_model.CustomDefectTypeModel(
+            object_saving.create(self.app_config, project_info["project_id"], new_model_folder))
 
         data, found_sub_categories, train_log_info = self.load_data_for_training(
             project_info, baseline_model, model_name)

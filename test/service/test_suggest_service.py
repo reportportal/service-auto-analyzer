@@ -21,7 +21,7 @@ from unittest.mock import MagicMock
 
 import httpretty
 
-from app.commons import launch_objects
+from app.commons import launch_objects, object_saving
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.service import SuggestService
 from app.utils import utils
@@ -807,7 +807,7 @@ class TestSuggestService(TestService):
                 if "msearch_results" in test:
                     suggest_service.es_client.es_client.msearch = MagicMock(
                         return_value={"responses": test["msearch_results"]})
-                _boosting_decision_maker = BoostingDecisionMaker('', '')
+                _boosting_decision_maker = BoostingDecisionMaker(object_saving.create_filesystem(""), '')
                 _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
                 _boosting_decision_maker.get_feature_names = MagicMock(return_value=["0"])
                 _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])

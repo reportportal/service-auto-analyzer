@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 from collections import Counter
-from typing import Any
 
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -32,9 +31,8 @@ class DefectTypeModel(MlModel):
     count_vectorizer_models: dict
     models: dict
 
-    def __init__(self, folder: str, tags: str = 'global defect type model', object_saver: ObjectSaver = None,
-                 app_config: dict[str, Any] = None) -> None:
-        super().__init__(folder, tags, object_saver=object_saver, app_config=app_config)
+    def __init__(self, object_saver: ObjectSaver, tags: str = 'global defect type model') -> None:
+        super().__init__(object_saver, tags)
 
     def load_model(self) -> None:
         model = self._load_models(MODEL_FILES)

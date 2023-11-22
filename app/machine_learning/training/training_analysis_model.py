@@ -24,7 +24,7 @@ import scipy.stats as stats
 from imblearn.over_sampling import SMOTE
 from sklearn.model_selection import train_test_split
 
-from app.commons import logging, namespace_finder
+from app.commons import logging, namespace_finder, object_saving
 from app.commons.esclient import EsClient
 from app.commons.model_chooser import ModelType
 from app.machine_learning.feature_encoding_configurer import FeatureEncodingConfigurer
@@ -52,8 +52,9 @@ class AnalysisModelTraining:
             "auto_analysis": self.search_cfg["RetrainAutoBoostModelConfig"]}
         self.weighted_log_similarity_calculator = None
         if self.search_cfg["SimilarityWeightsFolder"].strip():
-            self.weighted_log_similarity_calculator = weighted_similarity_calculator. \
-                WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
+            self.weighted_log_similarity_calculator = (
+                weighted_similarity_calculator.WeightedSimilarityCalculator(
+                    object_saving.create_filesystem(self.search_cfg["SimilarityWeightsFolder"])))
             self.weighted_log_similarity_calculator.load_model()
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.model_chooser = model_chooser
@@ -358,15 +359,15 @@ class AnalysisModelTraining:
         baseline_model_folder = os.path.basename(
             self.baseline_folders[project_info["model_type"]].strip("/").strip("\\"))
         self.baseline_model = boosting_decision_maker.BoostingDecisionMaker(
-            folder=self.baseline_folders[project_info["model_type"]])
+            object_saving.create_filesystem(self.baseline_folders[project_info["model_type"]]))
         self.baseline_model.load_model()
 
         full_config, features, monotonous_features = pickle.load(
             open(self.model_config[project_info["model_type"]], "rb"))
-        self.new_model = custom_boosting_decision_maker.CustomBoostingDecisionMaker(
-            "%s_model/%s/" % (project_info["model_type"], model_name), app_config=self.app_config,
-            project_id=project_info["project_id"]
-        )
+        new_model_folder = "%s_model/%s/" % (project_info["model_type"], model_name)
+        self.new_model = (
+            custom_boosting_decision_maker.CustomBoostingDecisionMaker(
+                object_saving.create(self.app_config, project_id=project_info["project_id"], path=new_model_folder)))
         self.new_model.add_config_info(full_config, features, monotonous_features)
 
         defect_type_model_to_use = self.model_chooser.choose_model(project_info["project_id"],

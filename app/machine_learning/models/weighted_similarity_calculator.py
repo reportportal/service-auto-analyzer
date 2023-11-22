@@ -16,6 +16,7 @@ import math
 
 import numpy as np
 
+from app.commons.object_saving import ObjectSaver
 from app.machine_learning.models import MlModel
 from app.utils import text_processing
 
@@ -24,8 +25,8 @@ MODEL_FILES: list[str] = ['weights.pickle']
 
 class WeightedSimilarityCalculator(MlModel):
 
-    def __init__(self, folder, block_to_split=10, min_log_number_in_block=1):
-        super().__init__(folder, 'global similarity model')
+    def __init__(self, object_saver: ObjectSaver, block_to_split=10, min_log_number_in_block=1):
+        super().__init__(object_saver, 'global similarity model')
         self.block_to_split = block_to_split
         self.min_log_number_in_block = min_log_number_in_block
         self.weights = []

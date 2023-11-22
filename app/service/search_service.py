@@ -17,7 +17,7 @@ from time import time
 import elasticsearch
 import elasticsearch.helpers
 
-from app.commons import logging, similarity_calculator
+from app.commons import logging, similarity_calculator, object_saving
 from app.commons.esclient import EsClient
 from app.commons.launch_objects import SearchLogInfo, Log
 from app.commons.log_merger import LogMerger
@@ -38,8 +38,9 @@ class SearchService:
         self.log_merger = LogMerger()
         self.weighted_log_similarity_calculator = None
         if self.search_cfg["SimilarityWeightsFolder"].strip():
-            self.weighted_log_similarity_calculator = weighted_similarity_calculator. \
-                WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
+            self.weighted_log_similarity_calculator = (
+                weighted_similarity_calculator.WeightedSimilarityCalculator(
+                    object_saving.create_filesystem(self.search_cfg["SimilarityWeightsFolder"])))
             self.weighted_log_similarity_calculator.load_model()
 
     def build_search_query(self, search_req, queried_log, search_min_should_match="95%"):

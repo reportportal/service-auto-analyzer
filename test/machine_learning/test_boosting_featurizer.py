@@ -17,6 +17,7 @@ import unittest
 
 import sure
 
+from app.commons.object_saving import create_filesystem
 from app.machine_learning.models import weighted_similarity_calculator
 from app.machine_learning.boosting_featurizer import BoostingFeaturizer
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
@@ -98,7 +99,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
             },
         ]
         weight_log_sim = weighted_similarity_calculator. \
-            WeightedSimilarityCalculator(folder=self.weights_folder)
+            WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
         weight_log_sim.load_model()
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case index: {0}', idx):
@@ -185,7 +186,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
             },
         ]
         weight_log_sim = weighted_similarity_calculator. \
-            WeightedSimilarityCalculator(folder=self.weights_folder)
+            WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
         weight_log_sim.load_model()
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case index: {0}', idx):
@@ -279,7 +280,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
             },
         ]
         weight_log_sim = weighted_similarity_calculator. \
-            WeightedSimilarityCalculator(folder=self.weights_folder)
+            WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
         weight_log_sim.load_model()
         for idx, test in enumerate(tests):
             try:
@@ -346,7 +347,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
             },
         ]
         weight_log_sim = weighted_similarity_calculator. \
-            WeightedSimilarityCalculator(folder=self.weights_folder)
+            WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
         weight_log_sim.load_model()
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case index: {0}', idx):
@@ -435,7 +436,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
             },
         ]
         weight_log_sim = weighted_similarity_calculator. \
-            WeightedSimilarityCalculator(folder=self.weights_folder)
+            WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
         weight_log_sim.load_model()
         for idx, test in enumerate(tests):
             with sure.ensure('Error in the test case index: {0}', idx):

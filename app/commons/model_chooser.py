@@ -14,10 +14,12 @@
 
 import enum
 import os
+from typing import Any
 
 import numpy as np
 
 from app.commons import logging
+from app.commons import object_saving
 from app.commons.object_saving.object_saver import ObjectSaver
 from app.machine_learning.models import (defect_type_model, custom_defect_type_model, custom_boosting_decision_maker,
                                          boosting_decision_maker)
@@ -32,11 +34,13 @@ class ModelType(str, enum.Enum):
 
 
 class ModelChooser:
+    app_config: dict[str, Any]
+    object_saver: ObjectSaver
 
     def __init__(self, app_config=None, search_cfg=None):
         self.app_config = app_config or {}
         self.search_cfg = search_cfg or {}
-        self.object_saver = ObjectSaver(self.app_config)
+        self.object_saver = object_saving.create(self.app_config)
         self.model_folder_mapping = {
             ModelType.DEFECT_TYPE_MODEL: custom_defect_type_model.CustomDefectTypeModel,
             ModelType.SUGGESTION_MODEL: custom_boosting_decision_maker.CustomBoostingDecisionMaker,
@@ -55,7 +59,7 @@ class ModelChooser:
              self.search_cfg["BoostModelFolder"], boosting_decision_maker.BoostingDecisionMaker)
         ]:
             if folder.strip():
-                model = class_to_use(folder=folder)
+                model = class_to_use(object_saving.create_filesystem(folder))
                 model.load_model()
                 self.global_models[model_type] = model
             else:
@@ -69,8 +73,8 @@ class ModelChooser:
         folders = self.object_saver.get_folder_objects(model_type, project_id)
         if len(folders):
             try:
-                model = self.model_folder_mapping[model_type](folders[0], app_config=self.app_config,
-                                                              project_id=project_id)
+                model = self.model_folder_mapping[model_type](object_saving.create(self.app_config, project_id,
+                                                                                   folders[0]))
                 model.load_model()
             except Exception as err:
                 logger.exception(err)

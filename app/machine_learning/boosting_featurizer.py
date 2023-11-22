@@ -18,7 +18,7 @@ from datetime import datetime
 import numpy as np
 
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
-from app.commons import logging, similarity_calculator
+from app.commons import logging, similarity_calculator, object_saving
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
@@ -253,7 +253,7 @@ class BoostingFeaturizer:
             return []
         if model_folder not in self.models:
             try:
-                model = BoostingDecisionMaker(folder=model_folder)
+                model = BoostingDecisionMaker(object_saving.create_filesystem(model_folder))
                 model.load_model()
                 self.models[model_folder] = model
             except Exception as exc:

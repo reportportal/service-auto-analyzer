@@ -14,36 +14,24 @@
 
 """Common package for ML models."""
 
-import os
 from abc import ABCMeta, abstractmethod
 from typing import Any
 
-from app.commons.object_saving.object_saver import ObjectSaver, CONFIG_KEY
+from app.commons.object_saving.object_saver import ObjectSaver
 
 
 class MlModel(metaclass=ABCMeta):
-    app_config: dict[str, Any]
     tags: list[str]
-    folder: str
     object_saver: ObjectSaver
 
-    def __init__(self, folder: str, tags: str, *, object_saver: ObjectSaver = None,
-                 app_config: dict[str, Any] = None) -> None:
-        self.folder = folder
+    def __init__(self, object_saver: ObjectSaver, tags: str) -> None:
         self.tags = [tag.strip() for tag in tags.split(',')]
-        self.app_config = app_config
-        if object_saver:
-            self.object_saver = object_saver
-        else:
-            if app_config:
-                self.object_saver = ObjectSaver(app_config)
-            else:
-                self.object_saver = ObjectSaver({CONFIG_KEY: 'filesystem', 'filesystemDefaultPath': ''})
+        self.object_saver = object_saver
 
     def _load_models(self, model_files: list[str]) -> list[Any]:
         result = []
         for file in model_files:
-            model = self.object_saver.get_project_object(os.path.join(self.folder, file), using_json=False)
+            model = self.object_saver.get_project_object(file, using_json=False)
             if model is None:
                 raise ValueError(f'Unable to load model "{file}".')
             result.append(model)
@@ -51,11 +39,10 @@ class MlModel(metaclass=ABCMeta):
 
     def _save_models(self, data: dict[str, Any] | list[tuple[str, Any]]) -> None:
         for file_name, object_to_save in dict(data).items():
-            self.object_saver.put_project_object(object_to_save, os.path.join(self.folder, file_name),
-                                                 using_json=False)
+            self.object_saver.put_project_object(object_to_save, file_name, using_json=False)
 
     def get_model_info(self) -> list[str]:
-        folder_name = os.path.basename(self.folder.strip("/").strip("\\")).strip()
+        folder_name = self.object_saver.storage.base_path.strip("/").strip("\\").strip()
         tags = self.tags
         if folder_name:
             tags = [folder_name] + self.tags

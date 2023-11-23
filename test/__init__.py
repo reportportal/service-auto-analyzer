@@ -13,6 +13,8 @@
 #   limitations under the License.
 
 import os
+import random
+import string
 from typing import List
 
 from app.utils.utils import read_json_file
@@ -31,3 +33,7 @@ def get_fixture(fixture_name, to_json=False):
 def read_file_lines(folder: str, filename: str) -> List[str]:
     with open(os.path.join(folder, filename), "r") as file:
         return file.readlines()
+
+
+def random_alphanumeric(num: int):
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=num))

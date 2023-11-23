@@ -15,6 +15,7 @@
 """Common interface class for Storage types."""
 
 from abc import ABCMeta, abstractmethod
+from typing import Any
 
 
 class Storage(metaclass=ABCMeta):
@@ -24,7 +25,7 @@ class Storage(metaclass=ABCMeta):
         raise NotImplementedError('"remove_project_objects" method is not implemented!')
 
     @abstractmethod
-    def put_project_object(self, data, path: str, object_name: str, using_json: bool = False) -> None:
+    def put_project_object(self, data: Any, path: str, object_name: str, using_json: bool = False) -> None:
         raise NotImplementedError('"put_project_object" method is not implemented!')
 
     @abstractmethod

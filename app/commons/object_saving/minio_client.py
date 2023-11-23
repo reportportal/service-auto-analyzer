@@ -19,7 +19,6 @@ from typing import Any
 
 from minio import Minio
 from minio.error import NoSuchKey
-from urllib3.exceptions import ResponseError
 
 from app.commons import logging
 from app.commons.object_saving.storage import Storage
@@ -44,7 +43,7 @@ class MinioClient(Storage):
         )
         logger.info(f'Minio initialized {minio_host}')
 
-    def remove_project_objects(self, bucket, object_names) -> None:
+    def remove_project_objects(self, bucket: str, object_names: list[str]) -> None:
         if self.minioClient is None:
             return
         bucket_name = self.bucket_prefix + bucket
@@ -53,7 +52,7 @@ class MinioClient(Storage):
         for object_name in object_names:
             self.minioClient.remove_object(bucket_name=bucket_name, object_name=object_name)
 
-    def put_project_object(self, data, bucket, object_name, using_json=False) -> None:
+    def put_project_object(self, data: Any, bucket: str, object_name: str, using_json=False) -> None:
         if self.minioClient is None:
             return
 
@@ -73,14 +72,14 @@ class MinioClient(Storage):
             data=data_stream, length=len(data_to_save))
         logger.debug("Saved into bucket '%s' with name '%s': %s", bucket_name, object_name, data)
 
-    def get_project_object(self, bucket, object_name, using_json=False) -> object | None:
+    def get_project_object(self, bucket: str, object_name: str, using_json=False) -> object | None:
         bucket_name = self.bucket_prefix + bucket
         if self.minioClient is None or not self.minioClient.bucket_exists(bucket_name):
             return
         obj = self.minioClient.get_object(bucket_name=bucket_name, object_name=object_name)
         return json.loads(obj.data) if using_json else pickle.loads(obj.data)
 
-    def does_object_exists(self, bucket, object_name) -> bool:
+    def does_object_exists(self, bucket: str, object_name: str) -> bool:
         bucket_name = self.bucket_prefix + bucket
         if self.minioClient is None:
             return False
@@ -92,7 +91,7 @@ class MinioClient(Storage):
             return False
         return True
 
-    def get_folder_objects(self, bucket, folder) -> list[str]:
+    def get_folder_objects(self, bucket: str, folder: str) -> list[str]:
         bucket_name = self.bucket_prefix + bucket
         if self.minioClient is None:
             return []
@@ -103,7 +102,7 @@ class MinioClient(Storage):
             object_names.append(obj.object_name)
         return object_names
 
-    def remove_folder_objects(self, bucket, folder) -> bool:
+    def remove_folder_objects(self, bucket: str, folder: str) -> bool:
         bucket_name = self.bucket_prefix + bucket
         if self.minioClient is None or not self.minioClient.bucket_exists(bucket_name):
             return False

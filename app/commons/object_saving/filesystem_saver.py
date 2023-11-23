@@ -22,14 +22,14 @@ from app.commons import logging
 from app.utils import utils
 from app.commons.object_saving.storage import Storage
 
-logger = logging.getLogger("analyzerApp.filesystemSaver")
+logger = logging.getLogger('analyzerApp.filesystemSaver')
 
 
 class FilesystemSaver(Storage):
     _base_path: str
 
     def __init__(self, app_config: dict[str, Any]) -> None:
-        self._base_path = app_config["filesystemDefaultPath"]
+        self._base_path = app_config['filesystemDefaultPath'] or ''
 
     def remove_project_objects(self, path: str, object_names: list[str]) -> None:
         for filename in object_names:
@@ -37,10 +37,11 @@ class FilesystemSaver(Storage):
             if os.path.exists(object_name_full):
                 os.remove(object_name_full)
 
-    def put_project_object(self, data, path: str, object_name: str, using_json: bool = False) -> None:
+    def put_project_object(self, data: Any, path: str, object_name: str, using_json: bool = False) -> None:
         folder_to_save = os.path.join(self._base_path, path, os.path.dirname(object_name)).replace("\\", "/")
         filename = os.path.join(self._base_path, path, object_name).replace("\\", "/")
-        os.makedirs(folder_to_save, exist_ok=True)
+        if folder_to_save:
+            os.makedirs(folder_to_save, exist_ok=True)
         with open(filename, "wb") as f:
             if using_json:
                 f.write(json.dumps(data).encode("utf-8"))
@@ -55,11 +56,14 @@ class FilesystemSaver(Storage):
         with open(filename, "rb") as f:
             return json.loads(f.read()) if using_json else pickle.load(f)
 
-    def does_object_exists(self, path, object_name) -> bool:
+    def does_object_exists(self, path: str, object_name: str) -> bool:
         return os.path.exists(os.path.join(self._base_path, path, object_name).replace("\\", "/"))
 
     def get_folder_objects(self, path: str, folder: str) -> list[str]:
-        folder_to_check = os.path.join(self._base_path, path, folder).replace("\\", "/")
+        root_path = self._base_path
+        if not root_path and not path:
+            root_path = os.getcwd()
+        folder_to_check = os.path.join(root_path, path, folder).replace("\\", "/")
         if os.path.exists(folder_to_check):
             return [os.path.join(folder, file_name) for file_name in os.listdir(folder_to_check)]
         return []

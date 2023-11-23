@@ -19,11 +19,6 @@ from abc import ABCMeta, abstractmethod
 
 class Storage(metaclass=ABCMeta):
 
-    @property
-    @abstractmethod
-    def base_path(self) -> str:
-        raise NotImplementedError('"path" property is not implemented!')
-
     @abstractmethod
     def remove_project_objects(self, path: str, object_names: list[str]) -> None:
         raise NotImplementedError('"remove_project_objects" method is not implemented!')

@@ -44,10 +44,6 @@ class MinioClient(Storage):
         )
         logger.info(f'Minio initialized {minio_host}')
 
-    @property
-    def base_path(self):
-        return ""
-
     def remove_project_objects(self, bucket, object_names) -> None:
         if self.minioClient is None:
             return
@@ -91,8 +87,7 @@ class MinioClient(Storage):
         if not self.minioClient.bucket_exists(bucket_name):
             return False
         try:
-            self.minioClient.get_object(
-                bucket_name=bucket_name, object_name=object_name)
+            self.minioClient.stat_object(bucket_name=bucket_name, object_name=object_name)
         except NoSuchKey:
             return False
         return True

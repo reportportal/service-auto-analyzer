@@ -42,7 +42,7 @@ class MlModel(metaclass=ABCMeta):
             self.object_saver.put_project_object(object_to_save, file_name, using_json=False)
 
     def get_model_info(self) -> list[str]:
-        folder_name = self.object_saver.storage.base_path.strip("/").strip("\\").strip()
+        folder_name = self.object_saver.path.strip("/").strip("\\").strip()
         tags = self.tags
         if folder_name:
             tags = [folder_name] + self.tags

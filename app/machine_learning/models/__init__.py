@@ -55,3 +55,8 @@ class MlModel(metaclass=ABCMeta):
     @abstractmethod
     def save_model(self) -> None:
         raise NotImplementedError('"save_model" method is not implemented!')
+
+    @property
+    @abstractmethod
+    def loaded(self) -> bool:
+        raise NotImplementedError('"loaded" property is not implemented!')

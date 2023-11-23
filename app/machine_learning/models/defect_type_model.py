@@ -28,15 +28,24 @@ MODEL_FILES: list[str] = ['count_vectorizer_models.pickle', 'models.pickle']
 
 
 class DefectTypeModel(MlModel):
+    _loaded: bool
     count_vectorizer_models: dict
     models: dict
 
     def __init__(self, object_saver: ObjectSaver, tags: str = 'global defect type model') -> None:
         super().__init__(object_saver, tags)
+        self._loaded = False
+
+    @property
+    def loaded(self) -> bool:
+        return self._loaded
 
     def load_model(self) -> None:
+        if self.loaded:
+            return
         model = self._load_models(MODEL_FILES)
         self.count_vectorizer_models, self.models = model
+        self._loaded = True
 
     def save_model(self):
         self._save_models(zip(MODEL_FILES, self.count_vectorizer_models, self.models))
@@ -54,6 +63,7 @@ class DefectTypeModel(MlModel):
             columns=self.count_vectorizer_models[name].get_feature_names_out())
         model.fit(x_train_values, labels)
         self.models[name] = model
+        self._loaded = True
 
     def train_models(self, train_data):
         for name, train_data_x, labels in train_data:

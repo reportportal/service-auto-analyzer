@@ -29,6 +29,8 @@ MODEL_FILES: list[str] = ['boost_model.pickle', 'data_features_config.pickle',
 
 class BoostingDecisionMaker(MlModel):
 
+    _loaded: bool
+
     def __init__(self, object_saver: ObjectSaver, tags: str = 'global boosting model', *, n_estimators: int = 75,
                  max_depth: int = 5, monotonous_features: str = '') -> None:
         super().__init__(object_saver, tags)
@@ -40,6 +42,11 @@ class BoostingDecisionMaker(MlModel):
         self.features_dict_with_saved_objects = {}
         self.full_config = {}
         self.feature_ids = []
+        self._loaded = False
+
+    @property
+    def loaded(self) -> bool:
+        return self._loaded
 
     def get_feature_ids(self):
         return text_processing.transform_string_feature_range_into_list(self.feature_ids) \
@@ -78,10 +85,13 @@ class BoostingDecisionMaker(MlModel):
         return _features_dict_with_saved_objects
 
     def load_model(self) -> None:
+        if self.loaded:
+            return
         boost_model, features_config, features_dict = self._load_models(MODEL_FILES)
         self.n_estimators, self.max_depth, self.xg_boost = boost_model
         self.full_config, self.feature_ids, self.monotonous_features = features_config
         self.features_dict_with_saved_objects = self.transform_feature_encoders_to_objects(features_dict)
+        self._loaded = True
 
     def save_model(self):
         self._save_models(zip(MODEL_FILES, [[self.n_estimators, self.max_depth, self.xg_boost],
@@ -96,6 +106,7 @@ class BoostingDecisionMaker(MlModel):
                                       max_depth=self.max_depth, random_state=43,
                                       monotone_constraints=mon_features_prepared)
         self.xg_boost.fit(train_data, labels)
+        self._loaded = True
         logger.info("Train score: %s", self.xg_boost.score(train_data, labels))
         logger.info("Feature importances: %s", self.xg_boost.feature_importances_)
 

@@ -24,6 +24,7 @@ MODEL_FILES: list[str] = ['weights.pickle']
 
 
 class WeightedSimilarityCalculator(MlModel):
+    _loaded: bool
 
     def __init__(self, object_saver: ObjectSaver, block_to_split=10, min_log_number_in_block=1):
         super().__init__(object_saver, 'global similarity model')
@@ -31,10 +32,18 @@ class WeightedSimilarityCalculator(MlModel):
         self.min_log_number_in_block = min_log_number_in_block
         self.weights = []
         self.softmax_weights = np.array([])
+        self._loaded = False
+
+    @property
+    def loaded(self) -> bool:
+        return self._loaded
 
     def load_model(self) -> None:
+        if self.loaded:
+            return
         weights = self._load_models(MODEL_FILES)[0]
         self.block_to_split, self.min_log_number_in_block, self.weights, self.softmax_weights = weights
+        self._loaded = True
 
     def save_model(self):
         self._save_models(zip(

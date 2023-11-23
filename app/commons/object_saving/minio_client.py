@@ -18,6 +18,7 @@ import pickle
 from typing import Any
 
 from minio import Minio
+from urllib3.exceptions import ResponseError
 
 from app.commons import logging
 from app.commons.object_saving.storage import Storage
@@ -88,8 +89,11 @@ class MinioClient(Storage):
             return False
         if not self.minioClient.bucket_exists(bucket_name):
             return False
-        self.minioClient.get_object(
-            bucket_name=bucket_name, object_name=object_name)
+        try:
+            self.minioClient.get_object(
+                bucket_name=bucket_name, object_name=object_name)
+        except ResponseError:
+            return False
         return True
 
     def get_folder_objects(self, bucket, folder) -> list[str]:

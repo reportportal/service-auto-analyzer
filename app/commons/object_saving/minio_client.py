@@ -18,6 +18,7 @@ import pickle
 from typing import Any
 
 from minio import Minio
+from minio.error import NoSuchKey
 from urllib3.exceptions import ResponseError
 
 from app.commons import logging
@@ -92,7 +93,7 @@ class MinioClient(Storage):
         try:
             self.minioClient.get_object(
                 bucket_name=bucket_name, object_name=object_name)
-        except ResponseError:
+        except NoSuchKey:
             return False
         return True
 

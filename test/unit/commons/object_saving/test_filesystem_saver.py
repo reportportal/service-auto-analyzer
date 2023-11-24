@@ -13,19 +13,134 @@
 #  limitations under the License.
 
 import os
+# noinspection PyPackageRequirements
 import pytest
 
 from app.commons.object_saving.filesystem_saver import FilesystemSaver
 from test import random_alphanumeric
 
 
+CREATED_FILES_AND_FOLDERS = []
+
+
+def create_storage_client(path):
+    return FilesystemSaver({'filesystemDefaultPath': path})
+
+
+def test_object_not_exists():
+    base_path = f'test_{random_alphanumeric(16)}'
+    object_name = f'{random_alphanumeric(16)}.pickle'
+    file_system = create_storage_client(base_path)
+
+    assert not file_system.does_object_exists('', object_name)
+
+
+def test_object_exists():
+    base_path = f'test_{random_alphanumeric(16)}'
+    object_name = f'{random_alphanumeric(16)}.pickle'
+    file_system = create_storage_client(base_path)
+    expected_path = os.path.join(base_path, object_name)
+    CREATED_FILES_AND_FOLDERS.append(expected_path)
+    CREATED_FILES_AND_FOLDERS.append(base_path)
+
+    file_system.put_project_object({'test': True}, '', object_name)
+
+    assert file_system.does_object_exists('', object_name)
+
+
+def test_json_write():
+    base_path = 'test'
+    object_name = f'{random_alphanumeric(16)}.json'
+    file_system = create_storage_client(base_path)
+
+    expected_path = os.path.join(base_path, object_name)
+
+    CREATED_FILES_AND_FOLDERS.append(expected_path)
+    CREATED_FILES_AND_FOLDERS.append(base_path)
+
+    file_system.put_project_object({'test': True}, '', object_name, using_json=True)
+
+    with open(expected_path, 'r') as f:
+        assert f.readline() == '{"test": true}'
+
+
+def test_json_read():
+    base_path = 'test'
+    object_name = f'{random_alphanumeric(16)}.json'
+    file_system = create_storage_client(base_path)
+    expected_path = os.path.join(base_path, object_name)
+
+    CREATED_FILES_AND_FOLDERS.append(expected_path)
+    CREATED_FILES_AND_FOLDERS.append(base_path)
+
+    with open(expected_path, 'w') as f:
+        f.writelines(['{"test": true}'])
+
+    result = file_system.get_project_object('', object_name, using_json=True)
+    assert isinstance(result, dict)
+    assert result['test'] is True
+
+
+def test_not_existing_file_get():
+    base_path = 'test'
+    object_name = f'{random_alphanumeric(16)}.json'
+    file_system = create_storage_client(base_path)
+    expected_path = os.path.join(base_path, object_name)
+
+    with pytest.raises(ValueError) as exc:
+        file_system.get_project_object('', object_name)
+    assert exc.value.args[0] == f'Unable to get file: {expected_path}'
+
+
+def test_remove_not_existing_folder():
+    base_path = f'test_{random_alphanumeric(16)}'
+    path = 'test'
+    file_system = create_storage_client(base_path)
+
+    assert not file_system.remove_folder_objects('', path)
+
+
+def test_remove_existing_folder():
+    base_path = f'test_{random_alphanumeric(16)}'
+    path = 'test'
+    expected_path = os.path.join(base_path, path)
+    os.makedirs(expected_path)
+    CREATED_FILES_AND_FOLDERS.append(base_path)
+
+    file_system = create_storage_client(base_path)
+
+    assert file_system.remove_folder_objects('', path)
+    assert not os.path.exists(expected_path)
+
+
+def test_list_not_existing_folder():
+    base_path = f'test_{random_alphanumeric(16)}'
+    path = 'test'
+    file_system = create_storage_client(base_path)
+
+    assert file_system.get_folder_objects('', path) == []
+
+
+def test_list_existing_folder():
+    base_path = f'test_{random_alphanumeric(16)}'
+    object_name = f'{random_alphanumeric(16)}.json'
+    path = 'test'
+    resource = '/'.join([path, object_name])
+    CREATED_FILES_AND_FOLDERS.append('/'.join([base_path, path, object_name]))
+    CREATED_FILES_AND_FOLDERS.append('/'.join([base_path, path]))
+    CREATED_FILES_AND_FOLDERS.append(base_path)
+
+    file_system = create_storage_client(base_path)
+    file_system.put_project_object({'test': True}, path, object_name, using_json=True)
+
+    assert file_system.get_folder_objects('', path) == [resource]
+
+
 @pytest.mark.parametrize('base_path', ['test_base_path', '', None])
 def test_base_path(base_path):
     object_name = f'{random_alphanumeric(16)}.pickle'
     path = random_alphanumeric(16)
-    file_system = FilesystemSaver({'filesystemDefaultPath': base_path})
-
-    assert not file_system.does_object_exists('', object_name)
+    file_system = create_storage_client(base_path)
 
     file_system.put_project_object({'test': True}, '', object_name)
     file_system.put_project_object({'test': True}, path, object_name)
@@ -33,12 +148,13 @@ def test_base_path(base_path):
     if base_path:
         expected_path = os.path.join(base_path, object_name)
         expected_directory = os.path.join(os.getcwd(), base_path)
+        CREATED_FILES_AND_FOLDERS.append(base_path)
     else:
         expected_path = object_name
         expected_directory = os.getcwd()
+    CREATED_FILES_AND_FOLDERS.append(expected_path)
     assert os.path.exists(expected_path)
     assert os.path.isfile(expected_path)
-    assert file_system.does_object_exists('', object_name)
 
     result = file_system.get_project_object('', object_name)
     assert isinstance(result, dict)
@@ -53,54 +169,15 @@ def test_base_path(base_path):
     assert not os.path.exists(expected_path)
 
 
-def test_json_write():
-    base_path = 'test'
-    object_name = f'{random_alphanumeric(16)}.json'
-    file_system = FilesystemSaver({'filesystemDefaultPath': base_path})
-
-    expected_path = os.path.join(base_path, object_name)
-    file_system.put_project_object({'test': True}, '', object_name, using_json=True)
-
-    with open(expected_path, 'r') as f:
-        assert f.readline() == '{"test": true}'
-
-
-def test_json_read():
-    base_path = 'test'
-    object_name = f'{random_alphanumeric(16)}.json'
-    file_system = FilesystemSaver({'filesystemDefaultPath': base_path})
-    expected_path = os.path.join(base_path, object_name)
-
-    with open(expected_path, 'w') as f:
-        f.writelines(['{"test": true}'])
-
-    result = file_system.get_project_object('', object_name, using_json=True)
-    assert isinstance(result, dict)
-    assert result['test'] is True
-
-
-def test_not_existing_file_get():
-    base_path = 'test'
-    object_name = f'{random_alphanumeric(16)}.json'
-    file_system = FilesystemSaver({'filesystemDefaultPath': base_path})
-    expected_path = os.path.join(base_path, object_name)
-
-    with pytest.raises(ValueError) as exc:
-        file_system.get_project_object('', object_name)
-    assert exc.value.args[0] == f'Unable to get file: {expected_path}'
-
-
-def test_remove_not_existing_folder():
-    base_path = f'test_{random_alphanumeric(16)}'
-    path = 'test'
-    file_system = FilesystemSaver({'filesystemDefaultPath': base_path})
-
-    assert not file_system.remove_folder_objects('', path)
-
-
-def test_list_not_existing_folder():
-    base_path = f'test_{random_alphanumeric(16)}'
-    path = 'test'
-    file_system = FilesystemSaver({'filesystemDefaultPath': base_path})
-
-    assert file_system.get_folder_objects('', path) == []
+@pytest.fixture(autouse=True, scope='session')
+def clean_up():
+    yield
+    for file in CREATED_FILES_AND_FOLDERS:
+        if os.path.exists(file):
+            if os.path.isdir(file):
+                try:
+                    os.removedirs(file)
+                except OSError:
+                    pass
+            else:
+                os.remove(file)

@@ -47,7 +47,7 @@ DEFAULT_LAUNCH_NAME_SEARCH = {'must': [{'term': {'launch_name': {'value': DEFAUL
         (2, 'CURRENT_LAUNCH', {'must': [{'term': {'launch_id': {'value': DEFAULT_LAUNCH_ID}}}], 'should': []}),
         (2, 'PREVIOUS_LAUNCH', {'must': [{'term': {'launch_id': {'value': 2}}}], 'should': []}),
         (None, 'PREVIOUS_LAUNCH', {'must': [], 'should': []}),
-        ('3', 'PREVIOUS_LAUNCH', {'must': [{'term': {'launch_id': {'value': 3}}},], 'should': []}),
+        ('3', 'PREVIOUS_LAUNCH', {'must': [{'term': {'launch_id': {'value': 3}}}], 'should': []}),
         (2, None, {'must': [], 'should': [{'term': {'launch_name': {'value': DEFAULT_LAUNCH_NAME,
                                                                     'boost': DEFAULT_BOOST_LAUNCH}}}]})
     ]

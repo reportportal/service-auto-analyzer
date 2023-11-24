@@ -63,9 +63,14 @@ class FilesystemSaver(Storage):
         root_path = self._base_path
         if not root_path and not path:
             root_path = os.getcwd()
-        folder_to_check = os.path.join(root_path, path).replace("\\", "/")
-        if os.path.exists(folder_to_check):
-            return [file_name for file_name in os.listdir(folder_to_check) if file_name.startswith(folder)]
+        if folder.endswith('/'):
+            folder_to_check = os.path.join(root_path, path, folder).replace("\\", "/")
+            if os.path.exists(folder_to_check):
+                return [os.path.join(folder, file_name) for file_name in os.listdir(folder_to_check)]
+        else:
+            folder_to_check = os.path.join(root_path, path).replace("\\", "/")
+            if os.path.exists(folder_to_check):
+                return [file_name for file_name in os.listdir(folder_to_check) if file_name.startswith(folder)]
         return []
 
     def remove_folder_objects(self, path: str, folder: str) -> bool:

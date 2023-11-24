@@ -138,14 +138,41 @@ def test_list_existing_folder():
     assert file_system.get_folder_objects(bucket, path) == [path]
 
 
+def test_list_dir_separators():
+    bucket = '7'
+    object_name = f'{random_alphanumeric(16)}.json'
+    path = 'test/'
+    resource = path + object_name
+    CREATED_FILES_AND_FOLDERS.append('/'.join([bucket, path, object_name]))
+    CREATED_FILES_AND_FOLDERS.append('/'.join([bucket, path]))
+    CREATED_FILES_AND_FOLDERS.append('/'.join([bucket]))
+
+    file_system = create_storage_client('')
+    file_system.put_project_object({'test': True}, bucket, resource, using_json=True)
+
+    assert file_system.get_folder_objects(bucket, path) == [resource]
+
+
+def test_remove_project_objects():
+    bucket = '8'
+    object_name = f'{random_alphanumeric(16)}.json'
+    path = 'test/'
+    resource = path + object_name
+
+    file_system = create_storage_client('')
+    file_system.put_project_object({'test': True}, bucket, resource, using_json=True)
+
+    file_system.remove_project_objects(bucket, [resource])
+    with pytest.raises(ValueError):
+        file_system.get_project_object(bucket, resource)
+
+
 @pytest.mark.parametrize('base_path', ['test_base_path', '', None])
 def test_base_path(base_path):
     object_name = f'{random_alphanumeric(16)}.pickle'
-    path = random_alphanumeric(16)
     file_system = create_storage_client(base_path)
 
     file_system.put_project_object({'test': True}, '', object_name)
-    file_system.put_project_object({'test': True}, path, object_name)
 
     if base_path:
         expected_path = os.path.join(base_path, object_name)
@@ -163,12 +190,6 @@ def test_base_path(base_path):
     assert result['test']
 
     assert file_system.get_folder_objects('', '') == os.listdir(expected_directory)
-
-    assert file_system.remove_folder_objects('', path)
-    assert not os.path.exists(os.path.join(expected_directory, path))
-
-    file_system.remove_project_objects('', [object_name])
-    assert not os.path.exists(expected_path)
 
 
 @pytest.fixture(autouse=True, scope='session')

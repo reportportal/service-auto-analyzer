@@ -157,13 +157,26 @@ def test_list_existing_folder():
 
 
 def test_list_dir_separators():
-    bucket = '6'
+    bucket = '7'
     object_name = f'{random_alphanumeric(16)}.json'
-    path = 'test'
-    path_separator = f'{path}/'
-    resource = '/'.join([path, object_name])
+    path = 'test/'
+    resource = path + object_name
 
     minio_client = create_storage_client()
     minio_client.put_project_object({'test': True}, bucket, resource, using_json=True)
 
-    assert minio_client.get_folder_objects(bucket, path_separator) == minio_client.get_folder_objects(bucket, path)
+    assert minio_client.get_folder_objects(bucket, path) == [resource]
+
+
+def test_remove_project_objects():
+    bucket = '8'
+    object_name = f'{random_alphanumeric(16)}.json'
+    path = 'test/'
+    resource = path + object_name
+
+    minio_client = create_storage_client()
+    minio_client.put_project_object({'test': True}, bucket, resource, using_json=True)
+
+    minio_client.remove_project_objects(bucket, [resource])
+    with pytest.raises(ValueError):
+        minio_client.get_project_object(bucket, resource)

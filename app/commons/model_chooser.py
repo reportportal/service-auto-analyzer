@@ -93,5 +93,5 @@ class ModelChooser:
             self.delete_old_model(model_name_folder.strip("/").strip("\\"), project_id)
 
     def get_model_info(self, model_name, project_id):
-        all_folders = self.object_saver.get_folder_objects(f'{model_name}/', project_id)
+        all_folders = self.object_saver.get_folder_objects(model_name, project_id)
         return all_folders[0] if len(all_folders) else ''

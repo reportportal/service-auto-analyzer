@@ -122,18 +122,20 @@ def test_list_not_existing_folder():
 
 
 def test_list_existing_folder():
+    bucket = '6'
     base_path = f'test_{random_alphanumeric(16)}'
     object_name = f'{random_alphanumeric(16)}.json'
     path = 'test'
     resource = '/'.join([path, object_name])
-    CREATED_FILES_AND_FOLDERS.append('/'.join([base_path, path, object_name]))
-    CREATED_FILES_AND_FOLDERS.append('/'.join([base_path, path]))
+    CREATED_FILES_AND_FOLDERS.append('/'.join([base_path, bucket, path, object_name]))
+    CREATED_FILES_AND_FOLDERS.append('/'.join([base_path, bucket, path]))
+    CREATED_FILES_AND_FOLDERS.append('/'.join([base_path, bucket]))
     CREATED_FILES_AND_FOLDERS.append(base_path)
 
     file_system = create_storage_client(base_path)
-    file_system.put_project_object({'test': True}, path, object_name, using_json=True)
+    file_system.put_project_object({'test': True}, bucket, resource, using_json=True)
 
-    assert file_system.get_folder_objects('', path) == [resource]
+    assert file_system.get_folder_objects(bucket, path) == [path]
 
 
 @pytest.mark.parametrize('base_path', ['test_base_path', '', None])

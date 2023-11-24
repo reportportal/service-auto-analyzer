@@ -98,11 +98,11 @@ class MinioClient(Storage):
         if bucket_name:
             if not self.minioClient.bucket_exists(bucket_name):
                 return []
-        object_names = []
-        object_list = self.minioClient.list_objects(bucket_name, prefix=folder, recursive=True)
+        object_names = set()
+        object_list = self.minioClient.list_objects(bucket_name, prefix=folder)
         for obj in object_list:
-            object_names.append(obj.object_name)
-        return object_names
+            object_names.add(obj.object_name.strip('/'))
+        return sorted(list(object_names))
 
     def remove_folder_objects(self, bucket: str, folder: str) -> bool:
         bucket_name = self.get_bucket(bucket)

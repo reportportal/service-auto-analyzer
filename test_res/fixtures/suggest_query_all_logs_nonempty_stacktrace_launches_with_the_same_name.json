@@ -62,6 +62,7 @@
                                 "boost": 10
                             }
                         }},
+                        {"term": {"launch_id": {"boost": 5, "value": 12}}},
                         {"more_like_this": {
                             "fields":               ["merged_small_logs"],
                             "like":                 "",

@@ -39,7 +39,7 @@ class AnalyzerService:
         return analyzer_config.minShouldMatch if analyzer_config.minShouldMatch > 0 else \
             int(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0))
 
-    def add_constraints_for_launches_into_query(self, query, launch):
+    def add_constraints_for_launches_into_query(self, query: dict, launch, *, suggest: bool = False) -> dict:
         previous_launch_id = getattr(launch, 'previousLaunchId', 0) or 0
         previous_launch_id = int(previous_launch_id)
         analyzer_mode = launch.analyzerConfig.analyzerMode
@@ -49,10 +49,19 @@ class AnalyzerService:
             query['query']['bool']['should'].append(
                 {'term': {'launch_id': {'value': launch.launchId, 'boost': abs(self.search_cfg['BoostLaunch'])}}})
         elif analyzer_mode == 'CURRENT_LAUNCH':
-            query['query']['bool']['must'].append({'term': {'launch_id': {'value': launch.launchId}}})
+            if suggest:
+                query['query']['bool']['should'].append(
+                    {'term': {'launch_id': {'value': launch.launchId, 'boost': abs(self.search_cfg['BoostLaunch'])}}})
+            else:
+                query['query']['bool']['must'].append({'term': {'launch_id': {'value': launch.launchId}}})
         elif analyzer_mode == 'PREVIOUS_LAUNCH':
             if previous_launch_id:
-                query['query']['bool']['must'].append({'term': {'launch_id': {'value': previous_launch_id}}})
+                if suggest:
+                    query['query']['bool']['should'].append(
+                        {'term': {
+                            'launch_id': {'value': previous_launch_id, 'boost': abs(self.search_cfg['BoostLaunch'])}}})
+                else:
+                    query['query']['bool']['must'].append({'term': {'launch_id': {'value': previous_launch_id}}})
         else:
             query['query']['bool']['should'].append(
                 {'term': {'launch_name': {'value': launch.launchName, 'boost': abs(self.search_cfg['BoostLaunch'])}}})

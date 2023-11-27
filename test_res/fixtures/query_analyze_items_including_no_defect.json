@@ -52,7 +52,7 @@
                             "boost":                8.0
                         }}
                     ],
-                    "should": []
+                    "should": [{"term": {"launch_id": {"boost": 5, "value": 12}}}]
                 }
             },
             "functions": [

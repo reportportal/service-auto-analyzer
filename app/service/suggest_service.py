@@ -87,7 +87,7 @@ class SuggestService(AnalyzerService):
         log_lines = test_item_info.analyzerConfig.numberOfLogLines
 
         query = self.build_common_query(log, size=size, filter_no_defect=False)
-        query = self.add_constraints_for_launches_into_query(query, test_item_info)
+        query = self.add_constraints_for_launches_into_query(query, test_item_info, suggest=True)
 
         if log["_source"]["message"].strip():
             query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})

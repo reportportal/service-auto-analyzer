@@ -107,8 +107,8 @@ class AnalyzerService:
             should.append({'term': {'launch_id': {'value': launch_id, 'boost': 1 / launch_boost}}})
         elif analyzer_mode == 'PREVIOUS_LAUNCH':
             # Just previous launch
-            should = self.create_path(query, ('query', 'bool', 'should'), [])
             if previous_launch_id:
+                should = self.create_path(query, ('query', 'bool', 'should'), [])
                 should.append({'term': {'launch_id': {'value': previous_launch_id, 'boost': launch_boost}}})
         else:
             # For:

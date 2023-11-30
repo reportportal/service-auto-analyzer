@@ -83,11 +83,11 @@ class AutoAnalyzerService(AnalyzerService):
             log_lines = launch.analyzerConfig.numberOfLogLines
             query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
             if log_lines == -1:
-                query["query"]["bool"]["must"].append(
-                    self.build_more_like_this_query(min_should_match,
-                                                    log["_source"]["detected_message"],
-                                                    field_name="detected_message",
-                                                    boost=4.0))
+                must = self.create_path(query, ('query', 'bool', 'must'), [])
+                must.append(self.build_more_like_this_query(min_should_match,
+                                                            log["_source"]["detected_message"],
+                                                            field_name="detected_message",
+                                                            boost=4.0))
                 if log["_source"]["stacktrace"].strip():
                     query["query"]["bool"]["must"].append(
                         self.build_more_like_this_query(min_should_match,
@@ -97,11 +97,11 @@ class AutoAnalyzerService(AnalyzerService):
                 else:
                     query["query"]["bool"]["must_not"].append({"wildcard": {"stacktrace": "*"}})
             else:
-                query["query"]["bool"]["must"].append(
-                    self.build_more_like_this_query(min_should_match,
-                                                    log["_source"]["message"],
-                                                    field_name="message",
-                                                    boost=4.0))
+                must = self.create_path(query, ('query', 'bool', 'must'), [])
+                must.append(self.build_more_like_this_query(min_should_match,
+                                                            log["_source"]["message"],
+                                                            field_name="message",
+                                                            boost=4.0))
                 query["query"]["bool"]["should"].append(
                     self.build_more_like_this_query("80%",
                                                     log["_source"]["detected_message"],

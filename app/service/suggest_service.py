@@ -92,25 +92,24 @@ class SuggestService(AnalyzerService):
         if log["_source"]["message"].strip():
             query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
             if log_lines == -1:
-                query["query"]["bool"]["must"].append(
-                    self.build_more_like_this_query("60%",
-                                                    log["_source"][det_mes_field],
-                                                    field_name=det_mes_field,
-                                                    boost=4.0))
+                must = self.create_path(query, ('query', 'bool', 'must'), [])
+                must.append(self.build_more_like_this_query("60%",
+                                                            log["_source"][det_mes_field],
+                                                            field_name=det_mes_field,
+                                                            boost=4.0))
                 if log["_source"][stacktrace_field].strip():
-                    query["query"]["bool"]["must"].append(
-                        self.build_more_like_this_query("60%",
-                                                        log["_source"][stacktrace_field],
-                                                        field_name=stacktrace_field,
-                                                        boost=2.0))
+                    must.append(self.build_more_like_this_query("60%",
+                                                                log["_source"][stacktrace_field],
+                                                                field_name=stacktrace_field,
+                                                                boost=2.0))
                 else:
                     query["query"]["bool"]["must_not"].append({"wildcard": {stacktrace_field: "*"}})
             else:
-                query["query"]["bool"]["must"].append(
-                    self.build_more_like_this_query("60%",
-                                                    log["_source"][message_field],
-                                                    field_name=message_field,
-                                                    boost=4.0))
+                must = self.create_path(query, ('query', 'bool', 'must'), [])
+                must.append(self.build_more_like_this_query("60%",
+                                                            log["_source"][message_field],
+                                                            field_name=message_field,
+                                                            boost=4.0))
                 query["query"]["bool"]["should"].append(
                     self.build_more_like_this_query("60%",
                                                     log["_source"][stacktrace_field],

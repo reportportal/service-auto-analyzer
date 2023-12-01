@@ -70,23 +70,23 @@ class AnalyzerService:
             # Previous launches with the same name
             must = self.create_path(query, ('query', 'bool', 'must'), [])
             must_not = self.create_path(query, ('query', 'bool', 'must_not'), [])
-            must.append({'term': {'launch_name': {'value': launch_name}}})
-            must_not.append({'term': {'launch_id': {'value': launch_id}}})
+            must.append({'term': {'launch_name': launch_name}})
+            must_not.append({'term': {'launch_id': launch_id}})
         elif analyzer_mode == 'CURRENT_AND_THE_SAME_NAME':
             # All launches with the same name
             must = self.create_path(query, ('query', 'bool', 'must'), [])
             should = self.create_path(query, ('query', 'bool', 'should'), [])
-            must.append({'term': {'launch_name': {'value': launch_name}}})
+            must.append({'term': {'launch_name': launch_name}})
             should.append({'term': {'launch_id': {'value': launch_id, 'boost': launch_boost}}})
         elif analyzer_mode == 'CURRENT_LAUNCH':
             # Just current launch
             must = self.create_path(query, ('query', 'bool', 'must'), [])
-            must.append({'term': {'launch_id': {'value': launch_id}}})
+            must.append({'term': {'launch_id': launch_id}})
         elif analyzer_mode == 'PREVIOUS_LAUNCH':
             # Just previous launch
             if previous_launch_id:
                 must = self.create_path(query, ('query', 'bool', 'must'), [])
-                must.append({'term': {'launch_id': {'value': previous_launch_id}}})
+                must.append({'term': {'launch_id': previous_launch_id}})
         else:
             # Just all launches
             # Boost launches with the same name, but do not ignore any

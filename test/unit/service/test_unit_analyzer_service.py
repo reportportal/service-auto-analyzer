@@ -22,7 +22,7 @@ from test import DEFAULT_SEARCH_CONFIG, DEFAULT_BOOST_LAUNCH
 DEFAULT_LAUNCH_NAME = 'Test Launch'
 DEFAULT_LAUNCH_ID = 3
 
-DEFAULT_LAUNCH_NAME_SEARCH = {'must': [{'term': {'launch_name': {'value': DEFAULT_LAUNCH_NAME}}}],
+DEFAULT_LAUNCH_NAME_SEARCH = {'must': [{'term': {'launch_name': DEFAULT_LAUNCH_NAME}}],
                               'should': [{'term': {'launch_id': {'value': DEFAULT_LAUNCH_ID,
                                                                  'boost': DEFAULT_BOOST_LAUNCH}}}]}
 DEFAULT_LAUNCH_BOOST = {'should': [
@@ -34,13 +34,13 @@ DEFAULT_LAUNCH_BOOST = {'should': [
 @pytest.mark.parametrize(
     'previous_launch_id, launch_mode, expected_query',
     [
-        (2, 'LAUNCH_NAME', {'must': [{'term': {'launch_name': {'value': DEFAULT_LAUNCH_NAME}}}],
-                            'must_not': [{'term': {'launch_id': {'value': DEFAULT_LAUNCH_ID}}}]}),
+        (2, 'LAUNCH_NAME', {'must': [{'term': {'launch_name': DEFAULT_LAUNCH_NAME}}],
+                            'must_not': [{'term': {'launch_id': DEFAULT_LAUNCH_ID}}]}),
         (2, 'CURRENT_AND_THE_SAME_NAME', DEFAULT_LAUNCH_NAME_SEARCH),
-        (2, 'CURRENT_LAUNCH', {'must': [{'term': {'launch_id': {'value': DEFAULT_LAUNCH_ID}}}]}),
-        (2, 'PREVIOUS_LAUNCH', {'must': [{'term': {'launch_id': {'value': 2}}}]}),
+        (2, 'CURRENT_LAUNCH', {'must': [{'term': {'launch_id': DEFAULT_LAUNCH_ID}}]}),
+        (2, 'PREVIOUS_LAUNCH', {'must': [{'term': {'launch_id': 2}}]}),
         (None, 'PREVIOUS_LAUNCH', {}),
-        ('3', 'PREVIOUS_LAUNCH', {'must': [{'term': {'launch_id': {'value': 3}}}]}),
+        ('3', 'PREVIOUS_LAUNCH', {'must': [{'term': {'launch_id': 3}}]}),
         (2, None, DEFAULT_LAUNCH_BOOST)
     ]
 )

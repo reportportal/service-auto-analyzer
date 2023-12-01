@@ -78,10 +78,10 @@ class DefectTypeModel(MlModel):
         print(confusion_matrix(y_pred=res, y_true=labels))
         print(classification_report(y_pred=res, y_true=labels))
         f1 = f1_score(y_pred=res, y_true=labels)
-        if f1 != f1:
+        if f1 is None:
             f1 = 0.0
         accuracy = accuracy_score(y_pred=res, y_true=labels)
-        if accuracy != accuracy:
+        if accuracy is None:
             accuracy = 0.0
         return f1, accuracy
 

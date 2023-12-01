@@ -224,7 +224,6 @@ class BoostingFeaturizer:
         if gathered_data:
             encoded_data = self.features_dict_with_saved_objects[feature_name].transform(
                 gathered_data).toarray()
-            encoded_data[encoded_data != 0.0] = 1.0
             for idx in range(len(issue_types)):
                 if only_query:
                     encodings_by_issue_type[issue_types[idx]] = list(encoded_data[idx])

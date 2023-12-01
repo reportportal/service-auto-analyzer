@@ -43,7 +43,7 @@ class EsClient:
         if not search_cfg:
             search_cfg = {}
         self.app_config = app_config
-        self.host = app_config["esHost"]
+        self.host = app_config.get('esHost', 'localhost:9000')
         self.search_cfg = search_cfg
         self.es_client = es_client or self.create_es_client(app_config)
         self.log_preparation = LogPreparation()

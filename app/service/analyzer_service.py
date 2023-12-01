@@ -32,7 +32,7 @@ class AnalyzerService:
         self.log_merger = LogMerger()
         self.model_chooser = model_chooser
         self.weighted_log_similarity_calculator = None
-        if self.search_cfg["SimilarityWeightsFolder"].strip():
+        if self.search_cfg.get('SimilarityWeightsFolder', 'res/model/weights_24.11.20').strip():
             self.weighted_log_similarity_calculator = (
                 weighted_similarity_calculator.WeightedSimilarityCalculator(
                     object_saving.create_filesystem(self.search_cfg["SimilarityWeightsFolder"])))

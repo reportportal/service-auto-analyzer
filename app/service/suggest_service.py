@@ -87,30 +87,29 @@ class SuggestService(AnalyzerService):
         log_lines = test_item_info.analyzerConfig.numberOfLogLines
 
         query = self.build_common_query(log, size=size, filter_no_defect=False)
-        query = self.add_constraints_for_launches_into_query(query, test_item_info, suggest=True)
+        query = self.add_constraints_for_launches_into_query_suggest(query, test_item_info)
 
         if log["_source"]["message"].strip():
             query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
             if log_lines == -1:
-                query["query"]["bool"]["must"].append(
-                    self.build_more_like_this_query("60%",
-                                                    log["_source"][det_mes_field],
-                                                    field_name=det_mes_field,
-                                                    boost=4.0))
+                must = self.create_path(query, ('query', 'bool', 'must'), [])
+                must.append(self.build_more_like_this_query("60%",
+                                                            log["_source"][det_mes_field],
+                                                            field_name=det_mes_field,
+                                                            boost=4.0))
                 if log["_source"][stacktrace_field].strip():
-                    query["query"]["bool"]["must"].append(
-                        self.build_more_like_this_query("60%",
-                                                        log["_source"][stacktrace_field],
-                                                        field_name=stacktrace_field,
-                                                        boost=2.0))
+                    must.append(self.build_more_like_this_query("60%",
+                                                                log["_source"][stacktrace_field],
+                                                                field_name=stacktrace_field,
+                                                                boost=2.0))
                 else:
                     query["query"]["bool"]["must_not"].append({"wildcard": {stacktrace_field: "*"}})
             else:
-                query["query"]["bool"]["must"].append(
-                    self.build_more_like_this_query("60%",
-                                                    log["_source"][message_field],
-                                                    field_name=message_field,
-                                                    boost=4.0))
+                must = self.create_path(query, ('query', 'bool', 'must'), [])
+                must.append(self.build_more_like_this_query("60%",
+                                                            log["_source"][message_field],
+                                                            field_name=message_field,
+                                                            boost=4.0))
                 query["query"]["bool"]["should"].append(
                     self.build_more_like_this_query("60%",
                                                     log["_source"][stacktrace_field],
@@ -124,11 +123,11 @@ class SuggestService(AnalyzerService):
         else:
             query["query"]["bool"]["filter"].append({"term": {"is_merged": True}})
             query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
-            query["query"]["bool"]["must"].append(
-                self.build_more_like_this_query(min_should_match,
-                                                log["_source"]["merged_small_logs"],
-                                                field_name="merged_small_logs",
-                                                boost=2.0))
+            must = self.create_path(query, ('query', 'bool', 'must'), [])
+            must.append(self.build_more_like_this_query(min_should_match,
+                                                        log["_source"]["merged_small_logs"],
+                                                        field_name="merged_small_logs",
+                                                        boost=2.0))
 
         utils.append_potential_status_codes(query, log, max_query_terms=self.search_cfg["MaxQueryTerms"])
 

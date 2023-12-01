@@ -59,6 +59,12 @@
                             }
                         }},
                         {"term": {
+                            "launch_id": {
+                                "value": 12,
+                                "boost": 5
+                            }
+                        }},
+                        {"term": {
                             "launch_name": {
                                 "value": "Launch name",
                                 "boost": 5

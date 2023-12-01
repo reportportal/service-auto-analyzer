@@ -18,9 +18,7 @@
                     ],
                     "must": [
                         {"term": {
-                            "launch_id": {
-                                "value": 12
-                            }
+                            "launch_id": 12
                         }},
                         {"more_like_this": {
                             "fields":               ["message"],

@@ -15,6 +15,7 @@
                         {"wildcard": {"issue_type": "ti*"}},
                         {"wildcard": {"issue_type": "nd*"}},
                         {"term": {"test_item": "123"}},
+                        {"term": {"launch_id": 12}},
                         {"wildcard": {"message": "*"}}
                     ],
                     "must": [
@@ -48,18 +49,6 @@
                             "is_auto_analyzed": {
                                 "value": "false",
                                 "boost": 10
-                            }
-                        }},
-                        {"term": {
-                            "launch_id": {
-                                "value": 12,
-                                "boost": 5
-                            }
-                        }},
-                        {"term": {
-                            "launch_name": {
-                                "value": "Launch name",
-                                "boost": 5
                             }
                         }},
                         {"more_like_this": {

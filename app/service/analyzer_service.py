@@ -25,9 +25,11 @@ logger = logging.getLogger("analyzerApp.analyzerService")
 
 
 class AnalyzerService:
+    launch_boost: float
 
     def __init__(self, model_chooser, search_cfg=None):
         self.search_cfg = search_cfg or {}
+        self.launch_boost = abs(self.search_cfg['BoostLaunch'])
         self.log_preparation = LogPreparation()
         self.log_merger = LogMerger()
         self.model_chooser = model_chooser
@@ -56,11 +58,17 @@ class AnalyzerService:
             current_node[last_element] = value
         return current_node[last_element]
 
-    def _add_launch_name_and_id_boost(self, query: dict, launch_name: str, launch_id: int) -> None:
-        launch_boost = abs(self.search_cfg['BoostLaunch'])
+    def _add_launch_name_boost(self, query: dict, launch_name: str) -> None:
         should = self.create_path(query, ('query', 'bool', 'should'), [])
-        should.append({'term': {'launch_id': {'value': launch_id, 'boost': launch_boost}}})
-        should.append({'term': {'launch_name': {'value': launch_name, 'boost': launch_boost}}})
+        should.append({'term': {'launch_name': {'value': launch_name, 'boost': self.launch_boost}}})
+
+    def _add_launch_id_boost(self, query: dict, launch_id: int) -> None:
+        should = self.create_path(query, ('query', 'bool', 'should'), [])
+        should.append({'term': {'launch_id': {'value': launch_id, 'boost': self.launch_boost}}})
+
+    def _add_launch_name_and_id_boost(self, query: dict, launch_name: str, launch_id: int):
+        self._add_launch_id_boost(query, launch_id)
+        self._add_launch_name_boost(query, launch_name)
 
     def add_constraints_for_launches_into_query(self, query: dict, launch) -> dict:
         previous_launch_id = getattr(launch, 'previousLaunchId', 0) or 0
@@ -68,7 +76,6 @@ class AnalyzerService:
         analyzer_mode = launch.analyzerConfig.analyzerMode
         launch_name = launch.launchName
         launch_id = launch.launchId
-        launch_boost = abs(self.search_cfg['BoostLaunch'])
         if analyzer_mode == 'LAUNCH_NAME':
             # Previous launches with the same name
             must = self.create_path(query, ('query', 'bool', 'must'), [])
@@ -78,9 +85,8 @@ class AnalyzerService:
         elif analyzer_mode == 'CURRENT_AND_THE_SAME_NAME':
             # All launches with the same name
             must = self.create_path(query, ('query', 'bool', 'must'), [])
-            should = self.create_path(query, ('query', 'bool', 'should'), [])
             must.append({'term': {'launch_name': launch_name}})
-            should.append({'term': {'launch_id': {'value': launch_id, 'boost': launch_boost}}})
+            self._add_launch_id_boost(query, launch_id)
         elif analyzer_mode == 'CURRENT_LAUNCH':
             # Just current launch
             must = self.create_path(query, ('query', 'bool', 'must'), [])
@@ -90,9 +96,12 @@ class AnalyzerService:
             if previous_launch_id:
                 must = self.create_path(query, ('query', 'bool', 'must'), [])
                 must.append({'term': {'launch_id': previous_launch_id}})
+        elif analyzer_mode == 'ALL':
+            # All previous launches
+            must_not = self.create_path(query, ('query', 'bool', 'must_not'), [])
+            must_not.append({'term': {'launch_id': launch_id}})
         else:
-            # Just all launches
-            # Boost launches with the same name, but do not ignore any
+            # Boost launches with the same name and ID, but do not ignore any
             self._add_launch_name_and_id_boost(query, launch_name, launch_id)
         return query
 
@@ -103,21 +112,19 @@ class AnalyzerService:
         launch_name = test_item_info.launchName
         launch_id = test_item_info.launchId
         launch_boost = abs(self.search_cfg['BoostLaunch'])
-        if analyzer_mode == 'LAUNCH_NAME':
+        if analyzer_mode in {'LAUNCH_NAME', 'ALL'}:
             # Previous launches with the same name
+            self._add_launch_name_boost(query, launch_name)
             should = self.create_path(query, ('query', 'bool', 'should'), [])
-            should.append({'term': {'launch_name': {'value': launch_name, 'boost': launch_boost}}})
             should.append({'term': {'launch_id': {'value': launch_id, 'boost': 1 / launch_boost}}})
         elif analyzer_mode == 'PREVIOUS_LAUNCH':
             # Just previous launch
             if previous_launch_id:
-                should = self.create_path(query, ('query', 'bool', 'should'), [])
-                should.append({'term': {'launch_id': {'value': previous_launch_id, 'boost': launch_boost}}})
+                self._add_launch_id_boost(query, previous_launch_id)
         else:
             # For:
             # * CURRENT_LAUNCH
             # * CURRENT_AND_THE_SAME_NAME
-            # * All launches
             # Boost launches with the same name, but do not ignore any
             self._add_launch_name_and_id_boost(query, launch_name, launch_id)
         return query

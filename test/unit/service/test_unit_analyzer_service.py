@@ -41,7 +41,8 @@ DEFAULT_LAUNCH_BOOST = {'should': [
         (2, 'PREVIOUS_LAUNCH', {'must': [{'term': {'launch_id': 2}}]}),
         (None, 'PREVIOUS_LAUNCH', {}),
         ('3', 'PREVIOUS_LAUNCH', {'must': [{'term': {'launch_id': 3}}]}),
-        (2, None, DEFAULT_LAUNCH_BOOST)
+        (2, None, DEFAULT_LAUNCH_BOOST),
+        (2, 'ALL', {'must_not': [{'term': {'launch_id': DEFAULT_LAUNCH_ID}}]})
     ]
 )
 def test_add_constraints_for_launches_into_query(previous_launch_id, launch_mode, expected_query):
@@ -55,19 +56,22 @@ def test_add_constraints_for_launches_into_query(previous_launch_id, launch_mode
     assert result['query']['bool'] == expected_query
 
 
+DEFAULT_LAUNCH_BOOST_SUGGEST = {'should': [
+    {'term': {'launch_name': {'value': DEFAULT_LAUNCH_NAME, 'boost': DEFAULT_BOOST_LAUNCH}}},
+    {'term': {'launch_id': {'value': DEFAULT_LAUNCH_ID, 'boost': 1 / DEFAULT_BOOST_LAUNCH}}}
+]}
+
+
 @pytest.mark.parametrize(
     'previous_launch_id, launch_mode, expected_query',
     [
-        (2, 'LAUNCH_NAME', {'should': [
-            {'term': {'launch_name': {'value': DEFAULT_LAUNCH_NAME, 'boost': DEFAULT_BOOST_LAUNCH}}},
-            {'term': {'launch_id': {'value': DEFAULT_LAUNCH_ID, 'boost': 1 / DEFAULT_BOOST_LAUNCH}}}
-        ]}),
+        (2, 'LAUNCH_NAME', DEFAULT_LAUNCH_BOOST_SUGGEST),
         (2, 'CURRENT_AND_THE_SAME_NAME', DEFAULT_LAUNCH_BOOST),
         (2, 'CURRENT_LAUNCH', DEFAULT_LAUNCH_BOOST),
         (2, 'PREVIOUS_LAUNCH', {'should': [{'term': {'launch_id': {'value': 2, 'boost': DEFAULT_BOOST_LAUNCH}}}]}),
         (None, 'PREVIOUS_LAUNCH', {}),
         ('2', 'PREVIOUS_LAUNCH', {'should': [{'term': {'launch_id': {'value': 2, 'boost': DEFAULT_BOOST_LAUNCH}}}]}),
-        (2, None, DEFAULT_LAUNCH_BOOST)
+        (2, 'ALL', DEFAULT_LAUNCH_BOOST_SUGGEST)
     ]
 )
 def test_add_constraints_for_launches_into_query_suggest(previous_launch_id, launch_mode, expected_query):

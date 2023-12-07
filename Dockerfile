@@ -40,15 +40,16 @@ FROM --platform=${BUILDPLATFORM} python:3.10.13-slim
 RUN apt-get update && apt-get -y upgrade \
     && apt-get install -y libxml2 libgomp1 curl libpcre3 libpcre3-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Create a group and user
+RUN groupadd uwsgi && useradd -g uwsgi uwsgi
+USER uwsgi
+
 COPY --from=builder /venv /venv
 RUN mkdir /usr/share/nltk_data && chmod g+w /usr/share/nltk_data
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
 WORKDIR /backend/
 COPY --from=builder /backend ./
-
-# Create a group and user
-RUN groupadd uwsgi && useradd -g uwsgi uwsgi
-USER uwsgi
 
 EXPOSE 5001
 ENV VIRTUAL_ENV="/venv"

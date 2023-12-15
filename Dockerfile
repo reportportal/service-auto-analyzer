@@ -43,10 +43,11 @@ COPY --from=builder /venv /venv
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
 RUN apt-get update && apt-get -y upgrade \
     && apt-get install -y libxml2 libgomp1 curl libpcre3 libpcre3-dev \
-    && rm -rf /var/lib/apt/lists/*
-RUN groupadd uwsgi && useradd -g uwsgi uwsgi
-RUN chown -R uwsgi: /usr/share/nltk_data && \
-    chown -R uwsgi: /backend
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p -m 0700 /backend/storage \
+    && groupadd uwsgi && useradd -g uwsgi uwsgi \
+    && chown -R uwsgi: /usr/share/nltk_data \
+    && chown -R uwsgi: /backend
 USER uwsgi
 EXPOSE 5001
 ENV VIRTUAL_ENV="/venv"

@@ -68,7 +68,7 @@ class AnalyzerService:
         self._add_launch_name_boost(query, launch_name)
 
     def add_constraints_for_launches_into_query(self, query: dict, launch) -> dict:
-        previous_launch_id = getattr(launch, 'previousLaunchId', 0) or 0
+        previous_launch_id = getattr(launch, 'previousLaunchId', -1) or -1
         previous_launch_id = int(previous_launch_id)
         analyzer_mode = launch.analyzerConfig.analyzerMode
         launch_name = launch.launchName

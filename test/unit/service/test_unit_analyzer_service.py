@@ -39,7 +39,7 @@ DEFAULT_LAUNCH_BOOST = {'should': [
         (2, 'CURRENT_AND_THE_SAME_NAME', DEFAULT_LAUNCH_NAME_SEARCH),
         (2, 'CURRENT_LAUNCH', {'must': [{'term': {'launch_id': DEFAULT_LAUNCH_ID}}]}),
         (2, 'PREVIOUS_LAUNCH', {'must': [{'term': {'launch_id': 2}}]}),
-        (None, 'PREVIOUS_LAUNCH', {}),
+        (None, 'PREVIOUS_LAUNCH', {'must': [{'term': {'launch_id': -1}}]}),
         ('3', 'PREVIOUS_LAUNCH', {'must': [{'term': {'launch_id': 3}}]}),
         (2, None, DEFAULT_LAUNCH_BOOST),
         (2, 'ALL', {'must_not': [{'term': {'launch_id': DEFAULT_LAUNCH_ID}}]})

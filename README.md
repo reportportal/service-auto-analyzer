@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/reportportal/service-auto-analyzer/actions/workflows/tests.yml/badge.svg)](https://github.com/reportportal/service-auto-analyzer/actions/workflows/tests.yml)
 [![codecov](https://codecov.io/github/reportportal/service-auto-analyzer/branch/master/graph/badge.svg?token=Y3llbuAYLr)](https://codecov.io/github/reportportal/service-auto-analyzer)
-[![Join Slack chat!](https://slack.epmrpp.reportportal.io/badge.svg)](https://slack.epmrpp.reportportal.io/)
+[![Join Slack chat!](https://img.shields.io/badge/slack-join-brightgreen.svg)](https://slack.epmrpp.reportportal.io/)
 [![stackoverflow](https://img.shields.io/badge/reportportal-stackoverflow-orange.svg?style=flat)](http://stackoverflow.com/questions/tagged/reportportal)
 [![Build with Love](https://img.shields.io/badge/build%20with-❤%EF%B8%8F%E2%80%8D-lightgrey.svg)](http://reportportal.io?style=flat)
 

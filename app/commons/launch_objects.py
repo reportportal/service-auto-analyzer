@@ -67,6 +67,8 @@ class TestItemInfo(BaseModel):
     clusterId: int = 0
     launchId: int
     launchName: str = ""
+    launchNumber: int = 0
+    previousLaunchId: int = 0
     testItemName: str = ""
     project: int
     analyzerConfig: AnalyzerConf = AnalyzerConf()
@@ -78,6 +80,8 @@ class Launch(BaseModel):
     launchId: int
     project: int
     launchName: str = ""
+    launchNumber: int = 0
+    previousLaunchId: int = 0
     launchStartTime: List[int] = list(datetime.now().timetuple())[:7]
     analyzerConfig: AnalyzerConf = AnalyzerConf()
     testItems: List[TestItem] = []
@@ -120,6 +124,7 @@ class SuggestAnalysisResult(BaseModel):
     testItemLogId: int
     launchId: int
     launchName: str
+    launchNumber: int
     issueType: str
     relevantItem: int
     relevantLogId: int
@@ -207,6 +212,7 @@ class BatchLogInfo(BaseModel):
     project: int
     launchId: int
     launchName: str
+    launchNumber: int = 0
 
 
 class AnalysisCandidate(BaseModel):
@@ -218,3 +224,4 @@ class AnalysisCandidate(BaseModel):
     project: int
     launchId: int
     launchName: str
+    launchNumber: int = 0

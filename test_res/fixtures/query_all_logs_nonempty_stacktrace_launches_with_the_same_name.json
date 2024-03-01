@@ -14,13 +14,12 @@
                     "must_not": [
                         {"wildcard": {"issue_type": "ti*"}},
                         {"wildcard": {"issue_type": "nd*"}},
-                        {"term": {"test_item": "123"}}
+                        {"term": {"test_item": "123"}},
+                        {"term": {"launch_id": 12}}
                     ],
                     "must": [
                         {"term": {
-                            "launch_name": {
-                                "value": "Launch name"
-                            }
+                            "launch_name": "Launch name"
                         }},
                         {"more_like_this": {
                             "fields":               ["detected_message"],

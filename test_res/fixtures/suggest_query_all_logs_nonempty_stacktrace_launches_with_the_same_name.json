@@ -16,11 +16,6 @@
                         {"term": {"test_item": "123"}}
                     ],
                     "must": [
-                        {"term": {
-                            "launch_name": {
-                                "value": "Launch name"
-                            }
-                        }},
                         {"more_like_this": {
                             "fields":               ["detected_message_without_params_extended"],
                             "like":                 "hello world",
@@ -62,6 +57,8 @@
                                 "boost": 10
                             }
                         }},
+                        {"term": {"launch_name": {"boost": 5, "value": "Launch name"}}},
+                        {"term": {"launch_id": {"boost": 0.2, "value": 12}}},
                         {"more_like_this": {
                             "fields":               ["merged_small_logs"],
                             "like":                 "",

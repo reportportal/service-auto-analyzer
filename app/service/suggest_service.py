@@ -12,30 +12,48 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.utils import utils, text_processing
-from app.commons.launch_objects import SuggestAnalysisResult
-from app.boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
-from app.amqp.amqp import AmqpClient
-from app.service.analyzer_service import AnalyzerService
-from app.commons import similarity_calculator
 import json
 import logging
-from time import time
 from datetime import datetime
+from functools import reduce
+from time import time
+
 import elasticsearch.helpers
 
+from app.amqp.amqp import AmqpClient
+from app.boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
+from app.commons import similarity_calculator
+from app.commons.esclient import EsClient
+from app.commons.launch_objects import SuggestAnalysisResult
+from app.commons.namespace_finder import NamespaceFinder
+from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
+from app.service.analyzer_service import AnalyzerService
+from app.utils import utils, text_processing
+
 logger = logging.getLogger("analyzerApp.suggestService")
+SPECIAL_FIELDS_BOOST_SCORES = [
+    ("detected_message_without_params_extended", 2.0),
+    ("only_numbers", 2.0), ("message_params", 2.0), ("urls", 2.0),
+    ("paths", 2.0), ("found_exceptions_extended", 8.0),
+    ("found_tests_and_methods", 2.0), ("test_item_name", 2.0)
+]
 
 
 class SuggestService(AnalyzerService):
+    """The service serves suggestion lists in Make Decision modal."""
 
-    def __init__(self, model_chooser, app_config=None, search_cfg=None):
+    es_client: EsClient
+    namespace_finder: NamespaceFinder
+
+    def __init__(self, model_chooser, app_config=None, search_cfg=None, es_client: EsClient = None):
         self.app_config = app_config or {}
         self.search_cfg = search_cfg or {}
-        super(SuggestService, self).__init__(model_chooser, app_config=self.app_config, search_cfg=self.search_cfg)
+        super().__init__(model_chooser, search_cfg=self.search_cfg)
+        self.es_client = es_client or EsClient(app_config=self.app_config, search_cfg=self.search_cfg)
         self.suggest_threshold = 0.4
         self.rp_suggest_index_template = "rp_suggestions_info"
         self.rp_suggest_metrics_index_template = "rp_suggestions_info_metrics"
+        self.namespace_finder = NamespaceFinder(app_config)
 
     def get_config_for_boosting_suggests(self, analyzerConfig):
         return {
@@ -63,36 +81,35 @@ class SuggestService(AnalyzerService):
     def build_suggest_query(self, test_item_info, log, size=10,
                             message_field="message", det_mes_field="detected_message",
                             stacktrace_field="stacktrace"):
-        min_should_match = "{}%".format(test_item_info.analyzerConfig.minShouldMatch)\
-            if test_item_info.analyzerConfig.minShouldMatch > 0\
+        min_should_match = "{}%".format(test_item_info.analyzerConfig.minShouldMatch) \
+            if test_item_info.analyzerConfig.minShouldMatch > 0 \
             else self.search_cfg["MinShouldMatch"]
         log_lines = test_item_info.analyzerConfig.numberOfLogLines
 
         query = self.build_common_query(log, size=size, filter_no_defect=False)
-        query = self.add_constraints_for_launches_into_query(query, test_item_info)
+        query = self.add_constraints_for_launches_into_query_suggest(query, test_item_info)
 
         if log["_source"]["message"].strip():
             query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
             if log_lines == -1:
-                query["query"]["bool"]["must"].append(
-                    self.build_more_like_this_query("60%",
-                                                    log["_source"][det_mes_field],
-                                                    field_name=det_mes_field,
-                                                    boost=4.0))
+                must = self.create_path(query, ('query', 'bool', 'must'), [])
+                must.append(self.build_more_like_this_query("60%",
+                                                            log["_source"][det_mes_field],
+                                                            field_name=det_mes_field,
+                                                            boost=4.0))
                 if log["_source"][stacktrace_field].strip():
-                    query["query"]["bool"]["must"].append(
-                        self.build_more_like_this_query("60%",
-                                                        log["_source"][stacktrace_field],
-                                                        field_name=stacktrace_field,
-                                                        boost=2.0))
+                    must.append(self.build_more_like_this_query("60%",
+                                                                log["_source"][stacktrace_field],
+                                                                field_name=stacktrace_field,
+                                                                boost=2.0))
                 else:
                     query["query"]["bool"]["must_not"].append({"wildcard": {stacktrace_field: "*"}})
             else:
-                query["query"]["bool"]["must"].append(
-                    self.build_more_like_this_query("60%",
-                                                    log["_source"][message_field],
-                                                    field_name=message_field,
-                                                    boost=4.0))
+                must = self.create_path(query, ('query', 'bool', 'must'), [])
+                must.append(self.build_more_like_this_query("60%",
+                                                            log["_source"][message_field],
+                                                            field_name=message_field,
+                                                            boost=4.0))
                 query["query"]["bool"]["should"].append(
                     self.build_more_like_this_query("60%",
                                                     log["_source"][stacktrace_field],
@@ -106,19 +123,15 @@ class SuggestService(AnalyzerService):
         else:
             query["query"]["bool"]["filter"].append({"term": {"is_merged": True}})
             query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
-            query["query"]["bool"]["must"].append(
-                self.build_more_like_this_query(min_should_match,
-                                                log["_source"]["merged_small_logs"],
-                                                field_name="merged_small_logs",
-                                                boost=2.0))
+            must = self.create_path(query, ('query', 'bool', 'must'), [])
+            must.append(self.build_more_like_this_query(min_should_match,
+                                                        log["_source"]["merged_small_logs"],
+                                                        field_name="merged_small_logs",
+                                                        boost=2.0))
 
         utils.append_potential_status_codes(query, log, max_query_terms=self.search_cfg["MaxQueryTerms"])
 
-        for field, boost_score in [
-                ("detected_message_without_params_extended", 2.0),
-                ("only_numbers", 2.0), ("message_params", 2.0), ("urls", 2.0),
-                ("paths", 2.0), ("found_exceptions_extended", 8.0),
-                ("found_tests_and_methods", 2.0), ("test_item_name", 2.0)]:
+        for field, boost_score in SPECIAL_FIELDS_BOOST_SCORES:
             if log["_source"][field].strip():
                 query["query"]["bool"]["should"].append(
                     self.build_more_like_this_query("1",
@@ -137,27 +150,27 @@ class SuggestService(AnalyzerService):
         for log in logs:
             message = log["_source"]["message"].strip()
             merged_small_logs = log["_source"]["merged_small_logs"].strip()
-            if log["_source"]["log_level"] < utils.ERROR_LOGGING_LEVEL or\
+            if log["_source"]["log_level"] < utils.ERROR_LOGGING_LEVEL or \
                     (not message and not merged_small_logs):
                 continue
             queries = []
 
             for query in [
-                    self.build_suggest_query(
-                        test_item_info, log,
-                        message_field="message_extended",
-                        det_mes_field="detected_message_extended",
-                        stacktrace_field="stacktrace_extended"),
-                    self.build_suggest_query(
-                        test_item_info, log,
-                        message_field="message_without_params_extended",
-                        det_mes_field="detected_message_without_params_extended",
-                        stacktrace_field="stacktrace_extended"),
-                    self.build_suggest_query(
-                        test_item_info, log,
-                        message_field="message_without_params_and_brackets",
-                        det_mes_field="detected_message_without_params_and_brackets",
-                        stacktrace_field="stacktrace_extended")]:
+                self.build_suggest_query(
+                    test_item_info, log,
+                    message_field="message_extended",
+                    det_mes_field="detected_message_extended",
+                    stacktrace_field="stacktrace_extended"),
+                self.build_suggest_query(
+                    test_item_info, log,
+                    message_field="message_without_params_extended",
+                    det_mes_field="detected_message_without_params_extended",
+                    stacktrace_field="stacktrace_extended"),
+                self.build_suggest_query(
+                    test_item_info, log,
+                    message_field="message_without_params_and_brackets",
+                    det_mes_field="detected_message_without_params_and_brackets",
+                    stacktrace_field="stacktrace_extended")]:
                 queries.append("{}\n{}".format(json.dumps({"index": index_name}), json.dumps(query)))
 
             partial_res = self.es_client.es_client.msearch("\n".join(queries) + "\n")["responses"]
@@ -206,7 +219,7 @@ class SuggestService(AnalyzerService):
                 detected_message_sim = det_message[group_id]
                 stacktrace_sim = _similarity_calculator.similarity_dict["stacktrace"][group_id]
                 merged_logs_sim = _similarity_calculator.similarity_dict["merged_small_logs"][group_id]
-                if detected_message_sim["similarity"] >= 0.98 and\
+                if detected_message_sim["similarity"] >= 0.98 and \
                         stacktrace_sim["similarity"] >= 0.98 and merged_logs_sim["similarity"] >= 0.98:
                     deleted_indices.add(j)
             filtered_results.append(gathered_results[i])
@@ -304,7 +317,6 @@ class SuggestService(AnalyzerService):
         return logs, test_item_id
 
     def prepare_logs_for_suggestions(self, test_item_info, index_name):
-        prepared_logs = []
         test_item_id_for_suggest = test_item_info.testItemId
         if test_item_info.clusterId != 0:
             prepared_logs, test_item_id_for_suggest = self.query_logs_for_cluster(test_item_info, index_name)
@@ -317,7 +329,8 @@ class SuggestService(AnalyzerService):
 
     @utils.ignore_warnings
     def suggest_items(self, test_item_info):
-        logger.info("Started suggesting test items")
+        logger.info(f'Started suggesting for test item with id: {test_item_info.testItemId}')
+        logger.debug(f'Started suggesting items by request: {test_item_info.json()}')
         logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))
         index_name = text_processing.unite_project_name(
             str(test_item_info.project), self.app_config["esProjectIndexPrefix"])
@@ -334,8 +347,12 @@ class SuggestService(AnalyzerService):
         feature_names = ""
         try:
             logs, test_item_id_for_suggest = self.prepare_logs_for_suggestions(test_item_info, index_name)
-            logger.info("Number of logs for suggestions: %d", len(logs))
+            logger.info(f'Number of prepared log search requests for suggestions: {len(logs)}')
+            logger.debug(f'Log search requests for suggestions: {json.dumps(logs)}')
             searched_res = self.query_es_for_suggested_items(test_item_info, logs)
+            res_num = reduce(lambda a, b: a + b, [len(res[1]['hits']['hits']) for res in searched_res], 0)
+            logger.info(f'Found {res_num} items by FTS (KNN)')
+            logger.debug(f'Items for suggestions by FTS (KNN): {json.dumps(searched_res)}')
 
             boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
             boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(
@@ -355,8 +372,8 @@ class SuggestService(AnalyzerService):
                 test_item_info.project, "defect_type_model/"))
             feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
             scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
-            model_info_tags = _boosting_data_gatherer.get_used_model_info() +\
-                _suggest_decision_maker_to_use.get_model_info()
+            model_info_tags = (_boosting_data_gatherer.get_used_model_info() +
+                               _suggest_decision_maker_to_use.get_model_info())
             feature_names = ";".join(_suggest_decision_maker_to_use.get_feature_names())
             if feature_data:
                 predicted_labels, predicted_labels_probability = _suggest_decision_maker_to_use.predict(
@@ -388,6 +405,7 @@ class SuggestService(AnalyzerService):
                             testItemLogId=test_item_log_id,
                             launchId=test_item_info.launchId,
                             launchName=test_item_info.launchName,
+                            launchNumber=test_item_info.launchNumber,
                             issueType=issue_type,
                             relevantItem=test_item_id,
                             relevantLogId=relevant_log_id,
@@ -411,9 +429,9 @@ class SuggestService(AnalyzerService):
                         global_idx += 1
             else:
                 logger.debug("There are no results for test item %s", test_item_info.testItemId)
-        except Exception as err:
-            logger.error(err)
-            errors_found.append(utils.extract_exception(err))
+        except Exception as exc:
+            logger.exception(exc)
+            errors_found.append(utils.extract_exception(exc))
             errors_count += 1
         results_to_share = {test_item_info.launchId: {
             "not_found": int(len(results) == 0), "items_to_process": 1,
@@ -438,18 +456,20 @@ class SuggestService(AnalyzerService):
                     feature_names,
                     model_info_tags)
             }])
-        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
-            AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
-                self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
-            if results:
-                for model_type in ["suggestion", "auto_analysis"]:
-                    AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
-                        self.app_config["exchangeName"], "train_models", json.dumps({
-                            "model_type": model_type,
-                            "project_id": test_item_info.project,
-                            "gathered_metric_total": len(results)
-                        }))
-
+        try:
+            if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+                AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                    self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
+                if results:
+                    for model_type in ["suggestion", "auto_analysis"]:
+                        AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
+                            self.app_config["exchangeName"], "train_models", json.dumps({
+                                "model_type": model_type,
+                                "project_id": test_item_info.project,
+                                GATHERED_METRIC_TOTAL: len(results)
+                            }))
+        except Exception as exc:
+            logger.exception(exc)
         logger.debug("Stats info %s", results_to_share)
         logger.info("Processed the test item. It took %.2f sec.", time() - t_start)
         logger.info("Finished suggesting for test item with %d results.", len(results))

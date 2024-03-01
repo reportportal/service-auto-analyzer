@@ -14,6 +14,7 @@
                     "must_not": [
                         {"term": {"issue_type": "ti001"}},
                         {"term": {"test_item": "123"}},
+                        {"term": {"launch_id": 12}},
                         {"wildcard": {"message": "*"}}
                     ],
                     "must": [
@@ -21,9 +22,7 @@
                             "test_case_hash": 1
                         }},
                         {"term": {
-                            "launch_name": {
-                                "value": "Launch name"
-                            }
+                            "launch_name": "Launch name"
                         }},
                         {"more_like_this": {
                             "fields":               ["merged_small_logs"],

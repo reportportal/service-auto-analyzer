@@ -27,8 +27,7 @@ logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
 class BoostingFeaturizer:
 
-    def __init__(self, all_results, config, feature_ids,
-                 weighted_log_similarity_calculator=None,
+    def __init__(self, all_results, config, feature_ids, weighted_log_similarity_calculator=None,
                  features_dict_with_saved_objects=None):
         self.config = config
         self.previously_gathered_features = {}
@@ -39,7 +38,7 @@ class BoostingFeaturizer:
         self.similarity_calculator = similarity_calculator.SimilarityCalculator(
             self.config,
             weighted_similarity_calculator=weighted_log_similarity_calculator)
-        if type(feature_ids) == str:
+        if type(feature_ids) is str:
             self.feature_ids = text_processing.transform_string_feature_range_into_list(feature_ids)
         else:
             self.feature_ids = feature_ids
@@ -113,9 +112,7 @@ class BoostingFeaturizer:
             71: (self._encode_into_vector,
                  {"field_name": "test_item_name", "feature_name": 71, "only_query": False}, []),
             72: (self._encode_into_vector,
-                 {"field_name": "test_case_hash", "feature_name": 72, "only_query": True}, []),
-            73: (self._encode_into_vector,
-                 {"field_name": "found_exceptions", "feature_name": 73, "only_query": True}, [])
+                 {"field_name": "found_exceptions", "feature_name": 72, "only_query": True}, [])
         }
 
         fields_to_calc_similarity = self.find_columns_to_find_similarities_for()
@@ -358,9 +355,9 @@ class BoostingFeaturizer:
                 num_of_logs_issue_type[issue_type] = 0
                 continue
 
-            if type(queried_item_value) == str:
+            if type(queried_item_value) is str:
                 queried_item_value = queried_item_value.strip().lower()
-            if type(rel_item_value) == str:
+            if type(rel_item_value) is str:
                 rel_item_value = rel_item_value.strip().lower()
 
             if rel_item_value == '' and queried_item_value == '':
@@ -636,7 +633,7 @@ class BoostingFeaturizer:
                 else:
                     func, args, _ = self.feature_functions[feature]
                     result = func(**args)
-                    if type(result) == list:
+                    if type(result) is list:
                         gathered_data_dict[feature] = result
                     else:
                         gathered_data_dict[feature] = []

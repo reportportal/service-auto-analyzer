@@ -189,7 +189,8 @@ class SearchService:
     def search_logs(self, search_req):
         """Get all logs similar to given logs"""
         similar_log_ids = {}
-        logger.info("Started searching by request %s", search_req.json())
+        logger.info(f'Started searching for test item with id: {search_req.itemId}')
+        logger.debug(f'Started searching by request: {search_req.json()}')
         logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))
         index_name = text_processing.unite_project_name(
             str(search_req.projectId), self.app_config["esProjectIndexPrefix"])

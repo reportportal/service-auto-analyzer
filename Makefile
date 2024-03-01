@@ -1,5 +1,6 @@
 IMAGE_NAME=reportportal/service-auto-analyzer$(IMAGE_POSTFIX)
 IMAGE_NAME_DEV=reportportal-dev/service-auto-analyzer
+DEV_BUILD_PLATFORM=amd64
 
 VENV_PATH?=/venv
 PYTHON=${VENV_PATH}/bin/python3
@@ -40,9 +41,10 @@ build-release: venv
 	${PYTHON} -m bumpversion --new-version ${v} build --no-commit --no-tag --allow-dirty
 
 build-image-dev:
-	docker build -t "$(IMAGE_NAME_DEV)" --build-arg version=${v} --build-arg prod="false" -f Dockerfile .
+	cat Dockerfile | sed "s/\$${BUILDPLATFORM}/$(DEV_BUILD_PLATFORM)/" | docker build -t "$(IMAGE_NAME_DEV)" --build-arg version=${v} --build-arg prod="false" --build-arg buildplatform="amd64" -f - .
 
 build-image:
-	docker build -t "$(IMAGE_NAME)" --build-arg version=${v} --build-arg prod="true" --build-arg githubtoken=${githubtoken} -f Dockerfile .
+	# To build image you need to pass these make args: "v" - app version, "githubtoken" - a GitHub token with commit rights, "buildplatform" - a platform for which build the image
+	cat Dockerfile | sed s/\$${BUILDPLATFORM}/${buildplatform}/ | docker build -t "$(IMAGE_NAME)" --build-arg version=${v} --build-arg prod="true" --build-arg githubtoken=${githubtoken} -f Dockerfile .
 
 test-all: checkstyle test

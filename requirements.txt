@@ -3,7 +3,7 @@ flask-cors==3.0.10
 waitress==2.1.2
 uWSGI==2.0.22
 pika==1.2.1
-pydantic==1.10.4
+pydantic==1.10.13
 elasticsearch==7.0.0
 requests==2.31.0
 bump2version==1.0.1
@@ -17,5 +17,5 @@ minio==6.0.0
 gensim==4.3.0
 pandas==1.5.3
 imbalanced-learn==0.9.1
-urllib3==1.26.5
-certifi==2023.7.22
+urllib3==1.26.18
+certifi>=2023.7.22

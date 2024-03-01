@@ -13,11 +13,13 @@
 #  limitations under the License.
 
 from app.utils import utils, text_processing
+from app.commons.esclient import EsClient
 from app.commons.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult
 from app.boosting_decision_making import boosting_featurizer
 from app.service.analyzer_service import AnalyzerService
 from app.amqp.amqp import AmqpClient
 from app.commons.similarity_calculator import SimilarityCalculator
+from app.commons.namespace_finder import NamespaceFinder
 import json
 import logging
 from time import time, sleep
@@ -31,11 +33,15 @@ EARLY_FINISH = False
 
 class AutoAnalyzerService(AnalyzerService):
 
-    def __init__(self, model_chooser, app_config=None, search_cfg=None):
+    es_client: EsClient
+    namespace_finder: NamespaceFinder
+
+    def __init__(self, model_chooser, app_config=None, search_cfg=None, es_client: EsClient = None):
         self.app_config = app_config or {}
         self.search_cfg = search_cfg or {}
-        super(AutoAnalyzerService, self).__init__(
-            model_chooser, app_config=self.app_config, search_cfg=self.search_cfg)
+        super().__init__(model_chooser, search_cfg=self.search_cfg)
+        self.es_client = es_client or EsClient(app_config=self.app_config, search_cfg=self.search_cfg)
+        self.namespace_finder = NamespaceFinder(app_config)
 
     def get_config_for_boosting(self, analyzer_config):
         min_should_match = self.find_min_should_match_threshold(analyzer_config) / 100
@@ -77,11 +83,11 @@ class AutoAnalyzerService(AnalyzerService):
             log_lines = launch.analyzerConfig.numberOfLogLines
             query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
             if log_lines == -1:
-                query["query"]["bool"]["must"].append(
-                    self.build_more_like_this_query(min_should_match,
-                                                    log["_source"]["detected_message"],
-                                                    field_name="detected_message",
-                                                    boost=4.0))
+                must = self.create_path(query, ('query', 'bool', 'must'), [])
+                must.append(self.build_more_like_this_query(min_should_match,
+                                                            log["_source"]["detected_message"],
+                                                            field_name="detected_message",
+                                                            boost=4.0))
                 if log["_source"]["stacktrace"].strip():
                     query["query"]["bool"]["must"].append(
                         self.build_more_like_this_query(min_should_match,
@@ -91,11 +97,11 @@ class AutoAnalyzerService(AnalyzerService):
                 else:
                     query["query"]["bool"]["must_not"].append({"wildcard": {"stacktrace": "*"}})
             else:
-                query["query"]["bool"]["must"].append(
-                    self.build_more_like_this_query(min_should_match,
-                                                    log["_source"]["message"],
-                                                    field_name="message",
-                                                    boost=4.0))
+                must = self.create_path(query, ('query', 'bool', 'must'), [])
+                must.append(self.build_more_like_this_query(min_should_match,
+                                                            log["_source"]["message"],
+                                                            field_name="message",
+                                                            boost=4.0))
                 query["query"]["bool"]["should"].append(
                     self.build_more_like_this_query("80%",
                                                     log["_source"]["detected_message"],
@@ -113,11 +119,11 @@ class AutoAnalyzerService(AnalyzerService):
         else:
             query["query"]["bool"]["filter"].append({"term": {"is_merged": True}})
             query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
-            query["query"]["bool"]["must"].append(
-                self.build_more_like_this_query(min_should_match,
-                                                log["_source"]["merged_small_logs"],
-                                                field_name="merged_small_logs",
-                                                boost=2.0))
+            must = self.create_path(query, ("query", "bool", "must"), [])
+            must.append(self.build_more_like_this_query(min_should_match,
+                                                        log["_source"]["merged_small_logs"],
+                                                        field_name="merged_small_logs",
+                                                        boost=2.0))
 
         if log["_source"]["found_exceptions"].strip():
             query["query"]["bool"]["must"].append(
@@ -131,7 +137,8 @@ class AutoAnalyzerService(AnalyzerService):
                 ("only_numbers", 2.0), ("potential_status_codes", 8.0),
                 ("found_tests_and_methods", 2), ("test_item_name", 2.0)]:
             if log["_source"][field].strip():
-                query["query"]["bool"]["should"].append(
+                should = self.create_path(query, ('query', 'bool', 'should'), [])
+                should.append(
                     self.build_more_like_this_query("1",
                                                     log["_source"][field],
                                                     field_name=field,
@@ -260,25 +267,28 @@ class AutoAnalyzerService(AnalyzerService):
             candidates = []
             candidates_with_no_defect = []
             time_processed = 0.0
-            for ind in test_item_dict[test_item_id]:
-                batch_log_info = batch_logs[ind]
+            batch_log_info = None
+            for idx in test_item_dict[test_item_id]:
+                batch_log_info = batch_logs[idx]
                 if batch_log_info.query_type == "without no defect":
                     candidates.append(
-                        (batch_log_info.log_info, partial_res[ind]))
+                        (batch_log_info.log_info, partial_res[idx]))
                 if batch_log_info.query_type == "with no defect":
                     candidates_with_no_defect.append(
-                        (batch_log_info.log_info, partial_res[ind]))
+                        (batch_log_info.log_info, partial_res[idx]))
                 time_processed += avg_time_processed
-            self.queue.put(AnalysisCandidate(
-                analyzerConfig=batch_log_info.analyzerConfig,
-                testItemId=batch_log_info.testItemId,
-                project=batch_log_info.project,
-                launchId=batch_log_info.launchId,
-                launchName=batch_log_info.launchName,
-                timeProcessed=time_processed,
-                candidates=candidates,
-                candidatesWithNoDefect=candidates_with_no_defect
-            ))
+            if batch_log_info:
+                self.queue.put(AnalysisCandidate(
+                    analyzerConfig=batch_log_info.analyzerConfig,
+                    testItemId=batch_log_info.testItemId,
+                    project=batch_log_info.project,
+                    launchId=batch_log_info.launchId,
+                    launchName=batch_log_info.launchName,
+                    launchNumber=batch_log_info.launchNumber,
+                    timeProcessed=time_processed,
+                    candidates=candidates,
+                    candidatesWithNoDefect=candidates_with_no_defect
+                ))
 
     def _query_elasticsearch(self, launches, max_batch_size=30):
         t_start = time()
@@ -334,7 +344,8 @@ class AutoAnalyzerService(AnalyzerService):
                                 query_type=query_type,
                                 project=launch.project,
                                 launchId=launch.launchId,
-                                launchName=launch.launchName
+                                launchName=launch.launchName,
+                                launchNumber=launch.launchNumber
                             ))
                             if test_item.testItemId not in test_item_dict:
                                 test_item_dict[test_item.testItemId] = []
@@ -355,7 +366,7 @@ class AutoAnalyzerService(AnalyzerService):
 
         except Exception as err:
             logger.error("Error in ES query")
-            logger.error(err)
+            logger.exception(err)
         self.finished_queue.put("Finished")
         logger.info("Es queries finished %.2f s.", time() - t_start)
 
@@ -490,6 +501,7 @@ class AutoAnalyzerService(AnalyzerService):
                                     testItemLogId=test_item_log_id,
                                     launchId=analyzer_candidates.launchId,
                                     launchName=analyzer_candidates.launchName,
+                                    launchNumber=analyzer_candidates.launchNumber,
                                     issueType=predicted_issue_type,
                                     relevantItem=relevant_item,
                                     relevantLogId=relevant_log_id,
@@ -531,7 +543,7 @@ class AutoAnalyzerService(AnalyzerService):
                         results_to_share[launch_id]["errors"].append(
                             utils.extract_exception(err))
                         results_to_share[launch_id]["errors_count"] += 1
-            if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+            if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip() and analyzed_results_for_index:
                 AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
                     self.app_config["exchangeName"], "index_suggest_info",
                     json.dumps([_info.dict() for _info in analyzed_results_for_index]))

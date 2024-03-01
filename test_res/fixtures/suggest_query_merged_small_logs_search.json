@@ -55,6 +55,7 @@
                                 "boost": 5
                             }
                         }},
+                        {"term": {"launch_id": {"boost": 0.2, "value": 12}}},
                         {"more_like_this": {
                             "fields":               ["detected_message_without_params_extended"],
                             "like":                 "hello world",

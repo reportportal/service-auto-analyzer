@@ -64,6 +64,7 @@ APP_CONFIG = {
     "minioHost": os.getenv("MINIO_SHORT_HOST", "minio:9000"),
     "minioAccessKey": os.getenv("MINIO_ACCESS_KEY", "minio"),
     "minioSecretKey": os.getenv("MINIO_SECRET_KEY", "minio123"),
+    "minioUseTls": json.loads(os.getenv("MINIO_USE_TLS", "false").lower()),
     "appVersion": "",
     "binaryStoreType": os.getenv("ANALYZER_BINSTORE_TYPE",
                                  os.getenv("ANALYZER_BINARYSTORE_TYPE", "filesystem")),
@@ -113,12 +114,13 @@ SEARCH_CONFIG = {
 def create_application():
     """Creates a Flask application"""
     _application = Flask(__name__)
+    CORS(_application)
     return _application
 
 
 def create_thread(func, args):
     """Creates a thread with specified function and arguments"""
-    thread = threading.Thread(target=func, args=args)
+    thread = threading.Thread(target=func, args=args, daemon=True)
     thread.start()
     return thread
 
@@ -169,7 +171,7 @@ def init_amqp(_amqp_client):
         _auto_analyzer_service = AutoAnalyzerService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
         _delete_index_service = DeleteIndexService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
         _clean_index_service = CleanIndexService(APP_CONFIG, SEARCH_CONFIG)
-        _analyzer_service = AnalyzerService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
+        _analyzer_service = AnalyzerService(_model_chooser, SEARCH_CONFIG)
         _suggest_service = SuggestService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
         _suggest_info_service = SuggestInfoService(APP_CONFIG, SEARCH_CONFIG)
         _search_service = SearchService(APP_CONFIG, SEARCH_CONFIG)
@@ -395,7 +397,6 @@ es_client = EsClient(APP_CONFIG, SEARCH_CONFIG)
 read_model_settings()
 
 application = create_application()
-CORS(application)
 threads = []
 
 

@@ -12,27 +12,28 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.utils import utils, text_processing
-from app.commons.esclient import EsClient
-from app.commons.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult
-from app.boosting_decision_making import boosting_featurizer
-from app.service.analyzer_service import AnalyzerService
-from app.amqp.amqp import AmqpClient
-from app.commons.similarity_calculator import SimilarityCalculator
-from app.commons.namespace_finder import NamespaceFinder
 import json
-import logging
-from time import time, sleep
 from datetime import datetime
 from queue import Queue
 from threading import Thread
+from time import time, sleep
+
+from app.amqp.amqp import AmqpClient
+from app.commons import logging
+from app.commons.esclient import EsClient
+from app.commons.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult
+from app.commons.model_chooser import ModelType
+from app.commons.namespace_finder import NamespaceFinder
+from app.commons.similarity_calculator import SimilarityCalculator
+from app.machine_learning import boosting_featurizer
+from app.service.analyzer_service import AnalyzerService
+from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.autoAnalyzerService")
 EARLY_FINISH = False
 
 
 class AutoAnalyzerService(AnalyzerService):
-
     es_client: EsClient
     namespace_finder: NamespaceFinder
 
@@ -61,16 +62,15 @@ class AutoAnalyzerService(AnalyzerService):
 
     def choose_fields_to_filter_strict(self, log_lines, min_should_match):
         fields = [
-            "detected_message", "message", "potential_status_codes"]\
+            "detected_message", "message", "potential_status_codes"] \
             if log_lines == -1 else ["message", "potential_status_codes"]
         if min_should_match > 0.99:
             fields.append("found_tests_and_methods")
         return fields
 
     def get_min_should_match_setting(self, launch):
-        return "{}%".format(launch.analyzerConfig.minShouldMatch)\
-            if launch.analyzerConfig.minShouldMatch > 0\
-            else self.search_cfg["MinShouldMatch"]
+        return "{}%".format(launch.analyzerConfig.minShouldMatch) \
+            if launch.analyzerConfig.minShouldMatch > 0 else self.search_cfg["MinShouldMatch"]
 
     def build_analyze_query(self, launch, log, size=10):
         """Build analyze query"""
@@ -133,9 +133,10 @@ class AutoAnalyzerService(AnalyzerService):
                                                 boost=8.0,
                                                 override_min_should_match="1"))
         for field, boost_score in [
-                ("detected_message_without_params_extended", 2.0),
-                ("only_numbers", 2.0), ("potential_status_codes", 8.0),
-                ("found_tests_and_methods", 2), ("test_item_name", 2.0)]:
+            ("detected_message_without_params_extended", 2.0),
+            ("only_numbers", 2.0), ("potential_status_codes", 8.0),
+            ("found_tests_and_methods", 2), ("test_item_name", 2.0)
+        ]:
             if log["_source"][field].strip():
                 should = self.create_path(query, ('query', 'bool', 'should'), [])
                 should.append(
@@ -328,12 +329,13 @@ class AutoAnalyzerService(AnalyzerService):
                     for log in results:
                         message = log["_source"]["message"].strip()
                         merged_logs = log["_source"]["merged_small_logs"].strip()
-                        if log["_source"]["log_level"] < utils.ERROR_LOGGING_LEVEL or\
+                        if log["_source"]["log_level"] < utils.ERROR_LOGGING_LEVEL or \
                                 (not message and not merged_logs):
                             continue
                         for query_type, query in [
-                                ("without no defect", self.build_analyze_query(launch, log)),
-                                ("with no defect", self.build_query_with_no_defect(launch, log))]:
+                            ("without no defect", self.build_analyze_query(launch, log)),
+                            ("with no defect", self.build_query_with_no_defect(launch, log))
+                        ]:
                             full_query = "{}\n{}".format(
                                 json.dumps({"index": index_name}), json.dumps(query))
                             batches.append(full_query)
@@ -364,9 +366,9 @@ class AutoAnalyzerService(AnalyzerService):
             if len(batches) > 0:
                 self._send_result_to_queue(test_item_dict, batches, batch_logs)
 
-        except Exception as err:
+        except Exception as exc:
             logger.error("Error in ES query")
-            logger.exception(err)
+            logger.exception(exc)
         self.finished_queue.put("Finished")
         logger.info("Es queries finished %.2f s.", time() - t_start)
 
@@ -379,7 +381,7 @@ class AutoAnalyzerService(AnalyzerService):
         self.queue = Queue()
         self.finished_queue = Queue()
         defect_type_model_to_use = {}
-        es_query_thread = Thread(target=self._query_elasticsearch, args=(launches, ))
+        es_query_thread = Thread(target=self._query_elasticsearch, args=(launches,))
         es_query_thread.daemon = True
         es_query_thread.start()
         analyzed_results_for_index = []
@@ -392,7 +394,8 @@ class AutoAnalyzerService(AnalyzerService):
             results_to_share = {}
             chosen_namespaces = {}
             while self.finished_queue.empty() or not self.queue.empty():
-                if (self.search_cfg["AutoAnalysisTimeout"] - (time() - t_start)) <= 5:  # check whether we are running out of time # noqa
+                if (self.search_cfg["AutoAnalysisTimeout"] - (
+                        time() - t_start)) <= 5:  # check whether we are running out of time # noqa
                     EARLY_FINISH = True
                     break
                 if self.queue.empty():
@@ -431,12 +434,12 @@ class AutoAnalyzerService(AnalyzerService):
                             project_id)
                     boosting_config["chosen_namespaces"] = chosen_namespaces[project_id]
                     _boosting_decision_maker = self.model_chooser.choose_model(
-                        project_id, "auto_analysis_model/",
+                        project_id, ModelType.AUTO_ANALYSIS_MODEL,
                         custom_model_prob=self.search_cfg["ProbabilityForCustomModelAutoAnalysis"])
                     features_dict_objects = _boosting_decision_maker.features_dict_with_saved_objects
                     if project_id not in defect_type_model_to_use:
                         defect_type_model_to_use[project_id] = self.model_chooser.choose_model(
-                            project_id, "defect_type_model/")
+                            project_id, ModelType.DEFECT_TYPE_MODEL)
 
                     relevant_with_no_defect_candidate = self.find_relevant_with_no_defect(
                         analyzer_candidates.candidatesWithNoDefect, boosting_config)
@@ -457,13 +460,13 @@ class AutoAnalyzerService(AnalyzerService):
                             features_dict_with_saved_objects=features_dict_objects)
                         boosting_data_gatherer.set_defect_type_model(defect_type_model_to_use[project_id])
                         feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
-                        model_info_tags = boosting_data_gatherer.get_used_model_info() +\
-                            _boosting_decision_maker.get_model_info()
+                        model_info_tags = (boosting_data_gatherer.get_used_model_info() +
+                                           _boosting_decision_maker.get_model_info())
                         results_to_share[launch_id]["model_info"].update(model_info_tags)
 
                         if len(feature_data) > 0:
 
-                            predicted_labels, predicted_labels_probability =\
+                            predicted_labels, predicted_labels_probability = \
                                 _boosting_decision_maker.predict(feature_data)
 
                             scores_by_issue_type = boosting_data_gatherer.scores_by_issue_type
@@ -537,11 +540,11 @@ class AutoAnalyzerService(AnalyzerService):
                     if not found_result:
                         results_to_share[launch_id]["not_found"] += 1
                     results_to_share[launch_id]["processed_time"] += (time() - t_start_item)
-                except Exception as err:
-                    logger.error(err)
+                except Exception as exc:
+                    logger.exception(exc)
                     if launch_id in results_to_share:
                         results_to_share[launch_id]["errors"].append(
-                            utils.extract_exception(err))
+                            utils.extract_exception(exc))
                         results_to_share[launch_id]["errors_count"] += 1
             if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip() and analyzed_results_for_index:
                 AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
@@ -552,8 +555,8 @@ class AutoAnalyzerService(AnalyzerService):
                         results_to_share[launch_id]["model_info"])
                 AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
                     self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
-        except Exception as err:
-            logger.error(err)
+        except Exception as exc:
+            logger.exception(exc)
         es_query_thread.join()
         EARLY_FINISH = False
         self.queue = Queue()

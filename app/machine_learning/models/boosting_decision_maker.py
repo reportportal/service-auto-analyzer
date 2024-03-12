@@ -12,44 +12,44 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from xgboost import XGBClassifier
 from sklearn.metrics import classification_report, confusion_matrix
-import os
-import pickle
-import logging
+from xgboost import XGBClassifier
 
+from app.commons import logging
+from app.commons.object_saving.object_saver import ObjectSaver
+from app.machine_learning import feature_encoder
+from app.machine_learning.models import MlModel
 from app.utils import text_processing
-from app.boosting_decision_making import feature_encoder
 
 logger = logging.getLogger("analyzerApp.boosting_decision_maker")
 
+MODEL_FILES: list[str] = ['boost_model.pickle', 'data_features_config.pickle',
+                          'features_dict_with_saved_objects.pickle']
 
-class BoostingDecisionMaker:
 
-    def __init__(self, folder="", n_estimators=75, max_depth=5, monotonous_features="", is_global=True):
+class BoostingDecisionMaker(MlModel):
+
+    _loaded: bool
+
+    def __init__(self, object_saver: ObjectSaver, tags: str = 'global boosting model', *, n_estimators: int = 75,
+                 max_depth: int = 5, monotonous_features: str = '') -> None:
+        super().__init__(object_saver, tags)
         self.n_estimators = n_estimators
         self.max_depth = max_depth
-        self.folder = folder
+        self.xg_boost = XGBClassifier(n_estimators=n_estimators, max_depth=max_depth, random_state=43)
         self.monotonous_features = text_processing.transform_string_feature_range_into_list(
             monotonous_features)
-        self.is_global = is_global
         self.features_dict_with_saved_objects = {}
-        if folder.strip():
-            self.load_model()
-        else:
-            self.xg_boost = XGBClassifier(n_estimators=n_estimators, max_depth=max_depth, random_state=43)
+        self.full_config = {}
+        self.feature_ids = []
+        self._loaded = False
 
-    def get_model_info(self):
-        folder_name = os.path.basename(self.folder.strip("/").strip("\\")).strip()
-        if folder_name:
-            tags = [folder_name]
-            if not self.is_global:
-                return tags + ["custom boosting model"]
-            return tags + ["global boosting model"]
-        return []
+    @property
+    def loaded(self) -> bool:
+        return self._loaded
 
     def get_feature_ids(self):
-        return text_processing.transform_string_feature_range_into_list(self.feature_ids)\
+        return text_processing.transform_string_feature_range_into_list(self.feature_ids) \
             if isinstance(self.feature_ids, str) else self.feature_ids
 
     def get_feature_names(self):
@@ -84,29 +84,19 @@ class BoostingDecisionMaker:
             _features_dict_with_saved_objects[feature] = _feature_encoder
         return _features_dict_with_saved_objects
 
-    def load_model(self):
-        with open(os.path.join(self.folder, "boost_model.pickle"), "rb") as f:
-            self.n_estimators, self.max_depth, self.xg_boost = pickle.load(f)
-        with open(os.path.join(self.folder, "data_features_config.pickle"), "rb") as f:
-            self.full_config, self.feature_ids, self.monotonous_features = pickle.load(f)
-        if os.path.exists(os.path.join(self.folder, "features_dict_with_saved_objects.pickle")):
-            features_dict_with_saved_objects = {}
-            with open(os.path.join(self.folder, "features_dict_with_saved_objects.pickle"), "rb") as f:
-                features_dict_with_saved_objects = pickle.load(f)
-            self.features_dict_with_saved_objects = self.transform_feature_encoders_to_objects(
-                features_dict_with_saved_objects)
-        else:
-            self.features_dict_with_saved_objects = {}
+    def load_model(self) -> None:
+        if self.loaded:
+            return
+        boost_model, features_config, features_dict = self._load_models(MODEL_FILES)
+        self.n_estimators, self.max_depth, self.xg_boost = boost_model
+        self.full_config, self.feature_ids, self.monotonous_features = features_config
+        self.features_dict_with_saved_objects = self.transform_feature_encoders_to_objects(features_dict)
+        self._loaded = True
 
-    def save_model(self, folder):
-        if not os.path.exists(folder):
-            os.makedirs(folder)
-        with open(os.path.join(folder, "boost_model.pickle"), "wb") as f:
-            pickle.dump([self.n_estimators, self.max_depth, self.xg_boost], f)
-        with open(os.path.join(folder, "data_features_config.pickle"), "wb") as f:
-            pickle.dump([self.full_config, self.feature_ids, self.monotonous_features], f)
-        with open(os.path.join(folder, "features_dict_with_saved_objects.pickle"), "wb") as f:
-            pickle.dump(self.transform_feature_encoders_to_dict(), f)
+    def save_model(self):
+        self._save_models(zip(MODEL_FILES, [[self.n_estimators, self.max_depth, self.xg_boost],
+                                            [self.full_config, self.feature_ids, self.monotonous_features],
+                                            self.transform_feature_encoders_to_dict()]))
 
     def train_model(self, train_data, labels):
         mon_features = [
@@ -116,6 +106,7 @@ class BoostingDecisionMaker:
                                       max_depth=self.max_depth, random_state=43,
                                       monotone_constraints=mon_features_prepared)
         self.xg_boost.fit(train_data, labels)
+        self._loaded = True
         logger.info("Train score: %s", self.xg_boost.score(train_data, labels))
         logger.info("Feature importances: %s", self.xg_boost.feature_importances_)
 

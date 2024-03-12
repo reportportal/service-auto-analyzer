@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.boosting_decision_making import boosting_featurizer
+from app.machine_learning import boosting_featurizer
 
 
 class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):

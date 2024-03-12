@@ -12,13 +12,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
-from sklearn.feature_extraction.text import HashingVectorizer
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.preprocessing import OneHotEncoder
 import re
 
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import HashingVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.preprocessing import OneHotEncoder
+
+from app.commons import logging
 from app.utils import text_processing
 
 logger = logging.getLogger("analyzerApp.feature_encoder")

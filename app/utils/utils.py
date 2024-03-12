@@ -12,21 +12,19 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from functools import wraps
-
-import logging
-import warnings
-import os
 import json
+import os
+import random
+import traceback
+import warnings
+from collections import Counter
+from functools import wraps
 from typing import Union, Any
 
-import requests
-from app.commons import launch_objects
-from collections import Counter
-import random
 import numpy as np
-import traceback
+import requests
 
+from app.commons import launch_objects, logging
 from app.utils.text_processing import split_words, remove_credentials_from_url
 
 logger = logging.getLogger("analyzerApp.utils")
@@ -42,19 +40,30 @@ def ignore_warnings(func):
             warnings.simplefilter("ignore")
             result = func(*args, **kwargs)
         return result
+
     return _inner
 
 
 def read_file(folder: str, filename: str) -> str:
-    """Read file content as string (UTF-8)"""
+    """Read file content as string (UTF-8)."""
     with open(os.path.join(folder, filename), "r") as file:
         return file.read()
 
 
-def read_json_file(folder: str, filename: str, to_json=False) -> Union[str, Any]:
-    """Read fixture from file"""
+def read_json_file(folder: str, filename: str, to_json: bool = False) -> Union[str, Any]:
+    """Read fixture from file."""
     content = read_file(folder, filename)
     return content if not to_json else json.loads(content)
+
+
+def validate_folder(folder_path: str) -> bool:
+    """Check that passed path points to a directory and it exists."""
+    return folder_path and folder_path.strip() and os.path.exists(folder_path) and os.path.isdir(folder_path)
+
+
+def validate_file(file_path: str) -> bool:
+    """Check that passed path points to a file and it exists."""
+    return file_path and file_path.strip() and os.path.exists(file_path) and os.path.isfile(file_path)
 
 
 def extract_real_id(elastic_id):
@@ -80,9 +89,9 @@ def choose_issue_type(predicted_labels, predicted_labels_probability,
             chosen_type = scores_by_issue_type[issue_type]
             start_time = chosen_type["mrHit"]["_source"]["start_time"]
             predicted_prob = round(predicted_labels_probability[i][1], 4)
-            if (predicted_prob > max_prob) or\
-                    ((predicted_prob == max_prob) and # noqa
-                        (max_val_start_time is None or start_time > max_val_start_time)):
+            if (predicted_prob > max_prob) or \
+                    ((predicted_prob == max_prob) and  # noqa
+                     (max_val_start_time is None or start_time > max_val_start_time)):
                 max_prob = predicted_prob
                 predicted_issue_type = issue_type
                 global_idx = i
@@ -189,10 +198,10 @@ def to_number_list(features_list):
         feature_name = feature_name.split("_")[0]
         try:
             feature_numbers_list.append(int(feature_name))
-        except: # noqa
+        except:  # noqa
             try:
                 feature_numbers_list.append(float(feature_name))
-            except: # noqa
+            except:  # noqa
                 pass
     return feature_numbers_list
 

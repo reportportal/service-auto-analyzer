@@ -12,13 +12,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
 import re
 from typing import Any
 
-from app.boosting_decision_making import weighted_similarity_calculator
+from app.commons import logging, object_saving
 from app.commons.log_merger import LogMerger
 from app.commons.log_preparation import LogPreparation
+from app.machine_learning.models import weighted_similarity_calculator
 from app.utils import utils
 
 logger = logging.getLogger("analyzerApp.analyzerService")
@@ -34,9 +34,12 @@ class AnalyzerService:
         self.log_merger = LogMerger()
         self.model_chooser = model_chooser
         self.weighted_log_similarity_calculator = None
-        if self.search_cfg["SimilarityWeightsFolder"].strip():
-            self.weighted_log_similarity_calculator = weighted_similarity_calculator. \
-                WeightedSimilarityCalculator(folder=self.search_cfg["SimilarityWeightsFolder"])
+        weights_folder = self.search_cfg.get('SimilarityWeightsFolder', 'res/model/weights_24.11.20').strip()
+        if weights_folder:
+            self.weighted_log_similarity_calculator = (
+                weighted_similarity_calculator.WeightedSimilarityCalculator(
+                    object_saving.create_filesystem(weights_folder)))
+            self.weighted_log_similarity_calculator.load_model()
 
     def find_min_should_match_threshold(self, analyzer_config):
         return analyzer_config.minShouldMatch if analyzer_config.minShouldMatch > 0 else \
@@ -209,7 +212,7 @@ class AnalyzerService:
             return deleted_models
         except Exception as err:
             logger.error("Error while removing models.")
-            logger.error(err)
+            logger.exception(err)
             return 0
 
     def get_model_info(self, model_info):
@@ -224,5 +227,5 @@ class AnalyzerService:
             return {"model_folder": model_folder}
         except Exception as err:
             logger.error("Error while getting info for models.")
-            logger.error(err)
+            logger.exception(err)
             return ""

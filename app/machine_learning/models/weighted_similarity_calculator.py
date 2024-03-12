@@ -12,56 +12,43 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import os
-import numpy as np
-import pickle
 import math
 
+import numpy as np
+
+from app.commons.object_saving import ObjectSaver
+from app.machine_learning.models import MlModel
 from app.utils import text_processing
 
+MODEL_FILES: list[str] = ['weights.pickle']
 
-class LogSimilarityCalculator:
 
-    def __init__(self, block_to_split=10, min_log_number_in_block=1, folder=""):
+class WeightedSimilarityCalculator(MlModel):
+    _loaded: bool
+
+    def __init__(self, object_saver: ObjectSaver, block_to_split=10, min_log_number_in_block=1):
+        super().__init__(object_saver, 'global similarity model')
         self.block_to_split = block_to_split
         self.min_log_number_in_block = min_log_number_in_block
-        self.folder = folder
-        self.weights = None
-        self.softmax_weights = None
-        if folder.strip() != "":
-            self.load_model(folder)
+        self.weights = []
+        self.softmax_weights = np.array([])
+        self._loaded = False
 
-    def load_model(self, folder):
-        self.folder = folder
-        if not os.path.exists(os.path.join(folder, "weights.pickle")):
+    @property
+    def loaded(self) -> bool:
+        return self._loaded
+
+    def load_model(self) -> None:
+        if self.loaded:
             return
-        with open(os.path.join(folder, "weights.pickle"), "rb") as f:
-            self.block_to_split, self.min_log_number_in_block, self.weights, self.softmax_weights =\
-                pickle.load(f)
-        if not os.path.exists(os.path.join(folder, "config.pickle")):
-            return
-        try:
-            with open(os.path.join(folder, "config.pickle"), "wb") as f:
-                self.config = pickle.load(f)
-        except: # noqa
-            pass
+        weights = self._load_models(MODEL_FILES)[0]
+        self.block_to_split, self.min_log_number_in_block, self.weights, self.softmax_weights = weights
+        self._loaded = True
 
-    def add_config_info(self, config):
-        self.config = config
-
-    def save_model(self, folder):
-        if not os.path.exists(folder):
-            os.makedirs(folder)
-        if self.weights is not None:
-            with open(os.path.join(folder, "weights.pickle"), "wb") as f:
-                pickle.dump([self.block_to_split, self.min_log_number_in_block,
-                             self.weights, self.softmax_weights], f)
-            try:
-                if self.config:
-                    with open(os.path.join(folder, "config.pickle"), "wb") as f:
-                        pickle.dump(self.config, f)
-            except: # noqa
-                pass
+    def save_model(self):
+        self._save_models(zip(
+            MODEL_FILES,
+            [[self.block_to_split, self.min_log_number_in_block, self.weights, self.softmax_weights]]))
 
     def message_to_array(self, detected_message_res, stacktrace_res):
         all_lines = [" ".join(text_processing.split_words(detected_message_res))]
@@ -75,14 +62,14 @@ class LogSimilarityCalculator:
         for block in range(blocks_num):
             all_lines.append("\n".join(
                 split_log_lines[block * data_in_block: (block + 1) * data_in_block]))
-        if len([line for line in all_lines if line.strip() != ""]) == 0:
+        if len([line for line in all_lines if line.strip()]) == 0:
             return []
         return all_lines
 
     def weigh_data_rows(self, data_rows, use_softmax=False):
         padded_data_rows = np.concatenate([data_rows,
                                            np.zeros((max(0, self.block_to_split + 1 - len(data_rows)),
-                                                    data_rows.shape[1]))], axis=0)
+                                                     data_rows.shape[1]))], axis=0)
         result = None
         if use_softmax:
             result = np.dot(np.reshape(self.softmax_weights, [-1]), padded_data_rows)

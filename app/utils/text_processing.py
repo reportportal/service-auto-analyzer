@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
 import re
 import string
 import urllib.parse
@@ -21,6 +20,8 @@ from urllib.parse import urlparse
 
 import nltk
 from dateutil.parser import parse
+
+from app.commons import logging
 
 logger = logging.getLogger("analyzerApp.utils.textProcessing")
 

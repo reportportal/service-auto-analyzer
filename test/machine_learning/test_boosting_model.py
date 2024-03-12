@@ -18,11 +18,11 @@ import unittest
 import numpy as np
 import sure
 
-from app.boosting_decision_making import defect_type_model
-from app.boosting_decision_making import weighted_similarity_calculator
-from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
-from app.boosting_decision_making.boosting_featurizer import BoostingFeaturizer
-from app.boosting_decision_making.suggest_boosting_featurizer import SuggestBoostingFeaturizer
+from app.commons.object_saving import create_filesystem
+from app.machine_learning.models import defect_type_model, weighted_similarity_calculator
+from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
+from app.machine_learning.boosting_featurizer import BoostingFeaturizer
+from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import utils
 from test import get_fixture
 
@@ -79,7 +79,8 @@ class TestBoostingModel(unittest.TestCase):
         for folder in [self.boost_model_folder,
                        self.suggest_boost_model_folder]:
             print("Boost model folder ", folder)
-            decision_maker = BoostingDecisionMaker(folder)
+            decision_maker = BoostingDecisionMaker(create_filesystem(folder))
+            decision_maker.load_model()
             test_data_size = 5
             random_data = np.random.rand(test_data_size, len(decision_maker.get_feature_names()))
             result, result_probability = decision_maker.predict(random_data)
@@ -91,7 +92,8 @@ class TestBoostingModel(unittest.TestCase):
         print("Boost model folder : ", self.boost_model_folder)
         print("Weights model folder : ", self.weights_folder)
         print("Global defect type model folder : ", self.global_defect_type_model_folder)
-        decision_maker = BoostingDecisionMaker(folder=self.boost_model_folder)
+        decision_maker = BoostingDecisionMaker(create_filesystem(self.boost_model_folder))
+        decision_maker.load_model()
         boost_model_results = get_fixture(self.boost_model_results, to_json=True)
         tests = []
         for log_lines, filter_fields, _decision_maker in [
@@ -146,15 +148,17 @@ class TestBoostingModel(unittest.TestCase):
             weight_log_sim = None
             if self.weights_folder.strip():
                 weight_log_sim = weighted_similarity_calculator. \
-                    WeightedSimilarityCalculator(folder=self.weights_folder)
+                    WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
+                weight_log_sim.load_model()
             _boosting_featurizer = BoostingFeaturizer(test["elastic_results"],
                                                       test["config"],
                                                       feature_ids,
                                                       weighted_log_similarity_calculator=weight_log_sim,
                                                       features_dict_with_saved_objects=feature_dict_objects)
             if self.global_defect_type_model_folder.strip():
-                _boosting_featurizer.set_defect_type_model(
-                    defect_type_model.DefectTypeModel(folder=self.global_defect_type_model_folder))
+                model = defect_type_model.DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
+                model.load_model()
+                _boosting_featurizer.set_defect_type_model(model)
             with sure.ensure('Error in the test case index: {0}', idx):
                 gathered_data, issue_type_names = _boosting_featurizer.gather_features_info()
                 predict_label, predict_probability = test["decision_maker"].predict(
@@ -169,7 +173,8 @@ class TestBoostingModel(unittest.TestCase):
         print("Boost model folder suggests: ", self.suggest_boost_model_folder)
         print("Weights model folder suggests: ", self.weights_folder)
         print("Global defect type model folder : ", self.global_defect_type_model_folder)
-        decision_maker = BoostingDecisionMaker(folder=self.suggest_boost_model_folder)
+        decision_maker = BoostingDecisionMaker(create_filesystem(self.suggest_boost_model_folder))
+        decision_maker.load_model()
         boost_model_results = get_fixture(self.suggest_boost_model_results, to_json=True)
         tests = []
         all_configs = [(-1,
@@ -236,7 +241,8 @@ class TestBoostingModel(unittest.TestCase):
             weight_log_sim = None
             if self.weights_folder.strip():
                 weight_log_sim = weighted_similarity_calculator. \
-                    WeightedSimilarityCalculator(folder=self.weights_folder)
+                    WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
+                weight_log_sim.load_model()
             _boosting_featurizer = SuggestBoostingFeaturizer(
                 test["elastic_results"],
                 test["config"],
@@ -244,8 +250,9 @@ class TestBoostingModel(unittest.TestCase):
                 weighted_log_similarity_calculator=weight_log_sim,
                 features_dict_with_saved_objects=feature_dict_objects)
             if self.global_defect_type_model_folder.strip():
-                _boosting_featurizer.set_defect_type_model(
-                    defect_type_model.DefectTypeModel(folder=self.global_defect_type_model_folder))
+                model = defect_type_model.DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
+                model.load_model()
+                _boosting_featurizer.set_defect_type_model(model)
             with sure.ensure('Error in the test case index: {0}', idx):
                 gathered_data, test_item_ids = _boosting_featurizer.gather_features_info()
                 predict_label, predict_probability = test["decision_maker"].predict(gathered_data)

@@ -12,9 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.utils import utils, text_processing
 from datetime import datetime
+
 from app.commons.log_merger import LogMerger
+from app.utils import utils, text_processing
 
 
 class LogPreparation:
@@ -36,38 +37,38 @@ class LogPreparation:
 
     def _create_log_template(self) -> dict:
         return {
-            "_id":    "",
+            "_id": "",
             "_index": "",
             "_source": {
-                "launch_id":        "",
-                "launch_name":      "",
-                "launch_number":    0,
+                "launch_id": "",
+                "launch_name": "",
+                "launch_number": 0,
                 "launch_start_time": "",
-                "test_item":        "",
-                "test_item_name":   "",
-                "unique_id":        "",
-                "cluster_id":       "",
-                "cluster_message":  "",
-                "test_case_hash":   0,
+                "test_item": "",
+                "test_item_name": "",
+                "unique_id": "",
+                "cluster_id": "",
+                "cluster_message": "",
+                "test_case_hash": 0,
                 "is_auto_analyzed": False,
-                "issue_type":       "",
-                "log_time":         "",
-                "log_level":        0,
+                "issue_type": "",
+                "log_time": "",
+                "log_level": 0,
                 "original_message_lines": 0,
                 "original_message_words_number": 0,
-                "message":          "",
-                "is_merged":        False,
-                "start_time":       "",
-                "merged_small_logs":  "",
+                "message": "",
+                "is_merged": False,
+                "start_time": "",
+                "merged_small_logs": "",
                 "detected_message": "",
                 "detected_message_with_numbers": "",
-                "stacktrace":                    "",
-                "only_numbers":                  "",
-                "found_exceptions":              "",
-                "whole_message":                 "",
-                "potential_status_codes":        "",
-                "found_tests_and_methods":       "",
-                "cluster_with_numbers":          False}}
+                "stacktrace": "",
+                "only_numbers": "",
+                "found_exceptions": "",
+                "whole_message": "",
+                "potential_status_codes": "",
+                "found_tests_and_methods": "",
+                "cluster_with_numbers": False}}
 
     def transform_issue_type_into_lowercase(self, issue_type):
         return issue_type[:2].lower() + issue_type[2:]
@@ -154,22 +155,22 @@ class LogPreparation:
         log_template["_source"]["message_params"] = message_params
         log_template["_source"]["found_exceptions"] = found_exceptions
         log_template["_source"]["found_exceptions_extended"] = found_exceptions_extended
-        log_template["_source"]["detected_message_extended"] =\
+        log_template["_source"]["detected_message_extended"] = \
             text_processing.enrich_text_with_method_and_classes(detected_message)
-        log_template["_source"]["detected_message_without_params_extended"] =\
+        log_template["_source"]["detected_message_without_params_extended"] = \
             text_processing.enrich_text_with_method_and_classes(detected_message_without_params)
-        log_template["_source"]["stacktrace_extended"] =\
+        log_template["_source"]["stacktrace_extended"] = \
             text_processing.enrich_text_with_method_and_classes(stacktrace)
-        log_template["_source"]["message_extended"] =\
+        log_template["_source"]["message_extended"] = \
             text_processing.enrich_text_with_method_and_classes(message)
-        log_template["_source"]["message_without_params_extended"] =\
+        log_template["_source"]["message_without_params_extended"] = \
             text_processing.enrich_text_with_method_and_classes(message_without_params)
         log_template["_source"]["whole_message"] = detected_message_wo_urls_and_paths + " \n " + stacktrace
-        log_template["_source"]["detected_message_without_params_and_brackets"] =\
+        log_template["_source"]["detected_message_without_params_and_brackets"] = \
             detected_message_without_params_and_brackets
-        log_template["_source"]["message_without_params_and_brackets"] =\
+        log_template["_source"]["message_without_params_and_brackets"] = \
             message_without_params_and_brackets
-        log_template["_source"]["potential_status_codes"] =\
+        log_template["_source"]["potential_status_codes"] = \
             potential_status_codes
         log_template["_source"]["found_tests_and_methods"] = found_test_methods
 
@@ -276,7 +277,8 @@ class LogPreparation:
                     continue
                 prepared_logs.append(
                     self.prepare_log_clustering_light(launch, test_item, log, project))
-            merged_logs, log_ids_for_merged_logs = self.log_merger.decompose_logs_merged_and_without_duplicates( # noqa
+            merged_logs, log_ids_for_merged_logs = self.log_merger.decompose_logs_merged_and_without_duplicates(
+                # noqa
                 prepared_logs)
             for _id in log_ids_for_merged_logs:
                 full_log_ids_for_merged_logs[_id] = log_ids_for_merged_logs[_id]

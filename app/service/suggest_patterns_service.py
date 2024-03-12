@@ -12,14 +12,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
+from time import time
 
-from app.utils import utils, text_processing
 import elasticsearch
 import elasticsearch.helpers
-from time import time
+
+from app.commons import logging
 from app.commons.esclient import EsClient
 from app.commons.launch_objects import SuggestPattern, SuggestPatternLabel
+from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.suggestPatternsService")
 

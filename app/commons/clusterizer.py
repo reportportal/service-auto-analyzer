@@ -12,14 +12,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
 import hashlib
 import heapq
+from time import time
+
 import numpy as np
 import sklearn
 from sklearn.feature_extraction.text import CountVectorizer
-from time import time
 
+from app.commons import logging
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.clusterizer")

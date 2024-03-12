@@ -11,3 +11,12 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
+from app.commons.object_saving.object_saver import ObjectSaver
+from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
+
+
+class CustomBoostingDecisionMaker(BoostingDecisionMaker):
+
+    def __init__(self, object_saver: ObjectSaver):
+        super().__init__(object_saver, 'custom boosting model')

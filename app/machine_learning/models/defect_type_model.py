@@ -12,49 +12,43 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import f1_score, accuracy_score
-from sklearn.metrics import classification_report, confusion_matrix
-
-from app.utils import text_processing
-import pandas as pd
-import os
-import pickle
 from collections import Counter
 
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import f1_score, accuracy_score
 
-class DefectTypeModel:
+from app.commons.object_saving.object_saver import ObjectSaver
+from app.machine_learning.models import MlModel
+from app.utils import text_processing
 
-    def __init__(self, folder=""):
-        self.folder = folder
-        self.count_vectorizer_models = {}
-        self.models = {}
-        self.is_global = True
-        if self.folder:
-            self.load_model(folder)
+MODEL_FILES: list[str] = ['count_vectorizer_models.pickle', 'models.pickle']
 
-    def get_model_info(self):
-        folder_name = os.path.basename(self.folder.strip("/").strip("\\")).strip()
-        if folder_name:
-            tags = [folder_name]
-            if not self.is_global:
-                return tags + ["custom defect type model"]
-            return tags + ["global defect type model"]
-        return []
 
-    def load_model(self, folder):
-        with open(os.path.join(folder, "count_vectorizer_models.pickle"), "rb") as f:
-            self.count_vectorizer_models = pickle.load(f)
-        with open(os.path.join(folder, "models.pickle"), "rb") as f:
-            self.models = pickle.load(f)
+class DefectTypeModel(MlModel):
+    _loaded: bool
+    count_vectorizer_models: dict
+    models: dict
 
-    def save_model(self, folder):
-        os.makedirs(folder, exist_ok=True)
-        with open(os.path.join(folder, "count_vectorizer_models.pickle"), "wb") as f:
-            pickle.dump(self.count_vectorizer_models, f)
-        with open(os.path.join(folder, "models.pickle"), "wb") as f:
-            pickle.dump(self.models, f)
+    def __init__(self, object_saver: ObjectSaver, tags: str = 'global defect type model') -> None:
+        super().__init__(object_saver, tags)
+        self._loaded = False
+
+    @property
+    def loaded(self) -> bool:
+        return self._loaded
+
+    def load_model(self) -> None:
+        if self.loaded:
+            return
+        model = self._load_models(MODEL_FILES)
+        self.count_vectorizer_models, self.models = model
+        self._loaded = True
+
+    def save_model(self):
+        self._save_models(zip(MODEL_FILES, self.count_vectorizer_models, self.models))
 
     def train_model(self, name, train_data_x, labels):
         self.count_vectorizer_models[name] = TfidfVectorizer(
@@ -69,6 +63,7 @@ class DefectTypeModel:
             columns=self.count_vectorizer_models[name].get_feature_names_out())
         model.fit(x_train_values, labels)
         self.models[name] = model
+        self._loaded = True
 
     def train_models(self, train_data):
         for name, train_data_x, labels in train_data:
@@ -83,10 +78,10 @@ class DefectTypeModel:
         print(confusion_matrix(y_pred=res, y_true=labels))
         print(classification_report(y_pred=res, y_true=labels))
         f1 = f1_score(y_pred=res, y_true=labels)
-        if f1 != f1:
+        if f1 is None:
             f1 = 0.0
         accuracy = accuracy_score(y_pred=res, y_true=labels)
-        if accuracy != accuracy:
+        if accuracy is None:
             accuracy = 0.0
         return f1, accuracy
 

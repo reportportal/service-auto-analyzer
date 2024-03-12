@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 import json
-import logging
 from datetime import datetime
 from time import time
 
@@ -21,6 +20,7 @@ import elasticsearch
 import elasticsearch.helpers
 
 from app.amqp.amqp import AmqpClient
+from app.commons import logging
 from app.commons.esclient import EsClient
 from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
 from app.utils import utils, text_processing
@@ -157,9 +157,9 @@ class SuggestInfoService:
                                                   index=index_name,
                                                   scroll="5m"):
                 sugggest_log_ids.add(res["_id"])
-        except Exception as err:
+        except Exception as exc:
             logger.error("Couldn't find logs with specified ids")
-            logger.error(err)
+            logger.exception(exc)
         bodies = []
         for _id in sugggest_log_ids:
             bodies.append({

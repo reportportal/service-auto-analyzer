@@ -12,14 +12,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
 from collections import deque
 from datetime import datetime
 
 import numpy as np
 
-from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
-from app.commons import similarity_calculator
+from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
+from app.commons import logging, similarity_calculator, object_saving
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
@@ -189,6 +188,7 @@ class BoostingFeaturizer:
         return all_results
 
     def _calculate_decay_function_score(self, field_name):
+        decay_speed = np.log(self.config["time_weight_decay"])
         scores_by_issue_type = self.find_most_relevant_by_type()
         dates_by_issue_types = {}
         for issue_type in scores_by_issue_type:
@@ -198,8 +198,7 @@ class BoostingFeaturizer:
             compared_field_date = datetime.strptime(compared_field_date, '%Y-%m-%d %H:%M:%S')
             if compared_field_date < field_date:
                 field_date, compared_field_date = compared_field_date, field_date
-            dates_by_issue_types[issue_type] = np.exp(
-                np.log(self.config["time_weight_decay"]) * (compared_field_date - field_date).days / 7)
+            dates_by_issue_types[issue_type] = np.exp(decay_speed * (compared_field_date - field_date).days / 7)
         return dates_by_issue_types
 
     def _encode_into_vector(self, field_name, feature_name, only_query):
@@ -225,7 +224,6 @@ class BoostingFeaturizer:
         if gathered_data:
             encoded_data = self.features_dict_with_saved_objects[feature_name].transform(
                 gathered_data).toarray()
-            encoded_data[encoded_data != 0.0] = 1.0
             for idx in range(len(issue_types)):
                 if only_query:
                     encodings_by_issue_type[issue_types[idx]] = list(encoded_data[idx])
@@ -254,10 +252,11 @@ class BoostingFeaturizer:
             return []
         if model_folder not in self.models:
             try:
-                self.models[model_folder] = BoostingDecisionMaker(folder=model_folder)
-                return self.models[model_folder].get_feature_ids()
-            except Exception as err:
-                logger.debug(err)
+                model = BoostingDecisionMaker(object_saving.create_filesystem(model_folder))
+                model.load_model()
+                self.models[model_folder] = model
+            except Exception as exc:
+                logger.exception(exc)
                 return []
         return self.models[model_folder].get_feature_ids()
 

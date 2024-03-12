@@ -12,19 +12,21 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.boosting_decision_making import defect_type_model, custom_defect_type_model
-from sklearn.model_selection import train_test_split
-from app.commons.esclient import EsClient
-from app.utils import utils, text_processing
-from time import time
-import scipy.stats as stats
-import numpy as np
-import logging
-from datetime import datetime
 import os
 import re
+from datetime import datetime
 from queue import Queue
+from time import time
+
 import elasticsearch.helpers
+import numpy as np
+import scipy.stats as stats
+from sklearn.model_selection import train_test_split
+
+from app.commons import logging, object_saving
+from app.commons.esclient import EsClient
+from app.machine_learning.models import defect_type_model, custom_defect_type_model
+from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.trainingDefectTypeModel")
 
@@ -38,7 +40,8 @@ class DefectTypeModelTraining:
         self.due_proportion = 0.2
         self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
         self.baseline_model = defect_type_model.DefectTypeModel(
-            folder=search_cfg["GlobalDefectTypeModelFolder"])
+            object_saving.create_filesystem(search_cfg["GlobalDefectTypeModelFolder"]))
+        self.baseline_model.load_model()
         self.model_chooser = model_chooser
 
     def return_similar_objects_into_sample(self, x_train_ind, y_train, data, additional_logs, label):
@@ -182,9 +185,9 @@ class DefectTypeModelTraining:
                 logger.debug("Finished quering for %d s", time_spent)
                 train_log_info[label]["time_spent"] = time_spent
                 train_log_info[label]["data_size"] = len(found_data)
-            except Exception as err:
-                logger.error(err)
-                errors.append(utils.extract_exception(err))
+            except Exception as exc:
+                logger.exception(exc)
+                errors.append(utils.extract_exception(exc))
                 errors_count += 1
             labels_to_find_queue.task_done()
         logger.debug("Data gathered: %d" % len(data))
@@ -230,9 +233,8 @@ class DefectTypeModelTraining:
                          353, 4561, 5417, 6427, 2029]
         bad_data = False
 
-        logs_to_train_idx, labels_filtered, data_to_train,\
-            additional_logs, proportion_binary_labels = self.creating_binary_target_data(
-                label, data, found_sub_categories)
+        logs_to_train_idx, labels_filtered, data_to_train, additional_logs, proportion_binary_labels = \
+            self.creating_binary_target_data(label, data, found_sub_categories)
 
         if proportion_binary_labels < self.due_proportion:
             logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
@@ -261,8 +263,9 @@ class DefectTypeModelTraining:
         model_name = "defect_type_model_%s" % datetime.now().strftime("%d.%m.%y")
         baseline_model = os.path.basename(
             self.search_cfg["GlobalDefectTypeModelFolder"].strip("/").strip("\\"))
+        new_model_folder = 'defect_type_model/%s/' % model_name
         self.new_model = custom_defect_type_model.CustomDefectTypeModel(
-            self.app_config, project_info["project_id"])
+            object_saving.create(self.app_config, project_info["project_id"], new_model_folder))
 
         data, found_sub_categories, train_log_info = self.load_data_for_training(
             project_info, baseline_model, model_name)
@@ -307,9 +310,8 @@ class DefectTypeModelTraining:
                 if use_custom_model:
                     logger.debug("Custom model '%s' should be saved" % label)
 
-                    logs_to_train_idx, labels_filtered, data_to_train,\
-                        additional_logs, proportion_binary_labels = self.creating_binary_target_data(
-                            label, data, found_sub_categories)
+                    logs_to_train_idx, labels_filtered, data_to_train, additional_logs, proportion_binary_labels = \
+                        self.creating_binary_target_data(label, data, found_sub_categories)
                     if proportion_binary_labels < self.due_proportion:
                         logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
                         bad_data = True
@@ -334,11 +336,11 @@ class DefectTypeModelTraining:
                         f1_baseline_models.append(train_log_info[label]["baseline_mean_metric"])
                         f1_chosen_models.append(train_log_info[label]["baseline_mean_metric"])
                 train_log_info[label]["time_spent"] += (time() - time_training)
-            except Exception as err:
-                logger.error(err)
+            except Exception as exc:
+                logger.exception(exc)
                 train_log_info[label]["errors_count"] += 1
-                train_log_info[label]["errors"].append(utils.extract_exception(err))
-                errors.append(utils.extract_exception(err))
+                train_log_info[label]["errors"].append(utils.extract_exception(exc))
+                errors.append(utils.extract_exception(exc))
                 errors_count += 1
                 self.copy_model_part_from_baseline(label)
 
@@ -348,8 +350,7 @@ class DefectTypeModelTraining:
             train_log_info["all"]["model_saved"] = 1
             train_log_info["all"]["p_value"] = p_value_max
             self.model_chooser.delete_old_model("defect_type_model", project_info["project_id"])
-            self.new_model.save_model(
-                "defect_type_model/%s/" % model_name)
+            self.new_model.save_model()
 
         time_spent = time() - start_time
         logger.info("Finished for %d s", time_spent)

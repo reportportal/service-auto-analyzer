@@ -11,3 +11,12 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
+from app.commons.object_saving.object_saver import ObjectSaver
+from app.machine_learning.models.defect_type_model import DefectTypeModel
+
+
+class CustomDefectTypeModel(DefectTypeModel):
+
+    def __init__(self, object_saver: ObjectSaver):
+        super().__init__(object_saver, 'custom defect type model')

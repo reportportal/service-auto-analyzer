@@ -12,12 +12,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
-from app.utils import utils
 from time import time
+
+from app.commons import logging
 from app.commons.esclient import EsClient
 from app.commons.launch_objects import CleanIndexStrIds
 from app.service import suggest_info_service
+from app.utils import utils
 
 logger = logging.getLogger("analyzerApp.cleanIndexService")
 

@@ -73,7 +73,7 @@ class TestDeleteIndexService(TestService):
                     "minioBucketPrefix": "",
                     "filesystemDefaultPath": "",
                     "esChunkNumber": 1000,
-                    "binaryStoreType": "minio",
+                    "binaryStoreType": "filesystem",
                     "minioHost": "",
                     "minioAccessKey": "",
                     "minioSecretKey": "",

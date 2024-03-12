@@ -20,8 +20,8 @@ from unittest.mock import MagicMock
 import httpretty
 import sure
 
-from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
-from app.commons import launch_objects
+from app.commons import launch_objects, object_saving
+from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.service import AutoAnalyzerService
 from app.utils import utils
 from test import get_fixture
@@ -219,7 +219,7 @@ class TestAutoAnalyzerService(TestService):
                     "minioBucketPrefix": "",
                     "filesystemDefaultPath": "",
                     "esChunkNumber": 1000,
-                    "binaryStoreType": "minio",
+                    "binaryStoreType": "filesystem",
                     "minioHost": "",
                     "minioAccessKey": "",
                     "minioSecretKey": "",
@@ -340,7 +340,7 @@ class TestAutoAnalyzerService(TestService):
                 analyzer_service = AutoAnalyzerService(self.model_chooser,
                                                        app_config=app_config,
                                                        search_cfg=config)
-                _boosting_decision_maker = BoostingDecisionMaker()
+                _boosting_decision_maker = BoostingDecisionMaker(object_saving.create_filesystem(""))
                 _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
                 _boosting_decision_maker.get_feature_names = MagicMock(return_value=["0"])
                 _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])

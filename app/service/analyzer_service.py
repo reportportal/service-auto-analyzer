@@ -93,9 +93,8 @@ class AnalyzerService:
             must.append({'term': {'launch_id': launch_id}})
         elif analyzer_mode == 'PREVIOUS_LAUNCH':
             # Just previous launch
-            if previous_launch_id:
-                must = self.create_path(query, ('query', 'bool', 'must'), [])
-                must.append({'term': {'launch_id': previous_launch_id}})
+            must = self.create_path(query, ('query', 'bool', 'must'), [])
+            must.append({'term': {'launch_id': previous_launch_id}})
         elif analyzer_mode == 'ALL':
             # All previous launches
             must_not = self.create_path(query, ('query', 'bool', 'must_not'), [])

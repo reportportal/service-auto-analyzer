@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [5.11.0]
 ### Added
 - `MINIO_USE_TLS` environment variable to address [Issue #136](https://github.com/reportportal/service-auto-analyzer/issues/136), by @HardNorth
 - `CURRENT_AND_THE_SAME_NAME` and `PREVIOUS_LAUNCH` analyze options handling, by @HardNorth

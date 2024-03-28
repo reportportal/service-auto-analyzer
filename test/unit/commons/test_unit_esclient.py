@@ -30,8 +30,8 @@ def create_test_es_client():
 
 def create_test_launch_one_item():
     logs = [Log(logId=37135, logLevel=40000, message="Environment variable 'SAUCELABS_USER' does not exist.")]
-    test_items = [TestItem(testItemId=2190, uniqueId='auto:4cf9a1d86e663dd6e8a4a99dbd78e7ce', isAutoAnalyzed=False,
-                           testCaseHash=-2120975783, testItemName='Example page test', logs=logs)]
+    test_items = [TestItem(testItemId=2190, isAutoAnalyzed=False, testCaseHash=-2120975783,
+                           testItemName='Example page test', logs=logs)]
     return Launch(launchId=10, project=TEST_PROJECT_ID, launchName='Test Launch', launchNumber=7, testItems=test_items)
 
 
@@ -39,8 +39,8 @@ def create_test_launch_two_items():
     launch = create_test_launch_one_item()
     test_items = launch.testItems
     logs = [Log(logId=37136, logLevel=40000, message="Environment variable 'SAUCELABS_USER' does not exist.")]
-    test_items.append(TestItem(testItemId=2191, uniqueId='auto:4cf9a1d86e663dd6e8a4a99dbd78e7cf', isAutoAnalyzed=False,
-                               testCaseHash=-2120975784, testItemName='Example page test', logs=logs))
+    test_items.append(TestItem(testItemId=2191, isAutoAnalyzed=False, testCaseHash=-2120975784,
+                               testItemName='Example page test', logs=logs))
     return launch
 
 
@@ -48,8 +48,8 @@ def create_test_launch_two_items_one_indexed_log():
     launch = create_test_launch_one_item()
     test_items = launch.testItems
     logs = [Log(logId=37136, logLevel=30000, message="Environment variable 'SAUCELABS_USER' does not exist.")]
-    test_items.append(TestItem(testItemId=2191, uniqueId='auto:4cf9a1d86e663dd6e8a4a99dbd78e7cf', isAutoAnalyzed=False,
-                               testCaseHash=-2120975784, testItemName='Example page test', logs=logs))
+    test_items.append(TestItem(testItemId=2191, isAutoAnalyzed=False, testCaseHash=-2120975784,
+                               testItemName='Example page test', logs=logs))
     return launch
 
 

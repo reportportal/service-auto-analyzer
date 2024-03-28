@@ -50,8 +50,8 @@ class Log(BaseModel):
 class TestItem(BaseModel):
     """Test item object"""
     testItemId: int
-    uniqueId: str
     isAutoAnalyzed: bool
+    uniqueId: str = ""
     issueType: str = ""
     originalIssueType: str = ""
     startTime: List[int] = list(datetime.now().timetuple())[:7]

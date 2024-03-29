@@ -23,6 +23,7 @@ from sys import exit
 
 from flask import Flask, Response, jsonify
 from flask_cors import CORS
+from flask_wtf.csrf import CSRFProtect
 
 from app.amqp import amqp_handler
 from app.amqp.amqp import AmqpClient
@@ -115,6 +116,7 @@ def create_application():
     """Creates a Flask application"""
     _application = Flask(__name__)
     CORS(_application)
+    CSRFProtect(_application)
     return _application
 
 

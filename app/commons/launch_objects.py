@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -53,10 +53,15 @@ class TestItem(BaseModel):
     isAutoAnalyzed: bool
     uniqueId: str = ""
     issueType: str = ""
+    issueDescription: str = ""
     originalIssueType: str = ""
     startTime: List[int] = list(datetime.now().timetuple())[:7]
+    endTime: Optional[List[int]] = None
+    lastModified: Optional[List[int]] = None
     testCaseHash: int = 0
     testItemName: str = ""
+    description: str = ""
+    linksToBts: List[str] = []
     logs: List[Log] = []
 
 

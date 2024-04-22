@@ -32,7 +32,7 @@ class AnalyzerConf(BaseModel):
 
 class SearchConfig(BaseModel):
     """Search config object"""
-    searchLogsMinShouldMatch: str = '95%'
+    SearchLogsMinShouldMatch: str = '95%'
     minShouldMatch: str = '80%'
     boostAA: float = 2.0
     boostTestCaseHash: float = 2.0

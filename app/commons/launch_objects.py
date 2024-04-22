@@ -20,7 +20,7 @@ from pydantic import BaseModel
 
 class AnalyzerConf(BaseModel):
     """Analyzer config object"""
-    analyzerMode: str = "ALL"
+    analyzerMode: str = 'ALL'
     minShouldMatch: int = 0
     numberOfLogLines: int = -1
     isAutoAnalyzerEnabled: bool = True
@@ -28,6 +28,15 @@ class AnalyzerConf(BaseModel):
     allMessagesShouldMatch: bool = False
     searchLogsMinShouldMatch: int = 95
     uniqueErrorsMinShouldMatch: int = 95
+
+
+class SearchConfig(BaseModel):
+    """Search config object"""
+    searchLogsMinShouldMatch: str = '95%'
+    minShouldMatch: str = '80%'
+    boostAA: float = 2.0
+    boostTestCaseHash: float = 2.0
+    boostLaunch: float = 2.0
 
 
 class SearchLogInfo(BaseModel):
@@ -44,23 +53,23 @@ class Log(BaseModel):
     logTime: List[int] = list(datetime.now().timetuple())[:7]
     message: str
     clusterId: int = 0
-    clusterMessage: str = ""
+    clusterMessage: str = ''
 
 
 class TestItem(BaseModel):
     """Test item object"""
     testItemId: int
     isAutoAnalyzed: bool
-    uniqueId: str = ""
-    issueType: str = ""
-    issueDescription: str = ""
-    originalIssueType: str = ""
+    uniqueId: str = ''
+    issueType: str = ''
+    issueDescription: str = ''
+    originalIssueType: str = ''
     startTime: List[int] = list(datetime.now().timetuple())[:7]
     endTime: Optional[List[int]] = None
     lastModified: Optional[List[int]] = None
     testCaseHash: int = 0
-    testItemName: str = ""
-    description: str = ""
+    testItemName: str = ''
+    description: str = ''
     linksToBts: List[str] = []
     logs: List[Log] = []
 
@@ -68,14 +77,14 @@ class TestItem(BaseModel):
 class TestItemInfo(BaseModel):
     """Test item info object"""
     testItemId: int = 0
-    uniqueId: str = ""
+    uniqueId: str = ''
     testCaseHash: int = 0
     clusterId: int = 0
     launchId: int
-    launchName: str = ""
+    launchName: str = ''
     launchNumber: int = 0
     previousLaunchId: int = 0
-    testItemName: str = ""
+    testItemName: str = ''
     project: int
     analyzerConfig: AnalyzerConf = AnalyzerConf()
     logs: List[Log] = []
@@ -85,7 +94,7 @@ class Launch(BaseModel):
     """Launch object"""
     launchId: int
     project: int
-    launchName: str = ""
+    launchName: str = ''
     launchNumber: int = 0
     previousLaunchId: int = 0
     launchStartTime: List[int] = list(datetime.now().timetuple())[:7]
@@ -177,7 +186,7 @@ class SearchLogs(BaseModel):
 class Response(BaseModel):
     """Response object"""
     acknowledged: bool = False
-    error: str = ""
+    error: str = ''
     status: int = 0
 
 
@@ -201,7 +210,7 @@ class SuggestPatternLabel(BaseModel):
     pattern: str
     totalCount: int
     percentTestItemsWithLabel: float = 0.0
-    label: str = ""
+    label: str = ''
 
 
 class SuggestPattern(BaseModel):

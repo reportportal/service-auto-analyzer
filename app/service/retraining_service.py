@@ -18,19 +18,21 @@ from time import time
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, trigger_manager
 from app.commons.esclient import EsClient
+from app.commons.launch_objects import SearchConfig
 from app.utils import utils
 
 logger = logging.getLogger("analyzerApp.retrainingService")
 
 
 class RetrainingService:
+    search_cfg: SearchConfig
 
-    def __init__(self, model_chooser, app_config=None, search_cfg=None):
+    def __init__(self, model_chooser, search_cfg: SearchConfig, app_config=None):
         self.app_config = app_config or {}
-        self.search_cfg = search_cfg or {}
+        self.search_cfg = search_cfg
         self.trigger_manager = trigger_manager.TriggerManager(
-            model_chooser, app_config=self.app_config, search_cfg=self.search_cfg)
-        self.es_client = EsClient(app_config=self.app_config, search_cfg=self.search_cfg)
+            model_chooser, self.search_cfg, app_config=self.app_config)
+        self.es_client = EsClient(app_config=self.app_config)
 
     @utils.ignore_warnings
     def train_models(self, train_info):

@@ -31,11 +31,13 @@ import unittest
 import httpretty
 
 from app.commons import model_chooser
+from app.commons.launch_objects import SearchConfig
 from app.utils import utils
 
 
 class TestService(unittest.TestCase):
     ERROR_LOGGING_LEVEL = 40000
+    model_settings: dict
 
     @utils.ignore_warnings
     def setUp(self):
@@ -188,8 +190,12 @@ class TestService(unittest.TestCase):
             "esProjectIndexPrefix": "",
             "esChunkNumberUpdateClusters": 500
         }
-        self.model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
-        self.model_chooser = model_chooser.ModelChooser(self.app_config, self.get_default_search_config())
+        model_settings = utils.read_json_file('res', 'model_settings.json', to_json=True)
+        if model_settings and isinstance(model_settings, dict):
+            self.model_settings = model_settings
+        else:
+            raise RuntimeError('Failed to read model settings')
+        self.model_chooser = model_chooser.ModelChooser(self.get_default_search_config(), self.app_config)
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings
@@ -197,41 +203,32 @@ class TestService(unittest.TestCase):
         logging.disable(logging.DEBUG)
 
     @utils.ignore_warnings
-    def get_default_search_config(self):
+    def get_default_search_config(self) -> SearchConfig:
         """Get default search config"""
-        return {
-            "MinShouldMatch": "80%",
-            "MinTermFreq": 1,
-            "MinDocFreq": 1,
-            "BoostAA": -2,
-            "BoostLaunch": 2,
-            "BoostTestCaseHash": 2,
-            "MaxQueryTerms": 50,
-            "SearchLogsMinShouldMatch": "95%",
-            "SearchLogsMinSimilarity": 0.95,
-            "MinWordLength": 0,
-            "TimeWeightDecay": 0.95,
-            "PatternLabelMinPercentToSuggest": 0.5,
-            "PatternLabelMinCountToSuggest": 5,
-            "PatternMinCountToSuggest": 10,
-            "BoostModelFolder":
-                self.model_settings["BOOST_MODEL_FOLDER"],
-            "SimilarityWeightsFolder":
-                self.model_settings["SIMILARITY_WEIGHTS_FOLDER"],
-            "SuggestBoostModelFolder":
-                self.model_settings["SUGGEST_BOOST_MODEL_FOLDER"],
-            "GlobalDefectTypeModelFolder":
-                self.model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"],
-            "ProbabilityForCustomModelSuggestions": 0.9,
-            "ProbabilityForCustomModelAutoAnalysis": 0.1,
-            "RetrainSuggestBoostModelConfig":
-                self.model_settings["RETRAIN_SUGGEST_BOOST_MODEL_CONFIG"],
-            "RetrainAutoBoostModelConfig":
-                self.model_settings["RETRAIN_AUTO_BOOST_MODEL_CONFIG"],
-            "MaxSuggestionsNumber": 3,
-            "AutoAnalysisTimeout": 300,
-            "MaxAutoAnalysisItemsToProcess": 4000
-        }
+        return SearchConfig(
+            MinShouldMatch='80%',
+            BoostAA=-2,
+            BoostLaunch=2,
+            BoostTestCaseHash=2,
+            MaxQueryTerms=50,
+            SearchLogsMinSimilarity=0.95,
+            MinWordLength=0,
+            TimeWeightDecay=0.95,
+            PatternLabelMinPercentToSuggest=0.5,
+            PatternLabelMinCountToSuggest=5,
+            PatternMinCountToSuggest=10,
+            BoostModelFolder=self.model_settings['BOOST_MODEL_FOLDER'],
+            SimilarityWeightsFolder=self.model_settings['SIMILARITY_WEIGHTS_FOLDER'],
+            SuggestBoostModelFolder=self.model_settings['SUGGEST_BOOST_MODEL_FOLDER'],
+            GlobalDefectTypeModelFolder=self.model_settings['GLOBAL_DEFECT_TYPE_MODEL_FOLDER'],
+            ProbabilityForCustomModelSuggestions=0.9,
+            ProbabilityForCustomModelAutoAnalysis=0.1,
+            RetrainSuggestBoostModelConfig=self.model_settings['RETRAIN_SUGGEST_BOOST_MODEL_CONFIG'],
+            RetrainAutoBoostModelConfig=self.model_settings['RETRAIN_AUTO_BOOST_MODEL_CONFIG'],
+            MaxSuggestionsNumber=3,
+            AutoAnalysisTimeout=300,
+            MaxAutoAnalysisItemsToProcess=4000
+        )
 
     @utils.ignore_warnings
     def _start_server(self, test_calls):

@@ -28,8 +28,8 @@ class DeleteIndexService:
         self.search_cfg = search_cfg or {}
         self.namespace_finder = namespace_finder.NamespaceFinder(self.app_config)
         self.trigger_manager = trigger_manager.TriggerManager(
-            model_chooser, app_config=self.app_config, search_cfg=self.search_cfg)
-        self.es_client = EsClient(app_config=self.app_config, search_cfg=self.search_cfg)
+            model_chooser, self.search_cfg, app_config=self.app_config)
+        self.es_client = EsClient(app_config=self.app_config)
         self.model_chooser = model_chooser
 
     @utils.ignore_warnings

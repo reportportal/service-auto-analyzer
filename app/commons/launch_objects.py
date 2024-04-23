@@ -37,6 +37,24 @@ class SearchConfig(BaseModel):
     BoostAA: float = 2.0
     BoostLaunch: float = 2.0
     BoostTestCaseHash: float = 2.0
+    MaxQueryTerms: int = 50
+    MinWordLength: int = 2
+    TimeWeightDecay: float = 0.95
+    PatternLabelMinPercentToSuggest: float = 0.9
+    PatternLabelMinCountToSuggest: int = 5
+    PatternMinCountToSuggest: int = 10
+    MaxLogsForDefectTypeModel: int = 10
+    ProbabilityForCustomModelSuggestions: float = 0.7
+    ProbabilityForCustomModelAutoAnalysis: float = 0.5
+    BoostModelFolder: str = ""
+    SuggestBoostModelFolder: str = ""
+    SimilarityWeightsFolder: str = ""
+    GlobalDefectTypeModelFolder: str = ""
+    RetrainSuggestBoostModelConfig: str = ""
+    RetrainAutoBoostModelConfig: str = ""
+    MaxSuggestionsNumber: int = 3
+    AutoAnalysisTimeout: int = 300
+    MaxAutoAnalysisItemsToProcess: int = 4000
 
 
 class SearchLogInfo(BaseModel):

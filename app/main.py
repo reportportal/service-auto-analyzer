@@ -29,6 +29,7 @@ from app.amqp import amqp_handler
 from app.amqp.amqp import AmqpClient
 from app.commons import model_chooser, logging as my_logging
 from app.commons.esclient import EsClient
+from app.commons.launch_objects import SearchConfig
 from app.service import AnalyzerService
 from app.service import AutoAnalyzerService
 from app.service import CleanIndexService
@@ -82,34 +83,34 @@ APP_CONFIG = {
     "analyzerPathToLog": os.getenv("ANALYZER_FILE_LOGGING_PATH", "/tmp/config.log")
 }
 
-SEARCH_CONFIG = {
-    "SearchLogsMinSimilarity": float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.95")),
-    "MinShouldMatch": os.getenv("ES_MIN_SHOULD_MATCH", "80%"),
-    "BoostAA": float(os.getenv("ES_BOOST_AA", "-8.0")),
-    "BoostLaunch": float(os.getenv("ES_BOOST_LAUNCH", "4.0")),
-    "BoostTestCaseHash": float(os.getenv("ES_BOOST_TEST_CASE_HASH", "8.0")),
-    "MaxQueryTerms": int(os.getenv("ES_MAX_QUERY_TERMS", "50")),
-    "MinWordLength": int(os.getenv("ES_MIN_WORD_LENGTH", "2")),
-    "TimeWeightDecay": float(os.getenv("ES_TIME_WEIGHT_DECAY", "0.95")),
-    "PatternLabelMinPercentToSuggest": float(os.getenv("PATTERN_LABEL_MIN_PERCENT", "0.9")),
-    "PatternLabelMinCountToSuggest": int(os.getenv("PATTERN_LABEL_MIN_COUNT", "5")),
-    "PatternMinCountToSuggest": int(os.getenv("PATTERN_MIN_COUNT", "10")),
-    "MaxLogsForDefectTypeModel": int(os.getenv("MAX_LOGS_FOR_DEFECT_TYPE_MODEL", "10000")),
-    "ProbabilityForCustomModelSuggestions": min(
+SEARCH_CONFIG = SearchConfig(
+    SearchLogsMinSimilarity=float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.95")),
+    MinShouldMatch=os.getenv("ES_MIN_SHOULD_MATCH", "80%"),
+    BoostAA=float(os.getenv("ES_BOOST_AA", "-8.0")),
+    BoostLaunch=float(os.getenv("ES_BOOST_LAUNCH", "4.0")),
+    BoostTestCaseHash=float(os.getenv("ES_BOOST_TEST_CASE_HASH", "8.0")),
+    MaxQueryTerms=int(os.getenv("ES_MAX_QUERY_TERMS", "50")),
+    MinWordLength=int(os.getenv("ES_MIN_WORD_LENGTH", "2")),
+    TimeWeightDecay=float(os.getenv("ES_TIME_WEIGHT_DECAY", "0.95")),
+    PatternLabelMinPercentToSuggest=float(os.getenv("PATTERN_LABEL_MIN_PERCENT", "0.9")),
+    PatternLabelMinCountToSuggest=int(os.getenv("PATTERN_LABEL_MIN_COUNT", "5")),
+    PatternMinCountToSuggest=int(os.getenv("PATTERN_MIN_COUNT", "10")),
+    MaxLogsForDefectTypeModel=int(os.getenv("MAX_LOGS_FOR_DEFECT_TYPE_MODEL", "10000")),
+    ProbabilityForCustomModelSuggestions=min(
         0.8, float(os.getenv("PROB_CUSTOM_MODEL_SUGGESTIONS", "0.7"))),
-    "ProbabilityForCustomModelAutoAnalysis": min(
+    ProbabilityForCustomModelAutoAnalysis=min(
         1.0, float(os.getenv("PROB_CUSTOM_MODEL_AUTO_ANALYSIS", "0.5"))),
-    "BoostModelFolder": "",
-    "SuggestBoostModelFolder": "",
-    "SimilarityWeightsFolder": "",
-    "GlobalDefectTypeModelFolder": "",
-    "RetrainSuggestBoostModelConfig": "",
-    "RetrainAutoBoostModelConfig": "",
-    "MaxSuggestionsNumber": int(os.getenv("MAX_SUGGESTIONS_NUMBER", "3")),
-    "AutoAnalysisTimeout": int(os.getenv("AUTO_ANALYSIS_TIMEOUT", "300")),
-    "MaxAutoAnalysisItemsToProcess": int(
+    BoostModelFolder="",
+    SuggestBoostModelFolder="",
+    SimilarityWeightsFolder="",
+    GlobalDefectTypeModelFolder="",
+    RetrainSuggestBoostModelConfig="",
+    RetrainAutoBoostModelConfig="",
+    MaxSuggestionsNumber=int(os.getenv("MAX_SUGGESTIONS_NUMBER", "3")),
+    AutoAnalysisTimeout=int(os.getenv("AUTO_ANALYSIS_TIMEOUT", "300")),
+    MaxAutoAnalysisItemsToProcess=int(
         os.getenv("ANALYZER_MAX_ITEMS_TO_PROCESS", os.getenv("MAX_AUTO_ANALYSIS_ITEMS_TO_PROCESS", "4000")))
-}
+)
 
 
 def create_application():
@@ -159,9 +160,9 @@ def init_amqp(_amqp_client):
             logger.error(err)
             return
     _threads = []
-    _model_chooser = model_chooser.ModelChooser(APP_CONFIG, SEARCH_CONFIG)
+    _model_chooser = model_chooser.ModelChooser(SEARCH_CONFIG, APP_CONFIG)
     if APP_CONFIG["instanceTaskType"] == "train":
-        _retraining_service = RetrainingService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
+        _retraining_service = RetrainingService(_model_chooser, SEARCH_CONFIG, APP_CONFIG)
         _threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                                       (APP_CONFIG["exchangeName"], "train_models", True, False,
                                        lambda current_channel, method, props, body:
@@ -169,7 +170,7 @@ def init_amqp(_amqp_client):
                                            current_channel, method, props, body,
                                            _retraining_service.train_models))))
     else:
-        _es_client = EsClient(APP_CONFIG, SEARCH_CONFIG)
+        _es_client = EsClient(APP_CONFIG)
         _auto_analyzer_service = AutoAnalyzerService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
         _delete_index_service = DeleteIndexService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
         _clean_index_service = CleanIndexService(APP_CONFIG, SEARCH_CONFIG)
@@ -376,26 +377,30 @@ def read_version():
 
 def read_model_settings():
     """Reads paths to models"""
-    model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
-    SEARCH_CONFIG["BoostModelFolder"] = model_settings["BOOST_MODEL_FOLDER"]
-    SEARCH_CONFIG["SuggestBoostModelFolder"] = model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
-    SEARCH_CONFIG["SimilarityWeightsFolder"] = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
-    SEARCH_CONFIG["GlobalDefectTypeModelFolder"] = model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]
-    SEARCH_CONFIG["RetrainSuggestBoostModelConfig"] = model_settings["RETRAIN_SUGGEST_BOOST_MODEL_CONFIG"]
-    SEARCH_CONFIG["RetrainAutoBoostModelConfig"] = model_settings["RETRAIN_AUTO_BOOST_MODEL_CONFIG"]
+    model_settings = utils.read_json_file('res', 'model_settings.json', to_json=True)
+    if not model_settings or not isinstance(model_settings, dict):
+        raise RuntimeError('Failed to read model settings')
+
+    SEARCH_CONFIG.BoostModelFolder = model_settings['BOOST_MODEL_FOLDER']
+    SEARCH_CONFIG.SuggestBoostModelFolder = model_settings['SUGGEST_BOOST_MODEL_FOLDER']
+    SEARCH_CONFIG.SimilarityWeightsFolder = model_settings['SIMILARITY_WEIGHTS_FOLDER']
+    SEARCH_CONFIG.GlobalDefectTypeModelFolder = model_settings[
+        'GLOBAL_DEFECT_TYPE_MODEL_FOLDER'].rstrip("/").rstrip("\\")
+    SEARCH_CONFIG.RetrainSuggestBoostModelConfig = model_settings['RETRAIN_SUGGEST_BOOST_MODEL_CONFIG']
+    SEARCH_CONFIG.RetrainAutoBoostModelConfig = model_settings['RETRAIN_AUTO_BOOST_MODEL_CONFIG']
 
 
 log_file_path = 'res/logging.conf'
 logging.config.fileConfig(log_file_path, defaults={'logfilename': APP_CONFIG["analyzerPathToLog"]})
-if APP_CONFIG["logLevel"].lower() == "debug":
+if APP_CONFIG['logLevel'].lower() == 'debug':
     logging.disable(logging.NOTSET)
-elif APP_CONFIG["logLevel"].lower() == "info":
+elif APP_CONFIG['logLevel'].lower() == 'info':
     logging.disable(logging.DEBUG)
 else:
     logging.disable(logging.INFO)
-logger = my_logging.getLogger("analyzerApp")
-APP_CONFIG["appVersion"] = read_version()
-es_client = EsClient(APP_CONFIG, SEARCH_CONFIG)
+logger = my_logging.getLogger('analyzerApp')
+APP_CONFIG['appVersion'] = read_version()
+es_client = EsClient(APP_CONFIG)
 read_model_settings()
 
 application = create_application()

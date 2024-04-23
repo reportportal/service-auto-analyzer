@@ -61,8 +61,7 @@ class TestEsClient(TestService):
             try:
                 self._start_server(test["test_calls"])
 
-                es_client = esclient.EsClient(app_config=self.app_config,
-                                              search_cfg=self.get_default_search_config())
+                es_client = esclient.EsClient(app_config=self.app_config)
 
                 response = es_client.list_indices()
                 assert test["expected_count"] == len(response)
@@ -102,8 +101,7 @@ class TestEsClient(TestService):
             try:
                 self._start_server(test["test_calls"])
 
-                es_client = esclient.EsClient(app_config=self.app_config,
-                                              search_cfg=self.get_default_search_config())
+                es_client = esclient.EsClient(app_config=self.app_config)
 
                 response = es_client.create_index(test["index"])
                 assert test["acknowledged"] == response.acknowledged
@@ -138,8 +136,7 @@ class TestEsClient(TestService):
             try:
                 self._start_server(test["test_calls"])
 
-                es_client = esclient.EsClient(app_config=self.app_config,
-                                              search_cfg=self.get_default_search_config())
+                es_client = esclient.EsClient(app_config=self.app_config)
 
                 response = es_client.index_exists(test["index"])
                 assert test["exists"] == response
@@ -178,8 +175,7 @@ class TestEsClient(TestService):
             try:
                 self._start_server(test["test_calls"])
 
-                es_client = esclient.EsClient(app_config=self.app_config,
-                                              search_cfg=self.get_default_search_config())
+                es_client = esclient.EsClient(app_config=self.app_config)
 
                 response = es_client.delete_index(test["index"])
 
@@ -367,10 +363,8 @@ class TestEsClient(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                es_client = esclient.EsClient(app_config=app_config,
-                                              search_cfg=self.get_default_search_config())
-                es_client.es_client.scroll = MagicMock(return_value=json.loads(
-                    get_fixture(self.no_hits_search_rs)))
+                es_client = esclient.EsClient(app_config=app_config)
+                es_client.es_client.scroll = MagicMock(return_value=json.loads(get_fixture(self.no_hits_search_rs)))
 
                 response = es_client.delete_logs(test["rq"])
 
@@ -649,7 +643,7 @@ class TestEsClient(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                es_client = esclient.EsClient(app_config=app_config, search_cfg=self.get_default_search_config())
+                es_client = esclient.EsClient(app_config=app_config)
                 es_client.es_client.scroll = MagicMock(return_value=json.loads(get_fixture(self.no_hits_search_rs)))
                 launches = [launch_objects.Launch(**launch) for launch in json.loads(test["index_rq"])]
                 response = es_client.index_logs(launches)
@@ -739,8 +733,7 @@ class TestEsClient(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                es_client = esclient.EsClient(app_config=app_config,
-                                              search_cfg=self.get_default_search_config())
+                es_client = esclient.EsClient(app_config=app_config)
                 es_client.es_client.scroll = MagicMock(return_value=json.loads(
                     get_fixture(self.no_hits_search_rs)))
                 response = es_client.defect_update(test["defect_update_info"])
@@ -831,8 +824,7 @@ class TestEsClient(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                es_client = esclient.EsClient(app_config=app_config,
-                                              search_cfg=self.get_default_search_config())
+                es_client = esclient.EsClient(app_config=app_config)
                 es_client.es_client.scroll = MagicMock(return_value=json.loads(
                     get_fixture(self.no_hits_search_rs)))
                 response = es_client.remove_test_items(test["item_remove_info"])
@@ -922,8 +914,7 @@ class TestEsClient(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                es_client = esclient.EsClient(app_config=app_config,
-                                              search_cfg=self.get_default_search_config())
+                es_client = esclient.EsClient(app_config=app_config)
                 es_client.es_client.scroll = MagicMock(return_value=json.loads(
                     get_fixture(self.no_hits_search_rs)))
                 response = es_client.remove_launches(test["launch_remove_info"])

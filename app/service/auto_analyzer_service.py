@@ -41,7 +41,7 @@ class AutoAnalyzerService(AnalyzerService):
         self.app_config = app_config or {}
         self.search_cfg = search_cfg or {}
         super().__init__(model_chooser, search_cfg=self.search_cfg)
-        self.es_client = es_client or EsClient(app_config=self.app_config, search_cfg=self.search_cfg)
+        self.es_client = es_client or EsClient(app_config=self.app_config)
         self.namespace_finder = NamespaceFinder(app_config)
 
     def get_config_for_boosting(self, analyzer_config):

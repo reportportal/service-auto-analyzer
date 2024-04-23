@@ -17,6 +17,7 @@ import unittest
 
 from app.commons import launch_objects
 from app.commons import model_chooser
+from app.commons.launch_objects import SearchConfig
 from app.service import AutoAnalyzerService
 from app.service import SearchService
 from app.service import SuggestService
@@ -26,6 +27,7 @@ from test import get_fixture
 
 class TestEsQuery(unittest.TestCase):
     """Tests building analyze query"""
+    model_settings: dict
 
     @utils.ignore_warnings
     def setUp(self):
@@ -65,8 +67,12 @@ class TestEsQuery(unittest.TestCase):
             'binaryStoreType': 'filesystem',
             'filesystemDefaultPath': ''
         }
-        self.model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
-        self.model_chooser = model_chooser.ModelChooser(self.app_config, self.get_default_search_config())
+        model_settings = utils.read_json_file('res', 'model_settings.json', to_json=True)
+        if model_settings and isinstance(model_settings, dict):
+            self.model_settings = model_settings
+        else:
+            raise RuntimeError('Failed to read model settings')
+        self.model_chooser = model_chooser.ModelChooser(self.get_default_search_config(), self.app_config)
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings
@@ -74,33 +80,24 @@ class TestEsQuery(unittest.TestCase):
         logging.disable(logging.DEBUG)
 
     @utils.ignore_warnings
-    def get_default_search_config(self):
+    def get_default_search_config(self) -> SearchConfig:
         """Get default search config"""
-        return {
-            "MinShouldMatch": "80%",
-            "MinTermFreq": 1,
-            "MinDocFreq": 1,
-            "BoostAA": -10,
-            "BoostLaunch": 5,
-            "BoostTestCaseHash": 3,
-            "MaxQueryTerms": 50,
-            "SearchLogsMinShouldMatch": "90%",
-            "SearchLogsMinSimilarity": 0.9,
-            "MinWordLength": 0,
-            "BoostModelFolder":
-                self.model_settings["BOOST_MODEL_FOLDER"],
-            "SimilarityWeightsFolder":
-                self.model_settings["SIMILARITY_WEIGHTS_FOLDER"],
-            "SuggestBoostModelFolder":
-                self.model_settings["SUGGEST_BOOST_MODEL_FOLDER"],
-            "GlobalDefectTypeModelFolder":
-                self.model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"],
-            "TimeWeightDecay": 0.95,
-            "RetrainSuggestBoostModelConfig":
-                self.model_settings["RETRAIN_SUGGEST_BOOST_MODEL_CONFIG"],
-            "RetrainAutoBoostModelConfig":
-                self.model_settings["RETRAIN_AUTO_BOOST_MODEL_CONFIG"]
-        }
+        return SearchConfig(
+            MinShouldMatch='80%',
+            BoostAA=-10,
+            BoostLaunch=5,
+            BoostTestCaseHash=3,
+            MaxQueryTerms=50,
+            SearchLogsMinSimilarity=0.9,
+            MinWordLength=0,
+            BoostModelFolder=self.model_settings['BOOST_MODEL_FOLDER'],
+            SimilarityWeightsFolder=self.model_settings['SIMILARITY_WEIGHTS_FOLDER'],
+            SuggestBoostModelFolder=self.model_settings['SUGGEST_BOOST_MODEL_FOLDER'],
+            GlobalDefectTypeModelFolder=self.model_settings['GLOBAL_DEFECT_TYPE_MODEL_FOLDER'],
+            TimeWeightDecay=0.95,
+            RetrainSuggestBoostModelConfig=self.model_settings['RETRAIN_SUGGEST_BOOST_MODEL_CONFIG'],
+            RetrainAutoBoostModelConfig=self.model_settings['RETRAIN_AUTO_BOOST_MODEL_CONFIG']
+        )
 
     @utils.ignore_warnings
     def test_build_analyze_query_all_logs_empty_stacktrace(self):

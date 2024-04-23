@@ -20,6 +20,7 @@ import numpy as np
 
 from app.commons import logging
 from app.commons import object_saving
+from app.commons.launch_objects import SearchConfig
 from app.commons.object_saving.object_saver import ObjectSaver
 from app.machine_learning.models import (defect_type_model, custom_defect_type_model, custom_boosting_decision_maker,
                                          boosting_decision_maker)
@@ -36,10 +37,11 @@ class ModelType(str, enum.Enum):
 class ModelChooser:
     app_config: dict[str, Any]
     object_saver: ObjectSaver
+    search_cfg: SearchConfig
 
-    def __init__(self, app_config=None, search_cfg=None):
+    def __init__(self, search_cfg: SearchConfig, app_config=None):
+        self.search_cfg = search_cfg
         self.app_config = app_config or {}
-        self.search_cfg = search_cfg or {}
         self.object_saver = object_saving.create(self.app_config)
         self.model_folder_mapping = {
             ModelType.DEFECT_TYPE_MODEL: custom_defect_type_model.CustomDefectTypeModel,

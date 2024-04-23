@@ -37,19 +37,15 @@ logger = logging.getLogger("analyzerApp.esclient")
 class EsClient:
     """Elasticsearch client implementation"""
 
-    def __init__(self, app_config=None, search_cfg=None, es_client: elasticsearch.Elasticsearch = None):
+    def __init__(self, app_config=None, es_client: elasticsearch.Elasticsearch = None):
         if not app_config:
             app_config = {}
-        if not search_cfg:
-            search_cfg = {}
         self.app_config = app_config
         self.host = app_config.get('esHost', 'localhost:9000')
-        self.search_cfg = search_cfg
         self.es_client = es_client or self.create_es_client(app_config)
         self.log_preparation = LogPreparation()
         self.log_merger = LogMerger()
-        self.tables_to_recreate = ["rp_aa_stats", "rp_model_train_stats",
-                                   "rp_suggestions_info_metrics"]
+        self.tables_to_recreate = ["rp_aa_stats", "rp_model_train_stats", "rp_suggestions_info_metrics"]
 
     def create_es_client(self, app_config) -> elasticsearch.Elasticsearch:
         if not app_config["esVerifyCerts"]:

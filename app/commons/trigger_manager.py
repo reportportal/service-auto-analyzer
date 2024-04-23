@@ -12,23 +12,25 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.machine_learning.training import training_defect_type_model, training_analysis_model
 from app.commons import logging
+from app.commons.launch_objects import SearchConfig
 from app.commons.triggering_training.retraining_triggering import RetrainingTriggering
+from app.machine_learning.training import training_defect_type_model, training_analysis_model
 
 logger = logging.getLogger("analyzerApp.triggerManager")
 
 
 class TriggerManager:
+    search_cfg: SearchConfig
 
-    def __init__(self, model_chooser, app_config=None, search_cfg=None):
+    def __init__(self, model_chooser, search_cfg: SearchConfig, app_config=None):
         self.app_config = app_config or {}
-        self.search_cfg = search_cfg or {}
+        self.search_cfg = search_cfg
         self.model_training_triggering = {
             "defect_type": (RetrainingTriggering(self.app_config, "defect_type_trigger_info",
                                                  start_number=100, accumulated_difference=100),
                             training_defect_type_model.DefectTypeModelTraining(
-                                model_chooser, self.app_config, self.search_cfg)),
+                                model_chooser, self.search_cfg, self.app_config)),
             "suggestion": (RetrainingTriggering(self.app_config, "suggestion_trigger_info",
                                                 start_number=100, accumulated_difference=50),
                            training_analysis_model.AnalysisModelTraining(

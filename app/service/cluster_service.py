@@ -36,7 +36,7 @@ class ClusterService:
     def __init__(self, app_config=None, search_cfg=None):
         self.app_config = app_config or {}
         self.search_cfg = search_cfg or {}
-        self.es_client = EsClient(app_config=self.app_config, search_cfg=self.search_cfg)
+        self.es_client = EsClient(app_config=self.app_config)
         self.log_preparation = LogPreparation()
         self.log_merger = LogMerger()
 

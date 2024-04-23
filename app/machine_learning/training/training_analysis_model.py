@@ -26,6 +26,7 @@ from sklearn.model_selection import train_test_split
 
 from app.commons import logging, namespace_finder, object_saving
 from app.commons.esclient import EsClient
+from app.commons.launch_objects import SearchConfig
 from app.commons.model_chooser import ModelType
 from app.machine_learning.feature_encoding_configurer import FeatureEncodingConfigurer
 from app.machine_learning.models import (boosting_decision_maker, custom_boosting_decision_maker,
@@ -37,24 +38,25 @@ logger = logging.getLogger("analyzerApp.trainingAnalysisModel")
 
 
 class AnalysisModelTraining:
+    search_cfg: SearchConfig
 
-    def __init__(self, model_chooser, app_config, search_cfg):
+    def __init__(self, model_chooser, search_cfg: SearchConfig, app_config):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.due_proportion = 0.05
         self.due_proportion_to_smote = 0.4
-        self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
+        self.es_client = EsClient(app_config=app_config)
         self.baseline_folders = {
-            "suggestion": self.search_cfg["SuggestBoostModelFolder"],
-            "auto_analysis": self.search_cfg["BoostModelFolder"]}
+            "suggestion": self.search_cfg.SuggestBoostModelFolder,
+            "auto_analysis": self.search_cfg.BoostModelFolder}
         self.model_config = {
-            "suggestion": self.search_cfg["RetrainSuggestBoostModelConfig"],
-            "auto_analysis": self.search_cfg["RetrainAutoBoostModelConfig"]}
+            "suggestion": self.search_cfg.RetrainSuggestBoostModelConfig,
+            "auto_analysis": self.search_cfg.RetrainAutoBoostModelConfig}
         self.weighted_log_similarity_calculator = None
-        if self.search_cfg["SimilarityWeightsFolder"].strip():
+        if self.search_cfg.SimilarityWeightsFolder.strip():
             self.weighted_log_similarity_calculator = (
                 weighted_similarity_calculator.WeightedSimilarityCalculator(
-                    object_saving.create_filesystem(self.search_cfg["SimilarityWeightsFolder"])))
+                    object_saving.create_filesystem(self.search_cfg.SimilarityWeightsFolder)))
             self.weighted_log_similarity_calculator.load_model()
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.model_chooser = model_chooser
@@ -98,9 +100,9 @@ class AnalysisModelTraining:
 
     def get_config_for_boosting(self, numberOfLogLines, boosting_model_name, namespaces):
         return {
-            "max_query_terms": self.search_cfg["MaxQueryTerms"],
+            "max_query_terms": self.search_cfg.MaxQueryTerms,
             "min_should_match": 0.4,
-            "min_word_length": self.search_cfg["MinWordLength"],
+            "min_word_length": self.search_cfg.MinWordLength,
             "filter_min_should_match": [],
             "filter_min_should_match_any": [],
             "number_of_log_lines": numberOfLogLines,
@@ -108,7 +110,7 @@ class AnalysisModelTraining:
             "boosting_model": self.baseline_folders[boosting_model_name],
             "chosen_namespaces": namespaces,
             "calculate_similarities": False,
-            "time_weight_decay": self.search_cfg["TimeWeightDecay"]}
+            "time_weight_decay": self.search_cfg.TimeWeightDecay}
 
     def get_info_template(self, project_info, baseline_model, model_name, metric_name):
         return {"method": "training", "sub_model_type": "all", "model_type": project_info["model_type"],

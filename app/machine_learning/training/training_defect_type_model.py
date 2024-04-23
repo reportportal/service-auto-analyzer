@@ -27,20 +27,22 @@ from app.commons import logging, object_saving
 from app.commons.esclient import EsClient
 from app.machine_learning.models import defect_type_model, custom_defect_type_model
 from app.utils import utils, text_processing
+from app.commons.launch_objects import SearchConfig
 
-logger = logging.getLogger("analyzerApp.trainingDefectTypeModel")
+logger = logging.getLogger('analyzerApp.trainingDefectTypeModel')
 
 
 class DefectTypeModelTraining:
+    search_cfg: SearchConfig
 
-    def __init__(self, model_chooser, app_config, search_cfg):
+    def __init__(self, model_chooser, app_config, search_cfg: SearchConfig):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.label2inds = {"ab": 0, "pb": 1, "si": 2}
         self.due_proportion = 0.2
-        self.es_client = EsClient(app_config=app_config, search_cfg=search_cfg)
+        self.es_client = EsClient(app_config=app_config)
         self.baseline_model = defect_type_model.DefectTypeModel(
-            object_saving.create_filesystem(search_cfg["GlobalDefectTypeModelFolder"]))
+            object_saving.create_filesystem(search_cfg.GlobalDefectTypeModelFolder))
         self.baseline_model.load_model()
         self.model_chooser = model_chooser
 
@@ -127,7 +129,7 @@ class DefectTypeModelTraining:
             if message_info not in message_launch_dict:
                 data.append((detected_message, label, r["_source"]["issue_type"]))
                 message_launch_dict.add(message_info)
-            if len(data) >= self.search_cfg["MaxLogsForDefectTypeModel"]:
+            if len(data) >= self.search_cfg.MaxLogsForDefectTypeModel:
                 break
         return data
 
@@ -261,8 +263,7 @@ class DefectTypeModelTraining:
     def train(self, project_info):
         start_time = time()
         model_name = "defect_type_model_%s" % datetime.now().strftime("%d.%m.%y")
-        baseline_model = os.path.basename(
-            self.search_cfg["GlobalDefectTypeModelFolder"].strip("/").strip("\\"))
+        baseline_model = os.path.basename(self.search_cfg.GlobalDefectTypeModelFolder)
         new_model_folder = 'defect_type_model/%s/' % model_name
         self.new_model = custom_defect_type_model.CustomDefectTypeModel(
             object_saving.create(self.app_config, project_info["project_id"], new_model_folder))

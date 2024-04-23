@@ -83,12 +83,12 @@ APP_CONFIG = {
 }
 
 SEARCH_CONFIG = {
+    "SearchLogsMinSimilarity": float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.95")),
     "MinShouldMatch": os.getenv("ES_MIN_SHOULD_MATCH", "80%"),
     "BoostAA": float(os.getenv("ES_BOOST_AA", "-8.0")),
     "BoostLaunch": float(os.getenv("ES_BOOST_LAUNCH", "4.0")),
     "BoostTestCaseHash": float(os.getenv("ES_BOOST_TEST_CASE_HASH", "8.0")),
     "MaxQueryTerms": int(os.getenv("ES_MAX_QUERY_TERMS", "50")),
-    "SearchLogsMinSimilarity": float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.95")),
     "MinWordLength": int(os.getenv("ES_MIN_WORD_LENGTH", "2")),
     "TimeWeightDecay": float(os.getenv("ES_TIME_WEIGHT_DECAY", "0.95")),
     "PatternLabelMinPercentToSuggest": float(os.getenv("PATTERN_LABEL_MIN_PERCENT", "0.9")),

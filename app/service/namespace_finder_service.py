@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from time import time
+from typing import Any
 
 from app.commons import logging, namespace_finder
 from app.commons.log_preparation import LogPreparation
@@ -22,10 +23,12 @@ logger = logging.getLogger("analyzerApp.namespaceFinderService")
 
 
 class NamespaceFinderService:
+    app_config: dict[str, Any]
+    namespace_finder: namespace_finder.NamespaceFinder
+    log_preparation: LogPreparation
 
-    def __init__(self, app_config=None, search_cfg=None):
-        self.app_config = app_config or {}
-        self.search_cfg = search_cfg or {}
+    def __init__(self, app_config: dict[str, Any]):
+        self.app_config = app_config
         self.namespace_finder = namespace_finder.NamespaceFinder(self.app_config)
         self.log_preparation = LogPreparation()
 

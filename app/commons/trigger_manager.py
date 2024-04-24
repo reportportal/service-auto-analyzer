@@ -25,6 +25,7 @@ logger = logging.getLogger("analyzerApp.triggerManager")
 class TriggerManager:
     app_config: dict[str, Any]
     search_cfg: SearchConfig
+    model_training_triggering: dict[str, tuple[RetrainingTriggering, Any]]
 
     def __init__(self, model_chooser: ModelChooser, search_cfg: SearchConfig, app_config: dict[str, Any]):
         self.app_config = app_config

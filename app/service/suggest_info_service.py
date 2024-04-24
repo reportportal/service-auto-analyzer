@@ -34,6 +34,7 @@ class SuggestInfoService:
 
      This is necessary for further use in custom model training.
      """
+
     app_config: dict[str, Any]
     es_client: EsClient
     rp_suggest_index_template: str

@@ -179,7 +179,7 @@ def init_amqp(_amqp_client):
         _suggest_info_service = SuggestInfoService(APP_CONFIG)
         _search_service = SearchService(APP_CONFIG, SEARCH_CONFIG)
         _cluster_service = ClusterService(APP_CONFIG, SEARCH_CONFIG)
-        _namespace_finder_service = NamespaceFinderService(APP_CONFIG, SEARCH_CONFIG)
+        _namespace_finder_service = NamespaceFinderService(APP_CONFIG)
         _suggest_patterns_service = SuggestPatternsService(APP_CONFIG, SEARCH_CONFIG)
         _threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                                       (APP_CONFIG["exchangeName"], "index", True, False,

@@ -29,6 +29,7 @@ logger = logging.getLogger("analyzerApp.suggestPatternsService")
 class SuggestPatternsService:
     app_config: dict[str, Any]
     search_cfg: SearchConfig
+    es_client: EsClient
 
     def __init__(self, app_config: dict[str, Any], search_cfg: SearchConfig):
         self.app_config = app_config

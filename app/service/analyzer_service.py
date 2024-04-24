@@ -15,10 +15,9 @@
 import re
 from typing import Any
 
-from app.commons import logging, object_saving
+from app.commons import logging
 from app.commons.log_merger import LogMerger
 from app.commons.log_preparation import LogPreparation
-from app.machine_learning.models import weighted_similarity_calculator
 from app.utils import utils
 
 logger = logging.getLogger("analyzerApp.analyzerService")
@@ -33,13 +32,6 @@ class AnalyzerService:
         self.log_preparation = LogPreparation()
         self.log_merger = LogMerger()
         self.model_chooser = model_chooser
-        self.weighted_log_similarity_calculator = None
-        weights_folder = self.search_cfg.get('SimilarityWeightsFolder', 'res/model/weights_24.11.20').strip()
-        if weights_folder:
-            self.weighted_log_similarity_calculator = (
-                weighted_similarity_calculator.WeightedSimilarityCalculator(
-                    object_saving.create_filesystem(weights_folder)))
-            self.weighted_log_similarity_calculator.load_model()
 
     def find_min_should_match_threshold(self, analyzer_config):
         return analyzer_config.minShouldMatch if analyzer_config.minShouldMatch > 0 else \

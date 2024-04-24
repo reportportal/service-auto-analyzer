@@ -13,23 +13,26 @@
 #  limitations under the License.
 
 from time import time
+from typing import Any
 
 import elasticsearch
 import elasticsearch.helpers
 
 from app.commons import logging
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import SuggestPattern, SuggestPatternLabel
+from app.commons.launch_objects import SuggestPattern, SuggestPatternLabel, SearchConfig
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.suggestPatternsService")
 
 
 class SuggestPatternsService:
+    app_config: dict[str, Any]
+    search_cfg: SearchConfig
 
-    def __init__(self, app_config=None, search_cfg=None):
-        self.app_config = app_config or {}
-        self.search_cfg = search_cfg or {}
+    def __init__(self, app_config: dict[str, Any], search_cfg: SearchConfig):
+        self.app_config = app_config
+        self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=self.app_config)
 
     def query_data(self, project, label):
@@ -64,30 +67,30 @@ class SuggestPatternsService:
         return data
 
     def get_patterns_with_labels(self, exceptions_with_labels):
-        min_count = self.search_cfg["PatternLabelMinCountToSuggest"]
-        min_percent = self.search_cfg["PatternLabelMinPercentToSuggest"]
-        suggestedPatternsWithLabels = []
+        min_count = self.search_cfg.PatternLabelMinCountToSuggest
+        min_percent = self.search_cfg.PatternLabelMinPercentToSuggest
+        suggested_patterns_with_labels = []
         for exception in exceptions_with_labels:
             sum_all = sum(exceptions_with_labels[exception].values())
             for issue_type in exceptions_with_labels[exception]:
                 percent_for_label = round(exceptions_with_labels[exception][issue_type] / sum_all, 2)
                 count_for_exception_with_label = exceptions_with_labels[exception][issue_type]
                 if percent_for_label >= min_percent and count_for_exception_with_label >= min_count:
-                    suggestedPatternsWithLabels.append(SuggestPatternLabel(
+                    suggested_patterns_with_labels.append(SuggestPatternLabel(
                         pattern=exception,
                         totalCount=sum_all,
                         percentTestItemsWithLabel=percent_for_label,
                         label=issue_type))
-        return suggestedPatternsWithLabels
+        return suggested_patterns_with_labels
 
     def get_patterns_without_labels(self, all_exceptions):
-        suggestedPatternsWithoutLabels = []
+        suggested_patterns_without_labels = []
         for exception in all_exceptions:
-            if all_exceptions[exception] >= self.search_cfg["PatternMinCountToSuggest"]:
-                suggestedPatternsWithoutLabels.append(SuggestPatternLabel(
+            if all_exceptions[exception] >= self.search_cfg.PatternMinCountToSuggest:
+                suggested_patterns_without_labels.append(SuggestPatternLabel(
                     pattern=exception,
                     totalCount=all_exceptions[exception]))
-        return suggestedPatternsWithoutLabels
+        return suggested_patterns_without_labels
 
     @utils.ignore_warnings
     def suggest_patterns(self, project_id):
@@ -117,9 +120,9 @@ class SuggestPatternsService:
                         if label not in exceptions_with_labels[exception]:
                             exceptions_with_labels[exception][label] = 0
                         exceptions_with_labels[exception][label] += 1
-        suggestedPatternsWithLabels = self.get_patterns_with_labels(exceptions_with_labels)
-        suggestedPatternsWithoutLabels = self.get_patterns_without_labels(all_exceptions)
+        suggested_patterns_with_labels = self.get_patterns_with_labels(exceptions_with_labels)
+        suggested_patterns_without_labels = self.get_patterns_without_labels(all_exceptions)
         logger.info("Finished suggesting patterns %.2f s", time() - t_start)
         return SuggestPattern(
-            suggestionsWithLabels=suggestedPatternsWithLabels,
-            suggestionsWithoutLabels=suggestedPatternsWithoutLabels)
+            suggestionsWithLabels=suggested_patterns_with_labels,
+            suggestionsWithoutLabels=suggested_patterns_without_labels)

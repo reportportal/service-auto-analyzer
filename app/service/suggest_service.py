@@ -16,16 +16,18 @@ import json
 from datetime import datetime
 from functools import reduce
 from time import time
+from typing import Any
 
 import elasticsearch.helpers
 
 from app.amqp.amqp import AmqpClient
-from app.commons import logging, similarity_calculator
+from app.commons import logging, similarity_calculator, object_saving
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import SuggestAnalysisResult
+from app.commons.launch_objects import SuggestAnalysisResult, SearchConfig
 from app.commons.model_chooser import ModelType
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
+from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.service.analyzer_service import AnalyzerService
 from app.utils import utils, text_processing
@@ -42,31 +44,40 @@ SPECIAL_FIELDS_BOOST_SCORES = [
 class SuggestService(AnalyzerService):
     """The service serves suggestion lists in Make Decision modal."""
 
+    app_config: dict[str, Any]
+    search_cfg: SearchConfig
     es_client: EsClient
     namespace_finder: NamespaceFinder
+    similarity_model: WeightedSimilarityCalculator
 
-    def __init__(self, model_chooser, app_config=None, search_cfg=None, es_client: EsClient = None):
-        self.app_config = app_config or {}
-        self.search_cfg = search_cfg or {}
+    def __init__(self, model_chooser, app_config: dict[str, Any], search_cfg: SearchConfig,
+                 es_client: EsClient = None):
+        self.app_config = app_config
+        self.search_cfg = search_cfg
         super().__init__(model_chooser, search_cfg=self.search_cfg)
         self.es_client = es_client or EsClient(app_config=self.app_config)
         self.suggest_threshold = 0.4
         self.rp_suggest_index_template = "rp_suggestions_info"
         self.rp_suggest_metrics_index_template = "rp_suggestions_info_metrics"
         self.namespace_finder = NamespaceFinder(app_config)
+        weights_folder = self.search_cfg.SimilarityWeightsFolder
+        if not weights_folder:
+            raise ValueError('SimilarityWeightsFolder is not set')
+        if weights_folder:
+            self.similarity_model = (WeightedSimilarityCalculator(object_saving.create_filesystem(weights_folder)))
+            self.similarity_model.load_model()
 
-    def get_config_for_boosting_suggests(self, analyzerConfig):
+    def get_config_for_boosting_suggests(self, analyzer_config):
         return {
-            "max_query_terms": self.search_cfg["MaxQueryTerms"],
+            "max_query_terms": self.search_cfg.MaxQueryTerms,
             "min_should_match": 0.4,
-            "min_word_length": self.search_cfg["MinWordLength"],
+            "min_word_length": self.search_cfg.MinWordLength,
             "filter_min_should_match": [],
-            "filter_min_should_match_any": self.choose_fields_to_filter_suggests(
-                analyzerConfig.numberOfLogLines),
-            "number_of_log_lines": analyzerConfig.numberOfLogLines,
+            "filter_min_should_match_any": self.choose_fields_to_filter_suggests(analyzer_config.numberOfLogLines),
+            "number_of_log_lines": analyzer_config.numberOfLogLines,
             "filter_by_test_case_hash": True,
-            "boosting_model": self.search_cfg["SuggestBoostModelFolder"],
-            "time_weight_decay": self.search_cfg["TimeWeightDecay"]
+            "boosting_model": self.search_cfg.SuggestBoostModelFolder,
+            "time_weight_decay": self.search_cfg.TimeWeightDecay
         }
 
     def choose_fields_to_filter_suggests(self, log_lines_num):
@@ -83,7 +94,7 @@ class SuggestService(AnalyzerService):
                             stacktrace_field="stacktrace"):
         min_should_match = "{}%".format(test_item_info.analyzerConfig.minShouldMatch) \
             if test_item_info.analyzerConfig.minShouldMatch > 0 \
-            else self.search_cfg["MinShouldMatch"]
+            else self.search_cfg.MinShouldMatch
         log_lines = test_item_info.analyzerConfig.numberOfLogLines
 
         query = self.build_common_query(log, size=size, filter_no_defect=False)
@@ -129,7 +140,7 @@ class SuggestService(AnalyzerService):
                                                         field_name="merged_small_logs",
                                                         boost=2.0))
 
-        utils.append_potential_status_codes(query, log, max_query_terms=self.search_cfg["MaxQueryTerms"])
+        utils.append_potential_status_codes(query, log, max_query_terms=self.search_cfg.MaxQueryTerms)
 
         for field, boost_score in SPECIAL_FIELDS_BOOST_SCORES:
             if log["_source"][field].strip():
@@ -181,12 +192,12 @@ class SuggestService(AnalyzerService):
     def deduplicate_results(self, gathered_results, scores_by_test_items, test_item_ids):
         _similarity_calculator = similarity_calculator.SimilarityCalculator(
             {
-                "max_query_terms": self.search_cfg["MaxQueryTerms"],
-                "min_word_length": self.search_cfg["MinWordLength"],
+                "max_query_terms": self.search_cfg.MaxQueryTerms,
+                "min_word_length": self.search_cfg.MinWordLength,
                 "min_should_match": "98%",
                 "number_of_log_lines": -1
             },
-            weighted_similarity_calculator=self.weighted_log_similarity_calculator)
+            similarity_model=self.similarity_model)
         all_pairs_to_check = []
         for i in range(len(gathered_results)):
             for j in range(i + 1, len(gathered_results)):
@@ -359,14 +370,14 @@ class SuggestService(AnalyzerService):
                 test_item_info.project)
             _suggest_decision_maker_to_use = self.model_chooser.choose_model(
                 test_item_info.project, ModelType.SUGGESTION_MODEL,
-                custom_model_prob=self.search_cfg["ProbabilityForCustomModelSuggestions"])
+                custom_model_prob=self.search_cfg.ProbabilityForCustomModelSuggestions)
             features_dict_objects = _suggest_decision_maker_to_use.features_dict_with_saved_objects
 
             _boosting_data_gatherer = SuggestBoostingFeaturizer(
                 searched_res,
                 boosting_config,
                 feature_ids=_suggest_decision_maker_to_use.get_feature_ids(),
-                weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
+                weighted_log_similarity_calculator=self.similarity_model,
                 features_dict_with_saved_objects=features_dict_objects)
             _boosting_data_gatherer.set_defect_type_model(self.model_chooser.choose_model(
                 test_item_info.project, ModelType.DEFECT_TYPE_MODEL))
@@ -389,7 +400,7 @@ class SuggestService(AnalyzerService):
                                  test_item_id, issue_type, prob)
                 processed_time = time() - t_start
                 global_idx = 0
-                for idx, prob, _ in sorted_results[:self.search_cfg["MaxSuggestionsNumber"]]:
+                for idx, prob, _ in sorted_results[:self.search_cfg.MaxSuggestionsNumber]:
                     if prob >= self.suggest_threshold:
                         test_item_id = test_item_ids[idx]
                         issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]

@@ -39,9 +39,9 @@ class ModelChooser:
     object_saver: ObjectSaver
     search_cfg: SearchConfig
 
-    def __init__(self, search_cfg: SearchConfig, app_config=None):
+    def __init__(self, app_config: dict[str, Any], search_cfg: SearchConfig):
         self.search_cfg = search_cfg
-        self.app_config = app_config or {}
+        self.app_config = app_config
         self.object_saver = object_saving.create(self.app_config)
         self.model_folder_mapping = {
             ModelType.DEFECT_TYPE_MODEL: custom_defect_type_model.CustomDefectTypeModel,
@@ -54,11 +54,11 @@ class ModelChooser:
     def initialize_global_models(self):
         for model_type, folder, class_to_use in [
             (ModelType.DEFECT_TYPE_MODEL,
-             self.search_cfg["GlobalDefectTypeModelFolder"], defect_type_model.DefectTypeModel),
+             self.search_cfg.GlobalDefectTypeModelFolder, defect_type_model.DefectTypeModel),
             (ModelType.SUGGESTION_MODEL,
-             self.search_cfg["SuggestBoostModelFolder"], boosting_decision_maker.BoostingDecisionMaker),
+             self.search_cfg.SuggestBoostModelFolder, boosting_decision_maker.BoostingDecisionMaker),
             (ModelType.AUTO_ANALYSIS_MODEL,
-             self.search_cfg["BoostModelFolder"], boosting_decision_maker.BoostingDecisionMaker)
+             self.search_cfg.BoostModelFolder, boosting_decision_maker.BoostingDecisionMaker)
         ]:
             if folder.strip():
                 model = class_to_use(object_saving.create_filesystem(folder))
@@ -75,8 +75,8 @@ class ModelChooser:
         folders = self.object_saver.get_folder_objects(model_type, project_id)
         if len(folders):
             try:
-                model = self.model_folder_mapping[model_type](object_saving.create(self.app_config, project_id,
-                                                                                   folders[0]))
+                model = self.model_folder_mapping[model_type](object_saving.create(
+                    self.app_config, project_id, folders[0]))
                 model.load_model()
             except Exception as err:
                 logger.exception(err)

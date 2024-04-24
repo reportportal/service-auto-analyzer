@@ -16,6 +16,7 @@ import hashlib
 import json
 from datetime import datetime
 from time import time
+from typing import Any
 
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
@@ -23,7 +24,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from app.amqp.amqp import AmqpClient
 from app.commons import clusterizer, logging
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import ClusterResult, ClusterInfo
+from app.commons.launch_objects import ClusterResult, ClusterInfo, SearchConfig
 from app.commons.log_merger import LogMerger
 from app.commons.log_preparation import LogPreparation
 from app.utils import utils, text_processing
@@ -32,17 +33,20 @@ logger = logging.getLogger("analyzerApp.clusterService")
 
 
 class ClusterService:
+    app_config: dict[str, Any]
+    search_cfg: SearchConfig
+    es_client: EsClient
+    log_preparation: LogPreparation
+    log_merger: LogMerger
 
-    def __init__(self, app_config=None, search_cfg=None):
-        self.app_config = app_config or {}
-        self.search_cfg = search_cfg or {}
+    def __init__(self, app_config: dict[str, Any], search_cfg: SearchConfig):
+        self.app_config = app_config
+        self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=self.app_config)
         self.log_preparation = LogPreparation()
         self.log_merger = LogMerger()
 
-    def build_search_similar_items_query(self, queried_log, message,
-                                         launch_info,
-                                         min_should_match="95%"):
+    def build_search_similar_items_query(self, queried_log, message, launch_info, min_should_match="95%"):
         """Build search query"""
         query = {
             "_source": ["whole_message", "test_item", "is_merged",
@@ -66,7 +70,7 @@ class ClusterService:
                             min_should_match, message,
                             field_name="whole_message", boost=1.0,
                             override_min_should_match=None,
-                            max_query_terms=self.search_cfg["MaxQueryTerms"])
+                            max_query_terms=self.search_cfg.MaxQueryTerms)
                     ]}}}
         if launch_info.forUpdate:
             query["query"]["bool"]["should"].append(
@@ -87,9 +91,9 @@ class ClusterService:
                     queried_log["_source"]["found_exceptions"],
                     field_name="found_exceptions", boost=1.0,
                     override_min_should_match="1",
-                    max_query_terms=self.search_cfg["MaxQueryTerms"]))
+                    max_query_terms=self.search_cfg.MaxQueryTerms))
         utils.append_potential_status_codes(query, queried_log, boost=1.0,
-                                            max_query_terms=self.search_cfg["MaxQueryTerms"])
+                                            max_query_terms=self.search_cfg.MaxQueryTerms)
         return self.add_query_with_start_time_decay(query)
 
     def add_query_with_start_time_decay(self, main_query):
@@ -105,7 +109,7 @@ class ClusterService:
                                     "origin": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                                     "scale": "7d",
                                     "offset": "1d",
-                                    "decay": self.search_cfg["TimeWeightDecay"]
+                                    "decay": self.search_cfg.TimeWeightDecay
                                 }
                             }
                         },
@@ -302,8 +306,7 @@ class ClusterService:
             regroupped_by_error[group_key].append(i)
         return regroupped_by_error
 
-    def cluster_messages_with_groupping_by_error(self, log_messages, log_dict,
-                                                 unique_errors_min_should_match):
+    def cluster_messages_with_groupping_by_error(self, log_messages, log_dict, unique_errors_min_should_match):
         regroupped_by_error = self.regroup_by_error_ans_status_codes(
             log_messages, log_dict)
         _clusterizer = clusterizer.Clusterizer()

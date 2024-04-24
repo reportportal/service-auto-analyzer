@@ -15,6 +15,7 @@
 import json
 from datetime import datetime
 from time import time
+from typing import Any
 
 import elasticsearch
 import elasticsearch.helpers
@@ -29,13 +30,17 @@ logger = logging.getLogger("analyzerApp.suggestInfoService")
 
 
 class SuggestInfoService:
-    """This service saves `SuggestAnalysisResult` entities to {project_id}_suggest ES/OS index.
+    """This service saves and manage `SuggestAnalysisResult` entities to {project_id}_suggest ES/OS index.
 
      This is necessary for further use in custom model training.
      """
+    app_config: dict[str, Any]
+    es_client: EsClient
+    rp_suggest_index_template: str
+    rp_suggest_metrics_index_template: str
 
-    def __init__(self, app_config=None):
-        self.app_config = app_config or {}
+    def __init__(self, app_config: dict[str, Any]):
+        self.app_config = app_config
         self.es_client = EsClient(app_config=self.app_config)
         self.rp_suggest_index_template = "rp_suggestions_info"
         self.rp_suggest_metrics_index_template = "rp_suggestions_info_metrics"
@@ -66,8 +71,7 @@ class SuggestInfoService:
                 project_index_name, self.app_config["esProjectIndexPrefix"])
             if project_index_name not in project_index_names:
                 self.es_client.create_index_for_stats_info(
-                    self.rp_suggest_index_template,
-                    override_index_name=project_index_name)
+                    self.rp_suggest_index_template, override_index_name=project_index_name)
                 project_index_names.add(project_index_name)
             bodies.append({
                 "_index": project_index_name,

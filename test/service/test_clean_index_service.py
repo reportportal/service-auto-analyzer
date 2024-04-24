@@ -310,9 +310,7 @@ class TestCleanIndexService(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                _clean_index_service = CleanIndexService(
-                    app_config=app_config,
-                    search_cfg=self.get_default_search_config())
+                _clean_index_service = CleanIndexService(app_config=app_config)
                 _clean_index_service.es_client.es_client.scroll = MagicMock(
                     return_value=json.loads(get_fixture(self.no_hits_search_rs)))
                 _clean_index_service.suggest_info_service.es_client.es_client.scroll = MagicMock(

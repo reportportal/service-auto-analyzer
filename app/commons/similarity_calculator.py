@@ -16,13 +16,15 @@ import numpy as np
 from scipy import spatial
 from sklearn.feature_extraction.text import CountVectorizer
 
+from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
 from app.utils import text_processing
 
 
 class SimilarityCalculator:
+    similarity_model: WeightedSimilarityCalculator
 
-    def __init__(self, config, weighted_similarity_calculator=None):
-        self.weighted_similarity_calculator = weighted_similarity_calculator
+    def __init__(self, config, similarity_model: WeightedSimilarityCalculator):
+        self.similarity_model = similarity_model
         self.config = config
         self.similarity_dict = {}
         self.object_id_weights = {}
@@ -55,7 +57,7 @@ class SimilarityCalculator:
                             if self.config["number_of_log_lines"] == -1 and \
                                     field in self.fields_mapping_for_weighting:
                                 fields_to_use = self.fields_mapping_for_weighting[field]
-                                text = self.weighted_similarity_calculator.message_to_array(
+                                text = self.similarity_model.message_to_array(
                                     obj["_source"][fields_to_use[0]],
                                     obj["_source"][fields_to_use[1]])
                             elif field == "namespaces_stacktrace":
@@ -85,7 +87,7 @@ class SimilarityCalculator:
                             elif field.startswith("stacktrace"):
                                 if text_processing.does_stacktrace_need_words_reweighting(obj["_source"][field]):
                                     needs_reweighting = 1
-                                text = self.weighted_similarity_calculator.message_to_array(
+                                text = self.similarity_model.message_to_array(
                                     "", obj["_source"][field])
                             else:
                                 text = text_processing.filter_empty_lines([" ".join(
@@ -156,8 +158,8 @@ class SimilarityCalculator:
                     if needs_reweighting_wc:
                         query_vector = self.reweight_words_weights_by_summing(query_vector)
                         log_vector = self.reweight_words_weights_by_summing(log_vector)
-                    query_vector = self.weighted_similarity_calculator.weigh_data_rows(query_vector)
-                    log_vector = self.weighted_similarity_calculator.weigh_data_rows(log_vector)
+                    query_vector = self.similarity_model.weigh_data_rows(query_vector)
+                    log_vector = self.similarity_model.weigh_data_rows(log_vector)
                     if needs_reweighting_wc:
                         query_vector *= 2
                         log_vector *= 2

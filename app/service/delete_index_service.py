@@ -13,19 +13,28 @@
 #  limitations under the License.
 
 from time import time
+from typing import Any
 
 from app.commons import logging, namespace_finder, trigger_manager
 from app.commons.esclient import EsClient
+from app.commons.launch_objects import SearchConfig
 from app.utils import utils, text_processing
+from app.commons.model_chooser import ModelChooser
 
 logger = logging.getLogger("analyzerApp.deleteIndexService")
 
 
 class DeleteIndexService:
+    app_config: dict[str, Any]
+    search_cfg: SearchConfig
+    namespace_finder: namespace_finder.NamespaceFinder
+    trigger_manager: trigger_manager.TriggerManager
+    es_client: EsClient
+    model_chooser: ModelChooser
 
-    def __init__(self, model_chooser, app_config=None, search_cfg=None):
-        self.app_config = app_config or {}
-        self.search_cfg = search_cfg or {}
+    def __init__(self, model_chooser: ModelChooser, app_config: dict[str, Any], search_cfg: SearchConfig):
+        self.app_config = app_config
+        self.search_cfg = search_cfg
         self.namespace_finder = namespace_finder.NamespaceFinder(self.app_config)
         self.trigger_manager = trigger_manager.TriggerManager(
             model_chooser, self.search_cfg, app_config=self.app_config)

@@ -14,11 +14,12 @@
 
 import json
 from time import time
+from typing import Any
 
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, trigger_manager
-from app.commons.esclient import EsClient
 from app.commons.launch_objects import SearchConfig
+from app.commons.model_chooser import ModelChooser
 from app.utils import utils
 
 logger = logging.getLogger("analyzerApp.retrainingService")
@@ -26,13 +27,14 @@ logger = logging.getLogger("analyzerApp.retrainingService")
 
 class RetrainingService:
     search_cfg: SearchConfig
+    app_config: dict[str, Any]
+    trigger_manager: trigger_manager.TriggerManager
 
-    def __init__(self, model_chooser, search_cfg: SearchConfig, app_config=None):
-        self.app_config = app_config or {}
+    def __init__(self, model_chooser: ModelChooser, search_cfg: SearchConfig, app_config: dict[str, Any]):
         self.search_cfg = search_cfg
+        self.app_config = app_config
         self.trigger_manager = trigger_manager.TriggerManager(
             model_chooser, self.search_cfg, app_config=self.app_config)
-        self.es_client = EsClient(app_config=self.app_config)
 
     @utils.ignore_warnings
     def train_models(self, train_info):

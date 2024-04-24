@@ -16,6 +16,7 @@ import os
 import pickle
 from datetime import datetime
 from time import time
+from typing import Any
 
 import elasticsearch
 import elasticsearch.helpers
@@ -27,7 +28,7 @@ from sklearn.model_selection import train_test_split
 from app.commons import logging, namespace_finder, object_saving
 from app.commons.esclient import EsClient
 from app.commons.launch_objects import SearchConfig
-from app.commons.model_chooser import ModelType
+from app.commons.model_chooser import ModelType, ModelChooser
 from app.machine_learning.feature_encoding_configurer import FeatureEncodingConfigurer
 from app.machine_learning.models import (boosting_decision_maker, custom_boosting_decision_maker,
                                          weighted_similarity_calculator)
@@ -38,9 +39,10 @@ logger = logging.getLogger("analyzerApp.trainingAnalysisModel")
 
 
 class AnalysisModelTraining:
+    app_config: dict[str, Any]
     search_cfg: SearchConfig
 
-    def __init__(self, model_chooser, search_cfg: SearchConfig, app_config):
+    def __init__(self, model_chooser: ModelChooser, app_config: dict[str, Any], search_cfg: SearchConfig):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.due_proportion = 0.05

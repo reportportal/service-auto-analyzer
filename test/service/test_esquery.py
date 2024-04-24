@@ -14,6 +14,7 @@
 
 import logging
 import unittest
+from typing import Any
 
 from app.commons import launch_objects
 from app.commons import model_chooser
@@ -28,6 +29,7 @@ from test import get_fixture
 class TestEsQuery(unittest.TestCase):
     """Tests building analyze query"""
     model_settings: dict
+    app_config: dict[str, Any]
 
     @utils.ignore_warnings
     def setUp(self):
@@ -72,7 +74,7 @@ class TestEsQuery(unittest.TestCase):
             self.model_settings = model_settings
         else:
             raise RuntimeError('Failed to read model settings')
-        self.model_chooser = model_chooser.ModelChooser(self.get_default_search_config(), self.app_config)
+        self.model_chooser = model_chooser.ModelChooser(self.app_config, self.get_default_search_config())
         logging.disable(logging.CRITICAL)
 
     @utils.ignore_warnings

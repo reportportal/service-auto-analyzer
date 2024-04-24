@@ -17,6 +17,7 @@ import re
 from datetime import datetime
 from queue import Queue
 from time import time
+from typing import Any
 
 import elasticsearch.helpers
 import numpy as np
@@ -25,17 +26,19 @@ from sklearn.model_selection import train_test_split
 
 from app.commons import logging, object_saving
 from app.commons.esclient import EsClient
+from app.commons.launch_objects import SearchConfig
+from app.commons.model_chooser import ModelChooser
 from app.machine_learning.models import defect_type_model, custom_defect_type_model
 from app.utils import utils, text_processing
-from app.commons.launch_objects import SearchConfig
 
 logger = logging.getLogger('analyzerApp.trainingDefectTypeModel')
 
 
 class DefectTypeModelTraining:
+    app_config: dict[str, Any]
     search_cfg: SearchConfig
 
-    def __init__(self, model_chooser, app_config, search_cfg: SearchConfig):
+    def __init__(self, model_chooser: ModelChooser, app_config: dict[str, Any], search_cfg: SearchConfig):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.label2inds = {"ab": 0, "pb": 1, "si": 2}

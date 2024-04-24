@@ -13,35 +13,41 @@
 #  limitations under the License.
 
 from time import time
+from typing import Any
 
 import elasticsearch
 import elasticsearch.helpers
 
 from app.commons import logging, similarity_calculator, object_saving
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import SearchLogInfo, Log
+from app.commons.launch_objects import SearchLogInfo, Log, SearchConfig
 from app.commons.log_merger import LogMerger
 from app.commons.log_preparation import LogPreparation
-from app.machine_learning.models import weighted_similarity_calculator
+from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.searchService")
 
 
 class SearchService:
+    app_config: dict[str, Any]
+    search_cfg: SearchConfig
+    es_client: EsClient
+    log_preparation: LogPreparation
+    log_merger: LogMerger
+    similarity_model: WeightedSimilarityCalculator
 
-    def __init__(self, app_config=None, search_cfg=None):
-        self.app_config = app_config or {}
-        self.search_cfg = search_cfg or {}
+    def __init__(self, app_config: dict[str, Any], search_cfg: SearchConfig):
+        self.app_config = app_config
+        self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=self.app_config)
         self.log_preparation = LogPreparation()
         self.log_merger = LogMerger()
-        self.weighted_log_similarity_calculator = None
-        if self.search_cfg["SimilarityWeightsFolder"].strip():
-            self.weighted_log_similarity_calculator = (
-                weighted_similarity_calculator.WeightedSimilarityCalculator(
-                    object_saving.create_filesystem(self.search_cfg["SimilarityWeightsFolder"])))
-            self.weighted_log_similarity_calculator.load_model()
+        if not self.search_cfg.SimilarityWeightsFolder:
+            raise ValueError('SimilarityWeightsFolder is not set')
+        self.similarity_model = (
+            WeightedSimilarityCalculator(object_saving.create_filesystem(self.search_cfg.SimilarityWeightsFolder)))
+        self.similarity_model.load_model()
 
     def build_search_query(self, search_req, queried_log, search_min_should_match="95%"):
         """Build search query"""
@@ -80,7 +86,7 @@ class SearchService:
                     queried_log["_source"]["message"],
                     field_name="message", boost=1.0,
                     override_min_should_match=None,
-                    max_query_terms=self.search_cfg["MaxQueryTerms"]))
+                    max_query_terms=self.search_cfg.MaxQueryTerms))
         else:
             query["query"]["bool"]["filter"].append({"term": {"is_merged": True}})
             query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
@@ -90,7 +96,7 @@ class SearchService:
                     queried_log["_source"]["merged_small_logs"],
                     field_name="merged_small_logs", boost=1.0,
                     override_min_should_match=None,
-                    max_query_terms=self.search_cfg["MaxQueryTerms"]))
+                    max_query_terms=self.search_cfg.MaxQueryTerms))
         if queried_log["_source"]["found_exceptions"].strip():
             query["query"]["bool"]["must"].append(
                 utils.build_more_like_this_query(
@@ -98,9 +104,9 @@ class SearchService:
                     queried_log["_source"]["found_exceptions"],
                     field_name="found_exceptions", boost=1.0,
                     override_min_should_match="1",
-                    max_query_terms=self.search_cfg["MaxQueryTerms"]))
+                    max_query_terms=self.search_cfg.MaxQueryTerms))
         utils.append_potential_status_codes(query, queried_log, boost=1.0,
-                                            max_query_terms=self.search_cfg["MaxQueryTerms"])
+                                            max_query_terms=self.search_cfg.MaxQueryTerms)
         return query
 
     def find_log_ids_for_test_items_with_merged_logs(self, test_item_ids, index_name, batch_size=1000):
@@ -219,11 +225,11 @@ class SearchService:
 
             _similarity_calculator = similarity_calculator.SimilarityCalculator(
                 {
-                    "max_query_terms": self.search_cfg["MaxQueryTerms"],
-                    "min_word_length": self.search_cfg["MinWordLength"],
+                    "max_query_terms": self.search_cfg.MaxQueryTerms,
+                    "min_word_length": self.search_cfg.MinWordLength,
                     "number_of_log_lines": search_req.logLines
                 },
-                weighted_similarity_calculator=self.weighted_log_similarity_calculator)
+                similarity_model=self.similarity_model)
             _similarity_calculator.find_similarity(
                 [(queried_log, search_results)], ["message", "potential_status_codes", "merged_small_logs"])
 
@@ -245,8 +251,7 @@ class SearchService:
                     log_id_extracted = utils.extract_real_id(log_id)
                     is_merged = log_id != str(log_id_extracted)
                     test_item_id = int(test_item_info[log_id])
-                    match_score = max(round(similarity_percent, 2),
-                                      round(global_search_min_should_match, 2))
+                    match_score = max(round(similarity_percent, 2), round(global_search_min_should_match, 2))
                     similar_log_ids[(log_id_extracted, test_item_id, is_merged)] = SearchLogInfo(
                         logId=log_id_extracted,
                         testItemId=test_item_id,

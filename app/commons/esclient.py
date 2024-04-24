@@ -16,6 +16,7 @@ import json
 import traceback
 from collections import deque
 from time import time
+from typing import Any
 
 import elasticsearch
 import elasticsearch.helpers
@@ -36,10 +37,14 @@ logger = logging.getLogger("analyzerApp.esclient")
 
 class EsClient:
     """Elasticsearch client implementation"""
+    app_config: dict[str, Any]
+    es_client: elasticsearch.Elasticsearch
+    host: str
+    log_preparation: LogPreparation
+    log_merger: LogMerger
+    tables_to_recreate: list[str]
 
-    def __init__(self, app_config=None, es_client: elasticsearch.Elasticsearch = None):
-        if not app_config:
-            app_config = {}
+    def __init__(self, app_config: dict[str, Any], es_client: elasticsearch.Elasticsearch = None):
         self.app_config = app_config
         self.host = app_config.get('esHost', 'localhost:9000')
         self.es_client = es_client or self.create_es_client(app_config)

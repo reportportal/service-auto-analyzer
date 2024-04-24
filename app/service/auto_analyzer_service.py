@@ -17,15 +17,19 @@ from datetime import datetime
 from queue import Queue
 from threading import Thread
 from time import time, sleep
+from typing import Any
 
 from app.amqp.amqp import AmqpClient
 from app.commons import logging
+from app.commons import object_saving
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult
+from app.commons.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult, \
+    SearchConfig
 from app.commons.model_chooser import ModelType
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.similarity_calculator import SimilarityCalculator
 from app.machine_learning import boosting_featurizer
+from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
 from app.service.analyzer_service import AnalyzerService
 from app.utils import utils, text_processing
 
@@ -34,30 +38,40 @@ EARLY_FINISH = False
 
 
 class AutoAnalyzerService(AnalyzerService):
+    app_config: dict[str, Any]
+    search_cfg: SearchConfig
     es_client: EsClient
     namespace_finder: NamespaceFinder
+    similarity_model: WeightedSimilarityCalculator
 
-    def __init__(self, model_chooser, app_config=None, search_cfg=None, es_client: EsClient = None):
-        self.app_config = app_config or {}
-        self.search_cfg = search_cfg or {}
+    def __init__(self, model_chooser, app_config: dict[str, Any], search_cfg: SearchConfig,
+                 es_client: EsClient = None):
+        self.app_config = app_config
+        self.search_cfg = search_cfg
         super().__init__(model_chooser, search_cfg=self.search_cfg)
         self.es_client = es_client or EsClient(app_config=self.app_config)
         self.namespace_finder = NamespaceFinder(app_config)
+        weights_folder = self.search_cfg.SimilarityWeightsFolder
+        if not weights_folder:
+            raise ValueError('SimilarityWeightsFolder is not set')
+        if weights_folder:
+            self.similarity_model = (WeightedSimilarityCalculator(object_saving.create_filesystem(weights_folder)))
+            self.similarity_model.load_model()
 
     def get_config_for_boosting(self, analyzer_config):
         min_should_match = self.find_min_should_match_threshold(analyzer_config) / 100
         return {
-            "max_query_terms": self.search_cfg["MaxQueryTerms"],
+            "max_query_terms": self.search_cfg.MaxQueryTerms,
             "min_should_match": min_should_match,
-            "min_word_length": self.search_cfg["MinWordLength"],
+            "min_word_length": self.search_cfg.MinWordLength,
             "filter_min_should_match_any": [],
             "filter_min_should_match": self.choose_fields_to_filter_strict(
                 analyzer_config.numberOfLogLines, min_should_match),
             "number_of_log_lines": analyzer_config.numberOfLogLines,
             "filter_by_test_case_hash": True,
-            "boosting_model": self.search_cfg["BoostModelFolder"],
+            "boosting_model": self.search_cfg.BoostModelFolder,
             "filter_by_all_logs_should_be_similar": analyzer_config.allMessagesShouldMatch,
-            "time_weight_decay": self.search_cfg["TimeWeightDecay"]
+            "time_weight_decay": self.search_cfg.TimeWeightDecay
         }
 
     def choose_fields_to_filter_strict(self, log_lines, min_should_match):
@@ -70,7 +84,7 @@ class AutoAnalyzerService(AnalyzerService):
 
     def get_min_should_match_setting(self, launch):
         return "{}%".format(launch.analyzerConfig.minShouldMatch) \
-            if launch.analyzerConfig.minShouldMatch > 0 else self.search_cfg["MinShouldMatch"]
+            if launch.analyzerConfig.minShouldMatch > 0 else self.search_cfg.MinShouldMatch
 
     def build_analyze_query(self, launch, log, size=10):
         """Build analyze query"""
@@ -190,7 +204,7 @@ class AutoAnalyzerService(AnalyzerService):
                                                 field_name="found_exceptions",
                                                 boost=8.0,
                                                 override_min_should_match="1"))
-        utils.append_potential_status_codes(query, log, max_query_terms=self.search_cfg["MaxQueryTerms"])
+        utils.append_potential_status_codes(query, log, max_query_terms=self.search_cfg.MaxQueryTerms)
         return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
     def leave_only_similar_logs(self, candidates_with_no_defect, boosting_config):
@@ -203,7 +217,7 @@ class AutoAnalyzerService(AnalyzerService):
             new_search_res = []
             _similarity_calculator = SimilarityCalculator(
                 boosting_config,
-                weighted_similarity_calculator=self.weighted_log_similarity_calculator)
+                similarity_model=self.similarity_model)
             if no_defect_candidate_exists:
                 _similarity_calculator.find_similarity(
                     [(log_info, search_res)],
@@ -306,17 +320,17 @@ class AutoAnalyzerService(AnalyzerService):
                     str(launch.project), self.app_config["esProjectIndexPrefix"])
                 if not self.es_client.index_exists(index_name):
                     continue
-                if test_items_number_to_process >= self.search_cfg["MaxAutoAnalysisItemsToProcess"]:
+                if test_items_number_to_process >= self.search_cfg.MaxAutoAnalysisItemsToProcess:
                     logger.info("Only first %d test items were taken",
-                                self.search_cfg["MaxAutoAnalysisItemsToProcess"])
+                                self.search_cfg.MaxAutoAnalysisItemsToProcess)
                     break
                 if EARLY_FINISH:
                     logger.info("Early finish from analyzer before timeout")
                     break
                 for test_item in launch.testItems:
-                    if test_items_number_to_process >= self.search_cfg["MaxAutoAnalysisItemsToProcess"]:
+                    if test_items_number_to_process >= self.search_cfg.MaxAutoAnalysisItemsToProcess:
                         logger.info("Only first %d test items were taken",
-                                    self.search_cfg["MaxAutoAnalysisItemsToProcess"])
+                                    self.search_cfg.MaxAutoAnalysisItemsToProcess)
                         break
                     if EARLY_FINISH:
                         logger.info("Early finish from analyzer before timeout")
@@ -394,7 +408,7 @@ class AutoAnalyzerService(AnalyzerService):
             results_to_share = {}
             chosen_namespaces = {}
             while self.finished_queue.empty() or not self.queue.empty():
-                if (self.search_cfg["AutoAnalysisTimeout"] - (
+                if (self.search_cfg.AutoAnalysisTimeout - (
                         time() - t_start)) <= 5:  # check whether we are running out of time # noqa
                     EARLY_FINISH = True
                     break
@@ -435,7 +449,7 @@ class AutoAnalyzerService(AnalyzerService):
                     boosting_config["chosen_namespaces"] = chosen_namespaces[project_id]
                     _boosting_decision_maker = self.model_chooser.choose_model(
                         project_id, ModelType.AUTO_ANALYSIS_MODEL,
-                        custom_model_prob=self.search_cfg["ProbabilityForCustomModelAutoAnalysis"])
+                        custom_model_prob=self.search_cfg.ProbabilityForCustomModelAutoAnalysis)
                     features_dict_objects = _boosting_decision_maker.features_dict_with_saved_objects
                     if project_id not in defect_type_model_to_use:
                         defect_type_model_to_use[project_id] = self.model_chooser.choose_model(
@@ -456,7 +470,7 @@ class AutoAnalyzerService(AnalyzerService):
                             candidates,
                             boosting_config,
                             feature_ids=_boosting_decision_maker.get_feature_ids(),
-                            weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
+                            weighted_log_similarity_calculator=self.similarity_model,
                             features_dict_with_saved_objects=features_dict_objects)
                         boosting_data_gatherer.set_defect_type_model(defect_type_model_to_use[project_id])
                         feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()

@@ -13,13 +13,13 @@
 #  limitations under the License.
 
 import json
-
 import logging.config
 import os
 import threading
 import time
 from signal import signal, SIGINT
 from sys import exit
+from typing import Any
 
 from flask import Flask, Response, jsonify
 from flask_cors import CORS
@@ -43,7 +43,7 @@ from app.service import SuggestPatternsService
 from app.service import SuggestService
 from app.utils import utils
 
-APP_CONFIG = {
+APP_CONFIG: dict[str, Any] = {
     "esHost": os.getenv("ES_HOSTS", "http://elasticsearch:9200").strip("/").strip("\\"),
     "esUser": os.getenv("ES_USER", "").strip(),
     "esPassword": os.getenv("ES_PASSWORD", "").strip(),
@@ -160,7 +160,7 @@ def init_amqp(_amqp_client):
             logger.error(err)
             return
     _threads = []
-    _model_chooser = model_chooser.ModelChooser(SEARCH_CONFIG, APP_CONFIG)
+    _model_chooser = model_chooser.ModelChooser(APP_CONFIG, SEARCH_CONFIG)
     if APP_CONFIG["instanceTaskType"] == "train":
         _retraining_service = RetrainingService(_model_chooser, SEARCH_CONFIG, APP_CONFIG)
         _threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
@@ -173,10 +173,10 @@ def init_amqp(_amqp_client):
         _es_client = EsClient(APP_CONFIG)
         _auto_analyzer_service = AutoAnalyzerService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
         _delete_index_service = DeleteIndexService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
-        _clean_index_service = CleanIndexService(APP_CONFIG, SEARCH_CONFIG)
+        _clean_index_service = CleanIndexService(APP_CONFIG)
         _analyzer_service = AnalyzerService(_model_chooser, SEARCH_CONFIG)
         _suggest_service = SuggestService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
-        _suggest_info_service = SuggestInfoService(APP_CONFIG, SEARCH_CONFIG)
+        _suggest_info_service = SuggestInfoService(APP_CONFIG)
         _search_service = SearchService(APP_CONFIG, SEARCH_CONFIG)
         _cluster_service = ClusterService(APP_CONFIG, SEARCH_CONFIG)
         _namespace_finder_service = NamespaceFinderService(APP_CONFIG, SEARCH_CONFIG)
@@ -381,13 +381,17 @@ def read_model_settings():
     if not model_settings or not isinstance(model_settings, dict):
         raise RuntimeError('Failed to read model settings')
 
-    SEARCH_CONFIG.BoostModelFolder = model_settings['BOOST_MODEL_FOLDER']
-    SEARCH_CONFIG.SuggestBoostModelFolder = model_settings['SUGGEST_BOOST_MODEL_FOLDER']
-    SEARCH_CONFIG.SimilarityWeightsFolder = model_settings['SIMILARITY_WEIGHTS_FOLDER']
+    SEARCH_CONFIG.BoostModelFolder = model_settings['BOOST_MODEL_FOLDER'].strip().rstrip("/").rstrip("\\")
+    SEARCH_CONFIG.SuggestBoostModelFolder = model_settings[
+        'SUGGEST_BOOST_MODEL_FOLDER'].strip().rstrip("/").rstrip("\\")
+    SEARCH_CONFIG.SimilarityWeightsFolder = model_settings[
+        'SIMILARITY_WEIGHTS_FOLDER'].strip().rstrip("/").rstrip("\\")
     SEARCH_CONFIG.GlobalDefectTypeModelFolder = model_settings[
-        'GLOBAL_DEFECT_TYPE_MODEL_FOLDER'].rstrip("/").rstrip("\\")
-    SEARCH_CONFIG.RetrainSuggestBoostModelConfig = model_settings['RETRAIN_SUGGEST_BOOST_MODEL_CONFIG']
-    SEARCH_CONFIG.RetrainAutoBoostModelConfig = model_settings['RETRAIN_AUTO_BOOST_MODEL_CONFIG']
+        'GLOBAL_DEFECT_TYPE_MODEL_FOLDER'].strip().rstrip("/").rstrip("\\")
+    SEARCH_CONFIG.RetrainSuggestBoostModelConfig = model_settings[
+        'RETRAIN_SUGGEST_BOOST_MODEL_CONFIG'].strip().rstrip("/").rstrip("\\")
+    SEARCH_CONFIG.RetrainAutoBoostModelConfig = model_settings[
+        'RETRAIN_AUTO_BOOST_MODEL_CONFIG'].strip().rstrip("/").rstrip("\\")
 
 
 log_file_path = 'res/logging.conf'

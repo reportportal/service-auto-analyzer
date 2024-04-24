@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from typing import Any
 
 from app.commons import logging
 
@@ -24,7 +25,7 @@ logger = logging.getLogger("analyzerApp.retraining_triggering")
 
 class RetrainingTriggering:
 
-    def __init__(self, app_config, trigger_saving_name, start_number=100, accumulated_difference=100):
+    def __init__(self, app_config: dict[str, Any], trigger_saving_name, start_number=100, accumulated_difference=100):
         self.object_saver = ObjectSaver(app_config)
         self.start_number = start_number
         self.accumulated_difference = accumulated_difference

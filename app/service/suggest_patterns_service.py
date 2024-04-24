@@ -13,25 +13,24 @@
 #  limitations under the License.
 
 from time import time
-from typing import Any
 
 import elasticsearch
 import elasticsearch.helpers
 
 from app.commons import logging
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import SuggestPattern, SuggestPatternLabel, SearchConfig
+from app.commons.launch_objects import SuggestPattern, SuggestPatternLabel, SearchConfig, ApplicationConfig
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.suggestPatternsService")
 
 
 class SuggestPatternsService:
-    app_config: dict[str, Any]
+    app_config: ApplicationConfig
     search_cfg: SearchConfig
     es_client: EsClient
 
-    def __init__(self, app_config: dict[str, Any], search_cfg: SearchConfig):
+    def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=self.app_config)
@@ -44,7 +43,7 @@ class SuggestPatternsService:
                 query={
                     "_source": ["detected_message", "issue_type"],
                     "sort": {"start_time": "desc"},
-                    "size": self.app_config["esChunkNumber"],
+                    "size": self.app_config.esChunkNumber,
                     "query": {
                         "bool": {
                             "must": [
@@ -96,7 +95,7 @@ class SuggestPatternsService:
     @utils.ignore_warnings
     def suggest_patterns(self, project_id):
         index_name = text_processing.unite_project_name(
-            str(project_id), self.app_config["esProjectIndexPrefix"])
+            str(project_id), self.app_config.esProjectIndexPrefix)
         logger.info("Started suggesting patterns for project '%s'", index_name)
         t_start = time()
         found_data = []

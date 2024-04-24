@@ -11,11 +11,11 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from typing import Any
 
 from app.commons import logging
 
 from app.commons.object_saving.object_saver import ObjectSaver
+from app.commons.launch_objects import ApplicationConfig
 
 METRIC_SINCE_TRAINING = "gathered_metric_since_training"
 GATHERED_METRIC_TOTAL = "gathered_metric_total"
@@ -25,7 +25,7 @@ logger = logging.getLogger("analyzerApp.retraining_triggering")
 
 class RetrainingTriggering:
 
-    def __init__(self, app_config: dict[str, Any], trigger_saving_name, start_number=100, accumulated_difference=100):
+    def __init__(self, app_config: ApplicationConfig, trigger_saving_name, start_number=100, accumulated_difference=100):
         self.object_saver = ObjectSaver(app_config)
         self.start_number = start_number
         self.accumulated_difference = accumulated_difference

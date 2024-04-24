@@ -14,7 +14,6 @@
 
 import logging
 import unittest
-from typing import Any
 
 from app.commons import launch_objects
 from app.commons import model_chooser
@@ -29,7 +28,7 @@ from test import get_fixture
 class TestEsQuery(unittest.TestCase):
     """Tests building analyze query"""
     model_settings: dict
-    app_config: dict[str, Any]
+    app_config: launch_objects.ApplicationConfig
 
     @utils.ignore_warnings
     def setUp(self):
@@ -53,22 +52,22 @@ class TestEsQuery(unittest.TestCase):
         self.query_analyze_items_including_no_defect = "query_analyze_items_including_no_defect.json"
         self.query_analyze_items_including_no_defect_small_logs = \
             "query_analyze_items_including_no_defect_small_logs.json"
-        self.app_config = {
-            "esHost": "http://localhost:9200",
-            "esUser": "",
-            "esPassword": "",
-            "esVerifyCerts": False,
-            "esUseSsl": False,
-            "esSslShowWarn": False,
-            "turnOffSslVerification": True,
-            "esCAcert": "",
-            "esClientCert": "",
-            "esClientKey": "",
-            "appVersion": "",
-            "esChunkNumber": 1000,
-            'binaryStoreType': 'filesystem',
-            'filesystemDefaultPath': ''
-        }
+        self.app_config = launch_objects.ApplicationConfig(
+            esHost="http://localhost:9200",
+            esUser="",
+            esPassword="",
+            esVerifyCerts=False,
+            esUseSsl=False,
+            esSslShowWarn=False,
+            turnOffSslVerification=True,
+            esCAcert="",
+            esClientCert="",
+            esClientKey="",
+            appVersion="",
+            esChunkNumber=1000,
+            binaryStoreType='filesystem',
+            filesystemDefaultPath=''
+        )
         model_settings = utils.read_json_file('res', 'model_settings.json', to_json=True)
         if model_settings and isinstance(model_settings, dict):
             self.model_settings = model_settings

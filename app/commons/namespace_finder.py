@@ -11,21 +11,20 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from typing import Any
 
 from gensim.models.phrases import Phrases
 
 from app.commons import logging
 from app.commons.object_saving.object_saver import ObjectSaver
+from app.commons.launch_objects import ApplicationConfig
 
 logger = logging.getLogger("analyzerApp.namespace_finder")
 
 
 class NamespaceFinder:
-    app_config: dict[str, Any]
     object_saver: ObjectSaver
 
-    def __init__(self, app_config: dict[str, Any]):
+    def __init__(self, app_config: ApplicationConfig):
         self.object_saver = ObjectSaver(app_config)
 
     def remove_namespaces(self, project_id):

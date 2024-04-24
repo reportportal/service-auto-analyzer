@@ -13,14 +13,13 @@
 #  limitations under the License.
 
 from time import time
-from typing import Any
 
 import elasticsearch
 import elasticsearch.helpers
 
 from app.commons import logging, similarity_calculator, object_saving
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import SearchLogInfo, Log, SearchConfig
+from app.commons.launch_objects import SearchLogInfo, Log, SearchConfig, ApplicationConfig
 from app.commons.log_merger import LogMerger
 from app.commons.log_preparation import LogPreparation
 from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
@@ -30,14 +29,14 @@ logger = logging.getLogger("analyzerApp.searchService")
 
 
 class SearchService:
-    app_config: dict[str, Any]
+    app_config: ApplicationConfig
     search_cfg: SearchConfig
     es_client: EsClient
     log_preparation: LogPreparation
     log_merger: LogMerger
     similarity_model: WeightedSimilarityCalculator
 
-    def __init__(self, app_config: dict[str, Any], search_cfg: SearchConfig):
+    def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=self.app_config)
@@ -54,7 +53,7 @@ class SearchService:
         query = {
             "_source": ["message", "test_item", "detected_message", "stacktrace",
                         "potential_status_codes", "merged_small_logs"],
-            "size": self.app_config["esChunkNumber"],
+            "size": self.app_config.esChunkNumber,
             "query": {
                 "bool": {
                     "filter": [
@@ -202,7 +201,7 @@ class SearchService:
         logger.debug(f'Started searching by request: {search_req.json()}')
         logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))
         index_name = text_processing.unite_project_name(
-            str(search_req.projectId), self.app_config["esProjectIndexPrefix"])
+            str(search_req.projectId), self.app_config.esProjectIndexPrefix)
         t_start = time()
         if not self.es_client.index_exists(index_name):
             return []

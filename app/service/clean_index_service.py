@@ -13,11 +13,10 @@
 #  limitations under the License.
 
 from time import time
-from typing import Any
 
 from app.commons import logging
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import CleanIndexStrIds
+from app.commons.launch_objects import CleanIndexStrIds, ApplicationConfig
 from app.service.suggest_info_service import SuggestInfoService
 from app.utils import utils
 
@@ -25,14 +24,13 @@ logger = logging.getLogger("analyzerApp.cleanIndexService")
 
 
 class CleanIndexService:
-    app_config: dict[str, Any]
     es_client: EsClient
     suggest_info_service: SuggestInfoService
 
-    def __init__(self, app_config: dict[str, Any]):
+    def __init__(self, app_config: ApplicationConfig):
         self.app_config = app_config
         self.es_client = EsClient(app_config=self.app_config)
-        self.suggest_info_service = SuggestInfoService(app_config=self.app_config)
+        self.suggest_info_service = SuggestInfoService(app_config=app_config)
 
     @utils.ignore_warnings
     def delete_logs(self, clean_index):

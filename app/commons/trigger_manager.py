@@ -14,7 +14,7 @@
 from typing import Any
 
 from app.commons import logging
-from app.commons.launch_objects import SearchConfig
+from app.commons.launch_objects import SearchConfig, ApplicationConfig
 from app.commons.model_chooser import ModelChooser
 from app.commons.triggering_training.retraining_triggering import RetrainingTriggering
 from app.machine_learning.training import training_defect_type_model, training_analysis_model
@@ -23,26 +23,19 @@ logger = logging.getLogger("analyzerApp.triggerManager")
 
 
 class TriggerManager:
-    app_config: dict[str, Any]
-    search_cfg: SearchConfig
     model_training_triggering: dict[str, tuple[RetrainingTriggering, Any]]
 
-    def __init__(self, model_chooser: ModelChooser, search_cfg: SearchConfig, app_config: dict[str, Any]):
-        self.app_config = app_config
-        self.search_cfg = search_cfg
+    def __init__(self, model_chooser: ModelChooser, app_config: ApplicationConfig, search_cfg: SearchConfig):
         self.model_training_triggering = {
-            "defect_type": (RetrainingTriggering(self.app_config, 'defect_type_trigger_info',
+            "defect_type": (RetrainingTriggering(app_config, 'defect_type_trigger_info',
                                                  start_number=100, accumulated_difference=100),
-                            training_defect_type_model.DefectTypeModelTraining(model_chooser, self.app_config,
-                                                                               self.search_cfg)),
-            "suggestion": (RetrainingTriggering(self.app_config, 'suggestion_trigger_info',
+                            training_defect_type_model.DefectTypeModelTraining(model_chooser, app_config, search_cfg)),
+            "suggestion": (RetrainingTriggering(app_config, 'suggestion_trigger_info',
                                                 start_number=100, accumulated_difference=50),
-                           training_analysis_model.AnalysisModelTraining(model_chooser, self.app_config,
-                                                                         self.search_cfg)),
-            "auto_analysis": (RetrainingTriggering(self.app_config, 'auto_analysis_trigger_info',
+                           training_analysis_model.AnalysisModelTraining(model_chooser, app_config, search_cfg)),
+            "auto_analysis": (RetrainingTriggering(app_config, 'auto_analysis_trigger_info',
                                                    start_number=300, accumulated_difference=100),
-                              training_analysis_model.AnalysisModelTraining(model_chooser, self.app_config,
-                                                                            self.search_cfg))
+                              training_analysis_model.AnalysisModelTraining(model_chooser, app_config, search_cfg))
         }
 
     def does_trigger_exist(self, name):

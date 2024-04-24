@@ -27,19 +27,18 @@
 import json
 import logging
 import unittest
-from typing import Any
 
 import httpretty
 
 from app.commons import model_chooser
-from app.commons.launch_objects import SearchConfig
+from app.commons.launch_objects import SearchConfig, ApplicationConfig
 from app.utils import utils
 
 
 class TestService(unittest.TestCase):
     ERROR_LOGGING_LEVEL = 40000
     model_settings: dict
-    app_config: dict[str, Any]
+    app_config: ApplicationConfig
 
     @utils.ignore_warnings
     def setUp(self):
@@ -169,29 +168,29 @@ class TestService(unittest.TestCase):
         self.launch_w_test_items_w_logs_with_clusters = "launch_w_test_items_w_logs_with_clusters.json"
         self.index_logs_rq_big_messages_with_clusters = \
             "index_logs_rq_big_messages_with_clusters.json"
-        self.app_config = {
-            "esHost": "http://localhost:9200",
-            "esUser": "",
-            "esPassword": "",
-            "esVerifyCerts": False,
-            "esUseSsl": False,
-            "esSslShowWarn": False,
-            "turnOffSslVerification": True,
-            "esCAcert": "",
-            "esClientCert": "",
-            "esClientKey": "",
-            "appVersion": "",
-            "minioRegion": "",
-            "minioBucketPrefix": "",
-            "filesystemDefaultPath": "",
-            "esChunkNumber": 1000,
-            "binaryStoreType": "filesystem",
-            "minioHost": "",
-            "minioAccessKey": "",
-            "minioSecretKey": "",
-            "esProjectIndexPrefix": "",
-            "esChunkNumberUpdateClusters": 500
-        }
+        self.app_config = ApplicationConfig(
+            esHost='http://localhost:9200',
+            esUser="",
+            esPassword="",
+            esVerifyCerts=False,
+            esUseSsl=False,
+            esSslShowWarn=False,
+            turnOffSslVerification=True,
+            esCAcert="",
+            esClientCert="",
+            esClientKey="",
+            appVersion="",
+            minioRegion="",
+            minioBucketPrefix="",
+            filesystemDefaultPath="",
+            esChunkNumber=1000,
+            binaryStoreType="filesystem",
+            minioHost="",
+            minioAccessKey="",
+            minioSecretKey="",
+            esProjectIndexPrefix="",
+            esChunkNumberUpdateClusters=500
+        )
         model_settings = utils.read_json_file('res', 'model_settings.json', to_json=True)
         if model_settings and isinstance(model_settings, dict):
             self.model_settings = model_settings
@@ -240,7 +239,7 @@ class TestService(unittest.TestCase):
             if "content_type" in test_info:
                 httpretty.register_uri(
                     test_info["method"],
-                    self.app_config["esHost"] + test_info["uri"],
+                    self.app_config.esHost + test_info["uri"],
                     body=test_info["rs"] if "rs" in test_info else "",
                     status=test_info["status"],
                     content_type=test_info["content_type"]
@@ -248,7 +247,7 @@ class TestService(unittest.TestCase):
             else:
                 httpretty.register_uri(
                     test_info["method"],
-                    self.app_config["esHost"] + test_info["uri"],
+                    self.app_config.esHost + test_info["uri"],
                     body=test_info["rs"] if "rs" in test_info else "",
                     status=test_info["status"]
                 )

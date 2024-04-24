@@ -17,15 +17,14 @@ from datetime import datetime
 from queue import Queue
 from threading import Thread
 from time import time, sleep
-from typing import Any
 
 from app.amqp.amqp import AmqpClient
 from app.commons import logging
 from app.commons import object_saving
 from app.commons.esclient import EsClient
 from app.commons.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult, \
-    SearchConfig
-from app.commons.model_chooser import ModelType
+    SearchConfig, ApplicationConfig
+from app.commons.model_chooser import ModelType, ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.similarity_calculator import SimilarityCalculator
 from app.machine_learning import boosting_featurizer
@@ -38,13 +37,13 @@ EARLY_FINISH = False
 
 
 class AutoAnalyzerService(AnalyzerService):
-    app_config: dict[str, Any]
+    app_config: ApplicationConfig
     search_cfg: SearchConfig
     es_client: EsClient
     namespace_finder: NamespaceFinder
     similarity_model: WeightedSimilarityCalculator
 
-    def __init__(self, model_chooser, app_config: dict[str, Any], search_cfg: SearchConfig,
+    def __init__(self, model_chooser: ModelChooser, app_config: ApplicationConfig, search_cfg: SearchConfig,
                  es_client: EsClient = None):
         self.app_config = app_config
         self.search_cfg = search_cfg
@@ -317,7 +316,7 @@ class AutoAnalyzerService(AnalyzerService):
         try:
             for launch in launches:
                 index_name = text_processing.unite_project_name(
-                    str(launch.project), self.app_config["esProjectIndexPrefix"])
+                    str(launch.project), self.app_config.esProjectIndexPrefix)
                 if not self.es_client.index_exists(index_name):
                     continue
                 if test_items_number_to_process >= self.search_cfg.MaxAutoAnalysisItemsToProcess:
@@ -399,9 +398,9 @@ class AutoAnalyzerService(AnalyzerService):
         es_query_thread.daemon = True
         es_query_thread.start()
         analyzed_results_for_index = []
+        t_start = time()
+        results = []
         try:
-            results = []
-            t_start = time()
             del launches
 
             cnt_items_to_process = 0
@@ -433,7 +432,7 @@ class AutoAnalyzerService(AnalyzerService):
                             "min_should_match": self.find_min_should_match_threshold(
                                 analyzer_candidates.analyzerConfig),
                             "model_info": set(),
-                            "module_version": [self.app_config["appVersion"]],
+                            "module_version": [self.app_config.appVersion],
                             "errors": [],
                             "errors_count": 0}
 
@@ -557,18 +556,17 @@ class AutoAnalyzerService(AnalyzerService):
                 except Exception as exc:
                     logger.exception(exc)
                     if launch_id in results_to_share:
-                        results_to_share[launch_id]["errors"].append(
-                            utils.extract_exception(exc))
+                        results_to_share[launch_id]["errors"].append(utils.extract_exception(exc))
                         results_to_share[launch_id]["errors_count"] += 1
-            if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip() and analyzed_results_for_index:
-                AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
-                    self.app_config["exchangeName"], "index_suggest_info",
+            if self.app_config.amqpUrl and analyzed_results_for_index:
+                amqp_client = AmqpClient(self.app_config.amqpUrl)
+                amqp_client.send_to_inner_queue(
+                    self.app_config.exchangeName, 'index_suggest_info',
                     json.dumps([_info.dict() for _info in analyzed_results_for_index]))
                 for launch_id in results_to_share:
-                    results_to_share[launch_id]["model_info"] = list(
-                        results_to_share[launch_id]["model_info"])
-                AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
-                    self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
+                    results_to_share[launch_id]['model_info'] = list(results_to_share[launch_id]['model_info'])
+                amqp_client.send_to_inner_queue(
+                    self.app_config.exchangeName, 'stats_info', json.dumps(results_to_share))
         except Exception as exc:
             logger.exception(exc)
         es_query_thread.join()

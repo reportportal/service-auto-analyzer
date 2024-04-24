@@ -16,7 +16,6 @@ import hashlib
 import json
 from datetime import datetime
 from time import time
-from typing import Any
 
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
@@ -24,7 +23,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from app.amqp.amqp import AmqpClient
 from app.commons import clusterizer, logging
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import ClusterResult, ClusterInfo, SearchConfig
+from app.commons.launch_objects import ClusterResult, ClusterInfo, SearchConfig, ApplicationConfig
 from app.commons.log_merger import LogMerger
 from app.commons.log_preparation import LogPreparation
 from app.utils import utils, text_processing
@@ -33,13 +32,13 @@ logger = logging.getLogger("analyzerApp.clusterService")
 
 
 class ClusterService:
-    app_config: dict[str, Any]
+    app_config: ApplicationConfig
     search_cfg: SearchConfig
     es_client: EsClient
     log_preparation: LogPreparation
     log_merger: LogMerger
 
-    def __init__(self, app_config: dict[str, Any], search_cfg: SearchConfig):
+    def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=self.app_config)
@@ -306,7 +305,7 @@ class ClusterService:
             regroupped_by_error[group_key].append(i)
         return regroupped_by_error
 
-    def cluster_messages_with_groupping_by_error(self, log_messages, log_dict, unique_errors_min_should_match):
+    def cluster_messages_with_grouping_by_error(self, log_messages, log_dict, unique_errors_min_should_match):
         regroupped_by_error = self.regroup_by_error_ans_status_codes(
             log_messages, log_dict)
         _clusterizer = clusterizer.Clusterizer()
@@ -335,7 +334,7 @@ class ClusterService:
     def find_clusters(self, launch_info):
         logger.info("Started clusterizing logs")
         index_name = text_processing.unite_project_name(
-            str(launch_info.project), self.app_config["esProjectIndexPrefix"])
+            str(launch_info.project), self.app_config.esProjectIndexPrefix)
         if not self.es_client.index_exists(index_name):
             logger.info("Project %s doesn't exist", index_name)
             logger.info("Finished clustering log with 0 clusters.")
@@ -356,7 +355,7 @@ class ClusterService:
                 launch_info.cleanNumbers, index_name)
             log_ids = set([str(log["_id"]) for log in log_dict.values()])
 
-            groups = self.cluster_messages_with_groupping_by_error(
+            groups = self.cluster_messages_with_grouping_by_error(
                 log_messages, log_dict,
                 unique_errors_min_should_match)
             logger.debug("Groups: %s", groups)
@@ -391,7 +390,7 @@ class ClusterService:
                                 "cluster_message": cluster_message,
                                 "cluster_with_numbers": not launch_info.cleanNumbers}})
                 self.es_client._bulk_index(
-                    bodies, refresh=False, chunk_size=self.app_config["esChunkNumberUpdateClusters"])
+                    bodies, refresh=False, chunk_size=self.app_config.esChunkNumberUpdateClusters)
         except Exception as exc:
             logger.exception(exc)
             errors_found.append(utils.extract_exception(exc))
@@ -404,13 +403,13 @@ class ClusterService:
             "project_id": launch_info.project, "method": "find_clusters",
             "gather_date": datetime.now().strftime("%Y-%m-%d"),
             "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "module_version": [self.app_config["appVersion"]],
+            "module_version": [self.app_config.appVersion],
             "model_info": [],
             "errors": errors_found,
             "errors_count": errors_count}}
-        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
-            AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
-                self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
+        if self.app_config.amqpUrl.strip():
+            AmqpClient(self.app_config.amqpUrl).send_to_inner_queue(
+                self.app_config.exchangeName, 'stats_info', json.dumps(results_to_share))
 
         logger.debug("Stats info %s", results_to_share)
         logger.info("Processed the launch. It took %.2f sec.", time() - t_start)

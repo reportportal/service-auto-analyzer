@@ -13,11 +13,10 @@
 #  limitations under the License.
 
 from time import time
-from typing import Any
 
 from app.commons import logging, namespace_finder, trigger_manager
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import SearchConfig
+from app.commons.launch_objects import SearchConfig, ApplicationConfig
 from app.utils import utils, text_processing
 from app.commons.model_chooser import ModelChooser
 
@@ -25,19 +24,19 @@ logger = logging.getLogger("analyzerApp.deleteIndexService")
 
 
 class DeleteIndexService:
-    app_config: dict[str, Any]
+    app_config: ApplicationConfig
     search_cfg: SearchConfig
     namespace_finder: namespace_finder.NamespaceFinder
     trigger_manager: trigger_manager.TriggerManager
     es_client: EsClient
     model_chooser: ModelChooser
 
-    def __init__(self, model_chooser: ModelChooser, app_config: dict[str, Any], search_cfg: SearchConfig):
+    def __init__(self, model_chooser: ModelChooser, app_config: ApplicationConfig, search_cfg: SearchConfig):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.namespace_finder = namespace_finder.NamespaceFinder(self.app_config)
-        self.trigger_manager = trigger_manager.TriggerManager(
-            model_chooser, self.search_cfg, app_config=self.app_config)
+        self.trigger_manager = trigger_manager.TriggerManager(model_chooser, app_config=self.app_config,
+                                                              search_cfg=self.search_cfg)
         self.es_client = EsClient(app_config=self.app_config)
         self.model_chooser = model_chooser
 
@@ -46,7 +45,7 @@ class DeleteIndexService:
         logger.info("Started deleting index")
         t_start = time()
         is_index_deleted = self.es_client.delete_index(text_processing.unite_project_name(
-            str(index_name), self.app_config["esProjectIndexPrefix"]))
+            str(index_name), self.app_config.esProjectIndexPrefix))
         self.namespace_finder.remove_namespaces(index_name)
         self.trigger_manager.delete_triggers(index_name)
         self.model_chooser.delete_all_custom_models(index_name)

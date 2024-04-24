@@ -15,7 +15,6 @@
 import json
 from datetime import datetime
 from time import time
-from typing import Any
 
 import elasticsearch
 import elasticsearch.helpers
@@ -25,6 +24,7 @@ from app.commons import logging
 from app.commons.esclient import EsClient
 from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
 from app.utils import utils, text_processing
+from app.commons.launch_objects import ApplicationConfig
 
 logger = logging.getLogger("analyzerApp.suggestInfoService")
 
@@ -35,12 +35,12 @@ class SuggestInfoService:
      This is necessary for further use in custom model training.
      """
 
-    app_config: dict[str, Any]
+    app_config: ApplicationConfig
     es_client: EsClient
     rp_suggest_index_template: str
     rp_suggest_metrics_index_template: str
 
-    def __init__(self, app_config: dict[str, Any]):
+    def __init__(self, app_config: ApplicationConfig):
         self.app_config = app_config
         self.es_client = EsClient(app_config=self.app_config)
         self.rp_suggest_index_template = "rp_suggestions_info"
@@ -63,13 +63,13 @@ class SuggestInfoService:
             obj_info = json.loads(obj.json())
             obj_info["savedDate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             obj_info["modelInfo"] = [obj.strip() for obj in obj_info["modelInfo"].split(";") if obj.strip()]
-            obj_info["module_version"] = [self.app_config["appVersion"]]
+            obj_info["module_version"] = [self.app_config.appVersion]
             if obj_info["testItem"] not in metrics_data_by_test_item:
                 metrics_data_by_test_item[obj_info["testItem"]] = []
             metrics_data_by_test_item[obj_info["testItem"]].append(obj_info)
             project_index_name = self.build_index_name(obj_info["project"])
             project_index_name = text_processing.unite_project_name(
-                project_index_name, self.app_config["esProjectIndexPrefix"])
+                project_index_name, self.app_config.esProjectIndexPrefix)
             if project_index_name not in project_index_names:
                 self.es_client.create_index_for_stats_info(
                     self.rp_suggest_index_template, override_index_name=project_index_name)
@@ -111,13 +111,13 @@ class SuggestInfoService:
         logger.info("Removing suggest_info index")
         project_index_name = self.build_index_name(project_id)
         project_index_name = text_processing.unite_project_name(
-            project_index_name, self.app_config["esProjectIndexPrefix"])
+            project_index_name, self.app_config.esProjectIndexPrefix)
         return self.es_client.delete_index(project_index_name)
 
     def build_suggest_info_ids_query(self, log_ids):
         return {
             "_source": ["testItem"],
-            "size": self.app_config["esChunkNumber"],
+            "size": self.app_config.esChunkNumber,
             "query": {
                 "bool": {
                     "should": [
@@ -145,14 +145,14 @@ class SuggestInfoService:
         """Delete logs from elasticsearch"""
         index_name = self.build_index_name(clean_index.project)
         index_name = text_processing.unite_project_name(
-            index_name, self.app_config["esProjectIndexPrefix"])
+            index_name, self.app_config.esProjectIndexPrefix)
         logger.info("Delete logs %s for the index %s",
                     clean_index.ids, index_name)
         t_start = time()
         if not self.es_client.index_exists(index_name, print_error=False):
             logger.info("Didn't find index '%s'", index_name)
             return 0
-        sugggest_log_ids = set()
+        suggest_log_ids = set()
         try:
             search_query = self.build_suggest_info_ids_query(
                 clean_index.ids)
@@ -160,12 +160,12 @@ class SuggestInfoService:
                                                   query=search_query,
                                                   index=index_name,
                                                   scroll="5m"):
-                sugggest_log_ids.add(res["_id"])
+                suggest_log_ids.add(res["_id"])
         except Exception as exc:
             logger.error("Couldn't find logs with specified ids")
             logger.exception(exc)
         bodies = []
-        for _id in sugggest_log_ids:
+        for _id in suggest_log_ids:
             bodies.append({
                 "_op_type": "delete",
                 "_id": _id,
@@ -180,7 +180,7 @@ class SuggestInfoService:
         """Delete logs from elasticsearch"""
         index_name = self.build_index_name(remove_items_info["project"])
         index_name = text_processing.unite_project_name(
-            index_name, self.app_config["esProjectIndexPrefix"])
+            index_name, self.app_config.esProjectIndexPrefix)
         logger.info("Delete test items %s for the index %s",
                     remove_items_info["itemsToDelete"], index_name)
         t_start = time()
@@ -197,7 +197,7 @@ class SuggestInfoService:
         launch_ids = launch_remove_info["launch_ids"]
         index_name = self.build_index_name(project)
         index_name = text_processing.unite_project_name(
-            index_name, self.app_config["esProjectIndexPrefix"]
+            index_name, self.app_config.esProjectIndexPrefix
         )
         logger.info("Delete launches %s for the index %s", launch_ids, index_name)
         t_start = time()
@@ -217,7 +217,7 @@ class SuggestInfoService:
     def build_query_for_getting_suggest_info(self, test_item_ids):
         return {
             "_source": ["testItem", "issueType"],
-            "size": self.app_config["esChunkNumber"],
+            "size": self.app_config.esChunkNumber,
             "query": {
                 "bool": {
                     "must": [
@@ -235,7 +235,7 @@ class SuggestInfoService:
         defect_update_info["itemsToUpdate"] = {
             int(key_): val for key_, val in defect_update_info["itemsToUpdate"].items()}
         index_name = self.build_index_name(defect_update_info["project"])
-        index_name = text_processing.unite_project_name(index_name, self.app_config["esProjectIndexPrefix"])
+        index_name = text_processing.unite_project_name(index_name, self.app_config.esProjectIndexPrefix)
         if not self.es_client.index_exists(index_name):
             return 0
         batch_size = 1000
@@ -265,10 +265,10 @@ class SuggestInfoService:
                     })
         result = self.es_client._bulk_index(log_update_queries)
         try:
-            if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
+            if self.app_config.amqpUrl:
                 for model_type in ["suggestion", "auto_analysis"]:
-                    AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
-                        self.app_config["exchangeName"], "train_models", json.dumps({
+                    AmqpClient(self.app_config.amqpUrl).send_to_inner_queue(
+                        self.app_config.exchangeName, "train_models", json.dumps({
                             "model_type": model_type,
                             "project_id": defect_update_info["project"],
                             GATHERED_METRIC_TOTAL: result.took

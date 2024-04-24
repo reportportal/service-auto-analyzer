@@ -16,14 +16,13 @@ import json
 from datetime import datetime
 from functools import reduce
 from time import time
-from typing import Any
 
 import elasticsearch.helpers
 
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, similarity_calculator, object_saving
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import SuggestAnalysisResult, SearchConfig
+from app.commons.launch_objects import SuggestAnalysisResult, SearchConfig, ApplicationConfig
 from app.commons.model_chooser import ModelType, ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
@@ -44,13 +43,13 @@ SPECIAL_FIELDS_BOOST_SCORES = [
 class SuggestService(AnalyzerService):
     """The service serves suggestion lists in Make Decision modal."""
 
-    app_config: dict[str, Any]
+    app_config: ApplicationConfig
     search_cfg: SearchConfig
     es_client: EsClient
     namespace_finder: NamespaceFinder
     similarity_model: WeightedSimilarityCalculator
 
-    def __init__(self, model_chooser: ModelChooser, app_config: dict[str, Any], search_cfg: SearchConfig,
+    def __init__(self, model_chooser: ModelChooser, app_config: ApplicationConfig, search_cfg: SearchConfig,
                  es_client: EsClient = None):
         self.app_config = app_config
         self.search_cfg = search_cfg
@@ -156,7 +155,7 @@ class SuggestService(AnalyzerService):
     def query_es_for_suggested_items(self, test_item_info, logs):
         full_results = []
         index_name = text_processing.unite_project_name(
-            str(test_item_info.project), self.app_config["esProjectIndexPrefix"])
+            str(test_item_info.project), self.app_config.esProjectIndexPrefix)
 
         for log in logs:
             message = log["_source"]["message"].strip()
@@ -272,7 +271,7 @@ class SuggestService(AnalyzerService):
             "processedTime": processed_time,
             "notFoundResults": 100,
             "savedDate": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "module_version": [self.app_config["appVersion"]],
+            "module_version": [self.app_config.appVersion],
             "methodName": "suggestion",
             "clusterId": test_item_info.clusterId
         }
@@ -344,7 +343,7 @@ class SuggestService(AnalyzerService):
         logger.debug(f'Started suggesting items by request: {test_item_info.json()}')
         logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))
         index_name = text_processing.unite_project_name(
-            str(test_item_info.project), self.app_config["esProjectIndexPrefix"])
+            str(test_item_info.project), self.app_config.esProjectIndexPrefix)
         if not self.es_client.index_exists(index_name):
             logger.info("Project %s doesn't exist", index_name)
             logger.info("Finished suggesting for test item with 0 results.")
@@ -453,7 +452,7 @@ class SuggestService(AnalyzerService):
             "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "number_of_log_lines": test_item_info.analyzerConfig.numberOfLogLines,
             "model_info": model_info_tags,
-            "module_version": [self.app_config["appVersion"]],
+            "module_version": [self.app_config.appVersion],
             "min_should_match": self.find_min_should_match_threshold(
                 test_item_info.analyzerConfig),
             "errors": errors_found,
@@ -468,13 +467,14 @@ class SuggestService(AnalyzerService):
                     model_info_tags)
             }])
         try:
-            if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
-                AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
-                    self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
+            if self.app_config.amqpUrl:
+                amqp_client = AmqpClient(self.app_config.amqpUrl)
+                amqp_client.send_to_inner_queue(
+                    self.app_config.exchangeName, "stats_info", json.dumps(results_to_share))
                 if results:
                     for model_type in ["suggestion", "auto_analysis"]:
-                        AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
-                            self.app_config["exchangeName"], "train_models", json.dumps({
+                        amqp_client.send_to_inner_queue(
+                            self.app_config.exchangeName, "train_models", json.dumps({
                                 "model_type": model_type,
                                 "project_id": test_item_info.project,
                                 GATHERED_METRIC_TOTAL: len(results)

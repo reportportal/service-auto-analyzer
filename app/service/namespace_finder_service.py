@@ -13,9 +13,9 @@
 #  limitations under the License.
 
 from time import time
-from typing import Any
 
 from app.commons import logging, namespace_finder
+from app.commons.launch_objects import ApplicationConfig
 from app.commons.log_preparation import LogPreparation
 from app.utils import utils
 
@@ -23,13 +23,11 @@ logger = logging.getLogger("analyzerApp.namespaceFinderService")
 
 
 class NamespaceFinderService:
-    app_config: dict[str, Any]
     namespace_finder: namespace_finder.NamespaceFinder
     log_preparation: LogPreparation
 
-    def __init__(self, app_config: dict[str, Any]):
-        self.app_config = app_config
-        self.namespace_finder = namespace_finder.NamespaceFinder(self.app_config)
+    def __init__(self, app_config: ApplicationConfig):
+        self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.log_preparation = LogPreparation()
 
     @utils.ignore_warnings

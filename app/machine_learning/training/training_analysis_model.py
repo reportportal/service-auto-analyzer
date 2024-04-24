@@ -16,7 +16,6 @@ import os
 import pickle
 from datetime import datetime
 from time import time
-from typing import Any
 
 import elasticsearch
 import elasticsearch.helpers
@@ -27,7 +26,7 @@ from sklearn.model_selection import train_test_split
 
 from app.commons import logging, namespace_finder, object_saving
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import SearchConfig
+from app.commons.launch_objects import SearchConfig, ApplicationConfig
 from app.commons.model_chooser import ModelType, ModelChooser
 from app.machine_learning.feature_encoding_configurer import FeatureEncodingConfigurer
 from app.machine_learning.models import (boosting_decision_maker, custom_boosting_decision_maker,
@@ -39,10 +38,10 @@ logger = logging.getLogger("analyzerApp.trainingAnalysisModel")
 
 
 class AnalysisModelTraining:
-    app_config: dict[str, Any]
+    app_config: ApplicationConfig
     search_cfg: SearchConfig
 
-    def __init__(self, model_chooser: ModelChooser, app_config: dict[str, Any], search_cfg: SearchConfig):
+    def __init__(self, model_chooser: ModelChooser, app_config: ApplicationConfig, search_cfg: SearchConfig):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.due_proportion = 0.05
@@ -197,7 +196,7 @@ class AnalysisModelTraining:
     def query_logs(self, project_id, log_ids_to_find):
         log_ids_to_find = list(log_ids_to_find)
         project_index_name = text_processing.unite_project_name(
-            str(project_id), self.app_config["esProjectIndexPrefix"])
+            str(project_id), self.app_config.esProjectIndexPrefix)
         batch_size = 1000
         log_id_dict = {}
         for i in range(int(len(log_ids_to_find) / batch_size) + 1):
@@ -205,7 +204,7 @@ class AnalysisModelTraining:
             if not log_ids:
                 continue
             ids_query = {
-                "size": self.app_config["esChunkNumber"],
+                "size": self.app_config.esChunkNumber,
                 "query": {
                     "bool": {
                         "filter": [
@@ -223,7 +222,7 @@ class AnalysisModelTraining:
     def get_search_query_suggest(self):
         return {
             "sort": {"savedDate": "desc"},
-            "size": self.app_config["esChunkNumber"],
+            "size": self.app_config.esChunkNumber,
             "query": {
                 "bool": {
                     "must": [
@@ -236,7 +235,7 @@ class AnalysisModelTraining:
     def get_search_query_aa(self, user_choice):
         return {
             "sort": {"savedDate": "desc"},
-            "size": self.app_config["esChunkNumber"],
+            "size": self.app_config.esChunkNumber,
             "query": {
                 "bool": {
                     "must": [
@@ -261,7 +260,7 @@ class AnalysisModelTraining:
         gathered_suggested_data = []
         log_id_pairs_set = set()
         index_name = text_processing.unite_project_name(
-            str(project_id) + "_suggest", self.app_config["esProjectIndexPrefix"])
+            str(project_id) + "_suggest", self.app_config.esProjectIndexPrefix)
         max_number_of_logs = 30000
         cur_number_of_logs = 0
         cur_number_of_logs_0 = 0
@@ -455,7 +454,7 @@ class AnalysisModelTraining:
         for metric in metrics_to_gather:
             train_log_info[metric]["time_spent"] = time_spent
             train_log_info[metric]["gather_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            train_log_info[metric]["module_version"] = [self.app_config["appVersion"]]
+            train_log_info[metric]["module_version"] = [self.app_config.appVersion]
             train_log_info[metric]["errors"].extend(errors)
             train_log_info[metric]["errors_count"] += errors_count
 

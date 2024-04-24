@@ -24,7 +24,7 @@ from app.amqp.amqp import AmqpClient
 from app.commons import logging, similarity_calculator, object_saving
 from app.commons.esclient import EsClient
 from app.commons.launch_objects import SuggestAnalysisResult, SearchConfig
-from app.commons.model_chooser import ModelType
+from app.commons.model_chooser import ModelType, ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
 from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
@@ -50,21 +50,21 @@ class SuggestService(AnalyzerService):
     namespace_finder: NamespaceFinder
     similarity_model: WeightedSimilarityCalculator
 
-    def __init__(self, model_chooser, app_config: dict[str, Any], search_cfg: SearchConfig,
+    def __init__(self, model_chooser: ModelChooser, app_config: dict[str, Any], search_cfg: SearchConfig,
                  es_client: EsClient = None):
         self.app_config = app_config
         self.search_cfg = search_cfg
         super().__init__(model_chooser, search_cfg=self.search_cfg)
         self.es_client = es_client or EsClient(app_config=self.app_config)
         self.suggest_threshold = 0.4
-        self.rp_suggest_index_template = "rp_suggestions_info"
-        self.rp_suggest_metrics_index_template = "rp_suggestions_info_metrics"
+        self.rp_suggest_index_template = 'rp_suggestions_info'
+        self.rp_suggest_metrics_index_template = 'rp_suggestions_info_metrics'
         self.namespace_finder = NamespaceFinder(app_config)
         weights_folder = self.search_cfg.SimilarityWeightsFolder
         if not weights_folder:
             raise ValueError('SimilarityWeightsFolder is not set')
         if weights_folder:
-            self.similarity_model = (WeightedSimilarityCalculator(object_saving.create_filesystem(weights_folder)))
+            self.similarity_model = WeightedSimilarityCalculator(object_saving.create_filesystem(weights_folder))
             self.similarity_model.load_model()
 
     def get_config_for_boosting_suggests(self, analyzer_config):

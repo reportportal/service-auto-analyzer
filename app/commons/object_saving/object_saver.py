@@ -16,6 +16,7 @@ import os
 from typing import Any, Callable
 
 from app.commons import logging
+from app.commons.launch_objects import ApplicationConfig
 from app.commons.object_saving.filesystem_saver import FilesystemSaver
 from app.commons.object_saving.minio_client import MinioClient
 from app.commons.object_saving.storage import Storage
@@ -23,20 +24,18 @@ from app.commons.object_saving.storage import Storage
 logger = logging.getLogger("analyzerApp.objectSaver")
 
 
-def create_minio_client(app_config: dict[str, Any]) -> Storage:
+def create_minio_client(app_config: ApplicationConfig) -> Storage:
     return MinioClient(app_config)
 
 
-def create_filesystem_client(app_config: dict[str, Any]) -> Storage:
+def create_filesystem_client(app_config: ApplicationConfig) -> Storage:
     return FilesystemSaver(app_config)
 
 
-STORAGE_FACTORIES: dict[str, Callable[[dict], Storage]] = {
+STORAGE_FACTORIES: dict[str, Callable[[ApplicationConfig], Storage]] = {
     'minio': create_minio_client,
     'filesystem': create_filesystem_client
 }
-
-CONFIG_KEY = 'binaryStoreType'
 
 
 class ObjectSaver:
@@ -44,15 +43,15 @@ class ObjectSaver:
     project_id: str | int | None = None
     path: str
 
-    def __init__(self, app_config: dict[str, Any], project_id: str | int | None = None,
+    def __init__(self, app_config: ApplicationConfig, project_id: str | int | None = None,
                  path: str | None = None) -> None:
         self.project_id = project_id
         self.path = path or ""
-        if CONFIG_KEY in app_config and app_config[CONFIG_KEY] in STORAGE_FACTORIES:
-            self.storage = STORAGE_FACTORIES[app_config[CONFIG_KEY]](app_config)
+        if app_config.binaryStoreType in STORAGE_FACTORIES:
+            self.storage = STORAGE_FACTORIES[app_config.binaryStoreType](app_config)
         else:
             raise ValueError(
-                f'Storage "{app_config.get(CONFIG_KEY, None)}" is not supported, possible types are: '
+                f'Storage "{app_config.binaryStoreType}" is not supported, possible types are: '
                 + str(STORAGE_FACTORIES.keys())
             )
 

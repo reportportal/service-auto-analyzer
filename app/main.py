@@ -19,17 +19,17 @@ import threading
 import time
 from signal import signal, SIGINT
 from sys import exit
-from typing import Any
 
 from flask import Flask, Response, jsonify
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
+from pika.adapters.blocking_connection import BlockingChannel
 
 from app.amqp import amqp_handler
 from app.amqp.amqp import AmqpClient
 from app.commons import model_chooser, logging as my_logging
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import SearchConfig
+from app.commons.launch_objects import ApplicationConfig, SearchConfig
 from app.service import AnalyzerService
 from app.service import AutoAnalyzerService
 from app.service import CleanIndexService
@@ -43,45 +43,45 @@ from app.service import SuggestPatternsService
 from app.service import SuggestService
 from app.utils import utils
 
-APP_CONFIG: dict[str, Any] = {
-    "esHost": os.getenv("ES_HOSTS", "http://elasticsearch:9200").strip("/").strip("\\"),
-    "esUser": os.getenv("ES_USER", "").strip(),
-    "esPassword": os.getenv("ES_PASSWORD", "").strip(),
-    "logLevel": os.getenv("LOGGING_LEVEL", "DEBUG").strip(),
-    "amqpUrl": os.getenv("AMQP_URL", "").strip("/").strip("\\") + "/" + os.getenv(
+APP_CONFIG = ApplicationConfig(
+    esHost=os.getenv("ES_HOSTS", "http://elasticsearch:9200").strip("/").strip("\\"),
+    esUser=os.getenv("ES_USER", "").strip(),
+    esPassword=os.getenv("ES_PASSWORD", "").strip(),
+    logLevel=os.getenv("LOGGING_LEVEL", "DEBUG").strip(),
+    amqpUrl=os.getenv("AMQP_URL", "").strip("/").strip("\\") + "/" + os.getenv(
         "AMQP_VIRTUAL_HOST", "analyzer"),
-    "exchangeName": os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
-    "analyzerPriority": int(os.getenv("ANALYZER_PRIORITY", "1")),
-    "analyzerIndex": json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),
-    "analyzerLogSearch": json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower()),
-    "analyzerSuggest": json.loads(os.getenv("ANALYZER_SUGGEST", "true").lower()),
-    "analyzerCluster": json.loads(os.getenv("ANALYZER_CLUSTER", "true").lower()),
-    "turnOffSslVerification": json.loads(os.getenv("ES_TURN_OFF_SSL_VERIFICATION", "false").lower()),
-    "esVerifyCerts": json.loads(os.getenv("ES_VERIFY_CERTS", "false").lower()),
-    "esUseSsl": json.loads(os.getenv("ES_USE_SSL", "false").lower()),
-    "esSslShowWarn": json.loads(os.getenv("ES_SSL_SHOW_WARN", "false").lower()),
-    "esCAcert": os.getenv("ES_CA_CERT", ""),
-    "esClientCert": os.getenv("ES_CLIENT_CERT", ""),
-    "esClientKey": os.getenv("ES_CLIENT_KEY", ""),
-    "minioHost": os.getenv("MINIO_SHORT_HOST", "minio:9000"),
-    "minioAccessKey": os.getenv("MINIO_ACCESS_KEY", "minio"),
-    "minioSecretKey": os.getenv("MINIO_SECRET_KEY", "minio123"),
-    "minioUseTls": json.loads(os.getenv("MINIO_USE_TLS", "false").lower()),
-    "appVersion": "",
-    "binaryStoreType": os.getenv("ANALYZER_BINSTORE_TYPE",
-                                 os.getenv("ANALYZER_BINARYSTORE_TYPE", "filesystem")),
-    "minioBucketPrefix": os.getenv("ANALYZER_BINSTORE_BUCKETPREFIX",
-                                   os.getenv("ANALYZER_BINARYSTORE_BUCKETPREFIX", "prj-")),
-    "minioRegion": os.getenv("ANALYZER_BINSTORE_MINIO_REGION",
-                             os.getenv("ANALYZER_BINARYSTORE_MINIO_REGION", None)),
-    "instanceTaskType": os.getenv("INSTANCE_TASK_TYPE", "").strip(),
-    "filesystemDefaultPath": os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
-    "esChunkNumber": int(os.getenv("ES_CHUNK_NUMBER", "1000")),
-    "esChunkNumberUpdateClusters": int(os.getenv("ES_CHUNK_NUMBER_UPDATE_CLUSTERS", "500")),
-    "esProjectIndexPrefix": os.getenv("ES_PROJECT_INDEX_PREFIX", "").strip(),
-    "analyzerHttpPort": int(os.getenv("ANALYZER_HTTP_PORT", "5001")),
-    "analyzerPathToLog": os.getenv("ANALYZER_FILE_LOGGING_PATH", "/tmp/config.log")
-}
+    exchangeName=os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
+    analyzerPriority=int(os.getenv("ANALYZER_PRIORITY", "1")),
+    analyzerIndex=json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),
+    analyzerLogSearch=json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower()),
+    analyzerSuggest=json.loads(os.getenv("ANALYZER_SUGGEST", "true").lower()),
+    analyzerCluster=json.loads(os.getenv("ANALYZER_CLUSTER", "true").lower()),
+    turnOffSslVerification=json.loads(os.getenv("ES_TURN_OFF_SSL_VERIFICATION", "false").lower()),
+    esVerifyCerts=json.loads(os.getenv("ES_VERIFY_CERTS", "false").lower()),
+    esUseSsl=json.loads(os.getenv("ES_USE_SSL", "false").lower()),
+    esSslShowWarn=json.loads(os.getenv("ES_SSL_SHOW_WARN", "false").lower()),
+    esCAcert=os.getenv("ES_CA_CERT", ""),
+    esClientCert=os.getenv("ES_CLIENT_CERT", ""),
+    esClientKey=os.getenv("ES_CLIENT_KEY", ""),
+    minioHost=os.getenv("MINIO_SHORT_HOST", "minio:9000"),
+    minioAccessKey=os.getenv("MINIO_ACCESS_KEY", "minio"),
+    minioSecretKey=os.getenv("MINIO_SECRET_KEY", "minio123"),
+    minioUseTls=json.loads(os.getenv("MINIO_USE_TLS", "false").lower()),
+    appVersion="",
+    binaryStoreType=os.getenv("ANALYZER_BINSTORE_TYPE",
+                              os.getenv("ANALYZER_BINARYSTORE_TYPE", "filesystem")),
+    minioBucketPrefix=os.getenv("ANALYZER_BINSTORE_BUCKETPREFIX",
+                                os.getenv("ANALYZER_BINARYSTORE_BUCKETPREFIX", "prj-")),
+    minioRegion=os.getenv("ANALYZER_BINSTORE_MINIO_REGION",
+                          os.getenv("ANALYZER_BINARYSTORE_MINIO_REGION", None)),
+    instanceTaskType=os.getenv("INSTANCE_TASK_TYPE", "").strip(),
+    filesystemDefaultPath=os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
+    esChunkNumber=int(os.getenv("ES_CHUNK_NUMBER", "1000")),
+    esChunkNumberUpdateClusters=int(os.getenv("ES_CHUNK_NUMBER_UPDATE_CLUSTERS", "500")),
+    esProjectIndexPrefix=os.getenv("ES_PROJECT_INDEX_PREFIX", "").strip(),
+    analyzerHttpPort=int(os.getenv("ANALYZER_HTTP_PORT", "5001")),
+    analyzerPathToLog=os.getenv("ANALYZER_FILE_LOGGING_PATH", "/tmp/config.log")
+)
 
 SEARCH_CONFIG = SearchConfig(
     SearchLogsMinSimilarity=float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.95")),
@@ -128,29 +128,30 @@ def create_thread(func, args):
     return thread
 
 
-def declare_exchange(channel, config):
+def declare_exchange(channel: BlockingChannel, config: ApplicationConfig):
     """Declares exchange for rabbitmq"""
-    logger.info("ExchangeName: %s", config["exchangeName"])
+    logger.info("ExchangeName: %s", config.exchangeName)
     try:
-        channel.exchange_declare(exchange=config["exchangeName"], exchange_type='direct',
+        channel.exchange_declare(exchange=config.exchangeName, exchange_type='direct',
                                  durable=False, auto_delete=True, internal=False,
                                  arguments={
-                                     "analyzer": config["exchangeName"],
-                                     "analyzer_index": config["analyzerIndex"],
-                                     "analyzer_priority": config["analyzerPriority"],
-                                     "analyzer_log_search": config["analyzerLogSearch"],
-                                     "analyzer_suggest": config["analyzerSuggest"],
-                                     "analyzer_cluster": config["analyzerCluster"],
-                                     "version": config["appVersion"], })
+                                     "analyzer": config.exchangeName,
+                                     "analyzer_index": config.analyzerIndex,
+                                     "analyzer_priority": config.analyzerPriority,
+                                     "analyzer_log_search": config.analyzerLogSearch,
+                                     "analyzer_suggest": config.analyzerSuggest,
+                                     "analyzer_cluster": config.analyzerCluster,
+                                     "version": config.appVersion
+                                 })
     except Exception as err:
         logger.error("Failed to declare exchange")
         logger.error(err)
         return False
-    logger.info("Exchange '%s' has been declared", config["exchangeName"])
+    logger.info("Exchange '%s' has been declared", config.exchangeName)
     return True
 
 
-def init_amqp(_amqp_client):
+def init_amqp(_amqp_client: AmqpClient):
     """Initialize rabbitmq queues, exchange and stars threads for queue messages processing"""
     with _amqp_client.connection.channel() as channel:
         try:
@@ -161,7 +162,7 @@ def init_amqp(_amqp_client):
             return
     _threads = []
     _model_chooser = model_chooser.ModelChooser(APP_CONFIG, SEARCH_CONFIG)
-    if APP_CONFIG["instanceTaskType"] == "train":
+    if APP_CONFIG.instanceTaskType == "train":
         _retraining_service = RetrainingService(_model_chooser, SEARCH_CONFIG, APP_CONFIG)
         _threads.append(create_thread(AmqpClient(APP_CONFIG["amqpUrl"]).receive,
                                       (APP_CONFIG["exchangeName"], "train_models", True, False,
@@ -344,9 +345,9 @@ def init_amqp(_amqp_client):
         )
         _threads.append(
             create_thread(
-                AmqpClient(APP_CONFIG["amqpUrl"]).receive,
+                AmqpClient(APP_CONFIG.amqpUrl).receive,
                 (
-                    APP_CONFIG["exchangeName"],
+                    APP_CONFIG.exchangeName,
                     "remove_by_log_time",
                     True,
                     False,
@@ -395,15 +396,15 @@ def read_model_settings():
 
 
 log_file_path = 'res/logging.conf'
-logging.config.fileConfig(log_file_path, defaults={'logfilename': APP_CONFIG["analyzerPathToLog"]})
-if APP_CONFIG['logLevel'].lower() == 'debug':
+logging.config.fileConfig(log_file_path, defaults={'logfilename': APP_CONFIG.analyzerPathToLog})
+if APP_CONFIG.logLevel.lower() == 'debug':
     logging.disable(logging.NOTSET)
-elif APP_CONFIG['logLevel'].lower() == 'info':
+elif APP_CONFIG.logLevel.lower() == 'info':
     logging.disable(logging.DEBUG)
 else:
     logging.disable(logging.INFO)
 logger = my_logging.getLogger('analyzerApp')
-APP_CONFIG['appVersion'] = read_version()
+APP_CONFIG.appVersion = read_version()
 es_client = EsClient(APP_CONFIG)
 read_model_settings()
 
@@ -431,7 +432,7 @@ def handler(signal_received, frame):
 def start_http_server():
     application.logger.setLevel(logging.INFO)
     logger.info("Started http server")
-    application.run(host='0.0.0.0', port=APP_CONFIG["analyzerHttpPort"], use_reloader=False)
+    application.run(host='0.0.0.0', port=APP_CONFIG.analyzerHttpPort, use_reloader=False)
 
 
 signal(SIGINT, handler)
@@ -440,7 +441,7 @@ while True:
     try:
         logger.info("Starting waiting for AMQP connection")
         try:
-            amqp_client = AmqpClient(APP_CONFIG["amqpUrl"])
+            amqp_client = AmqpClient(APP_CONFIG.amqpUrl)
         except Exception as exc:
             logger.error("Amqp connection was not established")
             logger.exception(exc)

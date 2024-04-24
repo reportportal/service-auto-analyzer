@@ -16,7 +16,6 @@ import json
 import traceback
 from collections import deque
 from time import time
-from typing import Any
 
 import elasticsearch
 import elasticsearch.helpers
@@ -26,7 +25,8 @@ from elasticsearch import RequestsHttpConnection
 from urllib3.exceptions import InsecureRequestWarning
 
 from app.amqp.amqp import AmqpClient
-from app.commons import launch_objects, logging
+from app.commons import logging
+from app.commons.launch_objects import ApplicationConfig, Response, Launch, TestItem, BulkResponse
 from app.commons.log_merger import LogMerger
 from app.commons.log_preparation import LogPreparation
 from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
@@ -37,41 +37,41 @@ logger = logging.getLogger("analyzerApp.esclient")
 
 class EsClient:
     """Elasticsearch client implementation"""
-    app_config: dict[str, Any]
+    app_config: ApplicationConfig
     es_client: elasticsearch.Elasticsearch
     host: str
     log_preparation: LogPreparation
     log_merger: LogMerger
     tables_to_recreate: list[str]
 
-    def __init__(self, app_config: dict[str, Any], es_client: elasticsearch.Elasticsearch = None):
+    def __init__(self, app_config: ApplicationConfig, es_client: elasticsearch.Elasticsearch = None):
         self.app_config = app_config
-        self.host = app_config.get('esHost', 'localhost:9000')
+        self.host = app_config.esHost
         self.es_client = es_client or self.create_es_client(app_config)
         self.log_preparation = LogPreparation()
         self.log_merger = LogMerger()
         self.tables_to_recreate = ["rp_aa_stats", "rp_model_train_stats", "rp_suggestions_info_metrics"]
 
-    def create_es_client(self, app_config) -> elasticsearch.Elasticsearch:
-        if not app_config["esVerifyCerts"]:
+    def create_es_client(self, app_config: ApplicationConfig) -> elasticsearch.Elasticsearch:
+        if not app_config.esVerifyCerts:
             urllib3.disable_warnings(InsecureRequestWarning)
         kwargs = {
             "timeout": 30,
             "max_retries": 5,
             "retry_on_timeout": True,
-            "use_ssl": app_config["esUseSsl"],
-            "verify_certs": app_config["esVerifyCerts"],
-            "ssl_show_warn": app_config["esSslShowWarn"],
-            "ca_certs": app_config["esCAcert"],
-            "client_cert": app_config["esClientCert"],
-            "client_key": app_config["esClientKey"],
+            "use_ssl": app_config.esUseSsl,
+            "verify_certs": app_config.esVerifyCerts,
+            "ssl_show_warn": app_config.esSslShowWarn,
+            "ca_certs": app_config.esCAcert,
+            "client_cert": app_config.esClientCert,
+            "client_key": app_config.esClientKey,
         }
 
-        if app_config["esUser"]:
-            kwargs["http_auth"] = (app_config["esUser"],
-                                   app_config["esPassword"])
+        if app_config.esUser:
+            kwargs["http_auth"] = (app_config.esUser,
+                                   app_config.esPassword)
 
-        if app_config["turnOffSslVerification"]:
+        if app_config.turnOffSslVerification:
             kwargs["connection_class"] = RequestsHttpConnection
 
         return elasticsearch.Elasticsearch([self.host], **kwargs)
@@ -80,7 +80,7 @@ class EsClient:
         """Build test item query"""
         if full_log:
             return {
-                "size": self.app_config["esChunkNumber"],
+                "size": self.app_config.esChunkNumber,
                 "query": {
                     "bool": {
                         "filter": [
@@ -92,7 +92,7 @@ class EsClient:
         else:
             return {
                 "_source": ["test_item"],
-                "size": self.app_config["esChunkNumber"],
+                "size": self.app_config.esChunkNumber,
                 "query": {
                     "bool": {
                         "filter": [
@@ -106,7 +106,7 @@ class EsClient:
         """Build search test item ids query"""
         return {
             "_source": ["test_item"],
-            "size": self.app_config["esChunkNumber"],
+            "size": self.app_config.esChunkNumber,
             "query": {
                 "bool": {
                     "filter": [
@@ -122,7 +122,7 @@ class EsClient:
         """Check whether elasticsearch is healthy"""
         try:
             url = text_processing.build_url(self.host, ["_cluster/health"])
-            res = utils.send_request(url, "GET", self.app_config["esUser"], self.app_config["esPassword"])
+            res = utils.send_request(url, "GET", self.app_config.esUser, self.app_config.esPassword)
             return res["status"] in ["green", "yellow"]
         except Exception as err:
             logger.error("Elasticsearch is not healthy")
@@ -152,17 +152,17 @@ class EsClient:
                 'mappings': utils.read_json_file("res", "index_mapping_settings.json", to_json=True)
             })
             logger.debug("Created '%s' Elasticsearch index", str(index_name))
-            return launch_objects.Response(**response)
+            return Response(**response)
         except Exception as err:
             logger.error("Couldn't create index")
             logger.error("ES Url %s", text_processing.remove_credentials_from_url(self.host))
             logger.error(err)
-            return launch_objects.Response()
+            return Response()
 
     def list_indices(self):
         """Get all indices from elasticsearch"""
         url = text_processing.build_url(self.host, ["_cat", "indices?format=json"])
-        res = utils.send_request(url, "GET", self.app_config["esUser"], self.app_config["esPassword"])
+        res = utils.send_request(url, "GET", self.app_config.esUser, self.app_config.esPassword)
         return res
 
     def index_exists(self, index_name, print_error=True):
@@ -198,8 +198,8 @@ class EsClient:
 
     def _to_launch_test_item_list(
             self,
-            launches: list[launch_objects.Launch]
-    ) -> deque[tuple[launch_objects.Launch, launch_objects.TestItem]]:
+            launches: list[Launch]
+    ) -> deque[tuple[Launch, TestItem]]:
         test_item_queue = deque()
         for launch in launches:
             test_items = launch.testItems
@@ -214,7 +214,7 @@ class EsClient:
     def _to_index_bodies(
             self,
             project_with_prefix: str,
-            test_item_queue: deque[tuple[launch_objects.Launch, launch_objects.TestItem]]
+            test_item_queue: deque[tuple[Launch, TestItem]]
     ) -> tuple[list[str], list[dict]]:
         bodies = []
         test_item_ids = []
@@ -241,9 +241,9 @@ class EsClient:
         test_item_queue = self._to_launch_test_item_list(launches)
         del launches
         if project is None:
-            return launch_objects.BulkResponse(took=0, errors=False)
+            return BulkResponse(took=0, errors=False)
 
-        project_with_prefix = text_processing.unite_project_name(project, self.app_config["esProjectIndexPrefix"])
+        project_with_prefix = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
         self.create_index_if_not_exists(project_with_prefix)
         test_item_ids, bodies = self._to_index_bodies(project_with_prefix, test_item_queue)
         logs_with_exceptions = utils.extract_all_exceptions(bodies)
@@ -251,13 +251,12 @@ class EsClient:
         result.logResults = logs_with_exceptions
         _, num_logs_with_defect_types = self._merge_logs(test_item_ids, project_with_prefix)
         try:
-            if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
-                AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
-                    self.app_config["exchangeName"], "train_models", json.dumps({
-                        "model_type": "defect_type",
-                        "project_id": project,
-                        GATHERED_METRIC_TOTAL: num_logs_with_defect_types
-                    }))
+            AmqpClient(self.app_config.amqpUrl).send_to_inner_queue(
+                self.app_config.exchangeName, "train_models", json.dumps({
+                    "model_type": "defect_type",
+                    "project_id": project,
+                    GATHERED_METRIC_TOTAL: num_logs_with_defect_types
+                }))
         except Exception as exc:
             logger.exception(exc)
         logger.info("Finished indexing logs for %d launches %s. It took %.2f sec.",
@@ -334,10 +333,10 @@ class EsClient:
 
     def _bulk_index(self, bodies, refresh=True, chunk_size=None):
         if not bodies:
-            return launch_objects.BulkResponse(took=0, errors=False)
+            return BulkResponse(took=0, errors=False)
         start_time = time()
         logger.debug("Indexing %d logs...", len(bodies))
-        es_chunk_number = self.app_config["esChunkNumber"]
+        es_chunk_number = self.app_config.esChunkNumber
         if chunk_size is not None:
             es_chunk_number = chunk_size
         try:
@@ -360,17 +359,17 @@ class EsClient:
             if errors:
                 logger.debug("Occured errors %s", errors)
             logger.debug("Finished indexing for %.2f s", time() - start_time)
-            return launch_objects.BulkResponse(took=success_count, errors=len(errors) > 0)
+            return BulkResponse(took=success_count, errors=len(errors) > 0)
         except Exception as exc:
             logger.error("Error in bulk")
             logger.error("ES Url %s", text_processing.remove_credentials_from_url(self.host))
             logger.exception(exc)
-            return launch_objects.BulkResponse(took=0, errors=True)
+            return BulkResponse(took=0, errors=True)
 
     def delete_logs(self, clean_index):
         """Delete logs from elasticsearch"""
         index_name = text_processing.unite_project_name(
-            str(clean_index.project), self.app_config["esProjectIndexPrefix"])
+            str(clean_index.project), self.app_config.esProjectIndexPrefix)
         logger.info("Delete logs %s for the project %s",
                     clean_index.ids, index_name)
         logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.host))
@@ -447,7 +446,7 @@ class EsClient:
 
     def get_test_items_by_ids_query(self, test_item_ids):
         return {"_source": ["test_item"],
-                "size": self.app_config["esChunkNumber"],
+                "size": self.app_config.esChunkNumber,
                 "query": {
                     "bool": {
                         "filter": [
@@ -463,7 +462,7 @@ class EsClient:
         defect_update_info["itemsToUpdate"] = {
             int(key_): val for key_, val in defect_update_info["itemsToUpdate"].items()}
         index_name = text_processing.unite_project_name(
-            str(defect_update_info["project"]), self.app_config["esProjectIndexPrefix"])
+            str(defect_update_info["project"]), self.app_config.esProjectIndexPrefix)
         if not self.index_exists(index_name):
             return test_item_ids
         batch_size = 1000
@@ -496,9 +495,8 @@ class EsClient:
         self._bulk_index(log_update_queries)
         items_not_updated = list(set(test_item_ids) - found_test_items)
         logger.debug("Not updated test items: %s", items_not_updated)
-        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
-            AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
-                self.app_config["exchangeName"], "update_suggest_info", json.dumps(defect_update_info))
+        AmqpClient(self.app_config.amqpUrl).send_to_inner_queue(
+            self.app_config.exchangeName, "update_suggest_info", json.dumps(defect_update_info))
         logger.info("Finished updating defect types. It took %.2f sec", time() - t_start)
         return items_not_updated
 
@@ -517,7 +515,7 @@ class EsClient:
         logger.info("Started removing test items")
         t_start = time()
         index_name = text_processing.unite_project_name(
-            str(remove_items_info["project"]), self.app_config["esProjectIndexPrefix"])
+            str(remove_items_info["project"]), self.app_config.esProjectIndexPrefix)
         deleted_logs = self.delete_by_query(
             index_name, remove_items_info["itemsToDelete"], self.build_delete_query_by_test_items)
         logger.debug("Removed %s logs by test item ids", deleted_logs)
@@ -531,7 +529,7 @@ class EsClient:
         logger.info("Started removing launches")
         t_start = time()
         index_name = text_processing.unite_project_name(
-            str(project), self.app_config["esProjectIndexPrefix"]
+            str(project), self.app_config.esProjectIndexPrefix
         )
         deleted_logs = self.delete_by_query(
             index_name,
@@ -567,7 +565,7 @@ class EsClient:
     ) -> dict:
         query = {"query": {"range": {time_field: {"gte": gte_time, "lte": lte_time}}}}
         if for_scan:
-            query["size"] = self.app_config["esChunkNumber"]
+            query["size"] = self.app_config.esChunkNumber
         return query
 
     @utils.ignore_warnings
@@ -575,7 +573,7 @@ class EsClient:
             self, project: int, start_date: str, end_date: str
     ) -> list[str]:
         index_name = text_processing.unite_project_name(
-            str(project), self.app_config["esProjectIndexPrefix"]
+            str(project), self.app_config.esProjectIndexPrefix
         )
         query = self.__time_range_query(
             "launch_start_time", start_date, end_date, for_scan=True
@@ -592,7 +590,7 @@ class EsClient:
             self, project: int, start_date: str, end_date: str
     ) -> int:
         index_name = text_processing.unite_project_name(
-            str(project), self.app_config["esProjectIndexPrefix"]
+            str(project), self.app_config.esProjectIndexPrefix
         )
         query = self.__time_range_query("launch_start_time", start_date, end_date)
         delete_response = self.es_client.delete_by_query(index_name, body=query)
@@ -603,7 +601,7 @@ class EsClient:
             self, project: int, start_date: str, end_date: str
     ) -> list[str]:
         index_name = text_processing.unite_project_name(
-            str(project), self.app_config["esProjectIndexPrefix"]
+            str(project), self.app_config.esProjectIndexPrefix
         )
         query = self.__time_range_query("log_time", start_date, end_date, for_scan=True)
         log_ids = set()
@@ -618,7 +616,7 @@ class EsClient:
             self, project: int, start_date: str, end_date: str
     ) -> int:
         index_name = text_processing.unite_project_name(
-            str(project), self.app_config["esProjectIndexPrefix"]
+            str(project), self.app_config.esProjectIndexPrefix
         )
         query = self.__time_range_query("log_time", start_date, end_date)
         delete_response = self.es_client.delete_by_query(index_name, body=query)

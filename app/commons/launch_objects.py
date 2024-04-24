@@ -30,6 +30,42 @@ class AnalyzerConf(BaseModel):
     uniqueErrorsMinShouldMatch: int = 95
 
 
+class ApplicationConfig(BaseModel):
+    esHost: str = ''
+    esUser: str = ''
+    esPassword: str = ''
+    logLevel: str = 'DEBUG'
+    amqpUrl: str = ''
+    exchangeName: str = 'analyzer'
+    analyzerPriority: int = 1
+    analyzerIndex: bool = True
+    analyzerLogSearch: bool = True
+    analyzerSuggest: bool = True
+    analyzerCluster: bool = True
+    turnOffSslVerification: bool = False
+    esVerifyCerts: bool = False
+    esUseSsl: bool = False
+    esSslShowWarn: bool = False
+    esCAcert: str = ''
+    esClientCert: str = ''
+    esClientKey: str = ''
+    minioHost: str = 'minio:9000'
+    minioAccessKey: str = 'minio'
+    minioSecretKey: str = 'minio123'
+    minioUseTls: bool = False
+    appVersion: str = ''
+    binaryStoreType: str = 'filesystem'
+    minioBucketPrefix: str = 'prj-'
+    minioRegion: str | None = None
+    instanceTaskType: str = ''
+    filesystemDefaultPath: str = 'storage'
+    esChunkNumber: int = 1000
+    esChunkNumberUpdateClusters: int = 500
+    esProjectIndexPrefix: str = ''
+    analyzerHttpPort: int = 5001
+    analyzerPathToLog: str = '/tmp/config.log'
+
+
 class SearchConfig(BaseModel):
     """Search config object"""
     SearchLogsMinSimilarity: float = 0.95

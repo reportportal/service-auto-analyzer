@@ -21,6 +21,7 @@ from minio import Minio
 from minio.error import NoSuchKey
 
 from app.commons import logging
+from app.commons.launch_objects import ApplicationConfig
 from app.commons.object_saving.storage import Storage
 
 logger = logging.getLogger("analyzerApp.minioClient")
@@ -30,15 +31,15 @@ class MinioClient(Storage):
     region: str
     bucket_prefix: str
 
-    def __init__(self, app_config: dict[str, Any]) -> None:
-        minio_host = app_config['minioHost']
-        self.region = app_config['minioRegion']
-        self.bucket_prefix = app_config['minioBucketPrefix']
+    def __init__(self, app_config: ApplicationConfig) -> None:
+        minio_host = app_config.minioHost
+        self.region = app_config.minioRegion
+        self.bucket_prefix = app_config.minioBucketPrefix
         self.minioClient = Minio(
             minio_host,
-            access_key=app_config['minioAccessKey'],
-            secret_key=app_config['minioSecretKey'],
-            secure=app_config['minioUseTls'],
+            access_key=app_config.minioAccessKey,
+            secret_key=app_config.minioSecretKey,
+            secure=app_config.minioUseTls,
             region=self.region
         )
         logger.info(f'Minio initialized {minio_host}')

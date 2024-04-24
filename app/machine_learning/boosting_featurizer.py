@@ -36,7 +36,7 @@ class BoostingFeaturizer:
             self.features_dict_with_saved_objects = features_dict_with_saved_objects
         self.similarity_calculator = similarity_calculator.SimilarityCalculator(
             self.config,
-            weighted_similarity_calculator=weighted_log_similarity_calculator)
+            similarity_model=weighted_log_similarity_calculator)
         if type(feature_ids) is str:
             self.feature_ids = text_processing.transform_string_feature_range_into_list(feature_ids)
         else:
@@ -433,7 +433,7 @@ class BoostingFeaturizer:
             new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
 
-    def filter_by_min_should_match_any(self, all_results, fields=["detected_message"]):
+    def filter_by_min_should_match_any(self, all_results, fields: list[str]):
         if not fields:
             return all_results
         new_results = []

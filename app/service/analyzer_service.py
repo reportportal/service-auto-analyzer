@@ -16,26 +16,32 @@ import re
 from typing import Any
 
 from app.commons import logging
+from app.commons.launch_objects import SearchConfig
 from app.commons.log_merger import LogMerger
 from app.commons.log_preparation import LogPreparation
+from app.commons.model_chooser import ModelChooser
 from app.utils import utils
 
 logger = logging.getLogger("analyzerApp.analyzerService")
 
 
 class AnalyzerService:
+    search_cfg: SearchConfig
     launch_boost: float
+    log_preparation: LogPreparation
+    log_merger: LogMerger
+    model_chooser: ModelChooser
 
-    def __init__(self, model_chooser, search_cfg=None):
-        self.search_cfg = search_cfg or {}
-        self.launch_boost = abs(self.search_cfg['BoostLaunch'])
+    def __init__(self, model_chooser: ModelChooser, search_cfg: SearchConfig):
+        self.search_cfg = search_cfg
+        self.launch_boost = abs(self.search_cfg.BoostLaunch)
         self.log_preparation = LogPreparation()
         self.log_merger = LogMerger()
         self.model_chooser = model_chooser
 
     def find_min_should_match_threshold(self, analyzer_config):
         return analyzer_config.minShouldMatch if analyzer_config.minShouldMatch > 0 else \
-            int(re.search(r"\d+", self.search_cfg["MinShouldMatch"]).group(0))
+            int(re.search(r"\d+", self.search_cfg.MinShouldMatch).group(0))
 
     def create_path(self, query: dict, path: tuple[str, ...], value: Any) -> Any:
         path_length = len(path)
@@ -102,7 +108,7 @@ class AnalyzerService:
         analyzer_mode = test_item_info.analyzerConfig.analyzerMode
         launch_name = test_item_info.launchName
         launch_id = test_item_info.launchId
-        launch_boost = abs(self.search_cfg['BoostLaunch'])
+        launch_boost = abs(self.search_cfg.BoostLaunch)
         if analyzer_mode in {'LAUNCH_NAME', 'ALL'}:
             # Previous launches with the same name
             self._add_launch_name_boost(query, launch_name)
@@ -131,7 +137,7 @@ class AnalyzerService:
             field_name=field_name,
             boost=boost,
             override_min_should_match=override_min_should_match,
-            max_query_terms=self.search_cfg["MaxQueryTerms"]
+            max_query_terms=self.search_cfg.MaxQueryTerms
         )
 
     def prepare_restrictions_by_issue_type(self, filter_no_defect=True):
@@ -156,10 +162,10 @@ class AnalyzerService:
                         "should": [
                             {"term": {"test_case_hash": {
                                 "value": log["_source"]["test_case_hash"],
-                                "boost": abs(self.search_cfg["BoostTestCaseHash"])}}},
+                                "boost": abs(self.search_cfg.BoostTestCaseHash)}}},
                             {"term": {"is_auto_analyzed": {
-                                "value": str(self.search_cfg["BoostAA"] > 0).lower(),
-                                "boost": abs(self.search_cfg["BoostAA"]), }}},
+                                "value": str(self.search_cfg.BoostAA > 0).lower(),
+                                "boost": abs(self.search_cfg.BoostAA), }}},
                         ]
                     }
                 }}
@@ -178,7 +184,7 @@ class AnalyzerService:
                                     "origin": start_time,
                                     "scale": "7d",
                                     "offset": "1d",
-                                    "decay": self.search_cfg["TimeWeightDecay"]
+                                    "decay": self.search_cfg.TimeWeightDecay
                                 }
                             }
                         },

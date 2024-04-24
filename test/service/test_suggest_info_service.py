@@ -119,8 +119,7 @@ class TestSuggestInfoService(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                suggest_info_service = SuggestInfoService(app_config=app_config,
-                                                          search_cfg=self.get_default_search_config())
+                suggest_info_service = SuggestInfoService(app_config=app_config)
 
                 suggest_info_service.es_client.es_client.scroll = MagicMock(
                     return_value=json.loads(get_fixture(self.no_hits_search_rs)))
@@ -194,8 +193,7 @@ class TestSuggestInfoService(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                suggest_info_service = SuggestInfoService(app_config=app_config,
-                                                          search_cfg=self.get_default_search_config())
+                suggest_info_service = SuggestInfoService(app_config=app_config)
 
                 response = suggest_info_service.remove_suggest_info(test["index"])
 
@@ -351,8 +349,7 @@ class TestSuggestInfoService(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                suggest_info_service = SuggestInfoService(app_config=app_config,
-                                                          search_cfg=self.get_default_search_config())
+                suggest_info_service = SuggestInfoService(app_config=app_config)
                 response = suggest_info_service.index_suggest_info(
                     [launch_objects.SuggestAnalysisResult(**res) for res in json.loads(test["index_rq"])])
 
@@ -444,8 +441,7 @@ class TestSuggestInfoService(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                suggest_info_service = SuggestInfoService(app_config=app_config,
-                                                          search_cfg=self.get_default_search_config())
+                suggest_info_service = SuggestInfoService(app_config=app_config)
                 response = suggest_info_service.clean_suggest_info_logs_by_test_item(
                     test["item_remove_info"])
 
@@ -536,8 +532,7 @@ class TestSuggestInfoService(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                suggest_info_service = SuggestInfoService(app_config=app_config,
-                                                          search_cfg=self.get_default_search_config())
+                suggest_info_service = SuggestInfoService(app_config=app_config)
                 response = suggest_info_service.clean_suggest_info_logs_by_launch_id(
                     test["launch_remove_info"])
 
@@ -627,8 +622,7 @@ class TestSuggestInfoService(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                suggest_info_service = SuggestInfoService(app_config=app_config,
-                                                          search_cfg=self.get_default_search_config())
+                suggest_info_service = SuggestInfoService(app_config=app_config)
                 suggest_info_service.es_client.es_client.scroll = MagicMock(return_value=json.loads(
                     get_fixture(self.no_hits_search_rs)))
                 response = suggest_info_service.update_suggest_info(test["defect_update_info"])

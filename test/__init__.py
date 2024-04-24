@@ -17,13 +17,14 @@ import random
 import string
 from typing import List
 
+from app.commons.launch_objects import SearchConfig
 from app.utils.utils import read_json_file
 
 DEFAULT_ES_CONFIG = {'esHost': 'http://localhost:9200', 'esVerifyCerts': False, 'esUseSsl': False,
                      'esSslShowWarn': False, 'esCAcert': None, 'esClientCert': None, 'esClientKey': None,
                      'esUser': None, 'turnOffSslVerification': True, 'esProjectIndexPrefix': '', 'esChunkNumber': 1000}
 DEFAULT_BOOST_LAUNCH = 8.0
-DEFAULT_SEARCH_CONFIG = {'SimilarityWeightsFolder': '', 'BoostLaunch': DEFAULT_BOOST_LAUNCH}
+DEFAULT_SEARCH_CONFIG = SearchConfig(BoostLaunch=DEFAULT_BOOST_LAUNCH)
 
 
 def get_fixture(fixture_name, to_json=False):

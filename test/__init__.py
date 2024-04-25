@@ -34,32 +34,32 @@ DEFAULT_ES_CONFIG = ApplicationConfig(
     esChunkNumber=1000
 )
 
-DEFAULT_BOOST_LAUNCH = 8.0
-DEFAULT_SEARCH_CONFIG = SearchConfig(BoostLaunch=DEFAULT_BOOST_LAUNCH)
-
 APP_CONFIG = ApplicationConfig(
-    esHost="http://localhost:9200",
-    esUser="",
-    esPassword="",
+    esHost='http://localhost:9200',
+    esUser='',
+    esPassword='',
     esVerifyCerts=False,
     esUseSsl=False,
     esSslShowWarn=False,
     turnOffSslVerification=True,
-    esCAcert="",
-    esClientCert="",
-    esClientKey="",
-    appVersion="",
-    minioRegion="",
-    minioBucketPrefix="",
-    filesystemDefaultPath="",
+    esCAcert='',
+    esClientCert='',
+    esClientKey='',
+    appVersion='',
+    minioRegion='',
+    minioBucketPrefix='',
+    filesystemDefaultPath='',
     esChunkNumber=1000,
-    binaryStoreType="filesystem",
-    minioHost="",
-    minioAccessKey="",
-    minioSecretKey="",
-    esProjectIndexPrefix="rp_",
+    binaryStoreType='filesystem',
+    minioHost='',
+    minioAccessKey='',
+    minioSecretKey='',
+    esProjectIndexPrefix='rp_',
     esChunkNumberUpdateClusters=500
 )
+
+DEFAULT_BOOST_LAUNCH = 8.0
+DEFAULT_SEARCH_CONFIG = SearchConfig(BoostLaunch=DEFAULT_BOOST_LAUNCH)
 
 
 def get_fixture(fixture_name, to_json=False):

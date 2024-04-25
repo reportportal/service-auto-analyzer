@@ -23,31 +23,8 @@ import sure
 import app.commons.launch_objects as launch_objects
 from app.commons import esclient
 from app.utils import utils
-from test import get_fixture
+from test import get_fixture, APP_CONFIG
 from test.mock_service import TestService
-
-APP_CONFIG = launch_objects.ApplicationConfig(
-    esHost="http://localhost:9200",
-    esUser="",
-    esPassword="",
-    esVerifyCerts=False,
-    esUseSsl=False,
-    esSslShowWarn=False,
-    turnOffSslVerification=True,
-    esCAcert="",
-    esClientCert="",
-    esClientKey="",
-    appVersion="",
-    minioRegion="",
-    minioBucketPrefix="",
-    filesystemDefaultPath="",
-    esChunkNumber=1000,
-    binaryStoreType="filesystem",
-    minioHost="",
-    minioAccessKey="",
-    minioSecretKey="",
-    esProjectIndexPrefix="rp_"
-)
 
 
 class TestEsClient(TestService):

@@ -26,29 +26,7 @@ from app.service import SuggestInfoService
 from app.utils import utils
 from test import get_fixture
 from test.mock_service import TestService
-
-APP_CONFIG = launch_objects.ApplicationConfig(
-    esHost="http://localhost:9200",
-    esUser="",
-    esPassword="",
-    esVerifyCerts=False,
-    esUseSsl=False,
-    esSslShowWarn=False,
-    turnOffSslVerification=True,
-    esCAcert="",
-    esClientCert="",
-    esClientKey="",
-    appVersion="",
-    minioRegion="",
-    minioBucketPrefix="",
-    filesystemDefaultPath="",
-    esChunkNumber=1000,
-    binaryStoreType="filesystem",
-    minioHost="",
-    minioAccessKey="",
-    minioSecretKey="",
-    esProjectIndexPrefix="rp_"
-)
+from test import APP_CONFIG
 
 
 class TestSuggestInfoService(TestService):

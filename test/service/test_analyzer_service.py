@@ -26,6 +26,7 @@ from app.service import AutoAnalyzerService
 from app.utils import utils
 from test import get_fixture
 from test.mock_service import TestService
+from test import APP_CONFIG
 
 
 class TestAutoAnalyzerService(TestService):
@@ -203,28 +204,7 @@ class TestAutoAnalyzerService(TestService):
                     self.launch_w_test_items_w_logs),
                 "expected_count": 1,
                 "expected_issue_type": "AB001",
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "filesystem",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "boost_predict": ([1, 0], [[0.2, 0.8], [0.7, 0.3]])
             },
             {

@@ -21,7 +21,7 @@ from freezegun import freeze_time
 from app.commons import launch_objects
 from app.service import ClusterService
 from app.utils import utils
-from test import get_fixture
+from test import get_fixture, APP_CONFIG
 from test.mock_service import TestService
 
 
@@ -72,29 +72,7 @@ class TestClusterService(TestService):
                     project=2,
                     forUpdate=False,
                     numberOfLogLines=-1),
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "filesystem",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_",
-                    "esChunkNumberUpdateClusters": 500
-                },
+                "app_config": APP_CONFIG,
                 "expected_result": launch_objects.ClusterResult(
                     project=2,
                     launchId=1,
@@ -377,29 +355,7 @@ class TestClusterService(TestService):
                     project=2,
                     forUpdate=True,
                     numberOfLogLines=2),
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "filesystem",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_",
-                    "esChunkNumberUpdateClusters": 500
-                },
+                "app_config": APP_CONFIG,
                 "expected_result": launch_objects.ClusterResult(
                     project=2,
                     launchId=1,

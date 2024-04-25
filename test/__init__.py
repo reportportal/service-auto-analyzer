@@ -46,7 +46,8 @@ APP_CONFIG = ApplicationConfig(
     minioHost="",
     minioAccessKey="",
     minioSecretKey="",
-    esProjectIndexPrefix="rp_"
+    esProjectIndexPrefix="rp_",
+    esChunkNumberUpdateClusters=500
 )
 
 

@@ -251,12 +251,13 @@ class EsClient:
         result.logResults = logs_with_exceptions
         _, num_logs_with_defect_types = self._merge_logs(test_item_ids, project_with_prefix)
         try:
-            AmqpClient(self.app_config.amqpUrl).send_to_inner_queue(
-                self.app_config.exchangeName, "train_models", json.dumps({
-                    "model_type": "defect_type",
-                    "project_id": project,
-                    GATHERED_METRIC_TOTAL: num_logs_with_defect_types
-                }))
+            if self.app_config.amqpUrl:
+                AmqpClient(self.app_config.amqpUrl).send_to_inner_queue(
+                    self.app_config.exchangeName, "train_models", json.dumps({
+                        "model_type": "defect_type",
+                        "project_id": project,
+                        GATHERED_METRIC_TOTAL: num_logs_with_defect_types
+                    }))
         except Exception as exc:
             logger.exception(exc)
         logger.info("Finished indexing logs for %d launches %s. It took %.2f sec.",
@@ -495,8 +496,9 @@ class EsClient:
         self._bulk_index(log_update_queries)
         items_not_updated = list(set(test_item_ids) - found_test_items)
         logger.debug("Not updated test items: %s", items_not_updated)
-        AmqpClient(self.app_config.amqpUrl).send_to_inner_queue(
-            self.app_config.exchangeName, "update_suggest_info", json.dumps(defect_update_info))
+        if self.app_config.amqpUrl:
+            AmqpClient(self.app_config.amqpUrl).send_to_inner_queue(
+                self.app_config.exchangeName, "update_suggest_info", json.dumps(defect_update_info))
         logger.info("Finished updating defect types. It took %.2f sec", time() - t_start)
         return items_not_updated
 

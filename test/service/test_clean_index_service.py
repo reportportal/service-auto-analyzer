@@ -22,7 +22,7 @@ import httpretty
 from app.commons import launch_objects
 from app.service.clean_index_service import CleanIndexService
 from app.utils import utils
-from test import get_fixture
+from test import get_fixture, APP_CONFIG
 from test.mock_service import TestService
 
 
@@ -54,28 +54,7 @@ class TestCleanIndexService(TestService):
                                 "status": HTTPStatus.NOT_FOUND,
                                 }, ],
                 "rq": launch_objects.CleanIndex(ids=[1], project=2),
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "filesystem",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "expected_count": 0
             },
             {
@@ -278,28 +257,7 @@ class TestCleanIndexService(TestService):
                                 "rs": get_fixture(self.delete_logs_rs),
                                 }],
                 "rq": launch_objects.CleanIndex(ids=[1], project=1),
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "filesystem",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "expected_count": 1
             }
         ]

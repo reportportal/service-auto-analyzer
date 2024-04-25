@@ -17,7 +17,6 @@ import re
 from datetime import datetime
 from queue import Queue
 from time import time
-from typing import Any
 
 import elasticsearch.helpers
 import numpy as np

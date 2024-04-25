@@ -28,7 +28,6 @@ MODEL_FILES: list[str] = ['boost_model.pickle', 'data_features_config.pickle',
 
 
 class BoostingDecisionMaker(MlModel):
-
     _loaded: bool
 
     def __init__(self, object_saver: ObjectSaver, tags: str = 'global boosting model', *, n_estimators: int = 75,

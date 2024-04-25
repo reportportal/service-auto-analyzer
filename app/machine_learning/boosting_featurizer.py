@@ -17,8 +17,8 @@ from datetime import datetime
 
 import numpy as np
 
-from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.commons import logging, similarity_calculator, object_saving
+from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")

@@ -19,7 +19,7 @@ import httpretty
 
 from app.service import DeleteIndexService
 from app.utils import utils
-from test import get_fixture
+from test import get_fixture, APP_CONFIG
 from test.mock_service import TestService
 
 
@@ -57,28 +57,7 @@ class TestDeleteIndexService(TestService):
                                 "rs": get_fixture(self.index_not_found_rs),
                                 }, ],
                 "index": 2,
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "filesystem",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "result": False,
             },
         ]

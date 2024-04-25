@@ -12,15 +12,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import requests
 # noinspection PyPackageRequirements
 import pytest
+import requests
 # noinspection PyPackageRequirements
 from moto.server import ThreadedMotoServer
 
+from app.commons.launch_objects import ApplicationConfig
 from app.commons.object_saving.minio_client import MinioClient
 from test import random_alphanumeric
-
 
 SERVER_PORT = 5000
 REGION = 'us-west-1'
@@ -37,9 +37,8 @@ def run_s3():
 
 
 def create_storage_client():
-    return MinioClient({'minioHost': SERVER_HOST, 'minioRegion': REGION,
-                        'minioBucketPrefix': BUCKET_PREFIX, 'minioAccessKey': 'minio', 'minioSecretKey': 'minio',
-                        'minioUseTls': False})
+    return MinioClient(ApplicationConfig(minioHost=SERVER_HOST, minioRegion=REGION, minioBucketPrefix=BUCKET_PREFIX,
+                                         minioAccessKey='minio', minioSecretKey='minio', minioUseTls=False))
 
 
 def test_object_not_exists():

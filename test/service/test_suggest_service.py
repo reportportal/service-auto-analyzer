@@ -25,7 +25,7 @@ from app.commons import launch_objects, object_saving
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.service import SuggestService
 from app.utils import utils
-from test import get_fixture
+from test import get_fixture, APP_CONFIG
 from test.mock_service import TestService
 
 
@@ -527,28 +527,7 @@ class TestSuggestService(TestService):
                                 "uri": "/rp_1",
                                 "status": HTTPStatus.OK,
                                 }],
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "filesystem",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "msearch_results": [
                     get_fixture(self.one_hit_search_rs_merged, to_json=True),
                     get_fixture(self.one_hit_search_rs_merged, to_json=True),
@@ -630,28 +609,7 @@ class TestSuggestService(TestService):
                                 "content_type": "application/json",
                                 "rs": get_fixture(self.index_logs_rs),
                                 }],
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "filesystem",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "msearch_results": [
                     get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True),
                     get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True),

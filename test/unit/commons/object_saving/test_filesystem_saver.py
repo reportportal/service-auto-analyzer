@@ -17,6 +17,7 @@ import os
 import pytest
 
 from app.commons.object_saving.filesystem_saver import FilesystemSaver
+from app.commons.launch_objects import ApplicationConfig
 from test import random_alphanumeric
 
 
@@ -24,7 +25,7 @@ CREATED_FILES_AND_FOLDERS = []
 
 
 def create_storage_client(path):
-    return FilesystemSaver({'filesystemDefaultPath': path})
+    return FilesystemSaver(ApplicationConfig(filesystemDefaultPath=path))
 
 
 def test_object_not_exists():
@@ -167,7 +168,7 @@ def test_remove_project_objects():
         file_system.get_project_object(bucket, resource)
 
 
-@pytest.mark.parametrize('base_path', ['test_base_path', '', None])
+@pytest.mark.parametrize('base_path', ['test_base_path', ''])
 def test_base_path(base_path):
     object_name = f'{random_alphanumeric(16)}.pickle'
     file_system = create_storage_client(base_path)

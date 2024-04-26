@@ -29,6 +29,18 @@ STOPWORDS = set(nltk.corpus.stopwords.words("english"))
 FILE_EXTENSIONS = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
 
 
+def create_punctuation_map(split_urls) -> dict[str, str]:
+    translate_map = {}
+    for punct in string.punctuation + "<>{}[];=()'\"":
+        if punct != '.' and (split_urls or punct not in ['/', '\\']):
+            translate_map[punct] = ' '
+    return translate_map
+
+
+PUNCTUATION_MAP_NO_SPLIT_URLS = create_punctuation_map(False)
+PUNCTUATION_MAP_SPLIT_URLS = create_punctuation_map(True)
+
+
 def remove_starting_datetime(text: str) -> str:
     """Removes datetime at the beginning of the text"""
     log_date = ""
@@ -299,24 +311,26 @@ def clean_html(message):
 
 
 def split_words(text, min_word_length=0, only_unique=True, split_urls=True, to_lower=True):
+    if not text:
+        return []
     all_unique_words = set()
     all_words = []
-    translate_map = {}
-    for punct in string.punctuation + "<>{}[];=()'\"":
-        if punct != "." and (split_urls or punct not in ["/", "\\"]):
-            translate_map[punct] = " "
-    text = text.translate(text.maketrans(translate_map)).strip().strip(".")
-    for word_part in text.split():
-        word_part = word_part.strip().strip(".")
-        for w in word_part.split():
-            if to_lower:
-                w = w.lower()
-            if w != "" and len(w) >= min_word_length:
-                if w in STOPWORDS:
-                    continue
-                if not only_unique or w not in all_unique_words:
-                    all_unique_words.add(w)
-                    all_words.append(w)
+
+    if split_urls:
+        text = text.translate(text.maketrans(PUNCTUATION_MAP_SPLIT_URLS))
+    else:
+        text = text.translate(text.maketrans(PUNCTUATION_MAP_NO_SPLIT_URLS))
+    text = text.strip().strip('.')
+    if to_lower:
+        text = text.lower()
+    for w in text.split():
+        w = w.strip().strip('.')
+        if w != "" and len(w) >= min_word_length:
+            if w in STOPWORDS:
+                continue
+            if not only_unique or w not in all_unique_words:
+                all_unique_words.add(w)
+                all_words.append(w)
     return all_words
 
 

@@ -21,7 +21,7 @@ from pydantic import BaseModel
 class AnalyzerConf(BaseModel):
     """Analyzer config object"""
     analyzerMode: str = 'ALL'
-    minShouldMatch: int = 0
+    minShouldMatch: int = 80
     numberOfLogLines: int = -1
     isAutoAnalyzerEnabled: bool = True
     indexingRunning: bool = True

@@ -21,7 +21,10 @@ from urllib.parse import urlparse
 import nltk
 from dateutil.parser import parse
 
-from app.commons import logging
+try:
+    from app.commons import logging
+except ImportError:
+    import logging
 
 logger = logging.getLogger("analyzerApp.utils.textProcessing")
 
@@ -244,9 +247,9 @@ def sanitize_text(text):
     return re.sub(r"\d+", "", text)
 
 
-def first_lines(log_str, n_lines):
-    """Take n first lines"""
-    return "\n".join((log_str.split("\n")[:n_lines])) if n_lines >= 0 else log_str
+def first_lines(log_str: str, n_lines: int):
+    """Take n first lines."""
+    return '\n'.join((log_str.split('\n')[:n_lines])) if n_lines >= 0 else log_str
 
 
 def prepare_message_for_clustering(message, number_of_log_lines, clean_numbers,

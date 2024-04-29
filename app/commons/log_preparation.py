@@ -275,10 +275,8 @@ class LogPreparation:
             for log in test_item.logs:
                 if log.logLevel < utils.ERROR_LOGGING_LEVEL:
                     continue
-                prepared_logs.append(
-                    self.prepare_log_clustering_light(launch, test_item, log, project))
+                prepared_logs.append(self.prepare_log_clustering_light(launch, test_item, log, project))
             merged_logs, log_ids_for_merged_logs = self.log_merger.decompose_logs_merged_and_without_duplicates(
-                # noqa
                 prepared_logs)
             for _id in log_ids_for_merged_logs:
                 full_log_ids_for_merged_logs[_id] = log_ids_for_merged_logs[_id]

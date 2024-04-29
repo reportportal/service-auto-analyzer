@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -104,7 +104,7 @@ class Log(BaseModel):
     """Log object"""
     logId: int
     logLevel: int = 0
-    logTime: List[int] = list(datetime.now().timetuple())[:7]
+    logTime: list[int] = list(datetime.now().timetuple())[:7]
     message: str
     clusterId: int = 0
     clusterMessage: str = ''
@@ -118,14 +118,14 @@ class TestItem(BaseModel):
     issueType: str = ''
     issueDescription: str = ''
     originalIssueType: str = ''
-    startTime: List[int] = list(datetime.now().timetuple())[:7]
-    endTime: Optional[List[int]] = None
-    lastModified: Optional[List[int]] = None
+    startTime: list[int] = list(datetime.now().timetuple())[:7]
+    endTime: Optional[list[int]] = None
+    lastModified: Optional[list[int]] = None
     testCaseHash: int = 0
     testItemName: str = ''
     description: str = ''
-    linksToBts: List[str] = []
-    logs: List[Log] = []
+    linksToBts: list[str] = []
+    logs: list[Log] = []
 
 
 class TestItemInfo(BaseModel):
@@ -141,7 +141,7 @@ class TestItemInfo(BaseModel):
     testItemName: str = ''
     project: int
     analyzerConfig: AnalyzerConf = AnalyzerConf()
-    logs: List[Log] = []
+    logs: list[Log] = []
 
 
 class Launch(BaseModel):
@@ -151,9 +151,9 @@ class Launch(BaseModel):
     launchName: str = ''
     launchNumber: int = 0
     previousLaunchId: int = 0
-    launchStartTime: List[int] = list(datetime.now().timetuple())[:7]
+    launchStartTime: list[int] = list(datetime.now().timetuple())[:7]
     analyzerConfig: AnalyzerConf = AnalyzerConf()
-    testItems: List[TestItem] = []
+    testItems: list[TestItem] = []
     clusters: dict = {}
 
 
@@ -175,15 +175,15 @@ class AnalysisResult(BaseModel):
 class ClusterInfo(BaseModel):
     clusterId: int
     clusterMessage: str
-    logIds: List[int]
-    itemIds: List[int]
+    logIds: list[int]
+    itemIds: list[int]
 
 
 class ClusterResult(BaseModel):
     """Analysis result object"""
     project: int
     launchId: int
-    clusters: List[ClusterInfo]
+    clusters: list[ClusterInfo]
 
 
 class SuggestAnalysisResult(BaseModel):
@@ -215,13 +215,13 @@ class SuggestAnalysisResult(BaseModel):
 
 class CleanIndex(BaseModel):
     """Clean index object"""
-    ids: List[int]
+    ids: list[int]
     project: int
 
 
 class CleanIndexStrIds(BaseModel):
     """Clean index object that supports string ids"""
-    ids: List[str]
+    ids: list[str]
     project: int
 
 
@@ -231,8 +231,8 @@ class SearchLogs(BaseModel):
     launchName: str
     itemId: int
     projectId: int
-    filteredLaunchIds: List[int]
-    logMessages: List[str]
+    filteredLaunchIds: list[int]
+    logMessages: list[str]
     analyzerConfig: AnalyzerConf = AnalyzerConf()
     logLines: int
 
@@ -247,15 +247,15 @@ class Response(BaseModel):
 class LogExceptionResult(BaseModel):
     """Log object with exceptions"""
     logId: int
-    foundExceptions: List[str] = []
+    foundExceptions: list[str] = []
 
 
 class BulkResponse(BaseModel):
     """Bulk response object"""
     took: int
     errors: bool
-    items: List[str] = []
-    logResults: List[LogExceptionResult] = []
+    items: list[str] = []
+    logResults: list[LogExceptionResult] = []
     status: int = 0
 
 
@@ -269,8 +269,8 @@ class SuggestPatternLabel(BaseModel):
 
 class SuggestPattern(BaseModel):
     """Suggest pattern object with 2 lists of suggestions"""
-    suggestionsWithLabels: List[SuggestPatternLabel] = []
-    suggestionsWithoutLabels: List[SuggestPatternLabel] = []
+    suggestionsWithLabels: list[SuggestPatternLabel] = []
+    suggestionsWithoutLabels: list[SuggestPatternLabel] = []
 
 
 class BatchLogInfo(BaseModel):
@@ -288,8 +288,8 @@ class AnalysisCandidate(BaseModel):
     analyzerConfig: AnalyzerConf
     testItemId: int
     timeProcessed: float
-    candidates: List[tuple]
-    candidatesWithNoDefect: List[tuple]
+    candidates: list[tuple]
+    candidatesWithNoDefect: list[tuple]
     project: int
     launchId: int
     launchName: str

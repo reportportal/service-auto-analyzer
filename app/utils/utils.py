@@ -272,7 +272,7 @@ def calculate_threshold(
 
 
 def calculate_threshold_for_text(text, cur_threshold, min_recalculated_threshold=0.8):
-    text_size = len(split_words(text, only_unique=True))
+    text_size = len(split_words(text))
     return calculate_threshold(
         text_size, cur_threshold,
         min_recalculated_threshold=min_recalculated_threshold)

@@ -331,16 +331,18 @@ def split_words(text, min_word_length=0, only_unique=True, split_urls=True, to_l
         if w != "" and len(w) >= min_word_length:
             if w in STOPWORDS:
                 continue
-            if not only_unique or w not in all_unique_words:
+            if only_unique:
+                if w in all_unique_words:
+                    continue
                 all_unique_words.add(w)
-                all_words.append(w)
+            all_words.append(w)
     return all_words
 
 
 def find_only_numbers(detected_message_with_numbers):
     """Removes all non digit symbols and concatenates unique numbers"""
     detected_message_only_numbers = re.sub(r"[^\d \._]", "", detected_message_with_numbers)
-    return " ".join(split_words(detected_message_only_numbers, only_unique=True))
+    return " ".join(split_words(detected_message_only_numbers))
 
 
 def enrich_text_with_method_and_classes(text):
@@ -348,7 +350,7 @@ def enrich_text_with_method_and_classes(text):
     for line in text.split("\n"):
         new_line = line
         found_values = []
-        for w in split_words(line, min_word_length=0, only_unique=True, split_urls=True, to_lower=False):
+        for w in split_words(line, min_word_length=0, split_urls=True, to_lower=False):
             if len(w.split(".")) > 2:
                 last_word = w.split(".")[-1]
                 if len(last_word) > 3:
@@ -408,7 +410,7 @@ def preprocess_found_test_methods(text):
 
 def compress(text):
     """compress sentence to consist of only unique words"""
-    return " ".join(split_words(text, only_unique=True))
+    return " ".join(split_words(text))
 
 
 def preprocess_words(text):

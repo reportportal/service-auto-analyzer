@@ -341,7 +341,7 @@ def split_words(text, min_word_length=0, only_unique=True, split_urls=True, to_l
 
 def find_only_numbers(detected_message_with_numbers):
     """Removes all non digit symbols and concatenates unique numbers"""
-    detected_message_only_numbers = re.sub(r"[^\d \._]", "", detected_message_with_numbers)
+    detected_message_only_numbers = re.sub(r"[^\d ._]", "", detected_message_with_numbers)
     return " ".join(split_words(detected_message_only_numbers))
 
 
@@ -384,7 +384,7 @@ def preprocess_test_item_name(text):
 def find_test_methods_in_text(text):
     test_methods = set()
     for m in re.findall(
-            r"([^ \(\)\/\\\\:]+(Test|Step)[s]*\.[^ \(\)\/\\\\:]+)|([^ \(\)\/\\\\:]+\.spec\.js)", text):
+            r"([^ ()/\\:]+(Test|Step)[s]*\.[^ ()/\\:]+)|([^ ()/\\:]+\.spec\.js)", text):
         if m[0].strip():
             test_methods.add(m[0].strip())
         if m[2].strip():
@@ -415,8 +415,8 @@ def compress(text):
 
 def preprocess_words(text):
     all_words = []
-    for w in re.finditer(r"[\w\._]+", text):
-        word_normalized = re.sub(r"^[\w]\.", "", w.group(0))
+    for w in re.finditer(r"[\w._]+", text):
+        word_normalized = re.sub(r"^\w\.", "", w.group(0))
         word = word_normalized.replace("_", "")
         if len(word) >= 3:
             all_words.append(word.lower())
@@ -470,7 +470,7 @@ def fix_big_encoded_urls(message):
     except:  # noqa
         pass
     if new_message != message:
-        return re.sub(r"[\(\)\{\}#%]", " ", new_message)
+        return re.sub(r"[(){}#%]", " ", new_message)
     return message
 
 
@@ -560,24 +560,24 @@ def clean_colon_stacking(text):
 
 
 def clean_from_params(text):
-    text = re.sub(r"(?<=[^\w])('.+?'|\".+?\")(?=[^\w]|$)|(?<=^)('.+?'|\".+?\")(?=[^\w]|$)", " ", text)
+    text = re.sub(r"(?<=[^\w])('.+?'|\".+?\")(?=\W|$)|(?<=^)('.+?'|\".+?\")(?=\W|$)", " ", text)
     return re.sub(r" +", " ", text).strip()
 
 
 def clean_from_paths(text):
-    text = re.sub(r"(^|(?<=[^\w:\\\/]))(\w:)?([\w\d\.\-_]+)?([\\\/]+[\w\d\.\-_]+){2,}", " ", text)
+    text = re.sub(r"(^|(?<=[^\w:\\/]))(\w:)?([\w.\-_]+)?([\\/]+[\w.\-_]+){2,}", " ", text)
     return re.sub(r" +", " ", text).strip()
 
 
 def clean_from_urls(text):
-    text = re.sub(r"(http|https|ftp):[^\s]+|\bwww\.[^\s]+", " ", text)
+    text = re.sub(r"(http|https|ftp):\S+|\bwww\.\S+", " ", text)
     return re.sub(r" +", " ", text).strip()
 
 
 def extract_urls(text):
     all_unique = set()
     all_urls = []
-    for param in re.findall(r"((http|https|ftp):[^\s]+|\bwww\.[^\s]+)", text):
+    for param in re.findall(r"((http|https|ftp):\S+|\bwww\.\S+)", text):
         url = param[0].strip()
         if url not in all_unique:
             all_unique.add(url)
@@ -588,7 +588,7 @@ def extract_urls(text):
 def extract_paths(text):
     all_unique = set()
     all_paths = []
-    for param in re.findall(r"((^|(?<=[^\w:\\\/]))(\w:)?([\w\d\.\-_ ]+)?([\\\/]+[\w\d\.\-_ ]+){2,})", text):
+    for param in re.findall(r"((^|(?<=[^\w:\\/]))(\w:)?([\w.\-_ ]+)?([\\/]+[\w.\-_ ]+){2,})", text):
         path = param[0].strip()
         if path not in all_unique:
             all_unique.add(path)
@@ -599,7 +599,7 @@ def extract_paths(text):
 def extract_message_params(text):
     all_unique = set()
     all_params = []
-    for param in re.findall(r"(^|[^\w])('.+?'|\".+?\")([^\w]|$|\n)", text):
+    for param in re.findall(r"(^|\W)('.+?'|\".+?\")(\W|$|\n)", text):
         param = re.search(r"[^\'\"]+", param[1].strip())
         if param is not None:
             param = param.group(0).strip()

@@ -501,7 +501,7 @@ def remove_generated_parts(message):
         if has_stacktrace_keywords(line) or has_more_lines_pattern(line):
             continue
         for symbol in [r"\$", "@"]:
-            all_found_parts = set()
+            all_found_parts: set[tuple] = set()
             for m in re.finditer(r"%s+(.+?)\b" % symbol, line):
                 try:
                     found_part = m.group(1).strip().strip(symbol).strip()
@@ -515,11 +515,14 @@ def remove_generated_parts(message):
                 found_part = found_part[0]
                 part_to_replace = ""
                 if re.search(r"\d", found_part):
-                    part_with_numbers_in_the_end = re.search(r"[a-zA-z]{5,}\d+", found_part)
-                    if part_with_numbers_in_the_end and part_with_numbers_in_the_end.group(0) == found_part:
-                        part_to_replace = " %s" % found_part
-                    else:
-                        part_to_replace = ""
+                    try:
+                        part_with_numbers_in_the_end = re.search(r"[a-zA-z]{5,}\d+", found_part)
+                        if part_with_numbers_in_the_end and part_with_numbers_in_the_end.group(0) == found_part:
+                            part_to_replace = " %s" % found_part
+                        else:
+                            part_to_replace = ""
+                    except:
+                        pass
                 else:
                     part_to_replace = ".%s" % found_part
                 try:

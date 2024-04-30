@@ -105,7 +105,7 @@ def get_found_exceptions(text, to_lower=False):
     found_exceptions = []
     for word in split_words(text, to_lower=to_lower):
         for key_word in ["error", "exception", "failure"]:
-            if re.search(r"[^\s]{3,}%s(\s|$)" % key_word, word.lower()) is not None:
+            if re.search(r"\S{3,}%s(\s|$)" % key_word, word.lower()) is not None:
                 if word not in unique_exceptions:
                     found_exceptions.append(word)
                     unique_exceptions.add(word)
@@ -147,7 +147,7 @@ def is_line_from_stacktrace(text):
         return False
 
     text = re.sub(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)", "", text)
-    res = re.sub(r"(?<=:)\d+(?=\)?\]?(\n|\r\n|$))", " ", text)
+    res = re.sub(r"(?<=:)\d+(?=\)?]?(\n|\r\n|$))", " ", text)
     if res != text:
         return True
     res = re.sub(r"((?<=line )|(?<=line))\s*\d+\s*((?=, in)|(?=,in)|(?=\n)|(?=\r\n)|(?=$))",
@@ -157,11 +157,11 @@ def is_line_from_stacktrace(text):
     res = re.sub("|".join([r"\.%s(?!\.)\b" % ext for ext in FILE_EXTENSIONS]), " ", res, flags=re.I)
     if res != text:
         return True
-    result = re.search(r"^\s*at\s+.*\(.*?\)[\s]*$", res)
+    result = re.search(r"^\s*at\s+.*\(.*?\)\s*$", res)
     if result and result.group(0) == res:
         return True
     else:
-        result = re.search(r"^\s*\w+([\.\/]\s*\w+)+\s*\(.*?\)[\s]*$", res)
+        result = re.search(r"^\s*\w+([./]\s*\w+)+\s*\(.*?\)\s*$", res)
         if result and result.group(0) == res:
             return True
     return False
@@ -350,7 +350,7 @@ def enrich_text_with_method_and_classes(text):
     for line in text.split("\n"):
         new_line = line
         found_values = []
-        for w in split_words(line, min_word_length=0, split_urls=True, to_lower=False):
+        for w in split_words(line, split_urls=True, to_lower=False):
             if len(w.split(".")) > 2:
                 last_word = w.split(".")[-1]
                 if len(last_word) > 3:
@@ -384,7 +384,7 @@ def preprocess_test_item_name(text):
 def find_test_methods_in_text(text):
     test_methods = set()
     for m in re.findall(
-            r"([^ ()/\\:]+(Test|Step)[s]*\.[^ ()/\\:]+)|([^ ()/\\:]+\.spec\.js)", text):
+            r"([^ ()/\\:]+(Test|Step)s*\.[^ ()/\\:]+)|([^ ()/\\:]+\.spec\.js)", text):
         if m[0].strip():
             test_methods.add(m[0].strip())
         if m[2].strip():
@@ -560,7 +560,7 @@ def clean_colon_stacking(text):
 
 
 def clean_from_params(text):
-    text = re.sub(r"(?<=[^\w])('.+?'|\".+?\")(?=\W|$)|(?<=^)('.+?'|\".+?\")(?=\W|$)", " ", text)
+    text = re.sub(r"(?<=\W)('.+?'|\".+?\")(?=\W|$)|(?<=^)('.+?'|\".+?\")(?=\W|$)", " ", text)
     return re.sub(r" +", " ", text).strip()
 
 

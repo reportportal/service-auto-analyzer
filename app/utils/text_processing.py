@@ -261,10 +261,10 @@ def prepare_message_for_clustering(message, number_of_log_lines, clean_numbers,
         for idx, code in enumerate(potential_status_codes):
             replaced_code = "#&#" * (idx + 1)
             status_codes_replaced[replaced_code] = code
-            message = re.sub(r"\b%s\b" % code, replaced_code, message)
+            message = re.sub(fr"\b{code}\b", replaced_code, message)
         message = sanitize_text(message)
         for code_replaced in sorted(status_codes_replaced.keys(), reverse=True):
-            message = re.sub(r"%s" % code_replaced, str(code), message)
+            message = re.sub(code_replaced, str(status_codes_replaced[code_replaced]), message)
     message = delete_empty_lines(message)
     message = first_lines(message, number_of_log_lines)
     if leave_log_structure:

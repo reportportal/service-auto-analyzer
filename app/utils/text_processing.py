@@ -515,14 +515,9 @@ def remove_generated_parts(message):
                 found_part = found_part[0]
                 part_to_replace = ""
                 if re.search(r"\d", found_part):
-                    try:
-                        part_with_numbers_in_the_end = re.search(r"[a-zA-z]{5,}\d+", found_part)
-                        if part_with_numbers_in_the_end and part_with_numbers_in_the_end.group(0) == found_part:
-                            part_to_replace = " %s" % found_part
-                        else:
-                            part_to_replace = ""
-                    except:
-                        pass
+                    part_with_numbers_in_the_end = re.search(r"[a-zA-z]{5,}\d+", found_part)
+                    if part_with_numbers_in_the_end and part_with_numbers_in_the_end.group(0) == found_part:
+                        part_to_replace = " %s" % found_part
                 else:
                     part_to_replace = ".%s" % found_part
                 try:

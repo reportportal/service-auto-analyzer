@@ -23,7 +23,7 @@ from app.commons import logging
 from app.commons import object_saving
 from app.commons.esclient import EsClient
 from app.commons.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult, \
-    SearchConfig, ApplicationConfig
+    SearchConfig, ApplicationConfig, Launch
 from app.commons.model_chooser import ModelType, ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.similarity_calculator import SimilarityCalculator
@@ -81,11 +81,11 @@ class AutoAnalyzerService(AnalyzerService):
             fields.append("found_tests_and_methods")
         return fields
 
-    def get_min_should_match_setting(self, launch):
+    def get_min_should_match_setting(self, launch: Launch) -> str:
         return "{}%".format(launch.analyzerConfig.minShouldMatch) \
             if launch.analyzerConfig.minShouldMatch > 0 else self.search_cfg.MinShouldMatch
 
-    def build_analyze_query(self, launch, log, size=10):
+    def build_analyze_query(self, launch: Launch, log: dict, size=10):
         """Build analyze query"""
         min_should_match = self.get_min_should_match_setting(launch)
 
@@ -96,7 +96,7 @@ class AutoAnalyzerService(AnalyzerService):
             log_lines = launch.analyzerConfig.numberOfLogLines
             query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
             if log_lines == -1:
-                must = self.create_path(query, ('query', 'bool', 'must'), [])
+                must = utils.create_path(query, ('query', 'bool', 'must'), [])
                 must.append(self.build_more_like_this_query(min_should_match,
                                                             log["_source"]["detected_message"],
                                                             field_name="detected_message",
@@ -110,7 +110,7 @@ class AutoAnalyzerService(AnalyzerService):
                 else:
                     query["query"]["bool"]["must_not"].append({"wildcard": {"stacktrace": "*"}})
             else:
-                must = self.create_path(query, ('query', 'bool', 'must'), [])
+                must = utils.create_path(query, ('query', 'bool', 'must'), [])
                 must.append(self.build_more_like_this_query(min_should_match,
                                                             log["_source"]["message"],
                                                             field_name="message",
@@ -132,7 +132,7 @@ class AutoAnalyzerService(AnalyzerService):
         else:
             query["query"]["bool"]["filter"].append({"term": {"is_merged": True}})
             query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
-            must = self.create_path(query, ("query", "bool", "must"), [])
+            must = utils.create_path(query, ("query", "bool", "must"), [])
             must.append(self.build_more_like_this_query(min_should_match,
                                                         log["_source"]["merged_small_logs"],
                                                         field_name="merged_small_logs",
@@ -151,7 +151,7 @@ class AutoAnalyzerService(AnalyzerService):
             ("found_tests_and_methods", 2), ("test_item_name", 2.0)
         ]:
             if log["_source"][field].strip():
-                should = self.create_path(query, ('query', 'bool', 'should'), [])
+                should = utils.create_path(query, ('query', 'bool', 'should'), [])
                 should.append(
                     self.build_more_like_this_query("1",
                                                     log["_source"][field],
@@ -161,7 +161,7 @@ class AutoAnalyzerService(AnalyzerService):
 
         return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
-    def build_query_with_no_defect(self, launch, log, size=10):
+    def build_query_with_no_defect(self, launch: Launch, log: dict, size=10):
         min_should_match = self.get_min_should_match_setting(launch)
         query = {
             "size": size,
@@ -304,7 +304,7 @@ class AutoAnalyzerService(AnalyzerService):
                     candidatesWithNoDefect=candidates_with_no_defect
                 ))
 
-    def _query_elasticsearch(self, launches, max_batch_size=30):
+    def _query_elasticsearch(self, launches: list[Launch], max_batch_size=30):
         t_start = time()
         batches = []
         batch_logs = []
@@ -386,7 +386,7 @@ class AutoAnalyzerService(AnalyzerService):
         logger.info("Es queries finished %.2f s.", time() - t_start)
 
     @utils.ignore_warnings
-    def analyze_logs(self, launches):
+    def analyze_logs(self, launches: list[Launch]):
         global EARLY_FINISH
         cnt_launches = len(launches)
         logger.info("Started analysis for %d launches", cnt_launches)

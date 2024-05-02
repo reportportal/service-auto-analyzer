@@ -21,6 +21,8 @@ from urllib.parse import urlparse
 import nltk
 from dateutil.parser import parse
 
+from app.commons.launch_objects import Log
+
 try:
     from app.commons import logging
 except ImportError:
@@ -543,13 +545,14 @@ def leave_only_unique_lines(message):
     return "\n".join(all_lines)
 
 
-def leave_only_unique_logs(logs):
+def leave_only_unique_logs(logs: list[Log]) -> list[Log]:
     unique_logs = set()
     all_logs = []
     for log in logs:
-        if log.message.strip() not in unique_logs:
+        stripped_message = log.message.strip()
+        if stripped_message not in unique_logs:
             all_logs.append(log)
-            unique_logs.add(log.message.strip())
+            unique_logs.add(stripped_message)
     return all_logs
 
 

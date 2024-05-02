@@ -22,7 +22,8 @@ import elasticsearch.helpers
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, similarity_calculator, object_saving
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import SuggestAnalysisResult, SearchConfig, ApplicationConfig
+from app.commons.launch_objects import SuggestAnalysisResult, SearchConfig, ApplicationConfig, TestItemInfo, \
+    AnalyzerConf
 from app.commons.model_chooser import ModelType, ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
@@ -66,7 +67,7 @@ class SuggestService(AnalyzerService):
             self.similarity_model = WeightedSimilarityCalculator(object_saving.create_filesystem(weights_folder))
             self.similarity_model.load_model()
 
-    def get_config_for_boosting_suggests(self, analyzer_config):
+    def get_config_for_boosting_suggests(self, analyzer_config: AnalyzerConf) -> dict:
         return {
             "max_query_terms": self.search_cfg.MaxQueryTerms,
             "min_should_match": 0.4,
@@ -79,7 +80,7 @@ class SuggestService(AnalyzerService):
             "time_weight_decay": self.search_cfg.TimeWeightDecay
         }
 
-    def choose_fields_to_filter_suggests(self, log_lines_num):
+    def choose_fields_to_filter_suggests(self, log_lines_num: int) -> list[str]:
         if log_lines_num == -1:
             return [
                 "detected_message_extended",
@@ -88,9 +89,9 @@ class SuggestService(AnalyzerService):
         return ["message_extended", "message_without_params_extended",
                 "message_without_params_and_brackets"]
 
-    def build_suggest_query(self, test_item_info, log, size=10,
-                            message_field="message", det_mes_field="detected_message",
-                            stacktrace_field="stacktrace"):
+    def build_suggest_query(self, test_item_info: TestItemInfo, log: dict, size: int = 10,
+                            message_field: str = "message", det_mes_field: str = "detected_message",
+                            stacktrace_field: str = "stacktrace"):
         min_should_match = "{}%".format(test_item_info.analyzerConfig.minShouldMatch) \
             if test_item_info.analyzerConfig.minShouldMatch > 0 \
             else self.search_cfg.MinShouldMatch
@@ -102,7 +103,7 @@ class SuggestService(AnalyzerService):
         if log["_source"]["message"].strip():
             query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
             if log_lines == -1:
-                must = self.create_path(query, ('query', 'bool', 'must'), [])
+                must = utils.create_path(query, ('query', 'bool', 'must'), [])
                 must.append(self.build_more_like_this_query("60%",
                                                             log["_source"][det_mes_field],
                                                             field_name=det_mes_field,
@@ -115,7 +116,7 @@ class SuggestService(AnalyzerService):
                 else:
                     query["query"]["bool"]["must_not"].append({"wildcard": {stacktrace_field: "*"}})
             else:
-                must = self.create_path(query, ('query', 'bool', 'must'), [])
+                must = utils.create_path(query, ('query', 'bool', 'must'), [])
                 must.append(self.build_more_like_this_query("60%",
                                                             log["_source"][message_field],
                                                             field_name=message_field,
@@ -133,7 +134,7 @@ class SuggestService(AnalyzerService):
         else:
             query["query"]["bool"]["filter"].append({"term": {"is_merged": True}})
             query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
-            must = self.create_path(query, ('query', 'bool', 'must'), [])
+            must = utils.create_path(query, ('query', 'bool', 'must'), [])
             must.append(self.build_more_like_this_query(min_should_match,
                                                         log["_source"]["merged_small_logs"],
                                                         field_name="merged_small_logs",
@@ -152,7 +153,7 @@ class SuggestService(AnalyzerService):
 
         return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
-    def query_es_for_suggested_items(self, test_item_info, logs):
+    def query_es_for_suggested_items(self, test_item_info: TestItemInfo, logs: list[dict]):
         full_results = []
         index_name = text_processing.unite_project_name(
             str(test_item_info.project), self.app_config.esProjectIndexPrefix)
@@ -305,7 +306,7 @@ class SuggestService(AnalyzerService):
             }
         }
 
-    def query_logs_for_cluster(self, test_item_info, index_name):
+    def query_logs_for_cluster(self, test_item_info: TestItemInfo, index_name: str) -> tuple[list[dict], int]:
         test_item_id = None
         test_items = self.es_client.es_client.search(
             index_name, body=self.get_query_for_test_item_in_cluster(test_item_info))
@@ -326,7 +327,7 @@ class SuggestService(AnalyzerService):
             logs.append(log)
         return logs, test_item_id
 
-    def prepare_logs_for_suggestions(self, test_item_info, index_name):
+    def prepare_logs_for_suggestions(self, test_item_info: TestItemInfo, index_name: str) -> tuple[list[dict], int]:
         test_item_id_for_suggest = test_item_info.testItemId
         if test_item_info.clusterId != 0:
             prepared_logs, test_item_id_for_suggest = self.query_logs_for_cluster(test_item_info, index_name)
@@ -338,7 +339,7 @@ class SuggestService(AnalyzerService):
         return logs, test_item_id_for_suggest
 
     @utils.ignore_warnings
-    def suggest_items(self, test_item_info):
+    def suggest_items(self, test_item_info: TestItemInfo):
         logger.info(f'Started suggesting for test item with id: {test_item_info.testItemId}')
         logger.debug(f'Started suggesting items by request: {test_item_info.json()}')
         logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))

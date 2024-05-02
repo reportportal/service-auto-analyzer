@@ -13,16 +13,90 @@
 #  limitations under the License.
 
 import re
-from typing import Any
 
 from app.commons import logging
-from app.commons.launch_objects import SearchConfig
+from app.commons.launch_objects import SearchConfig, Launch, TestItemInfo, AnalyzerConf
 from app.commons.log_merger import LogMerger
 from app.commons.log_preparation import LogPreparation
 from app.commons.model_chooser import ModelChooser
 from app.utils import utils
 
 logger = logging.getLogger("analyzerApp.analyzerService")
+
+
+def _add_launch_name_boost(query: dict, launch_name: str, launch_boost: float) -> None:
+    should = utils.create_path(query, ('query', 'bool', 'should'), [])
+    should.append({'term': {'launch_name': {'value': launch_name, 'boost': launch_boost}}})
+
+
+def _add_launch_id_boost(query: dict, launch_id: int, launch_boost: float) -> None:
+    should = utils.create_path(query, ('query', 'bool', 'should'), [])
+    should.append({'term': {'launch_id': {'value': launch_id, 'boost': launch_boost}}})
+
+
+def _add_launch_name_and_id_boost(query: dict, launch_name: str, launch_id: int, launch_boost: float) -> None:
+    _add_launch_id_boost(query, launch_id, launch_boost)
+    _add_launch_name_boost(query, launch_name, launch_boost)
+
+
+def add_constraints_for_launches_into_query(query: dict, launch: Launch, launch_boost: float) -> dict:
+    previous_launch_id = getattr(launch, 'previousLaunchId', 0) or 0
+    previous_launch_id = int(previous_launch_id)
+    analyzer_mode = launch.analyzerConfig.analyzerMode
+    launch_name = launch.launchName
+    launch_id = launch.launchId
+    if analyzer_mode == 'LAUNCH_NAME':
+        # Previous launches with the same name
+        must = utils.create_path(query, ('query', 'bool', 'must'), [])
+        must_not = utils.create_path(query, ('query', 'bool', 'must_not'), [])
+        must.append({'term': {'launch_name': launch_name}})
+        must_not.append({'term': {'launch_id': launch_id}})
+    elif analyzer_mode == 'CURRENT_AND_THE_SAME_NAME':
+        # All launches with the same name
+        must = utils.create_path(query, ('query', 'bool', 'must'), [])
+        must.append({'term': {'launch_name': launch_name}})
+        _add_launch_id_boost(query, launch_id, launch_boost)
+    elif analyzer_mode == 'CURRENT_LAUNCH':
+        # Just current launch
+        must = utils.create_path(query, ('query', 'bool', 'must'), [])
+        must.append({'term': {'launch_id': launch_id}})
+    elif analyzer_mode == 'PREVIOUS_LAUNCH':
+        # Just previous launch
+        must = utils.create_path(query, ('query', 'bool', 'must'), [])
+        must.append({'term': {'launch_id': previous_launch_id}})
+    elif analyzer_mode == 'ALL':
+        # All previous launches
+        must_not = utils.create_path(query, ('query', 'bool', 'must_not'), [])
+        must_not.append({'term': {'launch_id': launch_id}})
+    else:
+        # Boost launches with the same name and ID, but do not ignore any
+        _add_launch_name_and_id_boost(query, launch_name, launch_id, launch_boost)
+    return query
+
+
+def add_constraints_for_launches_into_query_suggest(query: dict, test_item_info: TestItemInfo,
+                                                    launch_boost: float) -> dict:
+    previous_launch_id = getattr(test_item_info, 'previousLaunchId', 0) or 0
+    previous_launch_id = int(previous_launch_id)
+    analyzer_mode = test_item_info.analyzerConfig.analyzerMode
+    launch_name = test_item_info.launchName
+    launch_id = test_item_info.launchId
+    if analyzer_mode in {'LAUNCH_NAME', 'ALL'}:
+        # Previous launches with the same name
+        _add_launch_name_boost(query, launch_name, launch_boost)
+        should = utils.create_path(query, ('query', 'bool', 'should'), [])
+        should.append({'term': {'launch_id': {'value': launch_id, 'boost': 1 / launch_boost}}})
+    elif analyzer_mode == 'PREVIOUS_LAUNCH':
+        # Just previous launch
+        if previous_launch_id:
+            _add_launch_id_boost(query, previous_launch_id, launch_boost)
+    else:
+        # For:
+        # * CURRENT_LAUNCH
+        # * CURRENT_AND_THE_SAME_NAME
+        # Boost launches with the same name, but do not ignore any
+        _add_launch_name_and_id_boost(query, launch_name, launch_id, launch_boost)
+    return query
 
 
 class AnalyzerService:
@@ -39,96 +113,19 @@ class AnalyzerService:
         self.log_merger = LogMerger()
         self.model_chooser = model_chooser
 
-    def find_min_should_match_threshold(self, analyzer_config):
+    def find_min_should_match_threshold(self, analyzer_config: AnalyzerConf):
         return analyzer_config.minShouldMatch if analyzer_config.minShouldMatch > 0 else \
             int(re.search(r"\d+", self.search_cfg.MinShouldMatch).group(0))
 
-    def create_path(self, query: dict, path: tuple[str, ...], value: Any) -> Any:
-        path_length = len(path)
-        last_element = path[path_length - 1]
-        current_node = query
-        for i in range(path_length - 1):
-            element = path[i]
-            if element not in current_node:
-                current_node[element] = {}
-            current_node = current_node[element]
-        if last_element not in current_node:
-            current_node[last_element] = value
-        return current_node[last_element]
+    def add_constraints_for_launches_into_query(self, query: dict, launch: Launch) -> dict:
+        return add_constraints_for_launches_into_query(query, launch, self.launch_boost)
 
-    def _add_launch_name_boost(self, query: dict, launch_name: str) -> None:
-        should = self.create_path(query, ('query', 'bool', 'should'), [])
-        should.append({'term': {'launch_name': {'value': launch_name, 'boost': self.launch_boost}}})
-
-    def _add_launch_id_boost(self, query: dict, launch_id: int) -> None:
-        should = self.create_path(query, ('query', 'bool', 'should'), [])
-        should.append({'term': {'launch_id': {'value': launch_id, 'boost': self.launch_boost}}})
-
-    def _add_launch_name_and_id_boost(self, query: dict, launch_name: str, launch_id: int):
-        self._add_launch_id_boost(query, launch_id)
-        self._add_launch_name_boost(query, launch_name)
-
-    def add_constraints_for_launches_into_query(self, query: dict, launch) -> dict:
-        previous_launch_id = getattr(launch, 'previousLaunchId', 0) or 0
-        previous_launch_id = int(previous_launch_id)
-        analyzer_mode = launch.analyzerConfig.analyzerMode
-        launch_name = launch.launchName
-        launch_id = launch.launchId
-        if analyzer_mode == 'LAUNCH_NAME':
-            # Previous launches with the same name
-            must = self.create_path(query, ('query', 'bool', 'must'), [])
-            must_not = self.create_path(query, ('query', 'bool', 'must_not'), [])
-            must.append({'term': {'launch_name': launch_name}})
-            must_not.append({'term': {'launch_id': launch_id}})
-        elif analyzer_mode == 'CURRENT_AND_THE_SAME_NAME':
-            # All launches with the same name
-            must = self.create_path(query, ('query', 'bool', 'must'), [])
-            must.append({'term': {'launch_name': launch_name}})
-            self._add_launch_id_boost(query, launch_id)
-        elif analyzer_mode == 'CURRENT_LAUNCH':
-            # Just current launch
-            must = self.create_path(query, ('query', 'bool', 'must'), [])
-            must.append({'term': {'launch_id': launch_id}})
-        elif analyzer_mode == 'PREVIOUS_LAUNCH':
-            # Just previous launch
-            must = self.create_path(query, ('query', 'bool', 'must'), [])
-            must.append({'term': {'launch_id': previous_launch_id}})
-        elif analyzer_mode == 'ALL':
-            # All previous launches
-            must_not = self.create_path(query, ('query', 'bool', 'must_not'), [])
-            must_not.append({'term': {'launch_id': launch_id}})
-        else:
-            # Boost launches with the same name and ID, but do not ignore any
-            self._add_launch_name_and_id_boost(query, launch_name, launch_id)
-        return query
-
-    def add_constraints_for_launches_into_query_suggest(self, query: dict, test_item_info) -> dict:
-        previous_launch_id = getattr(test_item_info, 'previousLaunchId', 0) or 0
-        previous_launch_id = int(previous_launch_id)
-        analyzer_mode = test_item_info.analyzerConfig.analyzerMode
-        launch_name = test_item_info.launchName
-        launch_id = test_item_info.launchId
-        launch_boost = abs(self.search_cfg.BoostLaunch)
-        if analyzer_mode in {'LAUNCH_NAME', 'ALL'}:
-            # Previous launches with the same name
-            self._add_launch_name_boost(query, launch_name)
-            should = self.create_path(query, ('query', 'bool', 'should'), [])
-            should.append({'term': {'launch_id': {'value': launch_id, 'boost': 1 / launch_boost}}})
-        elif analyzer_mode == 'PREVIOUS_LAUNCH':
-            # Just previous launch
-            if previous_launch_id:
-                self._add_launch_id_boost(query, previous_launch_id)
-        else:
-            # For:
-            # * CURRENT_LAUNCH
-            # * CURRENT_AND_THE_SAME_NAME
-            # Boost launches with the same name, but do not ignore any
-            self._add_launch_name_and_id_boost(query, launch_name, launch_id)
-        return query
+    def add_constraints_for_launches_into_query_suggest(self, query: dict, test_item_info: TestItemInfo) -> dict:
+        return add_constraints_for_launches_into_query_suggest(query, test_item_info, self.launch_boost)
 
     def build_more_like_this_query(self,
-                                   min_should_match, log_message,
-                                   field_name="message", boost=1.0,
+                                   min_should_match: str, log_message,
+                                   field_name: str = "message", boost: float = 1.0,
                                    override_min_should_match=None):
         """Build more like this query"""
         return utils.build_more_like_this_query(
@@ -147,7 +144,7 @@ class AnalyzerService:
                 {"wildcard": {"issue_type": "nd*"}}]
         return [{"term": {"issue_type": "ti001"}}]
 
-    def build_common_query(self, log, size=10, filter_no_defect=True):
+    def build_common_query(self, log, size=10, filter_no_defect=True) -> dict:
         issue_type_conditions = self.prepare_restrictions_by_issue_type(
             filter_no_defect=filter_no_defect)
         return {"size": size,
@@ -170,7 +167,7 @@ class AnalyzerService:
                     }
                 }}
 
-    def add_query_with_start_time_decay(self, main_query, start_time):
+    def add_query_with_start_time_decay(self, main_query: dict, start_time: int) -> dict:
         return {
             "size": main_query["size"],
             "sort": main_query["sort"],

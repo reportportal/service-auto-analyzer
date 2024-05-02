@@ -14,6 +14,7 @@
 
 from datetime import datetime
 
+from app.commons.launch_objects import Launch, TestItem, Log
 from app.commons.log_merger import LogMerger
 from app.utils import utils, text_processing
 
@@ -73,7 +74,7 @@ class LogPreparation:
     def transform_issue_type_into_lowercase(self, issue_type):
         return issue_type[:2].lower() + issue_type[2:]
 
-    def _fill_launch_test_item_fields(self, log_template, launch, test_item, project):
+    def _fill_launch_test_item_fields(self, log_template: dict, launch: Launch, test_item: TestItem, project: str):
         log_template["_index"] = project
         log_template["_source"]["launch_id"] = launch.launchId
         log_template["_source"]["launch_name"] = launch.launchName
@@ -91,7 +92,7 @@ class LogPreparation:
             *test_item.startTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
         return log_template
 
-    def _fill_log_fields(self, log_template, log, number_of_lines):
+    def _fill_log_fields(self, log_template: dict, log: Log, number_of_lines: int):
         cleaned_message = self.clean_message(log.message)
 
         test_and_methods = text_processing.find_test_methods_in_text(cleaned_message)
@@ -184,7 +185,7 @@ class LogPreparation:
             log_template["_source"][field] = text_processing.clean_colon_stacking(log_template["_source"][field])
         return log_template
 
-    def _prepare_log(self, launch, test_item, log, project) -> dict:
+    def _prepare_log(self, launch: Launch, test_item: TestItem, log: Log, project: str) -> dict:
         log_template = self._create_log_template()
         log_template = self._fill_launch_test_item_fields(log_template, launch, test_item, project)
         log_template = self._fill_log_fields(log_template, log, launch.analyzerConfig.numberOfLogLines)

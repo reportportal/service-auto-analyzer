@@ -278,10 +278,10 @@ def calculate_threshold_for_text(text, cur_threshold, min_recalculated_threshold
         min_recalculated_threshold=min_recalculated_threshold)
 
 
-def build_more_like_this_query(min_should_match, log_message,
-                               field_name="message", boost=1.0,
+def build_more_like_this_query(min_should_match: str, log_message,
+                               field_name: str = "message", boost: float = 1.0,
                                override_min_should_match=None,
-                               max_query_terms=50):
+                               max_query_terms: int = 50):
     return {"more_like_this": {
         "fields": [field_name],
         "like": log_message,
@@ -313,3 +313,18 @@ def extract_clustering_setting(cluster_id):
         return False
     last_bit = cluster_id % 10
     return (last_bit % 2) == 1
+
+
+def create_path(query: dict, path: tuple[str, ...], value: Any) -> Any:
+    """Create path in a dictionary and assign passed value on the last element in path."""
+    path_length = len(path)
+    last_element = path[path_length - 1]
+    current_node = query
+    for i in range(path_length - 1):
+        element = path[i]
+        if element not in current_node:
+            current_node[element] = {}
+        current_node = current_node[element]
+    if last_element not in current_node:
+        current_node[last_element] = value
+    return current_node[last_element]

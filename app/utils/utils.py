@@ -209,7 +209,7 @@ def to_number_list(features_list):
 def fill_prevously_gathered_features(feature_list, feature_ids):
     previously_gathered_features = {}
     try:
-        if type(feature_ids) == str:
+        if type(feature_ids) is str:
             feature_ids = to_number_list(feature_ids)
         for i in range(len(feature_list)):
             for idx, feature in enumerate(feature_ids):

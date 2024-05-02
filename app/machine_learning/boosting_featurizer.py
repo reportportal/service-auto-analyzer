@@ -261,8 +261,7 @@ class BoostingFeaturizer:
         return self.models[model_folder].get_feature_ids()
 
     def fill_prevously_gathered_features(self, feature_list, feature_ids):
-        self.previously_gathered_features = utils.fill_prevously_gathered_features(
-            feature_list, feature_ids)
+        self.previously_gathered_features = utils.fill_prevously_gathered_features(feature_list, feature_ids)
 
     def get_used_model_info(self):
         return list(self.used_model_info)

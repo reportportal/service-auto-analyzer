@@ -44,6 +44,6 @@ def test_filter_empty_lines():
 
 def test_remove_starting_datetime():
     log = read_file_lines('test_res/test_logs', 'log_line.txt')
-    expected_log = read_file_lines('test_res/test_logs', 'log_line_no_timestamp_current.txt')
+    expected_log = read_file_lines('test_res/test_logs', 'log_line_no_timestamp_right.txt')
     for i, line in enumerate(log):
         assert text_processing.remove_starting_datetime(line) == expected_log[i]

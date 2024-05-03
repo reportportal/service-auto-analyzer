@@ -19,7 +19,6 @@ from typing import List
 from urllib.parse import urlparse
 
 import nltk
-from dateutil.parser import parse
 
 from app.commons.launch_objects import Log
 
@@ -45,27 +44,44 @@ def create_punctuation_map(split_urls) -> dict[str, str]:
 PUNCTUATION_MAP_NO_SPLIT_URLS = create_punctuation_map(False)
 PUNCTUATION_MAP_SPLIT_URLS = create_punctuation_map(True)
 
+EU_DATE = r'\d+-\d+-\d+'
+EU_TIME = r'\d+:\d+:\d+(?:[.,]\d+)?'
+US_DATE = r'\d+/\d+/\d+'
+US_TIME = EU_TIME
+
+EU_DATETIME = fr'{EU_DATE}\s+{EU_TIME}'
+US_DATETIME = fr'{US_DATE}\s+{US_TIME}'
+
+DELIM = r'(?:\s*-\s*)|(?:\s*\|\s*)'
+
+DATETIME_PATTERNS = [
+    re.compile(fr'^{EU_DATETIME}(?:{DELIM})?\s*'),
+    re.compile(fr'^{US_DATETIME}(?:{DELIM})?\s*'),
+    re.compile(fr'^{EU_TIME}(?:{DELIM})?\s*'),
+    re.compile(fr'^\[{EU_TIME}](?:{DELIM})?\s*')
+]
+
 
 def remove_starting_datetime(text: str) -> str:
-    """Removes datetime at the beginning of the text"""
-    log_date = ""
-    idx_text_start = 0
-    tokenized_text = text.split(" ")
-    for idx, str_part in enumerate(tokenized_text):
-        try:
-            parsed_info = re.sub(r"[\[\]{},;!#\"$%&'()*<=>?@^_`|~]", "", log_date + " " + str_part)
-            parse(parsed_info)
-            log_date = parsed_info
-            log_date = log_date.strip()
-        except Exception as e:  # noqa
-            idx_text_start = idx
-            break
-    log_date = log_date.replace("'", "").replace("\"", "")
-    found_regex_log_date = re.search(r"\d{1,7}", log_date)
-    if found_regex_log_date and found_regex_log_date.group(0) == log_date:
-        idx_text_start = 0
+    """Removes datetime at the beginning of the text."""
+    result = text
+    for p in DATETIME_PATTERNS:
+        result = p.sub('', result)
+    return result
 
-    return " ".join(tokenized_text[idx_text_start:])
+
+LOG_LEVEL = r'(?:TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\s?'
+LOG_LEVEL_PATTERNS = [
+    re.compile(fr'^[\[(]?{LOG_LEVEL}[])]?\s+')
+]
+
+
+def remove_starting_log_level(text: str) -> str:
+    """ Removes log level at the beginning of the text."""
+    result = text
+    for p in LOG_LEVEL_PATTERNS:
+        result = p.sub('', result)
+    return result
 
 
 def filter_empty_lines(log_lines: List[str]) -> List[str]:
@@ -441,7 +457,7 @@ def preprocess_words(text):
     return all_words
 
 
-def remove_guid_uids_from_text(text):
+def remove_guid_uuids_from_text(text):
     for pattern in [
         r"[0-9a-fA-F]{16,48}|[0-9a-fA-F]{10,48}\.\.\.",
         r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",

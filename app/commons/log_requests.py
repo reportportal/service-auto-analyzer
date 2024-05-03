@@ -17,24 +17,13 @@ from datetime import datetime
 from app.commons.launch_objects import Launch, TestItem, Log
 from app.commons.log_merger import LogMerger
 from app.utils import utils, text_processing
+from app.utils.log_preparation import basic_prepare
 
 
 class LogRequests:
 
     def __init__(self):
         self.log_merger = LogMerger()
-
-    def clean_message(self, message):
-        # FIXME: unify line endings to '\n' to apply optimizations
-        # cleaned_message = text_processing.unify_line_endings(message)
-        cleaned_message = text_processing.replace_tabs_for_newlines(message)
-        cleaned_message = text_processing.fix_big_encoded_urls(cleaned_message)
-        cleaned_message = text_processing.remove_generated_parts(cleaned_message)
-        cleaned_message = text_processing.remove_guid_uids_from_text(cleaned_message)
-        cleaned_message = text_processing.clean_html(cleaned_message)
-        cleaned_message = text_processing.delete_empty_lines(cleaned_message)
-        cleaned_message = text_processing.leave_only_unique_lines(cleaned_message)
-        return cleaned_message
 
     def _create_log_template(self) -> dict:
         return {
@@ -93,7 +82,7 @@ class LogRequests:
         return log_template
 
     def _fill_log_fields(self, log_template: dict, log: Log, number_of_lines: int):
-        cleaned_message = self.clean_message(log.message)
+        cleaned_message = basic_prepare(log.message)
 
         test_and_methods = text_processing.find_test_methods_in_text(cleaned_message)
         message = text_processing.first_lines(cleaned_message, number_of_lines)
@@ -223,9 +212,8 @@ class LogRequests:
 
                     if log.logLevel < utils.ERROR_LOGGING_LEVEL or not log.message.strip():
                         continue
-                    clean_message = self.clean_message(log.message)
-                    det_message, stacktrace = text_processing.detect_log_description_and_stacktrace(
-                        clean_message)
+                    cleaned_message = basic_prepare(log.message)
+                    det_message, stacktrace = text_processing.detect_log_description_and_stacktrace(cleaned_message)
                     for word in text_processing.split_words(stacktrace):
                         if "." in word and len(word.split(".")) > 2:
                             log_words[word] = 1
@@ -234,7 +222,7 @@ class LogRequests:
     def prepare_log_clustering_light(self, launch, test_item, log, project):
         log_template = self._create_log_template()
         log_template = self._fill_launch_test_item_fields(log_template, launch, test_item, project)
-        cleaned_message = self.clean_message(log.message)
+        cleaned_message = basic_prepare(log.message)
         detected_message, stacktrace = text_processing.detect_log_description_and_stacktrace(
             cleaned_message)
         test_and_methods = text_processing.find_test_methods_in_text(cleaned_message)

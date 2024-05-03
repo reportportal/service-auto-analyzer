@@ -19,7 +19,7 @@ from app.commons.log_merger import LogMerger
 from app.utils import utils, text_processing
 
 
-class LogPreparation:
+class LogRequests:
 
     def __init__(self):
         self.log_merger = LogMerger()

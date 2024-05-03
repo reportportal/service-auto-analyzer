@@ -25,7 +25,7 @@ from app.commons import clusterizer, logging
 from app.commons.esclient import EsClient
 from app.commons.launch_objects import ClusterResult, ClusterInfo, SearchConfig, ApplicationConfig
 from app.commons.log_merger import LogMerger
-from app.commons.log_preparation import LogPreparation
+from app.commons.log_requests import LogRequests
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.clusterService")
@@ -35,14 +35,14 @@ class ClusterService:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
     es_client: EsClient
-    log_preparation: LogPreparation
+    log_requests: LogRequests
     log_merger: LogMerger
 
     def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=self.app_config)
-        self.log_preparation = LogPreparation()
+        self.log_requests = LogRequests()
         self.log_merger = LogMerger()
 
     def build_search_similar_items_query(self, queried_log, message, launch_info, min_should_match="95%"):
@@ -350,7 +350,7 @@ class ClusterService:
         log_ids = []
         try:
             unique_errors_min_should_match = launch_info.launch.analyzerConfig.uniqueErrorsMinShouldMatch / 100  # noqa
-            log_messages, log_dict, log_ids_for_merged_logs = self.log_preparation.prepare_logs_for_clustering(  # noqa
+            log_messages, log_dict, log_ids_for_merged_logs = self.log_requests.prepare_logs_for_clustering(  # noqa
                 launch_info.launch, launch_info.numberOfLogLines,
                 launch_info.cleanNumbers, index_name)
             log_ids = set([str(log["_id"]) for log in log_dict.values()])

@@ -21,7 +21,7 @@ from app.commons import logging, similarity_calculator, object_saving
 from app.commons.esclient import EsClient
 from app.commons.launch_objects import SearchLogInfo, Log, SearchConfig, ApplicationConfig
 from app.commons.log_merger import LogMerger
-from app.commons.log_preparation import LogPreparation
+from app.commons.log_requests import LogRequests
 from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
 from app.utils import utils, text_processing
 
@@ -32,7 +32,7 @@ class SearchService:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
     es_client: EsClient
-    log_preparation: LogPreparation
+    log_requests: LogRequests
     log_merger: LogMerger
     similarity_model: WeightedSimilarityCalculator
 
@@ -40,7 +40,7 @@ class SearchService:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=self.app_config)
-        self.log_preparation = LogPreparation()
+        self.log_requests = LogRequests()
         self.log_merger = LogMerger()
         if not self.search_cfg.SimilarityWeightsFolder:
             raise ValueError('SimilarityWeightsFolder is not set')
@@ -161,8 +161,8 @@ class SearchService:
             if not message.strip():
                 continue
 
-            queried_log = self.log_preparation._create_log_template()
-            queried_log = self.log_preparation._fill_log_fields(
+            queried_log = self.log_requests._create_log_template()
+            queried_log = self.log_requests._fill_log_fields(
                 queried_log,
                 Log(logId=global_id, message=message),
                 search_req.logLines)

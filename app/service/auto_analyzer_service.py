@@ -335,7 +335,7 @@ class AutoAnalyzerService(AnalyzerService):
                         logger.info("Early finish from analyzer before timeout")
                         break
                     unique_logs = text_processing.leave_only_unique_logs(test_item.logs)
-                    prepared_logs = [self.log_preparation._prepare_log(launch, test_item, log, index_name)
+                    prepared_logs = [self.log_requests._prepare_log(launch, test_item, log, index_name)
                                      for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
                     results, _ = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
 

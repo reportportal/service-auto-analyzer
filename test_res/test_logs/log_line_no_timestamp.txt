@@ -8,3 +8,6 @@ INFO  [    NotificationRestService] - Get notifications related entity by entity
 [pool-1-thread-9 for channel id=171242] INFO  - ---- Status: SUCCESS
 INFO| Page text for USD_PageSource was saved to file: DesktopClient_OutboundEmailGiven_ShouldBePossibleMoveEmailToWorkBin_PageSource_2024_02_19_14_23_29_749.xml
 INFO  (Logger.java:41) - Verifying Health Notification(s)
+base_page.ts:128:16   | waitForElementToBeEnabledSoft
+INFO - Filtering dataframe by {'Member_ID': 'TST02677080-01', 'Population_ID': 'service_date_4'}
+[INFO] 2024-03-02 03:46:05,366 - //button[@data-test='create-btn'] should be visible, 10 s. - FAIL

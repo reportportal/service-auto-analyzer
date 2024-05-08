@@ -16,10 +16,18 @@ from utils import text_processing
 
 def basic_prepare(message):
     cleaned_message = message.strip()
-    cleaned_message = text_processing.unify_line_endings(cleaned_message)
+    # Sometimes log level goes first
+    cleaned_message = text_processing.remove_starting_log_level(cleaned_message)
     cleaned_message = text_processing.remove_starting_datetime(cleaned_message)
     cleaned_message = text_processing.remove_starting_log_level(cleaned_message)
-    cleaned_message = text_processing.remove_starting_datetime(cleaned_message)  # Sometimes log level goes first
+    cleaned_message = text_processing.remove_starting_thread_id(cleaned_message)
+    cleaned_message = text_processing.remove_starting_thread_name(cleaned_message)
+    # Sometimes log level goes after thread name
+    cleaned_message = text_processing.remove_starting_log_level(cleaned_message)
+
+    # This should go right after starting garbage clean-up
+    cleaned_message = text_processing.unify_line_endings(cleaned_message)
+
     cleaned_message = text_processing.replace_tabs_for_newlines(cleaned_message)
     cleaned_message = text_processing.fix_big_encoded_urls(cleaned_message)
     cleaned_message = text_processing.remove_generated_parts(cleaned_message)

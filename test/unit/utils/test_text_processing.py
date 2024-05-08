@@ -43,7 +43,28 @@ def test_filter_empty_lines():
 
 
 def test_remove_starting_datetime():
-    log = read_file_lines('test_res/test_logs', 'log_line.txt')
-    expected_log = read_file_lines('test_res/test_logs', 'log_line_no_timestamp_right.txt')
+    log = read_file_lines('test_res/test_logs', 'log_line_timestamps.txt')
+    expected_log = read_file_lines('test_res/test_logs', 'log_line_no_timestamp.txt')
     for i, line in enumerate(log):
         assert text_processing.remove_starting_datetime(line) == expected_log[i]
+
+
+def test_remove_starting_log_level():
+    log = read_file_lines('test_res/test_logs', 'log_line_no_timestamp.txt')
+    expected_log = read_file_lines('test_res/test_logs', 'log_line_no_log_level.txt')
+    for i, line in enumerate(log):
+        assert text_processing.remove_starting_log_level(line) == expected_log[i]
+
+
+def test_remove_starting_thread_id():
+    log = read_file_lines('test_res/test_logs', 'log_line_no_log_level.txt')
+    expected_log = read_file_lines('test_res/test_logs', 'log_line_no_thread_id.txt')
+    for i, line in enumerate(log):
+        assert text_processing.remove_starting_thread_id(line) == expected_log[i]
+
+
+def test_remove_starting_thread_namer():
+    log = read_file_lines('test_res/test_logs', 'log_line_no_thread_id.txt')
+    expected_log = read_file_lines('test_res/test_logs', 'log_line_no_thread_name.txt')
+    for i, line in enumerate(log):
+        assert text_processing.remove_starting_thread_name(line) == expected_log[i]

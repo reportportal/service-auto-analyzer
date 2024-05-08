@@ -44,6 +44,15 @@ def create_punctuation_map(split_urls) -> dict[str, str]:
 PUNCTUATION_MAP_NO_SPLIT_URLS = create_punctuation_map(False)
 PUNCTUATION_MAP_SPLIT_URLS = create_punctuation_map(True)
 
+
+def remove_starting_patterns(text: str, patterns: List[re.Pattern]) -> str:
+    """Removes starting patterns from the text."""
+    result = text
+    for p in patterns:
+        result = p.sub('', result)
+    return result
+
+
 EU_DATE = r'\d+-\d+-\d+'
 EU_TIME = r'\d+:\d+:\d+(?:[.,]\d+)?'
 US_DATE = r'\d+/\d+/\d+'
@@ -58,30 +67,49 @@ DATETIME_PATTERNS = [
     re.compile(fr'^{EU_DATETIME}(?:{DELIM})?\s*'),
     re.compile(fr'^{US_DATETIME}(?:{DELIM})?\s*'),
     re.compile(fr'^{EU_TIME}(?:{DELIM})?\s*'),
-    re.compile(fr'^\[{EU_TIME}](?:{DELIM})?\s*')
+    re.compile(fr'^\[{EU_TIME}](?:{DELIM})?\s*'),
+    re.compile(fr'^\[{EU_DATETIME}](?:{DELIM})?\s*')
 ]
 
 
 def remove_starting_datetime(text: str) -> str:
     """Removes datetime at the beginning of the text."""
-    result = text
-    for p in DATETIME_PATTERNS:
-        result = p.sub('', result)
-    return result
+    return remove_starting_patterns(text, DATETIME_PATTERNS)
 
 
 LOG_LEVEL = r'(?:TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\s?'
 LOG_LEVEL_PATTERNS = [
-    re.compile(fr'^[\[(]?{LOG_LEVEL}[])]?\s+')
+    re.compile(fr'^{LOG_LEVEL}(?:{DELIM})?\s+'),
+    re.compile(fr'^\[{LOG_LEVEL}](?:{DELIM})?\s+'),
+    re.compile(fr'^\({LOG_LEVEL}\)(?:{DELIM})?\s+'),
 ]
 
 
 def remove_starting_log_level(text: str) -> str:
     """ Removes log level at the beginning of the text."""
-    result = text
-    for p in LOG_LEVEL_PATTERNS:
-        result = p.sub('', result)
-    return result
+    return remove_starting_patterns(text, LOG_LEVEL_PATTERNS)
+
+
+THREAD_ID_PATTERN = r'\d+\s+-+\s*'
+THREAD_ID_PATTERNS = [
+    re.compile(fr'^{THREAD_ID_PATTERN}(?:{DELIM})?\s+'),
+]
+
+
+def remove_starting_thread_id(text: str) -> str:
+    """Removes thread id at the beginning of the text."""
+    return remove_starting_patterns(text, THREAD_ID_PATTERNS)
+
+
+THREAD_NAME_PATTERN = r'\[[^\]]*]'
+THREAD_NAME_PATTERNS = [
+    re.compile(fr'^{THREAD_NAME_PATTERN}(?:{DELIM})?\s+')
+]
+
+
+def remove_starting_thread_name(text: str) -> str:
+    """Removes thread name at the beginning of the text."""
+    return remove_starting_patterns(text, THREAD_NAME_PATTERNS)
 
 
 def filter_empty_lines(log_lines: List[str]) -> List[str]:
@@ -457,27 +485,30 @@ def preprocess_words(text):
     return all_words
 
 
-def remove_guid_uuids_from_text(text):
-    for pattern in [
-        r"[0-9a-fA-F]{16,48}|[0-9a-fA-F]{10,48}\.\.\.",
-        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
-        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-\w+"
-    ]:
-        strings_to_replace = set()
-        for m in re.findall(pattern, text):
-            if not m.isdigit() and m.strip():
-                strings_to_replace.add(m)
-        for _str in sorted(strings_to_replace, key=lambda x: (len(x), x), reverse=True):
-            text = text.replace(_str, " ")
+UUID = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+TRUNCATED_UUID = r'[0-9a-fA-F]{16,48}|[0-9a-fA-F]{10,48}\.\.\.'
+NAMED_UUID = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-(\w+)'
+UUID_TAG = "SPECIALUUID"
+GUID_UUID_PATTERNS = [
+    (re.compile(fr'\b{UUID}\b'), UUID_TAG),
+    (re.compile(fr'\b{TRUNCATED_UUID}\b'), UUID_TAG),
+    (re.compile(fr'\b{NAMED_UUID}\b'), fr'{UUID_TAG} \1'),
+]
+
+
+def remove_guid_uuids_from_text(text: str) -> str:
+    result = text
+    for pattern in GUID_UUID_PATTERNS:
+        result = pattern[0].sub(pattern[1], result)
     return text
 
 
 def replace_tabs_for_newlines(message):
-    return message.replace("\t", "\n")
+    return message.replace('\t', '\n')
 
 
 def unify_line_endings(message):
-    return message.replace("\r\n", "\n")
+    return message.replace('\r\n', '\n')
 
 
 def fix_big_encoded_urls(message):

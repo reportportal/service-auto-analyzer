@@ -77,6 +77,7 @@ from test import read_file_lines, read_file
     [
         ('stacktraces/log_stacktrace_generated.txt', 'stacktraces/log_stacktrace_prepared.txt'),
         ('stacktraces/log_stacktrace_generated_2.txt', 'stacktraces/log_stacktrace_prepared_2.txt'),
+        ('stacktraces/log_stacktrace_generated_3.txt', 'stacktraces/log_stacktrace_prepared_3.txt'),
         ('log_locator_with_attribute.txt', 'log_locator_with_attribute_prepared.txt')
     ]
 )

@@ -15,7 +15,6 @@
 import os
 import random
 import string
-from typing import List
 
 from app.commons.launch_objects import SearchConfig, ApplicationConfig
 from app.utils.utils import read_json_file
@@ -66,9 +65,14 @@ def get_fixture(fixture_name, to_json=False):
     return read_json_file("test_res/fixtures", fixture_name, to_json)
 
 
-def read_file_lines(folder: str, filename: str) -> List[str]:
+def read_file_lines(folder: str, filename: str) -> list[str]:
     with open(os.path.join(folder, filename), "r") as file:
         return file.readlines()
+
+
+def read_file(folder: str, filename: str) -> str:
+    with open(os.path.join(folder, filename), "r") as file:
+        return file.read()
 
 
 def random_alphanumeric(num: int):

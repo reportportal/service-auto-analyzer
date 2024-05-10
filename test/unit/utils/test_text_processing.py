@@ -24,8 +24,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import pytest
+
 from app.utils import utils, text_processing
-from test import read_file_lines
+from test import read_file_lines, read_file
 
 
 def test_delete_empty_lines():
@@ -68,3 +70,16 @@ def test_remove_starting_thread_namer():
     expected_log = read_file_lines('test_res/test_logs', 'log_line_no_thread_name.txt')
     for i, line in enumerate(log):
         assert text_processing.remove_starting_thread_name(line) == expected_log[i]
+
+
+@pytest.mark.parametrize(
+    'test_file, expected_file',
+    [
+        ('log_stacktrace_generated.txt', 'log_stacktrace_prepared.txt'),
+        ('log_locator_with_attribute.txt', 'log_locator_with_attribute_prepared.txt')
+    ]
+)
+def test_remove_generated_parts(test_file, expected_file):
+    log = read_file('test_res/test_logs', test_file)
+    expected_log = read_file('test_res/test_logs', expected_file)
+    assert text_processing.remove_generated_parts(log) == expected_log

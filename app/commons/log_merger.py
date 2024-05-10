@@ -117,7 +117,7 @@ class LogMerger:
 
                     for field in log_level_messages:
                         if field in log["_source"]:
-                            splitter = "\r\n" if field in ["message", "whole_message"] else " "
+                            splitter = "\n" if field in ["message", "whole_message"] else " "
                             log_level_messages[field][log_level] = \
                                 log_level_messages[field][log_level] + log["_source"][field] + splitter
 

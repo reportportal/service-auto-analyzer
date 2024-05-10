@@ -258,14 +258,15 @@ class TestService(unittest.TestCase):
         """Shutdown server and test request calls"""
         actual_calls = httpretty.latest_requests()
         assert len(actual_calls) == len(test_calls)
-        for expected_test_call, test_call in zip(test_calls, actual_calls):
+        for i, calls in enumerate(zip(test_calls, actual_calls)):
+            expected_test_call, test_call = calls
             assert expected_test_call["method"] == test_call.method
             assert expected_test_call["uri"] == test_call.path
             if "rq" in expected_test_call:
                 expected_body = expected_test_call["rq"]
                 real_body = test_call.parse_request_body(test_call.body)
-                if type(expected_body) == str and type(real_body) != str:
+                if type(expected_body) is str and type(real_body) is not str:
                     expected_body = json.loads(expected_body)
-                assert expected_body == real_body
+                assert expected_body == real_body, f'Error in request {i}'
         httpretty.disable()
         httpretty.reset()

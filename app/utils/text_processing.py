@@ -198,10 +198,10 @@ def is_line_from_stacktrace(text):
         return False
 
     text = re.sub(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)", "", text)
-    res = re.sub(r"(?<=:)\d+(?=\)?]?(\n|\r\n|$))", " ", text)
+    res = re.sub(r"(?<=:)\d+(?=\)?]?(\n|$))", " ", text)
     if res != text:
         return True
-    res = re.sub(r"((?<=line )|(?<=line))\s*\d+\s*((?=, in)|(?=,in)|(?=\n)|(?=\r\n)|(?=$))",
+    res = re.sub(r"((?<=line )|(?<=line))\s*\d+\s*((?=, in)|(?=,in)|(?=\n)|(?=$))",
                  " ", res, flags=re.I)
     if res != text:
         return True

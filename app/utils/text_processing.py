@@ -543,15 +543,15 @@ def has_more_lines_pattern(line):
     return False
 
 
-CLASS_NAME_WITH_MEMORY_REFERENCE = r'\b((?:[a-zA-Z0-9_-]+\.)+)([a-zA-Z0-9_-]+)@[0-9a-f]+\b'
 INNER_CLASS_EXTERNAL = r'\b((?:[a-zA-Z0-9_-]+\/|\\)+)([a-zA-Z0-9_-]+)\$([a-zA-Z0-9_-]+\.class)\b'
-INNER_CLASS_INTERNAL = r'(?<=\.|\$)([a-zA-Z0-9_-]+)\$(?=[a-zA-Z0-9_-]+(?:\.|\$|\())'
-GENERATED_LINE = r'\s*at\s*(?:[a-zA-Z0-9_-]+\.)+(?:[a-zA-Z0-9_-]+\$\$)+([0-9a-f]+)\.invoke\(<generated>\).*'
+INNER_CLASS_INTERNAL = r'(?<=\.|\$)([a-zA-Z0-9_-]+)\$(?=[a-zA-Z0-9_-]+(?:\.|\$|\(|@))'
+GENERATED_LINE = r'\s*(?:at\s*)?(?:[a-zA-Z0-9_-]+\.)+(?:[a-zA-Z0-9_-]+\$\$)+(?:[0-9a-f]+)\.(?:[a-zA-Z0-9_-]+\$|\.)*(?:[a-zA-Z0-9_-]+)\(<generated>\).*'
+CLASS_NAME_WITH_MEMORY_REFERENCE = r'\b((?:[a-zA-Z0-9_-]+\.)+)([a-zA-Z0-9_-]+)@[0-9a-f]+\b'
 STACKTRACE_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
-    (re.compile(CLASS_NAME_WITH_MEMORY_REFERENCE), r'\1\2'),
+    (re.compile(GENERATED_LINE), r''),
     (re.compile(INNER_CLASS_EXTERNAL), r'\1\2.\3'),
     (re.compile(INNER_CLASS_INTERNAL), r'\1.'),
-    (re.compile(GENERATED_LINE), r''),
+    (re.compile(CLASS_NAME_WITH_MEMORY_REFERENCE), r'\1\2'),
 ]
 
 

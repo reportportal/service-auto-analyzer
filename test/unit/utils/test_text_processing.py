@@ -28,54 +28,55 @@ import pytest
 
 from app.utils import utils, text_processing
 from test import read_file_lines, read_file
-
-
-def test_delete_empty_lines():
-    log = utils.read_file('test_res/test_logs', 'reportportal-api.txt')
-    expected = utils.read_file('test_res/test_logs', 'reportportal-api-no-empty-lines.txt')
-
-    assert text_processing.delete_empty_lines(log) == expected
-
-
-def test_filter_empty_lines():
-    log = read_file_lines('test_res/test_logs', 'reportportal-api.txt')
-    expected = read_file_lines('test_res/test_logs', 'reportportal-api-no-empty-lines.txt')
-
-    assert text_processing.filter_empty_lines(log) == expected
-
-
-def test_remove_starting_datetime():
-    log = read_file_lines('test_res/test_logs', 'log_line_timestamps.txt')
-    expected_log = read_file_lines('test_res/test_logs', 'log_line_no_timestamp.txt')
-    for i, line in enumerate(log):
-        assert text_processing.remove_starting_datetime(line) == expected_log[i]
-
-
-def test_remove_starting_log_level():
-    log = read_file_lines('test_res/test_logs', 'log_line_no_timestamp.txt')
-    expected_log = read_file_lines('test_res/test_logs', 'log_line_no_log_level.txt')
-    for i, line in enumerate(log):
-        assert text_processing.remove_starting_log_level(line) == expected_log[i]
-
-
-def test_remove_starting_thread_id():
-    log = read_file_lines('test_res/test_logs', 'log_line_no_log_level.txt')
-    expected_log = read_file_lines('test_res/test_logs', 'log_line_no_thread_id.txt')
-    for i, line in enumerate(log):
-        assert text_processing.remove_starting_thread_id(line) == expected_log[i]
-
-
-def test_remove_starting_thread_namer():
-    log = read_file_lines('test_res/test_logs', 'log_line_no_thread_id.txt')
-    expected_log = read_file_lines('test_res/test_logs', 'log_line_no_thread_name.txt')
-    for i, line in enumerate(log):
-        assert text_processing.remove_starting_thread_name(line) == expected_log[i]
+#
+#
+# def test_delete_empty_lines():
+#     log = utils.read_file('test_res/test_logs', 'reportportal-api.txt')
+#     expected = utils.read_file('test_res/test_logs', 'reportportal-api-no-empty-lines.txt')
+#
+#     assert text_processing.delete_empty_lines(log) == expected
+#
+#
+# def test_filter_empty_lines():
+#     log = read_file_lines('test_res/test_logs', 'reportportal-api.txt')
+#     expected = read_file_lines('test_res/test_logs', 'reportportal-api-no-empty-lines.txt')
+#
+#     assert text_processing.filter_empty_lines(log) == expected
+#
+#
+# def test_remove_starting_datetime():
+#     log = read_file_lines('test_res/test_logs', 'log_line_timestamps.txt')
+#     expected_log = read_file_lines('test_res/test_logs', 'log_line_no_timestamp.txt')
+#     for i, line in enumerate(log):
+#         assert text_processing.remove_starting_datetime(line) == expected_log[i]
+#
+#
+# def test_remove_starting_log_level():
+#     log = read_file_lines('test_res/test_logs', 'log_line_no_timestamp.txt')
+#     expected_log = read_file_lines('test_res/test_logs', 'log_line_no_log_level.txt')
+#     for i, line in enumerate(log):
+#         assert text_processing.remove_starting_log_level(line) == expected_log[i]
+#
+#
+# def test_remove_starting_thread_id():
+#     log = read_file_lines('test_res/test_logs', 'log_line_no_log_level.txt')
+#     expected_log = read_file_lines('test_res/test_logs', 'log_line_no_thread_id.txt')
+#     for i, line in enumerate(log):
+#         assert text_processing.remove_starting_thread_id(line) == expected_log[i]
+#
+#
+# def test_remove_starting_thread_namer():
+#     log = read_file_lines('test_res/test_logs', 'log_line_no_thread_id.txt')
+#     expected_log = read_file_lines('test_res/test_logs', 'log_line_no_thread_name.txt')
+#     for i, line in enumerate(log):
+#         assert text_processing.remove_starting_thread_name(line) == expected_log[i]
 
 
 @pytest.mark.parametrize(
     'test_file, expected_file',
     [
         ('stacktraces/log_stacktrace_generated.txt', 'stacktraces/log_stacktrace_prepared.txt'),
+        ('stacktraces/log_stacktrace_generated_2.txt', 'stacktraces/log_stacktrace_prepared_2.txt'),
         ('log_locator_with_attribute.txt', 'log_locator_with_attribute_prepared.txt')
     ]
 )

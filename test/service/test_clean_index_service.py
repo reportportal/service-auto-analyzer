@@ -263,25 +263,22 @@ class TestCleanIndexService(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            try:
-                self._start_server(test["test_calls"])
-                app_config = self.app_config
-                if "app_config" in test:
-                    app_config = test["app_config"]
-                _clean_index_service = CleanIndexService(app_config=app_config)
-                _clean_index_service.es_client.es_client.scroll = MagicMock(
-                    return_value=json.loads(get_fixture(self.no_hits_search_rs)))
-                _clean_index_service.suggest_info_service.es_client.es_client.scroll = MagicMock(
-                    return_value=json.loads(get_fixture(self.no_hits_search_rs)))
+            print(f'Test case number: {idx}')
+            self._start_server(test["test_calls"])
+            app_config = self.app_config
+            if "app_config" in test:
+                app_config = test["app_config"]
+            _clean_index_service = CleanIndexService(app_config=app_config)
+            _clean_index_service.es_client.es_client.scroll = MagicMock(
+                return_value=json.loads(get_fixture(self.no_hits_search_rs)))
+            _clean_index_service.suggest_info_service.es_client.es_client.scroll = MagicMock(
+                return_value=json.loads(get_fixture(self.no_hits_search_rs)))
 
-                response = _clean_index_service.delete_logs(test["rq"])
+            response = _clean_index_service.delete_logs(test["rq"])
 
-                assert test["expected_count"] == response
+            assert test["expected_count"] == response
 
-                TestCleanIndexService.shutdown_server(test["test_calls"])
-            except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}'). \
-                    with_traceback(err.__traceback__)
+            TestCleanIndexService.shutdown_server(test["test_calls"])
 
 
 if __name__ == '__main__':

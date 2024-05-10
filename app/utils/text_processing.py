@@ -15,7 +15,7 @@
 import re
 import string
 import urllib.parse
-from typing import List
+from typing import Iterable
 from urllib.parse import urlparse
 
 import nltk
@@ -45,25 +45,30 @@ PUNCTUATION_MAP_NO_SPLIT_URLS = create_punctuation_map(False)
 PUNCTUATION_MAP_SPLIT_URLS = create_punctuation_map(True)
 
 
-def remove_starting_patterns(text: str, patterns: List[re.Pattern]) -> str:
+def replace_patterns(text: str, patterns: Iterable[tuple[re.Pattern, str]]) -> str:
     """Removes starting patterns from the text."""
     result = text
-    for p in patterns:
-        result = p.sub('', result)
+    for p, repl in patterns:
+        result = p.sub(repl, result)
     return result
 
 
-EU_DATE = r'\d+-\d+-\d+'
-EU_TIME = r'\d+:\d+:\d+(?:[.,]\d+)?'
-US_DATE = r'\d+/\d+/\d+'
-US_TIME = EU_TIME
+def remove_patterns(text: str, patterns: Iterable[re.Pattern]) -> str:
+    """Removes starting patterns from the text."""
+    return replace_patterns(text, map(lambda p: (p, ''), patterns))
 
-EU_DATETIME = fr'{EU_DATE}\s+{EU_TIME}'
-US_DATETIME = fr'{US_DATE}\s+{US_TIME}'
 
-DELIM = r'(?:\s*-\s*)|(?:\s*\|\s*)'
+EU_DATE: str = r'\d+-\d+-\d+'
+EU_TIME: str = r'\d+:\d+:\d+(?:[.,]\d+)?'
+US_DATE: str = r'\d+/\d+/\d+'
+US_TIME: str = EU_TIME
 
-DATETIME_PATTERNS = [
+EU_DATETIME: str = fr'{EU_DATE}\s+{EU_TIME}'
+US_DATETIME: str = fr'{US_DATE}\s+{US_TIME}'
+
+DELIM: str = r'(?:\s*-\s*)|(?:\s*\|\s*)'
+
+DATETIME_PATTERNS: Iterable[re.Pattern] = [
     re.compile(fr'^{EU_DATETIME}(?:{DELIM})?\s*'),
     re.compile(fr'^{US_DATETIME}(?:{DELIM})?\s*'),
     re.compile(fr'^{EU_TIME}(?:{DELIM})?\s*'),
@@ -74,11 +79,11 @@ DATETIME_PATTERNS = [
 
 def remove_starting_datetime(text: str) -> str:
     """Removes datetime at the beginning of the text."""
-    return remove_starting_patterns(text, DATETIME_PATTERNS)
+    return remove_patterns(text, DATETIME_PATTERNS)
 
 
-LOG_LEVEL = r'(?:TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\s?'
-LOG_LEVEL_PATTERNS = [
+LOG_LEVEL: str = r'(?:TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\s?'
+LOG_LEVEL_PATTERNS: Iterable[re.Pattern] = [
     re.compile(fr'^{LOG_LEVEL}(?:{DELIM})?\s+'),
     re.compile(fr'^\[{LOG_LEVEL}](?:{DELIM})?\s+'),
     re.compile(fr'^\({LOG_LEVEL}\)(?:{DELIM})?\s+'),
@@ -87,32 +92,32 @@ LOG_LEVEL_PATTERNS = [
 
 def remove_starting_log_level(text: str) -> str:
     """ Removes log level at the beginning of the text."""
-    return remove_starting_patterns(text, LOG_LEVEL_PATTERNS)
+    return remove_patterns(text, LOG_LEVEL_PATTERNS)
 
 
-THREAD_ID_PATTERN = r'\d+\s+-+\s*'
-THREAD_ID_PATTERNS = [
+THREAD_ID_PATTERN: str = r'\d+\s+-+\s*'
+THREAD_ID_PATTERNS: Iterable[re.Pattern] = [
     re.compile(fr'^{THREAD_ID_PATTERN}(?:{DELIM})?\s+'),
 ]
 
 
 def remove_starting_thread_id(text: str) -> str:
     """Removes thread id at the beginning of the text."""
-    return remove_starting_patterns(text, THREAD_ID_PATTERNS)
+    return remove_patterns(text, THREAD_ID_PATTERNS)
 
 
-THREAD_NAME_PATTERN = r'\[[^\]]*]'
-THREAD_NAME_PATTERNS = [
+THREAD_NAME_PATTERN: str = r'\[[^\]]*]'
+THREAD_NAME_PATTERNS: Iterable[re.Pattern] = [
     re.compile(fr'^{THREAD_NAME_PATTERN}(?:{DELIM})?\s+')
 ]
 
 
 def remove_starting_thread_name(text: str) -> str:
     """Removes thread name at the beginning of the text."""
-    return remove_starting_patterns(text, THREAD_NAME_PATTERNS)
+    return remove_patterns(text, THREAD_NAME_PATTERNS)
 
 
-def filter_empty_lines(log_lines: List[str]) -> List[str]:
+def filter_empty_lines(log_lines: list[str]) -> list[str]:
     return [line for line in log_lines if line.strip()]
 
 
@@ -485,11 +490,11 @@ def preprocess_words(text):
     return all_words
 
 
-UUID = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
-TRUNCATED_UUID = r'[0-9a-fA-F]{16,48}|[0-9a-fA-F]{10,48}\.\.\.'
-NAMED_UUID = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-(\w+)'
-UUID_TAG = "SPECIALUUID"
-GUID_UUID_PATTERNS = [
+UUID: str = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+TRUNCATED_UUID: str = r'[0-9a-fA-F]{16,48}|[0-9a-fA-F]{10,48}\.\.\.'
+NAMED_UUID: str = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-(\w+)'
+UUID_TAG: str = "SPECIALUUID"
+GUID_UUID_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
     (re.compile(fr'\b{UUID}\b'), UUID_TAG),
     (re.compile(fr'\b{TRUNCATED_UUID}\b'), UUID_TAG),
     (re.compile(fr'\b{NAMED_UUID}\b'), fr'{UUID_TAG} \1'),
@@ -497,10 +502,7 @@ GUID_UUID_PATTERNS = [
 
 
 def remove_guid_uuids_from_text(text: str) -> str:
-    result = text
-    for pattern in GUID_UUID_PATTERNS:
-        result = pattern[0].sub(pattern[1], result)
-    return text
+    return replace_patterns(text, GUID_UUID_PATTERNS)
 
 
 def replace_tabs_for_newlines(message):
@@ -541,42 +543,21 @@ def has_more_lines_pattern(line):
     return False
 
 
+CLASS_NAME_WITH_MEMORY_REFERENCE = r'\b((?:[a-zA-Z0-9_-]+\.)+)([a-zA-Z0-9_-]+)@[0-9a-f]+\b'
+INNER_CLASS_EXTERNAL = r'\b((?:[a-zA-Z0-9_-]+\/|\\)+)([a-zA-Z0-9_-]+)\$([a-zA-Z0-9_-]+\.class)\b'
+INNER_CLASS_INTERNAL = r'(?<=\.|\$)([a-zA-Z0-9_-]+)\$(?=[a-zA-Z0-9_-]+(?:\.|\$|\())'
+GENERATED_LINE = r'\s*at\s*(?:[a-zA-Z0-9_-]+\.)+(?:[a-zA-Z0-9_-]+\$\$)+([0-9a-f]+)\.invoke\(<generated>\).*'
+STACKTRACE_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
+    (re.compile(CLASS_NAME_WITH_MEMORY_REFERENCE), r'\1\2'),
+    (re.compile(INNER_CLASS_EXTERNAL), r'\1\2.\3'),
+    (re.compile(INNER_CLASS_INTERNAL), r'\1.'),
+    (re.compile(GENERATED_LINE), r''),
+]
+
+
 def remove_generated_parts(message):
     """Removes lines with '<generated>' keyword and removes parts, like $ab24b, @c321e from words"""
-    all_lines = []
-    for line in message.split("\n"):
-        if "<generated>" in line.lower():
-            continue
-        if has_stacktrace_keywords(line) or has_more_lines_pattern(line):
-            continue
-        for symbol in [r"\$", "@"]:
-            all_found_parts: set[tuple] = set()
-            for m in re.finditer(r"%s+(.+?)\b" % symbol, line):
-                try:
-                    found_part = m.group(1).strip().strip(symbol).strip()
-                    if found_part != "":
-                        all_found_parts.add((found_part, m.group(0).strip()))
-                except Exception as err:
-                    logger.error(err)
-            sorted_parts = sorted(list(all_found_parts), key=lambda x: len(x[1]), reverse=True)
-            for found_part in sorted_parts:
-                whole_found_part = found_part[1].replace("$", r"\$")
-                found_part = found_part[0]
-                part_to_replace = ""
-                if re.search(r"\d", found_part):
-                    part_with_numbers_in_the_end = re.search(r"[a-zA-z]{5,}\d+", found_part)
-                    if part_with_numbers_in_the_end and part_with_numbers_in_the_end.group(0) == found_part:
-                        part_to_replace = " %s" % found_part
-                else:
-                    part_to_replace = ".%s" % found_part
-                try:
-                    line = re.sub(whole_found_part, part_to_replace, line)
-                except:  # noqa
-                    pass
-
-        line = re.sub(r"\.+", ".", line)
-        all_lines.append(line)
-    return "\n".join(all_lines)
+    return replace_patterns(message, STACKTRACE_PATTERNS)
 
 
 def leave_only_unique_lines(message):

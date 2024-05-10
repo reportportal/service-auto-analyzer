@@ -75,7 +75,7 @@ def test_remove_starting_thread_namer():
 @pytest.mark.parametrize(
     'test_file, expected_file',
     [
-        ('log_stacktrace_generated.txt', 'log_stacktrace_prepared.txt'),
+        ('stacktraces/log_stacktrace_generated.txt', 'stacktraces/log_stacktrace_prepared.txt'),
         ('log_locator_with_attribute.txt', 'log_locator_with_attribute_prepared.txt')
     ]
 )

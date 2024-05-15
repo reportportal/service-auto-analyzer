@@ -17,7 +17,7 @@ from datetime import datetime
 from app.commons.launch_objects import Launch, TestItem, Log
 from app.commons.log_merger import LogMerger
 from app.utils import utils, text_processing
-from app.utils.log_preparation import basic_prepare
+from app.utils.log_preparation import basic_prepare, prepare_message, prepare_message_without_params
 
 
 class LogRequests:
@@ -82,46 +82,38 @@ class LogRequests:
         return log_template
 
     def _fill_log_fields(self, log_template: dict, log: Log, number_of_lines: int):
-        cleaned_message = basic_prepare(log.message)
+        clean_message = basic_prepare(log.message)
 
-        test_and_methods = text_processing.find_test_methods_in_text(cleaned_message)
-        message = text_processing.first_lines(cleaned_message, number_of_lines)
-        message = text_processing.replace_text_pieces(message, test_and_methods)
-        message_without_params = message
-        message = text_processing.delete_empty_lines(text_processing.sanitize_text(message))
+        test_and_methods = text_processing.find_test_methods_in_text(clean_message)
+        message = prepare_message(clean_message, number_of_lines, test_and_methods)
 
-        message_without_params = text_processing.clean_from_urls(message_without_params)
-        message_without_params = text_processing.clean_from_paths(message_without_params)
-        message_without_params = text_processing.clean_from_params(message_without_params)
-        message_without_params = text_processing.remove_starting_datetime(message_without_params)
-        message_without_params = text_processing.sanitize_text(message_without_params)
+        message_without_params = prepare_message_without_params(message)
         message_without_params_and_brackets = text_processing.clean_from_brackets(message_without_params)
 
-        detected_message, stacktrace = text_processing.detect_log_description_and_stacktrace(cleaned_message)
+        detected_message, stacktrace = text_processing.detect_log_description_and_stacktrace(clean_message)
 
-        detected_message_without_params = detected_message
-        urls = " ".join(text_processing.extract_urls(detected_message_without_params))
-        detected_message_without_params = text_processing.clean_from_urls(detected_message_without_params)
-        paths = " ".join(text_processing.extract_paths(detected_message_without_params))
-        detected_message_without_params = text_processing.clean_from_paths(detected_message_without_params)
+        detected_message_wo_urls_and_paths = detected_message
+        urls = " ".join(text_processing.extract_urls(detected_message_wo_urls_and_paths))
+        detected_message_wo_urls_and_paths = text_processing.clean_from_urls(detected_message_wo_urls_and_paths)
+        paths = " ".join(text_processing.extract_paths(detected_message_wo_urls_and_paths))
+        detected_message_wo_urls_and_paths = text_processing.clean_from_paths(detected_message_wo_urls_and_paths)
         potential_status_codes = " ".join(
-            text_processing.get_potential_status_codes(detected_message_without_params))
-        detected_message_without_params = text_processing.replace_text_pieces(
-            detected_message_without_params, test_and_methods)
+            text_processing.get_potential_status_codes(detected_message_wo_urls_and_paths))
+        detected_message_wo_urls_and_paths = text_processing.replace_text_pieces(
+            detected_message_wo_urls_and_paths, test_and_methods)
         detected_message = text_processing.replace_text_pieces(detected_message, test_and_methods)
-        detected_message_without_params = text_processing.remove_starting_datetime(detected_message_without_params)
-        detected_message_wo_urls_and_paths = detected_message_without_params
+        detected_message_without_params = detected_message_wo_urls_and_paths
 
         message_params = " ".join(text_processing.extract_message_params(detected_message_without_params))
         detected_message_without_params = text_processing.clean_from_params(detected_message_without_params)
-        detected_message_without_params = text_processing.sanitize_text(detected_message_without_params)
+        detected_message_without_params = text_processing.remove_numbers(detected_message_without_params)
         detected_message_without_params_and_brackets = text_processing.clean_from_brackets(
             detected_message_without_params)
 
-        detected_message_with_numbers = text_processing.remove_starting_datetime(detected_message)
+        detected_message_with_numbers = detected_message
         detected_message_only_numbers = text_processing.find_only_numbers(detected_message_with_numbers)
-        detected_message = text_processing.sanitize_text(detected_message)
-        stacktrace = text_processing.sanitize_text(stacktrace)
+        detected_message = text_processing.remove_numbers(detected_message)
+        stacktrace = text_processing.remove_numbers(stacktrace)
         found_exceptions = text_processing.get_found_exceptions(detected_message)
         found_exceptions_extended = text_processing.enrich_found_exceptions(found_exceptions)
         found_test_methods = text_processing.enrich_text_with_method_and_classes(" ".join(test_and_methods))
@@ -132,9 +124,9 @@ class LogRequests:
         log_template["_source"]["cluster_message"] = log.clusterMessage
         log_template["_source"]["cluster_with_numbers"] = utils.extract_clustering_setting(log.clusterId)
         log_template["_source"]["log_level"] = log.logLevel
-        log_template["_source"]["original_message_lines"] = text_processing.calculate_line_number(cleaned_message)
+        log_template["_source"]["original_message_lines"] = text_processing.calculate_line_number(clean_message)
         log_template["_source"]["original_message_words_number"] = len(
-            text_processing.split_words(cleaned_message, split_urls=False))
+            text_processing.split_words(clean_message, split_urls=False))
         log_template["_source"]["message"] = message
         log_template["_source"]["detected_message"] = detected_message
         log_template["_source"]["detected_message_with_numbers"] = detected_message_with_numbers
@@ -227,9 +219,9 @@ class LogRequests:
             cleaned_message)
         test_and_methods = text_processing.find_test_methods_in_text(cleaned_message)
         detected_message = text_processing.replace_text_pieces(detected_message, test_and_methods)
-        stacktrace = text_processing.sanitize_text(stacktrace)
+        stacktrace = text_processing.remove_numbers(stacktrace)
         message = text_processing.first_lines(cleaned_message, -1)
-        message = text_processing.sanitize_text(message)
+        message = text_processing.remove_numbers(message)
         log_template["_id"] = log.logId
         log_template["_source"]["cluster_id"] = str(log.clusterId)
         log_template["_source"]["cluster_message"] = log.clusterMessage

@@ -192,8 +192,8 @@ def detect_log_parts_python(message, default_log_number=1):
     return "\n".join(detected_message_lines), "\n".join(stacktrace_lines)
 
 
-def is_line_from_stacktrace(text):
-    """Deletes line numbers in the stacktrace"""
+def is_line_from_stacktrace(text: str) -> bool:
+    """Detects if the line is a stacktrace part"""
     if is_starting_message_pattern(text):
         return False
 
@@ -220,8 +220,6 @@ def is_line_from_stacktrace(text):
 
 def detect_log_description_and_stacktrace(message):
     """Split a log into a log message and stacktrace"""
-    message = remove_starting_datetime(message)
-    message = delete_empty_lines(message)
     if calculate_line_number(message) > 2:
         if is_python_log(message):
             return detect_log_parts_python(message)
@@ -293,7 +291,7 @@ def get_potential_status_codes(text):
     return potential_codes_list
 
 
-def sanitize_text(text):
+def remove_numbers(text):
     """Sanitize text by deleting all numbers"""
     return re.sub(r"\d+", "", text)
 
@@ -313,7 +311,7 @@ def prepare_message_for_clustering(message, number_of_log_lines, clean_numbers,
             replaced_code = "#&#" * (idx + 1)
             status_codes_replaced[replaced_code] = code
             message = re.sub(fr"\b{code}\b", replaced_code, message)
-        message = sanitize_text(message)
+        message = remove_numbers(message)
         for code_replaced in sorted(status_codes_replaced.keys(), reverse=True):
             message = re.sub(code_replaced, str(status_codes_replaced[code_replaced]), message)
     message = delete_empty_lines(message)
@@ -432,7 +430,7 @@ def preprocess_test_item_name(text):
     return " ".join(all_words)
 
 
-def find_test_methods_in_text(text):
+def find_test_methods_in_text(text: str) -> set[str]:
     test_methods = set()
     for m in re.findall(
             r"([^ ()/\\:]+(Test|Step)s*\.[^ ()/\\:]+)|([^ ()/\\:]+\.spec\.js)", text):
@@ -606,7 +604,7 @@ def clean_from_urls(text):
     return re.sub(r" +", " ", text).strip()
 
 
-def extract_urls(text):
+def extract_urls(text: str) -> list[str]:
     all_unique = set()
     all_urls = []
     for param in re.findall(r"((http|https|ftp):\S+|\bwww\.\S+)", text):

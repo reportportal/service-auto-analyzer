@@ -545,7 +545,8 @@ def has_more_lines_pattern(line):
 
 INNER_CLASS_EXTERNAL = r'\b((?:[a-zA-Z0-9_-]+\/|\\)+)([a-zA-Z0-9_-]+)\$([a-zA-Z0-9_-]+\.class)\b'
 INNER_CLASS_INTERNAL = r'(?<=\.|\$)([a-zA-Z0-9_-]+)\$(?=[a-zA-Z0-9_-]+(?:\.|\$|\(|@))'
-GENERATED_LINE = r'\s*(?:at\s*)?(?:[a-zA-Z0-9_-]+\.)+(?:[a-zA-Z0-9_-]+\$\$)+(?:[0-9a-f]+)\.(?:[a-zA-Z0-9_-]+\$|\.)*(?:[a-zA-Z0-9_-]+)\(<generated>\).*'
+GENERATED_LINE = (r'\s*(?:at\s*)?(?:[a-zA-Z0-9_-]+\.)+(?:[a-zA-Z0-9_-]+\$\$)+(?:[0-9a-f]+)\.(?:[a-zA-Z0-9_-]+\$|\.)*'
+                  r'(?:[a-zA-Z0-9_-]+)\(<generated>\).*')
 CLASS_NAME_WITH_MEMORY_REFERENCE = r'\b((?:[a-zA-Z0-9_-]+\.)+)([a-zA-Z0-9_-]+)@[0-9a-f]+\b'
 TRUNCATED_STACKTRACE = r'\s*\.\.\. \d+ more.*'
 STACKTRACE_PATTERNS: Iterable[tuple[re.Pattern, str]] = [

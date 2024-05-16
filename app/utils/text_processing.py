@@ -262,10 +262,15 @@ def detect_log_description_and_stacktrace_light(message):
     return message, ""
 
 
+SQR_BRCKTS = r'\[[^\]]*\]'
+RND_BRCKTS = r'\([^)]*\)'
+CRL_BRCKTS = r'\{[^\}]*\}'
+BRCKTS = re.compile(fr'{SQR_BRCKTS}|{RND_BRCKTS}|{CRL_BRCKTS}')
+
+
 def clean_from_brackets(text):
-    for pattern in [r"\[[\s\S]+\]", r"\{[\s\S]+?\}", r"\([\s\S]+?\)"]:
-        text = re.sub(pattern, "", text)
-    return text
+    """Removes all brackets and text inside them from the given text."""
+    return BRCKTS.sub('', text)
 
 
 def get_potential_status_codes(text):
@@ -291,12 +296,12 @@ def get_potential_status_codes(text):
     return potential_codes_list
 
 
-def remove_numbers(text):
+def remove_numbers(text: str) -> str:
     """Sanitize text by deleting all numbers"""
-    return re.sub(r"\d+", "", text)
+    return re.sub(r'\d+', '', text)
 
 
-def first_lines(log_str: str, n_lines: int):
+def first_lines(log_str: str, n_lines: int) -> str:
     """Take n first lines."""
     return '\n'.join((log_str.split('\n')[:n_lines])) if n_lines >= 0 else log_str
 
@@ -388,9 +393,9 @@ def split_words(text, min_word_length=0, only_unique=True, split_urls=True, to_l
     return all_words
 
 
-def find_only_numbers(detected_message_with_numbers):
+def find_only_numbers(detected_message_with_numbers: str) -> str:
     """Removes all non digit symbols and concatenates unique numbers"""
-    detected_message_only_numbers = re.sub(r"[^\d ._]", "", detected_message_with_numbers)
+    detected_message_only_numbers = re.sub(r'[^\d ._]', '', detected_message_with_numbers)
     return " ".join(split_words(detected_message_only_numbers))
 
 

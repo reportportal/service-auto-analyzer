@@ -85,3 +85,10 @@ def test_remove_generated_parts(test_file, expected_file):
     log = read_file('test_res/test_logs', test_file)
     expected_log = read_file('test_res/test_logs', expected_file)
     assert text_processing.remove_generated_parts(log) == expected_log
+
+
+def test_clean_from_brackets():
+    log = read_file_lines('test_res/test_logs', 'brackets_test.txt')
+    expected_log = read_file_lines('test_res/test_logs', 'brackets_test_results.txt')
+    for i, line in enumerate(log):
+        assert text_processing.clean_from_brackets(line) == expected_log[i]

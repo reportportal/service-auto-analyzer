@@ -63,3 +63,13 @@ def prepare_exception_message_without_params(prepared_exception_message_no_urls_
     detected_message_without_params = text_processing.clean_from_params(prepared_exception_message_no_urls_paths)
     detected_message_without_params = text_processing.remove_numbers(detected_message_without_params)
     return detected_message_without_params
+
+
+def prepare_exception_message_and_stacktrace(clean_message: str) -> tuple[str, str]:
+    exception_message, stacktrace = text_processing.detect_log_description_and_stacktrace(clean_message)
+    stacktrace = text_processing.remove_numbers(stacktrace)
+    return exception_message, stacktrace
+
+
+def prepare_exception_message_no_params(exception_message_no_urls_paths: str) -> str:
+    return text_processing.remove_numbers(text_processing.clean_from_params(exception_message_no_urls_paths))

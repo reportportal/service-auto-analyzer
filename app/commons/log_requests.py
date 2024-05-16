@@ -16,8 +16,9 @@ from datetime import datetime
 
 from app.commons.launch_objects import Launch, TestItem, Log
 from app.commons.log_merger import LogMerger
+from app.commons.prepared_log import PreparedLogMessage
 from app.utils import utils, text_processing
-from app.utils.log_preparation import basic_prepare, prepare_message, prepare_message_without_params
+from app.utils.log_preparation import basic_prepare
 
 
 class LogRequests:
@@ -82,79 +83,44 @@ class LogRequests:
         return log_template
 
     def _fill_log_fields(self, log_template: dict, log: Log, number_of_lines: int):
-        clean_message = basic_prepare(log.message)
-
-        test_and_methods = text_processing.find_test_methods_in_text(clean_message)
-        message = prepare_message(clean_message, number_of_lines, test_and_methods)
-
-        message_without_params = prepare_message_without_params(message)
-        message_without_params_and_brackets = text_processing.clean_from_brackets(message_without_params)
-
-        detected_message, stacktrace = text_processing.detect_log_description_and_stacktrace(clean_message)
-
-        detected_message_wo_urls_and_paths = detected_message
-        urls = " ".join(text_processing.extract_urls(detected_message_wo_urls_and_paths))
-        detected_message_wo_urls_and_paths = text_processing.clean_from_urls(detected_message_wo_urls_and_paths)
-        paths = " ".join(text_processing.extract_paths(detected_message_wo_urls_and_paths))
-        detected_message_wo_urls_and_paths = text_processing.clean_from_paths(detected_message_wo_urls_and_paths)
-        potential_status_codes = " ".join(
-            text_processing.get_potential_status_codes(detected_message_wo_urls_and_paths))
-        detected_message_wo_urls_and_paths = text_processing.replace_text_pieces(
-            detected_message_wo_urls_and_paths, test_and_methods)
-        detected_message = text_processing.replace_text_pieces(detected_message, test_and_methods)
-        detected_message_without_params = detected_message_wo_urls_and_paths
-
-        message_params = " ".join(text_processing.extract_message_params(detected_message_without_params))
-        detected_message_without_params = text_processing.clean_from_params(detected_message_without_params)
-        detected_message_without_params = text_processing.remove_numbers(detected_message_without_params)
-        detected_message_without_params_and_brackets = text_processing.clean_from_brackets(
-            detected_message_without_params)
-
-        detected_message_with_numbers = detected_message
-        detected_message_only_numbers = text_processing.find_only_numbers(detected_message_with_numbers)
-        detected_message = text_processing.remove_numbers(detected_message)
-        stacktrace = text_processing.remove_numbers(stacktrace)
-        found_exceptions = text_processing.get_found_exceptions(detected_message)
-        found_exceptions_extended = text_processing.enrich_found_exceptions(found_exceptions)
-        found_test_methods = text_processing.enrich_text_with_method_and_classes(" ".join(test_and_methods))
-
+        prepared_log = PreparedLogMessage(log.message, number_of_lines)
         log_template["_id"] = log.logId
         log_template["_source"]["log_time"] = datetime(*log.logTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
         log_template["_source"]["cluster_id"] = str(log.clusterId)
         log_template["_source"]["cluster_message"] = log.clusterMessage
         log_template["_source"]["cluster_with_numbers"] = utils.extract_clustering_setting(log.clusterId)
         log_template["_source"]["log_level"] = log.logLevel
-        log_template["_source"]["original_message_lines"] = text_processing.calculate_line_number(clean_message)
+        log_template["_source"]["original_message_lines"] = text_processing.calculate_line_number(
+            prepared_log.clean_message)
         log_template["_source"]["original_message_words_number"] = len(
-            text_processing.split_words(clean_message, split_urls=False))
-        log_template["_source"]["message"] = message
-        log_template["_source"]["detected_message"] = detected_message
-        log_template["_source"]["detected_message_with_numbers"] = detected_message_with_numbers
-        log_template["_source"]["stacktrace"] = stacktrace
-        log_template["_source"]["only_numbers"] = detected_message_only_numbers
-        log_template["_source"]["urls"] = urls
-        log_template["_source"]["paths"] = paths
-        log_template["_source"]["message_params"] = message_params
-        log_template["_source"]["found_exceptions"] = found_exceptions
-        log_template["_source"]["found_exceptions_extended"] = found_exceptions_extended
+            text_processing.split_words(prepared_log.clean_message, split_urls=False))
+        log_template["_source"]["message"] = prepared_log.message
+        log_template["_source"]["detected_message"] = prepared_log.exception_message_no_numbers
+        log_template["_source"]["detected_message_with_numbers"] = prepared_log.exception_message
+        log_template["_source"]["stacktrace"] = prepared_log.stacktrace
+        log_template["_source"]["only_numbers"] = prepared_log.exception_message_numbers
+        log_template["_source"]["urls"] = prepared_log.exception_message_urls
+        log_template["_source"]["paths"] = prepared_log.exception_message_paths
+        log_template["_source"]["message_params"] = prepared_log.exception_message_params
+        log_template["_source"]["found_exceptions"] = prepared_log.exception_found
+        log_template["_source"]["found_exceptions_extended"] = prepared_log.exception_found_extended
         log_template["_source"]["detected_message_extended"] = \
-            text_processing.enrich_text_with_method_and_classes(detected_message)
+            text_processing.enrich_text_with_method_and_classes(prepared_log.exception_message_no_numbers)
         log_template["_source"]["detected_message_without_params_extended"] = \
-            text_processing.enrich_text_with_method_and_classes(detected_message_without_params)
+            text_processing.enrich_text_with_method_and_classes(prepared_log.exception_message_no_params)
         log_template["_source"]["stacktrace_extended"] = \
-            text_processing.enrich_text_with_method_and_classes(stacktrace)
+            text_processing.enrich_text_with_method_and_classes(prepared_log.stacktrace)
         log_template["_source"]["message_extended"] = \
-            text_processing.enrich_text_with_method_and_classes(message)
+            text_processing.enrich_text_with_method_and_classes(prepared_log.message)
         log_template["_source"]["message_without_params_extended"] = \
-            text_processing.enrich_text_with_method_and_classes(message_without_params)
-        log_template["_source"]["whole_message"] = detected_message_wo_urls_and_paths + " \n " + stacktrace
+            text_processing.enrich_text_with_method_and_classes(prepared_log.message_no_params)
+        log_template["_source"]["whole_message"] = (prepared_log.exception_message_no_urls_paths + "\n"
+                                                    + prepared_log.stacktrace)
         log_template["_source"]["detected_message_without_params_and_brackets"] = \
-            detected_message_without_params_and_brackets
-        log_template["_source"]["message_without_params_and_brackets"] = \
-            message_without_params_and_brackets
-        log_template["_source"]["potential_status_codes"] = \
-            potential_status_codes
-        log_template["_source"]["found_tests_and_methods"] = found_test_methods
+            prepared_log.exception_message_no_params_and_brackets
+        log_template["_source"]["message_without_params_and_brackets"] = prepared_log.message_no_params_and_brackets
+        log_template["_source"]["potential_status_codes"] = prepared_log.exception_message_potential_status_codes
+        log_template["_source"]["found_tests_and_methods"] = prepared_log.test_and_methods_extended
 
         for field in ["message", "detected_message", "detected_message_with_numbers",
                       "stacktrace", "only_numbers", "found_exceptions", "found_exceptions_extended",
@@ -211,42 +177,29 @@ class LogRequests:
                             log_words[word] = 1
         return log_words, project
 
-    def prepare_log_clustering_light(self, launch, test_item, log, project):
+    def prepare_log_clustering_light(self, launch: Launch, test_item: TestItem, log: Log, project: str):
         log_template = self._create_log_template()
         log_template = self._fill_launch_test_item_fields(log_template, launch, test_item, project)
-        cleaned_message = basic_prepare(log.message)
-        detected_message, stacktrace = text_processing.detect_log_description_and_stacktrace(
-            cleaned_message)
-        test_and_methods = text_processing.find_test_methods_in_text(cleaned_message)
-        detected_message = text_processing.replace_text_pieces(detected_message, test_and_methods)
-        stacktrace = text_processing.remove_numbers(stacktrace)
-        message = text_processing.first_lines(cleaned_message, -1)
-        message = text_processing.remove_numbers(message)
+        prepared_log = PreparedLogMessage(log.message, -1)
         log_template["_id"] = log.logId
         log_template["_source"]["cluster_id"] = str(log.clusterId)
         log_template["_source"]["cluster_message"] = log.clusterMessage
         log_template["_source"]["log_level"] = log.logLevel
         log_template["_source"]["original_message_lines"] = text_processing.calculate_line_number(
-            cleaned_message)
+            prepared_log.clean_message)
         log_template["_source"]["original_message_words_number"] = len(
-            text_processing.split_words(cleaned_message, split_urls=False))
-        detected_message_wo_urls_and_paths = text_processing.clean_from_urls(detected_message)
-        detected_message_wo_urls_and_paths = text_processing.clean_from_paths(detected_message_wo_urls_and_paths)
-        detected_message_wo_urls_and_paths = text_processing.remove_starting_datetime(
-            detected_message_wo_urls_and_paths)
-        log_template["_source"]["message"] = message
-        log_template["_source"]["detected_message"] = detected_message_wo_urls_and_paths
-        log_template["_source"]["detected_message_with_numbers"] = detected_message_wo_urls_and_paths
-        log_template["_source"]["stacktrace"] = stacktrace
-        potential_status_codes = " ".join(
-            text_processing.get_potential_status_codes(detected_message_wo_urls_and_paths))
-        log_template["_source"]["potential_status_codes"] = potential_status_codes
-        log_template["_source"]["found_exceptions"] = text_processing.get_found_exceptions(detected_message)
-        log_template["_source"]["whole_message"] = text_processing.delete_empty_lines(
-            detected_message_wo_urls_and_paths + " \n " + stacktrace)
+            text_processing.split_words(prepared_log.clean_message, split_urls=False))
+        log_template["_source"]["message"] = text_processing.remove_numbers(prepared_log.message)
+        log_template["_source"]["detected_message"] = prepared_log.exception_message_no_numbers
+        log_template["_source"]["detected_message_with_numbers"] = prepared_log.exception_message
+        log_template["_source"]["stacktrace"] = prepared_log.stacktrace
+        log_template["_source"]["potential_status_codes"] = prepared_log.exception_message_potential_status_codes
+        log_template["_source"]["found_exceptions"] = prepared_log.exception_found
+        log_template["_source"]["whole_message"] = (prepared_log.exception_message_no_urls_paths + "\n"
+                                                    + prepared_log.stacktrace)
         return log_template
 
-    def prepare_logs_for_clustering(self, launch, number_of_lines, clean_numbers, project):
+    def prepare_logs_for_clustering(self, launch: Launch, number_of_lines: int, clean_numbers: bool, project: str):
         log_messages = []
         log_dict = {}
         ind = 0

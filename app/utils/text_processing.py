@@ -150,7 +150,7 @@ def is_starting_message_pattern(text):
     return False
 
 
-def get_found_exceptions(text, to_lower=False):
+def get_found_exceptions(text: str, to_lower: bool = False) -> str:
     """Extract exception and errors from logs"""
     unique_exceptions = set()
     found_exceptions = []

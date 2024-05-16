@@ -23,7 +23,8 @@ from sklearn.feature_extraction.text import CountVectorizer
 from app.amqp.amqp import AmqpClient
 from app.commons import clusterizer, logging
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import ClusterResult, ClusterInfo, SearchConfig, ApplicationConfig
+from app.commons.launch_objects import (ClusterResult, ClusterInfo, SearchConfig, ApplicationConfig,
+                                        LaunchInfoForClustering)
 from app.commons.log_merger import LogMerger
 from app.commons.log_requests import LogRequests
 from app.utils import utils, text_processing
@@ -331,7 +332,7 @@ class ClusterService:
         return all_groups
 
     @utils.ignore_warnings
-    def find_clusters(self, launch_info):
+    def find_clusters(self, launch_info: LaunchInfoForClustering):
         logger.info("Started clusterizing logs")
         index_name = text_processing.unite_project_name(
             str(launch_info.project), self.app_config.esProjectIndexPrefix)
@@ -351,8 +352,7 @@ class ClusterService:
         try:
             unique_errors_min_should_match = launch_info.launch.analyzerConfig.uniqueErrorsMinShouldMatch / 100  # noqa
             log_messages, log_dict, log_ids_for_merged_logs = self.log_requests.prepare_logs_for_clustering(  # noqa
-                launch_info.launch, launch_info.numberOfLogLines,
-                launch_info.cleanNumbers, index_name)
+                launch_info.launch, launch_info.numberOfLogLines, launch_info.cleanNumbers, index_name)
             log_ids = set([str(log["_id"]) for log in log_dict.values()])
 
             groups = self.cluster_messages_with_grouping_by_error(

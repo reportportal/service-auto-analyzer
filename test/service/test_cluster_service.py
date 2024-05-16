@@ -490,7 +490,7 @@ class TestClusterService(TestService):
                     clusters=[
                         launch_objects.ClusterInfo(
                             clusterId="78342974021039661",
-                            clusterMessage="error occured twice \nAssertionError error occured \n error found",
+                            clusterMessage="error occured twice\nAssertionError error occured \n error found",
                             # noqa
                             logIds=[3, 4],
                             itemIds=[2]),
@@ -522,7 +522,7 @@ class TestClusterService(TestService):
             response = _cluster_service.find_clusters(test["launch_info"])
 
             assert len(response.clusters) == len(test["expected_result"].clusters)
-            assert test["expected_result"] == response
+            assert response == test["expected_result"]
 
             TestClusterService.shutdown_server(test["test_calls"])
 

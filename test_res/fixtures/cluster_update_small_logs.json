@@ -1,12 +1,12 @@
 {"update":{"_index":"2","_id":3}}
-{"doc":{"cluster_id":"78342974021039661","cluster_message":"error occured twice \nAssertionError error occured \n error found","cluster_with_numbers":true}}
+{"doc":{"cluster_id":"78342974021039661","cluster_message":"error occured twice\nAssertionError error occured \n error found","cluster_with_numbers":true}}
 {"update":{"_index":"2","_id":4}}
-{"doc":{"cluster_id":"78342974021039661","cluster_message":"error occured twice \nAssertionError error occured \n error found","cluster_with_numbers":true}}
+{"doc":{"cluster_id":"78342974021039661","cluster_message":"error occured twice\nAssertionError error occured \n error found","cluster_with_numbers":true}}
 {"update":{"_index":"2","_id":5}}
 {"doc":{"cluster_id":"37054331802624341","cluster_message":"AssertionError status code: 500 error occured","cluster_with_numbers":true}}
 {"update":{"_index":"2","_id":9}}
 {"doc":{"cluster_id":"16492834929015971","cluster_message":"NoSuchElementException error occured \n error found \n assert query","cluster_with_numbers":true}}
 {"update":{"_index":"2","_id":"4_m"}}
-{"doc":{"cluster_id":"78342974021039661","cluster_message":"error occured twice \nAssertionError error occured \n error found","cluster_with_numbers":true}}
+{"doc":{"cluster_id":"78342974021039661","cluster_message":"error occured twice\nAssertionError error occured \n error found","cluster_with_numbers":true}}
 {"update":{"_index":"2","_id":"5_m"}}
 {"doc":{"cluster_id":"37054331802624341","cluster_message":"AssertionError status code: 500 error occured","cluster_with_numbers":true}}

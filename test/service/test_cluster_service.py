@@ -122,13 +122,13 @@ class TestClusterService(TestService):
                     launchId=1,
                     clusters=[
                         launch_objects.ClusterInfo(
-                            clusterId=51305554424475301,
-                            clusterMessage="error occured \n error found \n error mined",
+                            clusterId=21874152824769751,
+                            clusterMessage="error occurred\n error found\n error mined",
                             logIds=[4, 5],
                             itemIds=[2, 5]),
                         launch_objects.ClusterInfo(
-                            clusterId=2474938495021661,
-                            clusterMessage="error occured \n error found \n assert query",
+                            clusterId=44972330576749361,
+                            clusterMessage="error occurred\n error found\n assert query",
                             logIds=[9],
                             itemIds=[6])
                     ])
@@ -168,8 +168,8 @@ class TestClusterService(TestService):
                     launchId=1,
                     clusters=[
                         launch_objects.ClusterInfo(
-                            clusterId="53490850438321651",
-                            clusterMessage="error occured \n error found",
+                            clusterId="48859729558090231",
+                            clusterMessage="error occurred\n error found",
                             logIds=[4, 5, 9],
                             itemIds=[2, 5, 6])
                     ])
@@ -218,13 +218,13 @@ class TestClusterService(TestService):
                     launchId=1,
                     clusters=[
                         launch_objects.ClusterInfo(
-                            clusterId="51305554424475301",
-                            clusterMessage="error occured \n error found \n error mined",
+                            clusterId="21874152824769751",
+                            clusterMessage="error occurred\n error found\n error mined",
                             logIds=[4, 5],
                             itemIds=[2, 5]),
                         launch_objects.ClusterInfo(
-                            clusterId="2474938495021661",
-                            clusterMessage="error occured \n error found \n assert query",
+                            clusterId="44972330576749361",
+                            clusterMessage="error occurred\n error found\n assert query",
                             logIds=[9],
                             itemIds=[6]),
                     ])
@@ -274,12 +274,12 @@ class TestClusterService(TestService):
                     clusters=[
                         launch_objects.ClusterInfo(
                             clusterId="123",
-                            clusterMessage="error occured \n error found \n error mined",
+                            clusterMessage="error occurred \n error found \n error mined",
                             logIds=[4, 5, 111],
                             itemIds=[2, 5]),
                         launch_objects.ClusterInfo(
-                            clusterId="2474938495021661",
-                            clusterMessage="error occured \n error found \n assert query",
+                            clusterId="44972330576749361",
+                            clusterMessage="error occurred\n error found\n assert query",
                             logIds=[9],
                             itemIds=[6])
                     ])
@@ -319,8 +319,8 @@ class TestClusterService(TestService):
                     launchId=1,
                     clusters=[
                         launch_objects.ClusterInfo(
-                            clusterId="53490850438321651",
-                            clusterMessage="error occured \n error found",
+                            clusterId="48859729558090231",
+                            clusterMessage="error occurred\n error found",
                             logIds=[4, 5, 9],
                             itemIds=[2, 5, 6])
                     ])
@@ -361,8 +361,8 @@ class TestClusterService(TestService):
                     launchId=1,
                     clusters=[
                         launch_objects.ClusterInfo(
-                            clusterId="53490850438321651",
-                            clusterMessage="error occured \n error found",
+                            clusterId="48859729558090231",
+                            clusterMessage="error occurred\n error found",
                             logIds=[4, 5, 9],
                             itemIds=[2, 5, 6])
                     ])
@@ -420,18 +420,18 @@ class TestClusterService(TestService):
                     launchId=1,
                     clusters=[
                         launch_objects.ClusterInfo(
-                            clusterId="66538501077545981",
-                            clusterMessage="AssertionError error occured \n error found",
+                            clusterId="37711525315085941",
+                            clusterMessage="AssertionError error occurred\n error found",
                             logIds=[4],
                             itemIds=[2]),
                         launch_objects.ClusterInfo(
-                            clusterId="30071099716448071",
-                            clusterMessage="AssertionError status code: 500 error occured \n error found",
+                            clusterId="83179189436345941",
+                            clusterMessage="AssertionError status code: 500 error occurred\n error found",
                             logIds=[5],
                             itemIds=[5]),
                         launch_objects.ClusterInfo(
-                            clusterId="59521687023339221",
-                            clusterMessage="NoSuchElementException error occured \n error found",
+                            clusterId="90988898127574211",
+                            clusterMessage="NoSuchElementException error occurred\n error found",
                             logIds=[9],
                             itemIds=[6]),
                     ])
@@ -489,19 +489,19 @@ class TestClusterService(TestService):
                     launchId=1,
                     clusters=[
                         launch_objects.ClusterInfo(
-                            clusterId="78342974021039661",
-                            clusterMessage="error occured twice\nAssertionError error occured \n error found",
+                            clusterId="60604459849884091",
+                            clusterMessage="error occurred twice\nAssertionError error occurred\n error found",
                             # noqa
                             logIds=[3, 4],
                             itemIds=[2]),
                         launch_objects.ClusterInfo(
-                            clusterId="37054331802624341",
-                            clusterMessage="AssertionError status code: 500 error occured",
+                            clusterId="58202398056526781",
+                            clusterMessage="AssertionError status code: 500 error occurred",
                             logIds=[5],
                             itemIds=[5]),
                         launch_objects.ClusterInfo(
-                            clusterId="16492834929015971",
-                            clusterMessage="NoSuchElementException error occured \n error found \n assert query",
+                            clusterId="86465058569810291",
+                            clusterMessage="NoSuchElementException error occurred\n error found\n assert query",
                             # noqa
                             logIds=[9],
                             itemIds=[6]),

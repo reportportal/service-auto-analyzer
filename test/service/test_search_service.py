@@ -143,7 +143,7 @@ class TestSearchService(TestService):
                                                 itemId=3,
                                                 projectId=1,
                                                 filteredLaunchIds=[1],
-                                                logMessages=["error occured once"],
+                                                logMessages=["error occurred once"],
                                                 logLines=-1),
                 "expected_count": 1
             },
@@ -176,7 +176,7 @@ class TestSearchService(TestService):
                     itemId=3,
                     projectId=1,
                     filteredLaunchIds=[1],
-                    logMessages=["error occured once status code: 500 but got 200"],
+                    logMessages=["error occurred once status code: 500 but got 200"],
                     logLines=-1),
                 "expected_count": 1,
                 "response": [launch_objects.SearchLogInfo(logId=2, testItemId=1, matchScore=100)]
@@ -209,7 +209,7 @@ class TestSearchService(TestService):
                                                 itemId=3,
                                                 projectId=1,
                                                 filteredLaunchIds=[1],
-                                                logMessages=["error occured once"],
+                                                logMessages=["error occurred once"],
                                                 logLines=-1),
                 "app_config": APP_CONFIG,
                 "expected_count": 1,
@@ -243,7 +243,7 @@ class TestSearchService(TestService):
                                                 itemId=3,
                                                 projectId=1,
                                                 filteredLaunchIds=[1],
-                                                logMessages=["error occured once"],
+                                                logMessages=["error occurred once"],
                                                 logLines=-1,
                                                 analyzerConfig=launch_objects.AnalyzerConf(
                                                     allMessagesShouldMatch=True)),

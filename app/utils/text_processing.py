@@ -512,8 +512,13 @@ def replace_tabs_for_newlines(message):
     return message.replace('\t', '\n')
 
 
-def unify_line_endings(message):
-    return message.replace('\r\n', '\n')
+HORIZONTAL_WHITESPACE = (r' \t\u00A0\u1680\u180E\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A'
+                         r'\u202F\u205F\u3000')
+LINE_ENDING_PATTERN = re.compile(fr'[{HORIZONTAL_WHITESPACE}]*\r?\n')
+
+
+def unify_line_endings(message: str) -> str:
+    return LINE_ENDING_PATTERN.sub(r'\n', message)
 
 
 def fix_big_encoded_urls(message):

@@ -92,3 +92,17 @@ def test_clean_from_brackets():
     expected_log = read_file_lines('test_res/test_logs', 'brackets_test_results.txt')
     for i, line in enumerate(log):
         assert text_processing.clean_from_brackets(line) == expected_log[i]
+
+
+@pytest.mark.parametrize(
+    'message, expected_message',
+    [
+        ('\t \r\n ', '\n '),
+        ('\r\n', '\n'),
+        ('\n', '\n'),
+        ('\u00A0\u00A0\u00A0\n', '\n'),
+        ('\u00A0\r\n', '\n'),
+    ]
+)
+def test_unify_line_endings(message, expected_message):
+    assert text_processing.unify_line_endings(message) == expected_message

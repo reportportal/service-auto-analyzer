@@ -106,3 +106,20 @@ def test_clean_from_brackets():
 )
 def test_unify_line_endings(message, expected_message):
     assert text_processing.unify_line_endings(message) == expected_message
+
+
+@pytest.mark.parametrize(
+    'message, expected_message',
+    [
+        ('\t \r\n ', ' '),
+        ('\r\n', ' '),
+        ('\n', ' '),
+        ('\u00A0\u00A0\u00A0\n', ' '),
+        ('\u00A0\r\n', ' '),
+        ('\u00A0\u2000\u2001', ' '),
+        ('\u202F\u205F\u3000', ' '),
+        ('a\u202F\u205F\u3000b', 'a b'),
+    ]
+)
+def test_unify_spaces(message, expected_message):
+    assert text_processing.unify_spaces(message) == expected_message

@@ -521,6 +521,14 @@ def unify_line_endings(message: str) -> str:
     return LINE_ENDING_PATTERN.sub(r'\n', message)
 
 
+SPACE_PATTERN = re.compile(r'\s+')
+SPACE_REPLACEMENT = ' '
+
+
+def unify_spaces(message: str) -> str:
+    return SPACE_PATTERN.sub(SPACE_REPLACEMENT, message)
+
+
 def fix_big_encoded_urls(message):
     """Decodes urls encoded with %12, etc. and removes brackets to separate url"""
     new_message = message

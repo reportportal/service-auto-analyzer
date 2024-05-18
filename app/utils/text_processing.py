@@ -367,7 +367,8 @@ def clean_html(message):
     return delete_empty_lines("\n".join(all_lines))
 
 
-def split_words(text, min_word_length=0, only_unique=True, split_urls=True, to_lower=True):
+def split_words(text: str, min_word_length: int = 0, only_unique: bool = True, split_urls: bool = True,
+                to_lower: bool = True) -> list[str]:
     if not text:
         return []
     all_unique_words = set()

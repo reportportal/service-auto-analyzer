@@ -19,7 +19,6 @@ from typing import Iterable
 from urllib.parse import urlparse
 
 import nltk
-from nltk.stem import PorterStemmer
 
 from app.commons.launch_objects import Log
 
@@ -30,7 +29,6 @@ except ImportError:
 
 logger = logging.getLogger("analyzerApp.utils.textProcessing")
 
-_PS = PorterStemmer()
 STOPWORDS = nltk.corpus.stopwords.words("english")
 STOPWORDS_ALL = set(STOPWORDS)
 FILE_EXTENSIONS = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
@@ -387,14 +385,13 @@ def split_words(text: str, min_word_length: int = 0, only_unique: bool = True, s
     for w in text.split():
         w = w.strip().strip('.')
         if w != "" and len(w) >= min_word_length:
-            w_stem = _PS.stem(w, to_lowercase=False)
-            if w_stem in STOPWORDS_ALL:
+            if w in STOPWORDS_ALL:
                 continue
             if only_unique:
-                if w_stem in all_unique_words:
+                if w in all_unique_words:
                     continue
-                all_unique_words.add(w_stem)
-            all_words.append(w_stem)
+                all_unique_words.add(w)
+            all_words.append(w)
     return all_words
 
 
@@ -420,7 +417,7 @@ def enrich_text_with_method_and_classes(text):
             for i in [2, 1]:
                 full_path = full_path + " " + ".".join(words[-i:])
             full_path = full_path + " "
-            new_line = re.sub(r"\b(?<!\.)%s(?!\.)\b" % val, full_path, new_line)
+            new_line = re.sub(fr'\b(?<!\.){val}(?!\.)\b', full_path, new_line)
         new_lines.append(new_line)
     return "\n".join(new_lines)
 

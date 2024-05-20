@@ -19,6 +19,7 @@ from typing import Iterable
 from urllib.parse import urlparse
 
 import nltk
+from nltk.stem import PorterStemmer
 
 from app.commons.launch_objects import Log
 
@@ -29,7 +30,9 @@ except ImportError:
 
 logger = logging.getLogger("analyzerApp.utils.textProcessing")
 
-STOPWORDS = set(nltk.corpus.stopwords.words("english"))
+_PS = PorterStemmer()
+STOPWORDS = nltk.corpus.stopwords.words("english")
+STOPWORDS_ALL = set(STOPWORDS)
 FILE_EXTENSIONS = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
 
 
@@ -123,7 +126,7 @@ def filter_empty_lines(log_lines: list[str]) -> list[str]:
 
 def delete_empty_lines(log: str) -> str:
     """Delete empty lines"""
-    return "\n".join(filter_empty_lines(log.split("\n")))
+    return '\n'.join(filter_empty_lines(log.split('\n')))
 
 
 def calculate_line_number(text):
@@ -384,7 +387,8 @@ def split_words(text: str, min_word_length: int = 0, only_unique: bool = True, s
     for w in text.split():
         w = w.strip().strip('.')
         if w != "" and len(w) >= min_word_length:
-            if w in STOPWORDS:
+            w = _PS.stem(w)
+            if w in STOPWORDS_ALL:
                 continue
             if only_unique:
                 if w in all_unique_words:

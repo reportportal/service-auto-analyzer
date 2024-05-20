@@ -65,8 +65,7 @@ class SimilarityCalculator:
                                 weights = []
                                 for line in obj["_source"]["stacktrace"].split("\n"):
                                     line_words = text_processing.split_words(
-                                        line,
-                                        min_word_length=self.config["min_word_length"])
+                                        line, min_word_length=self.config["min_word_length"])
                                     for word in line_words:
                                         part_of_namespace = ".".join(word.split(".")[:2])
                                         if part_of_namespace in self.config["chosen_namespaces"]:

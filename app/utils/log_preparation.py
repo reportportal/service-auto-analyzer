@@ -12,9 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from nltk.stem import PorterStemmer
-from nltk.tokenize import word_tokenize
-
 from app.utils import text_processing
 
 

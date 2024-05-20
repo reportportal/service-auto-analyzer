@@ -387,7 +387,7 @@ def split_words(text: str, min_word_length: int = 0, only_unique: bool = True, s
     for w in text.split():
         w = w.strip().strip('.')
         if w != "" and len(w) >= min_word_length:
-            w = _PS.stem(w)
+            w = _PS.stem(w, to_lowercase=False)
             if w in STOPWORDS_ALL:
                 continue
             if only_unique:

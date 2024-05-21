@@ -510,7 +510,7 @@ def remove_guid_uuids_from_text(text: str) -> str:
     return replace_patterns(text, GUID_UUID_PATTERNS)
 
 
-def replace_tabs_for_newlines(message):
+def replace_tabs_for_newlines(message: str) -> str:
     return message.replace('\t', '\n')
 
 

@@ -24,6 +24,7 @@ from app.commons import logging, similarity_calculator, object_saving
 from app.commons.esclient import EsClient
 from app.commons.launch_objects import SuggestAnalysisResult, SearchConfig, ApplicationConfig, TestItemInfo, \
     AnalyzerConf
+from app.commons.log_requests import LogRequests
 from app.commons.model_chooser import ModelType, ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
@@ -333,7 +334,7 @@ class SuggestService(AnalyzerService):
             prepared_logs, test_item_id_for_suggest = self.query_logs_for_cluster(test_item_info, index_name)
         else:
             unique_logs = text_processing.leave_only_unique_logs(test_item_info.logs)
-            prepared_logs = [self.log_requests._prepare_log_for_suggests(test_item_info, log, index_name)
+            prepared_logs = [LogRequests._prepare_log_for_suggests(test_item_info, log, index_name)
                              for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
         logs, _ = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
         return logs, test_item_id_for_suggest

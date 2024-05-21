@@ -26,7 +26,8 @@ class LogRequests:
     def __init__(self):
         self.log_merger = LogMerger()
 
-    def _create_log_template(self) -> dict:
+    @staticmethod
+    def _create_log_template() -> dict:
         return {
             "_id": "",
             "_index": "",
@@ -61,10 +62,12 @@ class LogRequests:
                 "found_tests_and_methods": "",
                 "cluster_with_numbers": False}}
 
-    def transform_issue_type_into_lowercase(self, issue_type):
+    @staticmethod
+    def transform_issue_type_into_lowercase(issue_type):
         return issue_type[:2].lower() + issue_type[2:]
 
-    def _fill_launch_test_item_fields(self, log_template: dict, launch: Launch, test_item: TestItem, project: str):
+    @staticmethod
+    def _fill_launch_test_item_fields(log_template: dict, launch: Launch, test_item: TestItem, project: str):
         log_template["_index"] = project
         log_template["_source"]["launch_id"] = launch.launchId
         log_template["_source"]["launch_name"] = launch.launchName
@@ -76,13 +79,14 @@ class LogRequests:
         log_template["_source"]["test_case_hash"] = test_item.testCaseHash
         log_template["_source"]["is_auto_analyzed"] = test_item.isAutoAnalyzed
         log_template["_source"]["test_item_name"] = text_processing.preprocess_test_item_name(test_item.testItemName)
-        log_template["_source"]["issue_type"] = self.transform_issue_type_into_lowercase(
+        log_template["_source"]["issue_type"] = LogRequests.transform_issue_type_into_lowercase(
             test_item.issueType)
         log_template["_source"]["start_time"] = datetime(
             *test_item.startTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
         return log_template
 
-    def _fill_log_fields(self, log_template: dict, log: Log, number_of_lines: int):
+    @staticmethod
+    def _fill_log_fields(log_template: dict, log: Log, number_of_lines: int):
         prepared_log = PreparedLogMessage(log.message, number_of_lines)
         log_template["_id"] = log.logId
         log_template["_source"]["log_time"] = datetime(*log.logTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
@@ -132,12 +136,14 @@ class LogRequests:
             log_template["_source"][field] = text_processing.clean_colon_stacking(log_template["_source"][field])
         return log_template
 
-    def _prepare_log(self, launch: Launch, test_item: TestItem, log: Log, project: str) -> dict:
-        log_template = self._create_log_template()
-        log_template = self._fill_launch_test_item_fields(log_template, launch, test_item, project)
-        log_template = self._fill_log_fields(log_template, log, launch.analyzerConfig.numberOfLogLines)
+    @staticmethod
+    def _prepare_log(launch: Launch, test_item: TestItem, log: Log, project: str) -> dict:
+        log_template = LogRequests._create_log_template()
+        log_template = LogRequests._fill_launch_test_item_fields(log_template, launch, test_item, project)
+        log_template = LogRequests._fill_log_fields(log_template, log, launch.analyzerConfig.numberOfLogLines)
         return log_template
 
+    @staticmethod
     def _fill_test_item_info_fields(self, log_template, test_item_info, project):
         log_template["_index"] = project
         log_template["_source"]["launch_id"] = test_item_info.launchId
@@ -153,14 +159,16 @@ class LogRequests:
         log_template["_source"]["start_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         return log_template
 
-    def _prepare_log_for_suggests(self, test_item_info, log, project):
-        log_template = self._create_log_template()
-        log_template = self._fill_test_item_info_fields(log_template, test_item_info, project)
-        log_template = self._fill_log_fields(
+    @staticmethod
+    def _prepare_log_for_suggests(test_item_info, log, project):
+        log_template = LogRequests._create_log_template()
+        log_template = LogRequests._fill_test_item_info_fields(log_template, test_item_info, project)
+        log_template = LogRequests._fill_log_fields(
             log_template, log, test_item_info.analyzerConfig.numberOfLogLines)
         return log_template
 
-    def prepare_log_words(self, launches):
+    @staticmethod
+    def prepare_log_words(launches):
         log_words = {}
         project = None
         for launch in launches:
@@ -177,9 +185,10 @@ class LogRequests:
                             log_words[word] = 1
         return log_words, project
 
-    def prepare_log_clustering_light(self, launch: Launch, test_item: TestItem, log: Log, project: str):
-        log_template = self._create_log_template()
-        log_template = self._fill_launch_test_item_fields(log_template, launch, test_item, project)
+    @staticmethod
+    def prepare_log_clustering_light(launch: Launch, test_item: TestItem, log: Log, project: str):
+        log_template = LogRequests._create_log_template()
+        log_template = LogRequests._fill_launch_test_item_fields(log_template, launch, test_item, project)
         prepared_log = PreparedLogMessage(log.message, -1)
         log_template["_id"] = log.logId
         log_template["_source"]["cluster_id"] = str(log.clusterId)
@@ -209,7 +218,7 @@ class LogRequests:
             for log in test_item.logs:
                 if log.logLevel < utils.ERROR_LOGGING_LEVEL:
                     continue
-                prepared_logs.append(self.prepare_log_clustering_light(launch, test_item, log, project))
+                prepared_logs.append(LogRequests.prepare_log_clustering_light(launch, test_item, log, project))
             merged_logs, log_ids_for_merged_logs = self.log_merger.decompose_logs_merged_and_without_duplicates(
                 prepared_logs)
             for _id in log_ids_for_merged_logs:

@@ -14,7 +14,7 @@
 
 from datetime import datetime
 
-from app.commons.launch_objects import Launch, TestItem, Log
+from app.commons.launch_objects import Launch, TestItem, Log, TestItemInfo
 from app.commons.log_merger import LogMerger
 from app.commons.prepared_log import PreparedLogMessage
 from app.utils import utils, text_processing
@@ -144,7 +144,7 @@ class LogRequests:
         return log_template
 
     @staticmethod
-    def _fill_test_item_info_fields(self, log_template, test_item_info, project):
+    def _fill_test_item_info_fields(log_template: dict, test_item_info: TestItemInfo, project: str) -> dict:
         log_template["_index"] = project
         log_template["_source"]["launch_id"] = test_item_info.launchId
         log_template["_source"]["launch_name"] = test_item_info.launchName
@@ -160,7 +160,7 @@ class LogRequests:
         return log_template
 
     @staticmethod
-    def _prepare_log_for_suggests(test_item_info, log, project):
+    def _prepare_log_for_suggests(test_item_info: TestItemInfo, log: Log, project: str) -> dict:
         log_template = LogRequests._create_log_template()
         log_template = LogRequests._fill_test_item_info_fields(log_template, test_item_info, project)
         log_template = LogRequests._fill_log_fields(

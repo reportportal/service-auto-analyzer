@@ -269,4 +269,3 @@ class TestService(unittest.TestCase):
                     expected_body = json.loads(expected_body)
                 assert expected_body == real_body, f'Error in request {i}'
         httpretty.disable()
-        httpretty.reset()

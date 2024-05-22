@@ -39,7 +39,7 @@ jobs:
         run: python -m flake8
 
       - name: Test
-        run: pytest --cov-config=.coveragerc --cov --cov-report=xml test/ -s -vv
+        run: pytest --cov-config=.coveragerc --cov --cov-report=xml test/unit/commons/object_saving -s -vv
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

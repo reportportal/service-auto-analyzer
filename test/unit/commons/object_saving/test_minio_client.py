@@ -30,7 +30,7 @@ SERVER_HOST = f'localhost:{SERVER_PORT}'
 
 @pytest.fixture(autouse=True, scope='session')
 def run_s3():
-    server = ThreadedMotoServer(port=SERVER_PORT)
+    server = ThreadedMotoServer(port=SERVER_PORT, verbose=True)
     server.start()
     yield
     server.stop()

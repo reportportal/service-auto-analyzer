@@ -22,7 +22,7 @@ from app.commons.launch_objects import ApplicationConfig
 from app.commons.object_saving.minio_client import MinioClient
 from test import random_alphanumeric
 
-SERVER_PORT = 5000
+SERVER_PORT = 5123
 REGION = 'us-west-1'
 BUCKET_PREFIX = 'prj-'
 SERVER_HOST = f'localhost:{SERVER_PORT}'

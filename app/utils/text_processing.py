@@ -727,9 +727,9 @@ def prepare_es_min_should_match(min_should_match):
 ACCESS_OR_REFRESH_TOKEN_PATTERN: str = r'(?:access|refresh)_?token'
 JSON_ACCESS_TOKEN: str = fr'("{ACCESS_OR_REFRESH_TOKEN_PATTERN}"\s*:\s*")[^"]+'
 HTTP_ACCESS_TOKEN: str = (r'(Authorization\s*:\s*'
-                          r'(?:Bearer|Basic|Digest|HOBA|Mutual|Negotiate|NTLM|VAPID|SCRAM|AWS4-HMAC-SHA256)).*')
+                          r'(?:Bearer|Basic|Digest|HOBA|Mutual|Negotiate|NTLM|VAPID|SCRAM|AWS4-HMAC-SHA256)) .*')
 TOKEN_TAG: str = "SPECIALTOKEN"
-TOKEN_REPLACEMENT: str = fr'\1 {TOKEN_TAG}'
+TOKEN_REPLACEMENT: str = fr'\1{TOKEN_TAG}'
 ACCESS_TOKEN_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
     (re.compile(JSON_ACCESS_TOKEN, re.RegexFlag.IGNORECASE), TOKEN_REPLACEMENT),
     (re.compile(HTTP_ACCESS_TOKEN, re.RegexFlag.IGNORECASE), TOKEN_REPLACEMENT),

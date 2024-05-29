@@ -65,10 +65,6 @@ class DefectTypeModel(MlModel):
         self.models[name] = model
         self._loaded = True
 
-    def train_models(self, train_data):
-        for name, train_data_x, labels in train_data:
-            self.train_model(name, train_data_x, labels)
-
     def validate_model(self, name, test_data_x, labels):
         assert name in self.models
         print("Label distribution:", Counter(labels))

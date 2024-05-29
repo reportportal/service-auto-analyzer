@@ -70,7 +70,6 @@ class WeightedSimilarityCalculator(MlModel):
         padded_data_rows = np.concatenate([data_rows,
                                            np.zeros((max(0, self.block_to_split + 1 - len(data_rows)),
                                                      data_rows.shape[1]))], axis=0)
-        result = None
         if use_softmax:
             result = np.dot(np.reshape(self.softmax_weights, [-1]), padded_data_rows)
         else:

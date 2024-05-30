@@ -123,7 +123,7 @@ class TestItem(BaseModel):
     lastModified: Optional[list[int]] = None
     testCaseHash: int = 0
     testItemName: str = ''
-    description: str = ''
+    description: Optional[str] = None
     linksToBts: list[str] = []
     logs: list[Log] = []
 

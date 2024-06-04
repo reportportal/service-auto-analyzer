@@ -60,7 +60,7 @@ class WeightedSimilarityCalculator(MlModel):
         blocks_num = math.ceil(split_log_lines_num / data_in_block)
 
         for block in range(blocks_num):
-            all_lines.append("\n".join(
+            all_lines.append('\n'.join(
                 split_log_lines[block * data_in_block: (block + 1) * data_in_block]))
         if len([line for line in all_lines if line.strip()]) == 0:
             return []

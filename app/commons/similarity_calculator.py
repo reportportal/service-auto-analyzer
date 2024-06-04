@@ -35,17 +35,17 @@ class SimilarityCalculator:
         }
         self.artificial_columns = ["namespaces_stacktrace"]
 
-    def find_similarity(self, all_results, fields):
+    def find_similarity(self, all_results: list[tuple[dict, dict]], fields: list[str]) -> None:
         for field in fields:
             if field in self.similarity_dict:
                 continue
             self.similarity_dict[field] = {}
-            log_field_ids = {}
+            log_field_ids: dict = {}
             index_in_message_array = 0
-            count_vector_matrix = None
-            all_messages = []
-            all_messages_needs_reweighting = []
-            needs_reweighting_wc = False
+            count_vector_matrix: np.ndarray | None = None
+            all_messages: list[str] = []
+            all_messages_needs_reweighting: list[int] = []
+            needs_reweighting_wc: bool = False
             for log, res in all_results:
                 for obj in [log] + res["hits"]["hits"]:
                     if obj["_id"] not in log_field_ids:
@@ -54,12 +54,11 @@ class SimilarityCalculator:
                         else:
                             text = []
                             needs_reweighting = 0
-                            if self.config["number_of_log_lines"] == -1 and \
-                                    field in self.fields_mapping_for_weighting:
+                            if (self.config["number_of_log_lines"] == -1
+                                    and field in self.fields_mapping_for_weighting):
                                 fields_to_use = self.fields_mapping_for_weighting[field]
                                 text = self.similarity_model.message_to_array(
-                                    obj["_source"][fields_to_use[0]],
-                                    obj["_source"][fields_to_use[1]])
+                                    obj["_source"][fields_to_use[0]], obj["_source"][fields_to_use[1]])
                             elif field == "namespaces_stacktrace":
                                 gathered_lines = []
                                 weights = []
@@ -70,8 +69,7 @@ class SimilarityCalculator:
                                         part_of_namespace = ".".join(word.split(".")[:2])
                                         if part_of_namespace in self.config["chosen_namespaces"]:
                                             gathered_lines.append(" ".join(line_words))
-                                            weights.append(
-                                                self.config["chosen_namespaces"][part_of_namespace])
+                                            weights.append(self.config["chosen_namespaces"][part_of_namespace])
                                 if len(gathered_lines):
                                     text = gathered_lines
                                     self.object_id_weights[obj["_id"]] = weights
@@ -86,20 +84,17 @@ class SimilarityCalculator:
                             elif field.startswith("stacktrace"):
                                 if text_processing.does_stacktrace_need_words_reweighting(obj["_source"][field]):
                                     needs_reweighting = 1
-                                text = self.similarity_model.message_to_array(
-                                    "", obj["_source"][field])
+                                text = self.similarity_model.message_to_array("", obj["_source"][field])
                             else:
-                                text = text_processing.filter_empty_lines([" ".join(
-                                    text_processing.split_words(
-                                        obj["_source"][field],
-                                        min_word_length=self.config["min_word_length"]))])
+                                text = [" ".join(
+                                        text_processing.split_words(
+                                            obj["_source"][field], min_word_length=self.config["min_word_length"]))]
                             if not text:
                                 log_field_ids[obj["_id"]] = -1
                             else:
                                 all_messages.extend(text)
                                 all_messages_needs_reweighting.append(needs_reweighting)
-                                log_field_ids[obj["_id"]] = [index_in_message_array,
-                                                             len(all_messages) - 1]
+                                log_field_ids[obj["_id"]] = [index_in_message_array, len(all_messages) - 1]
                                 index_in_message_array += len(text)
             if all_messages:
                 needs_reweighting_wc = all_messages_needs_reweighting and \
@@ -133,17 +128,18 @@ class SimilarityCalculator:
         return np.clip(normalized_weights, a_min=1.0, a_max=3.0)
 
     def _calculate_field_similarity(
-            self, log, res, log_field_ids, count_vector_matrix, needs_reweighting_wc, field):
+            self, log: dict, res: dict, log_field_ids: dict, count_vector_matrix: np.ndarray,
+            needs_reweighting_wc: bool, field: str) -> dict:
         all_results_similarity = {}
         for obj in res["hits"]["hits"]:
             group_id = (obj["_id"], log["_id"])
             index_query_message = log_field_ids[log["_id"]]
             index_log_message = log_field_ids[obj["_id"]]
-            if (isinstance(index_query_message, int) and index_query_message < 0) and \
-                    (isinstance(index_log_message, int) and index_log_message < 0):
+            if ((isinstance(index_query_message, int) and index_query_message < 0)
+                    and (isinstance(index_log_message, int) and index_log_message < 0)):
                 all_results_similarity[group_id] = {"similarity": 1.0, "both_empty": True}
-            elif (isinstance(index_query_message, int) and index_query_message < 0) or \
-                    (isinstance(index_log_message, int) and index_log_message < 0):
+            elif ((isinstance(index_query_message, int) and index_query_message < 0)
+                    or (isinstance(index_log_message, int) and index_log_message < 0)):
                 all_results_similarity[group_id] = {"similarity": 0.0, "both_empty": False}
             else:
                 query_vector = count_vector_matrix[index_query_message[0]:index_query_message[1] + 1]

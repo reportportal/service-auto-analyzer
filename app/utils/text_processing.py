@@ -219,7 +219,7 @@ def is_line_from_stacktrace(text: str) -> bool:
     return False
 
 
-def detect_log_description_and_stacktrace(message):
+def detect_log_description_and_stacktrace(message: str) -> tuple[str, str]:
     """Split a log into a log message and stacktrace"""
     if calculate_line_number(message) > 2:
         if is_python_log(message):

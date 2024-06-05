@@ -49,7 +49,8 @@ class SimilarityCalculator:
             for log, res in all_results:
                 for obj in [log] + res["hits"]["hits"]:
                     if obj["_id"] not in log_field_ids:
-                        if field not in self.artificial_columns and not obj["_source"][field].strip():
+                        if field not in self.artificial_columns and (
+                                field not in obj["_source"] or not obj["_source"][field].strip()):
                             log_field_ids[obj["_id"]] = -1
                         else:
                             text = []

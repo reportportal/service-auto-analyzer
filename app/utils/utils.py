@@ -50,7 +50,7 @@ def read_file(folder: str, filename: str) -> str:
         return file.read()
 
 
-def read_json_file(folder: str, filename: str, to_json: bool = False) -> Union[str, Any]:
+def read_json_file(folder: str, filename: str, to_json: bool = False) -> Any:
     """Read fixture from file."""
     content = read_file(folder, filename)
     return content if not to_json else json.loads(content)

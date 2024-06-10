@@ -123,3 +123,9 @@ def test_unify_line_endings(message, expected_message):
 )
 def test_unify_spaces(message, expected_message):
     assert text_processing.unify_spaces(message) == expected_message
+
+
+def test_remove_markdown_mode():
+    log = read_file('test_res/test_logs/markdown', 'markdown_at_log.txt')
+    expected_log = read_file('test_res/test_logs/markdown', 'markdown_at_log_prepared.txt')
+    assert text_processing.remove_markdown_mode(log) == expected_log

@@ -495,7 +495,7 @@ def preprocess_words(text):
     return all_words
 
 
-UUID: str = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+UUID: str = r'[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}'
 TRUNCATED_UUID: str = r'[0-9a-fA-F]{16,48}|[0-9a-fA-F]{10,48}\.\.\.'
 NAMED_UUID: str = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-(\w+)'
 UUID_TAG: str = "SPECIALUUID"
@@ -724,7 +724,7 @@ def prepare_es_min_should_match(min_should_match):
     return str(int(min_should_match * 100)) + "%"
 
 
-ACCESS_OR_REFRESH_TOKEN_PATTERN: str = r'(?:access|refresh)_?token'
+ACCESS_OR_REFRESH_TOKEN_PATTERN: str = r'(?:access|refresh|biometric|jwt)_?token'
 JSON_ACCESS_TOKEN: str = fr'("{ACCESS_OR_REFRESH_TOKEN_PATTERN}"\s*:\s*")[^"]+'
 HTTP_ACCESS_TOKEN: str = (r'(Authorization\s*:\s*'
                           r'(?:Bearer|Basic|Digest|HOBA|Mutual|Negotiate|NTLM|VAPID|SCRAM|AWS4-HMAC-SHA256)) .*')
@@ -738,3 +738,14 @@ ACCESS_TOKEN_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
 
 def remove_access_tokens(text: str) -> str:
     return replace_patterns(text, ACCESS_TOKEN_PATTERNS)
+
+
+MARKDOWN_MODE_PATTERN: str = r'!!!MARKDOWN_MODE!!!\s*'
+MARKDOWN_MODE_REPLACEMENT: str = ''
+MARKDOWN_MODE_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
+    (re.compile(MARKDOWN_MODE_PATTERN), MARKDOWN_MODE_REPLACEMENT)
+]
+
+
+def remove_markdown_mode(text: str) -> str:
+    return replace_patterns(text, MARKDOWN_MODE_PATTERNS)

@@ -19,7 +19,7 @@ import traceback
 import warnings
 from collections import Counter
 from functools import wraps
-from typing import Union, Any
+from typing import Any
 
 import numpy as np
 import requests

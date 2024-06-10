@@ -749,3 +749,24 @@ MARKDOWN_MODE_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
 
 def remove_markdown_mode(text: str) -> str:
     return replace_patterns(text, MARKDOWN_MODE_PATTERNS)
+
+
+MARKDOWN_CODE_SEPARATOR: str = r'```\n'
+MARKDOWN_TEXT_SEPARATOR: str = r'-{3,}\s*'
+EQUALITY_TEXT_SEPARATOR: str = r'={3,}\s*'
+UNDERSCORE_TEXT_SEPARATOR: str = r'_{3,}\s*'
+CODE_SEPARATOR_REPLACEMENT: str = 'TEXTDELIMITER'
+CODE_SEPARATOR_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
+    (re.compile(fr'^{MARKDOWN_CODE_SEPARATOR}'), fr'{CODE_SEPARATOR_REPLACEMENT}\n'),
+    (re.compile(fr'\n{MARKDOWN_CODE_SEPARATOR}'), fr'\n{CODE_SEPARATOR_REPLACEMENT}\n'),
+    (re.compile(fr'^{MARKDOWN_TEXT_SEPARATOR}'), fr'{CODE_SEPARATOR_REPLACEMENT}\n'),
+    (re.compile(fr'\s*{MARKDOWN_TEXT_SEPARATOR}'), fr'\n{CODE_SEPARATOR_REPLACEMENT}\n'),
+    (re.compile(fr'^{EQUALITY_TEXT_SEPARATOR}'), fr'{CODE_SEPARATOR_REPLACEMENT}\n'),
+    (re.compile(fr'\s*{EQUALITY_TEXT_SEPARATOR}'), fr'\n{CODE_SEPARATOR_REPLACEMENT}\n'),
+    (re.compile(fr'^{UNDERSCORE_TEXT_SEPARATOR}'), fr'{CODE_SEPARATOR_REPLACEMENT}\n'),
+    (re.compile(fr'\s*{UNDERSCORE_TEXT_SEPARATOR}'), fr'\n{CODE_SEPARATOR_REPLACEMENT}\n'),
+]
+
+
+def replace_code_separators(text: str) -> str:
+    return replace_patterns(text, CODE_SEPARATOR_PATTERNS)

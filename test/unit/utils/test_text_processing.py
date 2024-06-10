@@ -129,3 +129,18 @@ def test_remove_markdown_mode():
     log = read_file('test_res/test_logs/markdown', 'markdown_at_log.txt')
     expected_log = read_file('test_res/test_logs/markdown', 'markdown_at_log_prepared.txt')
     assert text_processing.remove_markdown_mode(log) == expected_log
+
+
+@pytest.mark.parametrize(
+    'test_file, expected_file',
+    [
+        ('separators/markdown_separator_log.txt', 'separators/markdown_separator_log_prepared.txt'),
+        ('separators/step_separator_log.txt', 'separators/step_separator_log_prepared.txt'),
+        ('separators/step_separator_equality_log.txt', 'separators/step_separator_log_prepared.txt'),
+        ('separators/step_separator_underscore_log.txt', 'separators/step_separator_log_prepared.txt'),
+    ]
+)
+def test_replace_code_separators(test_file, expected_file):
+    log = read_file('test_res/test_logs', test_file)
+    expected_log = read_file('test_res/test_logs', expected_file)
+    assert text_processing.replace_code_separators(log) == expected_log

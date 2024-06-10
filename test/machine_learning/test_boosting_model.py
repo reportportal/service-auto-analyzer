@@ -16,7 +16,6 @@ import logging
 import unittest
 
 import numpy as np
-import sure
 
 from app.commons.object_saving import create_filesystem
 from app.machine_learning.models import defect_type_model, weighted_similarity_calculator
@@ -143,6 +142,7 @@ class TestBoostingModel(unittest.TestCase):
             ])
 
         for idx, test in enumerate(tests):
+            print(f'Running test {idx}')
             feature_ids = test["decision_maker"].get_feature_ids()
             feature_dict_objects = test["decision_maker"].features_dict_with_saved_objects
             weight_log_sim = None
@@ -159,14 +159,11 @@ class TestBoostingModel(unittest.TestCase):
                 model = defect_type_model.DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
                 model.load_model()
                 _boosting_featurizer.set_defect_type_model(model)
-            with sure.ensure('Error in the test case index: {0}', idx):
-                gathered_data, issue_type_names = _boosting_featurizer.gather_features_info()
-                predict_label, predict_probability = test["decision_maker"].predict(
-                    gathered_data)
-                gathered_data.should.equal(boost_model_results[str(idx)][0], epsilon=self.epsilon)
-                predict_label.tolist().should.equal(boost_model_results[str(idx)][1], epsilon=self.epsilon)
-                predict_probability.tolist().should.equal(boost_model_results[str(idx)][2],
-                                                          epsilon=self.epsilon)
+            gathered_data, issue_type_names = _boosting_featurizer.gather_features_info()
+            predict_label, predict_probability = test["decision_maker"].predict(gathered_data)
+            assert gathered_data == boost_model_results[str(idx)][0]
+            assert predict_label.tolist() == boost_model_results[str(idx)][1]
+            assert predict_probability.tolist() == boost_model_results[str(idx)][2]
 
     @utils.ignore_warnings
     def test_full_data_check_suggests(self):
@@ -236,6 +233,7 @@ class TestBoostingModel(unittest.TestCase):
                 },
             ])
         for idx, test in enumerate(tests):
+            print(f'Running test {idx}')
             feature_ids = test["decision_maker"].get_feature_ids()
             feature_dict_objects = test["decision_maker"].features_dict_with_saved_objects
             weight_log_sim = None
@@ -253,12 +251,9 @@ class TestBoostingModel(unittest.TestCase):
                 model = defect_type_model.DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
                 model.load_model()
                 _boosting_featurizer.set_defect_type_model(model)
-            with sure.ensure('Error in the test case index: {0}', idx):
-                gathered_data, test_item_ids = _boosting_featurizer.gather_features_info()
-                predict_label, predict_probability = test["decision_maker"].predict(gathered_data)
-                gathered_data.should.equal(boost_model_results[str(idx)][0],
-                                           epsilon=self.epsilon)
-                predict_label.tolist().should.equal(boost_model_results[str(idx)][1],
-                                                    epsilon=self.epsilon)
-                predict_probability.tolist().should.equal(boost_model_results[str(idx)][2],
-                                                          epsilon=self.epsilon)
+
+            gathered_data, test_item_ids = _boosting_featurizer.gather_features_info()
+            predict_label, predict_probability = test["decision_maker"].predict(gathered_data)
+            assert gathered_data == boost_model_results[str(idx)][0]
+            assert predict_label.tolist() == boost_model_results[str(idx)][1]
+            assert predict_probability.tolist() == boost_model_results[str(idx)][2]

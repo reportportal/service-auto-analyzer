@@ -1,0 +1,18 @@
+TEXTDELIMITER
+Then  Following project hours are displayed for "Qwerty123 Employee" employee position:
+| Parent section | Section | Value |
+|-|
+| Billable | Reported hours | 10.5 |
+| Billable | Overtime approved | 3 |
+| Billable | Overtime submitted | 2 |
+| Billable | On-duty hours | 10 |
+| Billable | Overtime approved | 1 |
+| Billable | Overtime submitted | 3 |
+| Non-billable | Reported hours | 4.5 |
+| Non-billable | Overtime approved | 1 |
+| Non-billable | Overtime submitted | 3 |
+| Non-billable | On-duty hours | 8 |
+| Non-billable | Overtime approved | 3 |
+| Non-billable | Overtime submitted | 1 |
+| Leave | Taken | 8 |
+| Leave | Requested | 4 |

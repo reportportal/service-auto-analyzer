@@ -5,7 +5,7 @@
 2023-05-30 12:47:43.985 DEBUG 1 --- [           main] edFilterInvocationSecurityMetadataSource : Adding web access control expression [permitAll] for Ant [pattern='/api-docs/**']
 2023-07-26 14:49:37,738 [TestNG-test=Json logging-1] INFO  com.epam.reportportal.example.testng.log4j.logging.JsonLoggingTest - com.epam.reportportal.message.ReportPortalMessage@3ba778b0
 11:51:27 INFO  [    NotificationRestService] - Get notifications related entity by entityId [#22:1923]
-08:58:16.754 [pool-1-thread-9 for channel id=171242] INFO  - ---- Status: SUCCESS
+08:58:16.754 [pool-1-thread-9 for channel id=171242] INFO  - -- Status: SUCCESS
 2024-02-19 14:23:29.7652|INFO| Page text for USD_PageSource was saved to file: DesktopClient_OutboundEmailGiven_ShouldBePossibleMoveEmailToWorkBin_PageSource_2024_02_19_14_23_29_749.xml
 [02:07:19] INFO  (Logger.java:41) - Verifying Health Notification(s)
 [2024-03-27 07:02:03] | base_page.ts:128:16   | waitForElementToBeEnabledSoft

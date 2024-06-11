@@ -109,7 +109,7 @@ class LogRequests:
         log_template["_source"]["found_exceptions"] = prepared_log.exception_found
         log_template["_source"]["found_exceptions_extended"] = prepared_log.exception_found_extended
         log_template["_source"]["detected_message_extended"] = \
-            text_processing.enrich_text_with_method_and_classes(prepared_log.exception_message_no_numbers)
+            text_processing.enrich_text_with_method_and_classes(prepared_log.exception_message)
         log_template["_source"]["detected_message_without_params_extended"] = \
             text_processing.enrich_text_with_method_and_classes(prepared_log.exception_message_no_params)
         log_template["_source"]["stacktrace_extended"] = \

@@ -18,7 +18,6 @@ from http import HTTPStatus
 from unittest.mock import MagicMock
 
 import httpretty
-import sure
 
 import app.commons.launch_objects as launch_objects
 from app.commons import esclient
@@ -316,19 +315,19 @@ class TestEsClient(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case index: {0}', idx):
-                self._start_server(test["test_calls"])
-                app_config = self.app_config
-                if "app_config" in test:
-                    app_config = test["app_config"]
-                es_client = esclient.EsClient(app_config=app_config)
-                es_client.es_client.scroll = MagicMock(return_value=json.loads(get_fixture(self.no_hits_search_rs)))
+            print(f"Test index: {idx}")
+            self._start_server(test["test_calls"])
+            app_config = self.app_config
+            if "app_config" in test:
+                app_config = test["app_config"]
+            es_client = esclient.EsClient(app_config=app_config)
+            es_client.es_client.scroll = MagicMock(return_value=json.loads(get_fixture(self.no_hits_search_rs)))
 
-                response = es_client.delete_logs(test["rq"])
+            response = es_client.delete_logs(test["rq"])
 
-                test["expected_count"].should.equal(response)
+            assert test["expected_count"] == response
 
-                TestEsClient.shutdown_server(test["test_calls"])
+            TestEsClient.shutdown_server(test["test_calls"])
 
     @utils.ignore_warnings
     def test_index_logs(self):
@@ -575,21 +574,21 @@ class TestEsClient(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case index: {0}', idx):
-                self._start_server(test["test_calls"])
-                app_config = self.app_config
-                if "app_config" in test:
-                    app_config = test["app_config"]
-                es_client = esclient.EsClient(app_config=app_config)
-                es_client.es_client.scroll = MagicMock(return_value=json.loads(get_fixture(self.no_hits_search_rs)))
-                launches = [launch_objects.Launch(**launch) for launch in json.loads(test["index_rq"])]
-                response = es_client.index_logs(launches)
+            print(f"Test index: {idx}")
+            self._start_server(test["test_calls"])
+            app_config = self.app_config
+            if "app_config" in test:
+                app_config = test["app_config"]
+            es_client = esclient.EsClient(app_config=app_config)
+            es_client.es_client.scroll = MagicMock(return_value=json.loads(get_fixture(self.no_hits_search_rs)))
+            launches = [launch_objects.Launch(**launch) for launch in json.loads(test["index_rq"])]
+            response = es_client.index_logs(launches)
 
-                test["has_errors"].should.equal(response.errors)
-                test["expected_count"].should.equal(response.took)
-                test["expected_log_exceptions"].should.equal(response.logResults)
+            assert test["has_errors"] == response.errors
+            assert test["expected_count"] == response.took
+            assert test["expected_log_exceptions"] == response.logResults
 
-                TestEsClient.shutdown_server(test["test_calls"])
+            TestEsClient.shutdown_server(test["test_calls"])
 
     def test_defect_update(self):
         tests = [

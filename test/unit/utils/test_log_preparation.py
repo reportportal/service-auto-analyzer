@@ -18,11 +18,11 @@ from test import read_file_lines, read_file
 from app.utils import log_preparation
 
 
-# def test_remove_starting_thread_name():
-#     log = read_file_lines('test_res/test_logs', 'log_line_timestamps.txt')
-#     expected_log = read_file_lines('test_res/test_logs', 'log_line_prepared.txt')
-#     for i, line in enumerate(log):
-#         assert log_preparation.basic_prepare(line) == expected_log[i].strip()
+def test_remove_starting_thread_name():
+    log = read_file_lines('test_res/test_logs', 'log_line_timestamps.txt')
+    expected_log = read_file_lines('test_res/test_logs', 'log_line_prepared.txt')
+    for i, line in enumerate(log):
+        assert log_preparation.basic_prepare(line) == expected_log[i].strip()
 
 
 @pytest.mark.parametrize(

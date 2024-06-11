@@ -31,6 +31,8 @@ def basic_prepare(message: str) -> str:
 
     cleaned_message = text_processing.remove_markdown_mode(cleaned_message)
     cleaned_message = text_processing.replace_code_separators(cleaned_message)
+    cleaned_message = text_processing.remove_webdriver_auxiliary_info(cleaned_message)
+    cleaned_message = text_processing.remove_stacktrace_trash(cleaned_message)
     cleaned_message = text_processing.replace_tabs_for_newlines(cleaned_message)
     cleaned_message = text_processing.fix_big_encoded_urls(cleaned_message)
     cleaned_message = text_processing.remove_generated_parts(cleaned_message)

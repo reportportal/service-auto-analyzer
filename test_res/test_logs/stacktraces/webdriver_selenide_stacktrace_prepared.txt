@@ -1,0 +1,9 @@
+Element should be clickable: interactable and enabled {button.btn-create}
+Element: '<button _ngcontent-ng-c1727841564 class="btn-create uui-button hit-button lime-green text-uppercase disable" disabled type="button">Schedule Interview</button>'
+Actual value: disabled
+Timeout: 4 s.
+at com.codeborne.selenide.impl.WebElementSource.handleError(WebElementSource.java:149)
+at com.codeborne.selenide.impl.WebElementSource.checkConditionAndReturnElement(WebElementSource.java:127)
+at com.codeborne.selenide.impl.WebElementSource.findAndAssertElementIsClickable(WebElementSource.java:173)
+at example.hit.pages.NewInterviewPage.scheduleInterview(NewInterviewPage.java:519)
+at com.example.automation.ui.regression.interview.AdditionalSkillsTest.skillToCheckTest(AdditionalSkillsTest.java:75)

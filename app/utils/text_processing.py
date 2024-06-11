@@ -771,3 +771,44 @@ CODE_SEPARATOR_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
 
 def replace_code_separators(text: str) -> str:
     return replace_patterns(text, CODE_SEPARATOR_PATTERNS)
+
+
+WEBDRIVER_SCREENSHOT_PATTERN: str = r'\s*-*>\s*Webdriver screenshot captured: [\w.-]+\.\w+'
+WEBDRIVER_SCREENSHOT_REFERENCE_PATTERN: str = r'\s*Screenshot: file:\/(?:[^\/\0\n]+\/)*[^\/\0\n]+'
+WEBDRIVER_PAGE_SOURCE_REFERENCE_PATTERN: str = r'\s*Page source: file:\/(?:[^\/\0\n]+\/)*[^\/\0\n]+'
+
+WEBDRIVER_AUXILIARY_INFO_REPLACEMENT: str = ''
+WEBDRIVER_AUXILIARY_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
+    (re.compile(WEBDRIVER_SCREENSHOT_PATTERN), WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
+    (re.compile(WEBDRIVER_SCREENSHOT_REFERENCE_PATTERN), WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
+    (re.compile(WEBDRIVER_PAGE_SOURCE_REFERENCE_PATTERN), WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
+]
+
+
+def remove_webdriver_auxiliary_info(text: str) -> str:
+    return replace_patterns(text, WEBDRIVER_AUXILIARY_PATTERNS)
+
+
+JAVA_STACKTRACE_PROXY_FRAME: str = r'\s*at com\.sun\.proxy\.\$Proxy\d+\.click\(Unknown Source\)[^\n]*'
+JAVA_STACKTRACE_MAVEN_FRAME: str = r'\s*at org\.apache\.maven\.surefire\.[^\n]+'
+JAVA_STACKTRACE_FRAME: str = r'\s*at java\.base\/j[^\n]+'
+JAVA_STACKTRACE_TESTNG_FRAME: str = r'\s*at org\.testng\.[^\n]+'
+SELENIDE_STACKTRACE_FRAME1: str = r'\s*	at com\.codeborne\.selenide\.impl\.SelenideElementProxy\.[^\n]+'
+SELENIDE_STACKTRACE_FRAME2: str = r'\s*	at com\.codeborne\.selenide\.commands\.[^\n]+'
+TRASH_STACKTRACE_REPLACEMENT: str = ''
+
+TRASH_STACKTRACE_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
+    (re.compile(JAVA_STACKTRACE_PROXY_FRAME), TRASH_STACKTRACE_REPLACEMENT),
+    (re.compile(JAVA_STACKTRACE_MAVEN_FRAME), TRASH_STACKTRACE_REPLACEMENT),
+    (re.compile(JAVA_STACKTRACE_FRAME), TRASH_STACKTRACE_REPLACEMENT),
+    (re.compile(JAVA_STACKTRACE_TESTNG_FRAME), TRASH_STACKTRACE_REPLACEMENT),
+    (re.compile(SELENIDE_STACKTRACE_FRAME1), TRASH_STACKTRACE_REPLACEMENT),
+    (re.compile(SELENIDE_STACKTRACE_FRAME2), TRASH_STACKTRACE_REPLACEMENT),
+]
+
+
+def remove_stacktrace_trash(text: str) -> str:
+    return replace_patterns(text, TRASH_STACKTRACE_PATTERNS)
+
+
+SELENIDE_STACKTRACE_FRAME1: str = r'\s*	at com\.codeborne\.selenide\.impl\.SelenideElementProxy\.[^\n]+'

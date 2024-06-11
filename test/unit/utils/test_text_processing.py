@@ -144,3 +144,23 @@ def test_replace_code_separators(test_file, expected_file):
     log = read_file('test_res/test_logs', test_file)
     expected_log = read_file('test_res/test_logs', expected_file)
     assert text_processing.replace_code_separators(log) == expected_log
+
+
+def test_remove_webdriver_auxiliary_info():
+    log = read_file_lines('test_res/test_logs/webdriver', 'webdriver_oneliners.txt')
+    expected_log = read_file_lines('test_res/test_logs/webdriver', 'webdriver_oneliners_prepared.txt')
+    for i, line in enumerate(log):
+        assert text_processing.remove_webdriver_auxiliary_info(line) == expected_log[i]
+
+
+@pytest.mark.parametrize(
+    'test_file, expected_file',
+    [
+        ('stacktraces/webdriver_selenide_stacktrace.txt',
+         'stacktraces/webdriver_selenide_stacktrace_no_webdriver.txt'),
+    ]
+)
+def test_remove_webdriver_auxiliary_info_big(test_file, expected_file):
+    log = read_file('test_res/test_logs', test_file)
+    expected_log = read_file('test_res/test_logs', expected_file)
+    assert text_processing.remove_webdriver_auxiliary_info(log) == expected_log

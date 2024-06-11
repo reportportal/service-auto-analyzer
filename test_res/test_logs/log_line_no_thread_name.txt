@@ -5,7 +5,7 @@ o.hibernate.annotations.common.Version   : HCANN000001: Hibernate Commons Annota
 edFilterInvocationSecurityMetadataSource : Adding web access control expression [permitAll] for Ant [pattern='/api-docs/**']
 INFO  com.epam.reportportal.example.testng.log4j.logging.JsonLoggingTest - com.epam.reportportal.message.ReportPortalMessage@3ba778b0
 Get notifications related entity by entityId [#22:1923]
-INFO  - ---- Status: SUCCESS
+INFO  - -- Status: SUCCESS
 Page text for USD_PageSource was saved to file: DesktopClient_OutboundEmailGiven_ShouldBePossibleMoveEmailToWorkBin_PageSource_2024_02_19_14_23_29_749.xml
 (Logger.java:41) - Verifying Health Notification(s)
 base_page.ts:128:16   | waitForElementToBeEnabledSoft

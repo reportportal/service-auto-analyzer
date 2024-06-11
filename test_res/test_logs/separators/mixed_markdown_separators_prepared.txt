@@ -1,5 +1,4 @@
-TEXTDELIMITER
-Then  Following project hours are displayed for "Qwerty123 Employee" employee position:
+TEXTDELIMITER Then  Following project hours are displayed for "Qwerty123 Employee" employee position: TEXTDELIMITER
 | Parent section | Section | Value |
 |-|
 | Billable | Reported hours | 10.5 |

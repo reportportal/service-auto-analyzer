@@ -751,20 +751,21 @@ def remove_markdown_mode(text: str) -> str:
     return replace_patterns(text, MARKDOWN_MODE_PATTERNS)
 
 
-MARKDOWN_CODE_SEPARATOR: str = r'```\n'
-MARKDOWN_TEXT_SEPARATOR: str = r'-{3,}\s*'
-EQUALITY_TEXT_SEPARATOR: str = r'={3,}\s*'
-UNDERSCORE_TEXT_SEPARATOR: str = r'_{3,}\s*'
+MARKDOWN_CODE_SEPARATOR: str = r'`{3}'
+MARKDOWN_TEXT_SEPARATOR: str = r'-{3,}'
+EQUALITY_TEXT_SEPARATOR: str = r'={3,}'
+UNDERSCORE_TEXT_SEPARATOR: str = r'_{3,}'
+TEXT_SEPARATORS_PATTERN: str = (fr'(?:{MARKDOWN_CODE_SEPARATOR}|{MARKDOWN_TEXT_SEPARATOR}|{EQUALITY_TEXT_SEPARATOR}'
+                                fr'|{UNDERSCORE_TEXT_SEPARATOR})')
 CODE_SEPARATOR_REPLACEMENT: str = 'TEXTDELIMITER'
 CODE_SEPARATOR_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
-    (re.compile(fr'^{MARKDOWN_CODE_SEPARATOR}'), fr'{CODE_SEPARATOR_REPLACEMENT}\n'),
-    (re.compile(fr'\n{MARKDOWN_CODE_SEPARATOR}'), fr'\n{CODE_SEPARATOR_REPLACEMENT}\n'),
-    (re.compile(fr'^{MARKDOWN_TEXT_SEPARATOR}'), fr'{CODE_SEPARATOR_REPLACEMENT}\n'),
-    (re.compile(fr'\s*{MARKDOWN_TEXT_SEPARATOR}'), fr'\n{CODE_SEPARATOR_REPLACEMENT}\n'),
-    (re.compile(fr'^{EQUALITY_TEXT_SEPARATOR}'), fr'{CODE_SEPARATOR_REPLACEMENT}\n'),
-    (re.compile(fr'\s*{EQUALITY_TEXT_SEPARATOR}'), fr'\n{CODE_SEPARATOR_REPLACEMENT}\n'),
-    (re.compile(fr'^{UNDERSCORE_TEXT_SEPARATOR}'), fr'{CODE_SEPARATOR_REPLACEMENT}\n'),
-    (re.compile(fr'\s*{UNDERSCORE_TEXT_SEPARATOR}'), fr'\n{CODE_SEPARATOR_REPLACEMENT}\n'),
+    (re.compile(fr'\n{TEXT_SEPARATORS_PATTERN}\n'), fr' {CODE_SEPARATOR_REPLACEMENT}\n'),
+    (re.compile(fr'\n{TEXT_SEPARATORS_PATTERN}\s+'), fr'\n{CODE_SEPARATOR_REPLACEMENT} '),
+    (re.compile(fr'\s+{TEXT_SEPARATORS_PATTERN}\s+'), fr' {CODE_SEPARATOR_REPLACEMENT} '),
+    (re.compile(fr'{TEXT_SEPARATORS_PATTERN}\n'), fr' {CODE_SEPARATOR_REPLACEMENT}\n'),
+    (re.compile(fr'^{TEXT_SEPARATORS_PATTERN}\s*'), fr'{CODE_SEPARATOR_REPLACEMENT} '),
+    (re.compile(fr'\s+{TEXT_SEPARATORS_PATTERN}$'), fr' {CODE_SEPARATOR_REPLACEMENT}'),
+    (re.compile(fr'{TEXT_SEPARATORS_PATTERN}$'), fr' {CODE_SEPARATOR_REPLACEMENT}'),
 ]
 
 

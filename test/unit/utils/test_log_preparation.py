@@ -30,6 +30,7 @@ def test_remove_starting_thread_name():
     [
         ('separators/mixed_markdown_separators.txt', 'separators/mixed_markdown_separators_prepared.txt'),
         ('stacktraces/webdriver_selenide_stacktrace.txt', 'stacktraces/webdriver_selenide_stacktrace_prepared.txt'),
+        ('webdriver/webdriver_exception_info.txt', 'webdriver/webdriver_exception_info_prepared.txt'),
     ]
 )
 def test_separators_log_prepare(test_file, expected_file):

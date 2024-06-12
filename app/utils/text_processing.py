@@ -778,8 +778,7 @@ WEBDRIVER_SCREENSHOT_REFERENCE_PATTERN: str = r'\s*Screenshot: file:\/(?:[^\/\0\
 WEBDRIVER_PAGE_SOURCE_REFERENCE_PATTERN: str = r'\s*Page source: file:\/(?:[^\/\0\n]+\/)*[^\/\0\n]+'
 WEBDRIVER_BUILD_INFO_PATTERN: str = r"\s*Build info: version: '[^']+', revision: '[^']+'"
 WEBDRIVER_DRIVER_INFO_PATTERN: str = r"\s*Driver info: [\w.]+"
-WEBDRIVER_SYSTEM_INFO_PATTERN: str = (r"\s*System info: host: '[^']+', ip: '[^']+', os.name: '[^']+',"
-                                      r"os.arch: '[^']+', os.version: '[^']+', java.version: '[^']+'")
+WEBDRIVER_SYSTEM_INFO_PATTERN: str = r"\s*System info: (?:[\w.]+: '[^']+', )+[\w.]+: '[^']+'"
 WEBDRIVER_DRIVER_CAPABILITIES_PATTERN: str = r"\s*Capabilities {\w+: [^\n]+"
 
 WEBDRIVER_AUXILIARY_INFO_REPLACEMENT: str = ''
@@ -787,6 +786,10 @@ WEBDRIVER_AUXILIARY_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
     (re.compile(WEBDRIVER_SCREENSHOT_PATTERN), WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
     (re.compile(WEBDRIVER_SCREENSHOT_REFERENCE_PATTERN), WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
     (re.compile(WEBDRIVER_PAGE_SOURCE_REFERENCE_PATTERN), WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
+    (re.compile(WEBDRIVER_BUILD_INFO_PATTERN), WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
+    (re.compile(WEBDRIVER_DRIVER_INFO_PATTERN), WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
+    (re.compile(WEBDRIVER_SYSTEM_INFO_PATTERN), WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
+    (re.compile(WEBDRIVER_DRIVER_CAPABILITIES_PATTERN), WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
 ]
 
 

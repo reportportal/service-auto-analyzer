@@ -773,7 +773,7 @@ def replace_code_separators(text: str) -> str:
     return replace_patterns(text, CODE_SEPARATOR_PATTERNS)
 
 
-WEBDRIVER_SCREENSHOT_PATTERN: str = r'\s*-*>\s*Webdriver screenshot captured: [\w.-]+\.\w+'
+WEBDRIVER_SCREENSHOT_PATTERN: str = r'(?:\s*-*>\s*)?Webdriver screenshot captured: [^\/\0\n.]+\.\w+'
 WEBDRIVER_SCREENSHOT_REFERENCE_PATTERN: str = r'\s*Screenshot: file:\/(?:[^\/\0\n]+\/)*[^\/\0\n]+'
 WEBDRIVER_PAGE_SOURCE_REFERENCE_PATTERN: str = r'\s*Page source: file:\/(?:[^\/\0\n]+\/)*[^\/\0\n]+'
 WEBDRIVER_BUILD_INFO_PATTERN: str = r"\s*Build info: version: '[^']+', revision: '[^']+'"

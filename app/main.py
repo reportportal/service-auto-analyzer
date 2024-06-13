@@ -185,10 +185,9 @@ def init_amqp(_amqp_client: AmqpClient):
         _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
                                       (APP_CONFIG.exchangeName, 'index', True, False,
                                        lambda current_channel, method, props, body:
-                                       amqp_handler.handle_amqp_request(current_channel, method, props, body,
-                                                                        _es_client.index_logs,
-                                                                        prepare_response_data=amqp_handler.
-                                                                        prepare_index_response_data))))
+                                       amqp_handler.handle_amqp_request(
+                                           current_channel, method, props, body, _es_client.index_logs,
+                                           prepare_response_data=amqp_handler.prepare_index_response_data))))
         _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
                                       (APP_CONFIG.exchangeName, 'analyze', True, False,
                                        lambda current_channel, method, props, body:

@@ -142,22 +142,16 @@ class EsClient:
             logger.error(err)
             logger.error("Can't reset read only mode for elastic indices")
 
-    def create_index(self, index_name):
+    def create_index(self, index_name: str) -> Response:
         """Create index in elasticsearch"""
-        logger.info("Creating '%s' Elasticsearch index", str(index_name))
+        logger.info("Creating '%s' Elasticsearch index", index_name)
         logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.host))
-        try:
-            response = self.es_client.indices.create(index=str(index_name), body={
-                'settings': utils.read_json_file("res", "index_settings.json", to_json=True),
-                'mappings': utils.read_json_file("res", "index_mapping_settings.json", to_json=True)
-            })
-            logger.debug("Created '%s' Elasticsearch index", str(index_name))
-            return Response(**response)
-        except Exception as err:
-            logger.error("Couldn't create index")
-            logger.error("ES Url %s", text_processing.remove_credentials_from_url(self.host))
-            logger.error(err)
-            return Response()
+        response = self.es_client.indices.create(index=index_name, body={
+            'settings': utils.read_json_file("res", "index_settings.json", to_json=True),
+            'mappings': utils.read_json_file("res", "index_mapping_settings.json", to_json=True)
+        })
+        logger.debug("Created '%s' Elasticsearch index", index_name)
+        return Response(**response)
 
     def list_indices(self):
         """Get all indices from elasticsearch"""
@@ -165,7 +159,7 @@ class EsClient:
         res = utils.send_request(url, "GET", self.app_config.esUser, self.app_config.esPassword)
         return res
 
-    def index_exists(self, index_name, print_error=True):
+    def index_exists(self, index_name: str, print_error: bool = True):
         """Checks whether index exists"""
         try:
             index = self.es_client.indices.get(index=str(index_name))
@@ -190,10 +184,11 @@ class EsClient:
             logger.error(err)
             return False
 
-    def create_index_if_not_exists(self, index_name):
+    def create_index_if_not_exists(self, index_name: str) -> bool:
         """Creates index if it doesn't exist"""
         if not self.index_exists(index_name, print_error=False):
-            return self.create_index(index_name)
+            response = self.create_index(index_name)
+            return response.acknowledged
         return True
 
     def _to_launch_test_item_list(

@@ -14,9 +14,11 @@
 
 from collections import deque
 from datetime import datetime
+from typing import Optional
 
 import numpy as np
 
+from app.machine_learning.models.defect_type_model import DefectTypeModel
 from app.commons import logging, similarity_calculator, object_saving
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.utils import utils, text_processing
@@ -25,6 +27,7 @@ logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
 
 class BoostingFeaturizer:
+    defect_type_predict_model: Optional[DefectTypeModel]
 
     def __init__(self, all_results, config, feature_ids, weighted_log_similarity_calculator=None,
                  features_dict_with_saved_objects=None):
@@ -266,7 +269,7 @@ class BoostingFeaturizer:
     def get_used_model_info(self):
         return list(self.used_model_info)
 
-    def set_defect_type_model(self, defect_type_model):
+    def set_defect_type_model(self, defect_type_model: DefectTypeModel):
         self.defect_type_predict_model = defect_type_model
 
     def predict_particular_defect_type(self):

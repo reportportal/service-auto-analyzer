@@ -29,12 +29,13 @@ MODEL_FILES: list[str] = ['count_vectorizer_models.pickle', 'models.pickle']
 
 class DefectTypeModel(MlModel):
     _loaded: bool
-    count_vectorizer_models: dict
+    count_vectorizer_models: dict[str, TfidfVectorizer]
     models: dict[str, RandomForestClassifier]
 
     def __init__(self, object_saver: ObjectSaver, tags: str = 'global defect type model') -> None:
         super().__init__(object_saver, tags)
         self._loaded = False
+        self.count_vectorizer_models = {}
 
     @property
     def loaded(self) -> bool:
@@ -50,7 +51,7 @@ class DefectTypeModel(MlModel):
     def save_model(self):
         self._save_models(zip(MODEL_FILES, self.count_vectorizer_models, self.models))
 
-    def train_model(self, name, train_data_x, labels):
+    def train_model(self, name: str, train_data_x, labels):
         self.count_vectorizer_models[name] = TfidfVectorizer(
             binary=True, stop_words="english", min_df=5,
             token_pattern=r"[\w\._]+", analyzer=text_processing.preprocess_words)

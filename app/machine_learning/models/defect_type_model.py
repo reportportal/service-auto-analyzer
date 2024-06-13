@@ -36,6 +36,7 @@ class DefectTypeModel(MlModel):
         super().__init__(object_saver, tags)
         self._loaded = False
         self.count_vectorizer_models = {}
+        self.models = {}
 
     @property
     def loaded(self) -> bool:

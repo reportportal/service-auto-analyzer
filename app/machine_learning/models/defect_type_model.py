@@ -30,7 +30,7 @@ MODEL_FILES: list[str] = ['count_vectorizer_models.pickle', 'models.pickle']
 class DefectTypeModel(MlModel):
     _loaded: bool
     count_vectorizer_models: dict
-    models: dict
+    models: dict[str, RandomForestClassifier]
 
     def __init__(self, object_saver: ObjectSaver, tags: str = 'global defect type model') -> None:
         super().__init__(object_saver, tags)

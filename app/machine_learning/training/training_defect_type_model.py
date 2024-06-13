@@ -48,7 +48,8 @@ class DefectTypeModelTraining:
         self.baseline_model.load_model()
         self.model_chooser = model_chooser
 
-    def return_similar_objects_into_sample(self, x_train_ind, y_train, data, additional_logs, label):
+    @staticmethod
+    def return_similar_objects_into_sample(x_train_ind, y_train, data, additional_logs, label):
         x_train = []
         x_train_add = []
         y_train_add = []
@@ -76,8 +77,7 @@ class DefectTypeModelTraining:
         x_train_ind, x_test_ind, y_train, y_test = train_test_split(
             logs_to_train_idx, labels_filtered,
             test_size=0.1, random_state=random_state, stratify=labels_filtered)
-        x_train, y_train = self.return_similar_objects_into_sample(
-            x_train_ind, y_train, data, additional_logs, label)
+        x_train, y_train = self.return_similar_objects_into_sample(x_train_ind, y_train, data, additional_logs, label)
         x_test = []
         for ind in x_test_ind:
             x_test.append(data[ind][0])
@@ -87,7 +87,7 @@ class DefectTypeModelTraining:
         return {
             "_source": ["detected_message_without_params_extended", "issue_type", "launch_id"],
             "sort": {"start_time": "desc"},
-            "size": self.app_config["esChunkNumber"],
+            "size": self.app_config.esChunkNumber,
             "query": {
                 "bool": {
                     "filter": [
@@ -116,7 +116,7 @@ class DefectTypeModelTraining:
     def query_data(self, project, label):
         message_launch_dict = set()
         project_index_name = text_processing.unite_project_name(
-            str(project), self.app_config["esProjectIndexPrefix"])
+            str(project), self.app_config.esProjectIndexPrefix)
         data = []
         for r in elasticsearch.helpers.scan(self.es_client.es_client,
                                             query=self.get_message_query_by_label(
@@ -209,7 +209,7 @@ class DefectTypeModelTraining:
         additional_logs, logs_to_train_idx = self.perform_light_deduplication(data_to_train)
         labels_filtered = []
         for ind in logs_to_train_idx:
-            if (data_to_train[ind][1] == label or data_to_train[ind][2] == label):
+            if data_to_train[ind][1] == label or data_to_train[ind][2] == label:
                 labels_filtered.append(1)
             else:
                 labels_filtered.append(0)
@@ -219,18 +219,18 @@ class DefectTypeModelTraining:
                 logs_to_train_idx, labels_filtered, self.due_proportion)
         return logs_to_train_idx, labels_filtered, data_to_train, additional_logs, proportion_binary_labels
 
-    def copy_model_part_from_baseline(self, label):
+    def copy_model_part_from_baseline(self, new_model, label):
         if label not in self.baseline_model.models:
-            if label in self.new_model.models:
-                del self.new_model.models[label]
-            if label in self.new_model.count_vectorizer_models:
-                del self.new_model.count_vectorizer_models[label]
+            if label in new_model.models:
+                del new_model.models[label]
+            if label in new_model.count_vectorizer_models:
+                del new_model.count_vectorizer_models[label]
         else:
-            self.new_model.models[label] = self.baseline_model.models[label]
+            new_model.models[label] = self.baseline_model.models[label]
             _count_vectorizer = self.baseline_model.count_vectorizer_models[label]
-            self.new_model.count_vectorizer_models[label] = _count_vectorizer
+            new_model.count_vectorizer_models[label] = _count_vectorizer
 
-    def train_several_times(self, label, data, found_sub_categories):
+    def train_several_times(self, new_model, label, data, found_sub_categories):
         new_model_results = []
         baseline_model_results = []
         random_states = [1257, 1873, 1917, 2477, 3449,
@@ -250,9 +250,9 @@ class DefectTypeModelTraining:
                     logs_to_train_idx, data_to_train, labels_filtered,
                     additional_logs, label,
                     random_state=random_state)
-                self.new_model.train_model(label, x_train, y_train)
+                new_model.train_model(label, x_train, y_train)
                 logger.debug("New model results")
-                f1, accuracy = self.new_model.validate_model(label, x_test, y_test)
+                f1, accuracy = new_model.validate_model(label, x_test, y_test)
                 new_model_results.append(f1)
                 if label in found_sub_categories:
                     baseline_model_results.append(0.001)
@@ -267,7 +267,7 @@ class DefectTypeModelTraining:
         model_name = "defect_type_model_%s" % datetime.now().strftime("%d.%m.%y")
         baseline_model = os.path.basename(self.search_cfg.GlobalDefectTypeModelFolder)
         new_model_folder = 'defect_type_model/%s/' % model_name
-        self.new_model = custom_defect_type_model.CustomDefectTypeModel(
+        new_model = custom_defect_type_model.CustomDefectTypeModel(
             object_saving.create(self.app_config, project_info["project_id"], new_model_folder))
 
         data, found_sub_categories, train_log_info = self.load_data_for_training(
@@ -287,7 +287,7 @@ class DefectTypeModelTraining:
                 logger.debug("Label to train the model %s", label)
 
                 baseline_model_results, new_model_results, bad_data = self.train_several_times(
-                    label, data, found_sub_categories)
+                    new_model, label, data, found_sub_categories)
 
                 use_custom_model = False
                 if not bad_data:
@@ -326,7 +326,7 @@ class DefectTypeModelTraining:
                         train_log_info[label]["model_saved"] = 1
                         data_proportion_min = min(
                             train_log_info[label]["data_proportion"], data_proportion_min)
-                        self.new_model.train_model(label, x_train, y_train)
+                        new_model.train_model(label, x_train, y_train)
                         custom_models.append(label)
                         if label not in found_sub_categories:
                             f1_baseline_models.append(train_log_info[label]["baseline_mean_metric"])
@@ -334,7 +334,7 @@ class DefectTypeModelTraining:
                     else:
                         train_log_info[label]["model_saved"] = 0
                 else:
-                    self.copy_model_part_from_baseline(label)
+                    self.copy_model_part_from_baseline(new_model, label)
                     if train_log_info[label]["baseline_mean_metric"] > 0.001:
                         f1_baseline_models.append(train_log_info[label]["baseline_mean_metric"])
                         f1_chosen_models.append(train_log_info[label]["baseline_mean_metric"])
@@ -345,7 +345,7 @@ class DefectTypeModelTraining:
                 train_log_info[label]["errors"].append(utils.extract_exception(exc))
                 errors.append(utils.extract_exception(exc))
                 errors_count += 1
-                self.copy_model_part_from_baseline(label)
+                self.copy_model_part_from_baseline(new_model, label)
 
         logger.debug("Custom models were for labels: %s" % custom_models)
         if len(custom_models):
@@ -353,7 +353,7 @@ class DefectTypeModelTraining:
             train_log_info["all"]["model_saved"] = 1
             train_log_info["all"]["p_value"] = p_value_max
             self.model_chooser.delete_old_model("defect_type_model", project_info["project_id"])
-            self.new_model.save_model()
+            new_model.save_model()
 
         time_spent = time() - start_time
         logger.info("Finished for %d s", time_spent)
@@ -368,5 +368,5 @@ class DefectTypeModelTraining:
         train_log_info["all"]["bad_data_proportion"] = all_bad_data
         for label in train_log_info:
             train_log_info[label]["gather_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            train_log_info[label]["module_version"] = [self.app_config["appVersion"]]
+            train_log_info[label]["module_version"] = [self.app_config.appVersion]
         return len(data), train_log_info

@@ -135,7 +135,8 @@ class DefectTypeModelTraining:
                 break
         return data
 
-    def perform_light_deduplication(self, data):
+    @staticmethod
+    def perform_light_deduplication(data):
         text_messages_set = {}
         logs_to_train_idx = []
         additional_logs = {}
@@ -151,7 +152,8 @@ class DefectTypeModelTraining:
                 additional_logs[text_messages_set[text_message_normalized]].append(idx)
         return additional_logs, logs_to_train_idx
 
-    def get_info_template(self, project_info, label, baseline_model, model_name):
+    @staticmethod
+    def get_info_template(project_info, label, baseline_model, model_name):
         return {"method": "training", "sub_model_type": label, "model_type": project_info["model_type"],
                 "baseline_model": [baseline_model], "new_model": [model_name],
                 "project_id": project_info["project_id"], "model_saved": 0, "p_value": 1.0,
@@ -262,7 +264,7 @@ class DefectTypeModelTraining:
                     baseline_model_results.append(f1)
         return baseline_model_results, new_model_results, bad_data
 
-    def train(self, project_info):
+    def train(self, project_info: dict):
         start_time = time()
         model_name = "defect_type_model_%s" % datetime.now().strftime("%d.%m.%y")
         baseline_model = os.path.basename(self.search_cfg.GlobalDefectTypeModelFolder)

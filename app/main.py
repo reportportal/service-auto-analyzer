@@ -164,12 +164,12 @@ def init_amqp(_amqp_client: AmqpClient):
     _model_chooser = model_chooser.ModelChooser(APP_CONFIG, SEARCH_CONFIG)
     if APP_CONFIG.instanceTaskType == 'train':
         _retraining_service = RetrainingService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
-                                      (APP_CONFIG.exchangeName, 'train_models', True, False,
-                                       lambda current_channel, method, props, body:
-                                       amqp_handler.handle_inner_amqp_request(
-                                           current_channel, method, props, body,
-                                           _retraining_service.train_models))))
+        _threads.append(
+            create_thread(
+                AmqpClient(APP_CONFIG.amqpUrl).receive,
+                (APP_CONFIG.exchangeName, 'train_models', True, False,
+                 lambda current_channel, method, props, body: amqp_handler.handle_inner_amqp_request(
+                     current_channel, method, props, body, _retraining_service.train_models))))
     else:
         _es_client = EsClient(APP_CONFIG)
         _auto_analyzer_service = AutoAnalyzerService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)

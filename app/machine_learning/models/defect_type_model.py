@@ -50,7 +50,7 @@ class DefectTypeModel(MlModel):
         self._loaded = True
 
     def save_model(self):
-        self._save_models(zip(MODEL_FILES, self.count_vectorizer_models, self.models))
+        self._save_models(zip(MODEL_FILES, [self.count_vectorizer_models, self.models]))
 
     def train_model(self, name: str, train_data_x, labels):
         self.count_vectorizer_models[name] = TfidfVectorizer(

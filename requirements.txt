@@ -18,5 +18,5 @@ minio==6.0.0
 gensim==4.3.2
 pandas==1.5.3
 imbalanced-learn==0.9.1
-urllib3==1.26.18
+urllib3==1.26.19
 certifi>=2023.7.22

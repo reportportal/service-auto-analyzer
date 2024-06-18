@@ -263,13 +263,13 @@ def detect_log_description_and_stacktrace_light(message):
     return message, ""
 
 
-SQR_BRCKTS = r'\[[^\]]*\]'
+SQR_BRCKTS = r'\[[^]]*]'
 RND_BRCKTS = r'\([^)]*\)'
-CRL_BRCKTS = r'\{[^\}]*\}'
+CRL_BRCKTS = r'\{[^}]*}'
 BRCKTS_TXT = re.compile(fr'{SQR_BRCKTS}|{RND_BRCKTS}|{CRL_BRCKTS}')
 
 
-def clean_from_brackets(text):
+def clean_from_brackets(text: str) -> str:
     """Removes all brackets and text inside them from the given text."""
     return BRCKTS_TXT.sub('', text)
 
@@ -287,12 +287,14 @@ def get_potential_status_codes(text):
     potential_codes_list = []
     for line in text.split("\n"):
         line = clean_from_brackets(line)
-        patterns_to_check = [r"\bcode[^\w\d\.]+(\d+)[^\d]*(\d*)|\bcode[^\w\d\.]+(\d+?)$",
-                             r"\w+_code[^\w\d\.]+(\d+)[^\d]*(\d*)|\w+_code[^\w\d\.]+(\d+?)$",
-                             r"\bstatus[^\w\d\.]+(\d+)[^\d]*(\d*)|\bstatus[^\w\d\.]+(\d+?)$",
-                             r"\w+_status[^\w\d\.]+(\d+)[^\d]*(\d*)|\w+_status[^\w\d\.]+(\d+?)$"]
+        patterns_to_check = [
+            re.compile(r"\bcode[^\w.]+(\d+)\D*(\d*)|\bcode[^\w.]+(\d+?)$", flags=re.IGNORECASE),
+            re.compile(r"\w+_code[^\w.]+(\d+)\D*(\d*)|\w+_code[^\w.]+(\d+?)$", flags=re.IGNORECASE),
+            re.compile(r"\bstatus[^\w.]+(\d+)\D*(\d*)|\bstatus[^\w.]+(\d+?)$", flags=re.IGNORECASE),
+            re.compile(r"\w+_status[^\w.]+(\d+)\D*(\d*)|\w+_status[^\w.]+(\d+?)$", flags=re.IGNORECASE)
+        ]
         for pattern in patterns_to_check:
-            result = re.search(pattern, line, flags=re.IGNORECASE)
+            result = pattern.search(line)
             for i in range(1, 4):
                 try:
                     found_code = result.group(i)
@@ -338,14 +340,16 @@ def prepare_message_for_clustering(message, number_of_log_lines, clean_numbers,
     return " ".join(words)
 
 
+REGEX_STYLE_TAG = re.compile('<style.*?>[\\s\\S]*?</style>')
+REGEX_SCRIPT_TAG = re.compile('<script.*?>[\\s\\S]*?</script>')
+REGEX_HTML_TAGS = re.compile('<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
+
+
 def clean_text_from_html_tags(message):
     """Removes style and script tags together with inner text and removes html tags"""
-    regex_style_tag = re.compile('<style.*?>[\\s\\S]*?</style>')
-    message = re.sub(regex_style_tag, " ", message)
-    regex_script_tag = re.compile('<script.*?>[\\s\\S]*?</script>')
-    message = re.sub(regex_script_tag, " ", message)
-    regex_html_tags = re.compile('<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
-    message = re.sub(regex_html_tags, " ", message)
+    message = re.sub(REGEX_STYLE_TAG, " ", message)
+    message = re.sub(REGEX_SCRIPT_TAG, " ", message)
+    message = re.sub(REGEX_HTML_TAGS, " ", message)
     return message
 
 
@@ -485,28 +489,28 @@ def preprocess_words(text):
         if len(word) >= 3:
             all_words.append(word.lower())
         split_parts = word_normalized.split("_")
-        split_words = []
+        split_words_list = []
         if len(split_parts) > 2:
             for idx in range(len(split_parts)):
                 if idx != len(split_parts) - 1:
-                    split_words.append("".join(split_parts[idx:idx + 2]).lower())
-            all_words.extend(split_words)
+                    split_words_list.append("".join(split_parts[idx:idx + 2]).lower())
+            all_words.extend(split_words_list)
         if "." not in word_normalized:
-            split_words = []
+            split_words_list = []
             split_parts = [s.strip() for s in re.split("([A-Z][^A-Z]+)", word) if s.strip()]
             if len(split_parts) > 2:
                 for idx in range(len(split_parts)):
                     if idx != len(split_parts) - 1:
                         if len("".join(split_parts[idx:idx + 2]).lower()) > 3:
-                            split_words.append("".join(split_parts[idx:idx + 2]).lower())
-            all_words.extend(split_words)
+                            split_words_list.append("".join(split_parts[idx:idx + 2]).lower())
+            all_words.extend(split_words_list)
     return all_words
 
 
-UUID: str = r'[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}'
-TRUNCATED_UUID: str = r'[0-9a-fA-F]{16,48}|[0-9a-fA-F]{10,48}\.\.\.'
-NAMED_UUID: str = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-(\w+)'
-UUID_TAG: str = "SPECIALUUID"
+UUID = r'[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}'
+TRUNCATED_UUID = r'[0-9a-fA-F]{16,48}|[0-9a-fA-F]{10,48}\.\.\.'
+NAMED_UUID = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-(\w+)'
+UUID_TAG = "SPECIALUUID"
 GUID_UUID_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
     (re.compile(fr'\b{UUID}\b'), UUID_TAG),
     (re.compile(fr'\b{TRUNCATED_UUID}\b'), UUID_TAG),
@@ -569,18 +573,18 @@ def has_more_lines_pattern(line):
     return False
 
 
-INNER_CLASS_EXTERNAL = r'\b((?:[a-zA-Z0-9_-]+\/|\\)+)([a-zA-Z0-9_-]+)\$([a-zA-Z0-9_-]+\.class)\b'
-INNER_CLASS_INTERNAL = r'(?<=\.|\$)([a-zA-Z0-9_-]+)\$(?=[a-zA-Z0-9_-]+(?:\.|\$|\(|@))'
-GENERATED_LINE = (r'\s*(?:at\s*)?(?:[a-zA-Z0-9_-]+\.)+(?:[a-zA-Z0-9_-]+\$\$)+(?:[0-9a-f]+)\.(?:[a-zA-Z0-9_-]+\$|\.)*'
-                  r'(?:[a-zA-Z0-9_-]+)\(<generated>\).*')
-CLASS_NAME_WITH_MEMORY_REFERENCE = r'\b((?:[a-zA-Z0-9_-]+\.)+)([a-zA-Z0-9_-]+)@[0-9a-f]+\b'
-TRUNCATED_STACKTRACE = r'\s*\.\.\. \d+ more.*'
+INNER_CLASS_EXTERNAL_PATTERN = re.compile(r'\b((?:[a-zA-Z0-9_-]+/|\\)+)([a-zA-Z0-9_-]+)\$([a-zA-Z0-9_-]+\.class)\b')
+INNER_CLASS_INTERNAL_PATTERN = re.compile(r'(?<=[.$])([a-zA-Z0-9_-]+)\$(?=[a-zA-Z0-9_-]+[.$(@])')
+GENERATED_LINE_PATTERN = re.compile((r'\s*(?:at\s*)?(?:[a-zA-Z0-9_-]+\.)+(?:[a-zA-Z0-9_-]+\$\$)+[0-9a-f]+\.'
+                                     r'(?:[a-zA-Z0-9_-]+\$|\.)*[a-zA-Z0-9_-]+\(<generated>\).*'))
+CLASS_NAME_WITH_MEMORY_REFERENCE_PATTERN = re.compile(r'\b((?:[a-zA-Z0-9_-]+\.)+)([a-zA-Z0-9_-]+)@[0-9a-f]+\b')
+TRUNCATED_STACKTRACE_PATTERN = re.compile(r'\s*\.\.\. \d+ more.*')
 STACKTRACE_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
-    (re.compile(GENERATED_LINE), r''),
-    (re.compile(INNER_CLASS_EXTERNAL), r'\1\2.\3'),
-    (re.compile(INNER_CLASS_INTERNAL), r'\1.'),
-    (re.compile(CLASS_NAME_WITH_MEMORY_REFERENCE), r'\1\2'),
-    (re.compile(TRUNCATED_STACKTRACE), r''),
+    (GENERATED_LINE_PATTERN, r''),
+    (INNER_CLASS_EXTERNAL_PATTERN, r'\1\2.\3'),
+    (INNER_CLASS_INTERNAL_PATTERN, r'\1.'),
+    (CLASS_NAME_WITH_MEMORY_REFERENCE_PATTERN, r'\1\2'),
+    (TRUNCATED_STACKTRACE_PATTERN, r''),
 ]
 
 
@@ -627,7 +631,8 @@ def clean_from_paths(text):
     return re.sub(r" +", " ", text).strip()
 
 
-URL_PATTERN = re.compile(r'(?i)\b((?:[a-z][\w-]+:(?:/{1,3}|[a-z0-9%])|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\'".,<>?«»“”‘’]))')  # noqa: E501
+URL_PATTERN = re.compile(
+    r'(?i)\b((?:[a-z][\w-]+:(?:/{1,3}|[a-z0-9%])|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\'".,<>?«»“”‘’]))')  # noqa: E501
 URL_SPLIT_TOKENS = ['://', '/', '?', '&', '=', '#', '@', ':', '.']
 LONG_WHITESPACES_PATTERN = re.compile(r'\s{2,}')
 
@@ -745,12 +750,12 @@ def prepare_es_min_should_match(min_should_match):
     return str(int(min_should_match * 100)) + "%"
 
 
-ACCESS_OR_REFRESH_TOKEN_PATTERN: str = r'(?:access|refresh|biometric|jwt)_?token'
-JSON_ACCESS_TOKEN: str = fr'("{ACCESS_OR_REFRESH_TOKEN_PATTERN}"\s*:\s*")[^"]+'
-HTTP_ACCESS_TOKEN: str = (r'(Authorization\s*:\s*'
-                          r'(?:Bearer|Basic|Digest|HOBA|Mutual|Negotiate|NTLM|VAPID|SCRAM|AWS4-HMAC-SHA256)) .*')
-TOKEN_TAG: str = "SPECIALTOKEN"
-TOKEN_REPLACEMENT: str = fr'\1{TOKEN_TAG}'
+ACCESS_OR_REFRESH_TOKEN_PATTERN = r'(?:access|refresh|biometric|jwt)_?token'
+JSON_ACCESS_TOKEN = fr'("{ACCESS_OR_REFRESH_TOKEN_PATTERN}"\s*:\s*")[^"]+'
+HTTP_ACCESS_TOKEN = (r'(Authorization\s*:\s*'
+                     r'(?:Bearer|Basic|Digest|HOBA|Mutual|Negotiate|NTLM|VAPID|SCRAM|AWS4-HMAC-SHA256)) .*')
+TOKEN_TAG = 'SPECIALTOKEN'
+TOKEN_REPLACEMENT = fr'\1{TOKEN_TAG}'
 ACCESS_TOKEN_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
     (re.compile(JSON_ACCESS_TOKEN, re.RegexFlag.IGNORECASE), TOKEN_REPLACEMENT),
     (re.compile(HTTP_ACCESS_TOKEN, re.RegexFlag.IGNORECASE), TOKEN_REPLACEMENT),
@@ -761,10 +766,10 @@ def remove_access_tokens(text: str) -> str:
     return replace_patterns(text, ACCESS_TOKEN_PATTERNS)
 
 
-MARKDOWN_MODE_PATTERN: str = r'!!!MARKDOWN_MODE!!!\s*'
-MARKDOWN_MODE_REPLACEMENT: str = ''
+MARKDOWN_MODE_PATTERN = re.compile(r'!!!MARKDOWN_MODE!!!\s*')
+MARKDOWN_MODE_REPLACEMENT = ''
 MARKDOWN_MODE_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
-    (re.compile(MARKDOWN_MODE_PATTERN), MARKDOWN_MODE_REPLACEMENT)
+    (MARKDOWN_MODE_PATTERN, MARKDOWN_MODE_REPLACEMENT)
 ]
 
 
@@ -798,23 +803,23 @@ def replace_code_separators(text: str) -> str:
     return replace_patterns(text, CODE_SEPARATOR_PATTERNS)
 
 
-WEBDRIVER_SCREENSHOT_PATTERN: str = r'(?:\s*-*>\s*)?Webdriver screenshot captured: [^\/\0\n.]+\.\w+'
-WEBDRIVER_SCREENSHOT_REFERENCE_PATTERN: str = r'\s*Screenshot: file:\/(?:[^\/\0\n]+\/)*[^\/\0\n]+'
-WEBDRIVER_PAGE_SOURCE_REFERENCE_PATTERN: str = r'\s*Page source: file:\/(?:[^\/\0\n]+\/)*[^\/\0\n]+'
-WEBDRIVER_BUILD_INFO_PATTERN: str = r"\s*Build info: version: '[^']+', revision: '[^']+'"
-WEBDRIVER_DRIVER_INFO_PATTERN: str = r"\s*Driver info: [\w.]+"
-WEBDRIVER_SYSTEM_INFO_PATTERN: str = r"\s*System info: (?:[\w.]+: '[^']+', )+[\w.]+: '[^']+'"
-WEBDRIVER_DRIVER_CAPABILITIES_PATTERN: str = r"\s*Capabilities {\w+: [^\n]+"
+WEBDRIVER_SCREENSHOT_PATTERN = re.compile(r'(?:\s*-*>\s*)?Webdriver screenshot captured: [^/\0\n.]+\.\w+')
+WEBDRIVER_SCREENSHOT_REFERENCE_PATTERN = re.compile(r'\s*Screenshot: file:/(?:[^/\0\n]+/)*[^/\0\n]+')
+WEBDRIVER_PAGE_SOURCE_REFERENCE_PATTERN = re.compile(r'\s*Page source: file:/(?:[^/\0\n]+/)*[^/\0\n]+')
+WEBDRIVER_BUILD_INFO_PATTERN = re.compile(r"\s*Build info: version: '[^']+', revision: '[^']+'")
+WEBDRIVER_DRIVER_INFO_PATTERN = re.compile(r'\s*Driver info: [\w.]+')
+WEBDRIVER_SYSTEM_INFO_PATTERN = re.compile(r"\s*System info: (?:[\w.]+: '[^']+', )+[\w.]+: '[^']+'")
+WEBDRIVER_DRIVER_CAPABILITIES_PATTERN = re.compile(r'\s*Capabilities {\w+: [^\n]+')
 
-WEBDRIVER_AUXILIARY_INFO_REPLACEMENT: str = ''
+WEBDRIVER_AUXILIARY_INFO_REPLACEMENT = ''
 WEBDRIVER_AUXILIARY_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
-    (re.compile(WEBDRIVER_SCREENSHOT_PATTERN), WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
-    (re.compile(WEBDRIVER_SCREENSHOT_REFERENCE_PATTERN), WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
-    (re.compile(WEBDRIVER_PAGE_SOURCE_REFERENCE_PATTERN), WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
-    (re.compile(WEBDRIVER_BUILD_INFO_PATTERN), WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
-    (re.compile(WEBDRIVER_DRIVER_INFO_PATTERN), WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
-    (re.compile(WEBDRIVER_SYSTEM_INFO_PATTERN), WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
-    (re.compile(WEBDRIVER_DRIVER_CAPABILITIES_PATTERN), WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
+    (WEBDRIVER_SCREENSHOT_PATTERN, WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
+    (WEBDRIVER_SCREENSHOT_REFERENCE_PATTERN, WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
+    (WEBDRIVER_PAGE_SOURCE_REFERENCE_PATTERN, WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
+    (WEBDRIVER_BUILD_INFO_PATTERN, WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
+    (WEBDRIVER_DRIVER_INFO_PATTERN, WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
+    (WEBDRIVER_SYSTEM_INFO_PATTERN, WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
+    (WEBDRIVER_DRIVER_CAPABILITIES_PATTERN, WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
 ]
 
 

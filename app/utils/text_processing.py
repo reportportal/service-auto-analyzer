@@ -619,9 +619,22 @@ def clean_from_paths(text):
     return re.sub(r" +", " ", text).strip()
 
 
+URL_PATTERN = re.compile(r'(?i)\b((?:[a-z][\w-]+:(?:/{1,3}|[a-z0-9%])|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\'".,<>?«»“”‘’]))')
+URL_SPLIT_TOKENS = ['://', '/', '?', '&', '=', '#', '@', ':', '.']
+LONG_WHITESPACES_PATTERN = re.compile(r'\s{2,}')
+
+
 def clean_from_urls(text):
-    text = re.sub(r"(http|https|ftp):\S+|\bwww\.\S+", " ", text)
-    return re.sub(r" +", " ", text).strip()
+    match_url = URL_PATTERN.search(text)
+    while match_url:
+        start, end = match_url.span()
+        url = text[start:end]
+        for split_token in URL_SPLIT_TOKENS:
+            url = url.replace(split_token, " ")
+        LONG_WHITESPACES_PATTERN.sub(" ", url)
+        text = text[:start] + url + text[end:]
+        match_url = URL_PATTERN.search(text)
+    return text
 
 
 def extract_urls(text: str) -> list[str]:

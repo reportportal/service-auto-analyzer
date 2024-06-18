@@ -1,0 +1,8 @@
+And eventually "Result title in #1 of Search result list items" should be visible TEXTDELIMITER
+AssertionError: '(//*//*[contains(concat(' ', normalize-space(./@class), ' '), ' srl-results-container ')]//*[./@data-testid = 'srl-item'])[position()=1]//*[./@data-testid = 'srl-item-title']' is not visible: expected false to deeply equal true
+ Error: AssertionError: '(//*//*[contains(concat(' ', normalize-space(./@class), ' '), ' srl-results-container ')]//*[./@data-testid = 'srl-item'])[position()=1]//*[./@data-testid = 'srl-item-title']' is not visible: expected false to deeply equal true
+    at Object.handleEventually (Z:\xml-data\build-dir\PROJECT-01\prj-e2e-acc\node_modules\@pr\aura-accelerate\lib\step_definitions\common.js:42:11)
+    at async ElementsHelper.seeVisibleElement (Z:\xml-data\build-dir\PROJECT-01\prj-e2e-acc\node_modules\@pr\aura-accelerate\lib\helpers\elementsHelper.js:38:13)
+    at async Z:\xml-data\build-dir\PROJECT-01\prj-e2e-acc\node_modules\@pr\aura-accelerate\lib\step_definitions\then.js:42:9
+    at async runSteps (Z:\xml-data\build-dir\PROJECT-01\prj-e2e-acc\node_modules\codeceptjs\lib\interfaces\gherkin.js:77:9)
+i Current URL: https://alb-1-2-3-ab-12345-treex.pint.prj-abcd-v2-dev.example.cloud/results/20209492515162 TEXTDELIMITER

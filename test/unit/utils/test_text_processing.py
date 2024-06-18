@@ -138,6 +138,7 @@ def test_remove_markdown_mode():
         ('separators/step_separator_log.txt', 'separators/step_separator_log_prepared.txt'),
         ('separators/step_separator_equality_log.txt', 'separators/step_separator_log_prepared.txt'),
         ('separators/step_separator_underscore_log.txt', 'separators/step_separator_log_prepared.txt'),
+        ('separators/fancy_separator_log.txt', 'separators/fancy_separator_log_prepared.txt'),
     ]
 )
 def test_replace_code_separators(test_file, expected_file):

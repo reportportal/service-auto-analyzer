@@ -20,10 +20,10 @@ from app.commons.prepared_log import PreparedLogMessage
 @pytest.mark.parametrize(
     'test_file, expected_file',
     [
-        ('stacktraces/log_stacktrace_js.txt', 'stacktraces/log_stacktrace_js_message_no_params_and_brackets.txt'),
+        ('stacktraces/log_stacktrace_js.txt', 'stacktraces/log_stacktrace_js_exception_message_no_params_and_brackets.txt'),
     ]
 )
-def test_message_no_params_and_brackets(test_file, expected_file):
+def test_exception_message_no_params_and_brackets(test_file, expected_file):
     log = read_file('test_res/test_logs', test_file)
     expected_log = read_file('test_res/test_logs', expected_file)
-    assert PreparedLogMessage(log, -1).message_no_params_and_brackets == expected_log.strip()
+    assert PreparedLogMessage(log, -1).exception_message_no_params_and_brackets == expected_log.strip()

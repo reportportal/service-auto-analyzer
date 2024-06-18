@@ -72,6 +72,7 @@ def prepare_exception_message_without_params(prepared_exception_message_no_urls_
 
 def prepare_exception_message_and_stacktrace(clean_message: str) -> tuple[str, str]:
     exception_message, stacktrace = text_processing.detect_log_description_and_stacktrace(clean_message)
+    stacktrace = text_processing.clean_from_brackets(stacktrace)
     stacktrace = text_processing.remove_numbers(stacktrace)
     return exception_message, stacktrace
 

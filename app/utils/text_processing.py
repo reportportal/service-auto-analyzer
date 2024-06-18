@@ -266,11 +266,19 @@ def detect_log_description_and_stacktrace_light(message):
 SQR_BRCKTS = r'\[[^\]]*\]'
 RND_BRCKTS = r'\([^)]*\)'
 CRL_BRCKTS = r'\{[^\}]*\}'
-BRCKTS = re.compile(fr'{SQR_BRCKTS}|{RND_BRCKTS}|{CRL_BRCKTS}')
+BRCKTS_TXT = re.compile(fr'{SQR_BRCKTS}|{RND_BRCKTS}|{CRL_BRCKTS}')
 
 
 def clean_from_brackets(text):
     """Removes all brackets and text inside them from the given text."""
+    return BRCKTS_TXT.sub('', text)
+
+
+BRCKTS = re.compile(r'[\[\]{}()<>]')
+
+
+def clean_brackets(text):
+    """Removes all brackets in the given text."""
     return BRCKTS.sub('', text)
 
 

@@ -82,7 +82,7 @@ class PreparedLogMessage:
     @property
     def message_no_params_and_brackets(self) -> str:
         if not self._message_no_params_and_brackets:
-            self._message_no_params_and_brackets = text_processing.clean_from_brackets(
+            self._message_no_params_and_brackets = text_processing.clean_brackets(
                 self.message_no_params)
         return self._message_no_params_and_brackets
 
@@ -168,7 +168,7 @@ class PreparedLogMessage:
     @property
     def exception_message_no_params_and_brackets(self) -> str:
         if not self._exception_message_no_params_and_brackets:
-            self._exception_message_no_params_and_brackets = text_processing.clean_from_brackets(
+            self._exception_message_no_params_and_brackets = text_processing.clean_brackets(
                 self.exception_message_no_params)
         return self._exception_message_no_params_and_brackets
 

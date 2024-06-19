@@ -631,9 +631,8 @@ def clean_from_paths(text):
     return re.sub(r" +", " ", text).strip()
 
 
-URL_PATTERN = re.compile(
-    r'(?i)\b((?:[a-z][\w-]+:(?:/{1,3}|[a-z0-9%])|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\'".,<>?«»“”‘’]))')  # noqa: E501
-URL_SPLIT_TOKENS = ['://', '/', '?', '&', '=', '#', '@', ':', '.']
+URL_PATTERN = re.compile(r'[a-z]+:/+\S+', re.IGNORECASE)
+URL_SPLIT_TOKENS = [':/', '/', '?', '&', '=', '#', '@', ':', '.']
 LONG_WHITESPACES_PATTERN = re.compile(r'\s{2,}')
 
 
@@ -644,7 +643,7 @@ def clean_from_urls(text):
         url = text[start:end]
         for split_token in URL_SPLIT_TOKENS:
             url = url.replace(split_token, " ")
-        LONG_WHITESPACES_PATTERN.sub(" ", url)
+        url = LONG_WHITESPACES_PATTERN.sub(" ", url)
         text = text[:start] + url + text[end:]
         match_url = URL_PATTERN.search(text)
     return text

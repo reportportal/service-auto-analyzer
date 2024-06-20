@@ -547,11 +547,17 @@ def unify_line_endings(message: str) -> str:
 
 
 SPACE_PATTERN = re.compile(fr'[{HORIZONTAL_WHITESPACE}]+')
+NEWLINE_SPACE_PATTERN = re.compile(fr'[{HORIZONTAL_WHITESPACE}]*\n[{HORIZONTAL_WHITESPACE}]*')
 SPACE_REPLACEMENT = ' '
+NEWLINE_SPACE_REPLACEMENT = '\n'
+SPACE_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
+    (SPACE_PATTERN, SPACE_REPLACEMENT),
+    (NEWLINE_SPACE_PATTERN, NEWLINE_SPACE_REPLACEMENT),
+]
 
 
 def unify_spaces(message: str) -> str:
-    return SPACE_PATTERN.sub(SPACE_REPLACEMENT, message)
+    return replace_patterns(message, SPACE_PATTERNS)
 
 
 def fix_big_encoded_urls(message):

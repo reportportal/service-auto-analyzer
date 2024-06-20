@@ -111,14 +111,15 @@ def test_unify_line_endings(message, expected_message):
 @pytest.mark.parametrize(
     'message, expected_message',
     [
-        ('\t \r\n ', ' '),
-        ('\r\n', ' '),
-        ('\n', ' '),
-        ('\u00A0\u00A0\u00A0\n', ' '),
-        ('\u00A0\r\n', ' '),
+        ('\t \r\n ', ' \r\n'),
+        ('\r\n', '\r\n'),
+        ('\n', '\n'),
+        ('\u00A0\u00A0\u00A0\n', '\n'),
+        ('\u00A0\r\n', ' \r\n'),
         ('\u00A0\u2000\u2001', ' '),
         ('\u202F\u205F\u3000', ' '),
         ('a\u202F\u205F\u3000b', 'a b'),
+        ('\u00A0\u00A0\u00A0\n\u00A0\u00A0\u00A0', '\n'),
     ]
 )
 def test_unify_spaces(message, expected_message):

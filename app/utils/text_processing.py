@@ -198,8 +198,8 @@ def is_line_from_stacktrace(text: str) -> bool:
     if is_starting_message_pattern(text):
         return False
 
-    text = re.sub(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)", "", text)
-    res = re.sub(r"(?<=:)\d+(?=\)?]?(\n|$))", " ", text)
+    res = re.sub(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d+)", "", text)
+    res = re.sub(r"(?<=:)\d+(?=\)?]?(\n|$))", " ", res)
     if res != text:
         return True
     res = re.sub(r"((?<=line )|(?<=line))\s*\d+\s*((?=, in)|(?=,in)|(?=\n)|(?=$))",
@@ -277,9 +277,28 @@ def clean_from_brackets(text: str) -> str:
 BRCKTS = re.compile(r'[\[\]{}()<>]')
 
 
-def clean_brackets(text):
+def clean_brackets(text: str) -> str:
     """Removes all brackets in the given text."""
-    return BRCKTS.sub('', text)
+    return BRCKTS.sub(' ', text)
+
+
+BRACES = re.compile(r'[\'"`]')
+
+
+def clean_braces(text: str) -> str:
+    """Removes all brackets in the given text."""
+    return BRACES.sub(' ', text)
+
+
+SPECIAL_CHARACTER_TOKENS = ['/', '?', '&', '=', '#', '@', ':', '.', '*', '!', '$', '%', '^', '+', '~', '\\', '|', ',']
+
+
+def clean_special_chars(text: str) -> str:
+    """Removes all brackets in the given text."""
+    result = text
+    for split_token in SPECIAL_CHARACTER_TOKENS:
+        result = result.replace(split_token, " ")
+    return result
 
 
 def get_potential_status_codes(text):
@@ -307,9 +326,16 @@ def get_potential_status_codes(text):
     return potential_codes_list
 
 
+NUMBER_PATTERN = re.compile(r'\b\d+\b')
+NUMBER_PART_PATTERN = re.compile(r'\d+')
+NUMBER_TAG = "SPECIALNUMBER"
+
+
 def remove_numbers(text: str) -> str:
     """Sanitize text by deleting all numbers"""
-    return re.sub(r'\d+', '', text)
+    result = NUMBER_PATTERN.sub(NUMBER_TAG, text)
+    result = NUMBER_PART_PATTERN.sub('', result)
+    return result
 
 
 def first_lines(log_str: str, n_lines: int) -> str:
@@ -388,13 +414,13 @@ def split_words(text: str, min_word_length: int = 0, only_unique: bool = True, s
     all_words = []
 
     if split_urls:
-        text = text.translate(text.maketrans(PUNCTUATION_MAP_SPLIT_URLS))
+        result = text.translate(text.maketrans(PUNCTUATION_MAP_SPLIT_URLS))
     else:
-        text = text.translate(text.maketrans(PUNCTUATION_MAP_NO_SPLIT_URLS))
-    text = text.strip().strip('.')
+        result = text.translate(text.maketrans(PUNCTUATION_MAP_NO_SPLIT_URLS))
+    result = result.strip().strip('.')
     if to_lower:
-        text = text.lower()
-    for w in text.split():
+        result = result.lower()
+    for w in result.split():
         w = w.strip().strip('.')
         if w != "" and len(w) >= min_word_length:
             if w in STOPWORDS_ALL:
@@ -434,10 +460,10 @@ def enrich_text_with_method_and_classes(text):
     return "\n".join(new_lines)
 
 
-def preprocess_test_item_name(text):
-    text = text.replace("-", " ").replace("_", " ")
+def preprocess_test_item_name(text: str) -> str:
+    result = text.replace("-", " ").replace("_", " ")
     all_words = []
-    words = split_words(text, to_lower=False, only_unique=False)
+    words = split_words(result, to_lower=False, only_unique=False)
     for w in words:
         if "." not in w:
             all_words.extend([s.strip() for s in re.split("([A-Z][^A-Z]+)", w) if s.strip()])
@@ -535,7 +561,7 @@ def unify_line_endings(message: str) -> str:
     return LINE_ENDING_PATTERN.sub(r'\n', message)
 
 
-SPACE_PATTERN = re.compile(r'\s+')
+SPACE_PATTERN = re.compile(fr'[{HORIZONTAL_WHITESPACE}]+')
 SPACE_REPLACEMENT = ' '
 
 
@@ -617,42 +643,28 @@ def leave_only_unique_logs(logs: list[Log]) -> list[Log]:
     return all_logs
 
 
-def clean_colon_stacking(text):
+def clean_colon_stacking(text: str) -> str:
     return text.replace(":", " : ")
 
 
-def clean_from_params(text):
-    text = re.sub(r"(?<=\W)('.+?'|\".+?\")(?=\W|$)|(?<=^)('.+?'|\".+?\")(?=\W|$)", " ", text)
-    return re.sub(r" +", " ", text).strip()
+def clean_from_params(text: str) -> str:
+    result = clean_brackets(text)
+    result = clean_braces(result)
+    result = clean_special_chars(result)
+    return result
 
 
-def clean_from_paths(text):
-    text = re.sub(r"(^|(?<=[^\w:\\/]))(\w:)?([\w.\-_]+)?([\\/]+[\w.\-_]+){2,}", " ", text)
-    return re.sub(r" +", " ", text).strip()
+def clean_from_paths(text: str):
+    return re.sub(r"(^|(?<=[^\w:\\/]))(\w:)?([\w.\-_]+)?([\\/]+[\w.\-_]+){2,}", " ", text)
 
 
 URL_PATTERN = re.compile(r'[a-z]+:/+\S+', re.IGNORECASE)
-URL_SPLIT_TOKENS = [':/', '/', '?', '&', '=', '#', '@', ':', '.']
-LONG_WHITESPACES_PATTERN = re.compile(r'\s{2,}')
-
-
-def clean_from_urls(text):
-    match_url = URL_PATTERN.search(text)
-    while match_url:
-        start, end = match_url.span()
-        url = text[start:end]
-        for split_token in URL_SPLIT_TOKENS:
-            url = url.replace(split_token, " ")
-        url = LONG_WHITESPACES_PATTERN.sub(" ", url)
-        text = text[:start] + url + text[end:]
-        match_url = URL_PATTERN.search(text)
-    return text
 
 
 def extract_urls(text: str) -> list[str]:
     all_unique = set()
     all_urls = []
-    for param in re.findall(r"((http|https|ftp):\S+|\bwww\.\S+)", text):
+    for param in URL_PATTERN.findall(text):
         url = param[0].strip()
         if url not in all_unique:
             all_unique.add(url)
@@ -739,10 +751,11 @@ def unite_project_name(project_id: str, prefix: str) -> str:
     return prefix + project_id
 
 
-def replace_text_pieces(text, text_pieces):
+def replace_text_pieces(text: str, text_pieces: Iterable[str]) -> str:
+    result = text
     for w in sorted(text_pieces, key=lambda x: len(x), reverse=True):
-        text = text.replace(w, " ")
-    return text
+        result = result.replace(w, " ")
+    return result
 
 
 def prepare_es_min_should_match(min_should_match):

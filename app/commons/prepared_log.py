@@ -12,8 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.utils.log_preparation import (basic_prepare, prepare_message, prepare_message_without_params,
-                                       prepare_exception_message_no_urls_paths, prepare_exception_message_no_params,
+from app.utils.log_preparation import (basic_prepare, prepare_message, prepare_message_no_params,
+                                       prepare_exception_message_no_params,
                                        prepare_exception_message_and_stacktrace)
 from app.utils import text_processing
 
@@ -26,19 +26,13 @@ class PreparedLogMessage:
     _test_and_methods: set[str] = None
     _message: str = None
     _message_no_params: str = None
-    _message_no_params_and_brackets: str = None
-    _raw_exception_message: str = None
     _exception_message: str = None
     _stacktrace: str = None
     _exception_message_urls: str = None
-    _exception_message_no_urls: str = None
     _exception_message_paths: str = None
-    _exception_message_no_paths: str = None
     _exception_message_potential_status_codes: str = None
-    _exception_message_no_urls_paths: str = None
     _exception_message_params: str = None
     _exception_message_no_params: str = None
-    _exception_message_no_params_and_brackets: str = None
     _exception_message_no_numbers: str = None
     _exception_message_numbers: str = None
     _exception_found: str = None
@@ -76,28 +70,13 @@ class PreparedLogMessage:
     @property
     def message_no_params(self) -> str:
         if not self._message_no_params:
-            self._message_no_params = prepare_message_without_params(self.message)
+            self._message_no_params = prepare_message_no_params(self.message)
         return self._message_no_params
-
-    @property
-    def message_no_params_and_brackets(self) -> str:
-        if not self._message_no_params_and_brackets:
-            self._message_no_params_and_brackets = text_processing.clean_brackets(
-                self.message_no_params)
-        return self._message_no_params_and_brackets
-
-    @property
-    def raw_exception_message(self) -> str:
-        if not self._raw_exception_message:
-            self._raw_exception_message, self._stacktrace = prepare_exception_message_and_stacktrace(
-                self.clean_message)
-        return self._raw_exception_message
 
     @property
     def exception_message(self) -> str:
         if not self._exception_message:
-            self._exception_message = text_processing.replace_text_pieces(
-                self.raw_exception_message, self.test_and_methods)
+            self._exception_message, self._stacktrace = prepare_exception_message_and_stacktrace(self.clean_message)
         return self._exception_message
 
     @property
@@ -110,53 +89,34 @@ class PreparedLogMessage:
     @property
     def exception_message_urls(self) -> str:
         if not self._exception_message_urls:
-            self._exception_message_urls = " ".join(text_processing.extract_urls(self.raw_exception_message))
+            self._exception_message_urls = " ".join(text_processing.extract_urls(self.exception_message))
         return self._exception_message_urls
-
-    @property
-    def exception_message_no_urls(self) -> str:
-        if not self._exception_message_no_urls:
-            self._exception_message_no_urls = text_processing.clean_from_urls(self.raw_exception_message)
-        return self._exception_message_no_urls
 
     @property
     def exception_message_paths(self) -> str:
         if not self._exception_message_paths:
-            self._exception_message_paths = " ".join(text_processing.extract_paths(self.exception_message_no_urls))
+            self._exception_message_paths = " ".join(text_processing.extract_paths(self.exception_message))
         return self._exception_message_paths
-
-    @property
-    def exception_message_no_paths(self) -> str:
-        if not self._exception_message_no_paths:
-            self._exception_message_no_paths = text_processing.clean_from_paths(self.exception_message_no_urls)
-        return self._exception_message_no_paths
 
     @property
     def exception_message_potential_status_codes(self) -> str:
         if not self._exception_message_potential_status_codes:
             self._exception_message_potential_status_codes = " ".join(
-                text_processing.get_potential_status_codes(self.exception_message_no_paths))
+                text_processing.get_potential_status_codes(self.exception_message))
         return self._exception_message_potential_status_codes
-
-    @property
-    def exception_message_no_urls_paths(self) -> str:
-        if not self._exception_message_no_urls_paths:
-            self._exception_message_no_urls_paths = prepare_exception_message_no_urls_paths(
-                self.exception_message_no_paths, self.test_and_methods)
-        return self._exception_message_no_urls_paths
 
     @property
     def exception_message_params(self) -> str:
         if not self._exception_message_params:
             self._exception_message_params = " ".join(text_processing.extract_message_params(
-                self.exception_message_no_urls_paths))
+                self.exception_message))
         return self._exception_message_params
 
     @property
     def exception_message_no_params(self) -> str:
         if not self._exception_message_no_params:
-            self._exception_message_no_params = prepare_exception_message_no_params(
-                self.exception_message_no_urls_paths)
+            self._exception_message_no_params = text_processing.unify_spaces(prepare_exception_message_no_params(
+                self.exception_message))
         return self._exception_message_no_params
 
     @property
@@ -164,13 +124,6 @@ class PreparedLogMessage:
         if not self._exception_message_no_numbers:
             self._exception_message_no_numbers = text_processing.remove_numbers(self.exception_message)
         return self._exception_message_no_numbers
-
-    @property
-    def exception_message_no_params_and_brackets(self) -> str:
-        if not self._exception_message_no_params_and_brackets:
-            self._exception_message_no_params_and_brackets = text_processing.clean_brackets(
-                self.exception_message_no_params)
-        return self._exception_message_no_params_and_brackets
 
     @property
     def exception_message_numbers(self) -> str:
@@ -201,7 +154,7 @@ class PreparedLogMessage:
     @property
     def stacktrace_no_paths(self) -> str:
         if not self._stacktrace_no_paths:
-            self._stacktrace_no_paths = text_processing.clean_from_paths(self.stacktrace)
+            self._stacktrace_no_paths = text_processing.unify_spaces(text_processing.clean_from_paths(self.stacktrace))
         return self._stacktrace_no_paths
 
     # TODO: This is used in training only, subject to remove

@@ -27,4 +27,4 @@ from app.commons.prepared_log import PreparedLogMessage
 def test_exception_message_no_params_and_brackets(test_file, expected_file):
     log = read_file('test_res/test_logs', test_file)
     expected_log = read_file('test_res/test_logs', expected_file)
-    assert PreparedLogMessage(log, -1).exception_message_no_params_and_brackets == expected_log.strip()
+    assert PreparedLogMessage(log, -1).exception_message_no_params == expected_log.strip()

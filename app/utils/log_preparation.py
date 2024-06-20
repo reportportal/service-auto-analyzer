@@ -50,24 +50,10 @@ def prepare_message(clean_message: str, number_of_lines: int, test_and_methods: 
     return message
 
 
-def prepare_message_without_params(message: str) -> str:
-    message_without_params = text_processing.clean_from_urls(message)
-    message_without_params = text_processing.clean_from_paths(message_without_params)
+def prepare_message_no_params(message: str) -> str:
+    message_without_params = text_processing.remove_numbers(message)
     message_without_params = text_processing.clean_from_params(message_without_params)
-    message_without_params = text_processing.remove_starting_datetime(message_without_params)
-    message_without_params = text_processing.remove_numbers(message_without_params)
     return message_without_params
-
-
-def prepare_exception_message_no_urls_paths(exception_message_no_paths: str, test_and_methods: set[str]) -> str:
-    detected_message_without_params = text_processing.replace_text_pieces(exception_message_no_paths, test_and_methods)
-    return detected_message_without_params
-
-
-def prepare_exception_message_without_params(prepared_exception_message_no_urls_paths: str) -> str:
-    detected_message_without_params = text_processing.clean_from_params(prepared_exception_message_no_urls_paths)
-    detected_message_without_params = text_processing.remove_numbers(detected_message_without_params)
-    return detected_message_without_params
 
 
 def prepare_exception_message_and_stacktrace(clean_message: str) -> tuple[str, str]:
@@ -77,5 +63,8 @@ def prepare_exception_message_and_stacktrace(clean_message: str) -> tuple[str, s
     return exception_message, stacktrace
 
 
-def prepare_exception_message_no_params(exception_message_no_urls_paths: str) -> str:
-    return text_processing.remove_numbers(text_processing.clean_from_params(exception_message_no_urls_paths))
+def prepare_exception_message_no_params(exception_message: str) -> str:
+    result = text_processing.remove_numbers(exception_message)
+    result = text_processing.clean_from_params(result)
+    result = text_processing.unify_spaces(result)
+    return result

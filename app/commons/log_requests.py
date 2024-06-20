@@ -118,11 +118,11 @@ class LogRequests:
             text_processing.enrich_text_with_method_and_classes(prepared_log.message)
         log_template["_source"]["message_without_params_extended"] = \
             text_processing.enrich_text_with_method_and_classes(prepared_log.message_no_params)
-        log_template["_source"]["whole_message"] = (prepared_log.exception_message_no_urls_paths + "\n"
+        log_template["_source"]["whole_message"] = (prepared_log.exception_message_no_params + "\n"
                                                     + prepared_log.stacktrace)
         log_template["_source"]["detected_message_without_params_and_brackets"] = \
-            prepared_log.exception_message_no_params_and_brackets
-        log_template["_source"]["message_without_params_and_brackets"] = prepared_log.message_no_params_and_brackets
+            prepared_log.exception_message_no_params
+        log_template["_source"]["message_without_params_and_brackets"] = prepared_log.message_no_params
         log_template["_source"]["potential_status_codes"] = prepared_log.exception_message_potential_status_codes
         log_template["_source"]["found_tests_and_methods"] = prepared_log.test_and_methods_extended
 
@@ -204,7 +204,7 @@ class LogRequests:
         log_template["_source"]["stacktrace"] = prepared_log.stacktrace
         log_template["_source"]["potential_status_codes"] = prepared_log.exception_message_potential_status_codes
         log_template["_source"]["found_exceptions"] = prepared_log.exception_found
-        log_template["_source"]["whole_message"] = (prepared_log.exception_message_no_urls_paths + "\n"
+        log_template["_source"]["whole_message"] = (prepared_log.exception_message_no_params + "\n"
                                                     + prepared_log.stacktrace)
         return log_template
 

@@ -274,16 +274,12 @@ def clean_from_brackets(text: str) -> str:
     return BRCKTS_TXT.sub('', text)
 
 
-SPECIAL_CHARACTER_TOKENS = ['/', '?', '&', '=', '#', '@', ':', '.', '*', '!', '$', '%', '^', '+', '~', '\\', '|', ',']
+SPECIAL_CHARACTER_PATTERN = re.compile(r'[/?&=#@:.*!$%^+~\\|,;<>\[\]{}()`"\'_]')
 
 
 def clean_special_chars(text: str) -> str:
-    """Removes all brackets in the given text."""
-    # This is faster than using re.sub
-    result = text
-    for split_token in SPECIAL_CHARACTER_TOKENS:
-        result = result.replace(split_token, ' ')
-    return result
+    """Removes all special characters in the given text."""
+    return SPECIAL_CHARACTER_PATTERN.sub(' ', text)
 
 
 def get_potential_status_codes(text):

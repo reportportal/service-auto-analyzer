@@ -274,30 +274,15 @@ def clean_from_brackets(text: str) -> str:
     return BRCKTS_TXT.sub('', text)
 
 
-BRCKTS = re.compile(r'[\[\]{}()<>]')
-
-
-def clean_brackets(text: str) -> str:
-    """Removes all brackets in the given text."""
-    return BRCKTS.sub(' ', text)
-
-
-BRACES = re.compile(r'[\'"`]')
-
-
-def clean_braces(text: str) -> str:
-    """Removes all brackets in the given text."""
-    return BRACES.sub(' ', text)
-
-
 SPECIAL_CHARACTER_TOKENS = ['/', '?', '&', '=', '#', '@', ':', '.', '*', '!', '$', '%', '^', '+', '~', '\\', '|', ',']
 
 
 def clean_special_chars(text: str) -> str:
     """Removes all brackets in the given text."""
+    # This is faster than using re.sub
     result = text
     for split_token in SPECIAL_CHARACTER_TOKENS:
-        result = result.replace(split_token, " ")
+        result = result.replace(split_token, ' ')
     return result
 
 
@@ -643,15 +628,8 @@ def leave_only_unique_logs(logs: list[Log]) -> list[Log]:
     return all_logs
 
 
-def clean_colon_stacking(text: str) -> str:
-    return text.replace(":", " : ")
-
-
 def clean_from_params(text: str) -> str:
-    result = clean_brackets(text)
-    result = clean_braces(result)
-    result = clean_special_chars(result)
-    return result
+    return clean_special_chars(text)
 
 
 def clean_from_paths(text: str):

@@ -280,7 +280,6 @@ class BoostingFeaturizer:
             det_message = compared_log["_source"]["detected_message_without_params_extended"]
             mr_hit = scores_by_issue_type[issue_type]["mrHit"]
             issue_type_to_compare = mr_hit["_source"]["issue_type"]
-            det_message = text_processing.clean_from_brackets(det_message)
             result[issue_type] = 0.0
             try:
                 model_to_use = issue_type_to_compare.lower()[:2]

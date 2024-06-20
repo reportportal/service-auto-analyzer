@@ -78,8 +78,7 @@ class SimilarityCalculator:
                                     text = []
                                     for line in obj["_source"]["stacktrace"].split("\n"):
                                         text.append(" ".join(text_processing.split_words(
-                                            text_processing.clean_from_brackets(line),
-                                            min_word_length=self.config["min_word_length"])))
+                                            line, min_word_length=self.config["min_word_length"])))
                                     text = text_processing.filter_empty_lines(text)
                                     self.object_id_weights[obj["_id"]] = [1] * len(text)
                             elif field.startswith("stacktrace"):

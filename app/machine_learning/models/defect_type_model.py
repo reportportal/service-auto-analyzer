@@ -54,12 +54,11 @@ class DefectTypeModel(MlModel):
 
     def train_model(self, name: str, train_data_x, labels):
         self.count_vectorizer_models[name] = TfidfVectorizer(
-            binary=True, stop_words="english", min_df=5,
-            token_pattern=r"[\w\._]+", analyzer=text_processing.preprocess_words)
+            binary=True, min_df=5, analyzer=text_processing.preprocess_words)
         transformed_values = self.count_vectorizer_models[name].fit_transform(train_data_x)
         print("Length of train data: ", len(labels))
         print("Label distribution:", Counter(labels))
-        model = RandomForestClassifier(class_weight="balanced")
+        model = RandomForestClassifier(class_weight='balanced_subsample')
         x_train_values = pd.DataFrame(
             transformed_values.toarray(),
             columns=self.count_vectorizer_models[name].get_feature_names_out())
@@ -97,8 +96,7 @@ class DefectTypeModel(MlModel):
             return [], []
         transformed_values = self.count_vectorizer_models[model_name].transform(data)
         x_test_values = pd.DataFrame(
-            transformed_values.toarray(),
-            columns=self.count_vectorizer_models[model_name].get_feature_names_out())
+            transformed_values.toarray(), columns=self.count_vectorizer_models[model_name].get_feature_names_out())
         predicted_labels = self.models[model_name].predict(x_test_values)
         predicted_probs = self.models[model_name].predict_proba(x_test_values)
         return predicted_labels, predicted_probs

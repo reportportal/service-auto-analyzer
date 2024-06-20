@@ -1,4 +1,4 @@
-And eventually should be visible TEXTDELIMITER
-AssertionError: srl-results-container position=//*./@data-testid = ' is not visible: expected false to deeply equal true
- Error: AssertionError: srl-results-container position=//*./@data-testid = ' is not visible: expected false to deeply equal true
-i Current URL: https alb----ab--treex pint prj-abcd-v-dev example cloud results  TEXTDELIMITER
+And eventually Result title in SPECIALNUMBER of Search result list items should be visible TEXTDELIMITER
+AssertionError contains concat normalize-space class srl-results-container data-testid srl-item position SPECIALNUMBER data-testid srl-item-title is not visible expected false to deeply equal true
+ Error AssertionError contains concat normalize-space class srl-results-container data-testid srl-item position SPECIALNUMBER data-testid srl-item-title is not visible expected false to deeply equal true
+i Current URL https alb-SPECIALNUMBER-SPECIALNUMBER-SPECIALNUMBER-ab-SPECIALNUMBER-treex pint prj-abcd-v-dev example cloud results SPECIALNUMBER TEXTDELIMITER

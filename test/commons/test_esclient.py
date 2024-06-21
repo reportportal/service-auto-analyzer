@@ -18,6 +18,7 @@ from http import HTTPStatus
 from unittest.mock import MagicMock
 
 import httpretty
+from elasticsearch import RequestError
 
 import app.commons.launch_objects as launch_objects
 from app.commons import esclient
@@ -70,45 +71,53 @@ class TestEsClient(TestService):
                 raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)
 
-    @utils.ignore_warnings
     def test_create_index(self):
         """Test creating index"""
-        tests = [
-            {
-                "test_calls": [{"method": httpretty.PUT,
-                                "uri": "/idx0",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rs": get_fixture(self.index_created_rs),
-                                }, ],
-                "index": "idx0",
-                "acknowledged": True,
-            },
-            {
-                "test_calls": [{"method": httpretty.PUT,
-                                "uri": "/idx1",
-                                "status": HTTPStatus.BAD_REQUEST,
-                                "content_type": "application/json",
-                                "rs": get_fixture(
-                                    self.index_already_exists_rs),
-                                }, ],
-                "index": "idx1",
-                "acknowledged": False,
-            },
-        ]
-        for idx, test in enumerate(tests):
-            try:
-                self._start_server(test["test_calls"])
+        test = {
+            "test_calls": [{"method": httpretty.PUT,
+                            "uri": "/idx0",
+                            "status": HTTPStatus.OK,
+                            "content_type": "application/json",
+                            "rs": get_fixture(self.index_created_rs),
+                            }, ],
+            "index": "idx0",
+            "acknowledged": True,
+        }
+        self._start_server(test["test_calls"])
 
-                es_client = esclient.EsClient(app_config=self.app_config)
+        es_client = esclient.EsClient(app_config=self.app_config)
 
-                response = es_client.create_index(test["index"])
-                assert test["acknowledged"] == response.acknowledged
+        response = es_client.create_index(test["index"])
+        assert test["acknowledged"] == response.acknowledged
 
-                TestEsClient.shutdown_server(test["test_calls"])
-            except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}'). \
-                    with_traceback(err.__traceback__)
+        TestEsClient.shutdown_server(test["test_calls"])
+
+    def test_create_index_error(self):
+        """Test creating index"""
+        test = {
+            "test_calls": [{"method": httpretty.PUT,
+                            "uri": "/idx1",
+                            "status": HTTPStatus.BAD_REQUEST,
+                            "content_type": "application/json",
+                            "rs": get_fixture(
+                                self.index_already_exists_rs),
+                            }, ],
+            "index": "idx1",
+            "acknowledged": False,
+        }
+        try:
+            self._start_server(test["test_calls"])
+
+            es_client = esclient.EsClient(app_config=self.app_config)
+
+            es_client.create_index(test["index"])
+            raise AssertionError("Expected RequestError")
+
+        except RequestError:
+            pass
+        finally:
+            TestEsClient.shutdown_server(test["test_calls"])
+
 
     @utils.ignore_warnings
     def test_exists_index(self):
@@ -144,6 +153,7 @@ class TestEsClient(TestService):
             except AssertionError as err:
                 raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)
+
 
     @utils.ignore_warnings
     def test_delete_index(self):
@@ -184,6 +194,7 @@ class TestEsClient(TestService):
             except AssertionError as err:
                 raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)
+
 
     @utils.ignore_warnings
     def test_clean_index(self):
@@ -328,6 +339,7 @@ class TestEsClient(TestService):
             assert test["expected_count"] == response
 
             TestEsClient.shutdown_server(test["test_calls"])
+
 
     @utils.ignore_warnings
     def test_index_logs(self):
@@ -590,6 +602,7 @@ class TestEsClient(TestService):
 
             TestEsClient.shutdown_server(test["test_calls"])
 
+
     def test_defect_update(self):
         tests = [
             {
@@ -681,6 +694,7 @@ class TestEsClient(TestService):
                 raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)
 
+
     def test_remove_test_items(self):
         tests = [
             {
@@ -750,6 +764,7 @@ class TestEsClient(TestService):
             except AssertionError as err:
                 raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)
+
 
     def test_launches(self):
         tests = [

@@ -128,10 +128,7 @@ class LogRequests:
 
         for field in ["message", "detected_message", "detected_message_with_numbers",
                       "stacktrace", "only_numbers", "found_exceptions", "found_exceptions_extended",
-                      "detected_message_extended", "detected_message_without_params_extended",
-                      "stacktrace_extended", "message_extended", "message_without_params_extended",
-                      "detected_message_without_params_and_brackets",
-                      "message_without_params_and_brackets"]:
+                      "detected_message_extended", "stacktrace_extended", "message_extended"]:
             log_template["_source"][field] = text_processing.leave_only_unique_lines(log_template["_source"][field])
             log_template["_source"][field] = text_processing.clean_colon_stacking(log_template["_source"][field])
         return log_template

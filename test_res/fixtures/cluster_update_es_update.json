@@ -5,4 +5,4 @@
 {"update":{"_index":"2","_id":111}}
 {"doc":{"cluster_id":"123","cluster_message":"error occurred \n error found \n error mined","cluster_with_numbers":true}}
 {"update":{"_index":"2","_id":9}}
-{"doc":{"cluster_id":"44972330576749361","cluster_message":"error occurred\n error found\n assert query","cluster_with_numbers":true}}
+{"doc":{"cluster_id":"44972330576749361","cluster_message":"error occurred\nerror found\nassert query","cluster_with_numbers":true}}

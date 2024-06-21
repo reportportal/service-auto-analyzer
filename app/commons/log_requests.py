@@ -133,6 +133,7 @@ class LogRequests:
                       "detected_message_without_params_and_brackets",
                       "message_without_params_and_brackets"]:
             log_template["_source"][field] = text_processing.leave_only_unique_lines(log_template["_source"][field])
+            log_template["_source"][field] = text_processing.clean_colon_stacking(log_template["_source"][field])
         return log_template
 
     @staticmethod

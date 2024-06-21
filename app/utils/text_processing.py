@@ -630,6 +630,10 @@ def leave_only_unique_logs(logs: list[Log]) -> list[Log]:
     return all_logs
 
 
+def clean_colon_stacking(text: str) -> str:
+    return text.replace(":", " : ")
+
+
 def clean_from_params(text: str) -> str:
     return clean_special_chars(text)
 

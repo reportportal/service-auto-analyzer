@@ -118,10 +118,9 @@ class TestEsClient(TestService):
         finally:
             TestEsClient.shutdown_server(test["test_calls"])
 
-
     @utils.ignore_warnings
     def test_exists_index(self):
-        """Test existance of a index"""
+        """Test existence of an index"""
         tests = [
             {
                 "test_calls": [{"method": httpretty.GET,
@@ -153,7 +152,6 @@ class TestEsClient(TestService):
             except AssertionError as err:
                 raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)
-
 
     @utils.ignore_warnings
     def test_delete_index(self):
@@ -194,7 +192,6 @@ class TestEsClient(TestService):
             except AssertionError as err:
                 raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)
-
 
     @utils.ignore_warnings
     def test_clean_index(self):
@@ -339,7 +336,6 @@ class TestEsClient(TestService):
             assert test["expected_count"] == response
 
             TestEsClient.shutdown_server(test["test_calls"])
-
 
     @utils.ignore_warnings
     def test_index_logs(self):
@@ -606,7 +602,6 @@ class TestEsClient(TestService):
 
             TestEsClient.shutdown_server(test["test_calls"])
 
-
     def test_defect_update(self):
         tests = [
             {
@@ -698,7 +693,6 @@ class TestEsClient(TestService):
                 raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)
 
-
     def test_remove_test_items(self):
         tests = [
             {
@@ -768,7 +762,6 @@ class TestEsClient(TestService):
             except AssertionError as err:
                 raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)
-
 
     def test_launches(self):
         tests = [

@@ -205,7 +205,7 @@ class TestSearchService(TestService):
                                                 logLines=-1),
                 "app_config": APP_CONFIG,
                 "expected_count": 1,
-                "response": [launch_objects.SearchLogInfo(logId=1, testItemId=1, matchScore=95)]
+                "response": [launch_objects.SearchLogInfo(logId=1, testItemId=1, matchScore=100)]
             },
             {
                 "test_calls": [{"method": httpretty.GET,
@@ -236,7 +236,7 @@ class TestSearchService(TestService):
                                                 analyzerConfig=launch_objects.AnalyzerConf(
                                                     allMessagesShouldMatch=True)),
                 "expected_count": 1,
-                "response": [launch_objects.SearchLogInfo(logId=1, testItemId=1, matchScore=95)]
+                "response": [launch_objects.SearchLogInfo(logId=1, testItemId=1, matchScore=100)]
             }
         ]
 

@@ -24,12 +24,12 @@
                     "log_level": 40000,
                     "original_message_lines": 1,
                     "original_message_words_number": 2,
-                    "message": "Message http : localhost/admin \n java.lang.NoClassDefFoundError\r",
+                    "message": "Message SPECIALNUMBER http : localhost/admin \n java.lang.NoClassDefFoundError\r",
                     "test_item": 1,
                     "start_time": "2020-01-15 10:57:43",
                     "unique_id": "unique2",
                     "test_case_hash": -1126886181,
-                    "detected_message": "Message http : localhost/admin \n java.lang.NoClassDefFoundError\r",
+                    "detected_message": "Message SPECIALNUMBER http : localhost/admin \n java.lang.NoClassDefFoundError\r",
                     "detected_message_with_numbers": "Message 34 http : localhost/admin \n java.lang.NoClassDefFoundError\r",
                     "only_numbers": "34",
                     "merged_small_logs": "",
@@ -42,12 +42,12 @@
                     "found_exceptions_extended": "java.lang.noclassdeffounderror lang.noclassdeffounderror noclassdeffounderror",
                     "found_tests_and_methods": "",
                     "stacktrace_extended": "",
-                    "message_extended": "Message http : localhost/admin \n java.lang lang.NoClassDefFoundError NoClassDefFoundError\r",
-                    "detected_message_extended": "Message http : localhost/admin \n java.lang lang.NoClassDefFoundError NoClassDefFoundError\r",
-                    "detected_message_without_params_extended": "Message  \n  java.lang lang.NoClassDefFoundError NoClassDefFoundError ",
-                    "message_without_params_extended": "Message  \n  java.lang lang.NoClassDefFoundError NoClassDefFoundError ",
-                    "detected_message_without_params_and_brackets": "Message  34 \n  java.lang lang.NoClassDefFoundError",
-                    "message_without_params_and_brackets": "Message  34 \n  java.lang lang.NoClassDefFoundError"
+                    "message_extended": "Message SPECIALNUMBER http : localhost/admin \n java.lang lang.NoClassDefFoundError NoClassDefFoundError\r",
+                    "detected_message_extended": "Message 34 http : localhost/admin \n java.lang lang.NoClassDefFoundError NoClassDefFoundError\r",
+                    "detected_message_without_params_extended": "Message SPECIALNUMBER \n  java.lang lang.NoClassDefFoundError NoClassDefFoundError ",
+                    "message_without_params_extended": "Message SPECIALNUMBER \n  java.lang lang.NoClassDefFoundError NoClassDefFoundError ",
+                    "detected_message_without_params_and_brackets": "Message SPECIALNUMBER \n  java.lang lang.NoClassDefFoundError",
+                    "message_without_params_and_brackets": "Message SPECIALNUMBER \n  java.lang lang.NoClassDefFoundError"
                 }
             },
             {
@@ -83,8 +83,8 @@
                     "detected_message_extended": "Message",
                     "detected_message_without_params_extended": "Message",
                     "message_without_params_extended": "Message",
-                    "message_without_params_and_brackets": "Message 111",
-                    "detected_message_without_params_and_brackets": "Message 111"
+                    "message_without_params_and_brackets": "Message SPECIALNUMBER",
+                    "detected_message_without_params_and_brackets": "Message SPECIALNUMBER"
                 }
             }
         ]

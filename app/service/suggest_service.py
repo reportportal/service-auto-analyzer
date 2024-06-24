@@ -339,7 +339,6 @@ class SuggestService(AnalyzerService):
         logs, _ = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
         return logs, test_item_id_for_suggest
 
-    @utils.ignore_warnings
     def suggest_items(self, test_item_info: TestItemInfo):
         logger.info(f'Started suggesting for test item with id: {test_item_info.testItemId}')
         logger.debug(f'Started suggesting items by request: {test_item_info.json()}')
@@ -367,8 +366,7 @@ class SuggestService(AnalyzerService):
             logger.debug(f'Items for suggestions by FTS (KNN): {json.dumps(searched_res)}')
 
             boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
-            boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(
-                test_item_info.project)
+            boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(test_item_info.project)
             _suggest_decision_maker_to_use = self.model_chooser.choose_model(
                 test_item_info.project, ModelType.SUGGESTION_MODEL,
                 custom_model_prob=self.search_cfg.ProbabilityForCustomModelSuggestions)

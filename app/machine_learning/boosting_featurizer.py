@@ -613,7 +613,6 @@ class BoostingFeaturizer:
         ordered_features = utils.topological_sort(feature_graph)
         return ordered_features
 
-    @utils.ignore_warnings
     def gather_features_info(self):
         """Gather all features from feature_ids for a test item"""
         gathered_data = []

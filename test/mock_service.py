@@ -236,21 +236,14 @@ class TestService(unittest.TestCase):
         httpretty.reset()
         httpretty.enable(allow_net_connect=False)
         for test_info in test_calls:
-            if "content_type" in test_info:
-                httpretty.register_uri(
-                    test_info["method"],
-                    self.app_config.esHost + test_info["uri"],
-                    body=test_info["rs"] if "rs" in test_info else "",
-                    status=test_info["status"],
-                    content_type=test_info["content_type"]
-                )
-            else:
-                httpretty.register_uri(
-                    test_info["method"],
-                    self.app_config.esHost + test_info["uri"],
-                    body=test_info["rs"] if "rs" in test_info else "",
-                    status=test_info["status"]
-                )
+            content_type = test_info.get('content_type', '')
+            httpretty.register_uri(
+                test_info["method"],
+                self.app_config.esHost + test_info["uri"],
+                body=test_info["rs"] if "rs" in test_info else "",
+                status=test_info["status"],
+                content_type=content_type
+            )
 
     @staticmethod
     @utils.ignore_warnings

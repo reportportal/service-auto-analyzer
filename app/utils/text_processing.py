@@ -472,7 +472,7 @@ def find_test_methods_in_text(text: str) -> set[str]:
     return final_test_methods
 
 
-def preprocess_found_test_methods(text):
+def preprocess_found_test_methods(text: str) -> str:
     all_words = []
     words = split_words(text, to_lower=False, only_unique=False)
     for w in words:

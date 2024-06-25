@@ -21,7 +21,7 @@ import httpretty
 import sure
 
 from app.commons import object_saving
-from commons.model import launch_objects
+from app.commons.model import launch_objects
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.service import AutoAnalyzerService
 from app.utils import utils

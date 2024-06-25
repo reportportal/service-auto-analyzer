@@ -19,7 +19,7 @@ from unittest.mock import MagicMock
 
 import httpretty
 
-from commons.model import launch_objects
+from app.commons.model import launch_objects
 from app.service.clean_index_service import CleanIndexService
 from app.utils import utils
 from test import get_fixture, APP_CONFIG

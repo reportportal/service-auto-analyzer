@@ -21,7 +21,7 @@ from unittest.mock import MagicMock
 
 import httpretty
 
-from commons.model import launch_objects
+from app.commons.model import launch_objects
 from app.service import SuggestInfoService
 from app.utils import utils
 from test import get_fixture

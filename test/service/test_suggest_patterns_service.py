@@ -20,7 +20,7 @@ from unittest.mock import MagicMock
 
 import httpretty
 
-from commons.model import launch_objects
+from app.commons.model import launch_objects
 from app.service import SuggestPatternsService
 from app.utils import utils
 from test import APP_CONFIG

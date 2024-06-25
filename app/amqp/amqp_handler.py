@@ -20,7 +20,7 @@ from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
 
 from app.commons import logging
-from commons.model import launch_objects
+from app.commons.model import launch_objects
 
 logger = logging.getLogger("analyzerApp.amqpHandler")
 

@@ -64,6 +64,7 @@ def prepare_train_info(train_info: dict) -> train.TrainInfo:
     """Function for deserializing train info object"""
     return train.TrainInfo(**train_info)
 
+
 def prepare_search_response_data(response: list | dict) -> str:
     """Function for serializing response from search request"""
     return json.dumps(response)

@@ -17,7 +17,7 @@ import unittest
 
 from commons.model import launch_objects
 from app.commons import model_chooser
-from commons.model.launch_objects import SearchConfig
+from app.commons.model.launch_objects import SearchConfig
 from app.service import AutoAnalyzerService
 from app.service import SearchService
 from app.service import SuggestService

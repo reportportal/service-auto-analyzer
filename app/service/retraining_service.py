@@ -18,7 +18,7 @@ from typing import Any
 
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, trigger_manager
-from commons.model.launch_objects import SearchConfig, ApplicationConfig
+from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
 from app.commons.model_chooser import ModelChooser
 from app.utils import utils
 

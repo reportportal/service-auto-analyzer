@@ -19,7 +19,7 @@ import elasticsearch.helpers
 
 from app.commons import logging
 from app.commons.esclient import EsClient
-from commons.model.launch_objects import SuggestPattern, SuggestPatternLabel, SearchConfig, ApplicationConfig
+from app.commons.model.launch_objects import SuggestPattern, SuggestPatternLabel, SearchConfig, ApplicationConfig
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.suggestPatternsService")

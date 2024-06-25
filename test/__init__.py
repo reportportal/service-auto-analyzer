@@ -16,7 +16,7 @@ import os
 import random
 import string
 
-from commons.model.launch_objects import SearchConfig, ApplicationConfig
+from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
 from app.utils.utils import read_json_file
 
 DEFAULT_ES_CONFIG = ApplicationConfig(

@@ -15,7 +15,7 @@
 from gensim.models.phrases import Phrases
 
 from app.commons import logging
-from commons.model.launch_objects import ApplicationConfig
+from app.commons.model.launch_objects import ApplicationConfig
 from app.commons.object_saving.object_saver import ObjectSaver
 
 logger = logging.getLogger("analyzerApp.namespace_finder")

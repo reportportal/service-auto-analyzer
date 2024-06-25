@@ -16,7 +16,7 @@ import os
 from typing import Any, Callable
 
 from app.commons import logging
-from commons.model.launch_objects import ApplicationConfig
+from app.commons.model.launch_objects import ApplicationConfig
 from app.commons.object_saving.filesystem_saver import FilesystemSaver
 from app.commons.object_saving.minio_client import MinioClient
 from app.commons.object_saving.storage import Storage

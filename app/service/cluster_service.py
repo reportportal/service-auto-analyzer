@@ -23,7 +23,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from app.amqp.amqp import AmqpClient
 from app.commons import clusterizer, logging
 from app.commons.esclient import EsClient
-from commons.model.launch_objects import (ClusterResult, ClusterInfo, SearchConfig, ApplicationConfig,
+from app.commons.model.launch_objects import (ClusterResult, ClusterInfo, SearchConfig, ApplicationConfig,
                                           LaunchInfoForClustering)
 from app.commons.log_merger import LogMerger
 from app.commons.log_requests import LogRequests

@@ -55,7 +55,7 @@ def prepare_delete_index(body: Any) -> int:
     return int(body)
 
 
-def prepare_test_item_info(test_item_info: Any) -> Any:
+def prepare_test_item_info(test_item_info: Any) -> launch_objects.TestItemInfo:
     """Function for deserializing test item info for suggestions"""
     return launch_objects.TestItemInfo(**test_item_info)
 

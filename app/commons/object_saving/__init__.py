@@ -14,7 +14,7 @@
 
 """Common package for different Storage services (Minio, Filesystem, etc.)."""
 
-from commons.model.launch_objects import ApplicationConfig
+from app.commons.model.launch_objects import ApplicationConfig
 from app.commons.object_saving.object_saver import ObjectSaver
 
 

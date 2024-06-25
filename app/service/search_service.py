@@ -19,7 +19,7 @@ import elasticsearch.helpers
 
 from app.commons import logging, similarity_calculator, object_saving
 from app.commons.esclient import EsClient
-from commons.model.launch_objects import SearchLogInfo, Log, SearchConfig, ApplicationConfig
+from app.commons.model.launch_objects import SearchLogInfo, Log, SearchConfig, ApplicationConfig
 from app.commons.log_merger import LogMerger
 from app.commons.log_requests import LogRequests
 from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator

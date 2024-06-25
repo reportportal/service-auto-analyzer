@@ -25,7 +25,7 @@ from sklearn.model_selection import train_test_split
 
 from app.commons import logging, object_saving
 from app.commons.esclient import EsClient
-from commons.model.launch_objects import SearchConfig, ApplicationConfig
+from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
 from app.commons.model_chooser import ModelChooser
 from app.machine_learning.models import defect_type_model, custom_defect_type_model
 from app.utils import utils, text_processing

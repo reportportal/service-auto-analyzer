@@ -16,7 +16,7 @@ from time import time
 
 from app.commons import logging
 from app.commons.esclient import EsClient
-from commons.model.launch_objects import CleanIndexStrIds, ApplicationConfig
+from app.commons.model.launch_objects import CleanIndexStrIds, ApplicationConfig
 from app.service.suggest_info_service import SuggestInfoService
 from app.utils import utils
 

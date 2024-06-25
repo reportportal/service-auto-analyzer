@@ -22,7 +22,7 @@ from app.amqp.amqp import AmqpClient
 from app.commons import logging
 from app.commons import object_saving
 from app.commons.esclient import EsClient
-from commons.model.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult, \
+from app.commons.model.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult, \
     SearchConfig, ApplicationConfig, Launch
 from app.commons.log_requests import LogRequests
 from app.commons.model_chooser import ModelType, ModelChooser

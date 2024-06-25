@@ -14,7 +14,7 @@
 from typing import Any
 
 from app.commons import logging
-from commons.model.launch_objects import SearchConfig, ApplicationConfig
+from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
 from app.commons.model_chooser import ModelChooser
 from app.commons.triggering_training.retraining_triggering import RetrainingTriggering
 from app.machine_learning.training import training_defect_type_model, training_analysis_model

@@ -26,7 +26,7 @@ from sklearn.model_selection import train_test_split
 
 from app.commons import logging, namespace_finder, object_saving
 from app.commons.esclient import EsClient
-from commons.model.launch_objects import SearchConfig, ApplicationConfig
+from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
 from app.commons.model_chooser import ModelType, ModelChooser
 from app.machine_learning.feature_encoding_configurer import FeatureEncodingConfigurer
 from app.machine_learning.models import (boosting_decision_maker, custom_boosting_decision_maker,

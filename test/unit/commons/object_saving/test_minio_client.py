@@ -18,7 +18,7 @@ import requests
 # noinspection PyPackageRequirements
 from moto.server import ThreadedMotoServer
 
-from commons.model.launch_objects import ApplicationConfig
+from app.commons.model.launch_objects import ApplicationConfig
 from app.commons.object_saving.minio_client import MinioClient
 from test import random_alphanumeric
 

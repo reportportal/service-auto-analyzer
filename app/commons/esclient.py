@@ -26,7 +26,7 @@ from urllib3.exceptions import InsecureRequestWarning
 
 from app.amqp.amqp import AmqpClient
 from app.commons import logging
-from commons.model.launch_objects import ApplicationConfig, Response, Launch, TestItem, BulkResponse
+from app.commons.model.launch_objects import ApplicationConfig, Response, Launch, TestItem, BulkResponse
 from app.commons.log_merger import LogMerger
 from app.commons.log_requests import LogRequests
 from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL

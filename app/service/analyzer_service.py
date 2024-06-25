@@ -15,7 +15,7 @@
 import re
 
 from app.commons import logging
-from commons.model.launch_objects import SearchConfig, Launch, TestItemInfo, AnalyzerConf
+from app.commons.model.launch_objects import SearchConfig, Launch, TestItemInfo, AnalyzerConf
 from app.commons.log_merger import LogMerger
 from app.commons.log_requests import LogRequests
 from app.commons.model_chooser import ModelChooser

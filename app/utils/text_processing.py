@@ -20,7 +20,7 @@ from urllib.parse import urlparse
 
 import nltk
 
-from commons.model.launch_objects import Log
+from app.commons.model.launch_objects import Log
 
 try:
     from app.commons import logging

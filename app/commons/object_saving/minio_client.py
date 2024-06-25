@@ -21,7 +21,7 @@ from minio import Minio
 from minio.error import NoSuchKey
 
 from app.commons import logging
-from commons.model.launch_objects import ApplicationConfig
+from app.commons.model.launch_objects import ApplicationConfig
 from app.commons.object_saving.storage import Storage
 
 logger = logging.getLogger("analyzerApp.minioClient")

@@ -17,7 +17,7 @@ import os
 import pytest
 
 from app.commons.object_saving.filesystem_saver import FilesystemSaver
-from commons.model.launch_objects import ApplicationConfig
+from app.commons.model.launch_objects import ApplicationConfig
 from test import random_alphanumeric
 
 

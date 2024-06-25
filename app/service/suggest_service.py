@@ -25,7 +25,7 @@ from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import SuggestAnalysisResult, SearchConfig, ApplicationConfig, TestItemInfo, \
     AnalyzerConf
 from app.commons.log_requests import LogRequests
-from app.commons.model_chooser import ModelType, ModelChooser
+from app.commons.model_chooser import ModelTypeFolder, ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
 from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
@@ -368,7 +368,7 @@ class SuggestService(AnalyzerService):
             boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
             boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(test_item_info.project)
             _suggest_decision_maker_to_use = self.model_chooser.choose_model(
-                test_item_info.project, ModelType.SUGGESTION_MODEL,
+                test_item_info.project, ModelTypeFolder.SUGGESTION_MODEL,
                 custom_model_prob=self.search_cfg.ProbabilityForCustomModelSuggestions)
             features_dict_objects = _suggest_decision_maker_to_use.features_dict_with_saved_objects
 
@@ -379,7 +379,7 @@ class SuggestService(AnalyzerService):
                 weighted_log_similarity_calculator=self.similarity_model,
                 features_dict_with_saved_objects=features_dict_objects)
             _boosting_data_gatherer.set_defect_type_model(self.model_chooser.choose_model(
-                test_item_info.project, ModelType.DEFECT_TYPE_MODEL))
+                test_item_info.project, ModelTypeFolder.DEFECT_TYPE_MODEL))
             feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
             scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
             model_info_tags = (_boosting_data_gatherer.get_used_model_info() +

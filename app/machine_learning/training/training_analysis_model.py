@@ -26,8 +26,9 @@ from sklearn.model_selection import train_test_split
 
 from app.commons import logging, namespace_finder, object_saving
 from app.commons.esclient import EsClient
+from app.commons.model.train import TrainInfo, ModelType
 from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
-from app.commons.model_chooser import ModelType, ModelChooser
+from app.commons.model_chooser import ModelChooser, ModelTypeFolder
 from app.machine_learning.feature_encoding_configurer import FeatureEncodingConfigurer
 from app.machine_learning.models import (boosting_decision_maker, custom_boosting_decision_maker,
                                          weighted_similarity_calculator)
@@ -35,6 +36,77 @@ from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeat
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.trainingAnalysisModel")
+
+
+def calculate_f1(model, x_test, y_test, _):
+    return model.validate_model(x_test, y_test)
+
+
+def calculate_mrr(model, x_test, y_test, test_item_ids_with_pos):
+    res_labels, prob_labels = model.predict(x_test)
+    test_item_ids_res = {}
+    for i in range(len(test_item_ids_with_pos)):
+        test_item = test_item_ids_with_pos[i]
+        if test_item not in test_item_ids_res:
+            test_item_ids_res[test_item] = []
+        test_item_ids_res[test_item].append((res_labels[i], prob_labels[i][1], y_test[i]))
+    mrr = 0
+    cnt_to_use = 0
+    for test_item in test_item_ids_res:
+        res = sorted(test_item_ids_res[test_item], key=lambda x: x[1], reverse=True)
+        has_positives = False
+        for r in res:
+            if r[2] == 1:
+                has_positives = True
+                break
+        if not has_positives:
+            continue
+        rr_test_item = 0
+        for idx, r in enumerate(res):
+            if r[2] == 1 and r[0] == 1:
+                rr_test_item = 1 / (idx + 1)
+                break
+        mrr += rr_test_item
+        cnt_to_use += 1
+    if cnt_to_use:
+        mrr /= cnt_to_use
+    return mrr
+
+
+def deduplicate_data(data, labels) -> tuple[list, list]:
+    data_wo_duplicates = []
+    labels_wo_duplicates = []
+    data_set = set()
+    for i in range(len(data)):
+        if tuple(data[i]) not in data_set:
+            data_set.add(tuple(data[i]))
+            data_wo_duplicates.append(data[i])
+            labels_wo_duplicates.append(labels[i])
+    return data_wo_duplicates, labels_wo_duplicates
+
+
+def split_data(data, labels, random_state, test_item_ids_with_pos) -> tuple[np.ndarray, np.ndarray, list, list, list]:
+    x_ids = [i for i in range(len(data))]
+    x_train_ids, x_test_ids, y_train, y_test = train_test_split(
+        x_ids, labels,
+        test_size=0.1, random_state=random_state, stratify=labels)
+    x_train = np.asarray([data[idx] for idx in x_train_ids])
+    x_test = np.asarray([data[idx] for idx in x_test_ids])
+    test_item_ids_with_pos_test = [test_item_ids_with_pos[idx] for idx in x_test_ids]
+    return x_train, x_test, y_train, y_test, test_item_ids_with_pos_test
+
+
+def transform_data_from_feature_lists(feature_list, cur_features, desired_features):
+    previously_gathered_features = utils.fill_prevously_gathered_features(feature_list, cur_features)
+    gathered_data = utils.gather_feature_list(previously_gathered_features, desired_features)
+    return gathered_data
+
+
+def prepare_encoders(features_encoding_config, logs_found):
+    _feature_encoding_configurer = FeatureEncodingConfigurer()
+    _feature_encoding_configurer.initialize_encoders_from_config(features_encoding_config)
+    _feature_encoding_configurer.prepare_encoders(logs_found)
+    return _feature_encoding_configurer.feature_dict_with_encodings
 
 
 class AnalysisModelTraining:
@@ -48,11 +120,11 @@ class AnalysisModelTraining:
         self.due_proportion_to_smote = 0.4
         self.es_client = EsClient(app_config=app_config)
         self.baseline_folders = {
-            "suggestion": self.search_cfg.SuggestBoostModelFolder,
-            "auto_analysis": self.search_cfg.BoostModelFolder}
+            ModelType.suggestion: self.search_cfg.SuggestBoostModelFolder,
+            ModelType.auto_analysis: self.search_cfg.BoostModelFolder}
         self.model_config = {
-            "suggestion": self.search_cfg.RetrainSuggestBoostModelConfig,
-            "auto_analysis": self.search_cfg.RetrainAutoBoostModelConfig}
+            ModelType.suggestion: self.search_cfg.RetrainSuggestBoostModelConfig,
+            ModelType.auto_analysis: self.search_cfg.RetrainAutoBoostModelConfig}
         self.weighted_log_similarity_calculator = None
         if self.search_cfg.SimilarityWeightsFolder.strip():
             self.weighted_log_similarity_calculator = (
@@ -62,61 +134,29 @@ class AnalysisModelTraining:
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.model_chooser = model_chooser
         self.metrics_calculations = {
-            "F1": self.calculate_F1,
-            "Mean Reciprocal Rank": self.calculate_MRR
+            "F1": calculate_f1,
+            "Mean Reciprocal Rank": calculate_mrr
         }
 
-    def calculate_F1(self, model, x_test, y_test, test_item_ids_with_pos):
-        return model.validate_model(x_test, y_test)
-
-    def calculate_MRR(self, model, x_test, y_test, test_item_ids_with_pos):
-        res_labels, prob_labels = model.predict(x_test)
-        test_item_ids_res = {}
-        for i in range(len(test_item_ids_with_pos)):
-            test_item = test_item_ids_with_pos[i]
-            if test_item not in test_item_ids_res:
-                test_item_ids_res[test_item] = []
-            test_item_ids_res[test_item].append((res_labels[i], prob_labels[i][1], y_test[i]))
-        MRR = 0
-        cnt_to_use = 0
-        for test_item in test_item_ids_res:
-            res = sorted(test_item_ids_res[test_item], key=lambda x: x[1], reverse=True)
-            has_positives = False
-            for r in res:
-                if r[2] == 1:
-                    has_positives = True
-                    break
-            if not has_positives:
-                continue
-            RR_test_item = 0
-            for idx, r in enumerate(res):
-                if r[2] == 1 and r[0] == 1:
-                    RR_test_item = 1 / (idx + 1)
-                    break
-            MRR += RR_test_item
-            cnt_to_use += 1
-        if cnt_to_use:
-            MRR /= cnt_to_use
-        return MRR
-
-    def get_config_for_boosting(self, numberOfLogLines, boosting_model_name, namespaces):
+    def get_config_for_boosting(self, number_of_log_lines: int, model_type: ModelType, namespaces):
         return {
             "max_query_terms": self.search_cfg.MaxQueryTerms,
             "min_should_match": 0.4,
             "min_word_length": self.search_cfg.MinWordLength,
             "filter_min_should_match": [],
             "filter_min_should_match_any": [],
-            "number_of_log_lines": numberOfLogLines,
+            "number_of_log_lines": number_of_log_lines,
             "filter_by_test_case_hash": False,
-            "boosting_model": self.baseline_folders[boosting_model_name],
+            "boosting_model": self.baseline_folders[model_type],
             "chosen_namespaces": namespaces,
             "calculate_similarities": False,
             "time_weight_decay": self.search_cfg.TimeWeightDecay}
 
-    def get_info_template(self, project_info, baseline_model, model_name, metric_name):
-        return {"method": "training", "sub_model_type": "all", "model_type": project_info["model_type"],
+    @staticmethod
+    def get_info_template(project_info: TrainInfo, baseline_model: str, model_name: str, metric_name: str):
+        return {"method": "training", "sub_model_type": "all", "model_type": project_info.model_type.name,
                 "baseline_model": [baseline_model], "new_model": [model_name],
-                "project_id": str(project_info["project_id"]), "model_saved": 0, "p_value": 1.0,
+                "project_id": str(project_info.project_id), "model_saved": 0, "p_value": 1.0,
                 "data_proportion": 0.0, "baseline_mean_metric": 0.0, "new_model_mean_metric": 0.0,
                 "bad_data_proportion": 0, "metric_name": metric_name, "errors": [], "errors_count": 0}
 
@@ -132,27 +172,6 @@ class AnalysisModelTraining:
             new_model_results[metric].append(metric_res)
         return new_model_results
 
-    def deduplicate_data(self, data, labels):
-        data_wo_duplicates = []
-        labels_wo_duplicates = []
-        data_set = set()
-        for i in range(len(data)):
-            if tuple(data[i]) not in data_set:
-                data_set.add(tuple(data[i]))
-                data_wo_duplicates.append(data[i])
-                labels_wo_duplicates.append(labels[i])
-        return data_wo_duplicates, labels_wo_duplicates
-
-    def split_data(self, data, labels, random_state, test_item_ids_with_pos):
-        x_ids = [i for i in range(len(data))]
-        x_train_ids, x_test_ids, y_train, y_test = train_test_split(
-            x_ids, labels,
-            test_size=0.1, random_state=random_state, stratify=labels)
-        x_train = np.asarray([data[idx] for idx in x_train_ids])
-        x_test = np.asarray([data[idx] for idx in x_test_ids])
-        test_item_ids_with_pos_test = [test_item_ids_with_pos[idx] for idx in x_test_ids]
-        return x_train, x_test, y_train, y_test, test_item_ids_with_pos_test
-
     def train_several_times(self, data, labels, features, test_item_ids_with_pos, metrics_to_gather):
         new_model_results = {}
         baseline_model_results = {}
@@ -167,9 +186,9 @@ class AnalysisModelTraining:
             bad_data = True
 
         if not bad_data:
-            data, labels = self.deduplicate_data(data, labels)
+            data, labels = deduplicate_data(data, labels)
             for random_state in random_states:
-                x_train, x_test, y_train, y_test, test_item_ids_with_pos_test = self.split_data(
+                x_train, x_test, y_train, y_test, test_item_ids_with_pos_test = split_data(
                     data, labels, random_state, test_item_ids_with_pos)
                 proportion_binary_labels = utils.calculate_proportions_for_labels(y_train)
                 if proportion_binary_labels < self.due_proportion_to_smote:
@@ -181,19 +200,14 @@ class AnalysisModelTraining:
                     self.new_model, x_test, y_test, metrics_to_gather,
                     test_item_ids_with_pos_test, new_model_results)
                 logger.debug("Baseline results")
-                x_test_for_baseline = self.transform_data_from_feature_lists(
+                x_test_for_baseline = transform_data_from_feature_lists(
                     x_test, features, self.baseline_model.get_feature_ids())
                 baseline_model_results = self.calculate_metrics(
                     self.baseline_model, x_test_for_baseline, y_test,
                     metrics_to_gather, test_item_ids_with_pos_test, baseline_model_results)
         return baseline_model_results, new_model_results, bad_data
 
-    def transform_data_from_feature_lists(self, feature_list, cur_features, desired_features):
-        previously_gathered_features = utils.fill_prevously_gathered_features(feature_list, cur_features)
-        gathered_data = utils.gather_feature_list(previously_gathered_features, desired_features)
-        return gathered_data
-
-    def query_logs(self, project_id, log_ids_to_find):
+    def query_logs(self, project_id: int, log_ids_to_find: list[str]):
         log_ids_to_find = list(log_ids_to_find)
         project_index_name = text_processing.unite_project_name(
             str(project_id), self.app_config.esProjectIndexPrefix)
@@ -212,10 +226,8 @@ class AnalysisModelTraining:
                         ]
                     }
                 }}
-            for r in elasticsearch.helpers.scan(self.es_client.es_client,
-                                                query=ids_query,
-                                                index=project_index_name,
-                                                scroll="5m"):
+            for r in elasticsearch.helpers.scan(
+                    self.es_client.es_client, query=ids_query, index=project_index_name, scroll="5m"):
                 log_id_dict[str(r["_id"])] = r
         return log_id_dict
 
@@ -246,7 +258,8 @@ class AnalysisModelTraining:
             }
         }
 
-    def stop_gathering_info_from_suggest_query(self, num_of_1s, num_of_0s, max_num):
+    @staticmethod
+    def stop_gathering_info_from_suggest_query(num_of_1s, num_of_0s, max_num):
         if (num_of_1s + num_of_0s) == 0:
             return False
         percent_logs = (num_of_1s + num_of_0s) / max_num
@@ -255,7 +268,7 @@ class AnalysisModelTraining:
             return True
         return False
 
-    def query_es_for_suggest_info(self, project_id):
+    def query_es_for_suggest_info(self, project_id: int):
         log_ids_to_find = set()
         gathered_suggested_data = []
         log_id_pairs_set = set()
@@ -305,19 +318,13 @@ class AnalysisModelTraining:
                     break
             logger.debug("Query: '%s', results number: %d, number of 1s: %d",
                          query_name, cur_number_of_logs, cur_number_of_logs_1)
-        log_id_dict = self.query_logs(project_id, log_ids_to_find)
+        log_id_dict = self.query_logs(project_id, list(log_ids_to_find))
         return gathered_suggested_data, log_id_dict
 
-    def prepare_encoders(self, features_encoding_config, logs_found):
-        _feature_encoding_configurer = FeatureEncodingConfigurer()
-        _feature_encoding_configurer.initialize_encoders_from_config(features_encoding_config)
-        _feature_encoding_configurer.prepare_encoders(logs_found)
-        return _feature_encoding_configurer.feature_dict_with_encodings
-
-    def gather_data(self, model_type, project_id, features, defect_type_model_to_use, full_config):
+    def gather_data(self, model_type: ModelType, project_id: int, features, defect_type_model_to_use, full_config):
         namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
         gathered_suggested_data, log_id_dict = self.query_es_for_suggest_info(project_id)
-        features_dict_with_saved_objects = self.prepare_encoders(
+        features_dict_with_saved_objects = prepare_encoders(
             full_config["features_encoding_config"], list(log_id_dict.values()))
         full_data_features, labels, test_item_ids_with_pos = [], [], []
         for _suggest_res in gathered_suggested_data:
@@ -354,27 +361,27 @@ class AnalysisModelTraining:
         return (np.asarray(full_data_features), np.asarray(labels), test_item_ids_with_pos,
                 features_dict_with_saved_objects)
 
-    def train(self, project_info):
+    def train(self, project_info: TrainInfo):
         time_training = time()
-        logger.debug("Started training model '%s'", project_info["model_type"])
-        model_name = "%s_model_%s" % (project_info["model_type"], datetime.now().strftime("%d.%m.%y"))
+        logger.debug("Started training model '%s'", project_info.model_type.name)
+        model_name = "%s_model_%s" % (project_info.model_type.name, datetime.now().strftime("%d.%m.%y"))
 
         baseline_model_folder = os.path.basename(
-            self.baseline_folders[project_info["model_type"]].strip("/").strip("\\"))
+            self.baseline_folders[project_info.model_type].strip("/").strip("\\"))
         self.baseline_model = boosting_decision_maker.BoostingDecisionMaker(
-            object_saving.create_filesystem(self.baseline_folders[project_info["model_type"]]))
+            object_saving.create_filesystem(self.baseline_folders[project_info.model_type]))
         self.baseline_model.load_model()
 
         full_config, features, monotonous_features = pickle.load(
-            open(self.model_config[project_info["model_type"]], "rb"))
-        new_model_folder = "%s_model/%s/" % (project_info["model_type"], model_name)
+            open(self.model_config[project_info.model_type], "rb"))
+        new_model_folder = "%s_model/%s/" % (project_info.model_type.name, model_name)
         self.new_model = (
             custom_boosting_decision_maker.CustomBoostingDecisionMaker(
-                object_saving.create(self.app_config, project_id=project_info["project_id"], path=new_model_folder)))
+                object_saving.create(self.app_config, project_id=project_info.project_id, path=new_model_folder)))
         self.new_model.add_config_info(full_config, features, monotonous_features)
 
-        defect_type_model_to_use = self.model_chooser.choose_model(project_info["project_id"],
-                                                                   ModelType.DEFECT_TYPE_MODEL)
+        defect_type_model_to_use = self.model_chooser.choose_model(project_info.project_id,
+                                                                   ModelTypeFolder.DEFECT_TYPE_MODEL)
 
         metrics_to_gather = ["F1", "Mean Reciprocal Rank"]
         train_log_info = {}
@@ -386,9 +393,9 @@ class AnalysisModelTraining:
         errors_count = 0
         train_data = []
         try:
-            logger.debug("Initialized training model '%s'", project_info["model_type"])
+            logger.debug("Initialized training model '%s'", project_info.model_type.name)
             train_data, labels, test_item_ids_with_pos, features_dict_with_saved_objects = self.gather_data(
-                project_info["model_type"], project_info["project_id"],
+                project_info.model_type, project_info.project_id,
                 self.new_model.get_feature_ids(), defect_type_model_to_use, full_config)
             self.new_model.features_dict_with_saved_objects = features_dict_with_saved_objects
 
@@ -396,7 +403,7 @@ class AnalysisModelTraining:
                 train_log_info[metric]["data_size"] = len(labels)
                 train_log_info[metric]["data_proportion"] = utils.calculate_proportions_for_labels(labels)
 
-            logger.debug("Loaded data for training model '%s'", project_info["model_type"])
+            logger.debug("Loaded data for training model '%s'", project_info.model_type.name)
             baseline_model_results, new_model_results, bad_data = self.train_several_times(
                 train_data, labels, self.new_model.get_feature_ids(),
                 test_item_ids_with_pos, metrics_to_gather)
@@ -443,7 +450,7 @@ class AnalysisModelTraining:
                     for metric in metrics_to_gather:
                         train_log_info[metric]["model_saved"] = 0
                 self.model_chooser.delete_old_model(
-                    "%s_model" % project_info["model_type"], project_info["project_id"])
+                    "%s_model" % project_info.model_type.name, project_info.project_id)
                 self.new_model.save_model()
         except Exception as err:
             logger.error(err)

@@ -13,8 +13,16 @@
 #  limitations under the License.
 from enum import Enum, auto
 
+from pydantic import BaseModel
+
 
 class ModelType(Enum):
-    DEFECT_TYPE = auto()
-    SUGGESTION = auto()
-    AUTO_ANALYSIS = auto()
+    defect_type = auto()
+    suggestion = auto()
+    auto_analysis = auto()
+
+
+class TrainInfo(BaseModel):
+    model_type: ModelType
+    project_id: int
+    gathered_metric_total: int

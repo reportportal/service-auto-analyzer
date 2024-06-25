@@ -55,7 +55,7 @@ class ObjectSaver:
                 + str(STORAGE_FACTORIES.keys())
             )
 
-    def get_project_id(self, project_id: str | int | None):
+    def get_project_id(self, project_id: str | int | None) -> str:
         if project_id is not None:
             return str(project_id)
         if self.project_id is not None:

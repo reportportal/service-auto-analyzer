@@ -27,7 +27,7 @@ from app.machine_learning.models import (defect_type_model, custom_defect_type_m
 logger = logging.getLogger("analyzerApp.modelChooser")
 
 
-class ModelType(str, enum.Enum):
+class ModelTypeFolder(str, enum.Enum):
     DEFECT_TYPE_MODEL = 'defect_type_model/'
     SUGGESTION_MODEL = 'suggestion_model/'
     AUTO_ANALYSIS_MODEL = 'auto_analysis_model/'
@@ -43,20 +43,20 @@ class ModelChooser:
         self.search_cfg = search_cfg
         self.object_saver = object_saving.create(self.app_config)
         self.model_folder_mapping = {
-            ModelType.DEFECT_TYPE_MODEL: custom_defect_type_model.CustomDefectTypeModel,
-            ModelType.SUGGESTION_MODEL: custom_boosting_decision_maker.CustomBoostingDecisionMaker,
-            ModelType.AUTO_ANALYSIS_MODEL: custom_boosting_decision_maker.CustomBoostingDecisionMaker
+            ModelTypeFolder.DEFECT_TYPE_MODEL: custom_defect_type_model.CustomDefectTypeModel,
+            ModelTypeFolder.SUGGESTION_MODEL: custom_boosting_decision_maker.CustomBoostingDecisionMaker,
+            ModelTypeFolder.AUTO_ANALYSIS_MODEL: custom_boosting_decision_maker.CustomBoostingDecisionMaker
         }
         self.global_models = {}
         self.initialize_global_models()
 
     def initialize_global_models(self):
         for model_type, folder, class_to_use in [
-            (ModelType.DEFECT_TYPE_MODEL,
+            (ModelTypeFolder.DEFECT_TYPE_MODEL,
              self.search_cfg.GlobalDefectTypeModelFolder, defect_type_model.DefectTypeModel),
-            (ModelType.SUGGESTION_MODEL,
+            (ModelTypeFolder.SUGGESTION_MODEL,
              self.search_cfg.SuggestBoostModelFolder, boosting_decision_maker.BoostingDecisionMaker),
-            (ModelType.AUTO_ANALYSIS_MODEL,
+            (ModelTypeFolder.AUTO_ANALYSIS_MODEL,
              self.search_cfg.BoostModelFolder, boosting_decision_maker.BoostingDecisionMaker)
         ]:
             if folder.strip():
@@ -66,7 +66,7 @@ class ModelChooser:
             else:
                 self.global_models[model_type] = None
 
-    def choose_model(self, project_id: int, model_type: ModelType, custom_model_prob: float = 1.0):
+    def choose_model(self, project_id: int, model_type: ModelTypeFolder, custom_model_prob: float = 1.0):
         model = self.global_models[model_type]
         prob_for_model = np.random.uniform()
         if prob_for_model > custom_model_prob:

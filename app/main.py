@@ -169,7 +169,8 @@ def init_amqp(_amqp_client: AmqpClient):
                 AmqpClient(APP_CONFIG.amqpUrl).receive,
                 (APP_CONFIG.exchangeName, 'train_models', True, False,
                  lambda current_channel, method, props, body: amqp_handler.handle_inner_amqp_request(
-                     current_channel, method, props, body, _retraining_service.train_models))))
+                     current_channel, method, props, body, _retraining_service.train_models,
+                     prepare_data_func=amqp_handler.prepare_train_info))))
     else:
         _es_client = EsClient(APP_CONFIG)
         _auto_analyzer_service = AutoAnalyzerService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)

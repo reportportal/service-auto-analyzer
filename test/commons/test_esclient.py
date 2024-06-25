@@ -20,7 +20,7 @@ from unittest.mock import MagicMock
 import httpretty
 from elasticsearch import RequestError
 
-import app.commons.launch_objects as launch_objects
+import commons.model.launch_objects as launch_objects
 from app.commons import esclient
 from app.utils import utils
 from test import get_fixture, APP_CONFIG

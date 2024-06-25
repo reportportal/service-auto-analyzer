@@ -24,7 +24,8 @@ from typing import Any
 import numpy as np
 import requests
 
-from app.commons import launch_objects, logging
+from app.commons import logging
+from commons.model import launch_objects
 from app.utils.text_processing import split_words, remove_credentials_from_url
 
 logger = logging.getLogger("analyzerApp.utils")

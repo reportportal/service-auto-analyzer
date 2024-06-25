@@ -31,7 +31,7 @@ import unittest
 import httpretty
 
 from app.commons import model_chooser
-from app.commons.launch_objects import SearchConfig, ApplicationConfig
+from commons.model.launch_objects import SearchConfig, ApplicationConfig
 from app.utils import utils
 
 

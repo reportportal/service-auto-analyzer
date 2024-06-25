@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 from app.commons import logging
-from app.commons.launch_objects import ApplicationConfig
+from commons.model.launch_objects import ApplicationConfig
 from app.commons.object_saving.object_saver import ObjectSaver
 
 METRIC_SINCE_TRAINING = "gathered_metric_since_training"

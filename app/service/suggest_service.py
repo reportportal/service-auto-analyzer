@@ -22,7 +22,7 @@ import elasticsearch.helpers
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, similarity_calculator, object_saving
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import SuggestAnalysisResult, SearchConfig, ApplicationConfig, TestItemInfo, \
+from commons.model.launch_objects import SuggestAnalysisResult, SearchConfig, ApplicationConfig, TestItemInfo, \
     AnalyzerConf
 from app.commons.log_requests import LogRequests
 from app.commons.model_chooser import ModelType, ModelChooser

@@ -29,7 +29,7 @@ from app.amqp import amqp_handler
 from app.amqp.amqp import AmqpClient
 from app.commons import model_chooser, logging as my_logging
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import ApplicationConfig, SearchConfig
+from commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.service import AnalyzerService
 from app.service import AutoAnalyzerService
 from app.service import CleanIndexService

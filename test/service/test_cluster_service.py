@@ -18,7 +18,7 @@ from http import HTTPStatus
 import httpretty
 from freezegun import freeze_time
 
-from app.commons import launch_objects
+from commons.model import launch_objects
 from app.service import ClusterService
 from app.utils import utils
 from test import get_fixture, APP_CONFIG

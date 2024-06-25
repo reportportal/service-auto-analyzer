@@ -15,9 +15,9 @@
 import logging
 import unittest
 
-from app.commons import launch_objects
+from commons.model import launch_objects
 from app.commons import model_chooser
-from app.commons.launch_objects import SearchConfig
+from commons.model.launch_objects import SearchConfig
 from app.service import AutoAnalyzerService
 from app.service import SearchService
 from app.service import SuggestService

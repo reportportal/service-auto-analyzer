@@ -24,7 +24,7 @@ from app.commons import logging
 from app.commons.esclient import EsClient
 from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
 from app.utils import utils, text_processing
-from app.commons.launch_objects import ApplicationConfig
+from commons.model.launch_objects import ApplicationConfig
 
 logger = logging.getLogger("analyzerApp.suggestInfoService")
 

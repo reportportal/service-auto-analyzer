@@ -16,7 +16,7 @@ from time import time
 
 from app.commons import logging, namespace_finder, trigger_manager
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import SearchConfig, ApplicationConfig
+from commons.model.launch_objects import SearchConfig, ApplicationConfig
 from app.utils import utils, text_processing
 from app.commons.model_chooser import ModelChooser
 

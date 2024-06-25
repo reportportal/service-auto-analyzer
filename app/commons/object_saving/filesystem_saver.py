@@ -19,7 +19,7 @@ import shutil
 from typing import Any
 
 from app.commons import logging
-from app.commons.launch_objects import ApplicationConfig
+from commons.model.launch_objects import ApplicationConfig
 from app.commons.object_saving.storage import Storage
 from app.utils import utils
 

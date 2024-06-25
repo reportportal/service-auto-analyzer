@@ -14,7 +14,7 @@
 
 from datetime import datetime
 
-from app.commons.launch_objects import Launch, TestItem, Log, TestItemInfo
+from commons.model.launch_objects import Launch, TestItem, Log, TestItemInfo
 from app.commons.log_merger import LogMerger
 from app.commons.prepared_log import PreparedLogMessage
 from app.utils import utils, text_processing

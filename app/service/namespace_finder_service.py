@@ -15,7 +15,7 @@
 from time import time
 
 from app.commons import logging, namespace_finder
-from app.commons.launch_objects import ApplicationConfig
+from commons.model.launch_objects import ApplicationConfig
 from app.commons.log_requests import LogRequests
 from app.utils import utils
 

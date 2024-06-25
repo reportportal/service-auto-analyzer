@@ -14,10 +14,11 @@
 
 import json
 from time import time
+from typing import Any
 
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, trigger_manager
-from app.commons.launch_objects import SearchConfig, ApplicationConfig
+from commons.model.launch_objects import SearchConfig, ApplicationConfig
 from app.commons.model_chooser import ModelChooser
 from app.utils import utils
 
@@ -36,7 +37,7 @@ class RetrainingService:
                                                               search_cfg=self.search_cfg)
 
     @utils.ignore_warnings
-    def train_models(self, train_info):
+    def train_models(self, train_info: dict[str, Any]):
         assert self.trigger_manager.does_trigger_exist(train_info["model_type"])
         logger.info("Started training")
         t_start = time()

@@ -19,7 +19,7 @@ import numpy as np
 
 from app.commons import logging
 from app.commons import object_saving
-from app.commons.launch_objects import SearchConfig, ApplicationConfig
+from commons.model.launch_objects import SearchConfig, ApplicationConfig
 from app.commons.object_saving.object_saver import ObjectSaver
 from app.machine_learning.models import (defect_type_model, custom_defect_type_model, custom_boosting_decision_maker,
                                          boosting_decision_maker)

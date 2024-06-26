@@ -156,8 +156,7 @@ class SuggestService(AnalyzerService):
 
     def query_es_for_suggested_items(self, test_item_info: TestItemInfo, logs: list[dict]):
         full_results = []
-        index_name = text_processing.unite_project_name(
-            str(test_item_info.project), self.app_config.esProjectIndexPrefix)
+        index_name = text_processing.unite_project_name(test_item_info.project, self.app_config.esProjectIndexPrefix)
 
         for log in logs:
             message = log["_source"]["message"].strip()
@@ -343,8 +342,7 @@ class SuggestService(AnalyzerService):
         logger.info(f'Started suggesting for test item with id: {test_item_info.testItemId}')
         logger.debug(f'Started suggesting items by request: {test_item_info.json()}')
         logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))
-        index_name = text_processing.unite_project_name(
-            str(test_item_info.project), self.app_config.esProjectIndexPrefix)
+        index_name = text_processing.unite_project_name(test_item_info.project, self.app_config.esProjectIndexPrefix)
         if not self.es_client.index_exists(index_name):
             logger.info("Project %s doesn't exist", index_name)
             logger.info("Finished suggesting for test item with 0 results.")

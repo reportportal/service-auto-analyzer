@@ -117,8 +117,7 @@ class DefectTypeModelTraining:
 
     def query_data(self, project: int, label):
         message_launch_dict = set()
-        project_index_name = text_processing.unite_project_name(
-            str(project), self.app_config.esProjectIndexPrefix)
+        project_index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
         data = []
         for r in elasticsearch.helpers.scan(self.es_client.es_client,
                                             query=self.get_message_query_by_label(
@@ -268,7 +267,7 @@ class DefectTypeModelTraining:
         start_time = time()
         model_name = f'defect_type_model_{datetime.now().strftime("%d.%m.%y")}'
         baseline_model = os.path.basename(self.search_cfg.GlobalDefectTypeModelFolder)
-        new_model_folder = 'defect_type_model/%s/' % model_name
+        new_model_folder = f'defect_type_model/{model_name}/'
         new_model = custom_defect_type_model.CustomDefectTypeModel(
             object_saving.create(self.app_config, project_info.project_id, new_model_folder))
 
@@ -286,7 +285,7 @@ class DefectTypeModelTraining:
         for label in list(self.label2inds.keys()) + list(found_sub_categories.keys()):
             try:
                 time_training = time()
-                logger.debug("Label to train the model %s", label)
+                logger.debug(f'Label to train the model {label}')
 
                 baseline_model_results, new_model_results, bad_data = self.train_several_times(
                     new_model, label, data, found_sub_categories)

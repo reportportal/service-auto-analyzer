@@ -316,8 +316,7 @@ class AutoAnalyzerService(AnalyzerService):
         test_items_number_to_process = 0
         try:
             for launch in launches:
-                index_name = text_processing.unite_project_name(
-                    str(launch.project), self.app_config.esProjectIndexPrefix)
+                index_name = text_processing.unite_project_name(launch.project, self.app_config.esProjectIndexPrefix)
                 if not self.es_client.index_exists(index_name):
                     continue
                 if test_items_number_to_process >= self.search_cfg.MaxAutoAnalysisItemsToProcess:

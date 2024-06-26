@@ -43,7 +43,7 @@ class RetrainingService:
         t_start = time()
         _retraining_triggering, _retraining = self.trigger_manager.get_trigger_info(train_info.model_type)
         if _retraining_triggering.should_model_training_be_triggered(train_info):
-            logger.debug("Should be trained ", train_info)
+            logger.debug("Should be trained ", json.dumps(train_info))
             gathered_data, training_log_info = _retraining.train(train_info)
             _retraining_triggering.clean_triggering_info(train_info.project_id, gathered_data)
             logger.debug(training_log_info)

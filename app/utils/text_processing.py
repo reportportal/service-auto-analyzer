@@ -731,8 +731,8 @@ def transform_string_feature_range_into_list(text):
     return values
 
 
-def unite_project_name(project_id: str, prefix: str) -> str:
-    return prefix + project_id
+def unite_project_name(project_id: str | int, prefix: str) -> str:
+    return f'{prefix}{project_id}'
 
 
 def replace_text_pieces(text: str, text_pieces: Iterable[str]) -> str:

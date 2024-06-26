@@ -144,8 +144,7 @@ class SuggestInfoService:
     def clean_suggest_info_logs(self, clean_index):
         """Delete logs from elasticsearch"""
         index_name = self.build_index_name(clean_index.project)
-        index_name = text_processing.unite_project_name(
-            index_name, self.app_config.esProjectIndexPrefix)
+        index_name = text_processing.unite_project_name(index_name, self.app_config.esProjectIndexPrefix)
         logger.info("Delete logs %s for the index %s",
                     clean_index.ids, index_name)
         t_start = time()
@@ -179,8 +178,7 @@ class SuggestInfoService:
     def clean_suggest_info_logs_by_test_item(self, remove_items_info):
         """Delete logs from elasticsearch"""
         index_name = self.build_index_name(remove_items_info["project"])
-        index_name = text_processing.unite_project_name(
-            index_name, self.app_config.esProjectIndexPrefix)
+        index_name = text_processing.unite_project_name(index_name, self.app_config.esProjectIndexPrefix)
         logger.info("Delete test items %s for the index %s",
                     remove_items_info["itemsToDelete"], index_name)
         t_start = time()
@@ -196,9 +194,7 @@ class SuggestInfoService:
         project = launch_remove_info["project"]
         launch_ids = launch_remove_info["launch_ids"]
         index_name = self.build_index_name(project)
-        index_name = text_processing.unite_project_name(
-            index_name, self.app_config.esProjectIndexPrefix
-        )
+        index_name = text_processing.unite_project_name(index_name, self.app_config.esProjectIndexPrefix)
         logger.info("Delete launches %s for the index %s", launch_ids, index_name)
         t_start = time()
         deleted_logs = self.es_client.delete_by_query(

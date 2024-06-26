@@ -232,7 +232,7 @@ class EsClient:
         logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.host))
         t_start = time()
         launch_ids = set(map(lambda launch_obj: launch_obj.launchId, launches))
-        project = str(next(map(lambda launch_obj: launch_obj.project, launches)))
+        project = next(map(lambda launch_obj: launch_obj.project, launches))
         test_item_queue = self._to_launch_test_item_list(launches)
         del launches
         if project is None:
@@ -364,8 +364,7 @@ class EsClient:
 
     def delete_logs(self, clean_index):
         """Delete logs from elasticsearch"""
-        index_name = text_processing.unite_project_name(
-            str(clean_index.project), self.app_config.esProjectIndexPrefix)
+        index_name = text_processing.unite_project_name(clean_index.project, self.app_config.esProjectIndexPrefix)
         logger.info("Delete logs %s for the project %s",
                     clean_index.ids, index_name)
         logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.host))
@@ -458,7 +457,7 @@ class EsClient:
         defect_update_info["itemsToUpdate"] = {
             int(key_): val for key_, val in defect_update_info["itemsToUpdate"].items()}
         index_name = text_processing.unite_project_name(
-            str(defect_update_info["project"]), self.app_config.esProjectIndexPrefix)
+            defect_update_info['project'], self.app_config.esProjectIndexPrefix)
         if not self.index_exists(index_name):
             return test_item_ids
         batch_size = 1000
@@ -525,9 +524,7 @@ class EsClient:
         launch_ids = remove_launches_info["launch_ids"]
         logger.info("Started removing launches")
         t_start = time()
-        index_name = text_processing.unite_project_name(
-            str(project), self.app_config.esProjectIndexPrefix
-        )
+        index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
         deleted_logs = self.delete_by_query(
             index_name,
             launch_ids,
@@ -569,11 +566,9 @@ class EsClient:
     def get_launch_ids_by_start_time_range(
             self, project: int, start_date: str, end_date: str
     ) -> list[str]:
-        index_name = text_processing.unite_project_name(
-            str(project), self.app_config.esProjectIndexPrefix
-        )
+        index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
         query = self.__time_range_query(
-            "launch_start_time", start_date, end_date, for_scan=True
+            'launch_start_time', start_date, end_date, for_scan=True
         )
         launch_ids = set()
         for log in elasticsearch.helpers.scan(
@@ -586,9 +581,7 @@ class EsClient:
     def remove_by_launch_start_time_range(
             self, project: int, start_date: str, end_date: str
     ) -> int:
-        index_name = text_processing.unite_project_name(
-            str(project), self.app_config.esProjectIndexPrefix
-        )
+        index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
         query = self.__time_range_query("launch_start_time", start_date, end_date)
         delete_response = self.es_client.delete_by_query(index_name, body=query)
         return delete_response["deleted"]
@@ -597,9 +590,7 @@ class EsClient:
     def get_log_ids_by_log_time_range(
             self, project: int, start_date: str, end_date: str
     ) -> list[str]:
-        index_name = text_processing.unite_project_name(
-            str(project), self.app_config.esProjectIndexPrefix
-        )
+        index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
         query = self.__time_range_query("log_time", start_date, end_date, for_scan=True)
         log_ids = set()
         for log in elasticsearch.helpers.scan(
@@ -612,9 +603,7 @@ class EsClient:
     def remove_by_log_time_range(
             self, project: int, start_date: str, end_date: str
     ) -> int:
-        index_name = text_processing.unite_project_name(
-            str(project), self.app_config.esProjectIndexPrefix
-        )
+        index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
         query = self.__time_range_query("log_time", start_date, end_date)
         delete_response = self.es_client.delete_by_query(index_name, body=query)
         return delete_response["deleted"]

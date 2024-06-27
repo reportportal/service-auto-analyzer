@@ -137,21 +137,19 @@ class TestRetrainingService(TestService):
             }
         ]
         for idx, test in enumerate(tests):
-            try:
-                _retraining_service = RetrainingService(self.model_chooser, app_config=self.app_config,
-                                                        search_cfg=self.get_default_search_config())
-                model_triggering = _retraining_service.trigger_manager.model_training_triggering
-                model_triggering = model_triggering[test["train_info"].model_type]
-                model_triggering[0].object_saver.get_project_object = mock.Mock(return_value=test["trigger_info"])
-                train_mock = mock.Mock(return_value=test["train_result"])
-                model_triggering[1].train = train_mock
-                _retraining_service.train_models(test["train_info"])
-                if test["is_model_trained"]:
-                    train_mock.assert_called_once()
-                else:
-                    train_mock.assert_not_called()
-            except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}', err).with_traceback(err.__traceback__)
+            print(f'Test case idx: {idx}')
+            _retraining_service = RetrainingService(self.model_chooser, app_config=self.app_config,
+                                                    search_cfg=self.get_default_search_config())
+            model_triggering = _retraining_service.trigger_manager.model_training_triggering
+            model_triggering = model_triggering[test["train_info"].model_type]
+            model_triggering[0].object_saver.get_project_object = mock.Mock(return_value=test["trigger_info"])
+            train_mock = mock.Mock(return_value=test["train_result"])
+            model_triggering[1].train = train_mock
+            _retraining_service.train_models(test["train_info"])
+            if test["is_model_trained"]:
+                train_mock.assert_called_once()
+            else:
+                train_mock.assert_not_called()
 
 
 if __name__ == '__main__':

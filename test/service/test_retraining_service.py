@@ -15,7 +15,7 @@
 import unittest
 from unittest import mock
 
-from app.commons.model.train import TrainInfo, ModelType
+from app.commons.model.ml import TrainInfo, ModelType
 from app.service import RetrainingService
 from app.utils import utils
 from test.mock_service import TestService

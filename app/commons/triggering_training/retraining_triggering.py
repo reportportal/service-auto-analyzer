@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 from app.commons import logging
-from app.commons.model.train import TrainInfo
+from app.commons.model.ml import TrainInfo
 from app.commons.model.launch_objects import ApplicationConfig
 from app.commons.object_saving.object_saver import ObjectSaver
 
@@ -57,11 +57,11 @@ class RetrainingTriggering:
         self.save_triggering_info(trigger_info, project_id)
 
     def should_model_training_be_triggered(self, train_info: TrainInfo) -> bool:
-        trigger_info = self.get_triggering_info(train_info.project_id)
+        trigger_info = self.get_triggering_info(train_info.project)
         gathered_metric_total = trigger_info.get(GATHERED_METRIC_TOTAL, 0)
         trigger_info[GATHERED_METRIC_TOTAL] = gathered_metric_total + train_info.gathered_metric_total
         metric_since_training = trigger_info.get(METRIC_SINCE_TRAINING, 0)
         trigger_info[METRIC_SINCE_TRAINING] = metric_since_training + train_info.gathered_metric_total
-        self.save_triggering_info(trigger_info, train_info.project_id)
+        self.save_triggering_info(trigger_info, train_info.project)
         return trigger_info[GATHERED_METRIC_TOTAL] >= self.start_number \
             and trigger_info[METRIC_SINCE_TRAINING] >= self.accumulated_difference

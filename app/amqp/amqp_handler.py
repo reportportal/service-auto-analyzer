@@ -20,7 +20,7 @@ from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
 
 from app.commons import logging
-from app.commons.model import launch_objects, train
+from app.commons.model import launch_objects, ml
 
 logger = logging.getLogger("analyzerApp.amqpHandler")
 
@@ -60,9 +60,9 @@ def prepare_test_item_info(test_item_info: Any) -> launch_objects.TestItemInfo:
     return launch_objects.TestItemInfo(**test_item_info)
 
 
-def prepare_train_info(train_info: dict) -> train.TrainInfo:
+def prepare_train_info(train_info: dict) -> ml.TrainInfo:
     """Function for deserializing train info object"""
-    return train.TrainInfo(**train_info)
+    return ml.TrainInfo(**train_info)
 
 
 def prepare_search_response_data(response: list | dict) -> str:

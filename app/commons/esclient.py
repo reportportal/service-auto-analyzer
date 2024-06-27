@@ -27,9 +27,9 @@ from urllib3.exceptions import InsecureRequestWarning
 from app.amqp.amqp import AmqpClient
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, Response, Launch, TestItem, BulkResponse
+from app.commons.model.ml import TrainInfo, ModelType
 from app.commons.log_merger import LogMerger
 from app.commons.log_requests import LogRequests
-from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.esclient")
@@ -248,11 +248,9 @@ class EsClient:
         try:
             if self.app_config.amqpUrl:
                 AmqpClient(self.app_config.amqpUrl).send_to_inner_queue(
-                    self.app_config.exchangeName, "train_models", json.dumps({
-                        "model_type": "defect_type",
-                        "project_id": project,
-                        GATHERED_METRIC_TOTAL: num_logs_with_defect_types
-                    }))
+                    self.app_config.exchangeName, 'train_models',
+                    TrainInfo(model_type=ModelType.defect_type, project=project,
+                              gathered_metric_total=num_logs_with_defect_types).json())
         except Exception as exc:
             logger.exception(exc)
         logger.info("Finished indexing logs for %d launches %s. It took %.2f sec.",

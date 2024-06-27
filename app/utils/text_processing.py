@@ -414,6 +414,10 @@ def split_words(text: str, min_word_length: int = 0, only_unique: bool = True, s
     return all_words
 
 
+def normalize_message(message: str) -> str:
+    return " ".join(sorted(split_words(message, to_lower=True)))
+
+
 def find_only_numbers(detected_message_with_numbers: str) -> str:
     """Removes all non digit symbols and concatenates unique numbers"""
     detected_message_only_numbers = re.sub(r'[^\d ._]', '', detected_message_with_numbers)

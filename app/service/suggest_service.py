@@ -22,12 +22,12 @@ import elasticsearch.helpers
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, similarity_calculator, object_saving
 from app.commons.esclient import EsClient
+from app.commons.log_requests import LogRequests
 from app.commons.model.launch_objects import SuggestAnalysisResult, SearchConfig, ApplicationConfig, TestItemInfo, \
     AnalyzerConf
-from app.commons.log_requests import LogRequests
-from app.commons.model_chooser import ModelTypeFolder, ModelChooser
+from app.commons.model.ml import ModelType, TrainInfo
+from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
-from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
 from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.service.analyzer_service import AnalyzerService
@@ -366,7 +366,7 @@ class SuggestService(AnalyzerService):
             boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
             boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(test_item_info.project)
             _suggest_decision_maker_to_use = self.model_chooser.choose_model(
-                test_item_info.project, ModelTypeFolder.SUGGESTION_MODEL,
+                test_item_info.project, ModelType.suggestion,
                 custom_model_prob=self.search_cfg.ProbabilityForCustomModelSuggestions)
             features_dict_objects = _suggest_decision_maker_to_use.features_dict_with_saved_objects
 
@@ -377,7 +377,7 @@ class SuggestService(AnalyzerService):
                 weighted_log_similarity_calculator=self.similarity_model,
                 features_dict_with_saved_objects=features_dict_objects)
             _boosting_data_gatherer.set_defect_type_model(self.model_chooser.choose_model(
-                test_item_info.project, ModelTypeFolder.DEFECT_TYPE_MODEL))
+                test_item_info.project, ModelType.defect_type))
             feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
             scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
             model_info_tags = (_boosting_data_gatherer.get_used_model_info() +
@@ -470,13 +470,11 @@ class SuggestService(AnalyzerService):
                 amqp_client.send_to_inner_queue(
                     self.app_config.exchangeName, "stats_info", json.dumps(results_to_share))
                 if results:
-                    for model_type in ["suggestion", "auto_analysis"]:
-                        amqp_client.send_to_inner_queue(
-                            self.app_config.exchangeName, "train_models", json.dumps({
-                                "model_type": model_type,
-                                "project_id": test_item_info.project,
-                                GATHERED_METRIC_TOTAL: len(results)
-                            }))
+                    for model_type in [ModelType.suggestion, ModelType.auto_analysis]:
+                        AmqpClient(self.app_config.amqpUrl).send_to_inner_queue(
+                            self.app_config.exchangeName, 'train_models',
+                            TrainInfo(model_type=model_type, project=test_item_info.project,
+                                      gathered_metric_total=len(results)).json())
         except Exception as exc:
             logger.exception(exc)
         logger.debug("Stats info %s", results_to_share)

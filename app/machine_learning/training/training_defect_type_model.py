@@ -27,12 +27,14 @@ from sklearn.model_selection import train_test_split
 from app.commons import logging, object_saving
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
-from app.commons.model.train import TrainInfo
+from app.commons.model.ml import TrainInfo
 from app.commons.model_chooser import ModelChooser
 from app.machine_learning.models import defect_type_model, custom_defect_type_model
 from app.utils import utils, text_processing
 
 logger = logging.getLogger('analyzerApp.trainingDefectTypeModel')
+
+DATA_FIELD = 'detected_message_without_params_extended'
 
 
 class DefectTypeModelTraining:
@@ -87,7 +89,7 @@ class DefectTypeModelTraining:
 
     def get_message_query_by_label(self, label):
         return {
-            "_source": ["detected_message_without_params_extended", "issue_type", "launch_id"],
+            "_source": [DATA_FIELD, "issue_type", "launch_id"],
             "sort": {"start_time": "desc"},
             "size": self.app_config.esChunkNumber,
             "query": {
@@ -115,20 +117,17 @@ class DefectTypeModelTraining:
             }
         }
 
-    def query_data(self, project: int, label):
+    def query_data(self, project: int, label: str) -> list[tuple[str, str, str]]:
         message_launch_dict = set()
         project_index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
         data = []
-        for r in elasticsearch.helpers.scan(self.es_client.es_client,
-                                            query=self.get_message_query_by_label(
-                                                label),
-                                            index=project_index_name):
-            detected_message = r["_source"]["detected_message_without_params_extended"]
-            text_message_normalized = " ".join(sorted(
-                text_processing.split_words(detected_message, to_lower=True)))
-            message_info = (text_message_normalized,
-                            r["_source"]["launch_id"],
-                            r["_source"]["issue_type"])
+        for r in elasticsearch.helpers.scan(
+                self.es_client.es_client, query=self.get_message_query_by_label(label), index=project_index_name):
+            detected_message = r['_source'][DATA_FIELD]
+            if not detected_message.strip():
+                continue
+            text_message_normalized = text_processing.normalize_message(detected_message)
+            message_info = (text_message_normalized, r["_source"]["launch_id"], r["_source"]["issue_type"])
             if message_info not in message_launch_dict:
                 data.append((detected_message, label, r["_source"]["issue_type"]))
                 message_launch_dict.add(message_info)
@@ -157,12 +156,13 @@ class DefectTypeModelTraining:
     def get_info_template(project_info: TrainInfo, label: str, baseline_model: str, model_name: str) -> dict[str, Any]:
         return {'method': 'training', 'sub_model_type': label, 'model_type': project_info.model_type.name,
                 'baseline_model': [baseline_model], 'new_model': [model_name],
-                'project_id': project_info.project_id, 'model_saved': 0, 'p_value': 1.0,
+                'project_id': project_info.project, 'model_saved': 0, 'p_value': 1.0,
                 'data_proportion': 0.0, 'baseline_mean_metric': 0.0, 'new_model_mean_metric': 0.0,
                 'bad_data_proportion': 0, 'metric_name': 'F1', 'errors': [], 'errors_count': 0,
                 'time_spent': 0.0}
 
-    def load_data_for_training(self, project_info: TrainInfo, baseline_model: str, model_name: str) -> tuple:
+    def load_data_for_training(self, project_info: TrainInfo, baseline_model: str, model_name: str) \
+            -> tuple[list[tuple[str, str, str]], dict[str, list[tuple[str, str, str]]], dict[str, dict[str, Any]]]:
         train_log_info = {}
         data = []
         found_sub_categories = {}
@@ -178,7 +178,7 @@ class DefectTypeModelTraining:
                 train_log_info[label] = self.get_info_template(project_info, label, baseline_model, model_name)
                 time_querying = time()
                 logger.debug(f'Label to gather data {label}.')
-                found_data = self.query_data(project_info.project_id, label)
+                found_data = self.query_data(project_info.project, label)
                 for _, _, _issue_type in found_data:
                     if re.search(r'\w{2}_\w+', _issue_type) and _issue_type not in found_sub_categories:
                         found_sub_categories[_issue_type] = []
@@ -231,7 +231,8 @@ class DefectTypeModelTraining:
             _count_vectorizer = self.baseline_model.count_vectorizer_models[label]
             new_model.count_vectorizer_models[label] = _count_vectorizer
 
-    def train_several_times(self, new_model, label, data, found_sub_categories):
+    def train_several_times(self, new_model, label: str, data: list[tuple[str, str, str]],
+                            found_sub_categories: dict[str, list[tuple[str, str, str]]]):
         new_model_results = []
         baseline_model_results = []
         random_states = [1257, 1873, 1917, 2477, 3449,
@@ -265,11 +266,11 @@ class DefectTypeModelTraining:
 
     def train(self, project_info: TrainInfo):
         start_time = time()
-        model_name = f'defect_type_model_{datetime.now().strftime("%d.%m.%y")}'
+        model_name = f'{project_info.model_type.name}_model_{datetime.now().strftime("%d.%m.%y")}'
         baseline_model = os.path.basename(self.search_cfg.GlobalDefectTypeModelFolder)
-        new_model_folder = f'defect_type_model/{model_name}/'
+        new_model_folder = f'{project_info.model_type.name}_model/{model_name}/'
         new_model = custom_defect_type_model.CustomDefectTypeModel(
-            object_saving.create(self.app_config, project_info.project_id, new_model_folder))
+            object_saving.create(self.app_config, project_info.project, new_model_folder))
 
         data, found_sub_categories, train_log_info = self.load_data_for_training(
             project_info, baseline_model, model_name)
@@ -353,7 +354,7 @@ class DefectTypeModelTraining:
             logger.debug("The custom model should be saved")
             train_log_info["all"]["model_saved"] = 1
             train_log_info["all"]["p_value"] = p_value_max
-            self.model_chooser.delete_old_model("defect_type_model", project_info.project_id)
+            self.model_chooser.delete_old_model(project_info.model_type, project_info.project)
             new_model.save_model()
 
         time_spent = time() - start_time

@@ -22,7 +22,10 @@ class ModelType(Enum):
     auto_analysis = auto()
 
 
-class TrainInfo(BaseModel):
+class ModelInfo(BaseModel):
     model_type: ModelType
-    project_id: int
+    project: int
+
+
+class TrainInfo(ModelInfo):
     gathered_metric_total: int

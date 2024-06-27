@@ -22,9 +22,9 @@ import elasticsearch.helpers
 from app.amqp.amqp import AmqpClient
 from app.commons import logging
 from app.commons.esclient import EsClient
-from app.commons.triggering_training.retraining_triggering import GATHERED_METRIC_TOTAL
-from app.utils import utils, text_processing
 from app.commons.model.launch_objects import ApplicationConfig
+from app.commons.model.ml import TrainInfo, ModelType
+from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.suggestInfoService")
 
@@ -262,13 +262,11 @@ class SuggestInfoService:
         result = self.es_client._bulk_index(log_update_queries)
         try:
             if self.app_config.amqpUrl:
-                for model_type in ["suggestion", "auto_analysis"]:
+                for model_type in [ModelType.suggestion, ModelType.auto_analysis]:
                     AmqpClient(self.app_config.amqpUrl).send_to_inner_queue(
-                        self.app_config.exchangeName, "train_models", json.dumps({
-                            "model_type": model_type,
-                            "project_id": defect_update_info["project"],
-                            GATHERED_METRIC_TOTAL: result.took
-                        }))
+                        self.app_config.exchangeName, 'train_models',
+                        TrainInfo(model_type=model_type, project=defect_update_info['project'],
+                                  gathered_metric_total=result.took).json())
         except Exception as exc:
             logger.exception(exc)
         logger.info("Finished updating suggest info for %.2f sec.", time() - t_start)

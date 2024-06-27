@@ -16,7 +16,7 @@ import json
 from time import time
 
 from app.amqp.amqp import AmqpClient
-from app.commons.model.train import TrainInfo
+from app.commons.model.ml import TrainInfo
 from app.commons import logging, trigger_manager
 from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
 from app.commons.model_chooser import ModelChooser
@@ -45,7 +45,7 @@ class RetrainingService:
         if _retraining_triggering.should_model_training_be_triggered(train_info):
             logger.debug("Should be trained ", train_info.json())
             gathered_data, training_log_info = _retraining.train(train_info)
-            _retraining_triggering.clean_triggering_info(train_info.project_id, gathered_data)
+            _retraining_triggering.clean_triggering_info(train_info.project, gathered_data)
             logger.debug(training_log_info)
             if self.app_config.amqpUrl:
                 AmqpClient(self.app_config.amqpUrl).send_to_inner_queue(

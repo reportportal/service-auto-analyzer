@@ -24,8 +24,9 @@ from app.commons import object_saving
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult, \
     SearchConfig, ApplicationConfig, Launch
+from app.commons.model.ml import ModelType
 from app.commons.log_requests import LogRequests
-from app.commons.model_chooser import ModelTypeFolder, ModelChooser
+from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.similarity_calculator import SimilarityCalculator
 from app.machine_learning import boosting_featurizer
@@ -447,12 +448,12 @@ class AutoAnalyzerService(AnalyzerService):
                             project_id)
                     boosting_config["chosen_namespaces"] = chosen_namespaces[project_id]
                     _boosting_decision_maker = self.model_chooser.choose_model(
-                        project_id, ModelTypeFolder.AUTO_ANALYSIS_MODEL,
+                        project_id, ModelType.auto_analysis,
                         custom_model_prob=self.search_cfg.ProbabilityForCustomModelAutoAnalysis)
                     features_dict_objects = _boosting_decision_maker.features_dict_with_saved_objects
                     if project_id not in defect_type_model_to_use:
                         defect_type_model_to_use[project_id] = self.model_chooser.choose_model(
-                            project_id, ModelTypeFolder.DEFECT_TYPE_MODEL)
+                            project_id, ModelType.defect_type)
 
                     relevant_with_no_defect_candidate = self.find_relevant_with_no_defect(
                         analyzer_candidates.candidatesWithNoDefect, boosting_config)

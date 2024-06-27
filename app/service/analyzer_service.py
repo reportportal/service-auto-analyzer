@@ -16,6 +16,7 @@ import re
 
 from app.commons import logging
 from app.commons.model.launch_objects import SearchConfig, Launch, TestItemInfo, AnalyzerConf
+from app.commons.model.ml import ModelInfo
 from app.commons.log_merger import LogMerger
 from app.commons.log_requests import LogRequests
 from app.commons.model_chooser import ModelChooser
@@ -137,7 +138,8 @@ class AnalyzerService:
             max_query_terms=self.search_cfg.MaxQueryTerms
         )
 
-    def prepare_restrictions_by_issue_type(self, filter_no_defect=True):
+    @staticmethod
+    def prepare_restrictions_by_issue_type(filter_no_defect=True):
         if filter_no_defect:
             return [
                 {"wildcard": {"issue_type": "ti*"}},
@@ -194,30 +196,28 @@ class AnalyzerService:
             }
         }
 
-    def remove_models(self, model_info):
+    def remove_models(self, model_info: ModelInfo):
         try:
             logger.info("Started removing %s models from project %d",
-                        model_info["model_type"], model_info["project"])
+                        model_info.model_type.name, model_info.project)
             deleted_models = self.model_chooser.delete_old_model(
-                model_name=model_info["model_type"] + "_model",
-                project_id=model_info["project"])
+                model_info.model_type, model_info.project)
             logger.info("Finished removing %s models from project %d",
-                        model_info["model_type"], model_info["project"])
+                        model_info.model_type.name, model_info.project)
             return deleted_models
         except Exception as err:
             logger.error("Error while removing models.")
             logger.exception(err)
             return 0
 
-    def get_model_info(self, model_info):
+    def get_model_info(self, model_info: ModelInfo):
         try:
             logger.info("Started getting info for %s model from project %d",
-                        model_info["model_type"], model_info["project"])
+                        model_info.model_type.name, model_info.project)
             model_folder = self.model_chooser.get_model_info(
-                model_name=model_info["model_type"] + "_model",
-                project_id=model_info["project"])
+                model_info.model_type, model_info.project)
             logger.info("Finished getting info for %s model from project %d",
-                        model_info["model_type"], model_info["project"])
+                        model_info.model_type.name, model_info.project)
             return {"model_folder": model_folder}
         except Exception as err:
             logger.error("Error while getting info for models.")

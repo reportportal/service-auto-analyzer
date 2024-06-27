@@ -26,9 +26,9 @@ from sklearn.model_selection import train_test_split
 
 from app.commons import logging, namespace_finder, object_saving
 from app.commons.esclient import EsClient
-from app.commons.model.train import TrainInfo, ModelType
+from app.commons.model.ml import TrainInfo, ModelType
 from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
-from app.commons.model_chooser import ModelChooser, ModelTypeFolder
+from app.commons.model_chooser import ModelChooser
 from app.machine_learning.feature_encoding_configurer import FeatureEncodingConfigurer
 from app.machine_learning.models import (boosting_decision_maker, custom_boosting_decision_maker,
                                          weighted_similarity_calculator)
@@ -156,7 +156,7 @@ class AnalysisModelTraining:
     def get_info_template(project_info: TrainInfo, baseline_model: str, model_name: str, metric_name: str):
         return {"method": "training", "sub_model_type": "all", "model_type": project_info.model_type.name,
                 "baseline_model": [baseline_model], "new_model": [model_name],
-                "project_id": str(project_info.project_id), "model_saved": 0, "p_value": 1.0,
+                "project_id": str(project_info.project), "model_saved": 0, "p_value": 1.0,
                 "data_proportion": 0.0, "baseline_mean_metric": 0.0, "new_model_mean_metric": 0.0,
                 "bad_data_proportion": 0, "metric_name": metric_name, "errors": [], "errors_count": 0}
 
@@ -350,7 +350,7 @@ class AnalysisModelTraining:
                     weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
                     features_dict_with_saved_objects=features_dict_with_saved_objects)
                 _boosting_data_gatherer.set_defect_type_model(defect_type_model_to_use)
-                _boosting_data_gatherer.fill_prevously_gathered_features(
+                _boosting_data_gatherer.fill_previously_gathered_features(
                     [utils.to_number_list(_suggest_res["_source"]["modelFeatureValues"])],
                     _suggest_res["_source"]["modelFeatureNames"])
                 feature_data, _ = _boosting_data_gatherer.gather_features_info()
@@ -377,11 +377,10 @@ class AnalysisModelTraining:
         new_model_folder = "%s_model/%s/" % (project_info.model_type.name, model_name)
         self.new_model = (
             custom_boosting_decision_maker.CustomBoostingDecisionMaker(
-                object_saving.create(self.app_config, project_id=project_info.project_id, path=new_model_folder)))
+                object_saving.create(self.app_config, project_id=project_info.project, path=new_model_folder)))
         self.new_model.add_config_info(full_config, features, monotonous_features)
 
-        defect_type_model_to_use = self.model_chooser.choose_model(project_info.project_id,
-                                                                   ModelTypeFolder.DEFECT_TYPE_MODEL)
+        defect_type_model_to_use = self.model_chooser.choose_model(project_info.project, ModelType.defect_type)
 
         metrics_to_gather = ["F1", "Mean Reciprocal Rank"]
         train_log_info = {}
@@ -395,7 +394,7 @@ class AnalysisModelTraining:
         try:
             logger.debug("Initialized training model '%s'", project_info.model_type.name)
             train_data, labels, test_item_ids_with_pos, features_dict_with_saved_objects = self.gather_data(
-                project_info.model_type, project_info.project_id,
+                project_info.model_type, project_info.project,
                 self.new_model.get_feature_ids(), defect_type_model_to_use, full_config)
             self.new_model.features_dict_with_saved_objects = features_dict_with_saved_objects
 
@@ -449,8 +448,7 @@ class AnalysisModelTraining:
                 else:
                     for metric in metrics_to_gather:
                         train_log_info[metric]["model_saved"] = 0
-                self.model_chooser.delete_old_model(
-                    "%s_model" % project_info.model_type.name, project_info.project_id)
+                self.model_chooser.delete_old_model(project_info.model_type, project_info.project)
                 self.new_model.save_model()
         except Exception as err:
             logger.error(err)

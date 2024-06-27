@@ -18,9 +18,10 @@ from typing import Optional
 
 import numpy as np
 
-from app.machine_learning.models.defect_type_model import DefectTypeModel
 from app.commons import logging, similarity_calculator, object_saving
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
+from app.machine_learning.models.defect_type_model import DefectTypeModel
+from app.machine_learning.training.training_defect_type_model import DATA_FIELD
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
@@ -277,7 +278,7 @@ class BoostingFeaturizer:
         result = {}
         for issue_type in scores_by_issue_type:
             compared_log = scores_by_issue_type[issue_type]["compared_log"]
-            det_message = compared_log["_source"]["detected_message_without_params_extended"]
+            det_message = compared_log["_source"][DATA_FIELD]
             mr_hit = scores_by_issue_type[issue_type]["mrHit"]
             issue_type_to_compare = mr_hit["_source"]["issue_type"]
             result[issue_type] = 0.0

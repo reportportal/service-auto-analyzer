@@ -22,10 +22,10 @@ from app.amqp.amqp import AmqpClient
 from app.commons import logging
 from app.commons import object_saving
 from app.commons.esclient import EsClient
+from app.commons.log_requests import LogRequests
 from app.commons.model.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult, \
     SearchConfig, ApplicationConfig, Launch
 from app.commons.model.ml import ModelType
-from app.commons.log_requests import LogRequests
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.similarity_calculator import SimilarityCalculator
@@ -36,6 +36,11 @@ from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.autoAnalyzerService")
 EARLY_FINISH = False
+SPECIAL_FIELDS_BOOST_SCORES = [
+    ("detected_message_without_params_extended", 2.0),
+    ("only_numbers", 2.0), ("potential_status_codes", 8.0),
+    ("found_tests_and_methods", 2), ("test_item_name", 2.0)
+]
 
 
 class AutoAnalyzerService(AnalyzerService):
@@ -147,11 +152,7 @@ class AutoAnalyzerService(AnalyzerService):
                                                 field_name="found_exceptions",
                                                 boost=8.0,
                                                 override_min_should_match="1"))
-        for field, boost_score in [
-            ("detected_message_without_params_extended", 2.0),
-            ("only_numbers", 2.0), ("potential_status_codes", 8.0),
-            ("found_tests_and_methods", 2), ("test_item_name", 2.0)
-        ]:
+        for field, boost_score in SPECIAL_FIELDS_BOOST_SCORES:
             if log["_source"][field].strip():
                 should = utils.create_path(query, ('query', 'bool', 'should'), [])
                 should.append(

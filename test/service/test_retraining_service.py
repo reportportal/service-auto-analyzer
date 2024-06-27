@@ -28,109 +28,109 @@ class TestRetrainingService(TestService):
         """Test train models triggering"""
         tests = [
             {
-                "train_info": TrainInfo(model_type=ModelType.defect_type, project_id=1, gathered_metric_total=5),
+                "train_info": TrainInfo(model_type=ModelType.defect_type, project=1, gathered_metric_total=5),
                 "trigger_info": {},
                 "train_result": (0, {}),
                 "is_model_trained": False
             },
             {
-                "train_info": TrainInfo(model_type=ModelType.defect_type, project_id=1, gathered_metric_total=5),
+                "train_info": TrainInfo(model_type=ModelType.defect_type, project=1, gathered_metric_total=5),
                 "trigger_info": {"gathered_metric_total": 120},
                 "train_result": (0, {}),
                 "is_model_trained": False
             },
             {
-                "train_info": TrainInfo(model_type=ModelType.defect_type, project_id=1, gathered_metric_total=5),
+                "train_info": TrainInfo(model_type=ModelType.defect_type, project=1, gathered_metric_total=5),
                 "trigger_info": {"gathered_metric_total": 94, "gathered_metric_since_training": 94},
                 "train_result": (0, {}),
                 "is_model_trained": False
             },
             {
-                "train_info": TrainInfo(model_type=ModelType.defect_type, project_id=1, gathered_metric_total=5),
+                "train_info": TrainInfo(model_type=ModelType.defect_type, project=1, gathered_metric_total=5),
                 "trigger_info": {"gathered_metric_total": 95, "gathered_metric_since_training": 95},
                 "train_result": (123, {}),
                 "is_model_trained": True
             },
             {
-                "train_info": TrainInfo(model_type=ModelType.defect_type, project_id=1, gathered_metric_total=5),
+                "train_info": TrainInfo(model_type=ModelType.defect_type, project=1, gathered_metric_total=5),
                 "trigger_info": {"gathered_metric_total": 120, "gathered_metric_since_training": 67},
                 "train_result": (0, {}),
                 "is_model_trained": False
             },
             {
-                "train_info": TrainInfo(model_type=ModelType.defect_type, project_id=1, gathered_metric_total=5),
+                "train_info": TrainInfo(model_type=ModelType.defect_type, project=1, gathered_metric_total=5),
                 "trigger_info": {"gathered_metric_total": 85, "gathered_metric_since_training": 95},
                 "train_result": (123, {}),
                 "is_model_trained": False
             },
             {
-                "train_info": TrainInfo(model_type=ModelType.suggestion, project_id=1, gathered_metric_total=3),
+                "train_info": TrainInfo(model_type=ModelType.suggestion, project=1, gathered_metric_total=3),
                 "trigger_info": {},
                 "train_result": (0, {}),
                 "is_model_trained": False
             },
             {
-                "train_info": TrainInfo(model_type=ModelType.suggestion, project_id=1, gathered_metric_total=3),
+                "train_info": TrainInfo(model_type=ModelType.suggestion, project=1, gathered_metric_total=3),
                 "trigger_info": {"gathered_metric_total": 14},
                 "train_result": (0, {}),
                 "is_model_trained": False
             },
             {
-                "train_info": TrainInfo(model_type=ModelType.suggestion, project_id=1, gathered_metric_total=5),
+                "train_info": TrainInfo(model_type=ModelType.suggestion, project=1, gathered_metric_total=5),
                 "trigger_info": {"gathered_metric_total": 90, "gathered_metric_since_training": 35},
                 "train_result": (0, {}),
                 "is_model_trained": False
             },
             {
-                "train_info": TrainInfo(model_type=ModelType.suggestion, project_id=1, gathered_metric_total=5),
+                "train_info": TrainInfo(model_type=ModelType.suggestion, project=1, gathered_metric_total=5),
                 "trigger_info": {"gathered_metric_total": 120, "gathered_metric_since_training": 30},
                 "train_result": (0, {}),
                 "is_model_trained": False
             },
             {
-                "train_info": TrainInfo(model_type=ModelType.suggestion, project_id=1, gathered_metric_total=5),
+                "train_info": TrainInfo(model_type=ModelType.suggestion, project=1, gathered_metric_total=5),
                 "trigger_info": {"gathered_metric_total": 95, "gathered_metric_since_training": 45},
                 "train_result": (100, {}),
                 "is_model_trained": True
             },
             {
-                "train_info": TrainInfo(model_type=ModelType.suggestion, project_id=1, gathered_metric_total=5),
+                "train_info": TrainInfo(model_type=ModelType.suggestion, project=1, gathered_metric_total=5),
                 "trigger_info": {"gathered_metric_total": 89, "gathered_metric_since_training": 55},
                 "train_result": (0, {}),
                 "is_model_trained": False
             },
             {
-                "train_info": TrainInfo(model_type=ModelType.auto_analysis, project_id=1, gathered_metric_total=3),
+                "train_info": TrainInfo(model_type=ModelType.auto_analysis, project=1, gathered_metric_total=3),
                 "trigger_info": {},
                 "train_result": (0, {}),
                 "is_model_trained": False
             },
             {
-                "train_info": TrainInfo(model_type=ModelType.auto_analysis, project_id=1, gathered_metric_total=3),
+                "train_info": TrainInfo(model_type=ModelType.auto_analysis, project=1, gathered_metric_total=3),
                 "trigger_info": {"gathered_metric_total": 14},
                 "train_result": (0, {}),
                 "is_model_trained": False
             },
             {
-                "train_info": TrainInfo(model_type=ModelType.auto_analysis, project_id=1, gathered_metric_total=5),
+                "train_info": TrainInfo(model_type=ModelType.auto_analysis, project=1, gathered_metric_total=5),
                 "trigger_info": {"gathered_metric_total": 290, "gathered_metric_since_training": 92},
                 "train_result": (0, {}),
                 "is_model_trained": False
             },
             {
-                "train_info": TrainInfo(model_type=ModelType.auto_analysis, project_id=1, gathered_metric_total=5),
+                "train_info": TrainInfo(model_type=ModelType.auto_analysis, project=1, gathered_metric_total=5),
                 "trigger_info": {"gathered_metric_total": 301, "gathered_metric_since_training": 93},
                 "train_result": (0, {}),
                 "is_model_trained": False
             },
             {
-                "train_info": TrainInfo(model_type=ModelType.auto_analysis, project_id=1, gathered_metric_total=5),
+                "train_info": TrainInfo(model_type=ModelType.auto_analysis, project=1, gathered_metric_total=5),
                 "trigger_info": {"gathered_metric_total": 295, "gathered_metric_since_training": 95},
                 "train_result": (100, {}),
                 "is_model_trained": True
             },
             {
-                "train_info": TrainInfo(model_type=ModelType.auto_analysis, project_id=1, gathered_metric_total=5),
+                "train_info": TrainInfo(model_type=ModelType.auto_analysis, project=1, gathered_metric_total=5),
                 "trigger_info": {"gathered_metric_total": 291, "gathered_metric_since_training": 95},
                 "train_result": (0, {}),
                 "is_model_trained": False

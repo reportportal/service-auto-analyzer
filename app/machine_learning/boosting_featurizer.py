@@ -21,7 +21,7 @@ import numpy as np
 from app.commons import logging, similarity_calculator, object_saving
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.machine_learning.models.defect_type_model import DefectTypeModel
-from app.machine_learning.training.training_defect_type_model import DATA_FIELD
+from app.machine_learning.models.defect_type_model import DATA_FIELD
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")

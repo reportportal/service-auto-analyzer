@@ -25,6 +25,7 @@ from app.machine_learning.models import MlModel
 from app.utils import text_processing
 
 MODEL_FILES: list[str] = ['count_vectorizer_models.pickle', 'models.pickle']
+DATA_FIELD = 'detected_message_without_params_extended'
 
 
 class DefectTypeModel(MlModel):

@@ -29,13 +29,11 @@ from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
 from app.commons.model.ml import TrainInfo
 from app.commons.model_chooser import ModelChooser
-from app.machine_learning.models import defect_type_model, custom_defect_type_model
+from app.machine_learning.models import DefectTypeModel, CustomDefectTypeModel
+from app.machine_learning.models.defect_type_model import DATA_FIELD
 from app.utils import utils, text_processing
 
 logger = logging.getLogger('analyzerApp.trainingDefectTypeModel')
-
-DATA_FIELD = 'detected_message_without_params_extended'
-
 
 class DefectTypeModelTraining:
     app_config: ApplicationConfig
@@ -47,8 +45,7 @@ class DefectTypeModelTraining:
         self.label2inds = {"ab": 0, "pb": 1, "si": 2}
         self.due_proportion = 0.2
         self.es_client = EsClient(app_config=app_config)
-        self.baseline_model = defect_type_model.DefectTypeModel(
-            object_saving.create_filesystem(search_cfg.GlobalDefectTypeModelFolder))
+        self.baseline_model = DefectTypeModel(object_saving.create_filesystem(search_cfg.GlobalDefectTypeModelFolder))
         self.baseline_model.load_model()
         self.model_chooser = model_chooser
 
@@ -89,7 +86,7 @@ class DefectTypeModelTraining:
 
     def get_message_query_by_label(self, label):
         return {
-            "_source": [DATA_FIELD, "issue_type", "launch_id"],
+            "_source": [DATA_FIELD, "issue_type", "launch_id", '_id'],
             "sort": {"start_time": "desc"},
             "size": self.app_config.esChunkNumber,
             "query": {
@@ -103,9 +100,9 @@ class DefectTypeModelTraining:
                         {
                             "bool": {
                                 "should": [
-                                    {"wildcard": {"issue_type": "{}*".format(label.upper())}},
-                                    {"wildcard": {"issue_type": "{}*".format(label.lower())}},
-                                    {"wildcard": {"issue_type": "{}*".format(label)}},
+                                    {"wildcard": {"issue_type": f'{label.upper()}*'}},
+                                    {"wildcard": {"issue_type": f'{label.lower()}*'}},
+                                    {"wildcard": {"issue_type": f'{label}*'}},
                                 ]
                             }
                         }
@@ -136,7 +133,7 @@ class DefectTypeModelTraining:
         return data
 
     @staticmethod
-    def perform_light_deduplication(data):
+    def perform_light_deduplication(data: list[tuple[str, str, str]]) -> tuple[dict[int, list[int]], list[int]]:
         text_messages_set = {}
         logs_to_train_idx = []
         additional_logs = {}
@@ -180,7 +177,7 @@ class DefectTypeModelTraining:
                 logger.debug(f'Label to gather data {label}.')
                 found_data = self.query_data(project_info.project, label)
                 for _, _, _issue_type in found_data:
-                    if re.search(r'\w{2}_\w+', _issue_type) and _issue_type not in found_sub_categories:
+                    if re.search(r'[^_]_.+', _issue_type) and _issue_type not in found_sub_categories:
                         found_sub_categories[_issue_type] = []
                         labels_to_find_queue.put(_issue_type)
                 if label in self.label2inds:
@@ -203,7 +200,8 @@ class DefectTypeModelTraining:
         train_log_info['all']['errors_count'] = errors_count
         return data, found_sub_categories, train_log_info
 
-    def creating_binary_target_data(self, label, data, found_sub_categories):
+    def create_binary_target_data(self, label: str, data: list[tuple[str, str, str]],
+                                  found_sub_categories: dict[str, list[tuple[str, str, str]]]):
         data_to_train = data
         if label in found_sub_categories:
             data_to_train = [d for d in data if d[2] != label] + found_sub_categories[label]
@@ -231,7 +229,7 @@ class DefectTypeModelTraining:
             _count_vectorizer = self.baseline_model.count_vectorizer_models[label]
             new_model.count_vectorizer_models[label] = _count_vectorizer
 
-    def train_several_times(self, new_model, label: str, data: list[tuple[str, str, str]],
+    def train_several_times(self, new_model: DefectTypeModel, label: str, data: list[tuple[str, str, str]],
                             found_sub_categories: dict[str, list[tuple[str, str, str]]]):
         new_model_results = []
         baseline_model_results = []
@@ -240,7 +238,7 @@ class DefectTypeModelTraining:
         bad_data = False
 
         logs_to_train_idx, labels_filtered, data_to_train, additional_logs, proportion_binary_labels = \
-            self.creating_binary_target_data(label, data, found_sub_categories)
+            self.create_binary_target_data(label, data, found_sub_categories)
 
         if proportion_binary_labels < self.due_proportion:
             logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
@@ -249,8 +247,7 @@ class DefectTypeModelTraining:
         if not bad_data:
             for random_state in random_states:
                 x_train, x_test, y_train, y_test = self.split_train_test(
-                    logs_to_train_idx, data_to_train, labels_filtered,
-                    additional_logs, label,
+                    logs_to_train_idx, data_to_train, labels_filtered, additional_logs, label,
                     random_state=random_state)
                 new_model.train_model(label, x_train, y_train)
                 logger.debug("New model results")
@@ -269,7 +266,7 @@ class DefectTypeModelTraining:
         model_name = f'{project_info.model_type.name}_model_{datetime.now().strftime("%d.%m.%y")}'
         baseline_model = os.path.basename(self.search_cfg.GlobalDefectTypeModelFolder)
         new_model_folder = f'{project_info.model_type.name}_model/{model_name}/'
-        new_model = custom_defect_type_model.CustomDefectTypeModel(
+        new_model = CustomDefectTypeModel(
             object_saving.create(self.app_config, project_info.project, new_model_folder))
 
         data, found_sub_categories, train_log_info = self.load_data_for_training(
@@ -316,7 +313,7 @@ class DefectTypeModelTraining:
                     logger.debug("Custom model '%s' should be saved" % label)
 
                     logs_to_train_idx, labels_filtered, data_to_train, additional_logs, proportion_binary_labels = \
-                        self.creating_binary_target_data(label, data, found_sub_categories)
+                        self.create_binary_target_data(label, data, found_sub_categories)
                     if proportion_binary_labels < self.due_proportion:
                         logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
                         bad_data = True

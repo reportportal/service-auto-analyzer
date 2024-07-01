@@ -129,7 +129,7 @@ def extract_all_exceptions(bodies):
     return logs_with_exceptions
 
 
-def calculate_proportions_for_labels(labels):
+def calculate_proportions_for_labels(labels: list[int]) -> float:
     counted_labels = Counter(labels)
     if len(counted_labels.keys()) >= 2:
         min_val = min(counted_labels.values())

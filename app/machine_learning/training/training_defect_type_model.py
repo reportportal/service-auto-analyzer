@@ -35,6 +35,7 @@ from app.utils import utils, text_processing
 
 logger = logging.getLogger('analyzerApp.trainingDefectTypeModel')
 
+
 class DefectTypeModelTraining:
     app_config: ApplicationConfig
     search_cfg: SearchConfig

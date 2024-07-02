@@ -13,11 +13,9 @@
 #  limitations under the License.
 
 import os
-import re
 from datetime import datetime
-from queue import Queue
 from time import time
-from typing import Any
+from typing import Any, Optional
 
 import elasticsearch.helpers
 import numpy as np
@@ -32,8 +30,10 @@ from app.commons.model_chooser import ModelChooser
 from app.machine_learning.models import DefectTypeModel, CustomDefectTypeModel
 from app.machine_learning.models.defect_type_model import DATA_FIELD
 from app.utils import utils, text_processing
+from app.utils.defaultdict import DefaultDict
 
-logger = logging.getLogger('analyzerApp.trainingDefectTypeModel')
+LOGGER = logging.getLogger('analyzerApp.trainingDefectTypeModel')
+TRAIN_DATA_RANDOM_STATES = [1257, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029]
 
 
 class DefectTypeModelTraining:
@@ -85,11 +85,11 @@ class DefectTypeModelTraining:
             x_test.append(data[ind][0])
         return x_train, x_test, y_train, y_test
 
-    def get_message_query_by_label(self, label):
+    @staticmethod
+    def get_messages_by_issue_type(issue_type_pattern: str):
         return {
             "_source": [DATA_FIELD, "issue_type", "launch_id", '_id'],
             "sort": {"start_time": "desc"},
-            "size": self.app_config.esChunkNumber,
             "query": {
                 "bool": {
                     "filter": [
@@ -101,9 +101,11 @@ class DefectTypeModelTraining:
                         {
                             "bool": {
                                 "should": [
-                                    {"wildcard": {"issue_type": f'{label.upper()}*'}},
-                                    {"wildcard": {"issue_type": f'{label.lower()}*'}},
-                                    {"wildcard": {"issue_type": f'{label}*'}},
+                                    {
+                                        "wildcard": {
+                                            "issue_type": {"value": issue_type_pattern, "case_insensitive": True}
+                                        }
+                                    }
                                 ]
                             }
                         }
@@ -115,22 +117,80 @@ class DefectTypeModelTraining:
             }
         }
 
-    def query_data(self, project: int, label: str) -> list[tuple[str, str, str]]:
-        message_launch_dict = set()
-        project_index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
+    def execute_data_query(self, project_index_name, query):
         data = []
-        for r in elasticsearch.helpers.scan(
-                self.es_client.es_client, query=self.get_message_query_by_label(label), index=project_index_name):
+        query_result = elasticsearch.helpers.scan(
+            self.es_client.es_client, query=self.get_messages_by_issue_type(query), index=project_index_name,
+            size=self.app_config.esChunkNumber)
+        message_launch_dict = set()
+        for r in query_result:
             detected_message = r['_source'][DATA_FIELD]
             if not detected_message.strip():
                 continue
             text_message_normalized = text_processing.normalize_message(detected_message)
-            message_info = (text_message_normalized, r["_source"]["launch_id"], r["_source"]["issue_type"])
+            issue_type = r["_source"]["issue_type"]
+            message_info = (text_message_normalized, r["_source"]["launch_id"], issue_type)
             if message_info not in message_launch_dict:
-                data.append((detected_message, label, r["_source"]["issue_type"]))
+                data.append((detected_message, issue_type[:2], issue_type))
                 message_launch_dict.add(message_info)
             if len(data) >= self.search_cfg.MaxLogsForDefectTypeModel:
                 break
+        return data
+
+    def query_label(self, query: str, index: str, stat: Optional[dict[str, Any]]) -> list[tuple[str, str, str]]:
+        LOGGER.debug(f'Query to gather data {query}.')
+        time_querying = time()
+        found_data = self.execute_data_query(index, query)
+        time_spent = time() - time_querying
+        LOGGER.debug(f'Finished querying "{query}" for {time_spent:.2f} s')
+        if stat:
+            stat['time_spent'] = time_spent
+            stat['data_size'] = len(found_data)
+        return found_data
+
+    def query_data(self, projects: list[int],
+                   stat_data_storage: Optional[DefaultDict[str, dict[str, Any]]]) -> list[tuple[str, str, str]]:
+        data = []
+        errors = []
+        error_count = 0
+        start_time = time()
+        for project in projects:
+            project_index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
+            for label in self.label2inds:
+                query = f'{label}???'
+                try:
+                    data.extend(
+                        self.query_label(
+                            query, project_index_name, stat_data_storage[label] if stat_data_storage else None))
+                except Exception as exc:
+                    LOGGER.exception(exc)
+                    errors.append(utils.extract_exception(exc))
+                    error_count += 1
+                query = f'{label}_*'
+                try:
+                    found_data = self.execute_data_query(project_index_name, query)
+                    sub_labels = {l[2] for l in found_data}
+                    for sub_label in sub_labels:
+                        try:
+                            data.extend(
+                                self.query_label(
+                                    sub_label, project_index_name,
+                                    stat_data_storage[sub_label] if stat_data_storage else None))
+                        except Exception as exc:
+                            LOGGER.exception(exc)
+                            errors.append(utils.extract_exception(exc))
+                            error_count += 1
+                except Exception as exc:
+                    LOGGER.exception(exc)
+                    errors.append(utils.extract_exception(exc))
+                    error_count += 1
+
+        LOGGER.debug(f'Data gathered: {len(data)}')
+        if stat_data_storage:
+            stat_data_storage['all']['data_size'] = len(data)
+            stat_data_storage['all']['errors'] = errors
+            stat_data_storage['all']['errors_count'] = error_count
+            stat_data_storage['all']['time_spent'] = start_time - time()
         return data
 
     @staticmethod
@@ -159,50 +219,7 @@ class DefectTypeModelTraining:
                 'bad_data_proportion': 0, 'metric_name': 'F1', 'errors': [], 'errors_count': 0,
                 'time_spent': 0.0}
 
-    def load_data_for_training(self, project_info: TrainInfo, baseline_model: str, model_name: str) \
-            -> tuple[list[tuple[str, str, str]], dict[str, list[tuple[str, str, str]]], dict[str, dict[str, Any]]]:
-        train_log_info = {}
-        data = []
-        found_sub_categories = {}
-        labels_to_find_queue = Queue()
-        errors = []
-        errors_count = 0
-
-        for label in self.label2inds:
-            labels_to_find_queue.put(label)
-        while not labels_to_find_queue.empty():
-            try:
-                label = labels_to_find_queue.get()
-                train_log_info[label] = self.get_info_template(project_info, label, baseline_model, model_name)
-                time_querying = time()
-                logger.debug(f'Label to gather data {label}.')
-                found_data = self.query_data(project_info.project, label)
-                for _, _, _issue_type in found_data:
-                    if re.search(r'[^_]_.+', _issue_type) and _issue_type not in found_sub_categories:
-                        found_sub_categories[_issue_type] = []
-                        labels_to_find_queue.put(_issue_type)
-                if label in self.label2inds:
-                    data.extend(found_data)
-                else:
-                    found_sub_categories[label] = found_data
-                time_spent = time() - time_querying
-                logger.debug(f'Finished querying for {time_spent:.2f} s')
-                train_log_info[label]['time_spent'] = time_spent
-                train_log_info[label]['data_size'] = len(found_data)
-            except Exception as exc:
-                logger.exception(exc)
-                errors.append(utils.extract_exception(exc))
-                errors_count += 1
-            labels_to_find_queue.task_done()
-        logger.debug(f'Data gathered: {len(data)}')
-        train_log_info['all'] = self.get_info_template(project_info, 'all', baseline_model, model_name)
-        train_log_info['all']['data_size'] = len(data)
-        train_log_info['all']['errors'] = errors
-        train_log_info['all']['errors_count'] = errors_count
-        return data, found_sub_categories, train_log_info
-
-    def create_binary_target_data(self, label: str, data: list[tuple[str, str, str]],
-                                  found_sub_categories: dict[str, list[tuple[str, str, str]]]):
+    def create_binary_target_data(self, label: str, data: list[tuple[str, str, str]]):
         data_to_train = data
         if label in found_sub_categories:
             data_to_train = [d for d in data if d[2] != label] + found_sub_categories[label]
@@ -230,34 +247,31 @@ class DefectTypeModelTraining:
             _count_vectorizer = self.baseline_model.count_vectorizer_models[label]
             new_model.count_vectorizer_models[label] = _count_vectorizer
 
-    def train_several_times(self, new_model: DefectTypeModel, label: str, data: list[tuple[str, str, str]],
-                            found_sub_categories: dict[str, list[tuple[str, str, str]]]):
+    def train_several_times(self, new_model: DefectTypeModel, label: str, data: list[tuple[str, str, str]]):
         new_model_results = []
         baseline_model_results = []
-        random_states = [1257, 1873, 1917, 2477, 3449,
-                         353, 4561, 5417, 6427, 2029]
         bad_data = False
 
         logs_to_train_idx, labels_filtered, data_to_train, additional_logs, proportion_binary_labels = \
-            self.create_binary_target_data(label, data, found_sub_categories)
+            self.create_binary_target_data(label, data)
 
         if proportion_binary_labels < self.due_proportion:
-            logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
+            LOGGER.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
             bad_data = True
 
         if not bad_data:
-            for random_state in random_states:
+            for random_state in TRAIN_DATA_RANDOM_STATES:
                 x_train, x_test, y_train, y_test = self.split_train_test(
                     logs_to_train_idx, data_to_train, labels_filtered, additional_logs, label,
                     random_state=random_state)
                 new_model.train_model(label, x_train, y_train)
-                logger.debug("New model results")
+                LOGGER.debug("New model results")
                 f1, accuracy = new_model.validate_model(label, x_test, y_test)
                 new_model_results.append(f1)
-                if label in found_sub_categories:
+                if label[2] == '_':
+                    # No baseline results for sub-categories
                     baseline_model_results.append(0.001)
                 else:
-                    logger.debug("Baseline results")
                     f1, accuracy = self.baseline_model.validate_model(label, x_test, y_test)
                     baseline_model_results.append(f1)
         return baseline_model_results, new_model_results, bad_data
@@ -270,8 +284,9 @@ class DefectTypeModelTraining:
         new_model = CustomDefectTypeModel(
             object_saving.create(self.app_config, project_info.project, new_model_folder))
 
-        data, found_sub_categories, train_log_info = self.load_data_for_training(
-            project_info, baseline_model, model_name)
+        train_log_info = DefaultDict(lambda k: self.get_info_template(project_info, k, baseline_model, model_name))
+        data = self.query_data([project_info.project], train_log_info)
+        unique_labels = {l[2] for l in data}
 
         data_proportion_min = 1.0
         p_value_max = 0.0
@@ -281,18 +296,17 @@ class DefectTypeModelTraining:
         f1_baseline_models = []
         errors = []
         errors_count = 0
-        for label in list(self.label2inds.keys()) + list(found_sub_categories.keys()):
+        for label in unique_labels:
             try:
                 time_training = time()
-                logger.debug(f'Label to train the model {label}')
+                LOGGER.debug(f'Label to train the model {label}')
 
-                baseline_model_results, new_model_results, bad_data = self.train_several_times(
-                    new_model, label, data, found_sub_categories)
+                baseline_model_results, new_model_results, bad_data = self.train_several_times(new_model, label, data)
 
                 use_custom_model = False
                 if not bad_data:
-                    logger.debug("Baseline test results %s", baseline_model_results)
-                    logger.debug("New model test results %s", new_model_results)
+                    LOGGER.debug("Baseline test results %s", baseline_model_results)
+                    LOGGER.debug("New model test results %s", new_model_results)
                     f_value, p_value = stats.f_oneway(baseline_model_results, new_model_results)
                     if p_value is None:
                         p_value = 1.0
@@ -304,19 +318,19 @@ class DefectTypeModelTraining:
                         p_value_max = max(p_value_max, p_value)
                         use_custom_model = True
                     all_bad_data = 0
-                    logger.debug(
+                    LOGGER.debug(
                         """Model training validation results:
                             p-value=%.3f mean baseline=%.3f mean new model=%.3f""",
                         p_value, np.mean(baseline_model_results), np.mean(new_model_results))
                 train_log_info[label]["bad_data_proportion"] = int(bad_data)
 
                 if use_custom_model:
-                    logger.debug("Custom model '%s' should be saved" % label)
+                    LOGGER.debug("Custom model '%s' should be saved" % label)
 
                     logs_to_train_idx, labels_filtered, data_to_train, additional_logs, proportion_binary_labels = \
-                        self.create_binary_target_data(label, data, found_sub_categories)
+                        self.create_binary_target_data(label, data)
                     if proportion_binary_labels < self.due_proportion:
-                        logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
+                        LOGGER.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
                         bad_data = True
                     train_log_info[label]["bad_data_proportion"] = int(bad_data)
                     train_log_info[label]["data_proportion"] = proportion_binary_labels
@@ -328,7 +342,7 @@ class DefectTypeModelTraining:
                             train_log_info[label]["data_proportion"], data_proportion_min)
                         new_model.train_model(label, x_train, y_train)
                         custom_models.append(label)
-                        if label not in found_sub_categories:
+                        if label[2] != '_':  # Not a sub-category
                             f1_baseline_models.append(train_log_info[label]["baseline_mean_metric"])
                             f1_chosen_models.append(train_log_info[label]["new_model_mean_metric"])
                     else:
@@ -340,23 +354,23 @@ class DefectTypeModelTraining:
                         f1_chosen_models.append(train_log_info[label]["baseline_mean_metric"])
                 train_log_info[label]["time_spent"] += (time() - time_training)
             except Exception as exc:
-                logger.exception(exc)
+                LOGGER.exception(exc)
                 train_log_info[label]["errors_count"] += 1
                 train_log_info[label]["errors"].append(utils.extract_exception(exc))
                 errors.append(utils.extract_exception(exc))
                 errors_count += 1
                 self.copy_model_part_from_baseline(new_model, label)
 
-        logger.debug("Custom models were for labels: %s" % custom_models)
+        LOGGER.debug("Custom models were for labels: %s" % custom_models)
         if len(custom_models):
-            logger.debug("The custom model should be saved")
+            LOGGER.debug("The custom model should be saved")
             train_log_info["all"]["model_saved"] = 1
             train_log_info["all"]["p_value"] = p_value_max
             self.model_chooser.delete_old_model(project_info.model_type, project_info.project)
             new_model.save_model()
 
         time_spent = time() - start_time
-        logger.info("Finished for %d s", time_spent)
+        LOGGER.info("Finished for %d s", time_spent)
         train_log_info["all"]["time_spent"] = time_spent
         train_log_info["all"]["data_proportion"] = data_proportion_min
         train_log_info["all"]["errors_count"] += errors_count

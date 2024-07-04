@@ -139,22 +139,35 @@ def calculate_proportions_for_labels(labels: list[int]) -> float:
     return 0.0
 
 
-def rebalance_data(train_data, train_labels, due_proportion):
-    one_data = [train_data[i] for i in range(len(train_data)) if train_labels[i] == 1]
-    zero_data = [train_data[i] for i in range(len(train_data)) if train_labels[i] == 0]
+def balance_data(train_data_indexes: list[int], train_labels: list[int],
+                 due_proportion: float) -> tuple[list[int], list[int], float]:
+    one_data = [train_data_indexes[i] for i in range(len(train_data_indexes)) if train_labels[i] == 1]
+    zero_data = [train_data_indexes[i] for i in range(len(train_data_indexes)) if train_labels[i] == 0]
     zero_count = len(zero_data)
     one_count = len(one_data)
+    min_count = min(zero_count, one_count)
+    if zero_count > one_count:
+        min_data = one_data
+        max_data = zero_data
+        min_label = 1
+        max_label = 0
+    else:
+        min_data = zero_data
+        max_data = one_data
+        min_label = 0
+        max_label = 1
+
     all_data = []
     all_data_labels = []
-    real_proportion = 0.0 if zero_count < 0.001 else np.round(one_count / zero_count, 3)
-    if zero_count > 0 and real_proportion < due_proportion:
-        all_data.extend(one_data)
-        all_data_labels.extend([1] * len(one_data))
+    real_proportion = 0.0 if min_count < 1 else np.round(one_count / zero_count, 3)
+    if min_count > 0 and real_proportion < due_proportion:
+        all_data.extend(min_data)
+        all_data_labels.extend([min_label] * len(min_data))
         random.seed(1763)
-        random.shuffle(zero_data)
-        zero_size = int(one_count * (1 / due_proportion) - 1)
-        all_data.extend(zero_data[:zero_size])
-        all_data_labels.extend([0] * zero_size)
+        random.shuffle(max_data)
+        max_size = int(min_count * (1 / due_proportion) - 1)
+        all_data.extend(max_data[:max_size])
+        all_data_labels.extend([max_label] * max_size)
         real_proportion = calculate_proportions_for_labels(all_data_labels)
         if real_proportion / due_proportion >= 0.9:
             real_proportion = due_proportion
@@ -239,7 +252,7 @@ def gather_feature_list(gathered_data_dict, feature_ids, to_list=False):
     return features_array.tolist() if to_list else features_array
 
 
-def extract_exception(err):
+def extract_exception(err: Exception) -> str:
     err_message = traceback.format_exception_only(type(err), err)
     if len(err_message):
         err_message = err_message[-1]

@@ -15,6 +15,7 @@
 from collections import Counter
 
 import pandas as pd
+import re
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import classification_report, confusion_matrix
@@ -23,21 +24,33 @@ from sklearn.metrics import f1_score, accuracy_score
 from app.commons.object_saving.object_saver import ObjectSaver
 from app.machine_learning.models import MlModel
 from app.utils import text_processing
+from app.utils.defaultdict import DefaultDict
 
 MODEL_FILES: list[str] = ['count_vectorizer_models.pickle', 'models.pickle']
 DATA_FIELD = 'detected_message_without_params_extended'
+BASE_DEFECT_TYPE_PATTERN = re.compile(r'([^_]+)_.*')
+
+
+def get_model(self: DefaultDict, model_name: str):
+    m = BASE_DEFECT_TYPE_PATTERN.match(model_name)
+    if not m:
+        raise KeyError(model_name)
+    base_model_name = m.group(1)
+    if not base_model_name:
+        raise KeyError(model_name)
+    return self[base_model_name]
 
 
 class DefectTypeModel(MlModel):
     _loaded: bool
-    count_vectorizer_models: dict[str, TfidfVectorizer]
-    models: dict[str, RandomForestClassifier]
+    count_vectorizer_models: DefaultDict[str, TfidfVectorizer]
+    models: DefaultDict[str, RandomForestClassifier]
 
     def __init__(self, object_saver: ObjectSaver, tags: str = 'global defect type model') -> None:
         super().__init__(object_saver, tags)
         self._loaded = False
-        self.count_vectorizer_models = {}
-        self.models = {}
+        self.count_vectorizer_models = DefaultDict(get_model)
+        self.models = DefaultDict(get_model)
 
     @property
     def loaded(self) -> bool:
@@ -67,7 +80,7 @@ class DefectTypeModel(MlModel):
         self.models[name] = model
         self._loaded = True
 
-    def validate_model(self, name, test_data_x, labels):
+    def validate_model(self, name: str, test_data_x, labels) -> tuple[float, float]:
         assert name in self.models
         print("Label distribution:", Counter(labels))
         print("Model name: %s" % name)
@@ -91,7 +104,7 @@ class DefectTypeModel(MlModel):
             results.append((name, f1, accuracy))
         return results
 
-    def predict(self, data, model_name):
+    def predict(self, data: list, model_name: str) -> tuple[list, list]:
         assert model_name in self.models
         if len(data) == 0:
             return [], []

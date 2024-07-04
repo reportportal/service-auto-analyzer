@@ -20,14 +20,29 @@ _RT = TypeVar("_RT")
 
 
 class DefaultDict(_defaultdict):
-    _default_factory: Callable[[_KT], _RT]
+    _checked_keys: set[_KT]
+    _default_factory: Callable[['DefaultDict', _KT], _RT]
 
-    def __init__(self, default_factory: Callable[[_KT], _RT], **kwargs):
+    def __init__(self, default_factory: Callable[['DefaultDict', _KT], _RT], **kwargs):
         super().__init__(**kwargs)
         self._default_factory = default_factory
+        self._checked_keys = set()
 
     def __missing__(self, key: _KT) -> _RT:
         if self._default_factory is None:
             raise KeyError(key)
-        self[key] = value = self._default_factory(key)
+        self[key] = value = self._default_factory(self, key)
         return value
+
+    def __contains__(self, item):
+        if item in self.keys():
+            return True
+        if item in self._checked_keys:
+            return False
+        self._checked_keys.add(item)
+        try:
+            # noinspection PyStatementEffect
+            self[item]
+            return True
+        except KeyError:
+            return False

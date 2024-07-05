@@ -127,9 +127,10 @@ def handle_amqp_request(channel: BlockingChannel, method: Basic.Deliver, props: 
     if publish_result:
         try:
             if props.reply_to:
-                channel.basic_publish(exchange='', routing_key=props.reply_to, properties=BasicProperties(
-                    correlation_id=props.correlation_id, content_type='application/json'), mandatory=False,
-                                      body=bytes(response_body, 'utf-8'))
+                channel.basic_publish(
+                    exchange='', routing_key=props.reply_to,
+                    properties=BasicProperties(correlation_id=props.correlation_id, content_type='application/json'),
+                    mandatory=False, body=bytes(response_body, 'utf-8'))
         except Exception as exc:
             logger.error('Failed to publish result')
             logger.exception(exc)

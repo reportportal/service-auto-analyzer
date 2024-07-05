@@ -193,7 +193,7 @@ class DefectTypeModelTraining:
                 sub_labels = {l[2] for l in found_data.result}
                 for sub_label in sub_labels:
                     found_data = self.query_label(
-                            sub_label, project_index_name, stat_data_storage[sub_label] if stat_data_storage else None)
+                        sub_label, project_index_name, stat_data_storage[sub_label] if stat_data_storage else None)
                     errors.append(found_data.errors)
                     error_count += found_data.error_count
                     data.extend(found_data.result)

@@ -475,8 +475,8 @@ class AutoAnalyzerService(AnalyzerService):
                             features_dict_with_saved_objects=features_dict_objects)
                         boosting_data_gatherer.set_defect_type_model(defect_type_model_to_use[project_id])
                         feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
-                        model_info_tags = (boosting_data_gatherer.get_used_model_info() +
-                                           _boosting_decision_maker.get_model_info())
+                        model_info_tags = (boosting_data_gatherer.get_used_model_info()
+                                           + _boosting_decision_maker.get_model_info())
                         results_to_share[launch_id]["model_info"].update(model_info_tags)
 
                         if len(feature_data) > 0:

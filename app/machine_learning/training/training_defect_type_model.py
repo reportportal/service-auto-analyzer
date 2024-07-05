@@ -51,7 +51,7 @@ class DefectTypeModelTraining:
     model_chooser: Optional[ModelChooser]
 
     def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig,
-                 model_chooser: Optional[ModelChooser]) -> None:
+                 model_chooser: Optional[ModelChooser] = None) -> None:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.label2inds = {"ab": 0, "pb": 1, "si": 2}

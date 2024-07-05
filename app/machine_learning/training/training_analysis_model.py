@@ -116,7 +116,7 @@ class AnalysisModelTraining:
     model_chooser: Optional[ModelChooser]
 
     def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig,
-                 model_chooser: Optional[ModelChooser]) -> None:
+                 model_chooser: Optional[ModelChooser] = None) -> None:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.due_proportion = 0.05

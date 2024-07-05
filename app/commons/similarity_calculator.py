@@ -97,8 +97,8 @@ class SimilarityCalculator:
                                 log_field_ids[obj["_id"]] = [index_in_message_array, len(all_messages) - 1]
                                 index_in_message_array += len(text)
             if all_messages:
-                needs_reweighting_wc = all_messages_needs_reweighting and \
-                                       sum(all_messages_needs_reweighting) == len(all_messages_needs_reweighting)
+                needs_reweighting_wc = (all_messages_needs_reweighting
+                                        and sum(all_messages_needs_reweighting) == len(all_messages_needs_reweighting))
                 vectorizer = CountVectorizer(
                     binary=not needs_reweighting_wc,
                     analyzer="word", token_pattern="[^ ]+")

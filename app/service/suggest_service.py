@@ -380,8 +380,8 @@ class SuggestService(AnalyzerService):
                 test_item_info.project, ModelType.defect_type))
             feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
             scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
-            model_info_tags = (_boosting_data_gatherer.get_used_model_info() +
-                               _suggest_decision_maker_to_use.get_model_info())
+            model_info_tags = (_boosting_data_gatherer.get_used_model_info()
+                               + _suggest_decision_maker_to_use.get_model_info())
             feature_names = ";".join(_suggest_decision_maker_to_use.get_feature_names())
             if feature_data:
                 predicted_labels, predicted_labels_probability = _suggest_decision_maker_to_use.predict(

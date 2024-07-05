@@ -257,8 +257,9 @@ class DefectTypeModelTraining:
             _count_vectorizer = self.baseline_model.count_vectorizer_models[label]
             new_model.count_vectorizer_models[label] = _count_vectorizer
 
-    def train_several_times(self, new_model: DefectTypeModel, label: str,
-                            data: list[tuple[str, str, str]]) -> tuple[list[float], list[float], bool]:
+    def train_several_times(self, new_model: DefectTypeModel, label: str, data: list[tuple[str, str, str]],
+                            random_states: Optional[list[int]] = None) -> tuple[list[float], list[float], bool]:
+        my_random_states = random_states if random_states else TRAIN_DATA_RANDOM_STATES
         new_model_results = []
         baseline_model_results = []
         bad_data = False
@@ -271,7 +272,7 @@ class DefectTypeModelTraining:
             bad_data = True
 
         if not bad_data:
-            for random_state in TRAIN_DATA_RANDOM_STATES:
+            for random_state in my_random_states:
                 x_train, x_test, y_train, y_test = self.split_train_test(
                     logs_to_train_idx, data, labels_filtered, additional_logs, label,
                     random_state=random_state)
@@ -336,24 +337,12 @@ class DefectTypeModelTraining:
             if use_custom_model:
                 LOGGER.debug("Custom model '%s' should be saved" % label)
 
-                logs_to_train_idx, labels_filtered, additional_logs, proportion_binary_labels = \
-                    self.create_binary_target_data(label, data)
-                if proportion_binary_labels < self.due_proportion:
-                    LOGGER.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
-                    bad_data = True
-                train_log_info[label]["bad_data_proportion"] = int(bad_data)
-                train_log_info[label]["data_proportion"] = proportion_binary_labels
+                baseline_model_results, new_model_results, bad_data = self.train_several_times(
+                    new_model, label, data, [0])
+
                 if not bad_data:
-                    x_train, y_train = self.return_similar_objects_into_sample(
-                        logs_to_train_idx, labels_filtered, data, additional_logs, label)
                     train_log_info[label]["model_saved"] = 1
-                    data_proportion_min = min(
-                        train_log_info[label]["data_proportion"], data_proportion_min)
-                    new_model.train_model(label, x_train, y_train)
                     custom_models.append(label)
-                    if label[2] != '_':  # Not a sub-category
-                        f1_baseline_models.append(train_log_info[label]["baseline_mean_metric"])
-                        f1_chosen_models.append(train_log_info[label]["new_model_mean_metric"])
                 else:
                     train_log_info[label]["model_saved"] = 0
             else:

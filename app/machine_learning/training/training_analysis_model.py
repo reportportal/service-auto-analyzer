@@ -16,6 +16,7 @@ import os
 import pickle
 from datetime import datetime
 from time import time
+from typing import Optional
 
 import elasticsearch
 import elasticsearch.helpers
@@ -112,8 +113,10 @@ def prepare_encoders(features_encoding_config, logs_found):
 class AnalysisModelTraining:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
+    model_chooser: Optional[ModelChooser]
 
-    def __init__(self, model_chooser: ModelChooser, app_config: ApplicationConfig, search_cfg: SearchConfig):
+    def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig,
+                 model_chooser: Optional[ModelChooser]) -> None:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.due_proportion = 0.05

@@ -48,8 +48,10 @@ class QueryResult(BaseModel):
 class DefectTypeModelTraining:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
+    model_chooser: Optional[ModelChooser]
 
-    def __init__(self, model_chooser: ModelChooser, app_config: ApplicationConfig, search_cfg: SearchConfig):
+    def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig,
+                 model_chooser: Optional[ModelChooser]) -> None:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.label2inds = {"ab": 0, "pb": 1, "si": 2}
@@ -83,8 +85,8 @@ class DefectTypeModelTraining:
         return x_train, y_train
 
     def split_train_test(
-            self, logs_to_train_idx, data, labels_filtered, additional_logs, label,
-            random_state=1257) -> tuple[list, list, list, list]:
+            self, logs_to_train_idx, data, labels_filtered, additional_logs, label: str,
+            random_state: int = 1257) -> tuple[list, list, list, list]:
         x_train_ind, x_test_ind, y_train, y_test = train_test_split(
             logs_to_train_idx, labels_filtered,
             test_size=0.1, random_state=random_state, stratify=labels_filtered)
@@ -357,7 +359,8 @@ class DefectTypeModelTraining:
             LOGGER.debug("The custom model should be saved")
             train_log_info["all"]["model_saved"] = 1
             train_log_info["all"]["p_value"] = p_value_max
-            self.model_chooser.delete_old_model(project_info.model_type, project_info.project)
+            if self.model_chooser:
+                self.model_chooser.delete_old_model(project_info.model_type, project_info.project)
             new_model.save_model()
 
         time_spent = time() - start_time

@@ -30,4 +30,4 @@ class ModelInfo(BaseModel):
 
 class TrainInfo(ModelInfo):
     additional_projects: Optional[Iterable[int]]
-    gathered_metric_total: int
+    gathered_metric_total: int = 0

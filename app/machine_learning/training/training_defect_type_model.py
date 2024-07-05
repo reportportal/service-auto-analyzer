@@ -288,7 +288,7 @@ class DefectTypeModelTraining:
                 baseline_model_results.append(f1)
         return baseline_model_results, new_model_results, bad_data_proportion
 
-    def train(self, project_info: TrainInfo):
+    def train(self, project_info: TrainInfo) -> tuple[int, dict[str, dict[str, Any]]]:
         start_time = time()
         model_name = f'{project_info.model_type.name}_model_{datetime.now().strftime("%d.%m.%y")}'
         baseline_model = os.path.basename(self.search_cfg.GlobalDefectTypeModelFolder)

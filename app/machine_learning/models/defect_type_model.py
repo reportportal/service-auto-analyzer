@@ -66,7 +66,7 @@ class DefectTypeModel(MlModel):
     def save_model(self):
         self._save_models(zip(MODEL_FILES, [self.count_vectorizer_models, self.models]))
 
-    def train_model(self, name: str, train_data_x, labels):
+    def train_model(self, name: str, train_data_x: list[str], labels: list[int]):
         self.count_vectorizer_models[name] = TfidfVectorizer(
             binary=True, min_df=5, analyzer=text_processing.preprocess_words)
         transformed_values = self.count_vectorizer_models[name].fit_transform(train_data_x)
@@ -80,7 +80,7 @@ class DefectTypeModel(MlModel):
         self.models[name] = model
         self._loaded = True
 
-    def validate_model(self, name: str, test_data_x, labels) -> tuple[float, float]:
+    def validate_model(self, name: str, test_data_x: list[str], labels: list[int]) -> tuple[float, float]:
         assert name in self.models
         print("Label distribution:", Counter(labels))
         print("Model name: %s" % name)

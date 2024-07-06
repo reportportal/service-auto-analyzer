@@ -14,6 +14,7 @@
 
 from collections import Counter
 
+import logging
 import pandas as pd
 import re
 from sklearn.ensemble import RandomForestClassifier
@@ -26,6 +27,7 @@ from app.machine_learning.models import MlModel
 from app.utils import text_processing
 from app.utils.defaultdict import DefaultDict
 
+LOGGER = logging.getLogger('analyzerApp.DefectTypeModel')
 MODEL_FILES: list[str] = ['count_vectorizer_models.pickle', 'models.pickle']
 DATA_FIELD = 'detected_message_without_params_extended'
 BASE_DEFECT_TYPE_PATTERN = re.compile(r'([^_]+)_.*')
@@ -82,12 +84,12 @@ class DefectTypeModel(MlModel):
 
     def validate_model(self, name: str, test_data_x: list[str], labels: list[int]) -> tuple[float, float]:
         assert name in self.models
-        print("Label distribution:", Counter(labels))
-        print("Model name: %s" % name)
+        LOGGER.debug(f'Label distribution: {Counter(labels)}')
+        LOGGER.debug(f'Model name: {name}')
         res, res_prob = self.predict(test_data_x, name)
-        print("Valid dataset F1 score: ", f1_score(y_pred=res, y_true=labels))
-        print(confusion_matrix(y_pred=res, y_true=labels))
-        print(classification_report(y_pred=res, y_true=labels))
+        LOGGER.debug(f'Valid dataset F1 score: {f1_score(y_pred=res, y_true=labels)}')
+        LOGGER.debug(f'{confusion_matrix(y_pred=res, y_true=labels)}')
+        LOGGER.debug(f'{classification_report(y_pred=res, y_true=labels)}')
         f1 = f1_score(y_pred=res, y_true=labels)
         if f1 is None:
             f1 = 0.0

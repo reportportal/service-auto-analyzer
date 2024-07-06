@@ -64,7 +64,9 @@ class DefectTypeModelTraining:
         self.model_chooser = model_chooser
 
     @staticmethod
-    def return_similar_objects_into_sample(x_train_ind, y_train, data, additional_logs, label):
+    def return_similar_objects_into_sample(x_train_ind: list[int], y_train: list[int],
+                                           data: list[tuple[str, str, str]], additional_logs: dict[int, list[int]],
+                                           label: str):
         x_train = []
         x_train_add = []
         y_train_add = []
@@ -87,15 +89,13 @@ class DefectTypeModelTraining:
         return x_train, y_train
 
     def split_train_test(
-            self, logs_to_train_idx, data, labels_filtered, additional_logs, label: str,
-            random_state: int = 1257) -> tuple[list, list, list, list]:
+            self, logs_to_train_idx: list[int], data: list[tuple[str, str, str]], labels_filtered, additional_logs,
+            label: str, random_state: int = 1257) -> tuple[list, list, list, list]:
         x_train_ind, x_test_ind, y_train, y_test = train_test_split(
-            logs_to_train_idx, labels_filtered,
-            test_size=0.1, random_state=random_state, stratify=labels_filtered)
+            logs_to_train_idx, labels_filtered, test_size=0.1, random_state=random_state,
+            stratify=labels_filtered)
         x_train, y_train = self.return_similar_objects_into_sample(x_train_ind, y_train, data, additional_logs, label)
-        x_test = []
-        for ind in x_test_ind:
-            x_test.append(data[ind][0])
+        x_test = [data[ind][0] for ind in x_test_ind]
         return x_train, x_test, y_train, y_test
 
     @staticmethod
@@ -268,8 +268,8 @@ class DefectTypeModelTraining:
         baseline_model_results = []
         bad_data_proportion = False
 
-        logs_to_train_idx, labels_filtered, additional_logs, proportion_binary_labels = \
-            self.create_binary_target_data(label, data)
+        logs_to_train_idx, labels_filtered, additional_logs, proportion_binary_labels = self.create_binary_target_data(
+            label, data)
 
         if proportion_binary_labels < MINIMAL_LABEL_PROPORTION:
             LOGGER.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
@@ -278,12 +278,12 @@ class DefectTypeModelTraining:
         if not bad_data_proportion:
             for random_state in my_random_states:
                 x_train, x_test, y_train, y_test = self.split_train_test(
-                    logs_to_train_idx, data, labels_filtered, additional_logs, label,
-                    random_state=random_state)
+                    logs_to_train_idx, data, labels_filtered, additional_logs, label, random_state=random_state)
                 new_model.train_model(label, x_train, y_train)
                 LOGGER.debug("New model results")
                 f1, accuracy = new_model.validate_model(label, x_test, y_test)
                 new_model_results.append(f1)
+                LOGGER.debug("Baseline model results")
                 f1, accuracy = self.baseline_model.validate_model(label, x_test, y_test)
                 baseline_model_results.append(f1)
         return baseline_model_results, new_model_results, bad_data_proportion
@@ -329,6 +329,7 @@ class DefectTypeModelTraining:
                 mean_f1 = np.mean(new_model_results)
                 train_log_info[label]["baseline_mean_metric"] = np.mean(baseline_model_results)
                 train_log_info[label]["new_model_mean_metric"] = mean_f1
+
                 if p_value < 0.05 and mean_f1 > np.mean(baseline_model_results) and mean_f1 >= 0.4:
                     p_value_max = max(p_value_max, p_value)
                     use_custom_model = True

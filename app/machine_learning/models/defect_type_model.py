@@ -72,8 +72,8 @@ class DefectTypeModel(MlModel):
         self.count_vectorizer_models[name] = TfidfVectorizer(
             binary=True, min_df=5, analyzer=text_processing.preprocess_words)
         transformed_values = self.count_vectorizer_models[name].fit_transform(train_data_x)
-        print("Length of train data: ", len(labels))
-        print("Label distribution:", Counter(labels))
+        LOGGER.debug(f'Length of train data: {len(labels)}')
+        LOGGER.debug(f'Label distribution: {Counter(labels)}')
         model = RandomForestClassifier(class_weight='balanced')
         x_train_values = pd.DataFrame(
             transformed_values.toarray(),

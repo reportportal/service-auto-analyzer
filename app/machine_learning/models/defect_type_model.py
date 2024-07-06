@@ -14,7 +14,6 @@
 
 from collections import Counter
 
-import logging
 import pandas as pd
 import re
 from sklearn.ensemble import RandomForestClassifier
@@ -22,6 +21,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.metrics import f1_score, accuracy_score
 
+from app.commons import logging
 from app.commons.object_saving.object_saver import ObjectSaver
 from app.machine_learning.models import MlModel
 from app.utils import text_processing

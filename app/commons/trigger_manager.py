@@ -18,7 +18,8 @@ from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
 from app.commons.model.ml import ModelType
 from app.commons.model_chooser import ModelChooser
 from app.commons.triggering_training.retraining_triggering import RetrainingTriggering
-from app.machine_learning.training import training_defect_type_model, training_analysis_model
+from app.machine_learning.training.train_analysis_model import AnalysisModelTraining
+from app.machine_learning.training.train_defect_type_model import DefectTypeModelTraining
 
 logger = logging.getLogger("analyzerApp.triggerManager")
 
@@ -30,16 +31,13 @@ class TriggerManager:
         self.model_training_triggering = {
             ModelType.defect_type: (RetrainingTriggering(app_config, 'defect_type_trigger_info',
                                                          start_number=100, accumulated_difference=100),
-                                    training_defect_type_model.DefectTypeModelTraining(app_config, search_cfg,
-                                                                                       model_chooser)),
+                                    DefectTypeModelTraining(app_config, search_cfg, model_chooser)),
             ModelType.suggestion: (RetrainingTriggering(app_config, 'suggestion_trigger_info',
                                                         start_number=100, accumulated_difference=50),
-                                   training_analysis_model.AnalysisModelTraining(app_config, search_cfg,
-                                                                                 model_chooser)),
+                                   AnalysisModelTraining(app_config, search_cfg, model_chooser)),
             ModelType.auto_analysis: (RetrainingTriggering(app_config, 'auto_analysis_trigger_info',
                                                            start_number=300, accumulated_difference=100),
-                                      training_analysis_model.AnalysisModelTraining(app_config, search_cfg,
-                                                                                    model_chooser))
+                                      AnalysisModelTraining(app_config, search_cfg, model_chooser))
         }
 
     def does_trigger_exist(self, model: ModelType):

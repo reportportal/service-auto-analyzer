@@ -31,7 +31,7 @@ LOGGER = logging.getLogger('analyzerApp.DefectTypeModel')
 MODEL_FILES: list[str] = ['count_vectorizer_models.pickle', 'models.pickle']
 DATA_FIELD = 'detected_message_without_params_extended'
 BASE_DEFECT_TYPE_PATTERN = re.compile(r'([^_]+)_.*')
-DEFAULT_N_ESTIMATORS = 100
+DEFAULT_N_ESTIMATORS = 13
 
 
 def get_model(self: DefaultDict, model_name: str):

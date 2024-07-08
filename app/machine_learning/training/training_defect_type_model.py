@@ -34,11 +34,111 @@ from app.utils import utils, text_processing
 from app.utils.defaultdict import DefaultDict
 
 LOGGER = logging.getLogger('analyzerApp.trainingDefectTypeModel')
-TRAIN_DATA_RANDOM_STATES = [1257, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029]
+TRAIN_DATA_RANDOM_STATES = [1257, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029, 2137]
 RETRY_COUNT = 5
 RETRY_PAUSES = [0, 1, 5, 10, 20, 40, 60]
 BASE_ISSUE_CLASS_INDEXES: dict[str, int] = {'ab': 0, 'pb': 1, 'si': 2}
 MINIMAL_LABEL_PROPORTION = 0.2
+
+
+def return_similar_objects_into_sample(x_train_ind: list[int], y_train: list[int],
+                                       data: list[tuple[str, str, str]], additional_logs: dict[int, list[int]],
+                                       label: str):
+    x_train = []
+    x_train_add = []
+    y_train_add = []
+
+    for idx, ind in enumerate(x_train_ind):
+        x_train.append(data[ind][0])
+        label_to_use = y_train[idx]
+        if ind in additional_logs and label_to_use != 1:
+            for idx_ in additional_logs[ind]:
+                log_res, label_res, real_label = data[idx_]
+                if label_res == label:
+                    label_to_use = 1
+                    break
+        if ind in additional_logs:
+            for idx_ in additional_logs[ind]:
+                x_train_add.append(data[idx_][0])
+                y_train_add.append(label_to_use)
+    x_train.extend(x_train_add)
+    y_train.extend(y_train_add)
+    return x_train, y_train
+
+
+def split_train_test(
+        logs_to_train_idx: list[int], data: list[tuple[str, str, str]], labels_filtered, additional_logs,
+        label: str, random_state: int = 1257) -> tuple[list, list, list, list]:
+    x_train_ind, x_test_ind, y_train, y_test = train_test_split(
+        logs_to_train_idx, labels_filtered, test_size=0.1, random_state=random_state,
+        stratify=labels_filtered)
+    x_train, y_train = return_similar_objects_into_sample(x_train_ind, y_train, data, additional_logs, label)
+    x_test = [data[ind][0] for ind in x_test_ind]
+    return x_train, x_test, y_train, y_test
+
+
+def perform_light_deduplication(data: list[tuple[str, str, str]]) -> tuple[dict[int, list[int]], list[int]]:
+    text_messages_set = {}
+    logs_to_train_idx = []
+    additional_logs = {}
+    for idx, text_message_data in enumerate(data):
+        text_message = text_message_data[0]
+        text_message_normalized = " ".join(sorted(
+            text_processing.split_words(text_message, to_lower=True)))
+        if text_message_normalized not in text_messages_set:
+            logs_to_train_idx.append(idx)
+            text_messages_set[text_message_normalized] = idx
+            additional_logs[idx] = []
+        else:
+            additional_logs[text_messages_set[text_message_normalized]].append(idx)
+    return additional_logs, logs_to_train_idx
+
+
+def create_binary_target_data(label: str, data: list[tuple[str, str, str]]):
+    additional_logs, logs_to_train_idx = perform_light_deduplication(data)
+    labels_filtered = []
+    for ind in logs_to_train_idx:
+        if data[ind][1] == label or data[ind][2] == label:
+            labels_filtered.append(1)
+        else:
+            labels_filtered.append(0)
+    proportion_binary_labels = utils.calculate_proportions_for_labels(labels_filtered)
+    if proportion_binary_labels < MINIMAL_LABEL_PROPORTION:
+        logs_to_train_idx, labels_filtered, proportion_binary_labels = utils.balance_data(
+            logs_to_train_idx, labels_filtered, MINIMAL_LABEL_PROPORTION)
+    return logs_to_train_idx, labels_filtered, additional_logs, proportion_binary_labels
+
+
+def train_several_times(new_model: DefectTypeModel, label: str, data: list[tuple[str, str, str]],
+                        random_states: list[int],
+                        baseline_model: Optional[DefectTypeModel] = None) -> tuple[list[float], list[float], bool]:
+    my_random_states = random_states if random_states else TRAIN_DATA_RANDOM_STATES
+    new_model_results = []
+    baseline_model_results = []
+    bad_data_proportion = False
+
+    logs_to_train_idx, labels_filtered, additional_logs, proportion_binary_labels = create_binary_target_data(
+        label, data)
+
+    if proportion_binary_labels < MINIMAL_LABEL_PROPORTION:
+        LOGGER.debug('Train data has a bad proportion: %.3f', proportion_binary_labels)
+        bad_data_proportion = True
+
+    if not bad_data_proportion:
+        for random_state in my_random_states:
+            x_train, x_test, y_train, y_test = split_train_test(
+                logs_to_train_idx, data, labels_filtered, additional_logs, label, random_state=random_state)
+            new_model.train_model(label, x_train, y_train)
+            LOGGER.debug('New model results')
+            f1, accuracy = new_model.validate_model(label, x_test, y_test)
+            new_model_results.append(f1)
+            LOGGER.debug('Baseline model results')
+            if baseline_model:
+                f1, accuracy = baseline_model.validate_model(label, x_test, y_test)
+                baseline_model_results.append(f1)
+            else:
+                baseline_model_results.append(0.0)
+    return baseline_model_results, new_model_results, bad_data_proportion
 
 
 class QueryResult(BaseModel):
@@ -62,41 +162,6 @@ class DefectTypeModelTraining:
         self.baseline_model = DefectTypeModel(object_saving.create_filesystem(search_cfg.GlobalDefectTypeModelFolder))
         self.baseline_model.load_model()
         self.model_chooser = model_chooser
-
-    @staticmethod
-    def return_similar_objects_into_sample(x_train_ind: list[int], y_train: list[int],
-                                           data: list[tuple[str, str, str]], additional_logs: dict[int, list[int]],
-                                           label: str):
-        x_train = []
-        x_train_add = []
-        y_train_add = []
-
-        for idx, ind in enumerate(x_train_ind):
-            x_train.append(data[ind][0])
-            label_to_use = y_train[idx]
-            if ind in additional_logs and label_to_use != 1:
-                for idx_ in additional_logs[ind]:
-                    log_res, label_res, real_label = data[idx_]
-                    if label_res == label:
-                        label_to_use = 1
-                        break
-            if ind in additional_logs:
-                for idx_ in additional_logs[ind]:
-                    x_train_add.append(data[idx_][0])
-                    y_train_add.append(label_to_use)
-        x_train.extend(x_train_add)
-        y_train.extend(y_train_add)
-        return x_train, y_train
-
-    def split_train_test(
-            self, logs_to_train_idx: list[int], data: list[tuple[str, str, str]], labels_filtered, additional_logs,
-            label: str, random_state: int = 1257) -> tuple[list, list, list, list]:
-        x_train_ind, x_test_ind, y_train, y_test = train_test_split(
-            logs_to_train_idx, labels_filtered, test_size=0.1, random_state=random_state,
-            stratify=labels_filtered)
-        x_train, y_train = self.return_similar_objects_into_sample(x_train_ind, y_train, data, additional_logs, label)
-        x_test = [data[ind][0] for ind in x_test_ind]
-        return x_train, x_test, y_train, y_test
 
     @staticmethod
     def get_messages_by_issue_type(issue_type_pattern: str) -> dict[str, Any]:
@@ -211,23 +276,6 @@ class DefectTypeModelTraining:
         return data
 
     @staticmethod
-    def perform_light_deduplication(data: list[tuple[str, str, str]]) -> tuple[dict[int, list[int]], list[int]]:
-        text_messages_set = {}
-        logs_to_train_idx = []
-        additional_logs = {}
-        for idx, text_message_data in enumerate(data):
-            text_message = text_message_data[0]
-            text_message_normalized = " ".join(sorted(
-                text_processing.split_words(text_message, to_lower=True)))
-            if text_message_normalized not in text_messages_set:
-                logs_to_train_idx.append(idx)
-                text_messages_set[text_message_normalized] = idx
-                additional_logs[idx] = []
-            else:
-                additional_logs[text_messages_set[text_message_normalized]].append(idx)
-        return additional_logs, logs_to_train_idx
-
-    @staticmethod
     def get_info_template(project_info: TrainInfo, label: str, baseline_model: str, model_name: str) -> dict[str, Any]:
         return {'method': 'training', 'sub_model_type': label, 'model_type': project_info.model_type.name,
                 'baseline_model': [baseline_model], 'new_model': [model_name],
@@ -235,20 +283,6 @@ class DefectTypeModelTraining:
                 'data_proportion': 0.0, 'baseline_mean_metric': 0.0, 'new_model_mean_metric': 0.0,
                 'bad_data_proportion': 0, 'metric_name': 'F1', 'errors': [], 'errors_count': 0,
                 'time_spent': 0.0}
-
-    def create_binary_target_data(self, label: str, data: list[tuple[str, str, str]]):
-        additional_logs, logs_to_train_idx = self.perform_light_deduplication(data)
-        labels_filtered = []
-        for ind in logs_to_train_idx:
-            if data[ind][1] == label or data[ind][2] == label:
-                labels_filtered.append(1)
-            else:
-                labels_filtered.append(0)
-        proportion_binary_labels = utils.calculate_proportions_for_labels(labels_filtered)
-        if proportion_binary_labels < MINIMAL_LABEL_PROPORTION:
-            logs_to_train_idx, labels_filtered, proportion_binary_labels = utils.balance_data(
-                logs_to_train_idx, labels_filtered, MINIMAL_LABEL_PROPORTION)
-        return logs_to_train_idx, labels_filtered, additional_logs, proportion_binary_labels
 
     def copy_model_part_from_baseline(self, new_model, label):
         if label not in self.baseline_model.models:
@@ -262,31 +296,8 @@ class DefectTypeModelTraining:
             new_model.count_vectorizer_models[label] = _count_vectorizer
 
     def train_several_times(self, new_model: DefectTypeModel, label: str, data: list[tuple[str, str, str]],
-                            random_states: Optional[list[int]] = None) -> tuple[list[float], list[float], bool]:
-        my_random_states = random_states if random_states else TRAIN_DATA_RANDOM_STATES
-        new_model_results = []
-        baseline_model_results = []
-        bad_data_proportion = False
-
-        logs_to_train_idx, labels_filtered, additional_logs, proportion_binary_labels = self.create_binary_target_data(
-            label, data)
-
-        if proportion_binary_labels < MINIMAL_LABEL_PROPORTION:
-            LOGGER.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
-            bad_data_proportion = True
-
-        if not bad_data_proportion:
-            for random_state in my_random_states:
-                x_train, x_test, y_train, y_test = self.split_train_test(
-                    logs_to_train_idx, data, labels_filtered, additional_logs, label, random_state=random_state)
-                new_model.train_model(label, x_train, y_train)
-                LOGGER.debug("New model results")
-                f1, accuracy = new_model.validate_model(label, x_test, y_test)
-                new_model_results.append(f1)
-                LOGGER.debug("Baseline model results")
-                f1, accuracy = self.baseline_model.validate_model(label, x_test, y_test)
-                baseline_model_results.append(f1)
-        return baseline_model_results, new_model_results, bad_data_proportion
+                            random_states: list[int]) -> tuple[list[float], list[float], bool]:
+        return train_several_times(new_model, label, data, random_states, self.baseline_model)
 
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, dict[str, Any]]]:
         start_time = time()
@@ -316,7 +327,7 @@ class DefectTypeModelTraining:
             LOGGER.debug(f'Label to train the model {label}')
 
             baseline_model_results, new_model_results, bad_data_proportion = self.train_several_times(
-                new_model, label, data)
+                new_model, label, data, TRAIN_DATA_RANDOM_STATES)
 
             use_custom_model = False
             if not bad_data_proportion:
@@ -326,11 +337,12 @@ class DefectTypeModelTraining:
                 if p_value is None:
                     p_value = 1.0
                 train_log_info[label]["p_value"] = p_value
+                baseline_mean_f1 = np.mean(baseline_model_results)
                 mean_f1 = np.mean(new_model_results)
-                train_log_info[label]["baseline_mean_metric"] = np.mean(baseline_model_results)
+                train_log_info[label]["baseline_mean_metric"] = baseline_mean_f1
                 train_log_info[label]["new_model_mean_metric"] = mean_f1
 
-                if p_value < 0.05 and mean_f1 > np.mean(baseline_model_results) and mean_f1 >= 0.4:
+                if p_value < 0.05 and mean_f1 > baseline_mean_f1 and mean_f1 >= 0.4:
                     p_value_max = max(p_value_max, p_value)
                     use_custom_model = True
                 all_bad_data = 0
@@ -342,9 +354,10 @@ class DefectTypeModelTraining:
 
             if use_custom_model:
                 LOGGER.debug("Custom model '%s' should be saved" % label)
+                max_train_result_idx = np.argmax(new_model_results)[0]
 
                 baseline_model_results, new_model_results, bad_data_proportion = self.train_several_times(
-                    new_model, label, data, [0])
+                    new_model, label, data, TRAIN_DATA_RANDOM_STATES[max_train_result_idx])
 
                 if not bad_data_proportion:
                     train_log_info[label]["model_saved"] = 1
@@ -358,7 +371,7 @@ class DefectTypeModelTraining:
                     f1_chosen_models.append(train_log_info[label]["baseline_mean_metric"])
             train_log_info[label]["time_spent"] += (time() - time_training)
 
-        LOGGER.debug("Custom models were for labels: %s" % custom_models)
+        LOGGER.debug(f'Custom models were for labels: {custom_models}')
         if len(custom_models):
             LOGGER.debug("The custom model should be saved")
             train_log_info["all"]["model_saved"] = 1

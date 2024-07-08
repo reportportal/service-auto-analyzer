@@ -31,6 +31,7 @@ LOGGER = logging.getLogger('analyzerApp.DefectTypeModel')
 MODEL_FILES: list[str] = ['count_vectorizer_models.pickle', 'models.pickle']
 DATA_FIELD = 'detected_message_without_params_extended'
 BASE_DEFECT_TYPE_PATTERN = re.compile(r'([^_]+)_.*')
+N_ESTIMATORS = 100
 
 
 def get_model(self: DefaultDict, model_name: str):
@@ -68,29 +69,39 @@ class DefectTypeModel(MlModel):
     def save_model(self):
         self._save_models(zip(MODEL_FILES, [self.count_vectorizer_models, self.models]))
 
-    def train_model(self, name: str, train_data_x: list[str], labels: list[int]):
+    def train_model(self, name: str, train_data_x: list[str], labels: list[int]) -> tuple[float, float]:
         self.count_vectorizer_models[name] = TfidfVectorizer(
             binary=True, min_df=5, analyzer=text_processing.preprocess_words)
         transformed_values = self.count_vectorizer_models[name].fit_transform(train_data_x)
         LOGGER.debug(f'Length of train data: {len(labels)}')
-        LOGGER.debug(f'Label distribution: {Counter(labels)}')
-        model = RandomForestClassifier(class_weight='balanced')
+        LOGGER.debug(f'Train data label distribution: {Counter(labels)}')
+        LOGGER.debug(f'Train model name: {name}')
+        model = RandomForestClassifier(N_ESTIMATORS, class_weight='balanced')
         x_train_values = pd.DataFrame(
             transformed_values.toarray(),
             columns=self.count_vectorizer_models[name].get_feature_names_out())
         model.fit(x_train_values, labels)
         self.models[name] = model
         self._loaded = True
+        res = model.predict(x_train_values)
+        f1 = f1_score(y_pred=res, y_true=labels)
+        LOGGER.debug(f'Train dataset F1 score: {f1:.4f}')
+        if f1 is None:
+            f1 = 0.0
+        accuracy = accuracy_score(y_pred=res, y_true=labels)
+        if accuracy is None:
+            accuracy = 0.0
+        return f1, accuracy
 
     def validate_model(self, name: str, test_data_x: list[str], labels: list[int]) -> tuple[float, float]:
         assert name in self.models
-        LOGGER.debug(f'Label distribution: {Counter(labels)}')
-        LOGGER.debug(f'Model name: {name}')
+        LOGGER.debug(f'Validation data label distribution: {Counter(labels)}')
+        LOGGER.debug(f'Validation model name: {name}')
         res, res_prob = self.predict(test_data_x, name)
-        LOGGER.debug(f'Valid dataset F1 score: {f1_score(y_pred=res, y_true=labels)}')
+        f1 = f1_score(y_pred=res, y_true=labels)
+        LOGGER.debug(f'Valid dataset F1 score: {f1:.4f}')
         LOGGER.debug(f'{confusion_matrix(y_pred=res, y_true=labels)}')
         LOGGER.debug(f'{classification_report(y_pred=res, y_true=labels)}')
-        f1 = f1_score(y_pred=res, y_true=labels)
         if f1 is None:
             f1 = 0.0
         accuracy = accuracy_score(y_pred=res, y_true=labels)

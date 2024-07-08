@@ -324,7 +324,7 @@ class DefectTypeModelTraining:
         errors_count = 0
         for label in unique_labels:
             time_training = time()
-            LOGGER.debug(f'Label to train the model {label}')
+            LOGGER.info(f'Label to train the model {label}')
 
             baseline_model_results, new_model_results, bad_data_proportion = self.train_several_times(
                 new_model, label, data, TRAIN_DATA_RANDOM_STATES)
@@ -346,10 +346,9 @@ class DefectTypeModelTraining:
                     p_value_max = max(p_value_max, p_value)
                     use_custom_model = True
                 all_bad_data = 0
-                LOGGER.debug(
-                    """Model training validation results:
-                        p-value=%.3f mean baseline=%.3f mean new model=%.3f""",
-                    p_value, np.mean(baseline_model_results), np.mean(new_model_results))
+                LOGGER.info(
+                    f'Model training validation results: p-value={p_value:.3f} mean '
+                    f'baseline={baseline_mean_f1:.3f} mean new model={mean_f1:.3f}')
             train_log_info[label]["bad_data_proportion"] = int(bad_data_proportion)
 
             if use_custom_model:

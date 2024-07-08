@@ -31,7 +31,7 @@ LOGGER = logging.getLogger('analyzerApp.DefectTypeModel')
 MODEL_FILES: list[str] = ['count_vectorizer_models.pickle', 'models.pickle']
 DATA_FIELD = 'detected_message_without_params_extended'
 BASE_DEFECT_TYPE_PATTERN = re.compile(r'([^_]+)_.*')
-N_ESTIMATORS = 100
+DEFAULT_N_ESTIMATORS = 100
 
 
 def get_model(self: DefaultDict, model_name: str):
@@ -48,12 +48,15 @@ class DefectTypeModel(MlModel):
     _loaded: bool
     count_vectorizer_models: DefaultDict[str, TfidfVectorizer]
     models: DefaultDict[str, RandomForestClassifier]
+    n_estimators: int
 
-    def __init__(self, object_saver: ObjectSaver, tags: str = 'global defect type model') -> None:
+    def __init__(self, object_saver: ObjectSaver, tags: str = 'global defect type model',
+                 n_estimators: int = DEFAULT_N_ESTIMATORS) -> None:
         super().__init__(object_saver, tags)
         self._loaded = False
         self.count_vectorizer_models = DefaultDict(get_model)
         self.models = DefaultDict(get_model)
+        self.n_estimators = n_estimators
 
     @property
     def loaded(self) -> bool:
@@ -76,7 +79,7 @@ class DefectTypeModel(MlModel):
         LOGGER.debug(f'Length of train data: {len(labels)}')
         LOGGER.debug(f'Train data label distribution: {Counter(labels)}')
         LOGGER.debug(f'Train model name: {name}')
-        model = RandomForestClassifier(N_ESTIMATORS, class_weight='balanced')
+        model = RandomForestClassifier(self.n_estimators, class_weight='balanced')
         x_train_values = pd.DataFrame(
             transformed_values.toarray(),
             columns=self.count_vectorizer_models[name].get_feature_names_out())

@@ -361,7 +361,7 @@ class DefectTypeModelTraining:
 
             if use_custom_model:
                 LOGGER.debug(f'Custom model {label} should be saved')
-                max_train_result_idx = np.argmax(new_model_results)[0]
+                max_train_result_idx = int(np.argmax(new_model_results))
                 best_random_state = TRAIN_DATA_RANDOM_STATES[max_train_result_idx]
 
                 LOGGER.info(f'Perform final training with random state: {best_random_state}')

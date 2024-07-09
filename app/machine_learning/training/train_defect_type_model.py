@@ -306,7 +306,7 @@ class DefectTypeModelTraining:
 
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, dict[str, Any]]]:
         start_time = time()
-        model_name = f'{project_info.model_type.name}_model_{datetime.now().strftime("%d.%m.%y")}'
+        model_name = f'{project_info.model_type.name}_model_{datetime.now().strftime("%Y-%m-%d")}'
         baseline_model = os.path.basename(self.search_cfg.GlobalDefectTypeModelFolder)
         new_model_folder = f'{project_info.model_type.name}_model/{model_name}/'
         LOGGER.info(f'Train using model type: {self.model_type}')

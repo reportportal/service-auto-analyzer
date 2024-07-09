@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from collections import Counter
+from typing import Optional
 
 import pandas as pd
 import re
@@ -51,12 +52,12 @@ class DefectTypeModel(MlModel):
     n_estimators: int
 
     def __init__(self, object_saver: ObjectSaver, tags: str = 'global defect type model',
-                 n_estimators: int = DEFAULT_N_ESTIMATORS) -> None:
+                 n_estimators: Optional[int] = None) -> None:
         super().__init__(object_saver, tags)
         self._loaded = False
         self.count_vectorizer_models = DefaultDict(get_model)
         self.models = DefaultDict(get_model)
-        self.n_estimators = n_estimators
+        self.n_estimators = n_estimators if n_estimators else DEFAULT_N_ESTIMATORS
 
     @property
     def loaded(self) -> bool:

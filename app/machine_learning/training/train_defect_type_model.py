@@ -366,7 +366,7 @@ class DefectTypeModelTraining:
 
                 LOGGER.info(f'Perform final training with random state: {best_random_state}')
                 baseline_model_results, new_model_results, bad_data_proportion = self.train_several_times(
-                    new_model, label, data, best_random_state)
+                    new_model, label, data, [best_random_state])
 
                 if not bad_data_proportion:
                     train_log_info[label]["model_saved"] = 1

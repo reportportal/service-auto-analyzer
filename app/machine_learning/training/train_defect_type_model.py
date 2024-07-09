@@ -153,7 +153,7 @@ class DefectTypeModelTraining:
     es_client: EsClient
     baseline_model: Optional[DefectTypeModel] = None
     model_chooser: Optional[ModelChooser]
-    model_type: Optional[Type[DefectTypeModel]]
+    model_type: Type[DefectTypeModel]
 
     def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig,
                  model_chooser: Optional[ModelChooser] = None,
@@ -166,7 +166,7 @@ class DefectTypeModelTraining:
                 search_cfg.GlobalDefectTypeModelFolder))
             self.baseline_model.load_model()
         self.model_chooser = model_chooser
-        self.model_type = model_type
+        self.model_type = model_type if model_type else CustomDefectTypeModel
 
     @staticmethod
     def get_messages_by_issue_type(issue_type_pattern: str) -> dict[str, Any]:
@@ -309,9 +309,8 @@ class DefectTypeModelTraining:
         model_name = f'{project_info.model_type.name}_model_{datetime.now().strftime("%d.%m.%y")}'
         baseline_model = os.path.basename(self.search_cfg.GlobalDefectTypeModelFolder)
         new_model_folder = f'{project_info.model_type.name}_model/{model_name}/'
-        model_type = self.model_type if self.model_type else CustomDefectTypeModel
-        LOGGER.info(f'Train using model type: {model_type}')
-        new_model = model_type(
+        LOGGER.info(f'Train using model type: {self.model_type}')
+        new_model = self.model_type(
             object_saving.create(self.app_config, project_info.project, new_model_folder),
             n_estimators=self.search_cfg.DefectTypeModelNumEstimators)
 

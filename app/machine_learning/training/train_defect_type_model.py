@@ -360,11 +360,13 @@ class DefectTypeModelTraining:
             train_log_info[label]["bad_data_proportion"] = int(bad_data_proportion)
 
             if use_custom_model:
-                LOGGER.debug("Custom model '%s' should be saved" % label)
+                LOGGER.debug(f'Custom model {label} should be saved')
                 max_train_result_idx = np.argmax(new_model_results)[0]
+                best_random_state = TRAIN_DATA_RANDOM_STATES[max_train_result_idx]
 
+                LOGGER.info(f'Perform final training with random state: {best_random_state}')
                 baseline_model_results, new_model_results, bad_data_proportion = self.train_several_times(
-                    new_model, label, data, TRAIN_DATA_RANDOM_STATES[max_train_result_idx])
+                    new_model, label, data, best_random_state)
 
                 if not bad_data_proportion:
                     train_log_info[label]["model_saved"] = 1

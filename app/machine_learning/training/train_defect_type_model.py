@@ -15,7 +15,7 @@
 import os
 from datetime import datetime
 from time import time, sleep
-from typing import Any, Optional
+from typing import Any, Optional, Type
 
 import elasticsearch.helpers
 import numpy as np
@@ -151,17 +151,22 @@ class DefectTypeModelTraining:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
     es_client: EsClient
-    baseline_model: DefectTypeModel
+    baseline_model: Optional[DefectTypeModel] = None
     model_chooser: Optional[ModelChooser]
+    model_type: Optional[Type[DefectTypeModel]]
 
     def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig,
-                 model_chooser: Optional[ModelChooser] = None) -> None:
+                 model_chooser: Optional[ModelChooser] = None,
+                 model_type: Optional[Type[DefectTypeModel]] = None) -> None:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=app_config)
-        self.baseline_model = DefectTypeModel(object_saving.create_filesystem(search_cfg.GlobalDefectTypeModelFolder))
-        self.baseline_model.load_model()
+        if search_cfg.GlobalDefectTypeModelFolder:
+            self.baseline_model = DefectTypeModel(object_saving.create_filesystem(
+                search_cfg.GlobalDefectTypeModelFolder))
+            self.baseline_model.load_model()
         self.model_chooser = model_chooser
+        self.model_type = model_type
 
     @staticmethod
     def get_messages_by_issue_type(issue_type_pattern: str) -> dict[str, Any]:
@@ -304,8 +309,11 @@ class DefectTypeModelTraining:
         model_name = f'{project_info.model_type.name}_model_{datetime.now().strftime("%d.%m.%y")}'
         baseline_model = os.path.basename(self.search_cfg.GlobalDefectTypeModelFolder)
         new_model_folder = f'{project_info.model_type.name}_model/{model_name}/'
-        new_model = CustomDefectTypeModel(
-            object_saving.create(self.app_config, project_info.project, new_model_folder))
+        model_type = self.model_type if self.model_type else CustomDefectTypeModel
+        LOGGER.info(f'Train using model type: {model_type}')
+        new_model = model_type(
+            object_saving.create(self.app_config, project_info.project, new_model_folder),
+            n_estimators=self.search_cfg.DefectTypeModelNumEstimators)
 
         train_log_info = DefaultDict(lambda _, k: self.get_info_template(project_info, k, baseline_model, model_name))
         projects = [project_info.project]

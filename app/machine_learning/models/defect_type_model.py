@@ -78,7 +78,7 @@ class DefectTypeModel(MlModel):
         transformed_values = self.count_vectorizer_models[name].fit_transform(train_data_x)
         LOGGER.debug(f'Length of train data: {len(labels)}')
         LOGGER.debug(f'Train data label distribution: {Counter(labels)}')
-        LOGGER.debug(f'Train model name: {name}')
+        LOGGER.debug(f'Train model name: {name}; estimators number: {self.n_estimators}')
         model = RandomForestClassifier(self.n_estimators, class_weight='balanced')
         x_train_values = pd.DataFrame(
             transformed_values.toarray(),

@@ -12,11 +12,20 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from typing import Optional
+
 from app.commons.object_saving.object_saver import ObjectSaver
 from app.machine_learning.models.defect_type_model import DefectTypeModel
 
 
+MODEL_TAG = 'custom defect type model'
+
+
 class CustomDefectTypeModel(DefectTypeModel):
 
-    def __init__(self, object_saver: ObjectSaver):
-        super().__init__(object_saver, 'custom defect type model')
+    def __init__(self, object_saver: ObjectSaver, n_estimators: Optional[int] = None):
+        if n_estimators:
+            super().__init__(object_saver, MODEL_TAG, n_estimators)
+        else:
+            super().__init__(object_saver, MODEL_TAG)
+

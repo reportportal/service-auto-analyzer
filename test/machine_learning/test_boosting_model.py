@@ -102,29 +102,22 @@ class TestBoostingModel(unittest.TestCase):
             tests.extend([
                 {
                     "elastic_results": [(get_fixture(self.log_message, to_json=True),
-                                         get_fixture(
-                                             self.one_hit_search_rs_explained, to_json=True))],
-                    "config": self.get_default_config(number_of_log_lines=log_lines,
-                                                      filter_fields=filter_fields),
+                                         get_fixture(self.one_hit_search_rs_explained, to_json=True))],
+                    "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
                     "decision_maker": _decision_maker
                 },
                 {
                     "elastic_results": [(get_fixture(self.log_message, to_json=True),
-                                         get_fixture(
-                                             self.two_hits_search_rs_explained, to_json=True))],
-                    "config": self.get_default_config(number_of_log_lines=log_lines,
-                                                      filter_fields=filter_fields),
+                                         get_fixture(self.two_hits_search_rs_explained, to_json=True))],
+                    "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
                     "decision_maker": _decision_maker
                 },
                 {
                     "elastic_results": [(get_fixture(self.log_message, to_json=True),
-                                         get_fixture(
-                                             self.two_hits_search_rs_explained, to_json=True)),
+                                         get_fixture(self.two_hits_search_rs_explained, to_json=True)),
                                         (get_fixture(self.log_message, to_json=True),
-                                         get_fixture(
-                                             self.one_hit_search_rs_explained, to_json=True))],
-                    "config": self.get_default_config(number_of_log_lines=log_lines,
-                                                      filter_fields=filter_fields),
+                                         get_fixture(self.one_hit_search_rs_explained, to_json=True))],
+                    "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
                     "decision_maker": _decision_maker
                 },
                 # TODO: uncomment after similarity and data obfuscation fix
@@ -150,11 +143,10 @@ class TestBoostingModel(unittest.TestCase):
                 weight_log_sim = weighted_similarity_calculator. \
                     WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
                 weight_log_sim.load_model()
-            _boosting_featurizer = BoostingFeaturizer(test["elastic_results"],
-                                                      test["config"],
-                                                      feature_ids,
-                                                      weighted_log_similarity_calculator=weight_log_sim,
-                                                      features_dict_with_saved_objects=feature_dict_objects)
+            _boosting_featurizer = BoostingFeaturizer(
+                test["elastic_results"], test["config"], feature_ids,
+                weighted_log_similarity_calculator=weight_log_sim,
+                features_dict_with_saved_objects=feature_dict_objects)
             if self.global_defect_type_model_folder.strip():
                 model = defect_type_model.DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
                 model.load_model()
@@ -186,48 +178,35 @@ class TestBoostingModel(unittest.TestCase):
             tests.extend([
                 {
                     "elastic_results": [(get_fixture(self.log_message_suggest, to_json=True),
-                                         get_fixture(
-                                             self.one_hit_search_rs_explained, to_json=True))],
+                                         get_fixture(self.one_hit_search_rs_explained, to_json=True))],
                     "config": TestBoostingModel.get_default_config(
-                        number_of_log_lines=log_lines,
-                        filter_fields=[],
-                        filter_fields_any=filter_fields_any,
+                        number_of_log_lines=log_lines, filter_fields=[], filter_fields_any=filter_fields_any,
                         min_should_match=0.4),
                     "decision_maker": _decision_maker
                 },
                 {
                     "elastic_results": [(get_fixture(self.log_message_suggest, to_json=True),
-                                         get_fixture(
-                                             self.two_hits_search_rs_explained, to_json=True))],
+                                         get_fixture(self.two_hits_search_rs_explained, to_json=True))],
                     "config": TestBoostingModel.get_default_config(
-                        number_of_log_lines=log_lines,
-                        filter_fields=[],
-                        filter_fields_any=filter_fields_any,
+                        number_of_log_lines=log_lines, filter_fields=[], filter_fields_any=filter_fields_any,
                         min_should_match=0.4),
                     "decision_maker": _decision_maker
                 },
                 {
                     "elastic_results": [(get_fixture(self.log_message_suggest, to_json=True),
-                                         get_fixture(
-                                             self.two_hits_search_rs_explained, to_json=True)),
+                                         get_fixture(self.two_hits_search_rs_explained, to_json=True)),
                                         (get_fixture(self.log_message_suggest, to_json=True),
-                                         get_fixture(
-                                             self.one_hit_search_rs_explained, to_json=True))],
+                                         get_fixture(self.one_hit_search_rs_explained, to_json=True))],
                     "config": TestBoostingModel.get_default_config(
-                        number_of_log_lines=log_lines,
-                        filter_fields=[],
-                        filter_fields_any=filter_fields_any,
+                        number_of_log_lines=log_lines, filter_fields=[], filter_fields_any=filter_fields_any,
                         min_should_match=0.4),
                     "decision_maker": _decision_maker
                 },
                 {
                     "elastic_results": [(get_fixture(self.log_message_only_small_logs, to_json=True),
-                                         get_fixture(
-                                             self.two_hits_search_rs_small_logs, to_json=True))],
+                                         get_fixture(self.two_hits_search_rs_small_logs, to_json=True))],
                     "config": TestBoostingModel.get_default_config(
-                        number_of_log_lines=log_lines,
-                        filter_fields=[],
-                        filter_fields_any=filter_fields_any,
+                        number_of_log_lines=log_lines, filter_fields=[], filter_fields_any=filter_fields_any,
                         min_should_match=0.0),
                     "decision_maker": _decision_maker
                 },

@@ -120,18 +120,6 @@ class TestBoostingModel(unittest.TestCase):
                     "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
                     "decision_maker": _decision_maker
                 },
-                # TODO: uncomment after similarity and data obfuscation fix
-                # {
-                #     "elastic_results": [(self.get_fixture(self.log_message_only_small_logs),
-                #                          self.get_fixture(self.two_hits_search_rs_small_logs))],
-                #     "config": TestBoostingModel.get_default_config(
-                #         number_of_log_lines=log_lines,
-                #         filter_fields=filter_fields,
-                #         time_weight_decay=0.95,
-                #         min_should_match=0.4
-                #     ),
-                #     "decision_maker": _decision_maker
-                # },
             ])
 
         for idx, test in enumerate(tests):

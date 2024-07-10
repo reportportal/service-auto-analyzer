@@ -67,8 +67,8 @@ def return_similar_objects_into_sample(x_train_ind: list[int], y_train: list[int
 
 
 def split_train_test(
-        logs_to_train_idx: list[int], data: list[tuple[str, str, str]], labels_filtered, additional_logs,
-        label: str, random_state: int = 1257) -> tuple[list, list, list, list]:
+        logs_to_train_idx: list[int], data: list[tuple[str, str, str]], labels_filtered: list[int],
+        additional_logs: dict[int, list[int]], label: str, random_state: int = 1257) -> tuple[list, list, list, list]:
     x_train_ind, x_test_ind, y_train, y_test = train_test_split(
         logs_to_train_idx, labels_filtered, test_size=0.1, random_state=random_state,
         stratify=labels_filtered)
@@ -94,7 +94,8 @@ def perform_light_deduplication(data: list[tuple[str, str, str]]) -> tuple[dict[
     return additional_logs, logs_to_train_idx
 
 
-def create_binary_target_data(label: str, data: list[tuple[str, str, str]]):
+def create_binary_target_data(
+        label: str, data: list[tuple[str, str, str]]) -> tuple[list[int], list[int], dict[int, list[int]], float]:
     additional_logs, logs_to_train_idx = perform_light_deduplication(data)
     labels_filtered = []
     for ind in logs_to_train_idx:

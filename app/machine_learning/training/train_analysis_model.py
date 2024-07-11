@@ -16,7 +16,7 @@ import os
 import pickle
 from datetime import datetime
 from time import time
-from typing import Optional
+from typing import Optional, Any
 
 import elasticsearch
 import elasticsearch.helpers
@@ -141,7 +141,7 @@ class AnalysisModelTraining:
             "Mean Reciprocal Rank": calculate_mrr
         }
 
-    def get_config_for_boosting(self, number_of_log_lines: int, model_type: ModelType, namespaces):
+    def get_config_for_boosting(self, number_of_log_lines: int, model_type: ModelType, namespaces) -> dict[str, Any]:
         return {
             "max_query_terms": self.search_cfg.MaxQueryTerms,
             "min_should_match": 0.4,
@@ -156,7 +156,8 @@ class AnalysisModelTraining:
             "time_weight_decay": self.search_cfg.TimeWeightDecay}
 
     @staticmethod
-    def get_info_template(project_info: TrainInfo, baseline_model: str, model_name: str, metric_name: str):
+    def get_info_template(project_info: TrainInfo, baseline_model: str, model_name: str,
+                          metric_name: str) -> dict[str, Any]:
         return {"method": "training", "sub_model_type": "all", "model_type": project_info.model_type.name,
                 "baseline_model": [baseline_model], "new_model": [model_name],
                 "project_id": str(project_info.project), "model_saved": 0, "p_value": 1.0,
@@ -210,7 +211,7 @@ class AnalysisModelTraining:
                     metrics_to_gather, test_item_ids_with_pos_test, baseline_model_results)
         return baseline_model_results, new_model_results, bad_data
 
-    def query_logs(self, project_id: int, log_ids_to_find: list[str]):
+    def query_logs(self, project_id: int, log_ids_to_find: list[str]) -> dict[str, Any]:
         log_ids_to_find = list(log_ids_to_find)
         project_index_name = text_processing.unite_project_name(
             str(project_id), self.app_config.esProjectIndexPrefix)
@@ -271,7 +272,7 @@ class AnalysisModelTraining:
             return True
         return False
 
-    def query_es_for_suggest_info(self, project_id: int):
+    def query_es_for_suggest_info(self, project_id: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         log_ids_to_find = set()
         gathered_suggested_data = []
         log_id_pairs_set = set()
@@ -364,7 +365,7 @@ class AnalysisModelTraining:
         return (np.asarray(full_data_features), np.asarray(labels), test_item_ids_with_pos,
                 features_dict_with_saved_objects)
 
-    def train(self, project_info: TrainInfo):
+    def train(self, project_info: TrainInfo) -> tuple[int, dict[str, Any]]:
         time_training = time()
         logger.debug("Started training model '%s'", project_info.model_type.name)
         model_name = "%s_model_%s" % (project_info.model_type.name, datetime.now().strftime("%d.%m.%y"))

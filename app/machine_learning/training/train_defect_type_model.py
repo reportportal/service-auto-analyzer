@@ -39,6 +39,7 @@ RETRY_COUNT = 5
 RETRY_PAUSES = [0, 1, 5, 10, 20, 40, 60]
 BASE_ISSUE_CLASS_INDEXES: dict[str, int] = {'ab': 0, 'pb': 1, 'si': 2}
 MINIMAL_LABEL_PROPORTION = 0.2
+TEST_DATA_PROPORTION = 0.1
 
 
 def return_similar_objects_into_sample(x_train_ind: list[int], y_train: list[int],
@@ -70,7 +71,7 @@ def split_train_test(
         logs_to_train_idx: list[int], data: list[tuple[str, str, str]], labels_filtered: list[int],
         additional_logs: dict[int, list[int]], label: str, random_state: int = 1257) -> tuple[list, list, list, list]:
     x_train_ind, x_test_ind, y_train, y_test = train_test_split(
-        logs_to_train_idx, labels_filtered, test_size=0.1, random_state=random_state,
+        logs_to_train_idx, labels_filtered, test_size=TEST_DATA_PROPORTION, random_state=random_state,
         stratify=labels_filtered)
     x_train, y_train = return_similar_objects_into_sample(x_train_ind, y_train, data, additional_logs, label)
     x_test = [data[ind][0] for ind in x_test_ind]
@@ -110,9 +111,9 @@ def create_binary_target_data(
     return logs_to_train_idx, labels_filtered, additional_logs, proportion_binary_labels
 
 
-def train_several_times(new_model: DefectTypeModel, label: str, data: list[tuple[str, str, str]],
-                        random_states: list[int],
-                        baseline_model: Optional[DefectTypeModel] = None) -> tuple[list[float], list[float], bool]:
+def train_several_times(
+        new_model: DefectTypeModel, label: str, data: list[tuple[str, str, str]], random_states: list[int],
+        baseline_model: Optional[DefectTypeModel] = None) -> tuple[list[float], list[float], bool, float]:
     my_random_states = random_states if random_states else TRAIN_DATA_RANDOM_STATES
     new_model_results = []
     baseline_model_results = []
@@ -139,7 +140,7 @@ def train_several_times(new_model: DefectTypeModel, label: str, data: list[tuple
                 baseline_model_results.append(f1)
             else:
                 baseline_model_results.append(0.0)
-    return baseline_model_results, new_model_results, bad_data_proportion
+    return baseline_model_results, new_model_results, bad_data_proportion, proportion_binary_labels
 
 
 class QueryResult(BaseModel):
@@ -302,7 +303,7 @@ class DefectTypeModelTraining:
             new_model.count_vectorizer_models[label] = _count_vectorizer
 
     def train_several_times(self, new_model: DefectTypeModel, label: str, data: list[tuple[str, str, str]],
-                            random_states: list[int]) -> tuple[list[float], list[float], bool]:
+                            random_states: list[int]) -> tuple[list[float], list[float], bool, float]:
         return train_several_times(new_model, label, data, random_states, self.baseline_model)
 
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, dict[str, Any]]]:
@@ -334,21 +335,21 @@ class DefectTypeModelTraining:
             time_training = time()
             LOGGER.info(f'Label to train the model {label}')
 
-            baseline_model_results, new_model_results, bad_data_proportion = self.train_several_times(
-                new_model, label, data, TRAIN_DATA_RANDOM_STATES)
+            (baseline_model_results, new_model_results, bad_data_proportion,
+             proportion_binary_labels) = self.train_several_times(new_model, label, data, TRAIN_DATA_RANDOM_STATES)
 
             use_custom_model = False
             if not bad_data_proportion:
-                LOGGER.debug("Baseline test results %s", baseline_model_results)
-                LOGGER.debug("New model test results %s", new_model_results)
+                LOGGER.debug(f'Baseline test results {baseline_model_results}')
+                LOGGER.debug(f'New model test results {new_model_results}')
                 f_value, p_value = stats.f_oneway(baseline_model_results, new_model_results)
                 if p_value is None:
                     p_value = 1.0
-                train_log_info[label]["p_value"] = p_value
+                train_log_info[label]['p_value'] = p_value
                 baseline_mean_f1 = np.mean(baseline_model_results)
                 mean_f1 = np.mean(new_model_results)
-                train_log_info[label]["baseline_mean_metric"] = baseline_mean_f1
-                train_log_info[label]["new_model_mean_metric"] = mean_f1
+                train_log_info[label]['baseline_mean_metric'] = baseline_mean_f1
+                train_log_info[label]['new_model_mean_metric'] = mean_f1
 
                 if p_value < 0.05 and mean_f1 > baseline_mean_f1 and mean_f1 >= 0.4:
                     p_value_max = max(p_value_max, p_value)
@@ -357,7 +358,7 @@ class DefectTypeModelTraining:
                 LOGGER.info(
                     f'Model training validation results: p-value={p_value:.3f}; mean '
                     f'baseline={baseline_mean_f1:.3f}; mean new model={mean_f1:.3f}.')
-            train_log_info[label]["bad_data_proportion"] = int(bad_data_proportion)
+            train_log_info[label]['bad_data_proportion'] = int(bad_data_proportion)
 
             if use_custom_model:
                 LOGGER.debug(f'Custom model {label} should be saved')
@@ -365,12 +366,13 @@ class DefectTypeModelTraining:
                 best_random_state = TRAIN_DATA_RANDOM_STATES[max_train_result_idx]
 
                 LOGGER.info(f'Perform final training with random state: {best_random_state}')
-                baseline_model_results, new_model_results, bad_data_proportion = self.train_several_times(
-                    new_model, label, data, [best_random_state])
+                (baseline_model_results, new_model_results, bad_data_proportion,
+                 proportion_binary_labels) = self.train_several_times(new_model, label, data, [best_random_state])
 
                 if not bad_data_proportion:
                     train_log_info[label]["model_saved"] = 1
                     custom_models.append(label)
+                    data_proportion_min = min(proportion_binary_labels, data_proportion_min)
                 else:
                     train_log_info[label]["model_saved"] = 0
             else:

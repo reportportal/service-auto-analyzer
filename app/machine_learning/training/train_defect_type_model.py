@@ -123,8 +123,12 @@ def train_several_times(
     logs_to_train_idx, labels_filtered, additional_logs, proportion_binary_labels = create_binary_target_data(
         label, data)
 
-    if proportion_binary_labels < MINIMAL_LABEL_PROPORTION or len(data) < MINIMAL_DATA_LENGTH_FOR_TRAIN:
+    if proportion_binary_labels < MINIMAL_LABEL_PROPORTION:
         LOGGER.debug('Train data has a bad proportion: %.3f', proportion_binary_labels)
+        bad_data_proportion = True
+    data_length = len(data)
+    if data_length < MINIMAL_DATA_LENGTH_FOR_TRAIN:
+        LOGGER.debug(f'Train data has a too few entities:{data_length}')
         bad_data_proportion = True
 
     if not bad_data_proportion:

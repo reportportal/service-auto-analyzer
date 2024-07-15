@@ -143,6 +143,18 @@ def train_several_times(
     return baseline_model_results, new_model_results, bad_data_proportion, proportion_binary_labels
 
 
+def copy_model_part_from_baseline(label: str, new_model: DefectTypeModel, baseline_model: DefectTypeModel) -> None:
+    if label not in baseline_model.models:
+        if label in new_model.models:
+            del new_model.models[label]
+        if label in new_model.count_vectorizer_models:
+            del new_model.count_vectorizer_models[label]
+    else:
+        new_model.models[label] = baseline_model.models[label]
+        _count_vectorizer = baseline_model.count_vectorizer_models[label]
+        new_model.count_vectorizer_models[label] = _count_vectorizer
+
+
 class QueryResult(BaseModel):
     result: list[tuple[str, str, str]]
     error_count: int
@@ -291,16 +303,7 @@ class DefectTypeModelTraining:
                 'bad_data_proportion': 0, 'metric_name': 'F1', 'errors': [], 'errors_count': 0,
                 'time_spent': 0.0}
 
-    def copy_model_part_from_baseline(self, new_model, label):
-        if label not in self.baseline_model.models:
-            if label in new_model.models:
-                del new_model.models[label]
-            if label in new_model.count_vectorizer_models:
-                del new_model.count_vectorizer_models[label]
-        else:
-            new_model.models[label] = self.baseline_model.models[label]
-            _count_vectorizer = self.baseline_model.count_vectorizer_models[label]
-            new_model.count_vectorizer_models[label] = _count_vectorizer
+
 
     def train_several_times(self, new_model: DefectTypeModel, label: str, data: list[tuple[str, str, str]],
                             random_states: list[int]) -> tuple[list[float], list[float], bool, float]:
@@ -376,7 +379,7 @@ class DefectTypeModelTraining:
                 else:
                     train_log_info[label]["model_saved"] = 0
             else:
-                self.copy_model_part_from_baseline(new_model, label)
+                copy_model_part_from_baseline(label, new_model, self.baseline_model)
                 if train_log_info[label]["baseline_mean_metric"] > 0.001:
                     f1_baseline_models.append(train_log_info[label]["baseline_mean_metric"])
                     f1_chosen_models.append(train_log_info[label]["baseline_mean_metric"])

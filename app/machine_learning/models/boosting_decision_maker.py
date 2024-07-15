@@ -47,7 +47,7 @@ class BoostingDecisionMaker(MlModel):
     def loaded(self) -> bool:
         return self._loaded
 
-    def get_feature_ids(self):
+    def get_feature_ids(self) -> list[int]:
         return text_processing.transform_string_feature_range_into_list(self.feature_ids) \
             if isinstance(self.feature_ids, str) else self.feature_ids
 

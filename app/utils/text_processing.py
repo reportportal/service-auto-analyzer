@@ -721,7 +721,7 @@ def enrich_found_exceptions(text):
     return " ".join(new_words)
 
 
-def transform_string_feature_range_into_list(text):
+def transform_string_feature_range_into_list(text: str) -> list[int]:
     """Converts features from string to list of ids"""
     values = []
     for part in text.split(","):

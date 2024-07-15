@@ -325,7 +325,8 @@ class AnalysisModelTraining:
         log_id_dict = self.query_logs(project_id, list(log_ids_to_find))
         return gathered_suggested_data, log_id_dict
 
-    def gather_data(self, model_type: ModelType, project_id: int, features, defect_type_model_to_use, full_config):
+    def gather_data(self, model_type: ModelType, project_id: int, features: list[int], defect_type_model_to_use,
+                    full_config):
         namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
         gathered_suggested_data, log_id_dict = self.query_es_for_suggest_info(project_id)
         features_dict_with_saved_objects = prepare_encoders(
@@ -379,9 +380,8 @@ class AnalysisModelTraining:
         full_config, features, monotonous_features = pickle.load(
             open(self.model_config[project_info.model_type], "rb"))
         new_model_folder = "%s_model/%s/" % (project_info.model_type.name, model_name)
-        self.new_model = (
-            custom_boosting_decision_maker.CustomBoostingDecisionMaker(
-                object_saving.create(self.app_config, project_id=project_info.project, path=new_model_folder)))
+        self.new_model = custom_boosting_decision_maker.CustomBoostingDecisionMaker(
+                object_saving.create(self.app_config, project_id=project_info.project, path=new_model_folder))
         self.new_model.add_config_info(full_config, features, monotonous_features)
 
         defect_type_model_to_use = self.model_chooser.choose_model(project_info.project, ModelType.defect_type)
@@ -398,8 +398,8 @@ class AnalysisModelTraining:
         try:
             logger.debug("Initialized training model '%s'", project_info.model_type.name)
             train_data, labels, test_item_ids_with_pos, features_dict_with_saved_objects = self.gather_data(
-                project_info.model_type, project_info.project,
-                self.new_model.get_feature_ids(), defect_type_model_to_use, full_config)
+                project_info.model_type, project_info.project, self.new_model.get_feature_ids(),
+                defect_type_model_to_use, full_config)
             self.new_model.features_dict_with_saved_objects = features_dict_with_saved_objects
 
             for metric in metrics_to_gather:

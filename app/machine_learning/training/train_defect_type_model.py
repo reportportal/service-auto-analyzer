@@ -40,6 +40,7 @@ RETRY_PAUSES = [0, 1, 5, 10, 20, 40, 60]
 BASE_ISSUE_CLASS_INDEXES: dict[str, int] = {'ab': 0, 'pb': 1, 'si': 2}
 MINIMAL_LABEL_PROPORTION = 0.2
 TEST_DATA_PROPORTION = 0.1
+MINIMAL_DATA_LENGTH_FOR_TRAIN = 100
 
 
 def return_similar_objects_into_sample(x_train_ind: list[int], y_train: list[int],
@@ -122,7 +123,7 @@ def train_several_times(
     logs_to_train_idx, labels_filtered, additional_logs, proportion_binary_labels = create_binary_target_data(
         label, data)
 
-    if proportion_binary_labels < MINIMAL_LABEL_PROPORTION:
+    if proportion_binary_labels < MINIMAL_LABEL_PROPORTION or len(data) < MINIMAL_DATA_LENGTH_FOR_TRAIN:
         LOGGER.debug('Train data has a bad proportion: %.3f', proportion_binary_labels)
         bad_data_proportion = True
 
@@ -302,8 +303,6 @@ class DefectTypeModelTraining:
                 'data_proportion': 0.0, 'baseline_mean_metric': 0.0, 'new_model_mean_metric': 0.0,
                 'bad_data_proportion': 0, 'metric_name': 'F1', 'errors': [], 'errors_count': 0,
                 'time_spent': 0.0}
-
-
 
     def train_several_times(self, new_model: DefectTypeModel, label: str, data: list[tuple[str, str, str]],
                             random_states: list[int]) -> tuple[list[float], list[float], bool, float]:

@@ -31,7 +31,7 @@ from app.utils.defaultdict import DefaultDict
 LOGGER = logging.getLogger('analyzerApp.DefectTypeModel')
 MODEL_FILES: list[str] = ['count_vectorizer_models.pickle', 'models.pickle']
 DATA_FIELD = 'detected_message_without_params_extended'
-BASE_DEFECT_TYPE_PATTERN = re.compile(r'([^_]+)_.*')
+BASE_DEFECT_TYPE_PATTERN = re.compile(r'^([^_]+)_.*|^(\D+)\d+')
 DEFAULT_N_ESTIMATORS = 10
 
 
@@ -40,6 +40,8 @@ def get_model(self: DefaultDict, model_name: str):
     if not m:
         raise KeyError(model_name)
     base_model_name = m.group(1)
+    if not base_model_name:
+        base_model_name = m.group(2)
     if not base_model_name:
         raise KeyError(model_name)
     return self[base_model_name]
@@ -67,7 +69,8 @@ class DefectTypeModel(MlModel):
         if self.loaded:
             return
         model = self._load_models(MODEL_FILES)
-        self.count_vectorizer_models, self.models = model
+        self.count_vectorizer_models = DefaultDict(get_model, **model[0])
+        self.models = DefaultDict(get_model, **model[1])
         self._loaded = True
 
     def save_model(self):

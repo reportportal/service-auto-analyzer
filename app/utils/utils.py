@@ -134,7 +134,7 @@ def calculate_proportions_for_labels(labels: list[int]) -> float:
     if len(counted_labels.keys()) >= 2:
         min_val = min(counted_labels.values())
         max_val = max(counted_labels.values())
-        if max_val > 0:
+        if min_val > 1:
             return np.round(min_val / max_val, 3)
     return 0.0
 

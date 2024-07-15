@@ -40,7 +40,7 @@ RETRY_PAUSES = [0, 1, 5, 10, 20, 40, 60]
 BASE_ISSUE_CLASS_INDEXES: dict[str, int] = {'ab': 0, 'pb': 1, 'si': 2}
 MINIMAL_LABEL_PROPORTION = 0.2
 TEST_DATA_PROPORTION = 0.1
-MINIMAL_DATA_LENGTH_FOR_TRAIN = 100
+MINIMAL_DATA_LENGTH_FOR_TRAIN = 50
 
 
 def return_similar_objects_into_sample(x_train_ind: list[int], y_train: list[int],

@@ -129,7 +129,7 @@ def extract_all_exceptions(bodies):
     return logs_with_exceptions
 
 
-MINIMAL_VALUE_FOR_GOOD_PROPORTION = 5
+MINIMAL_VALUE_FOR_GOOD_PROPORTION = 2
 
 
 def calculate_proportions_for_labels(labels: list[int]) -> float:
@@ -163,7 +163,9 @@ def balance_data(train_data_indexes: list[int], train_labels: list[int],
 
     all_data = []
     all_data_labels = []
-    real_proportion = 0.0 if min_count < 1 or max_count < 2 else np.round(min_count / max_count, 3)
+    real_proportion = 0.0
+    if min_count > MINIMAL_VALUE_FOR_GOOD_PROPORTION:
+        real_proportion = np.round(min_count / max_count, 3)
     if min_count > 0 and real_proportion < due_proportion:
         all_data.extend(min_data)
         all_data_labels.extend([min_label] * len(min_data))

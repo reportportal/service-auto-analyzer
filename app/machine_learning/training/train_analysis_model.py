@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 import os
-import pickle
 from datetime import datetime
 from time import time
 from typing import Optional, Any
@@ -27,16 +26,17 @@ from sklearn.model_selection import train_test_split
 
 from app.commons import logging, namespace_finder, object_saving
 from app.commons.esclient import EsClient
-from app.commons.model.ml import TrainInfo, ModelType
 from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
+from app.commons.model.ml import TrainInfo, ModelType
 from app.commons.model_chooser import ModelChooser
 from app.machine_learning.feature_encoding_configurer import FeatureEncodingConfigurer
+from app.machine_learning.models import BoostingDecisionMaker
 from app.machine_learning.models import (boosting_decision_maker, custom_boosting_decision_maker,
                                          weighted_similarity_calculator)
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import utils, text_processing
 
-logger = logging.getLogger("analyzerApp.trainingAnalysisModel")
+LOGGER = logging.getLogger("analyzerApp.trainingAnalysisModel")
 
 
 def calculate_f1(model, x_test, y_test, _):
@@ -113,21 +113,37 @@ def prepare_encoders(features_encoding_config, logs_found):
 class AnalysisModelTraining:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
+    baseline_model_folder: Optional[str]
+    baseline_model: Optional[BoostingDecisionMaker]
     model_chooser: Optional[ModelChooser]
+    full_config: Optional[dict[str, Any]]
+    features: Optional[list[int]]
+    mono_features: Optional[list[int]]
 
-    def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig,
+    def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig, model_type: ModelType,
                  model_chooser: Optional[ModelChooser] = None) -> None:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.due_proportion = 0.05
         self.due_proportion_to_smote = 0.4
         self.es_client = EsClient(app_config=app_config)
-        self.baseline_folders = {
-            ModelType.suggestion: self.search_cfg.SuggestBoostModelFolder,
-            ModelType.auto_analysis: self.search_cfg.BoostModelFolder}
-        self.model_config = {
-            ModelType.suggestion: self.search_cfg.RetrainSuggestBoostModelConfig,
-            ModelType.auto_analysis: self.search_cfg.RetrainAutoBoostModelConfig}
+        if model_type is ModelType.suggestion:
+            baseline_folder = self.search_cfg.SuggestBoostModelFolder
+            model_config = self.search_cfg.RetrainSuggestBoostModelConfig
+        elif model_type is ModelType.auto_analysis:
+            baseline_folder = self.search_cfg.BoostModelFolder
+            model_config = self.search_cfg.RetrainAutoBoostModelConfig
+        else:
+            raise ValueError(f'Incorrect model type {model_type}')
+
+        if baseline_folder:
+            self.baseline_model_folder = os.path.basename(baseline_folder.strip("/").strip("\\"))
+            self.baseline_model = boosting_decision_maker.BoostingDecisionMaker(
+                object_saving.create_filesystem(self.baseline_model_folder))
+            self.baseline_model.load_model()
+            self.full_config, self.features, self.monotonous_features = object_saving.create_filesystem(
+                model_config).get_project_object('', using_json=False)
+
         self.weighted_log_similarity_calculator = None
         if self.search_cfg.SimilarityWeightsFolder.strip():
             self.weighted_log_similarity_calculator = (
@@ -141,7 +157,7 @@ class AnalysisModelTraining:
             "Mean Reciprocal Rank": calculate_mrr
         }
 
-    def get_config_for_boosting(self, number_of_log_lines: int, model_type: ModelType, namespaces) -> dict[str, Any]:
+    def get_config_for_boosting(self, number_of_log_lines: int, namespaces) -> dict[str, Any]:
         return {
             "max_query_terms": self.search_cfg.MaxQueryTerms,
             "min_should_match": 0.4,
@@ -150,7 +166,7 @@ class AnalysisModelTraining:
             "filter_min_should_match_any": [],
             "number_of_log_lines": number_of_log_lines,
             "filter_by_test_case_hash": False,
-            "boosting_model": self.baseline_folders[model_type],
+            "boosting_model": self.baseline_model_folder,
             "chosen_namespaces": namespaces,
             "calculate_similarities": False,
             "time_weight_decay": self.search_cfg.TimeWeightDecay}
@@ -176,7 +192,8 @@ class AnalysisModelTraining:
             new_model_results[metric].append(metric_res)
         return new_model_results
 
-    def train_several_times(self, data, labels, features, test_item_ids_with_pos, metrics_to_gather):
+    def train_several_times(self, new_model: BoostingDecisionMaker, data, labels, features, test_item_ids_with_pos,
+                            metrics_to_gather):
         new_model_results = {}
         baseline_model_results = {}
         random_states = [1257, 1873, 1917, 2477, 3449,
@@ -186,7 +203,7 @@ class AnalysisModelTraining:
         proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
 
         if proportion_binary_labels < self.due_proportion:
-            logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
+            LOGGER.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
             bad_data = True
 
         if not bad_data:
@@ -198,12 +215,12 @@ class AnalysisModelTraining:
                 if proportion_binary_labels < self.due_proportion_to_smote:
                     oversample = SMOTE(ratio="minority")
                     x_train, y_train = oversample.fit_resample(x_train, y_train)
-                self.new_model.train_model(x_train, y_train)
-                logger.debug("New model results")
+                new_model.train_model(x_train, y_train)
+                LOGGER.debug("New model results")
                 new_model_results = self.calculate_metrics(
-                    self.new_model, x_test, y_test, metrics_to_gather,
+                    new_model, x_test, y_test, metrics_to_gather,
                     test_item_ids_with_pos_test, new_model_results)
-                logger.debug("Baseline results")
+                LOGGER.debug("Baseline results")
                 x_test_for_baseline = transform_data_from_feature_lists(
                     x_test, features, self.baseline_model.get_feature_ids())
                 baseline_model_results = self.calculate_metrics(
@@ -320,12 +337,12 @@ class AnalysisModelTraining:
                 if query_name == "suggestion" and self.stop_gathering_info_from_suggest_query(
                         cur_number_of_logs_1, cur_number_of_logs_0, max_number_of_logs):
                     break
-            logger.debug("Query: '%s', results number: %d, number of 1s: %d",
+            LOGGER.debug("Query: '%s', results number: %d, number of 1s: %d",
                          query_name, cur_number_of_logs, cur_number_of_logs_1)
         log_id_dict = self.query_logs(project_id, list(log_ids_to_find))
         return gathered_suggested_data, log_id_dict
 
-    def gather_data(self, model_type: ModelType, project_id: int, features: list[int], defect_type_model_to_use,
+    def gather_data(self, project_id: int, features: list[int], defect_type_model_to_use,
                     full_config):
         namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
         gathered_suggested_data, log_id_dict = self.query_es_for_suggest_info(project_id)
@@ -349,8 +366,7 @@ class AnalysisModelTraining:
             if searched_res:
                 _boosting_data_gatherer = SuggestBoostingFeaturizer(
                     searched_res,
-                    self.get_config_for_boosting(
-                        _suggest_res["_source"]["usedLogLines"], model_type, namespaces),
+                    self.get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
                     feature_ids=features,
                     weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
                     features_dict_with_saved_objects=features_dict_with_saved_objects)
@@ -368,21 +384,13 @@ class AnalysisModelTraining:
 
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, Any]]:
         time_training = time()
-        logger.debug("Started training model '%s'", project_info.model_type.name)
+        LOGGER.debug("Started training model '%s'", project_info.model_type.name)
         model_name = "%s_model_%s" % (project_info.model_type.name, datetime.now().strftime("%d.%m.%y"))
 
-        baseline_model_folder = os.path.basename(
-            self.baseline_folders[project_info.model_type].strip("/").strip("\\"))
-        self.baseline_model = boosting_decision_maker.BoostingDecisionMaker(
-            object_saving.create_filesystem(self.baseline_folders[project_info.model_type]))
-        self.baseline_model.load_model()
-
-        full_config, features, monotonous_features = pickle.load(
-            open(self.model_config[project_info.model_type], "rb"))
         new_model_folder = "%s_model/%s/" % (project_info.model_type.name, model_name)
-        self.new_model = custom_boosting_decision_maker.CustomBoostingDecisionMaker(
+        new_model = custom_boosting_decision_maker.CustomBoostingDecisionMaker(
             object_saving.create(self.app_config, project_id=project_info.project, path=new_model_folder))
-        self.new_model.add_config_info(full_config, features, monotonous_features)
+        new_model.add_config_info(self.full_config, self.features, self.monotonous_features)
 
         defect_type_model_to_use = self.model_chooser.choose_model(project_info.project, ModelType.defect_type)
 
@@ -390,50 +398,48 @@ class AnalysisModelTraining:
         train_log_info = {}
         for metric in metrics_to_gather:
             train_log_info[metric] = self.get_info_template(
-                project_info, baseline_model_folder, model_name, metric)
+                project_info, self.baseline_model_folder, model_name, metric)
 
         errors = []
         errors_count = 0
         train_data = []
         try:
-            logger.debug("Initialized training model '%s'", project_info.model_type.name)
+            LOGGER.debug("Initialized training model '%s'", project_info.model_type.name)
             train_data, labels, test_item_ids_with_pos, features_dict_with_saved_objects = self.gather_data(
-                project_info.model_type, project_info.project, self.new_model.get_feature_ids(),
-                defect_type_model_to_use, full_config)
-            self.new_model.features_dict_with_saved_objects = features_dict_with_saved_objects
+                project_info.project, new_model.get_feature_ids(), defect_type_model_to_use, self.full_config)
+            new_model.features_dict_with_saved_objects = features_dict_with_saved_objects
 
             for metric in metrics_to_gather:
                 train_log_info[metric]["data_size"] = len(labels)
                 train_log_info[metric]["data_proportion"] = utils.calculate_proportions_for_labels(labels)
 
-            logger.debug("Loaded data for training model '%s'", project_info.model_type.name)
+            LOGGER.debug("Loaded data for training model '%s'", project_info.model_type.name)
             baseline_model_results, new_model_results, bad_data = self.train_several_times(
-                train_data, labels, self.new_model.get_feature_ids(),
-                test_item_ids_with_pos, metrics_to_gather)
+                new_model, train_data, labels, new_model.get_feature_ids(), test_item_ids_with_pos, metrics_to_gather)
             for metric in metrics_to_gather:
                 train_log_info[metric]["bad_data_proportion"] = int(bad_data)
 
             use_custom_model = False
             if not bad_data:
                 for metric in metrics_to_gather:
-                    logger.debug("Baseline test results %s", baseline_model_results[metric])
-                    logger.debug("New model test results %s", new_model_results[metric])
+                    LOGGER.debug("Baseline test results %s", baseline_model_results[metric])
+                    LOGGER.debug("New model test results %s", new_model_results[metric])
                     f_value, p_value = stats.f_oneway(baseline_model_results[metric], new_model_results[metric])
                     if p_value is None:
                         p_value = 1.0
                     train_log_info[metric]["p_value"] = p_value
-                    mean_f1 = np.mean(new_model_results[metric])
-                    train_log_info[metric]["baseline_mean_metric"] = np.mean(baseline_model_results[metric])
-                    train_log_info[metric]["new_model_mean_metric"] = mean_f1
-                    if p_value < 0.05 and mean_f1 > np.mean(baseline_model_results[metric]) and mean_f1 >= 0.4:
+                    mean_metric = np.mean(new_model_results[metric])
+                    baseline_mean_metric = np.mean(baseline_model_results[metric])
+                    train_log_info[metric]["baseline_mean_metric"] = baseline_mean_metric
+                    train_log_info[metric]["new_model_mean_metric"] = mean_metric
+                    if p_value < 0.05 and mean_metric > baseline_mean_metric and mean_metric >= 0.4:
                         use_custom_model = True
-                    logger.debug(
-                        """Model training validation results:
-                            p-value=%.3f mean baseline=%.3f mean new model=%.3f""",
-                        p_value, np.mean(baseline_model_results[metric]), np.mean(new_model_results[metric]))
+                    LOGGER.info(
+                        f'Model training validation results: p-value={p_value:.3f}; mean {mean_metric} metric '
+                        f'baseline={baseline_mean_metric:.3f}; mean new model={mean_metric:.3f}.')
 
             if use_custom_model:
-                logger.debug("Custom model should be saved")
+                LOGGER.debug("Custom model should be saved")
 
                 proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
                 if proportion_binary_labels < self.due_proportion_to_smote:
@@ -441,21 +447,21 @@ class AnalysisModelTraining:
                     train_data, labels = oversample.fit_resample(train_data, labels)
                     proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
                 if proportion_binary_labels < self.due_proportion:
-                    logger.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
+                    LOGGER.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
                     bad_data = True
                 for metric in metrics_to_gather:
                     train_log_info[metric]["bad_data_proportion"] = int(bad_data)
                 if not bad_data:
                     for metric in metrics_to_gather:
                         train_log_info[metric]["model_saved"] = 1
-                    self.new_model.train_model(train_data, labels)
+                    new_model.train_model(train_data, labels)
                 else:
                     for metric in metrics_to_gather:
                         train_log_info[metric]["model_saved"] = 0
                 self.model_chooser.delete_old_model(project_info.model_type, project_info.project)
-                self.new_model.save_model()
+                new_model.save_model()
         except Exception as err:
-            logger.error(err)
+            LOGGER.error(err)
             errors.append(utils.extract_exception(err))
             errors_count += 1
 
@@ -467,5 +473,5 @@ class AnalysisModelTraining:
             train_log_info[metric]["errors"].extend(errors)
             train_log_info[metric]["errors_count"] += errors_count
 
-        logger.info("Finished for %d s", time_spent)
+        LOGGER.info("Finished for %d s", time_spent)
         return len(train_data), train_log_info

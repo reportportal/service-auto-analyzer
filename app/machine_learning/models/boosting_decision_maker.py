@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from typing import Any
 
 from sklearn.metrics import classification_report, confusion_matrix
 from xgboost import XGBClassifier
@@ -29,6 +30,9 @@ MODEL_FILES: list[str] = ['boost_model.pickle', 'data_features_config.pickle',
 
 class BoostingDecisionMaker(MlModel):
     _loaded: bool
+    full_config: dict[str, Any]
+    feature_ids: list[int]
+    monotonous_features: list[int]
 
     def __init__(self, object_saver: ObjectSaver, tags: str = 'global boosting model', *, n_estimators: int = 75,
                  max_depth: int = 5, monotonous_features: str = '') -> None:
@@ -36,11 +40,11 @@ class BoostingDecisionMaker(MlModel):
         self.n_estimators = n_estimators
         self.max_depth = max_depth
         self.xg_boost = XGBClassifier(n_estimators=n_estimators, max_depth=max_depth, random_state=43)
+        self.full_config = {}
+        self.feature_ids = []
         self.monotonous_features = text_processing.transform_string_feature_range_into_list(
             monotonous_features)
         self.features_dict_with_saved_objects = {}
-        self.full_config = {}
-        self.feature_ids = []
         self._loaded = False
 
     @property
@@ -63,7 +67,7 @@ class BoostingDecisionMaker(MlModel):
                 feature_names.append(str(_id))
         return feature_names
 
-    def add_config_info(self, full_config, features, monotonous_features):
+    def add_config_info(self, full_config: dict[str, Any], features: list[int], monotonous_features: list[int]):
         self.full_config = full_config
         self.feature_ids = features
         self.monotonous_features = monotonous_features

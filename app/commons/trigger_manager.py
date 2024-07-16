@@ -34,10 +34,11 @@ class TriggerManager:
                                     DefectTypeModelTraining(app_config, search_cfg, model_chooser)),
             ModelType.suggestion: (RetrainingTriggering(app_config, 'suggestion_trigger_info',
                                                         start_number=100, accumulated_difference=50),
-                                   AnalysisModelTraining(app_config, search_cfg, model_chooser)),
+                                   AnalysisModelTraining(app_config, search_cfg, ModelType.suggestion, model_chooser)),
             ModelType.auto_analysis: (RetrainingTriggering(app_config, 'auto_analysis_trigger_info',
                                                            start_number=300, accumulated_difference=100),
-                                      AnalysisModelTraining(app_config, search_cfg, model_chooser))
+                                      AnalysisModelTraining(app_config, search_cfg, ModelType.auto_analysis,
+                                                            model_chooser))
         }
 
     def does_trigger_exist(self, model: ModelType):

@@ -381,7 +381,7 @@ class AnalysisModelTraining:
             open(self.model_config[project_info.model_type], "rb"))
         new_model_folder = "%s_model/%s/" % (project_info.model_type.name, model_name)
         self.new_model = custom_boosting_decision_maker.CustomBoostingDecisionMaker(
-                object_saving.create(self.app_config, project_id=project_info.project, path=new_model_folder))
+            object_saving.create(self.app_config, project_id=project_info.project, path=new_model_folder))
         self.new_model.add_config_info(full_config, features, monotonous_features)
 
         defect_type_model_to_use = self.model_chooser.choose_model(project_info.project, ModelType.defect_type)

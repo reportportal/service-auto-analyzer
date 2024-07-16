@@ -362,7 +362,7 @@ class DefectTypeModelTraining:
                     use_custom_model = True
                 all_bad_data = 0
                 LOGGER.info(
-                    f'Model training validation results: p-value={p_value:.3f}; mean '
+                    f'Model training validation results: p-value={p_value:.3f}; mean F1 metric '
                     f'baseline={baseline_mean_f1:.3f}; mean new model={mean_f1:.3f}.')
             train_log_info[label]['bad_data_proportion'] = int(bad_data_proportion)
 

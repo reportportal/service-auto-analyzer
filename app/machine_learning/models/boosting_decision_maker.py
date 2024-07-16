@@ -121,7 +121,7 @@ class BoostingDecisionMaker(MlModel):
         logger.info(classification_report(valid_test_labels, res))
         return f1_score
 
-    def predict(self, data):
+    def predict(self, data: list):
         if not len(data):
             return [], []
         return self.xg_boost.predict(data), self.xg_boost.predict_proba(data)

@@ -65,7 +65,7 @@ class ModelChooser:
                 result[model_type] = None
         return result
 
-    def choose_model(self, project_id: int, model_type: ModelType, custom_model_prob: float = 1.0):
+    def choose_model(self, project_id: int, model_type: ModelType, custom_model_prob: float = 1.0) -> MlModel:
         model = self.global_models[model_type]
         prob_for_model = np.random.uniform()
         if prob_for_model > custom_model_prob:

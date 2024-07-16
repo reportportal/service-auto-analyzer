@@ -15,7 +15,7 @@
 from time import time
 
 from app.commons import logging, namespace_finder
-from app.commons.model.launch_objects import ApplicationConfig
+from app.commons.model.launch_objects import ApplicationConfig, Launch
 from app.commons.log_requests import LogRequests
 from app.utils import utils
 
@@ -31,12 +31,11 @@ class NamespaceFinderService:
         self.log_requests = LogRequests()
 
     @utils.ignore_warnings
-    def update_chosen_namespaces(self, launches):
+    def update_chosen_namespaces(self, launches: list[Launch]):
         logger.info("Started updating chosen namespaces")
         t_start = time()
         log_words, project_id = LogRequests.prepare_log_words(launches)
-        logger.debug("Project id %s", project_id)
+        logger.debug(f'Project id {project_id}')
         if project_id is not None:
-            self.namespace_finder.update_namespaces(
-                project_id, log_words)
-        logger.info("Finished updating chosen namespaces %.2f s", time() - t_start)
+            self.namespace_finder.update_namespaces(project_id, log_words)
+        logger.info('Finished updating chosen namespaces %.2f s', time() - t_start)

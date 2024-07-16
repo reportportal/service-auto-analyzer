@@ -30,9 +30,8 @@ from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
 from app.commons.model.ml import TrainInfo, ModelType
 from app.commons.model_chooser import ModelChooser
 from app.machine_learning.feature_encoding_configurer import FeatureEncodingConfigurer
-from app.machine_learning.models import BoostingDecisionMaker
 from app.machine_learning.models import (boosting_decision_maker, custom_boosting_decision_maker,
-                                         weighted_similarity_calculator)
+                                         weighted_similarity_calculator, BoostingDecisionMaker)
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import utils, text_processing
 
@@ -115,13 +114,13 @@ class AnalysisModelTraining:
     search_cfg: SearchConfig
     baseline_model_folder: Optional[str]
     baseline_model: Optional[BoostingDecisionMaker]
-    model_chooser: Optional[ModelChooser]
+    model_chooser: ModelChooser
     full_config: Optional[dict[str, Any]]
     features: Optional[list[int]]
     mono_features: Optional[list[int]]
 
     def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig, model_type: ModelType,
-                 model_chooser: Optional[ModelChooser] = None) -> None:
+                 model_chooser: ModelChooser) -> None:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.due_proportion = 0.05
@@ -342,8 +341,7 @@ class AnalysisModelTraining:
         log_id_dict = self.query_logs(project_id, list(log_ids_to_find))
         return gathered_suggested_data, log_id_dict
 
-    def gather_data(self, project_id: int, features: list[int], defect_type_model_to_use,
-                    full_config):
+    def gather_data(self, project_id: int, features: list[int], full_config: dict[str, Any]) -> tuple:
         namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
         gathered_suggested_data, log_id_dict = self.query_es_for_suggest_info(project_id)
         features_dict_with_saved_objects = prepare_encoders(
@@ -370,7 +368,9 @@ class AnalysisModelTraining:
                     feature_ids=features,
                     weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
                     features_dict_with_saved_objects=features_dict_with_saved_objects)
-                _boosting_data_gatherer.set_defect_type_model(defect_type_model_to_use)
+                # noinspection PyTypeChecker
+                _boosting_data_gatherer.set_defect_type_model(
+                    self.model_chooser.choose_model(project_id, ModelType.defect_type))
                 _boosting_data_gatherer.fill_previously_gathered_features(
                     [utils.to_number_list(_suggest_res["_source"]["modelFeatureValues"])],
                     _suggest_res["_source"]["modelFeatureNames"])
@@ -392,8 +392,6 @@ class AnalysisModelTraining:
             object_saving.create(self.app_config, project_id=project_info.project, path=new_model_folder))
         new_model.add_config_info(self.full_config, self.features, self.monotonous_features)
 
-        defect_type_model_to_use = self.model_chooser.choose_model(project_info.project, ModelType.defect_type)
-
         metrics_to_gather = ["F1", "Mean Reciprocal Rank"]
         train_log_info = {}
         for metric in metrics_to_gather:
@@ -406,7 +404,7 @@ class AnalysisModelTraining:
         try:
             LOGGER.debug("Initialized training model '%s'", project_info.model_type.name)
             train_data, labels, test_item_ids_with_pos, features_dict_with_saved_objects = self.gather_data(
-                project_info.project, new_model.get_feature_ids(), defect_type_model_to_use, self.full_config)
+                project_info.project, new_model.get_feature_ids(), self.full_config)
             new_model.features_dict_with_saved_objects = features_dict_with_saved_objects
 
             for metric in metrics_to_gather:

@@ -41,7 +41,7 @@ class DeleteIndexService:
         self.model_chooser = model_chooser
 
     @utils.ignore_warnings
-    def delete_index(self, index_name):
+    def delete_index(self, index_name: int) -> int:
         logger.info("Started deleting index")
         t_start = time()
         is_index_deleted = self.es_client.delete_index(text_processing.unite_project_name(

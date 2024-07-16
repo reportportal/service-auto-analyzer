@@ -167,20 +167,19 @@ class LogRequests:
         return log_template
 
     @staticmethod
-    def prepare_log_words(launches):
+    def prepare_log_words(launches: list[Launch]) -> tuple[dict[str, int], int]:
         log_words = {}
         project = None
         for launch in launches:
-            project = str(launch.project)
+            project = launch.project
             for test_item in launch.testItems:
                 for log in test_item.logs:
-
                     if log.logLevel < utils.ERROR_LOGGING_LEVEL or not log.message.strip():
                         continue
                     cleaned_message = basic_prepare(log.message)
                     det_message, stacktrace = text_processing.detect_log_description_and_stacktrace(cleaned_message)
                     for word in text_processing.split_words(stacktrace):
-                        if "." in word and len(word.split(".")) > 2:
+                        if '.' in word and len(word.split('.')) > 2:
                             log_words[word] = 1
         return log_words, project
 

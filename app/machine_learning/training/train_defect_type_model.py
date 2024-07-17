@@ -113,7 +113,8 @@ def create_binary_target_data(
 
 
 def train_several_times(
-        new_model: DefectTypeModel, label: str, data: list[tuple[str, str, str]], random_states: list[int],
+        new_model: DefectTypeModel, label: str, data: list[tuple[str, str, str]],
+        random_states: Optional[list[int]] = None,
         baseline_model: Optional[DefectTypeModel] = None) -> tuple[list[float], list[float], bool, float]:
     my_random_states = random_states if random_states else TRAIN_DATA_RANDOM_STATES
     new_model_results = []
@@ -309,7 +310,7 @@ class DefectTypeModelTraining:
                 'time_spent': 0.0}
 
     def train_several_times(self, new_model: DefectTypeModel, label: str, data: list[tuple[str, str, str]],
-                            random_states: list[int]) -> tuple[list[float], list[float], bool, float]:
+                            random_states: Optional[list[int]] = None) -> tuple[list[float], list[float], bool, float]:
         return train_several_times(new_model, label, data, random_states, self.baseline_model)
 
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, dict[str, Any]]]:

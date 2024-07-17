@@ -36,6 +36,7 @@ from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeat
 from app.utils import utils, text_processing
 
 LOGGER = logging.getLogger("analyzerApp.trainingAnalysisModel")
+TRAIN_DATA_RANDOM_STATES = [1257, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029]
 
 
 def calculate_f1(model, x_test, y_test, _):
@@ -196,8 +197,7 @@ class AnalysisModelTraining:
                             metrics_to_gather):
         new_model_results = {}
         baseline_model_results = {}
-        random_states = [1257, 1873, 1917, 2477, 3449,
-                         353, 4561, 5417, 6427, 2029]
+        my_random_states = TRAIN_DATA_RANDOM_STATES
         bad_data = False
 
         proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
@@ -208,7 +208,7 @@ class AnalysisModelTraining:
 
         if not bad_data:
             data, labels = deduplicate_data(data, labels)
-            for random_state in random_states:
+            for random_state in my_random_states:
                 x_train, x_test, y_train, y_test, test_item_ids_with_pos_test = split_data(
                     data, labels, random_state, test_item_ids_with_pos)
                 proportion_binary_labels = utils.calculate_proportions_for_labels(y_train)
@@ -307,15 +307,11 @@ class AnalysisModelTraining:
         ]:
             if cur_number_of_logs >= max_number_of_logs:
                 break
-            for res in elasticsearch.helpers.scan(self.es_client.es_client,
-                                                  query=query,
-                                                  index=index_name,
+            for res in elasticsearch.helpers.scan(self.es_client.es_client, query=query, index=index_name,
                                                   scroll="5m"):
                 if cur_number_of_logs >= max_number_of_logs:
                     break
-                saved_model_features = "{}|{}".format(
-                    res["_source"]["modelFeatureNames"],
-                    res["_source"]["modelFeatureValues"])
+                saved_model_features = f'{res["_source"]["modelFeatureNames"]}|{res["_source"]["modelFeatureValues"]}'
                 if saved_model_features in unique_saved_features:
                     continue
                 unique_saved_features.add(saved_model_features)

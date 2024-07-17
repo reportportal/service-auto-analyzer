@@ -112,6 +112,7 @@ def prepare_encoders(features_encoding_config, logs_found):
 class AnalysisModelTraining:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
+    baseline_folder: Optional[str]
     baseline_model_folder: Optional[str]
     baseline_model: Optional[BoostingDecisionMaker]
     model_chooser: ModelChooser
@@ -127,21 +128,21 @@ class AnalysisModelTraining:
         self.due_proportion_to_smote = 0.4
         self.es_client = EsClient(app_config=app_config)
         if model_type is ModelType.suggestion:
-            baseline_folder = self.search_cfg.SuggestBoostModelFolder
+            self.baseline_folder = self.search_cfg.SuggestBoostModelFolder
             model_config = self.search_cfg.RetrainSuggestBoostModelConfig
         elif model_type is ModelType.auto_analysis:
-            baseline_folder = self.search_cfg.BoostModelFolder
+            self.baseline_folder = self.search_cfg.BoostModelFolder
             model_config = self.search_cfg.RetrainAutoBoostModelConfig
         else:
             raise ValueError(f'Incorrect model type {model_type}')
 
-        if baseline_folder:
-            self.baseline_model_folder = os.path.basename(baseline_folder.strip("/").strip("\\"))
+        if self.baseline_folder:
+            self.baseline_model_folder = os.path.basename(self.baseline_folder.strip("/").strip("\\"))
             self.baseline_model = boosting_decision_maker.BoostingDecisionMaker(
-                object_saving.create_filesystem(self.baseline_model_folder))
+                object_saving.create_filesystem(self.baseline_folder))
             self.baseline_model.load_model()
             self.full_config, self.features, self.monotonous_features = object_saving.create_filesystem(
-                model_config).get_project_object('', using_json=False)
+                os.path.dirname(model_config)).get_project_object(os.path.basename(model_config), using_json=False)
 
         self.weighted_log_similarity_calculator = None
         if self.search_cfg.SimilarityWeightsFolder.strip():
@@ -165,7 +166,7 @@ class AnalysisModelTraining:
             "filter_min_should_match_any": [],
             "number_of_log_lines": number_of_log_lines,
             "filter_by_test_case_hash": False,
-            "boosting_model": self.baseline_model_folder,
+            "boosting_model": self.baseline_folder,
             "chosen_namespaces": namespaces,
             "calculate_similarities": False,
             "time_weight_decay": self.search_cfg.TimeWeightDecay}
@@ -392,7 +393,7 @@ class AnalysisModelTraining:
             object_saving.create(self.app_config, project_id=project_info.project, path=new_model_folder))
         new_model.add_config_info(self.full_config, self.features, self.monotonous_features)
 
-        metrics_to_gather = ["F1", "Mean Reciprocal Rank"]
+        metrics_to_gather = ['F1', 'Mean Reciprocal Rank']
         train_log_info = {}
         for metric in metrics_to_gather:
             train_log_info[metric] = self.get_info_template(
@@ -402,7 +403,7 @@ class AnalysisModelTraining:
         errors_count = 0
         train_data = []
         try:
-            LOGGER.debug("Initialized training model '%s'", project_info.model_type.name)
+            LOGGER.debug(f'Initialized model training {project_info.model_type.name}')
             train_data, labels, test_item_ids_with_pos, features_dict_with_saved_objects = self.gather_data(
                 project_info.project, new_model.get_feature_ids(), self.full_config)
             new_model.features_dict_with_saved_objects = features_dict_with_saved_objects

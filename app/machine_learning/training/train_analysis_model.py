@@ -31,6 +31,7 @@ from app.commons.model.ml import TrainInfo, ModelType
 from app.commons.model_chooser import ModelChooser
 from app.machine_learning.models import (boosting_decision_maker, custom_boosting_decision_maker,
                                          weighted_similarity_calculator, BoostingDecisionMaker)
+from app.machine_learning.boosting_featurizer import BoostingFeaturizer
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import utils, text_processing
 
@@ -329,41 +330,58 @@ class AnalysisModelTraining:
         log_id_dict = self.query_logs(project_id, list(log_ids_to_find))
         return gathered_suggested_data, log_id_dict
 
-    def gather_data(self, project_id: int, features: list[int]) -> tuple[np.array, np.array, list]:
-        namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
-        gathered_suggested_data, log_id_dict = self.query_es_for_suggest_info(project_id)
+    def gather_data(self, project_info: TrainInfo, features: list[int]) -> tuple[np.array, np.array, list]:
+        projects = [project_info.project]
+        if project_info.additional_projects:
+            projects.extend(project_info.additional_projects)
+
         full_data_features, labels, test_item_ids_with_pos = [], [], []
-        for _suggest_res in gathered_suggested_data:
-            searched_res = []
-            found_logs = {}
-            for col in ["testItemLogId", "relevantLogId"]:
-                log_id = str(_suggest_res["_source"][col])
-                if _suggest_res["_source"]["isMergedLog"]:
-                    log_id = log_id + "_m"
-                if log_id in log_id_dict:
-                    found_logs[col] = log_id_dict[log_id]
-            if len(found_logs) == 2:
-                log_relevant = found_logs["relevantLogId"]
-                log_relevant["_score"] = _suggest_res["_source"]["esScore"]
-                searched_res = [
-                    (found_logs["testItemLogId"], {"hits": {"hits": [log_relevant]}})]
-            if searched_res:
-                _boosting_data_gatherer = SuggestBoostingFeaturizer(
-                    searched_res,
-                    self.get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
-                    feature_ids=features,
-                    weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
-                # noinspection PyTypeChecker
-                _boosting_data_gatherer.set_defect_type_model(
-                    self.model_chooser.choose_model(project_id, ModelType.defect_type))
-                _boosting_data_gatherer.fill_previously_gathered_features(
-                    [utils.to_number_list(_suggest_res["_source"]["modelFeatureValues"])],
-                    _suggest_res["_source"]["modelFeatureNames"])
-                feature_data, _ = _boosting_data_gatherer.gather_features_info()
-                if feature_data:
-                    full_data_features.extend(feature_data)
-                    labels.append(_suggest_res["_source"]["userChoice"])
-                    test_item_ids_with_pos.append(_suggest_res["_source"]["testItem"])
+        for project_id in projects:
+            namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
+            gathered_suggested_data, log_id_dict = self.query_es_for_suggest_info(project_id)
+
+            for _suggest_res in gathered_suggested_data:
+                searched_res = []
+                found_logs = {}
+                for col in ["testItemLogId", "relevantLogId"]:
+                    log_id = str(_suggest_res["_source"][col])
+                    if _suggest_res["_source"]["isMergedLog"]:
+                        log_id = log_id + "_m"
+                    if log_id in log_id_dict:
+                        found_logs[col] = log_id_dict[log_id]
+                if len(found_logs) == 2:
+                    log_relevant = found_logs["relevantLogId"]
+                    log_relevant["_score"] = _suggest_res["_source"]["esScore"]
+                    searched_res = [
+                        (found_logs["testItemLogId"], {"hits": {"hits": [log_relevant]}})]
+                if searched_res:
+                    model_type = project_info.model_type
+                    if model_type is ModelType.suggestion:
+                        _boosting_data_gatherer = SuggestBoostingFeaturizer(
+                            searched_res,
+                            self.get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
+                            feature_ids=features,
+                            weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
+                    elif model_type is ModelType.auto_analysis:
+                        _boosting_data_gatherer = BoostingFeaturizer(
+                            searched_res,
+                            self.get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
+                            feature_ids=features,
+                            weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
+                    else:
+                        raise ValueError(f'Unknown model type to train: {model_type.name}')
+
+                    # noinspection PyTypeChecker
+                    _boosting_data_gatherer.set_defect_type_model(
+                        self.model_chooser.choose_model(project_id, ModelType.defect_type))
+                    _boosting_data_gatherer.fill_previously_gathered_features(
+                        [utils.to_number_list(_suggest_res["_source"]["modelFeatureValues"])],
+                        _suggest_res["_source"]["modelFeatureNames"])
+                    feature_data, _ = _boosting_data_gatherer.gather_features_info()
+                    if feature_data:
+                        full_data_features.extend(feature_data)
+                        labels.append(_suggest_res["_source"]["userChoice"])
+                        test_item_ids_with_pos.append(_suggest_res["_source"]["testItem"])
         return np.asarray(full_data_features), np.asarray(labels), test_item_ids_with_pos
 
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, Any]]:
@@ -388,8 +406,7 @@ class AnalysisModelTraining:
         train_data = []
         try:
             LOGGER.debug(f'Initialized model training {project_info.model_type.name}')
-            train_data, labels, test_item_ids_with_pos = self.gather_data(
-                project_info.project, new_model.feature_ids)
+            train_data, labels, test_item_ids_with_pos = self.gather_data(project_info, new_model.feature_ids)
 
             for metric in metrics_to_gather:
                 train_log_info[metric]["data_size"] = len(labels)

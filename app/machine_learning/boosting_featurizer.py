@@ -18,8 +18,7 @@ from typing import Optional
 
 import numpy as np
 
-from app.commons import logging, similarity_calculator, object_saving
-from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
+from app.commons import logging, similarity_calculator
 from app.machine_learning.models.defect_type_model import DefectTypeModel
 from app.machine_learning.models.defect_type_model import DATA_FIELD
 from app.utils import utils, text_processing
@@ -30,14 +29,10 @@ logger = logging.getLogger("analyzerApp.boosting_featurizer")
 class BoostingFeaturizer:
     defect_type_predict_model: Optional[DefectTypeModel]
 
-    def __init__(self, all_results, config, feature_ids, weighted_log_similarity_calculator=None,
-                 features_dict_with_saved_objects=None):
+    def __init__(self, all_results, config, feature_ids, weighted_log_similarity_calculator=None):
         self.config = config
         self.previously_gathered_features = {}
         self.models = {}
-        self.features_dict_with_saved_objects = {}
-        if features_dict_with_saved_objects is not None:
-            self.features_dict_with_saved_objects = features_dict_with_saved_objects
         self.similarity_calculator = similarity_calculator.SimilarityCalculator(
             self.config,
             similarity_model=weighted_log_similarity_calculator)
@@ -96,26 +91,11 @@ class BoostingFeaturizer:
                  {"field_name": "potential_status_codes"}, []),
             56: (self.is_the_same_launch, {}, []),
             57: (self.is_the_same_launch_id, {}, []),
-            58: (self._calculate_model_probability,
-                 {"model_folder": self.config["boosting_model"]},
-                 self.get_necessary_features(self.config["boosting_model"])),
             59: (self._calculate_similarity_percent, {"field_name": "found_tests_and_methods"}, []),
             61: (self._calculate_similarity_percent, {"field_name": "test_item_name"}, []),
             64: (self._calculate_decay_function_score, {"field_name": "start_time"}, []),
             65: (self._calculate_test_item_logs_similar_percent, {}, []),
-            66: (self._count_test_item_logs, {}, []),
-            67: (self._encode_into_vector,
-                 {"field_name": "launch_name", "feature_name": 67, "only_query": True}, []),
-            68: (self._encode_into_vector,
-                 {"field_name": "detected_message", "feature_name": 68, "only_query": False}, []),
-            69: (self._encode_into_vector,
-                 {"field_name": "stacktrace", "feature_name": 69, "only_query": False}, []),
-            70: (self._encode_into_vector,
-                 {"field_name": "launch_name", "feature_name": 70, "only_query": True}, []),
-            71: (self._encode_into_vector,
-                 {"field_name": "test_item_name", "feature_name": 71, "only_query": False}, []),
-            72: (self._encode_into_vector,
-                 {"field_name": "found_exceptions", "feature_name": 72, "only_query": True}, [])
+            66: (self._count_test_item_logs, {}, [])
         }
 
         fields_to_calc_similarity = self.find_columns_to_find_similarities_for()
@@ -204,65 +184,6 @@ class BoostingFeaturizer:
                 field_date, compared_field_date = compared_field_date, field_date
             dates_by_issue_types[issue_type] = np.exp(decay_speed * (compared_field_date - field_date).days / 7)
         return dates_by_issue_types
-
-    def _encode_into_vector(self, field_name, feature_name, only_query):
-        if feature_name not in self.features_dict_with_saved_objects:
-            logger.error(self.features_dict_with_saved_objects)
-            logger.error("Feature '%s' has no encoder" % feature_name)
-            return []
-        if field_name != self.features_dict_with_saved_objects[feature_name].field_name:
-            logger.error(field_name)
-            logger.error("Field name '%s' is not the same as in the settings '%s'" % (
-                field_name, self.features_dict_with_saved_objects[feature_name].field_name))
-            return []
-        scores_by_issue_type = self.find_most_relevant_by_type()
-        encodings_by_issue_type = {}
-        issue_types, gathered_data = [], []
-        for issue_type in scores_by_issue_type:
-            field_data = scores_by_issue_type[issue_type]["compared_log"]["_source"][field_name]
-            issue_types.append(issue_type)
-            gathered_data.append(field_data)
-            if not only_query:
-                gathered_data.append(
-                    scores_by_issue_type[issue_type]["mrHit"]["_source"][field_name])
-        if gathered_data:
-            encoded_data = self.features_dict_with_saved_objects[feature_name].transform(
-                gathered_data).toarray()
-            for idx in range(len(issue_types)):
-                if only_query:
-                    encodings_by_issue_type[issue_types[idx]] = list(encoded_data[idx])
-                else:
-                    encodings_by_issue_type[issue_types[idx]] = list(
-                        (encoded_data[2 * idx] + encoded_data[2 * idx + 1]) / 2)
-        return encodings_by_issue_type
-
-    def _calculate_model_probability(self, model_folder=""):
-        if not model_folder.strip():
-            return []
-        if model_folder not in self.models:
-            logger.error("Model folder is not found: '%s'", model_folder)
-            return []
-        feature_ids = self.models[model_folder].get_feature_ids()
-        feature_data = utils.gather_feature_list(self.previously_gathered_features, feature_ids, to_list=True)
-        predicted_labels, predicted_labels_probability = self.models[model_folder].predict(
-            feature_data)
-        predicted_probability = []
-        for res in predicted_labels_probability:
-            predicted_probability.append(float(res[1]))
-        return [[round(r, 2)] for r in predicted_probability]
-
-    def get_necessary_features(self, model_folder):
-        if not model_folder.strip():
-            return []
-        if model_folder not in self.models:
-            try:
-                model = BoostingDecisionMaker(object_saving.create_filesystem(model_folder))
-                model.load_model()
-                self.models[model_folder] = model
-            except Exception as exc:
-                logger.exception(exc)
-                return []
-        return self.models[model_folder].get_feature_ids()
 
     def fill_previously_gathered_features(self, feature_list, feature_ids):
         self.previously_gathered_features = utils.fill_prevously_gathered_features(feature_list, feature_ids)

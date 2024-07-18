@@ -29,7 +29,6 @@ from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
 from app.commons.model.ml import TrainInfo, ModelType
 from app.commons.model_chooser import ModelChooser
-from app.machine_learning.feature_encoding_configurer import FeatureEncodingConfigurer
 from app.machine_learning.models import (boosting_decision_maker, custom_boosting_decision_maker,
                                          weighted_similarity_calculator, BoostingDecisionMaker)
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
@@ -103,13 +102,6 @@ def transform_data_from_feature_lists(feature_list, cur_features, desired_featur
     return gathered_data
 
 
-def prepare_encoders(features_encoding_config, logs_found):
-    _feature_encoding_configurer = FeatureEncodingConfigurer()
-    _feature_encoding_configurer.initialize_encoders_from_config(features_encoding_config)
-    _feature_encoding_configurer.prepare_encoders(logs_found)
-    return _feature_encoding_configurer.feature_dict_with_encodings
-
-
 class AnalysisModelTraining:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
@@ -117,7 +109,6 @@ class AnalysisModelTraining:
     baseline_model_folder: Optional[str]
     baseline_model: Optional[BoostingDecisionMaker]
     model_chooser: ModelChooser
-    full_config: Optional[dict[str, Any]]
     features: Optional[list[int]]
     mono_features: Optional[list[int]]
 
@@ -142,7 +133,7 @@ class AnalysisModelTraining:
             self.baseline_model = boosting_decision_maker.BoostingDecisionMaker(
                 object_saving.create_filesystem(self.baseline_folder))
             self.baseline_model.load_model()
-            self.full_config, self.features, self.monotonous_features = object_saving.create_filesystem(
+            self.features, self.monotonous_features = object_saving.create_filesystem(
                 os.path.dirname(model_config)).get_project_object(os.path.basename(model_config), using_json=False)
 
         self.weighted_log_similarity_calculator = None
@@ -222,10 +213,10 @@ class AnalysisModelTraining:
                     test_item_ids_with_pos_test, new_model_results)
                 LOGGER.debug("Baseline results")
                 x_test_for_baseline = transform_data_from_feature_lists(
-                    x_test, features, self.baseline_model.get_feature_ids())
+                    x_test, features, self.baseline_model.feature_ids)
                 baseline_model_results = self.calculate_metrics(
-                    self.baseline_model, x_test_for_baseline, y_test,
-                    metrics_to_gather, test_item_ids_with_pos_test, baseline_model_results)
+                    self.baseline_model, x_test_for_baseline, y_test,  metrics_to_gather, test_item_ids_with_pos_test,
+                    baseline_model_results)
         return baseline_model_results, new_model_results, bad_data
 
     def query_logs(self, project_id: int, log_ids_to_find: list[str]) -> dict[str, Any]:
@@ -338,11 +329,9 @@ class AnalysisModelTraining:
         log_id_dict = self.query_logs(project_id, list(log_ids_to_find))
         return gathered_suggested_data, log_id_dict
 
-    def gather_data(self, project_id: int, features: list[int], full_config: dict[str, Any]) -> tuple:
+    def gather_data(self, project_id: int, features: list[int]) -> tuple[np.array, np.array, list]:
         namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
         gathered_suggested_data, log_id_dict = self.query_es_for_suggest_info(project_id)
-        features_dict_with_saved_objects = prepare_encoders(
-            full_config["features_encoding_config"], list(log_id_dict.values()))
         full_data_features, labels, test_item_ids_with_pos = [], [], []
         for _suggest_res in gathered_suggested_data:
             searched_res = []
@@ -363,8 +352,7 @@ class AnalysisModelTraining:
                     searched_res,
                     self.get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
                     feature_ids=features,
-                    weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
-                    features_dict_with_saved_objects=features_dict_with_saved_objects)
+                    weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
                 # noinspection PyTypeChecker
                 _boosting_data_gatherer.set_defect_type_model(
                     self.model_chooser.choose_model(project_id, ModelType.defect_type))
@@ -376,8 +364,7 @@ class AnalysisModelTraining:
                     full_data_features.extend(feature_data)
                     labels.append(_suggest_res["_source"]["userChoice"])
                     test_item_ids_with_pos.append(_suggest_res["_source"]["testItem"])
-        return (np.asarray(full_data_features), np.asarray(labels), test_item_ids_with_pos,
-                features_dict_with_saved_objects)
+        return np.asarray(full_data_features), np.asarray(labels), test_item_ids_with_pos
 
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, Any]]:
         time_training = time()
@@ -386,8 +373,9 @@ class AnalysisModelTraining:
 
         new_model_folder = "%s_model/%s/" % (project_info.model_type.name, model_name)
         new_model = custom_boosting_decision_maker.CustomBoostingDecisionMaker(
-            object_saving.create(self.app_config, project_id=project_info.project, path=new_model_folder))
-        new_model.add_config_info(self.full_config, self.features, self.monotonous_features)
+            object_saving.create(self.app_config, project_id=project_info.project, path=new_model_folder),
+            features=self.features, monotonous_features=self.features)
+        new_model.add_config_info(self.features, self.monotonous_features)
 
         metrics_to_gather = ['F1', 'Mean Reciprocal Rank']
         train_log_info = {}
@@ -400,9 +388,8 @@ class AnalysisModelTraining:
         train_data = []
         try:
             LOGGER.debug(f'Initialized model training {project_info.model_type.name}')
-            train_data, labels, test_item_ids_with_pos, features_dict_with_saved_objects = self.gather_data(
-                project_info.project, new_model.get_feature_ids(), self.full_config)
-            new_model.features_dict_with_saved_objects = features_dict_with_saved_objects
+            train_data, labels, test_item_ids_with_pos = self.gather_data(
+                project_info.project, new_model.feature_ids)
 
             for metric in metrics_to_gather:
                 train_log_info[metric]["data_size"] = len(labels)
@@ -410,7 +397,7 @@ class AnalysisModelTraining:
 
             LOGGER.debug("Loaded data for training model '%s'", project_info.model_type.name)
             baseline_model_results, new_model_results, bad_data = self.train_several_times(
-                new_model, train_data, labels, new_model.get_feature_ids(), test_item_ids_with_pos, metrics_to_gather)
+                new_model, train_data, labels, new_model.feature_ids, test_item_ids_with_pos, metrics_to_gather)
             for metric in metrics_to_gather:
                 train_log_info[metric]["bad_data_proportion"] = int(bad_data)
 

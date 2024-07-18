@@ -12,11 +12,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from typing import Optional
+
 from app.commons.object_saving.object_saver import ObjectSaver
-from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
+from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker, DEFAULT_RANDOM_STATE
 
 
 class CustomBoostingDecisionMaker(BoostingDecisionMaker):
 
-    def __init__(self, object_saver: ObjectSaver):
-        super().__init__(object_saver, 'custom boosting model')
+    def __init__(self, object_saver: ObjectSaver, *,
+                 features: list[int], monotonous_features: Optional[list[int]] = None, n_estimators: int = 75,
+                 max_depth: int = 5, random_state: int = DEFAULT_RANDOM_STATE):
+        super().__init__(object_saver, 'custom boosting model', features=features,
+                         monotonous_features=monotonous_features, n_estimators=n_estimators,
+                         max_depth=max_depth, random_state=random_state)

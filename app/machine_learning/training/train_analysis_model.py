@@ -106,6 +106,7 @@ def transform_data_from_feature_lists(feature_list, cur_features, desired_featur
 class AnalysisModelTraining:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
+    model_type: ModelType
     baseline_folder: Optional[str]
     baseline_model_folder: Optional[str]
     baseline_model: Optional[BoostingDecisionMaker]
@@ -120,6 +121,7 @@ class AnalysisModelTraining:
         self.due_proportion = 0.05
         self.due_proportion_to_smote = 0.4
         self.es_client = EsClient(app_config=app_config)
+        self.model_type = model_type
         if model_type is ModelType.suggestion:
             self.baseline_folder = self.search_cfg.SuggestBoostModelFolder
             model_config = self.search_cfg.RetrainSuggestBoostModelConfig
@@ -330,11 +332,7 @@ class AnalysisModelTraining:
         log_id_dict = self.query_logs(project_id, list(log_ids_to_find))
         return gathered_suggested_data, log_id_dict
 
-    def gather_data(self, project_info: TrainInfo, features: list[int]) -> tuple[np.array, np.array, list]:
-        projects = [project_info.project]
-        if project_info.additional_projects:
-            projects.extend(project_info.additional_projects)
-
+    def gather_data(self, projects: list[int], features: list[int]) -> tuple[np.array, np.array, list]:
         full_data_features, labels, test_item_ids_with_pos = [], [], []
         for project_id in projects:
             namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
@@ -355,21 +353,18 @@ class AnalysisModelTraining:
                     searched_res = [
                         (found_logs["testItemLogId"], {"hits": {"hits": [log_relevant]}})]
                 if searched_res:
-                    model_type = project_info.model_type
-                    if model_type is ModelType.suggestion:
+                    if self.model_type is ModelType.suggestion:
                         _boosting_data_gatherer = SuggestBoostingFeaturizer(
                             searched_res,
                             self.get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
                             feature_ids=features,
                             weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
-                    elif model_type is ModelType.auto_analysis:
+                    else:
                         _boosting_data_gatherer = BoostingFeaturizer(
                             searched_res,
                             self.get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
                             feature_ids=features,
                             weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
-                    else:
-                        raise ValueError(f'Unknown model type to train: {model_type.name}')
 
                     # noinspection PyTypeChecker
                     _boosting_data_gatherer.set_defect_type_model(
@@ -406,7 +401,10 @@ class AnalysisModelTraining:
         train_data = []
         try:
             LOGGER.debug(f'Initialized model training {project_info.model_type.name}')
-            train_data, labels, test_item_ids_with_pos = self.gather_data(project_info, new_model.feature_ids)
+            projects = [project_info.project]
+            if project_info.additional_projects:
+                projects.extend(project_info.additional_projects)
+            train_data, labels, test_item_ids_with_pos = self.gather_data(projects, new_model.feature_ids)
 
             for metric in metrics_to_gather:
                 train_log_info[metric]["data_size"] = len(labels)

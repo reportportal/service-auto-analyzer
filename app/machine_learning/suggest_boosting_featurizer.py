@@ -17,8 +17,7 @@ from app.machine_learning import boosting_featurizer
 
 class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
 
-    def __init__(self, all_results, config, feature_ids,
-                 weighted_log_similarity_calculator=None):
+    def __init__(self, all_results, config, feature_ids, weighted_log_similarity_calculator=None):
         super().__init__(
             all_results, config, feature_ids, weighted_log_similarity_calculator=weighted_log_similarity_calculator)
 

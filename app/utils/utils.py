@@ -185,7 +185,7 @@ def balance_data(train_data_indexes: list[int], train_labels: list[int],
     return all_data, all_data_labels, real_proportion
 
 
-def topological_sort(feature_graph):
+def topological_sort(feature_graph: dict[int, list[int]]) -> list[int]:
     visited = {}
     for key_ in feature_graph:
         visited[key_] = 0
@@ -212,25 +212,26 @@ def topological_sort(feature_graph):
     return stack
 
 
-def to_number_list(features_list):
+def to_int_list(features_list: str) -> list[int]:
     feature_numbers_list = []
     for feature_name in features_list.split(";"):
         feature_name = feature_name.split("_")[0]
-        try:
-            feature_numbers_list.append(int(feature_name))
-        except:  # noqa
-            try:
-                feature_numbers_list.append(float(feature_name))
-            except:  # noqa
-                pass
+        feature_numbers_list.append(int(feature_name))
     return feature_numbers_list
 
 
-def fill_prevously_gathered_features(feature_list, feature_ids):
+def to_float_list(features_list: str) -> list[float]:
+    feature_numbers_list = []
+    for feature_name in features_list.split(";"):
+        feature_name = feature_name.split("_")[0]
+        feature_numbers_list.append(float(feature_name))
+    return feature_numbers_list
+
+
+def fill_previously_gathered_features(feature_list: list[list[float]],
+                                      feature_ids: list[int]) -> dict[int, list[list[float]]]:
     previously_gathered_features = {}
     try:
-        if type(feature_ids) is str:
-            feature_ids = to_number_list(feature_ids)
         for i in range(len(feature_list)):
             for idx, feature in enumerate(feature_ids):
                 if feature not in previously_gathered_features:
@@ -243,8 +244,8 @@ def fill_prevously_gathered_features(feature_list, feature_ids):
     return previously_gathered_features
 
 
-def gather_feature_list(gathered_data_dict, feature_ids, to_list=False):
-    features_array = None
+def gather_feature_list(gathered_data_dict: dict[int, list[list[float]]], feature_ids: list[int]) -> list[list[float]]:
+    features_array: np.array = None
     axis_x_size = max(map(lambda x: len(x), gathered_data_dict.values()))
     if axis_x_size <= 0:
         return []
@@ -255,7 +256,7 @@ def gather_feature_list(gathered_data_dict, feature_ids, to_list=False):
             features_array = np.asarray(gathered_data_dict[feature])
         else:
             features_array = np.concatenate([features_array, gathered_data_dict[feature]], axis=1)
-    return features_array.tolist() if to_list else features_array
+    return features_array.tolist()
 
 
 def extract_exception(err: Exception) -> str:

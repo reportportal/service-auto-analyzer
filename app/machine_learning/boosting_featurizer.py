@@ -14,7 +14,7 @@
 
 from collections import deque, defaultdict
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional, Any, Callable
 
 import numpy as np
 
@@ -22,6 +22,7 @@ from app.commons import logging, similarity_calculator
 from app.machine_learning.models.defect_type_model import DefectTypeModel
 from app.machine_learning.models.defect_type_model import DATA_FIELD
 from app.utils import utils, text_processing
+from app.machine_learning.models import WeightedSimilarityCalculator
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
@@ -29,14 +30,16 @@ logger = logging.getLogger("analyzerApp.boosting_featurizer")
 class BoostingFeaturizer:
     defect_type_predict_model: Optional[DefectTypeModel]
     scores_by_type: Optional[dict[str, dict[str, Any]]]
+    feature_ids: list[int]
+    feature_functions: dict[int, tuple[Callable, dict[str, Any], list[int]]]
+    previously_gathered_features: dict[int, list[list[float]]]
 
-    def __init__(self, all_results, config, feature_ids, weighted_log_similarity_calculator=None):
+    def __init__(self, all_results, config, feature_ids: str | list[int],
+                 weighted_log_similarity_calculator: WeightedSimilarityCalculator = None):
         self.config = config
         self.previously_gathered_features = {}
-        self.models = {}
         self.similarity_calculator = similarity_calculator.SimilarityCalculator(
-            self.config,
-            similarity_model=weighted_log_similarity_calculator)
+            self.config, similarity_model=weighted_log_similarity_calculator)
         if type(feature_ids) is str:
             self.feature_ids = text_processing.transform_string_feature_range_into_list(feature_ids)
         else:
@@ -48,7 +51,8 @@ class BoostingFeaturizer:
             "message_extended",
             "detected_message_extended",
             "message_without_params_and_brackets",
-            "detected_message_without_params_and_brackets"]
+            "detected_message_without_params_and_brackets"
+        ]
 
         self.feature_functions = {
             0: (self._calculate_score, {}, []),
@@ -68,14 +72,12 @@ class BoostingFeaturizer:
             25: (self._calculate_similarity_percent, {"field_name": "only_numbers"}, []),
             26: (self._calculate_max_score_and_pos, {"return_val_name": "max_score"}, []),
             27: (self._calculate_min_score_and_pos, {"return_val_name": "min_score"}, []),
-            28: (self._calculate_percent_count_items_and_mean,
-                 {"return_val_name": "mean_score"}, []),
+            28: (self._calculate_percent_count_items_and_mean, {"return_val_name": "mean_score"}, []),
             29: (self._calculate_similarity_percent, {"field_name": "message_params"}, []),
             34: (self._calculate_similarity_percent, {"field_name": "found_exceptions"}, []),
             35: (self._is_all_log_lines, {}, []),
             36: (self._calculate_similarity_percent, {"field_name": "detected_message_extended"}, []),
-            37: (self._calculate_similarity_percent,
-                 {"field_name": "detected_message_without_params_extended"}, []),
+            37: (self._calculate_similarity_percent, {"field_name": "detected_message_without_params_extended"}, []),
             38: (self._calculate_similarity_percent, {"field_name": "stacktrace_extended"}, []),
             40: (self._calculate_similarity_percent, {"field_name": "message_without_params_extended"}, []),
             41: (self._calculate_similarity_percent, {"field_name": "message_extended"}, []),
@@ -86,10 +88,9 @@ class BoostingFeaturizer:
             50: (self.is_text_of_particular_defect_type, {"label_type": "si"}, []),
             51: (self.predict_particular_defect_type, {}, []),
             52: (self._calculate_similarity_percent, {"field_name": "namespaces_stacktrace"}, []),
-            53: (self._calculate_similarity_percent,
-                 {"field_name": "detected_message_without_params_and_brackets"}, []),
-            55: (self._calculate_similarity_percent,
-                 {"field_name": "potential_status_codes"}, []),
+            53: (self._calculate_similarity_percent, {"field_name": "detected_message_without_params_and_brackets"},
+                 []),
+            55: (self._calculate_similarity_percent, {"field_name": "potential_status_codes"}, []),
             56: (self.is_the_same_launch, {}, []),
             57: (self.is_the_same_launch_id, {}, []),
             59: (self._calculate_similarity_percent, {"field_name": "found_tests_and_methods"}, []),
@@ -104,29 +105,22 @@ class BoostingFeaturizer:
 
         if "filter_min_should_match" in self.config and len(self.config["filter_min_should_match"]) > 0:
             self.similarity_calculator.find_similarity(
-                all_results,
-                self.config["filter_min_should_match"] + ["merged_small_logs"])
+                all_results, self.config["filter_min_should_match"] + ["merged_small_logs"])
             for field in self.config["filter_min_should_match"]:
                 all_results = self.filter_by_min_should_match(all_results, field=field)
-        if "filter_min_should_match_any" in self.config and \
-                len(self.config["filter_min_should_match_any"]) > 0:
+        if "filter_min_should_match_any" in self.config and len(self.config["filter_min_should_match_any"]) > 0:
             self.similarity_calculator.find_similarity(
-                all_results,
-                self.config["filter_min_should_match_any"] + ["merged_small_logs"])
+                all_results, self.config["filter_min_should_match_any"] + ["merged_small_logs"])
             all_results = self.filter_by_min_should_match_any(
-                all_results,
-                fields=self.config["filter_min_should_match_any"])
+                all_results, fields=self.config["filter_min_should_match_any"])
         self.test_item_log_stats = self._calculate_stats_by_test_item_ids(all_results)
         if "filter_by_all_logs_should_be_similar" in self.config:
             if self.config["filter_by_all_logs_should_be_similar"]:
                 all_results = self.filter_by_all_logs_should_be_similar(all_results)
-        if "filter_by_test_case_hash" in self.config \
-                and self.config["filter_by_test_case_hash"]:
+        if "filter_by_test_case_hash" in self.config and self.config["filter_by_test_case_hash"]:
             all_results = self.filter_by_test_case_hash(all_results)
         if "calculate_similarities" not in self.config or self.config["calculate_similarities"]:
-            self.similarity_calculator.find_similarity(
-                all_results,
-                fields_to_calc_similarity)
+            self.similarity_calculator.find_similarity(all_results, fields_to_calc_similarity)
         self.raw_results = all_results
         self.all_results = self.normalize_results(all_results)
         self.scores_by_type = None
@@ -164,7 +158,8 @@ class BoostingFeaturizer:
                 test_item_log_stats[test_item_id] /= all_logs
         return test_item_log_stats
 
-    def _perform_additional_text_processing(self, all_results):
+    @staticmethod
+    def _perform_additional_text_processing(all_results):
         for log, res in all_results:
             for r in res["hits"]["hits"]:
                 if "found_tests_and_methods" in r["_source"]:
@@ -186,8 +181,8 @@ class BoostingFeaturizer:
             dates_by_issue_types[issue_type] = np.exp(decay_speed * (compared_field_date - field_date).days / 7)
         return dates_by_issue_types
 
-    def fill_previously_gathered_features(self, feature_list, feature_ids):
-        self.previously_gathered_features = utils.fill_prevously_gathered_features(feature_list, feature_ids)
+    def fill_previously_gathered_features(self, feature_list: list[list[float]], feature_ids: list[int]) -> None:
+        self.previously_gathered_features = utils.fill_previously_gathered_features(feature_list, feature_ids)
 
     def get_used_model_info(self):
         return list(self.used_model_info)
@@ -316,12 +311,12 @@ class BoostingFeaturizer:
             num_of_logs_issue_type[issue_type] = has_the_same_test_case
         return num_of_logs_issue_type
 
-    def find_columns_to_find_similarities_for(self):
+    def find_columns_to_find_similarities_for(self) -> list[str]:
         fields_to_calc_similarity = set()
         for feature in self.feature_ids:
             method_params = self.feature_functions[feature]
-            if "field_name" in method_params[1]:
-                fields_to_calc_similarity.add(method_params[1]["field_name"])
+            if 'field_name' in method_params[1]:
+                fields_to_calc_similarity.add(method_params[1]['field_name'])
         return list(fields_to_calc_similarity)
 
     def _is_all_log_lines(self):
@@ -429,9 +424,7 @@ class BoostingFeaturizer:
     def _calculate_place(self):
         scores_by_issue_type = self._calculate_score()
         place_by_issue_type = {}
-        for idx, issue_type_item in enumerate(sorted(scores_by_issue_type.items(),
-                                                     key=lambda x: x[1],
-                                                     reverse=True)):
+        for idx, issue_type_item in enumerate(sorted(scores_by_issue_type.items(), key=lambda x: x[1], reverse=True)):
             place_by_issue_type[issue_type_item[0]] = 1 / (1 + idx)
         return place_by_issue_type
 
@@ -515,8 +508,8 @@ class BoostingFeaturizer:
             similarity_percent_by_type[issue_type] = sim_obj["similarity"]
         return similarity_percent_by_type
 
-    def get_ordered_features_to_process(self):
-        feature_graph = {}
+    def get_ordered_features_to_process(self) -> list[int]:
+        feature_graph: dict[int, list[int]] = {}
         features_queue = deque(self.feature_ids.copy())
         while features_queue:
             cur_feature = features_queue.popleft()
@@ -528,21 +521,20 @@ class BoostingFeaturizer:
         ordered_features = utils.topological_sort(feature_graph)
         return ordered_features
 
-    def gather_features_info(self):
+    def gather_features_info(self) -> tuple[list[list[float]], list[str]]:
         """Gather all features from feature_ids for a test item"""
         gathered_data = []
-        gathered_data_dict = {}
-        issue_type_names = []
-        issue_type_by_index = {}
+        gathered_data_dict: dict[int, list[list[float]]] = {}
+        issue_type_names: list[str] = []
+        issue_type_by_index: dict[int, str] = {}
         try:
-            issue_types = self.find_most_relevant_by_type()
-            for idx, issue_type in enumerate(issue_types):
+            scores_by_types = self.find_most_relevant_by_type()
+            for idx, issue_type in enumerate(scores_by_types):
                 issue_type_by_index[idx] = issue_type
                 issue_type_names.append(issue_type)
 
             for feature in self.get_ordered_features_to_process():
-                if feature in self.previously_gathered_features and \
-                        feature not in self.features_to_recalculate_always:
+                if feature in self.previously_gathered_features and feature not in self.features_to_recalculate_always:
                     gathered_data_dict[feature] = self.previously_gathered_features[feature]
                 else:
                     func, args, _ = self.feature_functions[feature]
@@ -559,7 +551,7 @@ class BoostingFeaturizer:
                             except:  # noqa
                                 gathered_data_dict[feature].append([round(result[issue_type], 2)])
                     self.previously_gathered_features[feature] = gathered_data_dict[feature]
-            gathered_data = utils.gather_feature_list(gathered_data_dict, self.feature_ids, to_list=True)
+            gathered_data = utils.gather_feature_list(gathered_data_dict, self.feature_ids)
         except Exception as err:
             logger.error("Errors in boosting features calculation")
             logger.error(err)

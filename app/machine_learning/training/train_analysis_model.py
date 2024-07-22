@@ -89,16 +89,16 @@ def deduplicate_data(data, labels) -> tuple[list, list]:
 def split_data(data, labels, random_state, test_item_ids_with_pos) -> tuple[np.ndarray, np.ndarray, list, list, list]:
     x_ids = [i for i in range(len(data))]
     x_train_ids, x_test_ids, y_train, y_test = train_test_split(
-        x_ids, labels,
-        test_size=0.1, random_state=random_state, stratify=labels)
+        x_ids, labels, test_size=0.1, random_state=random_state, stratify=labels)
     x_train = np.asarray([data[idx] for idx in x_train_ids])
     x_test = np.asarray([data[idx] for idx in x_test_ids])
     test_item_ids_with_pos_test = [test_item_ids_with_pos[idx] for idx in x_test_ids]
     return x_train, x_test, y_train, y_test, test_item_ids_with_pos_test
 
 
-def transform_data_from_feature_lists(feature_list, cur_features, desired_features):
-    previously_gathered_features = utils.fill_prevously_gathered_features(feature_list, cur_features)
+def transform_data_from_feature_lists(feature_list, cur_features: list[int],
+                                      desired_features: list[int]) -> list[list[float]]:
+    previously_gathered_features = utils.fill_previously_gathered_features(feature_list, cur_features)
     gathered_data = utils.gather_feature_list(previously_gathered_features, desired_features)
     return gathered_data
 
@@ -175,20 +175,19 @@ class AnalysisModelTraining:
                 "data_proportion": 0.0, "baseline_mean_metric": 0.0, "new_model_mean_metric": 0.0,
                 "bad_data_proportion": 0, "metric_name": metric_name, "errors": [], "errors_count": 0}
 
-    def calculate_metrics(self, model, x_test, y_test,
-                          metrics_to_gather, test_item_ids_with_pos, new_model_results):
+    def calculate_metrics(self, model: BoostingDecisionMaker, x_test: list[list[float]], y_test,
+                          metrics_to_gather: list[str], test_item_ids_with_pos, new_model_results):
         for metric in metrics_to_gather:
             metric_res = 0.0
             if metric in self.metrics_calculations:
-                metric_res = self.metrics_calculations[metric](
-                    model, x_test, y_test, test_item_ids_with_pos)
+                metric_res = self.metrics_calculations[metric](model, x_test, y_test, test_item_ids_with_pos)
             if metric not in new_model_results:
                 new_model_results[metric] = []
             new_model_results[metric].append(metric_res)
         return new_model_results
 
-    def train_several_times(self, new_model: BoostingDecisionMaker, data, labels, features, test_item_ids_with_pos,
-                            metrics_to_gather):
+    def train_several_times(self, new_model: BoostingDecisionMaker, data, labels, features: list[int],
+                            test_item_ids_with_pos, metrics_to_gather: list[str]):
         new_model_results = {}
         baseline_model_results = {}
         my_random_states = TRAIN_DATA_RANDOM_STATES
@@ -212,8 +211,8 @@ class AnalysisModelTraining:
                 new_model.train_model(x_train, y_train)
                 LOGGER.debug("New model results")
                 new_model_results = self.calculate_metrics(
-                    new_model, x_test, y_test, metrics_to_gather,
-                    test_item_ids_with_pos_test, new_model_results)
+                    new_model, x_test.tolist(), y_test, metrics_to_gather, test_item_ids_with_pos_test,
+                    new_model_results)
                 LOGGER.debug("Baseline results")
                 x_test_for_baseline = transform_data_from_feature_lists(
                     x_test, features, self.baseline_model.feature_ids)
@@ -370,7 +369,7 @@ class AnalysisModelTraining:
                     _boosting_data_gatherer.set_defect_type_model(
                         self.model_chooser.choose_model(project_id, ModelType.defect_type))
                     _boosting_data_gatherer.fill_previously_gathered_features(
-                        [utils.to_number_list(_suggest_res["_source"]["modelFeatureValues"])],
+                        [utils.to_float_list(_suggest_res["_source"]["modelFeatureValues"])],
                         _suggest_res["_source"]["modelFeatureNames"])
                     feature_data, _ = _boosting_data_gatherer.gather_features_info()
                     if feature_data:

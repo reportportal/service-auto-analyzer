@@ -451,7 +451,6 @@ class AutoAnalyzerService(AnalyzerService):
                     _boosting_decision_maker = self.model_chooser.choose_model(
                         project_id, ModelType.auto_analysis,
                         custom_model_prob=self.search_cfg.ProbabilityForCustomModelAutoAnalysis)
-                    features_dict_objects = _boosting_decision_maker.features_dict_with_saved_objects
                     if project_id not in defect_type_model_to_use:
                         defect_type_model_to_use[project_id] = self.model_chooser.choose_model(
                             project_id, ModelType.defect_type)
@@ -471,8 +470,7 @@ class AutoAnalyzerService(AnalyzerService):
                             candidates,
                             boosting_config,
                             feature_ids=_boosting_decision_maker.get_feature_ids(),
-                            weighted_log_similarity_calculator=self.similarity_model,
-                            features_dict_with_saved_objects=features_dict_objects)
+                            weighted_log_similarity_calculator=self.similarity_model)
                         boosting_data_gatherer.set_defect_type_model(defect_type_model_to_use[project_id])
                         feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
                         model_info_tags = (boosting_data_gatherer.get_used_model_info()
@@ -484,14 +482,14 @@ class AutoAnalyzerService(AnalyzerService):
                             predicted_labels, predicted_labels_probability = \
                                 _boosting_decision_maker.predict(feature_data)
 
-                            scores_by_issue_type = boosting_data_gatherer.scores_by_issue_type
+                            scores_by_issue_type = boosting_data_gatherer.find_most_relevant_by_type()
 
                             for i in range(len(issue_type_names)):
                                 logger.debug(
                                     "Most relevant item with issue type %s has id %s",
                                     issue_type_names[i],
-                                    boosting_data_gatherer.
-                                    scores_by_issue_type[issue_type_names[i]]["mrHit"]["_id"])
+                                    boosting_data_gatherer
+                                    .find_most_relevant_by_type()[issue_type_names[i]]["mrHit"]["_id"])
                                 logger.debug(
                                     "Issue type %s has label %d and probability %.3f for features %s",
                                     issue_type_names[i],
@@ -503,7 +501,7 @@ class AutoAnalyzerService(AnalyzerService):
                                 predicted_labels,
                                 predicted_labels_probability,
                                 issue_type_names,
-                                boosting_data_gatherer.scores_by_issue_type)
+                                boosting_data_gatherer.find_most_relevant_by_type())
 
                             if predicted_issue_type:
                                 chosen_type = scores_by_issue_type[predicted_issue_type]

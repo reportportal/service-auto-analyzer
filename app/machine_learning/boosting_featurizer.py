@@ -12,9 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from collections import deque
+from collections import deque, defaultdict
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any
 
 import numpy as np
 
@@ -28,6 +28,7 @@ logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
 class BoostingFeaturizer:
     defect_type_predict_model: Optional[DefectTypeModel]
+    scores_by_type: Optional[dict[str, dict[str, Any]]]
 
     def __init__(self, all_results, config, feature_ids, weighted_log_similarity_calculator=None):
         self.config = config
@@ -128,7 +129,7 @@ class BoostingFeaturizer:
                 fields_to_calc_similarity)
         self.raw_results = all_results
         self.all_results = self.normalize_results(all_results)
-        self.scores_by_issue_type = None
+        self.scores_by_type = None
         self.defect_type_predict_model = None
         self.used_model_info = set()
         self.features_to_recalculate_always = set([51, 58] + list(range(67, 74)))
@@ -403,31 +404,23 @@ class BoostingFeaturizer:
             has_several_logs_by_type[issue_type] = int(merged_small_logs.strip() != "")
         return has_several_logs_by_type
 
-    def find_most_relevant_by_type(self):
-        if self.scores_by_issue_type is not None:
-            return self.scores_by_issue_type
-        self.scores_by_issue_type = {}
+    def find_most_relevant_by_type(self) -> dict[str, dict[str, Any]]:
+        if self.scores_by_type is not None:
+            return self.scores_by_type
+
+        scores_by_issue_type = defaultdict(lambda: {'mrHit': {'_score': -1}, 'score': 0})
         for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
                 hit["es_pos"] = idx
 
-                if issue_type not in self.scores_by_issue_type:
-                    self.scores_by_issue_type[issue_type] = {
-                        "mrHit": hit,
-                        "compared_log": log,
-                        "score": 0}
-
-                issue_type_item = self.scores_by_issue_type[issue_type]
-                if hit["_score"] > issue_type_item["mrHit"]["_score"]:
-                    self.scores_by_issue_type[issue_type]["mrHit"] = hit
-                    self.scores_by_issue_type[issue_type]["compared_log"] = log
-
-            for idx, hit in enumerate(es_results):
-                issue_type = hit["_source"]["issue_type"]
-                self.scores_by_issue_type[issue_type]["score"] += \
-                    (hit["normalized_score"] / self.total_normalized)
-        return self.scores_by_issue_type
+                issue_type_item = scores_by_issue_type[issue_type]
+                if hit['_score'] > issue_type_item['mrHit']['_score']:
+                    issue_type_item['mrHit'] = hit
+                    issue_type_item['compared_log'] = log
+                issue_type_item['score'] += (hit['normalized_score'] / self.total_normalized)
+        self.scores_by_type = dict(scores_by_issue_type)
+        return self.scores_by_type
 
     def _calculate_score(self):
         scores_by_issue_type = self.find_most_relevant_by_type()

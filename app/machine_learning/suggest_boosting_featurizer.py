@@ -12,6 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from collections import defaultdict
+from typing import Any
+
 from app.machine_learning import boosting_featurizer
 
 
@@ -32,33 +35,23 @@ class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
             percent_by_issue_type[test_item] = 1 / len(issue_types) if len(issue_types) > 0 else 0
         return percent_by_issue_type
 
-    def find_most_relevant_by_type(self):
-        if self.scores_by_issue_type is not None:
-            return self.scores_by_issue_type
-        self.scores_by_issue_type = {}
+    def find_most_relevant_by_type(self) -> dict[str, dict[str, Any]]:
+        if self.scores_by_type is not None:
+            return self.scores_by_type
+        scores_by_type = defaultdict(lambda: {'mrHit': {'_score': -1}, 'score': 0})
         for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
-                test_item = hit["_source"]["test_item"]
-                hit["es_pos"] = idx
+                test_item = hit['_source']['test_item']
+                hit['es_pos'] = idx
 
-                if test_item not in self.scores_by_issue_type:
-                    self.scores_by_issue_type[test_item] = {
-                        "mrHit": hit,
-                        "compared_log": log,
-                        "score": 0
-                    }
+                issue_type_item = scores_by_type[test_item]
+                if hit['_score'] > issue_type_item['mrHit']['_score']:
+                    issue_type_item['mrHit'] = hit
+                    issue_type_item['compared_log'] = log
 
-                issue_type_item = self.scores_by_issue_type[test_item]
-                if hit["_score"] > issue_type_item["mrHit"]["_score"]:
-                    self.scores_by_issue_type[test_item]["mrHit"] = hit
-                    self.scores_by_issue_type[test_item]["compared_log"] = log
-
-            for idx, hit in enumerate(es_results):
-                test_item = hit["_source"]["test_item"]
-                self.scores_by_issue_type[test_item]["score"] = max(
-                    self.scores_by_issue_type[test_item]["score"],
-                    hit["normalized_score"])
-        return self.scores_by_issue_type
+                issue_type_item['score'] = max(issue_type_item['score'], hit["normalized_score"])
+        self.scores_by_type = dict(scores_by_type)
+        return self.scores_by_type
 
     def _calculate_max_score_and_pos(self, return_val_name="max_score"):
         max_scores_results = super()._calculate_max_score_and_pos(return_val_name=return_val_name)

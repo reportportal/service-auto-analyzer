@@ -411,8 +411,8 @@ class BoostingFeaturizer:
         scores_by_issue_type = defaultdict(lambda: {'mrHit': {'_score': -1}, 'score': 0})
         for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
-                issue_type = hit["_source"]["issue_type"]
-                hit["es_pos"] = idx
+                issue_type = hit['_source']['issue_type']
+                hit['es_pos'] = idx
 
                 issue_type_item = scores_by_issue_type[issue_type]
                 if hit['_score'] > issue_type_item['mrHit']['_score']:

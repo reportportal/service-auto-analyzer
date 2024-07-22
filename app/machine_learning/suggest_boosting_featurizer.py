@@ -49,7 +49,7 @@ class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
                     issue_type_item['mrHit'] = hit
                     issue_type_item['compared_log'] = log
 
-                issue_type_item['score'] = max(issue_type_item['score'], hit["normalized_score"])
+                issue_type_item['score'] = max(issue_type_item['score'], hit['normalized_score'])
         self.scores_by_type = dict(scores_by_type)
         return self.scores_by_type
 

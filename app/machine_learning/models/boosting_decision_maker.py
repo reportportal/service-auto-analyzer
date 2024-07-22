@@ -20,7 +20,6 @@ from xgboost import XGBClassifier
 from app.commons import logging
 from app.commons.object_saving.object_saver import ObjectSaver
 from app.machine_learning.models import MlModel
-from app.utils import text_processing
 
 LOGGER = logging.getLogger("analyzerApp.boosting_decision_maker")
 

@@ -218,7 +218,7 @@ class AnalysisModelTraining:
                 x_test_for_baseline = transform_data_from_feature_lists(
                     x_test, features, self.baseline_model.feature_ids)
                 baseline_model_results = self.calculate_metrics(
-                    self.baseline_model, x_test_for_baseline, y_test,  metrics_to_gather, test_item_ids_with_pos_test,
+                    self.baseline_model, x_test_for_baseline, y_test, metrics_to_gather, test_item_ids_with_pos_test,
                     baseline_model_results)
         return baseline_model_results, new_model_results, bad_data
 

@@ -45,7 +45,8 @@ class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
                     self.scores_by_issue_type[test_item] = {
                         "mrHit": hit,
                         "compared_log": log,
-                        "score": 0}
+                        "score": 0
+                    }
 
                 issue_type_item = self.scores_by_issue_type[test_item]
                 if hit["_score"] > issue_type_item["mrHit"]["_score"]:

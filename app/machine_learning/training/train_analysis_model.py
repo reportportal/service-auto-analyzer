@@ -34,13 +34,14 @@ from app.machine_learning.models import (BoostingDecisionMaker, CustomBoostingDe
 from app.machine_learning.boosting_featurizer import BoostingFeaturizer
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import utils, text_processing
+from app.utils.defaultdict import DefaultDict
 
 LOGGER = logging.getLogger("analyzerApp.trainingAnalysisModel")
 TRAIN_DATA_RANDOM_STATES = [1257, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029]
 
 
 def calculate_f1(model: BoostingDecisionMaker, x_test: list[list[float]], y_test: list[int], _) -> float:
-    return model.validate_model(x_test, y_test)[0]
+    return model.validate_model(x_test, y_test)
 
 
 def calculate_mrr(model: BoostingDecisionMaker, x_test: list[list[float]], y_test: list[int],
@@ -73,6 +74,21 @@ def calculate_mrr(model: BoostingDecisionMaker, x_test: list[list[float]], y_tes
     if cnt_to_use:
         mrr /= cnt_to_use
     return mrr
+
+
+METRIC_CALCULATIONS: dict[str, Callable[[BoostingDecisionMaker, list[list[float]], list[int], list[int]], float]] = {
+    "F1": calculate_f1,
+    "Mean Reciprocal Rank": calculate_mrr
+}
+
+
+def calculate_metrics(model: BoostingDecisionMaker, x_test: list[list[float]], y_test: list[int],
+                      test_item_ids_with_pos: list[int], result_dict: dict[str, list[float]]) -> None:
+    for metric, metric_calc_func in METRIC_CALCULATIONS:
+        metric_res = metric_calc_func(model, x_test, y_test, test_item_ids_with_pos)
+        if metric not in result_dict:
+            result_dict[metric] = []
+        result_dict[metric].append(metric_res)
 
 
 def deduplicate_data(data: list[list[float]], labels: list[int]) -> tuple[list[list[float]], list[int]]:
@@ -113,12 +129,10 @@ class AnalysisModelTraining:
     model_type: ModelType
     model_class: Type[BoostingDecisionMaker]
     baseline_folder: Optional[str]
-    baseline_model_folder: Optional[str]
     baseline_model: Optional[BoostingDecisionMaker]
     model_chooser: ModelChooser
     features: Optional[list[int]]
     mono_features: Optional[list[int]]
-    metrics_calculations: dict[str, Callable[[BoostingDecisionMaker, list[list[float]], list[int], list[int]], float]]
 
     def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig, model_type: ModelType,
                  model_chooser: ModelChooser, model_class: Optional[Type[BoostingDecisionMaker]] = None) -> None:
@@ -140,7 +154,6 @@ class AnalysisModelTraining:
         self.model_class = model_class if model_class else CustomBoostingDecisionMaker
 
         if self.baseline_folder:
-            self.baseline_model_folder = os.path.basename(self.baseline_folder.strip("/").strip("\\"))
             self.baseline_model = BoostingDecisionMaker(
                 object_saving.create_filesystem(self.baseline_folder))
             self.baseline_model.load_model()
@@ -154,10 +167,6 @@ class AnalysisModelTraining:
             self.weighted_log_similarity_calculator.load_model()
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.model_chooser = model_chooser
-        self.metrics_calculations = {
-            "F1": calculate_f1,
-            "Mean Reciprocal Rank": calculate_mrr
-        }
 
     def get_config_for_boosting(self, number_of_log_lines: int, namespaces) -> dict[str, Any]:
         return {
@@ -176,26 +185,14 @@ class AnalysisModelTraining:
     @staticmethod
     def get_info_template(project_info: TrainInfo, baseline_model: str, model_name: str,
                           metric_name: str) -> dict[str, Any]:
-        return {"method": "training", "sub_model_type": "all", "model_type": project_info.model_type.name,
-                "baseline_model": [baseline_model], "new_model": [model_name],
-                "project_id": str(project_info.project), "model_saved": 0, "p_value": 1.0,
-                "data_proportion": 0.0, "baseline_mean_metric": 0.0, "new_model_mean_metric": 0.0,
-                "bad_data_proportion": 0, "metric_name": metric_name, "errors": [], "errors_count": 0}
-
-    def calculate_metrics(self, model: BoostingDecisionMaker, x_test: list[list[float]], y_test: list[int],
-                          metrics_to_gather: list[str], test_item_ids_with_pos: list[int],
-                          result_dict: dict[str, list[float]]) -> None:
-        for metric in metrics_to_gather:
-            metric_res = 0.0
-            if metric in self.metrics_calculations:
-                metric_res = self.metrics_calculations[metric](model, x_test, y_test, test_item_ids_with_pos)
-            if metric not in result_dict:
-                result_dict[metric] = []
-            result_dict[metric].append(metric_res)
+        return {'method': 'training', 'sub_model_type': 'all', 'model_type': project_info.model_type.name,
+                'baseline_model': [baseline_model], 'new_model': [model_name],
+                'project_id': str(project_info.project), 'model_saved': 0, 'p_value': 1.0, 'data_size': 0,
+                'data_proportion': 0.0, 'baseline_mean_metric': 0.0, 'new_model_mean_metric': 0.0,
+                'bad_data_proportion': 0, 'metric_name': metric_name, 'errors': [], 'errors_count': 0}
 
     def train_several_times(self, new_model: BoostingDecisionMaker, data: list[list[float]], labels: list[int],
-                            features: list[int], test_item_ids_with_pos: list[int],
-                            metrics_to_gather: list[str]) -> tuple[dict, dict, bool]:
+                            features: list[int], test_item_ids_with_pos: list[int]) -> tuple[dict, dict, bool, float]:
         new_model_results: dict[str, list[float]] = {}
         baseline_model_results: dict[str, list[float]] = {}
         my_random_states = TRAIN_DATA_RANDOM_STATES
@@ -218,15 +215,15 @@ class AnalysisModelTraining:
                     x_train, y_train = oversample.fit_resample(x_train, y_train)
                 new_model.train_model(x_train, y_train)
                 LOGGER.debug("New model results")
-                self.calculate_metrics(
-                    new_model, x_test, y_test, metrics_to_gather, test_item_ids_with_pos_test, new_model_results)
+                calculate_metrics(
+                    new_model, x_test, y_test, test_item_ids_with_pos_test, new_model_results)
                 LOGGER.debug("Baseline results")
                 x_test_for_baseline = transform_data_from_feature_lists(
                     x_test, features, self.baseline_model.feature_ids)
-                self.calculate_metrics(
-                    self.baseline_model, x_test_for_baseline, y_test, metrics_to_gather, test_item_ids_with_pos_test,
+                calculate_metrics(
+                    self.baseline_model, x_test_for_baseline, y_test, test_item_ids_with_pos_test,
                     baseline_model_results)
-        return baseline_model_results, new_model_results, bad_data
+        return baseline_model_results, new_model_results, bad_data, proportion_binary_labels
 
     def query_logs(self, project_id: int, log_ids_to_find: list[str]) -> dict[str, Any]:
         log_ids_to_find = list(log_ids_to_find)
@@ -387,6 +384,7 @@ class AnalysisModelTraining:
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, Any]]:
         time_training = time()
         model_name = f'{project_info.model_type.name}_model_{datetime.now().strftime("%Y-%m-%d")}'
+        baseline_model = os.path.basename(self.baseline_folder)
         new_model_folder = f'{project_info.model_type.name}_model/{model_name}/'
 
         LOGGER.info(f'Train "{self.model_type.name}" model using class: {self.model_class}')
@@ -395,31 +393,25 @@ class AnalysisModelTraining:
             features=self.features, monotonous_features=self.features)
         new_model.add_config_info(self.features, self.monotonous_features)
 
-        metrics_to_gather = ['F1', 'Mean Reciprocal Rank']
-        train_log_info = {}
-        for metric in metrics_to_gather:
-            train_log_info[metric] = self.get_info_template(
-                project_info, self.baseline_model_folder, model_name, metric)
+        train_log_info = DefaultDict(lambda _, k: self.get_info_template(project_info, baseline_model, model_name, k))
 
         LOGGER.debug(f'Initialized model training {project_info.model_type.name}')
         projects = [project_info.project]
         if project_info.additional_projects:
             projects.extend(project_info.additional_projects)
         train_data, labels, test_item_ids_with_pos = self.gather_data(projects, new_model.feature_ids)
+        LOGGER.debug(f'Loaded data for model training {self.model_type.name}')
 
-        for metric in metrics_to_gather:
-            train_log_info[metric]["data_size"] = len(labels)
-            train_log_info[metric]["data_proportion"] = utils.calculate_proportions_for_labels(labels)
-
-        LOGGER.debug("Loaded data for training model '%s'", project_info.model_type.name)
-        baseline_model_results, new_model_results, bad_data = self.train_several_times(
-            new_model, train_data, labels, new_model.feature_ids, test_item_ids_with_pos, metrics_to_gather)
-        for metric in metrics_to_gather:
-            train_log_info[metric]["bad_data_proportion"] = int(bad_data)
+        baseline_model_results, new_model_results, bad_data, data_proportion = self.train_several_times(
+            new_model, train_data, labels, new_model.feature_ids, test_item_ids_with_pos)
+        for metric in new_model_results:
+            train_log_info[metric]['data_size'] = len(labels)
+            train_log_info[metric]['bad_data_proportion'] = int(bad_data)
+            train_log_info[metric]['data_proportion'] = data_proportion
 
         use_custom_model = False
         if not bad_data:
-            for metric in metrics_to_gather:
+            for metric in new_model_results:
                 LOGGER.debug("Baseline test results %s", baseline_model_results[metric])
                 LOGGER.debug("New model test results %s", new_model_results[metric])
                 f_value, p_value = stats.f_oneway(baseline_model_results[metric], new_model_results[metric])
@@ -447,20 +439,20 @@ class AnalysisModelTraining:
             if proportion_binary_labels < self.due_proportion:
                 LOGGER.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
                 bad_data = True
-            for metric in metrics_to_gather:
+            for metric in METRIC_CALCULATIONS:
                 train_log_info[metric]["bad_data_proportion"] = int(bad_data)
             if not bad_data:
-                for metric in metrics_to_gather:
+                for metric in METRIC_CALCULATIONS:
                     train_log_info[metric]["model_saved"] = 1
                 new_model.train_model(train_data, labels)
             else:
-                for metric in metrics_to_gather:
+                for metric in METRIC_CALCULATIONS:
                     train_log_info[metric]["model_saved"] = 0
             self.model_chooser.delete_old_model(project_info.model_type, project_info.project)
             new_model.save_model()
 
         time_spent = (time() - time_training)
-        for metric in metrics_to_gather:
+        for metric in METRIC_CALCULATIONS:
             train_log_info[metric]["time_spent"] = time_spent
             train_log_info[metric]["gather_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             train_log_info[metric]["module_version"] = [self.app_config.appVersion]

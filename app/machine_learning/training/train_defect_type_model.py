@@ -138,12 +138,10 @@ def train_several_times(
                 logs_to_train_idx, data, labels_filtered, additional_logs, label, random_state=random_state)
             new_model.train_model(label, x_train, y_train)
             LOGGER.debug('New model results')
-            f1 = new_model.validate_model(label, x_test, y_test)
-            new_model_results.append(f1)
+            new_model_results.append(new_model.validate_model(label, x_test, y_test))
             LOGGER.debug('Baseline model results')
             if baseline_model:
-                f1 = baseline_model.validate_model(label, x_test, y_test)
-                baseline_model_results.append(f1)
+                baseline_model_results.append(baseline_model.validate_model(label, x_test, y_test))
             else:
                 baseline_model_results.append(0.0)
     return baseline_model_results, new_model_results, bad_data_proportion, proportion_binary_labels
@@ -301,10 +299,10 @@ class DefectTypeModelTraining:
         return data
 
     @staticmethod
-    def get_info_template(project_info: TrainInfo, label: str, baseline_model: str, model_name: str) -> dict[str, Any]:
+    def get_info_template(project_info: TrainInfo, baseline_model: str, model_name: str, label: str) -> dict[str, Any]:
         return {'method': 'training', 'sub_model_type': label, 'model_type': project_info.model_type.name,
                 'baseline_model': [baseline_model], 'new_model': [model_name],
-                'project_id': project_info.project, 'model_saved': 0, 'p_value': 1.0,
+                'project_id': project_info.project, 'model_saved': 0, 'p_value': 1.0, 'data_size': 0,
                 'data_proportion': 0.0, 'baseline_mean_metric': 0.0, 'new_model_mean_metric': 0.0,
                 'bad_data_proportion': 0, 'metric_name': 'F1', 'errors': [], 'errors_count': 0,
                 'time_spent': 0.0}
@@ -324,11 +322,13 @@ class DefectTypeModelTraining:
             object_saving.create(self.app_config, project_info.project, new_model_folder),
             n_estimators=self.search_cfg.DefectTypeModelNumEstimators)
 
-        train_log_info = DefaultDict(lambda _, k: self.get_info_template(project_info, k, baseline_model, model_name))
+        train_log_info = DefaultDict(lambda _, k: self.get_info_template(project_info, baseline_model, model_name, k))
         projects = [project_info.project]
         if project_info.additional_projects:
             projects.extend(project_info.additional_projects)
         data = self.query_data(projects, train_log_info)
+        LOGGER.debug(f'Loaded data for model training {project_info.model_type.name}')
+
         unique_labels = {l[2] for l in data}
 
         data_proportion_min = 1.0

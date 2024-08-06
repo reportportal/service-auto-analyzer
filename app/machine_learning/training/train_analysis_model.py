@@ -15,7 +15,7 @@
 import os
 from datetime import datetime
 from time import time
-from typing import Optional, Any, Callable
+from typing import Optional, Any, Callable, Type
 
 import elasticsearch
 import elasticsearch.helpers
@@ -29,8 +29,8 @@ from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
 from app.commons.model.ml import TrainInfo, ModelType
 from app.commons.model_chooser import ModelChooser
-from app.machine_learning.models import (boosting_decision_maker, custom_boosting_decision_maker,
-                                         weighted_similarity_calculator, BoostingDecisionMaker)
+from app.machine_learning.models import (BoostingDecisionMaker, CustomBoostingDecisionMaker,
+                                         WeightedSimilarityCalculator)
 from app.machine_learning.boosting_featurizer import BoostingFeaturizer
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import utils, text_processing
@@ -111,6 +111,7 @@ class AnalysisModelTraining:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
     model_type: ModelType
+    model_class: Type[BoostingDecisionMaker]
     baseline_folder: Optional[str]
     baseline_model_folder: Optional[str]
     baseline_model: Optional[BoostingDecisionMaker]
@@ -120,7 +121,7 @@ class AnalysisModelTraining:
     metrics_calculations: dict[str, Callable[[BoostingDecisionMaker, list[list[float]], list[int], list[int]], float]]
 
     def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig, model_type: ModelType,
-                 model_chooser: ModelChooser) -> None:
+                 model_chooser: ModelChooser, model_class: Optional[Type[BoostingDecisionMaker]] = None) -> None:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.due_proportion = 0.05
@@ -136,9 +137,11 @@ class AnalysisModelTraining:
         else:
             raise ValueError(f'Incorrect model type {model_type}')
 
+        self.model_class = model_class if model_class else CustomBoostingDecisionMaker
+
         if self.baseline_folder:
             self.baseline_model_folder = os.path.basename(self.baseline_folder.strip("/").strip("\\"))
-            self.baseline_model = boosting_decision_maker.BoostingDecisionMaker(
+            self.baseline_model = BoostingDecisionMaker(
                 object_saving.create_filesystem(self.baseline_folder))
             self.baseline_model.load_model()
             self.features, self.monotonous_features = object_saving.create_filesystem(
@@ -146,9 +149,8 @@ class AnalysisModelTraining:
 
         self.weighted_log_similarity_calculator = None
         if self.search_cfg.SimilarityWeightsFolder.strip():
-            self.weighted_log_similarity_calculator = (
-                weighted_similarity_calculator.WeightedSimilarityCalculator(
-                    object_saving.create_filesystem(self.search_cfg.SimilarityWeightsFolder)))
+            self.weighted_log_similarity_calculator = WeightedSimilarityCalculator(
+                    object_saving.create_filesystem(self.search_cfg.SimilarityWeightsFolder))
             self.weighted_log_similarity_calculator.load_model()
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.model_chooser = model_chooser
@@ -384,11 +386,11 @@ class AnalysisModelTraining:
 
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, Any]]:
         time_training = time()
-        LOGGER.debug("Started training model '%s'", project_info.model_type.name)
-        model_name = "%s_model_%s" % (project_info.model_type.name, datetime.now().strftime("%d.%m.%y"))
+        model_name = f'{project_info.model_type.name}_model_{datetime.now().strftime("%Y-%m-%d")}'
+        new_model_folder = f'{project_info.model_type.name}_model/{model_name}/'
 
-        new_model_folder = "%s_model/%s/" % (project_info.model_type.name, model_name)
-        new_model = custom_boosting_decision_maker.CustomBoostingDecisionMaker(
+        LOGGER.info(f'Train "{self.model_type.name}" model using class: {self.model_class}')
+        new_model = self.model_class(
             object_saving.create(self.app_config, project_id=project_info.project, path=new_model_folder),
             features=self.features, monotonous_features=self.features)
         new_model.add_config_info(self.features, self.monotonous_features)
@@ -399,79 +401,69 @@ class AnalysisModelTraining:
             train_log_info[metric] = self.get_info_template(
                 project_info, self.baseline_model_folder, model_name, metric)
 
-        errors = []
-        errors_count = 0
-        train_data = []
-        try:
-            LOGGER.debug(f'Initialized model training {project_info.model_type.name}')
-            projects = [project_info.project]
-            if project_info.additional_projects:
-                projects.extend(project_info.additional_projects)
-            train_data, labels, test_item_ids_with_pos = self.gather_data(projects, new_model.feature_ids)
+        LOGGER.debug(f'Initialized model training {project_info.model_type.name}')
+        projects = [project_info.project]
+        if project_info.additional_projects:
+            projects.extend(project_info.additional_projects)
+        train_data, labels, test_item_ids_with_pos = self.gather_data(projects, new_model.feature_ids)
 
+        for metric in metrics_to_gather:
+            train_log_info[metric]["data_size"] = len(labels)
+            train_log_info[metric]["data_proportion"] = utils.calculate_proportions_for_labels(labels)
+
+        LOGGER.debug("Loaded data for training model '%s'", project_info.model_type.name)
+        baseline_model_results, new_model_results, bad_data = self.train_several_times(
+            new_model, train_data, labels, new_model.feature_ids, test_item_ids_with_pos, metrics_to_gather)
+        for metric in metrics_to_gather:
+            train_log_info[metric]["bad_data_proportion"] = int(bad_data)
+
+        use_custom_model = False
+        if not bad_data:
             for metric in metrics_to_gather:
-                train_log_info[metric]["data_size"] = len(labels)
-                train_log_info[metric]["data_proportion"] = utils.calculate_proportions_for_labels(labels)
+                LOGGER.debug("Baseline test results %s", baseline_model_results[metric])
+                LOGGER.debug("New model test results %s", new_model_results[metric])
+                f_value, p_value = stats.f_oneway(baseline_model_results[metric], new_model_results[metric])
+                if p_value is None:
+                    p_value = 1.0
+                train_log_info[metric]["p_value"] = p_value
+                mean_metric = np.mean(new_model_results[metric])
+                baseline_mean_metric = np.mean(baseline_model_results[metric])
+                train_log_info[metric]["baseline_mean_metric"] = baseline_mean_metric
+                train_log_info[metric]["new_model_mean_metric"] = mean_metric
+                if p_value < 0.05 and mean_metric > baseline_mean_metric and mean_metric >= 0.4:
+                    use_custom_model = True
+                LOGGER.info(
+                    f'Model training validation results: p-value={p_value:.3f}; mean {mean_metric} metric '
+                    f'baseline={baseline_mean_metric:.3f}; mean new model={mean_metric:.3f}.')
 
-            LOGGER.debug("Loaded data for training model '%s'", project_info.model_type.name)
-            baseline_model_results, new_model_results, bad_data = self.train_several_times(
-                new_model, train_data, labels, new_model.feature_ids, test_item_ids_with_pos, metrics_to_gather)
+        if use_custom_model:
+            LOGGER.debug("Custom model should be saved")
+
+            proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
+            if proportion_binary_labels < self.due_proportion_to_smote:
+                oversample = SMOTE(ratio="minority")
+                train_data, labels = oversample.fit_resample(train_data, labels)
+                proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
+            if proportion_binary_labels < self.due_proportion:
+                LOGGER.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
+                bad_data = True
             for metric in metrics_to_gather:
                 train_log_info[metric]["bad_data_proportion"] = int(bad_data)
-
-            use_custom_model = False
             if not bad_data:
                 for metric in metrics_to_gather:
-                    LOGGER.debug("Baseline test results %s", baseline_model_results[metric])
-                    LOGGER.debug("New model test results %s", new_model_results[metric])
-                    f_value, p_value = stats.f_oneway(baseline_model_results[metric], new_model_results[metric])
-                    if p_value is None:
-                        p_value = 1.0
-                    train_log_info[metric]["p_value"] = p_value
-                    mean_metric = np.mean(new_model_results[metric])
-                    baseline_mean_metric = np.mean(baseline_model_results[metric])
-                    train_log_info[metric]["baseline_mean_metric"] = baseline_mean_metric
-                    train_log_info[metric]["new_model_mean_metric"] = mean_metric
-                    if p_value < 0.05 and mean_metric > baseline_mean_metric and mean_metric >= 0.4:
-                        use_custom_model = True
-                    LOGGER.info(
-                        f'Model training validation results: p-value={p_value:.3f}; mean {mean_metric} metric '
-                        f'baseline={baseline_mean_metric:.3f}; mean new model={mean_metric:.3f}.')
-
-            if use_custom_model:
-                LOGGER.debug("Custom model should be saved")
-
-                proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
-                if proportion_binary_labels < self.due_proportion_to_smote:
-                    oversample = SMOTE(ratio="minority")
-                    train_data, labels = oversample.fit_resample(train_data, labels)
-                    proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
-                if proportion_binary_labels < self.due_proportion:
-                    LOGGER.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
-                    bad_data = True
+                    train_log_info[metric]["model_saved"] = 1
+                new_model.train_model(train_data, labels)
+            else:
                 for metric in metrics_to_gather:
-                    train_log_info[metric]["bad_data_proportion"] = int(bad_data)
-                if not bad_data:
-                    for metric in metrics_to_gather:
-                        train_log_info[metric]["model_saved"] = 1
-                    new_model.train_model(train_data, labels)
-                else:
-                    for metric in metrics_to_gather:
-                        train_log_info[metric]["model_saved"] = 0
-                self.model_chooser.delete_old_model(project_info.model_type, project_info.project)
-                new_model.save_model()
-        except Exception as err:
-            LOGGER.error(err)
-            errors.append(utils.extract_exception(err))
-            errors_count += 1
+                    train_log_info[metric]["model_saved"] = 0
+            self.model_chooser.delete_old_model(project_info.model_type, project_info.project)
+            new_model.save_model()
 
         time_spent = (time() - time_training)
         for metric in metrics_to_gather:
             train_log_info[metric]["time_spent"] = time_spent
             train_log_info[metric]["gather_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             train_log_info[metric]["module_version"] = [self.app_config.appVersion]
-            train_log_info[metric]["errors"].extend(errors)
-            train_log_info[metric]["errors_count"] += errors_count
 
         LOGGER.info("Finished for %d s", time_spent)
         return len(train_data), train_log_info

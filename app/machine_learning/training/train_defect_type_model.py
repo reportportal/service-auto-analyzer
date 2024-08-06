@@ -26,7 +26,7 @@ from sklearn.model_selection import train_test_split
 from app.commons import logging, object_saving
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
-from app.commons.model.ml import TrainInfo
+from app.commons.model.ml import TrainInfo, ModelType
 from app.commons.model_chooser import ModelChooser
 from app.machine_learning.models import DefectTypeModel, CustomDefectTypeModel
 from app.machine_learning.models.defect_type_model import DATA_FIELD
@@ -173,11 +173,11 @@ class DefectTypeModelTraining:
     es_client: EsClient
     baseline_model: Optional[DefectTypeModel] = None
     model_chooser: Optional[ModelChooser]
-    model_type: Type[DefectTypeModel]
+    model_class: Type[DefectTypeModel]
 
     def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig,
                  model_chooser: Optional[ModelChooser] = None,
-                 model_type: Optional[Type[DefectTypeModel]] = None) -> None:
+                 model_class: Optional[Type[DefectTypeModel]] = None) -> None:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=app_config)
@@ -186,7 +186,7 @@ class DefectTypeModelTraining:
                 search_cfg.GlobalDefectTypeModelFolder))
             self.baseline_model.load_model()
         self.model_chooser = model_chooser
-        self.model_type = model_type if model_type else CustomDefectTypeModel
+        self.model_class = model_class if model_class else CustomDefectTypeModel
 
     @staticmethod
     def get_messages_by_issue_type(issue_type_pattern: str) -> dict[str, Any]:
@@ -318,8 +318,9 @@ class DefectTypeModelTraining:
         model_name = f'{project_info.model_type.name}_model_{datetime.now().strftime("%Y-%m-%d")}'
         baseline_model = os.path.basename(self.search_cfg.GlobalDefectTypeModelFolder)
         new_model_folder = f'{project_info.model_type.name}_model/{model_name}/'
-        LOGGER.info(f'Train using model type: {self.model_type}')
-        new_model = self.model_type(
+
+        LOGGER.info(f'Train "{ModelType.defect_type.name}" model using class: {self.model_class}')
+        new_model = self.model_class(
             object_saving.create(self.app_config, project_info.project, new_model_folder),
             n_estimators=self.search_cfg.DefectTypeModelNumEstimators)
 
@@ -336,8 +337,6 @@ class DefectTypeModelTraining:
         custom_models = []
         f1_chosen_models = []
         f1_baseline_models = []
-        errors = []
-        errors_count = 0
         for label in unique_labels:
             time_training = time()
             LOGGER.info(f'Label to train the model {label}')
@@ -402,8 +401,6 @@ class DefectTypeModelTraining:
         LOGGER.info("Finished for %d s", time_spent)
         train_log_info["all"]["time_spent"] = time_spent
         train_log_info["all"]["data_proportion"] = data_proportion_min
-        train_log_info["all"]["errors_count"] += errors_count
-        train_log_info["all"]["errors"].extend(errors)
         train_log_info["all"]["baseline_mean_metric"] = np.mean(
             f1_baseline_models) if f1_baseline_models else 0.0
         train_log_info["all"]["new_model_mean_metric"] = np.mean(

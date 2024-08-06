@@ -15,7 +15,7 @@
 import os
 from datetime import datetime
 from time import time
-from typing import Optional, Any
+from typing import Optional, Any, Callable
 
 import elasticsearch
 import elasticsearch.helpers
@@ -39,11 +39,12 @@ LOGGER = logging.getLogger("analyzerApp.trainingAnalysisModel")
 TRAIN_DATA_RANDOM_STATES = [1257, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029]
 
 
-def calculate_f1(model, x_test, y_test, _):
-    return model.validate_model(x_test, y_test)
+def calculate_f1(model: BoostingDecisionMaker, x_test: list[list[float]], y_test: list[int], _) -> float:
+    return model.validate_model(x_test, y_test)[0]
 
 
-def calculate_mrr(model, x_test, y_test, test_item_ids_with_pos):
+def calculate_mrr(model: BoostingDecisionMaker, x_test: list[list[float]], y_test: list[int],
+                  test_item_ids_with_pos: list[int]) -> float:
     res_labels, prob_labels = model.predict(x_test)
     test_item_ids_res = {}
     for i in range(len(test_item_ids_with_pos)):
@@ -51,7 +52,7 @@ def calculate_mrr(model, x_test, y_test, test_item_ids_with_pos):
         if test_item not in test_item_ids_res:
             test_item_ids_res[test_item] = []
         test_item_ids_res[test_item].append((res_labels[i], prob_labels[i][1], y_test[i]))
-    mrr = 0
+    mrr = 0.0
     cnt_to_use = 0
     for test_item in test_item_ids_res:
         res = sorted(test_item_ids_res[test_item], key=lambda x: x[1], reverse=True)
@@ -62,7 +63,7 @@ def calculate_mrr(model, x_test, y_test, test_item_ids_with_pos):
                 break
         if not has_positives:
             continue
-        rr_test_item = 0
+        rr_test_item = 0.0
         for idx, r in enumerate(res):
             if r[2] == 1 and r[0] == 1:
                 rr_test_item = 1 / (idx + 1)
@@ -74,24 +75,27 @@ def calculate_mrr(model, x_test, y_test, test_item_ids_with_pos):
     return mrr
 
 
-def deduplicate_data(data, labels) -> tuple[list, list]:
+def deduplicate_data(data: list[list[float]], labels: list[int]) -> tuple[list[list[float]], list[int]]:
     data_wo_duplicates = []
     labels_wo_duplicates = []
     data_set = set()
     for i in range(len(data)):
-        if tuple(data[i]) not in data_set:
-            data_set.add(tuple(data[i]))
+        data_tuple = tuple(data[i])
+        if data_tuple not in data_set:
+            data_set.add(data_tuple)
             data_wo_duplicates.append(data[i])
             labels_wo_duplicates.append(labels[i])
     return data_wo_duplicates, labels_wo_duplicates
 
 
-def split_data(data, labels, random_state, test_item_ids_with_pos) -> tuple[np.ndarray, np.ndarray, list, list, list]:
-    x_ids = [i for i in range(len(data))]
+def split_data(
+        data: list[list[float]], labels: list[int], random_state: int, test_item_ids_with_pos: list[int]
+) -> tuple[list[list[float]], list[list[float]], list[int], list[int], list[int]]:
+    x_ids: list[int] = [i for i in range(len(data))]
     x_train_ids, x_test_ids, y_train, y_test = train_test_split(
         x_ids, labels, test_size=0.1, random_state=random_state, stratify=labels)
-    x_train = np.asarray([data[idx] for idx in x_train_ids])
-    x_test = np.asarray([data[idx] for idx in x_test_ids])
+    x_train = [data[idx] for idx in x_train_ids]
+    x_test = [data[idx] for idx in x_test_ids]
     test_item_ids_with_pos_test = [test_item_ids_with_pos[idx] for idx in x_test_ids]
     return x_train, x_test, y_train, y_test, test_item_ids_with_pos_test
 
@@ -113,6 +117,7 @@ class AnalysisModelTraining:
     model_chooser: ModelChooser
     features: Optional[list[int]]
     mono_features: Optional[list[int]]
+    metrics_calculations: dict[str, Callable[[BoostingDecisionMaker, list[list[float]], list[int], list[int]], float]]
 
     def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig, model_type: ModelType,
                  model_chooser: ModelChooser) -> None:
@@ -175,21 +180,22 @@ class AnalysisModelTraining:
                 "data_proportion": 0.0, "baseline_mean_metric": 0.0, "new_model_mean_metric": 0.0,
                 "bad_data_proportion": 0, "metric_name": metric_name, "errors": [], "errors_count": 0}
 
-    def calculate_metrics(self, model: BoostingDecisionMaker, x_test: list[list[float]], y_test,
-                          metrics_to_gather: list[str], test_item_ids_with_pos, new_model_results):
+    def calculate_metrics(self, model: BoostingDecisionMaker, x_test: list[list[float]], y_test: list[int],
+                          metrics_to_gather: list[str], test_item_ids_with_pos: list[int],
+                          result_dict: dict[str, list[float]]) -> None:
         for metric in metrics_to_gather:
             metric_res = 0.0
             if metric in self.metrics_calculations:
                 metric_res = self.metrics_calculations[metric](model, x_test, y_test, test_item_ids_with_pos)
-            if metric not in new_model_results:
-                new_model_results[metric] = []
-            new_model_results[metric].append(metric_res)
-        return new_model_results
+            if metric not in result_dict:
+                result_dict[metric] = []
+            result_dict[metric].append(metric_res)
 
-    def train_several_times(self, new_model: BoostingDecisionMaker, data, labels, features: list[int],
-                            test_item_ids_with_pos, metrics_to_gather: list[str]):
-        new_model_results = {}
-        baseline_model_results = {}
+    def train_several_times(self, new_model: BoostingDecisionMaker, data: list[list[float]], labels: list[int],
+                            features: list[int], test_item_ids_with_pos: list[int],
+                            metrics_to_gather: list[str]) -> tuple[dict, dict, bool]:
+        new_model_results: dict[str, list[float]] = {}
+        baseline_model_results: dict[str, list[float]] = {}
         my_random_states = TRAIN_DATA_RANDOM_STATES
         bad_data = False
 
@@ -210,13 +216,12 @@ class AnalysisModelTraining:
                     x_train, y_train = oversample.fit_resample(x_train, y_train)
                 new_model.train_model(x_train, y_train)
                 LOGGER.debug("New model results")
-                new_model_results = self.calculate_metrics(
-                    new_model, x_test.tolist(), y_test, metrics_to_gather, test_item_ids_with_pos_test,
-                    new_model_results)
+                self.calculate_metrics(
+                    new_model, x_test, y_test, metrics_to_gather, test_item_ids_with_pos_test, new_model_results)
                 LOGGER.debug("Baseline results")
                 x_test_for_baseline = transform_data_from_feature_lists(
                     x_test, features, self.baseline_model.feature_ids)
-                baseline_model_results = self.calculate_metrics(
+                self.calculate_metrics(
                     self.baseline_model, x_test_for_baseline, y_test, metrics_to_gather, test_item_ids_with_pos_test,
                     baseline_model_results)
         return baseline_model_results, new_model_results, bad_data
@@ -258,7 +263,7 @@ class AnalysisModelTraining:
             }
         }
 
-    def get_search_query_aa(self, user_choice):
+    def get_search_query_aa(self, user_choice: int) -> dict[str, Any]:
         return {
             "sort": {"savedDate": "desc"},
             "size": self.app_config.esChunkNumber,
@@ -331,7 +336,7 @@ class AnalysisModelTraining:
         log_id_dict = self.query_logs(project_id, list(log_ids_to_find))
         return gathered_suggested_data, log_id_dict
 
-    def gather_data(self, projects: list[int], features: list[int]) -> tuple[np.array, np.array, list]:
+    def gather_data(self, projects: list[int], features: list[int]) -> tuple[list[list[float]], list[int], list[int]]:
         full_data_features, labels, test_item_ids_with_pos = [], [], []
         for project_id in projects:
             namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
@@ -349,8 +354,7 @@ class AnalysisModelTraining:
                 if len(found_logs) == 2:
                     log_relevant = found_logs["relevantLogId"]
                     log_relevant["_score"] = _suggest_res["_source"]["esScore"]
-                    searched_res = [
-                        (found_logs["testItemLogId"], {"hits": {"hits": [log_relevant]}})]
+                    searched_res = [(found_logs["testItemLogId"], {"hits": {"hits": [log_relevant]}})]
                 if searched_res:
                     if self.model_type is ModelType.suggestion:
                         _boosting_data_gatherer = SuggestBoostingFeaturizer(
@@ -369,14 +373,14 @@ class AnalysisModelTraining:
                     _boosting_data_gatherer.set_defect_type_model(
                         self.model_chooser.choose_model(project_id, ModelType.defect_type))
                     _boosting_data_gatherer.fill_previously_gathered_features(
-                        [utils.to_float_list(_suggest_res["_source"]["modelFeatureValues"])],
-                        _suggest_res["_source"]["modelFeatureNames"])
+                        [utils.to_float_list(_suggest_res['_source']['modelFeatureValues'])],
+                        [int(_id) for _id in _suggest_res['_source']['modelFeatureNames'].split(';')])
                     feature_data, _ = _boosting_data_gatherer.gather_features_info()
                     if feature_data:
                         full_data_features.extend(feature_data)
-                        labels.append(_suggest_res["_source"]["userChoice"])
-                        test_item_ids_with_pos.append(_suggest_res["_source"]["testItem"])
-        return np.asarray(full_data_features), np.asarray(labels), test_item_ids_with_pos
+                        labels.append(_suggest_res['_source']['userChoice'])
+                        test_item_ids_with_pos.append(int(_suggest_res['_source']['testItem']))
+        return full_data_features, labels, test_item_ids_with_pos
 
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, Any]]:
         time_training = time()

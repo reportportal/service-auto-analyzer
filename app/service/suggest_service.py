@@ -28,7 +28,7 @@ from app.commons.model.launch_objects import SuggestAnalysisResult, SearchConfig
 from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
-from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
+from app.machine_learning.models import WeightedSimilarityCalculator, BoostingDecisionMaker
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.service.analyzer_service import AnalyzerService
 from app.utils import utils, text_processing
@@ -248,9 +248,7 @@ class SuggestService(AnalyzerService):
         gathered_results = sorted(gathered_results, key=lambda x: (x[1], x[2]), reverse=True)
         return self.deduplicate_results(gathered_results, scores_by_test_items, test_item_ids)
 
-    def prepare_not_found_object_info(
-            self, test_item_info,
-            processed_time, model_feature_names, model_info):
+    def prepare_not_found_object_info(self, test_item_info, processed_time, model_feature_names: str, model_info):
         return {  # reciprocalRank is not filled for not found results not to count in the metrics dashboard
             "project": test_item_info.project,
             "testItem": test_item_info.testItemId,
@@ -316,9 +314,8 @@ class SuggestService(AnalyzerService):
         if test_item_id is None:
             return [], 0
         logs = []
-        for log in elasticsearch.helpers.scan(self.es_client.es_client,
-                                              query=self.get_query_for_logs_by_test_item(test_item_id),
-                                              index=index_name):
+        for log in elasticsearch.helpers.scan(
+                self.es_client.es_client, query=self.get_query_for_logs_by_test_item(test_item_id), index=index_name):
             # clean test item info not to boost by it
             log["_source"]["test_item"] = 0
             log["_source"]["test_case_hash"] = 0
@@ -365,27 +362,26 @@ class SuggestService(AnalyzerService):
 
             boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
             boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(test_item_info.project)
-            _suggest_decision_maker_to_use = self.model_chooser.choose_model(
+            # noinspection PyTypeChecker
+            _suggest_decision_maker_to_use: BoostingDecisionMaker = self.model_chooser.choose_model(
                 test_item_info.project, ModelType.suggestion,
                 custom_model_prob=self.search_cfg.ProbabilityForCustomModelSuggestions)
-            features_dict_objects = _suggest_decision_maker_to_use.features_dict_with_saved_objects
 
             _boosting_data_gatherer = SuggestBoostingFeaturizer(
                 searched_res,
                 boosting_config,
-                feature_ids=_suggest_decision_maker_to_use.get_feature_ids(),
-                weighted_log_similarity_calculator=self.similarity_model,
-                features_dict_with_saved_objects=features_dict_objects)
-            _boosting_data_gatherer.set_defect_type_model(self.model_chooser.choose_model(
-                test_item_info.project, ModelType.defect_type))
+                feature_ids=_suggest_decision_maker_to_use.feature_ids,
+                weighted_log_similarity_calculator=self.similarity_model)
+            # noinspection PyTypeChecker
+            _boosting_data_gatherer.set_defect_type_model(
+                self.model_chooser.choose_model(test_item_info.project, ModelType.defect_type))
             feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
-            scores_by_test_items = _boosting_data_gatherer.scores_by_issue_type
+            scores_by_test_items = _boosting_data_gatherer.find_most_relevant_by_type()
             model_info_tags = (_boosting_data_gatherer.get_used_model_info()
                                + _suggest_decision_maker_to_use.get_model_info())
-            feature_names = ";".join(_suggest_decision_maker_to_use.get_feature_names())
+            feature_names = ";".join([str(i) for i in _suggest_decision_maker_to_use.feature_ids])
             if feature_data:
-                predicted_labels, predicted_labels_probability = _suggest_decision_maker_to_use.predict(
-                    feature_data)
+                predicted_labels, predicted_labels_probability = _suggest_decision_maker_to_use.predict(feature_data)
                 sorted_results = self.sort_results(
                     scores_by_test_items, test_item_ids, predicted_labels_probability)
 
@@ -422,8 +418,7 @@ class SuggestService(AnalyzerService):
                             esScore=round(scores_by_test_items[test_item_id]["mrHit"]["_score"], 2),
                             esPosition=scores_by_test_items[test_item_id]["mrHit"]["es_pos"],
                             modelFeatureNames=feature_names,
-                            modelFeatureValues=";".join(
-                                [str(feature) for feature in feature_data[idx]]),
+                            modelFeatureValues=";".join([str(feature) for feature in feature_data[idx]]),
                             modelInfo=";".join(model_info_tags),
                             resultPosition=global_idx,
                             usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
@@ -460,9 +455,7 @@ class SuggestService(AnalyzerService):
             self.es_client._bulk_index([{
                 "_index": self.rp_suggest_metrics_index_template,
                 "_source": self.prepare_not_found_object_info(
-                    test_item_info, time() - t_start,
-                    feature_names,
-                    model_info_tags)
+                    test_item_info, time() - t_start, feature_names, model_info_tags)
             }])
         try:
             if self.app_config.amqpUrl:

@@ -106,11 +106,11 @@ class DefectTypeModel(MlModel):
         LOGGER.debug(f'Validation model name: {name}')
         res, res_prob = self.predict(test_data_x, name)
         f1 = f1_score(y_pred=res, y_true=labels)
-        LOGGER.debug(f'Valid dataset F1 score: {f1:.4f}')
-        LOGGER.debug(f'{confusion_matrix(y_pred=res, y_true=labels)}')
-        LOGGER.debug(f'{classification_report(y_pred=res, y_true=labels)}')
         if f1 is None:
             f1 = 0.0
+        LOGGER.debug(f'Valid dataset F1 score: {f1:.4f}')
+        LOGGER.debug(confusion_matrix(y_pred=res, y_true=labels))
+        LOGGER.debug(classification_report(y_pred=res, y_true=labels))
         accuracy = accuracy_score(y_pred=res, y_true=labels)
         if accuracy is None:
             accuracy = 0.0

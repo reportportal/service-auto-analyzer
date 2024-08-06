@@ -14,7 +14,7 @@
 
 from typing import Any, Optional
 
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, f1_score, accuracy_score
 from xgboost import XGBClassifier
 
 from app.commons import logging
@@ -68,7 +68,7 @@ class BoostingDecisionMaker(MlModel):
         self._save_models(zip(MODEL_FILES, [[self.n_estimators, self.max_depth, self.random_state, self.boost_model],
                                             [self.feature_ids, self.monotonous_features]]))
 
-    def train_model(self, train_data, labels):
+    def train_model(self, train_data: list[list[float]], labels: list[int]) -> tuple[float, float]:
         mon_features = [
             (1 if feature in self.monotonous_features else 0) for feature in self.feature_ids]
         mon_features_prepared = "(" + ",".join([str(f) for f in mon_features]) + ")"
@@ -77,18 +77,31 @@ class BoostingDecisionMaker(MlModel):
             monotone_constraints=mon_features_prepared)
         self.boost_model.fit(train_data, labels)
         self._loaded = True
-        LOGGER.info("Train score: %s", self.boost_model.score(train_data, labels))
-        LOGGER.info("Feature importances: %s", self.boost_model.feature_importances_)
+        res = self.boost_model.predict(train_data)
+        f1 = f1_score(y_pred=res, y_true=labels)
+        if f1 is None:
+            f1 = 0.0
+        LOGGER.debug(f'Train dataset F1 score: {f1:.4f}')
+        LOGGER.debug(f'Feature importances: {self.boost_model.feature_importances_}')
+        accuracy = accuracy_score(y_pred=res, y_true=labels)
+        if accuracy is None:
+            accuracy = 0.0
+        return f1, accuracy
 
-    def validate_model(self, valid_test_set, valid_test_labels):
-        res, res_prob = self.predict(valid_test_set)
-        f1_score = self.boost_model.score(valid_test_set, valid_test_labels)
-        LOGGER.info("Valid dataset F1 score: %s", f1_score)
-        LOGGER.info(confusion_matrix(valid_test_labels, res))
-        LOGGER.info(classification_report(valid_test_labels, res))
-        return f1_score
-
-    def predict(self, data: list):
+    def predict(self, data: list[list[float]]) -> tuple[list[int], list[list[float]]]:
         if not len(data):
             return [], []
         return self.boost_model.predict(data), self.boost_model.predict_proba(data)
+
+    def validate_model(self, valid_test_set: list[list[float]], valid_test_labels: list[int]) -> tuple[float, float]:
+        res, res_prob = self.predict(valid_test_set)
+        f1 = f1_score(y_pred=res, y_true=valid_test_labels)
+        if f1 is None:
+            f1 = 0.0
+        LOGGER.debug(f'Valid dataset F1 score: {f1:.4f}')
+        LOGGER.debug(confusion_matrix(valid_test_labels, res))
+        LOGGER.debug(classification_report(valid_test_labels, res))
+        accuracy = accuracy_score(y_pred=res, y_true=valid_test_labels)
+        if accuracy is None:
+            accuracy = 0.0
+        return f1, accuracy

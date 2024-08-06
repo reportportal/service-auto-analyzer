@@ -138,11 +138,11 @@ def train_several_times(
                 logs_to_train_idx, data, labels_filtered, additional_logs, label, random_state=random_state)
             new_model.train_model(label, x_train, y_train)
             LOGGER.debug('New model results')
-            f1, accuracy = new_model.validate_model(label, x_test, y_test)
+            f1 = new_model.validate_model(label, x_test, y_test)
             new_model_results.append(f1)
             LOGGER.debug('Baseline model results')
             if baseline_model:
-                f1, accuracy = baseline_model.validate_model(label, x_test, y_test)
+                f1 = baseline_model.validate_model(label, x_test, y_test)
                 baseline_model_results.append(f1)
             else:
                 baseline_model_results.append(0.0)

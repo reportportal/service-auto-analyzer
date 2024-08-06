@@ -12,15 +12,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import re
 from collections import Counter
 from typing import Optional
 
 import pandas as pd
-import re
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics import classification_report, confusion_matrix
-from sklearn.metrics import f1_score, accuracy_score
+from sklearn.metrics import classification_report, confusion_matrix, f1_score
 
 from app.commons import logging
 from app.commons.object_saving.object_saver import ObjectSaver
@@ -76,7 +75,7 @@ class DefectTypeModel(MlModel):
     def save_model(self):
         self._save_models(zip(MODEL_FILES, [self.count_vectorizer_models, self.models]))
 
-    def train_model(self, name: str, train_data_x: list[str], labels: list[int]) -> tuple[float, float]:
+    def train_model(self, name: str, train_data_x: list[str], labels: list[int]) -> float:
         self.count_vectorizer_models[name] = TfidfVectorizer(
             binary=True, min_df=5, analyzer=text_processing.preprocess_words)
         transformed_values = self.count_vectorizer_models[name].fit_transform(train_data_x)
@@ -92,15 +91,12 @@ class DefectTypeModel(MlModel):
         self._loaded = True
         res = model.predict(x_train_values)
         f1 = f1_score(y_pred=res, y_true=labels)
-        LOGGER.debug(f'Train dataset F1 score: {f1:.4f}')
         if f1 is None:
             f1 = 0.0
-        accuracy = accuracy_score(y_pred=res, y_true=labels)
-        if accuracy is None:
-            accuracy = 0.0
-        return f1, accuracy
+        LOGGER.debug(f'Train dataset F1 score: {f1:.4f}')
+        return f1
 
-    def validate_model(self, name: str, test_data_x: list[str], labels: list[int]) -> tuple[float, float]:
+    def validate_model(self, name: str, test_data_x: list[str], labels: list[int]) -> float:
         assert name in self.models
         LOGGER.debug(f'Validation data label distribution: {Counter(labels)}')
         LOGGER.debug(f'Validation model name: {name}')
@@ -111,18 +107,7 @@ class DefectTypeModel(MlModel):
         LOGGER.debug(f'Valid dataset F1 score: {f1:.4f}')
         LOGGER.debug(confusion_matrix(y_pred=res, y_true=labels))
         LOGGER.debug(classification_report(y_pred=res, y_true=labels))
-        accuracy = accuracy_score(y_pred=res, y_true=labels)
-        if accuracy is None:
-            accuracy = 0.0
-        return f1, accuracy
-
-    def validate_models(self, test_data):
-        results = []
-        for name, test_data_x, labels in test_data:
-            f1, accuracy = self.validate_model(
-                name, test_data_x, labels)
-            results.append((name, f1, accuracy))
-        return results
+        return f1
 
     def predict(self, data: list, model_name: str) -> tuple[list, list]:
         assert model_name in self.models

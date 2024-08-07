@@ -41,6 +41,7 @@ BASE_ISSUE_CLASS_INDEXES: dict[str, int] = {'ab': 0, 'pb': 1, 'si': 2}
 MINIMAL_LABEL_PROPORTION = 0.2
 TEST_DATA_PROPORTION = 0.1
 MINIMAL_DATA_LENGTH_FOR_TRAIN = 50
+MIN_P_VALUE = 0.05
 
 
 def return_similar_objects_into_sample(x_train_ind: list[int], y_train: list[int],
@@ -358,7 +359,7 @@ class DefectTypeModelTraining:
                 train_log_info[label]['baseline_mean_metric'] = baseline_mean_f1
                 train_log_info[label]['new_model_mean_metric'] = mean_f1
 
-                if p_value < 0.05 and mean_f1 > baseline_mean_f1 and mean_f1 >= 0.4:
+                if p_value < MIN_P_VALUE and mean_f1 > baseline_mean_f1 and mean_f1 >= 0.4:
                     p_value_max = max(p_value_max, p_value)
                     use_custom_model = True
                 all_bad_data = 0

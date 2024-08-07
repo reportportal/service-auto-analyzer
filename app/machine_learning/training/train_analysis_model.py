@@ -40,6 +40,7 @@ LOGGER = logging.getLogger("analyzerApp.trainingAnalysisModel")
 TRAIN_DATA_RANDOM_STATES = [1257, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029, 2137]
 DUE_PROPORTION = 0.05
 SMOTE_PROPORTION = 0.4
+MIN_P_VALUE = 0.05
 
 
 def calculate_f1(model: BoostingDecisionMaker, x_test: list[list[float]], y_test: list[int], _) -> float:
@@ -461,7 +462,7 @@ class AnalysisModelTraining:
                 else:
                     mean_metric_results = metric_results.copy()
 
-            if max(p_values) < 0.05 and new_metrics_better:
+            if max(p_values) < MIN_P_VALUE and new_metrics_better:
                 use_custom_model = True
 
         if use_custom_model:

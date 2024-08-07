@@ -353,7 +353,7 @@ class AnalysisModelTraining:
         log_id_dict = self.query_logs(project_id, list(log_ids_to_find))
         return gathered_suggested_data, log_id_dict
 
-    def gather_data(self, projects: list[int], features: list[int]) -> tuple[list[list[float]], list[int], list[int]]:
+    def query_data(self, projects: list[int], features: list[int]) -> tuple[list[list[float]], list[int], list[int]]:
         full_data_features, labels, test_item_ids_with_pos = [], [], []
         for project_id in projects:
             namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
@@ -424,7 +424,7 @@ class AnalysisModelTraining:
         projects = [project_info.project]
         if project_info.additional_projects:
             projects.extend(project_info.additional_projects)
-        train_data, labels, test_item_ids_with_pos = self.gather_data(projects, new_model.feature_ids)
+        train_data, labels, test_item_ids_with_pos = self.query_data(projects, new_model.feature_ids)
         LOGGER.debug(f'Loaded data for model training {self.model_type.name}')
 
         baseline_model_results, new_model_results, bad_data, data_proportion = self.train_several_times(

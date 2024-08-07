@@ -183,8 +183,8 @@ class AnalysisModelTraining:
     baseline_folder: Optional[str]
     baseline_model: Optional[BoostingDecisionMaker]
     model_chooser: ModelChooser
-    features: Optional[list[int]]
-    mono_features: Optional[list[int]]
+    features: list[int]
+    monotonous_features: list[int]
 
     def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig, model_type: ModelType,
                  model_chooser: ModelChooser, model_class: Optional[Type[BoostingDecisionMaker]] = None) -> None:
@@ -197,9 +197,17 @@ class AnalysisModelTraining:
         if model_type is ModelType.suggestion:
             self.baseline_folder = self.search_cfg.SuggestBoostModelFolder
             model_config = self.search_cfg.RetrainSuggestBoostModelConfig
+            self.features = text_processing.transform_string_feature_range_into_list(
+                self.search_cfg.SuggestBoostModelFeatures)
+            self.monotonous_features = text_processing.transform_string_feature_range_into_list(
+                self.search_cfg.SuggestBoostModelMonotonousFeatures)
         elif model_type is ModelType.auto_analysis:
             self.baseline_folder = self.search_cfg.BoostModelFolder
             model_config = self.search_cfg.RetrainAutoBoostModelConfig
+            self.features = text_processing.transform_string_feature_range_into_list(
+                self.search_cfg.AutoBoostModelFeatures)
+            self.monotonous_features = text_processing.transform_string_feature_range_into_list(
+                self.search_cfg.AutoBoostModelMonotonousFeatures)
         else:
             raise ValueError(f'Incorrect model type {model_type}')
 
@@ -209,8 +217,12 @@ class AnalysisModelTraining:
             self.baseline_model = BoostingDecisionMaker(
                 object_saving.create_filesystem(self.baseline_folder))
             self.baseline_model.load_model()
+            # Take features from baseline model if this is retrain
             self.features, self.monotonous_features = object_saving.create_filesystem(
                 os.path.dirname(model_config)).get_project_object(os.path.basename(model_config), using_json=False)
+
+        if not self.features:
+            raise ValueError('No feature config found, please either correct values in "search_cfg" parameter')
 
         self.weighted_log_similarity_calculator = None
         if self.search_cfg.SimilarityWeightsFolder.strip():

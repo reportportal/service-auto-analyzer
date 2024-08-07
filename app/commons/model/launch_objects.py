@@ -88,10 +88,15 @@ class SearchConfig(BaseModel):
     GlobalDefectTypeModelFolder: str = ''
     RetrainSuggestBoostModelConfig: str = ''
     RetrainAutoBoostModelConfig: str = ''
+    SuggestBoostModelFeatures: str = ''
+    AutoBoostModelFeatures: str = ''
+    SuggestBoostModelMonotonousFeatures: str = ''
+    AutoBoostModelMonotonousFeatures: str = ''
     MaxSuggestionsNumber: int = 3
     AutoAnalysisTimeout: int = 300
     MaxAutoAnalysisItemsToProcess: int = 4000
     DefectTypeModelNumEstimators: int = 5
+
 
 
 class SearchLogInfo(BaseModel):

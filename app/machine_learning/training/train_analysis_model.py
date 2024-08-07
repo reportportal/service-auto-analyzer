@@ -29,9 +29,9 @@ from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
 from app.commons.model.ml import TrainInfo, ModelType
 from app.commons.model_chooser import ModelChooser
+from app.machine_learning.boosting_featurizer import BoostingFeaturizer
 from app.machine_learning.models import (BoostingDecisionMaker, CustomBoostingDecisionMaker,
                                          WeightedSimilarityCalculator)
-from app.machine_learning.boosting_featurizer import BoostingFeaturizer
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import utils, text_processing
 from app.utils.defaultdict import DefaultDict
@@ -215,7 +215,7 @@ class AnalysisModelTraining:
         self.weighted_log_similarity_calculator = None
         if self.search_cfg.SimilarityWeightsFolder.strip():
             self.weighted_log_similarity_calculator = WeightedSimilarityCalculator(
-                    object_saving.create_filesystem(self.search_cfg.SimilarityWeightsFolder))
+                object_saving.create_filesystem(self.search_cfg.SimilarityWeightsFolder))
             self.weighted_log_similarity_calculator.load_model()
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.model_chooser = model_chooser

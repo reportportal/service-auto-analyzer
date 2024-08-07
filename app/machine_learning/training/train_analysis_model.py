@@ -120,7 +120,7 @@ def split_data(
     return x_train, x_test, y_train, y_test, test_item_ids_with_pos_test
 
 
-def transform_data_from_feature_lists(feature_list, cur_features: list[int],
+def transform_data_from_feature_lists(feature_list: list[list[float]], cur_features: list[int],
                                       desired_features: list[int]) -> list[list[float]]:
     previously_gathered_features = utils.fill_previously_gathered_features(feature_list, cur_features)
     gathered_data = utils.gather_feature_list(previously_gathered_features, desired_features)
@@ -140,7 +140,7 @@ def fill_metric_stats(baseline_model_metric_result: list[float], new_model_metri
 
 
 def train_several_times(
-        new_model: BoostingDecisionMaker, data: list[list[float]], labels: list[int], features: list[int],
+        new_model: BoostingDecisionMaker, data: list[list[float]], labels: list[int],
         test_item_ids_with_pos: list[int], random_states: Optional[list[int]] = None,
         baseline_model: Optional[BoostingDecisionMaker] = None
 ) -> tuple[dict[str, list[float]], dict[str, list[float]], bool, float]:
@@ -168,7 +168,8 @@ def train_several_times(
             calculate_metrics(
                 new_model, x_test, y_test, test_item_ids_with_pos_test, new_model_results)
             LOGGER.debug("Baseline results")
-            x_test_for_baseline = transform_data_from_feature_lists(x_test, features, baseline_model.feature_ids)
+            x_test_for_baseline = transform_data_from_feature_lists(
+                x_test, new_model.feature_ids, baseline_model.feature_ids) if baseline_model else x_test
             calculate_metrics(
                 baseline_model, x_test_for_baseline, y_test, test_item_ids_with_pos_test, baseline_model_results)
 
@@ -412,11 +413,11 @@ class AnalysisModelTraining:
         return full_data_features, labels, test_item_ids_with_pos
 
     def train_several_times(
-            self, new_model: BoostingDecisionMaker, data: list[list[float]], labels: list[int], features: list[int],
+            self, new_model: BoostingDecisionMaker, data: list[list[float]], labels: list[int],
             test_item_ids_with_pos: list[int], random_states: Optional[list[int]] = None
     ) -> tuple[dict[str, list[float]], dict[str, list[float]], bool, float]:
         return train_several_times(
-            new_model, data, labels, features, test_item_ids_with_pos, random_states, self.baseline_model)
+            new_model, data, labels, test_item_ids_with_pos, random_states, self.baseline_model)
 
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, Any]]:
         time_training = time()
@@ -484,7 +485,7 @@ class AnalysisModelTraining:
 
             LOGGER.info(f'Perform final training with random state: {best_random_state}')
             self.train_several_times(
-                new_model, train_data, labels, new_model.feature_ids, test_item_ids_with_pos, [best_random_state])
+                new_model, train_data, labels, test_item_ids_with_pos, [best_random_state])
             if self.model_chooser:
                 self.model_chooser.delete_old_model(project_info.model_type, project_info.project)
             new_model.save_model()

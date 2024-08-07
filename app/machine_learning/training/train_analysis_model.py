@@ -424,7 +424,7 @@ class AnalysisModelTraining:
             train_log_info[metric]['data_proportion'] = data_proportion
 
         use_custom_model = False
-        mean_metric_results = None
+        mean_metric_results: Optional[list[float]] = None
         if not bad_data:
             LOGGER.debug(f'Baseline test results {baseline_model_results}')
             LOGGER.debug(f'New model test results {new_model_results}')
@@ -449,7 +449,7 @@ class AnalysisModelTraining:
                     for i in range(len(metric_results)):
                         mean_metric_results[i] = mean_metric_results[i] * metric_results[i]
                 else:
-                    mean_metric_results = list(metric_results)
+                    mean_metric_results = metric_results.copy()
 
             if max(p_values) < 0.05 and new_metrics_better:
                 use_custom_model = True

@@ -37,7 +37,7 @@ from app.utils import utils, text_processing
 from app.utils.defaultdict import DefaultDict
 
 LOGGER = logging.getLogger("analyzerApp.trainingAnalysisModel")
-TRAIN_DATA_RANDOM_STATES = [1257, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029]
+TRAIN_DATA_RANDOM_STATES = [1257, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029, 2137]
 
 
 def calculate_f1(model: BoostingDecisionMaker, x_test: list[list[float]], y_test: list[int], _) -> float:
@@ -123,6 +123,18 @@ def transform_data_from_feature_lists(feature_list, cur_features: list[int],
     return gathered_data
 
 
+def fill_metric_stats(baseline_model_metric_result: list[float], new_model_metric_results: list[float],
+                      info_dict: dict[str, Any]) -> None:
+    _, p_value = stats.f_oneway(baseline_model_metric_result, new_model_metric_results)
+    p_value = p_value if p_value is not None else 1.0
+    info_dict['p_value'] = p_value
+    mean_metric = np.mean(new_model_metric_results)
+    baseline_mean_metric = np.mean(baseline_model_metric_result)
+    info_dict['baseline_mean_metric'] = baseline_mean_metric
+    info_dict['new_model_mean_metric'] = mean_metric
+    info_dict['gather_date'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
 class AnalysisModelTraining:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
@@ -191,11 +203,13 @@ class AnalysisModelTraining:
                 'data_proportion': 0.0, 'baseline_mean_metric': 0.0, 'new_model_mean_metric': 0.0,
                 'bad_data_proportion': 0, 'metric_name': metric_name, 'errors': [], 'errors_count': 0}
 
-    def train_several_times(self, new_model: BoostingDecisionMaker, data: list[list[float]], labels: list[int],
-                            features: list[int], test_item_ids_with_pos: list[int]) -> tuple[dict, dict, bool, float]:
+    def train_several_times(
+            self, new_model: BoostingDecisionMaker, data: list[list[float]], labels: list[int], features: list[int],
+            test_item_ids_with_pos: list[int], random_states: Optional[list[int]] = None
+    ) -> tuple[dict[str, list[float]], dict[str, list[float]], bool, float]:
         new_model_results: dict[str, list[float]] = {}
         baseline_model_results: dict[str, list[float]] = {}
-        my_random_states = TRAIN_DATA_RANDOM_STATES
+        my_random_states = random_states if random_states else TRAIN_DATA_RANDOM_STATES
         bad_data = False
 
         proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
@@ -410,52 +424,57 @@ class AnalysisModelTraining:
             train_log_info[metric]['data_proportion'] = data_proportion
 
         use_custom_model = False
+        mean_metric_results = None
         if not bad_data:
-            for metric in new_model_results:
-                LOGGER.debug("Baseline test results %s", baseline_model_results[metric])
-                LOGGER.debug("New model test results %s", new_model_results[metric])
-                f_value, p_value = stats.f_oneway(baseline_model_results[metric], new_model_results[metric])
-                if p_value is None:
-                    p_value = 1.0
-                train_log_info[metric]["p_value"] = p_value
-                mean_metric = np.mean(new_model_results[metric])
-                baseline_mean_metric = np.mean(baseline_model_results[metric])
-                train_log_info[metric]["baseline_mean_metric"] = baseline_mean_metric
-                train_log_info[metric]["new_model_mean_metric"] = mean_metric
-                if p_value < 0.05 and mean_metric > baseline_mean_metric and mean_metric >= 0.4:
-                    use_custom_model = True
+            LOGGER.debug(f'Baseline test results {baseline_model_results}')
+            LOGGER.debug(f'New model test results {new_model_results}')
+            p_values = []
+            new_metrics_better = True
+            for metric, metric_results in new_model_results.items():
+                info_dict = train_log_info[metric]
+                fill_metric_stats(baseline_model_results[metric], metric_results, info_dict)
+                p_value = info_dict['p_value']
+                p_values.append(p_value)
+                mean_metric = info_dict['new_model_mean_metric']
+                baseline_mean_metric = info_dict['baseline_mean_metric']
+                new_metrics_better = (
+                        new_metrics_better
+                        and mean_metric > baseline_mean_metric
+                        and mean_metric >= 0.4
+                )
                 LOGGER.info(
-                    f'Model training validation results: p-value={p_value:.3f}; mean {mean_metric} metric '
+                    f'Model training validation results: p-value={p_value:.3f}; mean {metric} metric '
                     f'baseline={baseline_mean_metric:.3f}; mean new model={mean_metric:.3f}.')
+                if mean_metric_results:
+                    for i in range(len(metric_results)):
+                        mean_metric_results[i] = mean_metric_results[i] * metric_results[i]
+                else:
+                    mean_metric_results = list(metric_results)
+
+            if max(p_values) < 0.05 and new_metrics_better:
+                use_custom_model = True
 
         if use_custom_model:
-            LOGGER.debug("Custom model should be saved")
+            LOGGER.debug('Custom model should be saved')
+            max_train_result_idx = int(np.argmax(mean_metric_results))
+            best_random_state = TRAIN_DATA_RANDOM_STATES[max_train_result_idx]
 
-            proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
-            if proportion_binary_labels < self.due_proportion_to_smote:
-                oversample = SMOTE(ratio="minority")
-                train_data, labels = oversample.fit_resample(train_data, labels)
-                proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
-            if proportion_binary_labels < self.due_proportion:
-                LOGGER.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
-                bad_data = True
-            for metric in METRIC_CALCULATIONS:
-                train_log_info[metric]["bad_data_proportion"] = int(bad_data)
-            if not bad_data:
-                for metric in METRIC_CALCULATIONS:
-                    train_log_info[metric]["model_saved"] = 1
-                new_model.train_model(train_data, labels)
-            else:
-                for metric in METRIC_CALCULATIONS:
-                    train_log_info[metric]["model_saved"] = 0
-            self.model_chooser.delete_old_model(project_info.model_type, project_info.project)
+            LOGGER.info(f'Perform final training with random state: {best_random_state}')
+            self.train_several_times(
+                new_model, train_data, labels, new_model.feature_ids, test_item_ids_with_pos, [best_random_state])
+            if self.model_chooser:
+                self.model_chooser.delete_old_model(project_info.model_type, project_info.project)
             new_model.save_model()
+            for metric in METRIC_CALCULATIONS:
+                train_log_info[metric]['model_saved'] = 1
+        else:
+            for metric in METRIC_CALCULATIONS:
+                train_log_info[metric]['model_saved'] = 0
 
         time_spent = (time() - time_training)
         for metric in METRIC_CALCULATIONS:
-            train_log_info[metric]["time_spent"] = time_spent
-            train_log_info[metric]["gather_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            train_log_info[metric]["module_version"] = [self.app_config.appVersion]
+            train_log_info[metric]['time_spent'] = time_spent
+            train_log_info[metric]['module_version'] = [self.app_config.appVersion]
 
-        LOGGER.info("Finished for %d s", time_spent)
+        LOGGER.info(f'Finished for {time_spent} s')
         return len(train_data), train_log_info

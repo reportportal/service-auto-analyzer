@@ -343,6 +343,7 @@ class DefectTypeModelTraining:
 
             (baseline_model_results, new_model_results, bad_data_proportion,
              proportion_binary_labels) = self.train_several_times(new_model, label, data, TRAIN_DATA_RANDOM_STATES)
+            data_proportion_min = min(proportion_binary_labels, data_proportion_min)
 
             use_custom_model = False
             if not bad_data_proportion:
@@ -372,16 +373,12 @@ class DefectTypeModelTraining:
                 best_random_state = TRAIN_DATA_RANDOM_STATES[max_train_result_idx]
 
                 LOGGER.info(f'Perform final training with random state: {best_random_state}')
-                (baseline_model_results, new_model_results, bad_data_proportion,
-                 proportion_binary_labels) = self.train_several_times(new_model, label, data, [best_random_state])
+                self.train_several_times(new_model, label, data, [best_random_state])
 
-                if not bad_data_proportion:
-                    train_log_info[label]["model_saved"] = 1
-                    custom_models.append(label)
-                    data_proportion_min = min(proportion_binary_labels, data_proportion_min)
-                else:
-                    train_log_info[label]["model_saved"] = 0
+                train_log_info[label]["model_saved"] = 1
+                custom_models.append(label)
             else:
+                train_log_info[label]["model_saved"] = 0
                 copy_model_part_from_baseline(label, new_model, self.baseline_model)
                 if train_log_info[label]["baseline_mean_metric"] > 0.001:
                     f1_baseline_models.append(train_log_info[label]["baseline_mean_metric"])

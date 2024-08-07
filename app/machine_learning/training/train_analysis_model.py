@@ -38,6 +38,8 @@ from app.utils.defaultdict import DefaultDict
 
 LOGGER = logging.getLogger("analyzerApp.trainingAnalysisModel")
 TRAIN_DATA_RANDOM_STATES = [1257, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029, 2137]
+DUE_PROPORTION = 0.05
+SMOTE_PROPORTION = 0.4
 
 
 def calculate_f1(model: BoostingDecisionMaker, x_test: list[list[float]], y_test: list[int], _) -> float:
@@ -82,13 +84,14 @@ METRIC_CALCULATIONS: dict[str, Callable[[BoostingDecisionMaker, list[list[float]
 }
 
 
-def calculate_metrics(model: BoostingDecisionMaker, x_test: list[list[float]], y_test: list[int],
-                      test_item_ids_with_pos: list[int], result_dict: dict[str, list[float]]) -> None:
+def calculate_metrics(model: Optional[BoostingDecisionMaker], x_test: list[list[float]], y_test: list[int],
+                      test_item_ids_with_pos: list[int], result_dict: DefaultDict[str, list[float]]) -> None:
     for metric, metric_calc_func in METRIC_CALCULATIONS:
-        metric_res = metric_calc_func(model, x_test, y_test, test_item_ids_with_pos)
-        if metric not in result_dict:
-            result_dict[metric] = []
-        result_dict[metric].append(metric_res)
+        if model:
+            metric_res = metric_calc_func(model, x_test, y_test, test_item_ids_with_pos)
+            result_dict[metric].append(metric_res)
+        else:
+            result_dict[metric].append(0.0)
 
 
 def deduplicate_data(data: list[list[float]], labels: list[int]) -> tuple[list[list[float]], list[int]]:
@@ -133,6 +136,42 @@ def fill_metric_stats(baseline_model_metric_result: list[float], new_model_metri
     info_dict['baseline_mean_metric'] = baseline_mean_metric
     info_dict['new_model_mean_metric'] = mean_metric
     info_dict['gather_date'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def train_several_times(
+        new_model: BoostingDecisionMaker, data: list[list[float]], labels: list[int], features: list[int],
+        test_item_ids_with_pos: list[int], random_states: Optional[list[int]] = None,
+        baseline_model: Optional[BoostingDecisionMaker] = None
+) -> tuple[dict[str, list[float]], dict[str, list[float]], bool, float]:
+    new_model_results = DefaultDict(lambda _, __: [])
+    baseline_model_results = DefaultDict(lambda _, __: [])
+    my_random_states = random_states if random_states else TRAIN_DATA_RANDOM_STATES
+
+    bad_data = False
+    proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
+    if proportion_binary_labels < DUE_PROPORTION:
+        LOGGER.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
+        bad_data = True
+
+    if not bad_data:
+        data, labels = deduplicate_data(data, labels)
+        for random_state in my_random_states:
+            x_train, x_test, y_train, y_test, test_item_ids_with_pos_test = split_data(
+                data, labels, random_state, test_item_ids_with_pos)
+            proportion_binary_labels = utils.calculate_proportions_for_labels(y_train)
+            if proportion_binary_labels < SMOTE_PROPORTION:
+                oversample = SMOTE(ratio="minority")
+                x_train, y_train = oversample.fit_resample(x_train, y_train)
+            new_model.train_model(x_train, y_train)
+            LOGGER.debug("New model results")
+            calculate_metrics(
+                new_model, x_test, y_test, test_item_ids_with_pos_test, new_model_results)
+            LOGGER.debug("Baseline results")
+            x_test_for_baseline = transform_data_from_feature_lists(x_test, features, baseline_model.feature_ids)
+            calculate_metrics(
+                baseline_model, x_test_for_baseline, y_test, test_item_ids_with_pos_test, baseline_model_results)
+
+    return baseline_model_results, new_model_results, bad_data, proportion_binary_labels
 
 
 class AnalysisModelTraining:
@@ -202,42 +241,6 @@ class AnalysisModelTraining:
                 'project_id': str(project_info.project), 'model_saved': 0, 'p_value': 1.0, 'data_size': 0,
                 'data_proportion': 0.0, 'baseline_mean_metric': 0.0, 'new_model_mean_metric': 0.0,
                 'bad_data_proportion': 0, 'metric_name': metric_name, 'errors': [], 'errors_count': 0}
-
-    def train_several_times(
-            self, new_model: BoostingDecisionMaker, data: list[list[float]], labels: list[int], features: list[int],
-            test_item_ids_with_pos: list[int], random_states: Optional[list[int]] = None
-    ) -> tuple[dict[str, list[float]], dict[str, list[float]], bool, float]:
-        new_model_results: dict[str, list[float]] = {}
-        baseline_model_results: dict[str, list[float]] = {}
-        my_random_states = random_states if random_states else TRAIN_DATA_RANDOM_STATES
-        bad_data = False
-
-        proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
-
-        if proportion_binary_labels < self.due_proportion:
-            LOGGER.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
-            bad_data = True
-
-        if not bad_data:
-            data, labels = deduplicate_data(data, labels)
-            for random_state in my_random_states:
-                x_train, x_test, y_train, y_test, test_item_ids_with_pos_test = split_data(
-                    data, labels, random_state, test_item_ids_with_pos)
-                proportion_binary_labels = utils.calculate_proportions_for_labels(y_train)
-                if proportion_binary_labels < self.due_proportion_to_smote:
-                    oversample = SMOTE(ratio="minority")
-                    x_train, y_train = oversample.fit_resample(x_train, y_train)
-                new_model.train_model(x_train, y_train)
-                LOGGER.debug("New model results")
-                calculate_metrics(
-                    new_model, x_test, y_test, test_item_ids_with_pos_test, new_model_results)
-                LOGGER.debug("Baseline results")
-                x_test_for_baseline = transform_data_from_feature_lists(
-                    x_test, features, self.baseline_model.feature_ids)
-                calculate_metrics(
-                    self.baseline_model, x_test_for_baseline, y_test, test_item_ids_with_pos_test,
-                    baseline_model_results)
-        return baseline_model_results, new_model_results, bad_data, proportion_binary_labels
 
     def query_logs(self, project_id: int, log_ids_to_find: list[str]) -> dict[str, Any]:
         log_ids_to_find = list(log_ids_to_find)
@@ -394,6 +397,13 @@ class AnalysisModelTraining:
                         labels.append(_suggest_res['_source']['userChoice'])
                         test_item_ids_with_pos.append(int(_suggest_res['_source']['testItem']))
         return full_data_features, labels, test_item_ids_with_pos
+
+    def train_several_times(
+            self, new_model: BoostingDecisionMaker, data: list[list[float]], labels: list[int], features: list[int],
+            test_item_ids_with_pos: list[int], random_states: Optional[list[int]] = None
+    ) -> tuple[dict[str, list[float]], dict[str, list[float]], bool, float]:
+        return train_several_times(
+            new_model, data, labels, features, test_item_ids_with_pos, random_states, self.baseline_model)
 
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, Any]]:
         time_training = time()

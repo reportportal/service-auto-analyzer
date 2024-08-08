@@ -461,11 +461,7 @@ class AnalysisModelTraining:
                 p_values.append(p_value)
                 mean_metric = info_dict['new_model_mean_metric']
                 baseline_mean_metric = info_dict['baseline_mean_metric']
-                new_metrics_better = (
-                        new_metrics_better
-                        and mean_metric > baseline_mean_metric
-                        and mean_metric >= 0.4
-                )
+                new_metrics_better = new_metrics_better and mean_metric > baseline_mean_metric and mean_metric >= 0.4
                 LOGGER.info(
                     f'Model training validation results: p-value={p_value:.3f}; mean {metric} metric '
                     f'baseline={baseline_mean_metric:.3f}; mean new model={mean_metric:.3f}.')

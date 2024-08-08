@@ -98,7 +98,6 @@ class SearchConfig(BaseModel):
     DefectTypeModelNumEstimators: int = 5
 
 
-
 class SearchLogInfo(BaseModel):
     """Search log info"""
     logId: int

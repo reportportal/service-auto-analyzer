@@ -96,8 +96,6 @@ class TestEsQuery(unittest.TestCase):
             SuggestBoostModelFolder=self.model_settings['SUGGEST_BOOST_MODEL_FOLDER'],
             GlobalDefectTypeModelFolder=self.model_settings['GLOBAL_DEFECT_TYPE_MODEL_FOLDER'],
             TimeWeightDecay=0.95,
-            RetrainSuggestBoostModelConfig=self.model_settings['RETRAIN_SUGGEST_BOOST_MODEL_CONFIG'],
-            RetrainAutoBoostModelConfig=self.model_settings['RETRAIN_AUTO_BOOST_MODEL_CONFIG']
         )
 
     @utils.ignore_warnings

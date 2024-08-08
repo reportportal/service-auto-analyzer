@@ -224,8 +224,6 @@ class TestService(unittest.TestCase):
             GlobalDefectTypeModelFolder=self.model_settings['GLOBAL_DEFECT_TYPE_MODEL_FOLDER'],
             ProbabilityForCustomModelSuggestions=0.9,
             ProbabilityForCustomModelAutoAnalysis=0.1,
-            RetrainSuggestBoostModelConfig=self.model_settings['RETRAIN_SUGGEST_BOOST_MODEL_CONFIG'],
-            RetrainAutoBoostModelConfig=self.model_settings['RETRAIN_AUTO_BOOST_MODEL_CONFIG'],
             MaxSuggestionsNumber=3,
             AutoAnalysisTimeout=300,
             MaxAutoAnalysisItemsToProcess=4000

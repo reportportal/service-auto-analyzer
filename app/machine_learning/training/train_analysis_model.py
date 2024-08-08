@@ -132,7 +132,8 @@ class AnalysisModelTraining:
     monotonous_features: list[int]
 
     def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig, model_type: ModelType,
-                 model_chooser: ModelChooser, model_class: Optional[Type[BoostingDecisionMaker]] = None) -> None:
+                 model_chooser: ModelChooser, model_class: Optional[Type[BoostingDecisionMaker]] = None,
+                 use_baseline_features: bool = True) -> None:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.due_proportion = 0.05
@@ -161,8 +162,9 @@ class AnalysisModelTraining:
                 object_saving.create_filesystem(self.baseline_folder))
             self.baseline_model.load_model()
             # Take features from baseline model if this is retrain
-            self.features = self.baseline_model.feature_ids
-            self.monotonous_features = list(self.baseline_model.monotonous_features)
+            if use_baseline_features:
+                self.features = self.baseline_model.feature_ids
+                self.monotonous_features = list(self.baseline_model.monotonous_features)
 
         if not self.features:
             raise ValueError('No feature config found, please either correct values in "search_cfg" parameter')

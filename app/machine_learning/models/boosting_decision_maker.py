@@ -33,7 +33,7 @@ class BoostingDecisionMaker(MlModel):
     max_depth: int
     random_state: int
     feature_ids: list[int]
-    monotonous_features: list[int]
+    monotonous_features: set[int]
     boost_model: Any
 
     def __init__(self, object_saver: ObjectSaver, tags: str = 'global boosting model', *,
@@ -43,9 +43,10 @@ class BoostingDecisionMaker(MlModel):
         self.n_estimators = n_estimators
         self.max_depth = max_depth
         self.random_state = random_state
-        self.boost_model = XGBClassifier(n_estimators=n_estimators, max_depth=max_depth, random_state=random_state)
+        self.boost_model = XGBClassifier(
+            n_estimators=n_estimators, max_depth=max_depth, random_state=self.random_state)
         self.feature_ids = features if features else []
-        self.monotonous_features = monotonous_features if monotonous_features else []
+        self.monotonous_features = set(monotonous_features) if monotonous_features else {}
         self._loaded = False
 
     @property
@@ -54,14 +55,21 @@ class BoostingDecisionMaker(MlModel):
 
     def add_config_info(self, features: list[int], monotonous_features: Optional[list[int]] = None) -> None:
         self.feature_ids = features
-        self.monotonous_features = monotonous_features if monotonous_features else []
+        self.monotonous_features = set(monotonous_features) if monotonous_features else {}
 
     def load_model(self) -> None:
         if self.loaded:
             return
         boost_model, features_config = self._load_models(MODEL_FILES)
-        self.n_estimators, self.max_depth, self.random_state, self.boost_model = boost_model
-        self.feature_ids, self.monotonous_features = features_config
+        if len(boost_model) > 3:
+            # New model format
+            self.n_estimators, self.max_depth, self.random_state, self.boost_model = boost_model
+            self.feature_ids, self.monotonous_features = features_config
+        else:
+            # Old model format
+            self.n_estimators, self.max_depth, self.boost_model = boost_model
+            self.random_state = DEFAULT_RANDOM_STATE
+            _, self.feature_ids, self.monotonous_features = features_config
         self._loaded = True
 
     def save_model(self):
@@ -73,7 +81,7 @@ class BoostingDecisionMaker(MlModel):
             (1 if feature in self.monotonous_features else 0) for feature in self.feature_ids]
         mon_features_prepared = "(" + ",".join([str(f) for f in mon_features]) + ")"
         self.boost_model = XGBClassifier(
-            n_estimators=self.n_estimators, max_depth=self.max_depth, random_state=43,
+            n_estimators=self.n_estimators, max_depth=self.max_depth, random_state=self.random_state,
             monotone_constraints=mon_features_prepared)
         self.boost_model.fit(train_data, labels)
         self._loaded = True

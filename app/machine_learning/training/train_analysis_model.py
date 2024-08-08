@@ -15,7 +15,7 @@
 import os
 from datetime import datetime
 from time import time
-from typing import Optional, Any, Callable, Type
+from typing import Optional, Any, Type
 
 import elasticsearch
 import elasticsearch.helpers
@@ -41,58 +41,7 @@ TRAIN_DATA_RANDOM_STATES = [1257, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427,
 DUE_PROPORTION = 0.05
 SMOTE_PROPORTION = 0.4
 MIN_P_VALUE = 0.05
-
-
-def calculate_f1(model: BoostingDecisionMaker, x_test: list[list[float]], y_test: list[int], _) -> float:
-    return model.validate_model(x_test, y_test)
-
-
-def calculate_mrr(model: BoostingDecisionMaker, x_test: list[list[float]], y_test: list[int],
-                  test_item_ids_with_pos: list[int]) -> float:
-    res_labels, prob_labels = model.predict(x_test)
-    test_item_ids_res = {}
-    for i in range(len(test_item_ids_with_pos)):
-        test_item = test_item_ids_with_pos[i]
-        if test_item not in test_item_ids_res:
-            test_item_ids_res[test_item] = []
-        test_item_ids_res[test_item].append((res_labels[i], prob_labels[i][1], y_test[i]))
-    mrr = 0.0
-    cnt_to_use = 0
-    for test_item in test_item_ids_res:
-        res = sorted(test_item_ids_res[test_item], key=lambda x: x[1], reverse=True)
-        has_positives = False
-        for r in res:
-            if r[2] == 1:
-                has_positives = True
-                break
-        if not has_positives:
-            continue
-        rr_test_item = 0.0
-        for idx, r in enumerate(res):
-            if r[2] == 1 and r[0] == 1:
-                rr_test_item = 1 / (idx + 1)
-                break
-        mrr += rr_test_item
-        cnt_to_use += 1
-    if cnt_to_use:
-        mrr /= cnt_to_use
-    return mrr
-
-
-METRIC_CALCULATIONS: dict[str, Callable[[BoostingDecisionMaker, list[list[float]], list[int], list[int]], float]] = {
-    "F1": calculate_f1,
-    "Mean Reciprocal Rank": calculate_mrr
-}
-
-
-def calculate_metrics(model: Optional[BoostingDecisionMaker], x_test: list[list[float]], y_test: list[int],
-                      test_item_ids_with_pos: list[int], result_dict: DefaultDict[str, list[float]]) -> None:
-    for metric, metric_calc_func in METRIC_CALCULATIONS:
-        if model:
-            metric_res = metric_calc_func(model, x_test, y_test, test_item_ids_with_pos)
-            result_dict[metric].append(metric_res)
-        else:
-            result_dict[metric].append(0.0)
+METRIC = 'F1'
 
 
 def deduplicate_data(data: list[list[float]], labels: list[int]) -> tuple[list[list[float]], list[int]]:
@@ -109,15 +58,14 @@ def deduplicate_data(data: list[list[float]], labels: list[int]) -> tuple[list[l
 
 
 def split_data(
-        data: list[list[float]], labels: list[int], random_state: int, test_item_ids_with_pos: list[int]
-) -> tuple[list[list[float]], list[list[float]], list[int], list[int], list[int]]:
+        data: list[list[float]], labels: list[int], random_state: int
+) -> tuple[list[list[float]], list[list[float]], list[int], list[int]]:
     x_ids: list[int] = [i for i in range(len(data))]
     x_train_ids, x_test_ids, y_train, y_test = train_test_split(
         x_ids, labels, test_size=0.1, random_state=random_state, stratify=labels)
     x_train = [data[idx] for idx in x_train_ids]
     x_test = [data[idx] for idx in x_test_ids]
-    test_item_ids_with_pos_test = [test_item_ids_with_pos[idx] for idx in x_test_ids]
-    return x_train, x_test, y_train, y_test, test_item_ids_with_pos_test
+    return x_train, x_test, y_train, y_test
 
 
 def transform_data_from_feature_lists(feature_list: list[list[float]], cur_features: list[int],
@@ -141,8 +89,7 @@ def fill_metric_stats(baseline_model_metric_result: list[float], new_model_metri
 
 def train_several_times(
         new_model: BoostingDecisionMaker, data: list[list[float]], labels: list[int],
-        test_item_ids_with_pos: list[int], random_states: Optional[list[int]] = None,
-        baseline_model: Optional[BoostingDecisionMaker] = None
+        random_states: Optional[list[int]] = None, baseline_model: Optional[BoostingDecisionMaker] = None
 ) -> tuple[dict[str, list[float]], dict[str, list[float]], bool, float]:
     new_model_results = DefaultDict(lambda _, __: [])
     baseline_model_results = DefaultDict(lambda _, __: [])
@@ -157,21 +104,18 @@ def train_several_times(
     if not bad_data:
         data, labels = deduplicate_data(data, labels)
         for random_state in my_random_states:
-            x_train, x_test, y_train, y_test, test_item_ids_with_pos_test = split_data(
-                data, labels, random_state, test_item_ids_with_pos)
+            x_train, x_test, y_train, y_test = split_data(data, labels, random_state)
             proportion_binary_labels = utils.calculate_proportions_for_labels(y_train)
             if proportion_binary_labels < SMOTE_PROPORTION:
                 oversample = SMOTE(ratio="minority")
                 x_train, y_train = oversample.fit_resample(x_train, y_train)
             new_model.train_model(x_train, y_train)
             LOGGER.debug("New model results")
-            calculate_metrics(
-                new_model, x_test, y_test, test_item_ids_with_pos_test, new_model_results)
+            new_model_results[METRIC].append(new_model.validate_model(x_test, y_test))
             LOGGER.debug("Baseline results")
             x_test_for_baseline = transform_data_from_feature_lists(
                 x_test, new_model.feature_ids, baseline_model.feature_ids) if baseline_model else x_test
-            calculate_metrics(
-                baseline_model, x_test_for_baseline, y_test, test_item_ids_with_pos_test, baseline_model_results)
+            baseline_model_results[METRIC] = baseline_model.validate_model(x_test_for_baseline, y_test)
 
     return baseline_model_results, new_model_results, bad_data, proportion_binary_labels
 
@@ -364,8 +308,8 @@ class AnalysisModelTraining:
         log_id_dict = self.query_logs(project_id, list(log_ids_to_find))
         return gathered_suggested_data, log_id_dict
 
-    def query_data(self, projects: list[int], features: list[int]) -> tuple[list[list[float]], list[int], list[int]]:
-        full_data_features, labels, test_item_ids_with_pos = [], [], []
+    def query_data(self, projects: list[int], features: list[int]) -> tuple[list[list[float]], list[int]]:
+        full_data_features, labels = [], []
         for project_id in projects:
             namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
             gathered_suggested_data, log_id_dict = self.query_es_for_suggest_info(project_id)
@@ -407,15 +351,14 @@ class AnalysisModelTraining:
                     if feature_data:
                         full_data_features.extend(feature_data)
                         labels.append(_suggest_res['_source']['userChoice'])
-                        test_item_ids_with_pos.append(int(_suggest_res['_source']['testItem']))
-        return full_data_features, labels, test_item_ids_with_pos
+        return full_data_features, labels
 
     def train_several_times(
             self, new_model: BoostingDecisionMaker, data: list[list[float]], labels: list[int],
-            test_item_ids_with_pos: list[int], random_states: Optional[list[int]] = None
+            random_states: Optional[list[int]] = None
     ) -> tuple[dict[str, list[float]], dict[str, list[float]], bool, float]:
         return train_several_times(
-            new_model, data, labels, test_item_ids_with_pos, random_states, self.baseline_model)
+            new_model, data, labels, random_states, self.baseline_model)
 
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, Any]]:
         time_training = time()
@@ -434,11 +377,11 @@ class AnalysisModelTraining:
         projects = [project_info.project]
         if project_info.additional_projects:
             projects.extend(project_info.additional_projects)
-        train_data, labels, test_item_ids_with_pos = self.query_data(projects, new_model.feature_ids)
+        train_data, labels = self.query_data(projects, new_model.feature_ids)
         LOGGER.debug(f'Loaded data for model training {self.model_type.name}')
 
         baseline_model_results, new_model_results, bad_data, data_proportion = self.train_several_times(
-            new_model, train_data, labels, new_model.feature_ids, test_item_ids_with_pos)
+            new_model, train_data, labels, new_model.feature_ids)
         for metric in new_model_results:
             train_log_info[metric]['data_size'] = len(labels)
             train_log_info[metric]['bad_data_proportion'] = int(bad_data)
@@ -478,20 +421,17 @@ class AnalysisModelTraining:
 
             LOGGER.info(f'Perform final training with random state: {best_random_state}')
             self.train_several_times(
-                new_model, train_data, labels, test_item_ids_with_pos, [best_random_state])
+                new_model, train_data, labels, [best_random_state])
             if self.model_chooser:
                 self.model_chooser.delete_old_model(project_info.model_type, project_info.project)
             new_model.save_model()
-            for metric in METRIC_CALCULATIONS:
-                train_log_info[metric]['model_saved'] = 1
+            train_log_info[METRIC]['model_saved'] = 1
         else:
-            for metric in METRIC_CALCULATIONS:
-                train_log_info[metric]['model_saved'] = 0
+            train_log_info[METRIC]['model_saved'] = 0
 
         time_spent = (time() - time_training)
-        for metric in METRIC_CALCULATIONS:
-            train_log_info[metric]['time_spent'] = time_spent
-            train_log_info[metric]['module_version'] = [self.app_config.appVersion]
+        train_log_info[METRIC]['time_spent'] = time_spent
+        train_log_info[METRIC]['module_version'] = [self.app_config.appVersion]
 
         LOGGER.info(f'Finished for {time_spent} s')
         return len(train_data), train_log_info

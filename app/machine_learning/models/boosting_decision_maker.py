@@ -20,6 +20,7 @@ from xgboost import XGBClassifier
 from app.commons import logging
 from app.commons.object_saving.object_saver import ObjectSaver
 from app.machine_learning.models import MlModel
+from app.utils import text_processing
 
 LOGGER = logging.getLogger("analyzerApp.boosting_decision_maker")
 
@@ -69,7 +70,8 @@ class BoostingDecisionMaker(MlModel):
             # Old model format
             self.n_estimators, self.max_depth, self.boost_model = boost_model
             self.random_state = DEFAULT_RANDOM_STATE
-            _, self.feature_ids, self.monotonous_features = features_config
+            _, features, self.monotonous_features = features_config
+            self.feature_ids = text_processing.transform_string_feature_range_into_list(features)
         self._loaded = True
 
     def save_model(self):
@@ -96,7 +98,7 @@ class BoostingDecisionMaker(MlModel):
     def predict(self, data: list[list[float]]) -> tuple[list[int], list[list[float]]]:
         if not len(data):
             return [], []
-        return self.boost_model.predict(data), self.boost_model.predict_proba(data)
+        return self.boost_model.predict(data).tolist(), self.boost_model.predict_proba(data).tolist()
 
     def validate_model(self, valid_test_set: list[list[float]], valid_test_labels: list[int]) -> float:
         res, res_prob = self.predict(valid_test_set)

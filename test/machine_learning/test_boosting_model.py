@@ -18,7 +18,7 @@ import unittest
 import numpy as np
 
 from app.commons.object_saving import create_filesystem
-from app.machine_learning.models import defect_type_model, weighted_similarity_calculator
+from app.machine_learning.models import DefectTypeModel, WeightedSimilarityCalculator
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.machine_learning.boosting_featurizer import BoostingFeaturizer
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
@@ -42,8 +42,7 @@ class TestBoostingModel(unittest.TestCase):
         self.epsilon = 0.0001
         model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
         self.boost_model_folder = model_settings["BOOST_MODEL_FOLDER"]
-        self.suggest_boost_model_folder = \
-            model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
+        self.suggest_boost_model_folder = model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
         self.weights_folder = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
         self.global_defect_type_model_folder = model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]
         logging.disable(logging.CRITICAL)
@@ -75,13 +74,12 @@ class TestBoostingModel(unittest.TestCase):
     @utils.ignore_warnings
     def test_random_run(self):
         print("Weights model folder: ", self.weights_folder)
-        for folder in [self.boost_model_folder,
-                       self.suggest_boost_model_folder]:
+        for folder in [self.boost_model_folder, self.suggest_boost_model_folder]:
             print("Boost model folder ", folder)
             decision_maker = BoostingDecisionMaker(create_filesystem(folder))
             decision_maker.load_model()
             test_data_size = 5
-            random_data = np.random.rand(test_data_size, len(decision_maker.get_feature_names()))
+            random_data = np.random.rand(test_data_size, len(decision_maker.feature_ids)).tolist()
             result, result_probability = decision_maker.predict(random_data)
             assert len(result) == test_data_size
             assert len(result_probability) == test_data_size
@@ -124,26 +122,23 @@ class TestBoostingModel(unittest.TestCase):
 
         for idx, test in enumerate(tests):
             print(f'Running test {idx}')
-            feature_ids = test["decision_maker"].get_feature_ids()
-            feature_dict_objects = test["decision_maker"].features_dict_with_saved_objects
+            feature_ids = test["decision_maker"].feature_ids
             weight_log_sim = None
             if self.weights_folder.strip():
-                weight_log_sim = weighted_similarity_calculator. \
-                    WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
+                weight_log_sim = WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
                 weight_log_sim.load_model()
             _boosting_featurizer = BoostingFeaturizer(
                 test["elastic_results"], test["config"], feature_ids,
-                weighted_log_similarity_calculator=weight_log_sim,
-                features_dict_with_saved_objects=feature_dict_objects)
+                weighted_log_similarity_calculator=weight_log_sim)
             if self.global_defect_type_model_folder.strip():
-                model = defect_type_model.DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
+                model = DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
                 model.load_model()
                 _boosting_featurizer.set_defect_type_model(model)
             gathered_data, issue_type_names = _boosting_featurizer.gather_features_info()
             predict_label, predict_probability = test["decision_maker"].predict(gathered_data)
             assert gathered_data == boost_model_results[str(idx)][0]
-            assert predict_label.tolist() == boost_model_results[str(idx)][1]
-            assert predict_probability.tolist() == boost_model_results[str(idx)][2]
+            assert predict_label == boost_model_results[str(idx)][1]
+            assert predict_probability == boost_model_results[str(idx)][2]
 
     @utils.ignore_warnings
     def test_full_data_check_suggests(self):
@@ -201,26 +196,23 @@ class TestBoostingModel(unittest.TestCase):
             ])
         for idx, test in enumerate(tests):
             print(f'Running test {idx}')
-            feature_ids = test["decision_maker"].get_feature_ids()
-            feature_dict_objects = test["decision_maker"].features_dict_with_saved_objects
+            feature_ids = test["decision_maker"].feature_ids
             weight_log_sim = None
             if self.weights_folder.strip():
-                weight_log_sim = weighted_similarity_calculator. \
-                    WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
+                weight_log_sim = WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
                 weight_log_sim.load_model()
             _boosting_featurizer = SuggestBoostingFeaturizer(
                 test["elastic_results"],
                 test["config"],
                 feature_ids,
-                weighted_log_similarity_calculator=weight_log_sim,
-                features_dict_with_saved_objects=feature_dict_objects)
+                weighted_log_similarity_calculator=weight_log_sim)
             if self.global_defect_type_model_folder.strip():
-                model = defect_type_model.DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
+                model = DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
                 model.load_model()
                 _boosting_featurizer.set_defect_type_model(model)
 
             gathered_data, test_item_ids = _boosting_featurizer.gather_features_info()
             predict_label, predict_probability = test["decision_maker"].predict(gathered_data)
             assert gathered_data == boost_model_results[str(idx)][0]
-            assert predict_label.tolist() == boost_model_results[str(idx)][1]
-            assert predict_probability.tolist() == boost_model_results[str(idx)][2]
+            assert predict_label == boost_model_results[str(idx)][1]
+            assert predict_probability == boost_model_results[str(idx)][2]

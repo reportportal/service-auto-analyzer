@@ -197,14 +197,12 @@ class AnalysisModelTraining:
         self.model_type = model_type
         if model_type is ModelType.suggestion:
             self.baseline_folder = self.search_cfg.SuggestBoostModelFolder
-            model_config = self.search_cfg.RetrainSuggestBoostModelConfig
             self.features = text_processing.transform_string_feature_range_into_list(
                 self.search_cfg.SuggestBoostModelFeatures)
             self.monotonous_features = text_processing.transform_string_feature_range_into_list(
                 self.search_cfg.SuggestBoostModelMonotonousFeatures)
         elif model_type is ModelType.auto_analysis:
             self.baseline_folder = self.search_cfg.BoostModelFolder
-            model_config = self.search_cfg.RetrainAutoBoostModelConfig
             self.features = text_processing.transform_string_feature_range_into_list(
                 self.search_cfg.AutoBoostModelFeatures)
             self.monotonous_features = text_processing.transform_string_feature_range_into_list(
@@ -219,8 +217,8 @@ class AnalysisModelTraining:
                 object_saving.create_filesystem(self.baseline_folder))
             self.baseline_model.load_model()
             # Take features from baseline model if this is retrain
-            self.features, self.monotonous_features = object_saving.create_filesystem(
-                os.path.dirname(model_config)).get_project_object(os.path.basename(model_config), using_json=False)
+            self.features = self.baseline_model.feature_ids
+            self.monotonous_features = list(self.baseline_model.monotonous_features)
 
         if not self.features:
             raise ValueError('No feature config found, please either correct values in "search_cfg" parameter')
@@ -428,8 +426,7 @@ class AnalysisModelTraining:
         LOGGER.info(f'Train "{self.model_type.name}" model using class: {self.model_class}')
         new_model = self.model_class(
             object_saving.create(self.app_config, project_id=project_info.project, path=new_model_folder),
-            features=self.features, monotonous_features=self.features)
-        new_model.add_config_info(self.features, self.monotonous_features)
+            features=self.features, monotonous_features=self.monotonous_features)
 
         train_log_info = DefaultDict(lambda _, k: self.get_info_template(project_info, baseline_model, model_name, k))
 

@@ -389,10 +389,6 @@ def read_model_settings():
         'SIMILARITY_WEIGHTS_FOLDER'].strip().rstrip('/').rstrip('\\')
     SEARCH_CONFIG.GlobalDefectTypeModelFolder = model_settings[
         'GLOBAL_DEFECT_TYPE_MODEL_FOLDER'].strip().rstrip('/').rstrip('\\')
-    SEARCH_CONFIG.RetrainSuggestBoostModelConfig = model_settings[
-        'RETRAIN_SUGGEST_BOOST_MODEL_CONFIG'].strip().rstrip('/').rstrip('\\')
-    SEARCH_CONFIG.RetrainAutoBoostModelConfig = model_settings[
-        'RETRAIN_AUTO_BOOST_MODEL_CONFIG'].strip().rstrip('/').rstrip('\\')
 
 
 log_file_path = 'res/logging.conf'

@@ -54,10 +54,6 @@ class BoostingDecisionMaker(MlModel):
     def loaded(self) -> bool:
         return self._loaded
 
-    def add_config_info(self, features: list[int], monotonous_features: Optional[list[int]] = None) -> None:
-        self.feature_ids = features
-        self.monotonous_features = set(monotonous_features) if monotonous_features else {}
-
     def load_model(self) -> None:
         if self.loaded:
             return

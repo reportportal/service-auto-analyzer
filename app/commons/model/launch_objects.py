@@ -86,8 +86,6 @@ class SearchConfig(BaseModel):
     SuggestBoostModelFolder: str = ''
     SimilarityWeightsFolder: str = ''
     GlobalDefectTypeModelFolder: str = ''
-    RetrainSuggestBoostModelConfig: str = ''
-    RetrainAutoBoostModelConfig: str = ''
     SuggestBoostModelFeatures: str = ''
     AutoBoostModelFeatures: str = ''
     SuggestBoostModelMonotonousFeatures: str = ''

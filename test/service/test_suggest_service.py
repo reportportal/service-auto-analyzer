@@ -764,9 +764,7 @@ class TestSuggestService(TestService):
             if "msearch_results" in test:
                 suggest_service.es_client.es_client.msearch = MagicMock(
                     return_value={"responses": test["msearch_results"]})
-            _boosting_decision_maker = BoostingDecisionMaker(object_saving.create_filesystem(""), '')
-            _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
-            _boosting_decision_maker.get_feature_names = MagicMock(return_value=["0"])
+            _boosting_decision_maker = BoostingDecisionMaker(object_saving.create_filesystem(""), '', features=[0])
             _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])
             suggest_service.model_chooser.choose_model = MagicMock(return_value=_boosting_decision_maker)
             response = suggest_service.suggest_items(test["test_item_info"])

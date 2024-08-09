@@ -359,8 +359,7 @@ class AnalysisModelTraining:
             self, new_model: BoostingDecisionMaker, data: list[list[float]], labels: list[int],
             random_states: Optional[list[int]] = None
     ) -> tuple[dict[str, list[float]], dict[str, list[float]], bool, float]:
-        return train_several_times(
-            new_model, data, labels, random_states, self.baseline_model)
+        return train_several_times(new_model, data, labels, random_states, self.baseline_model)
 
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, Any]]:
         time_training = time()

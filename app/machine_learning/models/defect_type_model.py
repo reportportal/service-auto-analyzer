@@ -110,7 +110,6 @@ class DefectTypeModel(MlModel):
         return f1
 
     def predict(self, data: list, model_name: str) -> tuple[list, list]:
-        assert model_name in self.models
         if len(data) == 0:
             return [], []
         transformed_values = self.count_vectorizer_models[model_name].transform(data)

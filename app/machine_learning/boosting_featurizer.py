@@ -210,7 +210,7 @@ class BoostingFeaturizer:
                 result[issue_type] = res_prob[0][1] if len(res_prob[0]) == 2 else 0.0
                 self.used_model_info.update(self.defect_type_predict_model.get_model_info())
             except Exception as err:
-                logger.error(err)
+                logger.exception(err)
         return result
 
     def is_text_of_particular_defect_type(self, label_type):
@@ -554,5 +554,5 @@ class BoostingFeaturizer:
             gathered_data = utils.gather_feature_list(gathered_data_dict, self.feature_ids)
         except Exception as err:
             logger.error("Errors in boosting features calculation")
-            logger.error(err)
+            logger.exception(err)
         return gathered_data, issue_type_names

@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+import json
 from typing import Any, Optional
 
 from sklearn.metrics import classification_report, confusion_matrix, f1_score
@@ -88,7 +88,9 @@ class BoostingDecisionMaker(MlModel):
         if f1 is None:
             f1 = 0.0
         LOGGER.debug(f'Train dataset F1 score: {f1:.4f}')
-        LOGGER.debug(f'Feature importances: {zip(self.feature_ids, self.boost_model.feature_importances_)}')
+        LOGGER.debug(
+            'Feature importances: %s',
+            json.dumps(dict(zip(self.feature_ids, self.boost_model.feature_importances_.tolist()))))
         return f1
 
     def predict(self, data: list[list[float]]) -> tuple[list[int], list[list[float]]]:

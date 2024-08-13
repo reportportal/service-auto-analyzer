@@ -21,7 +21,7 @@ import elasticsearch
 import elasticsearch.helpers
 import numpy as np
 import scipy.stats as stats
-from imblearn.over_sampling import SMOTE
+from imblearn.over_sampling import BorderlineSMOTE
 from sklearn.model_selection import train_test_split
 
 from app.commons import logging, namespace_finder, object_saving
@@ -107,7 +107,7 @@ def train_several_times(
             x_train, x_test, y_train, y_test = split_data(data, labels, random_state)
             proportion_binary_labels = utils.calculate_proportions_for_labels(y_train)
             if proportion_binary_labels < SMOTE_PROPORTION:
-                oversample = SMOTE(ratio="minority")
+                oversample = BorderlineSMOTE(sampling_strategy=SMOTE_PROPORTION, random_state=random_state)
                 x_train, y_train = oversample.fit_resample(x_train, y_train)
             new_model.train_model(x_train, y_train)
             LOGGER.debug("New model results")

@@ -129,6 +129,8 @@ class AnalysisModelTraining:
     model_chooser: ModelChooser
     features: list[int]
     monotonous_features: list[int]
+    n_estimators: int
+    max_depth: int
 
     def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig, model_type: ModelType,
                  model_chooser: ModelChooser, model_class: Optional[Type[BoostingDecisionMaker]] = None,
@@ -145,12 +147,16 @@ class AnalysisModelTraining:
                 self.search_cfg.SuggestBoostModelFeatures)
             self.monotonous_features = text_processing.transform_string_feature_range_into_list(
                 self.search_cfg.SuggestBoostModelMonotonousFeatures)
+            self.n_estimators = self.search_cfg.SuggestBoostModelNumEstimators
+            self.max_depth = self.search_cfg.SuggestBoostModelMaxDepth
         elif model_type is ModelType.auto_analysis:
             self.baseline_folder = self.search_cfg.BoostModelFolder
             self.features = text_processing.transform_string_feature_range_into_list(
                 self.search_cfg.AutoBoostModelFeatures)
             self.monotonous_features = text_processing.transform_string_feature_range_into_list(
                 self.search_cfg.AutoBoostModelMonotonousFeatures)
+            self.n_estimators = self.search_cfg.AutoBoostModelNumEstimators
+            self.max_depth = self.search_cfg.AutoBoostModelMaxDepth
         else:
             raise ValueError(f'Incorrect model type {model_type}')
 
@@ -369,7 +375,8 @@ class AnalysisModelTraining:
         LOGGER.info(f'Train "{self.model_type.name}" model using class: {self.model_class}')
         new_model = self.model_class(
             object_saving.create(self.app_config, project_id=project_info.project, path=new_model_folder),
-            features=self.features, monotonous_features=self.monotonous_features)
+            features=self.features, monotonous_features=self.monotonous_features, n_estimators=self.n_estimators,
+            max_depth=self.max_depth)
 
         train_log_info = DefaultDict(lambda _, k: self.get_info_template(project_info, baseline_model, model_name, k))
 

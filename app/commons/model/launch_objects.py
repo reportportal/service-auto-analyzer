@@ -94,6 +94,10 @@ class SearchConfig(BaseModel):
     AutoAnalysisTimeout: int = 300
     MaxAutoAnalysisItemsToProcess: int = 4000
     DefectTypeModelNumEstimators: int = 5
+    SuggestBoostModelNumEstimators: int = 75
+    SuggestBoostModelMaxDepth: int = 5
+    AutoBoostModelNumEstimators: int = 75
+    AutoBoostModelMaxDepth: int = 5
 
 
 class SearchLogInfo(BaseModel):

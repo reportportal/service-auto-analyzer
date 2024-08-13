@@ -26,6 +26,8 @@ LOGGER = logging.getLogger("analyzerApp.boosting_decision_maker")
 
 MODEL_FILES: list[str] = ['boost_model.pickle', 'data_features_config.pickle']
 DEFAULT_RANDOM_STATE = 43
+DEFAULT_N_ESTIMATORS = 75
+DEFAULT_MAX_DEPTH = 5
 
 
 class BoostingDecisionMaker(MlModel):
@@ -39,11 +41,11 @@ class BoostingDecisionMaker(MlModel):
 
     def __init__(self, object_saver: ObjectSaver, tags: str = 'global boosting model', *,
                  features: Optional[list[int]] = None, monotonous_features: Optional[list[int]] = None,
-                 n_estimators: int = 75, max_depth: int = 5, random_state: int = DEFAULT_RANDOM_STATE) -> None:
+                 n_estimators: Optional[int] = None, max_depth: Optional[int] = None, random_state: Optional[int] = None) -> None:
         super().__init__(object_saver, tags)
-        self.n_estimators = n_estimators
-        self.max_depth = max_depth
-        self.random_state = random_state
+        self.n_estimators = n_estimators if n_estimators is not None else DEFAULT_N_ESTIMATORS
+        self.max_depth = max_depth if max_depth is not None else DEFAULT_MAX_DEPTH
+        self.random_state = random_state if random_state is not None else DEFAULT_RANDOM_STATE
         self.boost_model = XGBClassifier(
             n_estimators=n_estimators, max_depth=max_depth, random_state=self.random_state)
         self.feature_ids = features if features else []

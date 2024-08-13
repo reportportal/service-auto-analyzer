@@ -58,7 +58,7 @@ class DefectTypeModel(MlModel):
         self._loaded = False
         self.count_vectorizer_models = DefaultDict(get_model)
         self.models = DefaultDict(get_model)
-        self.n_estimators = n_estimators if n_estimators else DEFAULT_N_ESTIMATORS
+        self.n_estimators = n_estimators if n_estimators is not None else DEFAULT_N_ESTIMATORS
 
     @property
     def loaded(self) -> bool:

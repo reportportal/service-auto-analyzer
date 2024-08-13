@@ -115,8 +115,7 @@ def train_several_times(
             LOGGER.debug("Baseline results")
             x_test_for_baseline = transform_data_from_feature_lists(
                 x_test, new_model.feature_ids, baseline_model.feature_ids) if baseline_model else x_test
-            baseline_model_results[METRIC] = baseline_model.validate_model(x_test_for_baseline, y_test)
-
+            baseline_model_results[METRIC].append(baseline_model.validate_model(x_test_for_baseline, y_test))
     return baseline_model_results, new_model_results, bad_data, proportion_binary_labels
 
 

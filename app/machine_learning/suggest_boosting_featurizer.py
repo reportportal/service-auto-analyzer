@@ -16,11 +16,13 @@ from collections import defaultdict
 from typing import Any
 
 from app.machine_learning import boosting_featurizer
+from app.machine_learning.models import WeightedSimilarityCalculator
 
 
 class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
 
-    def __init__(self, all_results, config, feature_ids, weighted_log_similarity_calculator=None):
+    def __init__(self, all_results, config, feature_ids: str | list[int],
+                 weighted_log_similarity_calculator: WeightedSimilarityCalculator = None) -> None:
         super().__init__(
             all_results, config, feature_ids, weighted_log_similarity_calculator=weighted_log_similarity_calculator)
 
@@ -71,7 +73,7 @@ class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
             min_scores_by_test_item[test_item] = min_scores_results[issue_type]
         return min_scores_by_test_item
 
-    def _calculate_percent_count_items_and_mean(self, return_val_name="mean_score"):
+    def _calculate_percent_count_items_and_mean(self, return_val_name="mean_score") -> dict[str, float]:
         mean_scores_results = super()._calculate_percent_count_items_and_mean(return_val_name=return_val_name)
         mean_scores_by_test_item = {}
         test_items = self.find_most_relevant_by_type()

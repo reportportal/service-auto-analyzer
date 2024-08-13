@@ -24,4 +24,4 @@ MODEL_TAG = 'custom defect type model'
 class CustomDefectTypeModel(DefectTypeModel):
 
     def __init__(self, object_saver: ObjectSaver, n_estimators: Optional[int] = None):
-        super().__init__(object_saver, MODEL_TAG, n_estimators)
+        super().__init__(object_saver, MODEL_TAG, n_estimators=n_estimators)

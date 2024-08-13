@@ -52,7 +52,7 @@ class DefectTypeModel(MlModel):
     models: DefaultDict[str, RandomForestClassifier]
     n_estimators: int
 
-    def __init__(self, object_saver: ObjectSaver, tags: str = 'global defect type model',
+    def __init__(self, object_saver: ObjectSaver, tags: str = 'global defect type model', *,
                  n_estimators: Optional[int] = None) -> None:
         super().__init__(object_saver, tags)
         self._loaded = False

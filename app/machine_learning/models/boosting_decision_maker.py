@@ -41,7 +41,8 @@ class BoostingDecisionMaker(MlModel):
 
     def __init__(self, object_saver: ObjectSaver, tags: str = 'global boosting model', *,
                  features: Optional[list[int]] = None, monotonous_features: Optional[list[int]] = None,
-                 n_estimators: Optional[int] = None, max_depth: Optional[int] = None, random_state: Optional[int] = None) -> None:
+                 n_estimators: Optional[int] = None, max_depth: Optional[int] = None,
+                 random_state: Optional[int] = None) -> None:
         super().__init__(object_saver, tags)
         self.n_estimators = n_estimators if n_estimators is not None else DEFAULT_N_ESTIMATORS
         self.max_depth = max_depth if max_depth is not None else DEFAULT_MAX_DEPTH

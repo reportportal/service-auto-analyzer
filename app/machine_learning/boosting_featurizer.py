@@ -371,7 +371,7 @@ class BoostingFeaturizer:
             new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
 
-    def _calculate_percent_issue_types(self):
+    def _calculate_percent_issue_types(self) -> dict[str, float]:
         scores_by_issue_type = self._calculate_score()
         percent_by_issue_type = {}
         for issue_type in scores_by_issue_type:

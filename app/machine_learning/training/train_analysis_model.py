@@ -381,7 +381,7 @@ class AnalysisModelTraining:
         LOGGER.debug(f'Loaded data for model training {self.model_type.name}')
 
         baseline_model_results, new_model_results, bad_data, data_proportion = self.train_several_times(
-            new_model, train_data, labels, new_model.feature_ids)
+            new_model, train_data, labels)
         for metric in new_model_results:
             train_log_info[metric]['data_size'] = len(labels)
             train_log_info[metric]['bad_data_proportion'] = int(bad_data)

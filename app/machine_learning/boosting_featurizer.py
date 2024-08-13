@@ -19,10 +19,10 @@ from typing import Optional, Any, Callable
 import numpy as np
 
 from app.commons import logging, similarity_calculator
-from app.machine_learning.models.defect_type_model import DefectTypeModel
-from app.machine_learning.models.defect_type_model import DATA_FIELD
-from app.utils import utils, text_processing
 from app.machine_learning.models import WeightedSimilarityCalculator
+from app.machine_learning.models.defect_type_model import DATA_FIELD
+from app.machine_learning.models.defect_type_model import DefectTypeModel
+from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
@@ -138,8 +138,8 @@ class BoostingFeaturizer:
     def _calculate_test_item_logs_similar_percent(self):
         scores_by_issue_type = self.find_most_relevant_by_type()
         sim_logs_num_scores = {}
-        for issue_type in scores_by_issue_type:
-            test_item_id = scores_by_issue_type[issue_type]["mrHit"]["_source"]["test_item"]
+        for issue_type, search_rs in scores_by_issue_type.items():
+            test_item_id = search_rs["mrHit"]["_source"]["test_item"]
             sim_logs_num_scores[issue_type] = 0.0
             if test_item_id in self.test_item_log_stats:
                 sim_logs_num_scores[issue_type] = self.test_item_log_stats[test_item_id]
@@ -171,10 +171,10 @@ class BoostingFeaturizer:
         decay_speed = np.log(self.config["time_weight_decay"])
         scores_by_issue_type = self.find_most_relevant_by_type()
         dates_by_issue_types = {}
-        for issue_type in scores_by_issue_type:
-            field_date = scores_by_issue_type[issue_type]["mrHit"]["_source"][field_name]
+        for issue_type, search_rs in scores_by_issue_type.items():
+            field_date = search_rs["mrHit"]["_source"][field_name]
             field_date = datetime.strptime(field_date, '%Y-%m-%d %H:%M:%S')
-            compared_field_date = scores_by_issue_type[issue_type]["compared_log"]["_source"][field_name]
+            compared_field_date = search_rs["compared_log"]["_source"][field_name]
             compared_field_date = datetime.strptime(compared_field_date, '%Y-%m-%d %H:%M:%S')
             if compared_field_date < field_date:
                 field_date, compared_field_date = compared_field_date, field_date
@@ -193,10 +193,10 @@ class BoostingFeaturizer:
     def predict_particular_defect_type(self):
         scores_by_issue_type = self.find_most_relevant_by_type()
         result = {}
-        for issue_type in scores_by_issue_type:
-            compared_log = scores_by_issue_type[issue_type]["compared_log"]
+        for issue_type, search_rs in scores_by_issue_type.items():
+            compared_log = search_rs["compared_log"]
             det_message = compared_log["_source"][DATA_FIELD]
-            mr_hit = scores_by_issue_type[issue_type]["mrHit"]
+            mr_hit = search_rs["mrHit"]
             issue_type_to_compare = mr_hit["_source"]["issue_type"]
             result[issue_type] = 0.0
             try:
@@ -216,8 +216,8 @@ class BoostingFeaturizer:
     def is_text_of_particular_defect_type(self, label_type):
         scores_by_issue_type = self.find_most_relevant_by_type()
         issue_type_stats = {}
-        for issue_type in scores_by_issue_type:
-            mr_hit = scores_by_issue_type[issue_type]["mrHit"]
+        for issue_type, search_rs in scores_by_issue_type.items():
+            mr_hit = search_rs["mrHit"]
             rel_item_issue_type = mr_hit["_source"]["issue_type"]
             issue_type_stats[issue_type] = int(label_type == rel_item_issue_type.lower()[:2])
         return issue_type_stats
@@ -265,9 +265,9 @@ class BoostingFeaturizer:
     def is_the_same_field(self, field_name: str) -> dict[str, int]:
         scores_by_issue_type = self.find_most_relevant_by_type()
         num_of_logs_issue_type = {}
-        for issue_type in scores_by_issue_type:
-            rel_item_value = scores_by_issue_type[issue_type]["mrHit"]["_source"][field_name]
-            queried_item_value = scores_by_issue_type[issue_type]["compared_log"]["_source"][field_name]
+        for issue_type, search_rs in scores_by_issue_type.items():
+            rel_item_value = search_rs["mrHit"]["_source"][field_name]
+            queried_item_value = search_rs["compared_log"]["_source"][field_name]
 
             if rel_item_value is None and queried_item_value is None:
                 num_of_logs_issue_type[issue_type] = 0
@@ -298,10 +298,9 @@ class BoostingFeaturizer:
         scores_by_issue_type = self.find_most_relevant_by_type()
         num_of_logs_issue_type = {}
         has_the_same_test_case = 0
-        for issue_type in scores_by_issue_type:
-            rel_item_test_case_hash = scores_by_issue_type[issue_type]["mrHit"]["_source"]["test_case_hash"]
-            queried_item_test_case_hash = \
-                scores_by_issue_type[issue_type]["compared_log"]["_source"]["test_case_hash"]
+        for search_rs in scores_by_issue_type.values():
+            rel_item_test_case_hash = search_rs["mrHit"]["_source"]["test_case_hash"]
+            queried_item_test_case_hash = search_rs["compared_log"]["_source"]["test_case_hash"]
             if not rel_item_test_case_hash:
                 continue
             if rel_item_test_case_hash == queried_item_test_case_hash:
@@ -329,9 +328,8 @@ class BoostingFeaturizer:
     def is_only_merged_small_logs(self):
         scores_by_issue_type = self.find_most_relevant_by_type()
         similarity_percent_by_type = {}
-        for issue_type in scores_by_issue_type:
-            group_id = (scores_by_issue_type[issue_type]["mrHit"]["_id"],
-                        scores_by_issue_type[issue_type]["compared_log"]["_id"])
+        for issue_type, search_rs in scores_by_issue_type.items():
+            group_id = (search_rs["mrHit"]["_id"], search_rs["compared_log"]["_id"])
             sim_obj = self.similarity_calculator.similarity_dict["message"][group_id]
             similarity_percent_by_type[issue_type] = int(sim_obj["both_empty"])
         return similarity_percent_by_type
@@ -377,25 +375,22 @@ class BoostingFeaturizer:
         scores_by_issue_type = self._calculate_score()
         percent_by_issue_type = {}
         for issue_type in scores_by_issue_type:
-            percent_by_issue_type[issue_type] = 1 / len(scores_by_issue_type) \
-                if len(scores_by_issue_type) else 0
+            percent_by_issue_type[issue_type] = 1 / len(scores_by_issue_type) if len(scores_by_issue_type) else 0
         return percent_by_issue_type
 
     def _has_test_item_several_logs(self):
         scores_by_issue_type = self.find_most_relevant_by_type()
         has_several_logs_by_type = {}
-        for issue_type in scores_by_issue_type:
-            merged_small_logs = \
-                scores_by_issue_type[issue_type]["mrHit"]["_source"]["merged_small_logs"]
+        for issue_type, search_rs in scores_by_issue_type.items():
+            merged_small_logs = search_rs["mrHit"]["_source"]["merged_small_logs"]
             has_several_logs_by_type[issue_type] = int(merged_small_logs.strip() != "")
         return has_several_logs_by_type
 
     def _has_query_several_logs(self):
         scores_by_issue_type = self.find_most_relevant_by_type()
         has_several_logs_by_type = {}
-        for issue_type in scores_by_issue_type:
-            merged_small_logs = \
-                scores_by_issue_type[issue_type]["compared_log"]["_source"]["merged_small_logs"]
+        for issue_type, search_rs in scores_by_issue_type.items():
+            merged_small_logs = search_rs["compared_log"]["_source"]["merged_small_logs"]
             has_several_logs_by_type[issue_type] = int(merged_small_logs.strip() != "")
         return has_several_logs_by_type
 
@@ -419,7 +414,7 @@ class BoostingFeaturizer:
 
     def _calculate_score(self):
         scores_by_issue_type = self.find_most_relevant_by_type()
-        return {item: scores_by_issue_type[item]["score"] for item in scores_by_issue_type}
+        return {item: search_rs['score'] for item, search_rs in scores_by_issue_type.items()}
 
     def _calculate_place(self):
         scores_by_issue_type = self._calculate_score()
@@ -434,13 +429,11 @@ class BoostingFeaturizer:
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
 
-                if issue_type not in max_scores_by_issue_type or \
-                        hit["normalized_score"] > max_scores_by_issue_type[issue_type]["max_score"]:
+                if issue_type not in max_scores_by_issue_type \
+                        or hit["normalized_score"] > max_scores_by_issue_type[issue_type]["max_score"]:
                     max_scores_by_issue_type[issue_type] = {"max_score": hit["normalized_score"],
                                                             "max_score_pos": 1 / (1 + idx), }
-
-        return {item: max_scores_by_issue_type[item][return_val_name]
-                for item in max_scores_by_issue_type}
+        return {item: results[return_val_name] for item, results in max_scores_by_issue_type.items()}
 
     def _calculate_min_score_and_pos(self, return_val_name="min_score"):
         min_scores_by_issue_type = {}
@@ -448,13 +441,11 @@ class BoostingFeaturizer:
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
 
-                if issue_type not in min_scores_by_issue_type or \
-                        hit["normalized_score"] < min_scores_by_issue_type[issue_type]["min_score"]:
+                if issue_type not in min_scores_by_issue_type \
+                        or hit["normalized_score"] < min_scores_by_issue_type[issue_type]["min_score"]:
                     min_scores_by_issue_type[issue_type] = {"min_score": hit["normalized_score"],
                                                             "min_score_pos": 1 / (1 + idx), }
-
-        return {item: min_scores_by_issue_type[item][return_val_name]
-                for item in min_scores_by_issue_type}
+        return {item: results[return_val_name] for item, results in min_scores_by_issue_type.items()}
 
     def _calculate_percent_count_items_and_mean(self, return_val_name: str = 'mean_score') -> dict[str, float]:
         """Calculate percent of items by issue type and mean score of this issue type.
@@ -475,7 +466,7 @@ class BoostingFeaturizer:
         for issue_scores in cnt_items_by_issue_type.values():
             issue_scores['mean_score'] /= issue_scores['cnt_items_percent']
             issue_scores['cnt_items_percent'] /= cnt_items_glob
-        return {item: cnt_items_by_issue_type[item][return_val_name] for item in cnt_items_by_issue_type}
+        return {item: results[return_val_name] for item, results in cnt_items_by_issue_type.items()}
 
     def normalize_results(self, all_elastic_results):
         all_results = []
@@ -488,20 +479,16 @@ class BoostingFeaturizer:
             for hit in es_results["hits"]["hits"]:
                 hit["normalized_score"] = hit["_score"] / max_score
                 self.total_normalized += hit["normalized_score"]
-
             all_results.append((log, es_results["hits"]["hits"]))
         return all_results
 
     def _calculate_similarity_percent(self, field_name="message"):
         scores_by_issue_type = self.find_most_relevant_by_type()
         if field_name not in self.similarity_calculator.similarity_dict:
-            self.similarity_calculator.find_similarity(
-                self.raw_results,
-                [field_name])
+            self.similarity_calculator.find_similarity(self.raw_results, [field_name])
         similarity_percent_by_type = {}
-        for issue_type in scores_by_issue_type:
-            group_id = (scores_by_issue_type[issue_type]["mrHit"]["_id"],
-                        scores_by_issue_type[issue_type]["compared_log"]["_id"])
+        for issue_type, search_rs in scores_by_issue_type.items():
+            group_id = (search_rs["mrHit"]["_id"], search_rs["compared_log"]["_id"])
             sim_obj = self.similarity_calculator.similarity_dict[field_name][group_id]
             similarity_percent_by_type[issue_type] = sim_obj["similarity"]
         return similarity_percent_by_type

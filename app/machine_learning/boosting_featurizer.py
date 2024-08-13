@@ -473,7 +473,7 @@ class BoostingFeaturizer:
                 cnt_items_by_issue_type[issue_type]['mean_score'] += hit['normalized_score']
 
         for issue_scores in cnt_items_by_issue_type.values():
-            issue_scores['mean_score'] /= ['cnt_items_percent']
+            issue_scores['mean_score'] /= issue_scores['cnt_items_percent']
             issue_scores['cnt_items_percent'] /= cnt_items_glob
         return {item: cnt_items_by_issue_type[item][return_val_name] for item in cnt_items_by_issue_type}
 

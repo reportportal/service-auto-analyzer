@@ -88,7 +88,7 @@ class BoostingDecisionMaker(MlModel):
         if f1 is None:
             f1 = 0.0
         LOGGER.debug(f'Train dataset F1 score: {f1:.4f}')
-        LOGGER.debug(f'Feature importances: {self.boost_model.feature_importances_}')
+        LOGGER.debug(f'Feature importances: {zip(self.feature_ids, self.boost_model.feature_importances_)}')
         return f1
 
     def predict(self, data: list[list[float]]) -> tuple[list[int], list[list[float]]]:

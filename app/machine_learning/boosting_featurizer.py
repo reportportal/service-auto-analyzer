@@ -456,28 +456,26 @@ class BoostingFeaturizer:
         return {item: min_scores_by_issue_type[item][return_val_name]
                 for item in min_scores_by_issue_type}
 
-    def _calculate_percent_count_items_and_mean(self, return_val_name="mean_score", scaled=False):
-        cnt_items_by_issue_type = {}
+    def _calculate_percent_count_items_and_mean(self, return_val_name: str = 'mean_score') -> dict[str, float]:
+        """Calculate percent of items by issue type and mean score of this issue type.
+
+        :param str return_val_name: name of return value, can be 'mean_score' or 'cnt_items_percent'
+        :return: dict with issue type as key and value as mean score or percent of items
+        """
+        cnt_items_by_issue_type: dict[str, dict[str: int]] = defaultdict(lambda: defaultdict(lambda: 0))
         cnt_items_glob = 0
         for log, es_results in self.all_results:
             cnt_items_glob += len(es_results)
 
             for idx, hit in enumerate(es_results):
-                issue_type = hit["_source"]["issue_type"]
+                issue_type = hit['_source']['issue_type']
+                cnt_items_by_issue_type[issue_type]['cnt_items_percent'] += 1
+                cnt_items_by_issue_type[issue_type]['mean_score'] += hit['normalized_score']
 
-                if issue_type not in cnt_items_by_issue_type:
-                    cnt_items_by_issue_type[issue_type] = {"mean_score": 0,
-                                                           "cnt_items_percent": 0, }
-
-                cnt_items_by_issue_type[issue_type]["cnt_items_percent"] += 1
-                cnt_items_by_issue_type[issue_type]["mean_score"] += hit["normalized_score"]
-
-        for issue_type in cnt_items_by_issue_type:
-            cnt_items_by_issue_type[issue_type]["mean_score"] /= \
-                cnt_items_by_issue_type[issue_type]["cnt_items_percent"]
-            cnt_items_by_issue_type[issue_type]["cnt_items_percent"] /= cnt_items_glob
-        return {item: cnt_items_by_issue_type[item][return_val_name]
-                for item in cnt_items_by_issue_type}
+        for issue_scores in cnt_items_by_issue_type.values():
+            issue_scores['mean_score'] /= ['cnt_items_percent']
+            issue_scores['cnt_items_percent'] /= cnt_items_glob
+        return {item: cnt_items_by_issue_type[item][return_val_name] for item in cnt_items_by_issue_type}
 
     def normalize_results(self, all_elastic_results):
         all_results = []

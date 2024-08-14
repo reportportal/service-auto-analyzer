@@ -15,8 +15,8 @@
 import unittest
 
 from app.commons.object_saving import create_filesystem
-from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
 from app.machine_learning.boosting_featurizer import BoostingFeaturizer
+from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import utils
 from test import get_fixture
@@ -296,9 +296,9 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                      get_fixture(self.one_hit_search_rs_explained, to_json=True))],
                 "config": TestBoostingFeaturizer.get_default_config(),
                 "result": {'1': {"mrHit": {"_score": 158.08437,
-                                         "_id": "1"},
-                               "compared_log": get_fixture(self.log_message, to_json=True),
-                               "score": 1.0, },
+                                           "_id": "1"},
+                                 "compared_log": get_fixture(self.log_message, to_json=True),
+                                 "score": 1.0, },
                            }
             },
             {
@@ -306,13 +306,13 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                      get_fixture(self.two_hits_search_rs_explained, to_json=True))],
                 "config": TestBoostingFeaturizer.get_default_config(),
                 "result": {'1': {"mrHit": {"_score": 158.08437,
-                                         "_id": "1"},
-                               "compared_log": get_fixture(self.log_message, to_json=True),
-                               "score": 1.0, },
+                                           "_id": "1"},
+                                 "compared_log": get_fixture(self.log_message, to_json=True),
+                                 "score": 1.0, },
                            '2': {"mrHit": {"_score": 77.53298,
-                                         "_id": "2"},
-                               "compared_log": get_fixture(self.log_message, to_json=True),
-                               "score": 0.4905, },
+                                           "_id": "2"},
+                                 "compared_log": get_fixture(self.log_message, to_json=True),
+                                 "score": 0.4905, },
                            }
             },
             {
@@ -322,13 +322,13 @@ class TestBoostingFeaturizer(unittest.TestCase):
                                      get_fixture(self.three_hits_search_rs_explained, to_json=True))],
                 "config": TestBoostingFeaturizer.get_default_config(),
                 "result": {'1': {"mrHit": {"_score": 158.08437,
-                                         "_id": "1"},
-                               "compared_log": get_fixture(self.log_message, to_json=True),
-                               "score": 0.9392, },
+                                           "_id": "1"},
+                                 "compared_log": get_fixture(self.log_message, to_json=True),
+                                 "score": 0.9392, },
                            '2': {"mrHit": {"_score": 168.31,
-                                         "_id": "2"},
-                               "compared_log": get_fixture(self.log_message, to_json=True),
-                               "score": 1.0, }
+                                           "_id": "2"},
+                                 "compared_log": get_fixture(self.log_message, to_json=True),
+                                 "score": 1.0, }
                            }
             },
         ]

@@ -105,8 +105,8 @@ class DefectTypeModel(MlModel):
         if f1 is None:
             f1 = 0.0
         LOGGER.debug(f'Valid dataset F1 score: {f1:.5f}')
-        LOGGER.debug(confusion_matrix(y_pred=res, y_true=labels))
-        LOGGER.debug(classification_report(y_pred=res, y_true=labels))
+        LOGGER.debug(f'\n{confusion_matrix(y_pred=res, y_true=labels)}')
+        LOGGER.debug(f'\n{classification_report(y_pred=res, y_true=labels)}')
         return f1
 
     def predict(self, data: list, model_name: str) -> tuple[list, list]:

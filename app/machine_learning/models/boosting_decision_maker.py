@@ -107,6 +107,6 @@ class BoostingDecisionMaker(MlModel):
         if f1 is None:
             f1 = 0.0
         LOGGER.debug(f'Valid dataset F1 score: {f1:.5f}')
-        LOGGER.debug(confusion_matrix(valid_test_labels, res))
-        LOGGER.debug(classification_report(valid_test_labels, res))
+        LOGGER.debug(f'\n{confusion_matrix(valid_test_labels, res)}')
+        LOGGER.debug(f'\n{classification_report(valid_test_labels, res)}')
         return f1

@@ -90,7 +90,7 @@ class BoostingDecisionMaker(MlModel):
         f1 = f1_score(y_pred=res, y_true=labels)
         if f1 is None:
             f1 = 0.0
-        LOGGER.debug(f'Train dataset F1 score: {f1:.4f}')
+        LOGGER.debug(f'Train dataset F1 score: {f1:.5f}')
         LOGGER.debug(
             'Feature importances: %s',
             json.dumps(dict(zip(self.feature_ids, self.boost_model.feature_importances_.tolist()))))
@@ -106,7 +106,7 @@ class BoostingDecisionMaker(MlModel):
         f1 = f1_score(y_pred=res, y_true=valid_test_labels)
         if f1 is None:
             f1 = 0.0
-        LOGGER.debug(f'Valid dataset F1 score: {f1:.4f}')
+        LOGGER.debug(f'Valid dataset F1 score: {f1:.5f}')
         LOGGER.debug(confusion_matrix(valid_test_labels, res))
         LOGGER.debug(classification_report(valid_test_labels, res))
         return f1

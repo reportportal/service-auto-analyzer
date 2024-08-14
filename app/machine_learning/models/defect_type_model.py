@@ -93,7 +93,7 @@ class DefectTypeModel(MlModel):
         f1 = f1_score(y_pred=res, y_true=labels)
         if f1 is None:
             f1 = 0.0
-        LOGGER.debug(f'Train dataset F1 score: {f1:.4f}')
+        LOGGER.debug(f'Train dataset F1 score: {f1:.5f}')
         return f1
 
     def validate_model(self, name: str, test_data_x: list[str], labels: list[int]) -> float:
@@ -104,7 +104,7 @@ class DefectTypeModel(MlModel):
         f1 = f1_score(y_pred=res, y_true=labels)
         if f1 is None:
             f1 = 0.0
-        LOGGER.debug(f'Valid dataset F1 score: {f1:.4f}')
+        LOGGER.debug(f'Valid dataset F1 score: {f1:.5f}')
         LOGGER.debug(confusion_matrix(y_pred=res, y_true=labels))
         LOGGER.debug(classification_report(y_pred=res, y_true=labels))
         return f1

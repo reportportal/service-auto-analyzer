@@ -41,6 +41,8 @@ class RetrainingTriggering:
         self.object_saver.remove_project_objects([self.trigger_saving_name], project_id)
 
     def get_triggering_info(self, project_id: int) -> dict[str, int]:
+        if not self.object_saver.does_object_exists(self.trigger_saving_name, project_id):
+            self.clean_triggering_info(project_id, 0)
         obj = self.object_saver.get_project_object(self.trigger_saving_name, project_id, using_json=True)
         for required_field in REQUIRED_FIELDS:
             if required_field not in obj:
@@ -51,7 +53,10 @@ class RetrainingTriggering:
         self.object_saver.put_project_object(trigger_info, self.trigger_saving_name, project_id, using_json=True)
 
     def clean_triggering_info(self, project_id: int, gathered_metric_total: int) -> None:
-        trigger_info = self.get_triggering_info(project_id)
+        if self.object_saver.does_object_exists(self.trigger_saving_name, project_id):
+            trigger_info = self.get_triggering_info(project_id)
+        else:
+            trigger_info = {}
         trigger_info[METRIC_SINCE_TRAINING] = 0
         trigger_info[GATHERED_METRIC_TOTAL] = gathered_metric_total
         self.save_triggering_info(trigger_info, project_id)

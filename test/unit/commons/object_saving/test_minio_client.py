@@ -124,7 +124,7 @@ def test_remove_existing_folder():
     minio_client = create_storage_client()
     minio_client.put_project_object({'test': True}, bucket, resource)
 
-    assert minio_client.remove_folder_objects(bucket, resource)
+    assert minio_client.remove_folder_objects(bucket, path)
     headers = {
         'x-amz-date': '20231124T123217Z',
         'x-amz-content-sha256': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',

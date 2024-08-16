@@ -389,7 +389,7 @@ class SuggestService(AnalyzerService):
                 for idx, prob, _ in sorted_results:
                     test_item_id = test_item_ids[idx]
                     issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
-                    logger.debug("Test item id %d with issue type %s has probability %.2f",
+                    logger.debug("Test item id %s with issue type %s has probability %.2f",
                                  test_item_id, issue_type, prob)
                 processed_time = time() - t_start
                 global_idx = 0

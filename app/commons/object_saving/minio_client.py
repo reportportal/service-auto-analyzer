@@ -112,6 +112,6 @@ class MinioClient(Storage):
         if bucket_name:
             if not self.minioClient.bucket_exists(bucket_name):
                 return False
-        for obj in self.minioClient.list_objects(bucket_name, prefix=folder):
+        for obj in self.minioClient.list_objects(bucket_name, prefix=folder.endswith('/') and folder or folder + '/'):
             self.minioClient.remove_object(bucket_name=bucket_name, object_name=obj.object_name)
         return True

@@ -66,13 +66,15 @@ class MinioClient(Storage):
                 logger.debug("Created minio bucket %s" % bucket_name)
         if using_json:
             data_to_save = json.dumps(data).encode("utf-8")
+            content_type = 'application/json'
         else:
             data_to_save = pickle.dumps(data)
+            content_type = 'application/octet-stream'
         data_stream = io.BytesIO(data_to_save)
         data_stream.seek(0)
         self.minioClient.put_object(
-            bucket_name=bucket_name, object_name=object_name,
-            data=data_stream, length=len(data_to_save))
+            bucket_name=bucket_name, object_name=object_name, data=data_stream, length=len(data_to_save),
+            content_type=content_type)
         logger.debug("Saved into bucket '%s' with name '%s': %s", bucket_name, object_name, data)
 
     def get_project_object(self, bucket: str, object_name: str, using_json=False) -> object | None:

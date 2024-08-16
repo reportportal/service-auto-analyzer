@@ -102,7 +102,8 @@ class MinioClient(Storage):
             if not self.minioClient.bucket_exists(bucket_name):
                 return []
         object_names = set()
-        object_list = self.minioClient.list_objects(bucket_name, prefix=folder)
+        object_list = self.minioClient.list_objects(
+            bucket_name, prefix=folder.endswith('/') and folder or folder + '/')
         for obj in object_list:
             object_names.add(obj.object_name.strip('/'))
         return sorted(list(object_names))

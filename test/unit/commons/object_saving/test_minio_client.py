@@ -152,7 +152,7 @@ def test_list_existing_folder():
     minio_client = create_storage_client()
     minio_client.put_project_object({'test': True}, bucket, resource, using_json=True)
 
-    assert minio_client.get_folder_objects(bucket, path) == [path]
+    assert minio_client.get_folder_objects(bucket, path) == [resource]
 
 
 def test_list_dir_separators():

@@ -14,12 +14,13 @@
 
 import json
 import uuid
-from typing import Callable, Any
+from typing import Callable, Any, Optional
 
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
 
-from app.commons import launch_objects, logging
+from app.commons import logging
+from app.commons.model import launch_objects, ml
 
 logger = logging.getLogger("analyzerApp.amqpHandler")
 
@@ -54,9 +55,14 @@ def prepare_delete_index(body: Any) -> int:
     return int(body)
 
 
-def prepare_test_item_info(test_item_info: Any) -> Any:
+def prepare_test_item_info(test_item_info: Any) -> launch_objects.TestItemInfo:
     """Function for deserializing test item info for suggestions"""
     return launch_objects.TestItemInfo(**test_item_info)
+
+
+def prepare_train_info(train_info: dict) -> ml.TrainInfo:
+    """Function for deserializing train info object"""
+    return ml.TrainInfo(**train_info)
 
 
 def prepare_search_response_data(response: list | dict) -> str:
@@ -121,9 +127,10 @@ def handle_amqp_request(channel: BlockingChannel, method: Basic.Deliver, props: 
     if publish_result:
         try:
             if props.reply_to:
-                channel.basic_publish(exchange='', routing_key=props.reply_to, properties=BasicProperties(
-                    correlation_id=props.correlation_id, content_type='application/json'), mandatory=False,
-                                      body=bytes(response_body, 'utf-8'))
+                channel.basic_publish(
+                    exchange='', routing_key=props.reply_to,
+                    properties=BasicProperties(correlation_id=props.correlation_id, content_type='application/json'),
+                    mandatory=False, body=bytes(response_body, 'utf-8'))
         except Exception as exc:
             logger.error('Failed to publish result')
             logger.exception(exc)
@@ -132,7 +139,8 @@ def handle_amqp_request(channel: BlockingChannel, method: Basic.Deliver, props: 
 
 
 def handle_inner_amqp_request(_: BlockingChannel, method: Basic.Deliver, props: BasicProperties, body: bytes,
-                              request_handler: Callable[[Any], Any]):
+                              request_handler: Callable[[Any], Any],
+                              prepare_data_func: Optional[Callable[[Any], Any]] = None):
     """Function for handling inner amqp requests."""
     logging.new_correlation_id()
     logger.debug(f'Started inner message processing.\n--Method: {method}\n'
@@ -143,6 +151,13 @@ def handle_inner_amqp_request(_: BlockingChannel, method: Basic.Deliver, props: 
         logger.error('Failed to parse message body to JSON')
         logger.exception(exc)
         return
+    if prepare_data_func:
+        try:
+            message = prepare_data_func(message)
+        except Exception as exc:
+            logger.error('Failed to prepare message body')
+            logger.exception(exc)
+            return
     try:
         request_handler(message)
     except Exception as exc:

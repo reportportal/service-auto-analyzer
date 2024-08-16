@@ -23,26 +23,30 @@ from sklearn.feature_extraction.text import CountVectorizer
 from app.amqp.amqp import AmqpClient
 from app.commons import clusterizer, logging
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import ClusterResult, ClusterInfo
 from app.commons.log_merger import LogMerger
-from app.commons.log_preparation import LogPreparation
+from app.commons.log_requests import LogRequests
+from app.commons.model.launch_objects import (ClusterResult, ClusterInfo, SearchConfig, ApplicationConfig,
+                                              LaunchInfoForClustering)
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.clusterService")
 
 
 class ClusterService:
+    app_config: ApplicationConfig
+    search_cfg: SearchConfig
+    es_client: EsClient
+    log_requests: LogRequests
+    log_merger: LogMerger
 
-    def __init__(self, app_config=None, search_cfg=None):
-        self.app_config = app_config or {}
-        self.search_cfg = search_cfg or {}
-        self.es_client = EsClient(app_config=self.app_config, search_cfg=self.search_cfg)
-        self.log_preparation = LogPreparation()
+    def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig):
+        self.app_config = app_config
+        self.search_cfg = search_cfg
+        self.es_client = EsClient(app_config=self.app_config)
+        self.log_requests = LogRequests()
         self.log_merger = LogMerger()
 
-    def build_search_similar_items_query(self, queried_log, message,
-                                         launch_info,
-                                         min_should_match="95%"):
+    def build_search_similar_items_query(self, queried_log, message, launch_info, min_should_match="95%"):
         """Build search query"""
         query = {
             "_source": ["whole_message", "test_item", "is_merged",
@@ -66,7 +70,7 @@ class ClusterService:
                             min_should_match, message,
                             field_name="whole_message", boost=1.0,
                             override_min_should_match=None,
-                            max_query_terms=self.search_cfg["MaxQueryTerms"])
+                            max_query_terms=self.search_cfg.MaxQueryTerms)
                     ]}}}
         if launch_info.forUpdate:
             query["query"]["bool"]["should"].append(
@@ -87,9 +91,9 @@ class ClusterService:
                     queried_log["_source"]["found_exceptions"],
                     field_name="found_exceptions", boost=1.0,
                     override_min_should_match="1",
-                    max_query_terms=self.search_cfg["MaxQueryTerms"]))
+                    max_query_terms=self.search_cfg.MaxQueryTerms))
         utils.append_potential_status_codes(query, queried_log, boost=1.0,
-                                            max_query_terms=self.search_cfg["MaxQueryTerms"])
+                                            max_query_terms=self.search_cfg.MaxQueryTerms)
         return self.add_query_with_start_time_decay(query)
 
     def add_query_with_start_time_decay(self, main_query):
@@ -105,7 +109,7 @@ class ClusterService:
                                     "origin": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                                     "scale": "7d",
                                     "offset": "1d",
-                                    "decay": self.search_cfg["TimeWeightDecay"]
+                                    "decay": self.search_cfg.TimeWeightDecay
                                 }
                             }
                         },
@@ -302,8 +306,7 @@ class ClusterService:
             regroupped_by_error[group_key].append(i)
         return regroupped_by_error
 
-    def cluster_messages_with_groupping_by_error(self, log_messages, log_dict,
-                                                 unique_errors_min_should_match):
+    def cluster_messages_with_grouping_by_error(self, log_messages, log_dict, unique_errors_min_should_match):
         regroupped_by_error = self.regroup_by_error_ans_status_codes(
             log_messages, log_dict)
         _clusterizer = clusterizer.Clusterizer()
@@ -329,10 +332,9 @@ class ClusterService:
         return all_groups
 
     @utils.ignore_warnings
-    def find_clusters(self, launch_info):
+    def find_clusters(self, launch_info: LaunchInfoForClustering):
         logger.info("Started clusterizing logs")
-        index_name = text_processing.unite_project_name(
-            str(launch_info.project), self.app_config["esProjectIndexPrefix"])
+        index_name = text_processing.unite_project_name(launch_info.project, self.app_config.esProjectIndexPrefix)
         if not self.es_client.index_exists(index_name):
             logger.info("Project %s doesn't exist", index_name)
             logger.info("Finished clustering log with 0 clusters.")
@@ -348,12 +350,11 @@ class ClusterService:
         log_ids = []
         try:
             unique_errors_min_should_match = launch_info.launch.analyzerConfig.uniqueErrorsMinShouldMatch / 100  # noqa
-            log_messages, log_dict, log_ids_for_merged_logs = self.log_preparation.prepare_logs_for_clustering(  # noqa
-                launch_info.launch, launch_info.numberOfLogLines,
-                launch_info.cleanNumbers, index_name)
+            log_messages, log_dict, log_ids_for_merged_logs = self.log_requests.prepare_logs_for_clustering(  # noqa
+                launch_info.launch, launch_info.numberOfLogLines, launch_info.cleanNumbers, index_name)
             log_ids = set([str(log["_id"]) for log in log_dict.values()])
 
-            groups = self.cluster_messages_with_groupping_by_error(
+            groups = self.cluster_messages_with_grouping_by_error(
                 log_messages, log_dict,
                 unique_errors_min_should_match)
             logger.debug("Groups: %s", groups)
@@ -388,7 +389,7 @@ class ClusterService:
                                 "cluster_message": cluster_message,
                                 "cluster_with_numbers": not launch_info.cleanNumbers}})
                 self.es_client._bulk_index(
-                    bodies, refresh=False, chunk_size=self.app_config["esChunkNumberUpdateClusters"])
+                    bodies, refresh=False, chunk_size=self.app_config.esChunkNumberUpdateClusters)
         except Exception as exc:
             logger.exception(exc)
             errors_found.append(utils.extract_exception(exc))
@@ -401,13 +402,13 @@ class ClusterService:
             "project_id": launch_info.project, "method": "find_clusters",
             "gather_date": datetime.now().strftime("%Y-%m-%d"),
             "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "module_version": [self.app_config["appVersion"]],
+            "module_version": [self.app_config.appVersion],
             "model_info": [],
             "errors": errors_found,
             "errors_count": errors_count}}
-        if "amqpUrl" in self.app_config and self.app_config["amqpUrl"].strip():
-            AmqpClient(self.app_config["amqpUrl"]).send_to_inner_queue(
-                self.app_config["exchangeName"], "stats_info", json.dumps(results_to_share))
+        if self.app_config.amqpUrl.strip():
+            AmqpClient(self.app_config.amqpUrl).send_to_inner_queue(
+                self.app_config.exchangeName, 'stats_info', json.dumps(results_to_share))
 
         logger.debug("Stats info %s", results_to_share)
         logger.info("Processed the launch. It took %.2f sec.", time() - t_start)

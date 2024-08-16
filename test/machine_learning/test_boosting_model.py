@@ -16,10 +16,9 @@ import logging
 import unittest
 
 import numpy as np
-import sure
 
 from app.commons.object_saving import create_filesystem
-from app.machine_learning.models import defect_type_model, weighted_similarity_calculator
+from app.machine_learning.models import DefectTypeModel, WeightedSimilarityCalculator
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.machine_learning.boosting_featurizer import BoostingFeaturizer
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
@@ -43,8 +42,7 @@ class TestBoostingModel(unittest.TestCase):
         self.epsilon = 0.0001
         model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
         self.boost_model_folder = model_settings["BOOST_MODEL_FOLDER"]
-        self.suggest_boost_model_folder = \
-            model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
+        self.suggest_boost_model_folder = model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
         self.weights_folder = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
         self.global_defect_type_model_folder = model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]
         logging.disable(logging.CRITICAL)
@@ -76,13 +74,12 @@ class TestBoostingModel(unittest.TestCase):
     @utils.ignore_warnings
     def test_random_run(self):
         print("Weights model folder: ", self.weights_folder)
-        for folder in [self.boost_model_folder,
-                       self.suggest_boost_model_folder]:
+        for folder in [self.boost_model_folder, self.suggest_boost_model_folder]:
             print("Boost model folder ", folder)
             decision_maker = BoostingDecisionMaker(create_filesystem(folder))
             decision_maker.load_model()
             test_data_size = 5
-            random_data = np.random.rand(test_data_size, len(decision_maker.get_feature_names()))
+            random_data = np.random.rand(test_data_size, len(decision_maker.feature_ids)).tolist()
             result, result_probability = decision_maker.predict(random_data)
             assert len(result) == test_data_size
             assert len(result_probability) == test_data_size
@@ -103,70 +100,45 @@ class TestBoostingModel(unittest.TestCase):
             tests.extend([
                 {
                     "elastic_results": [(get_fixture(self.log_message, to_json=True),
-                                         get_fixture(
-                                             self.one_hit_search_rs_explained, to_json=True))],
-                    "config": self.get_default_config(number_of_log_lines=log_lines,
-                                                      filter_fields=filter_fields),
+                                         get_fixture(self.one_hit_search_rs_explained, to_json=True))],
+                    "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
                     "decision_maker": _decision_maker
                 },
                 {
                     "elastic_results": [(get_fixture(self.log_message, to_json=True),
-                                         get_fixture(
-                                             self.two_hits_search_rs_explained, to_json=True))],
-                    "config": self.get_default_config(number_of_log_lines=log_lines,
-                                                      filter_fields=filter_fields),
+                                         get_fixture(self.two_hits_search_rs_explained, to_json=True))],
+                    "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
                     "decision_maker": _decision_maker
                 },
                 {
                     "elastic_results": [(get_fixture(self.log_message, to_json=True),
-                                         get_fixture(
-                                             self.two_hits_search_rs_explained, to_json=True)),
+                                         get_fixture(self.two_hits_search_rs_explained, to_json=True)),
                                         (get_fixture(self.log_message, to_json=True),
-                                         get_fixture(
-                                             self.one_hit_search_rs_explained, to_json=True))],
-                    "config": self.get_default_config(number_of_log_lines=log_lines,
-                                                      filter_fields=filter_fields),
+                                         get_fixture(self.one_hit_search_rs_explained, to_json=True))],
+                    "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
                     "decision_maker": _decision_maker
                 },
-                # TODO: uncomment after similarity and data obfuscation fix
-                # {
-                #     "elastic_results": [(self.get_fixture(self.log_message_only_small_logs),
-                #                          self.get_fixture(self.two_hits_search_rs_small_logs))],
-                #     "config": TestBoostingModel.get_default_config(
-                #         number_of_log_lines=log_lines,
-                #         filter_fields=filter_fields,
-                #         time_weight_decay=0.95,
-                #         min_should_match=0.4
-                #     ),
-                #     "decision_maker": _decision_maker
-                # },
             ])
 
         for idx, test in enumerate(tests):
-            feature_ids = test["decision_maker"].get_feature_ids()
-            feature_dict_objects = test["decision_maker"].features_dict_with_saved_objects
+            print(f'Running test {idx}')
+            feature_ids = test["decision_maker"].feature_ids
             weight_log_sim = None
             if self.weights_folder.strip():
-                weight_log_sim = weighted_similarity_calculator. \
-                    WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
+                weight_log_sim = WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
                 weight_log_sim.load_model()
-            _boosting_featurizer = BoostingFeaturizer(test["elastic_results"],
-                                                      test["config"],
-                                                      feature_ids,
-                                                      weighted_log_similarity_calculator=weight_log_sim,
-                                                      features_dict_with_saved_objects=feature_dict_objects)
+            _boosting_featurizer = BoostingFeaturizer(
+                test["elastic_results"], test["config"], feature_ids,
+                weighted_log_similarity_calculator=weight_log_sim)
             if self.global_defect_type_model_folder.strip():
-                model = defect_type_model.DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
+                model = DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
                 model.load_model()
                 _boosting_featurizer.set_defect_type_model(model)
-            with sure.ensure('Error in the test case index: {0}', idx):
-                gathered_data, issue_type_names = _boosting_featurizer.gather_features_info()
-                predict_label, predict_probability = test["decision_maker"].predict(
-                    gathered_data)
-                gathered_data.should.equal(boost_model_results[str(idx)][0], epsilon=self.epsilon)
-                predict_label.tolist().should.equal(boost_model_results[str(idx)][1], epsilon=self.epsilon)
-                predict_probability.tolist().should.equal(boost_model_results[str(idx)][2],
-                                                          epsilon=self.epsilon)
+            gathered_data, issue_type_names = _boosting_featurizer.gather_features_info()
+            predict_label, predict_probability = test["decision_maker"].predict(gathered_data)
+            assert gathered_data == boost_model_results[str(idx)][0]
+            assert predict_label == boost_model_results[str(idx)][1]
+            assert predict_probability == boost_model_results[str(idx)][2]
 
     @utils.ignore_warnings
     def test_full_data_check_suggests(self):
@@ -189,76 +161,58 @@ class TestBoostingModel(unittest.TestCase):
             tests.extend([
                 {
                     "elastic_results": [(get_fixture(self.log_message_suggest, to_json=True),
-                                         get_fixture(
-                                             self.one_hit_search_rs_explained, to_json=True))],
+                                         get_fixture(self.one_hit_search_rs_explained, to_json=True))],
                     "config": TestBoostingModel.get_default_config(
-                        number_of_log_lines=log_lines,
-                        filter_fields=[],
-                        filter_fields_any=filter_fields_any,
+                        number_of_log_lines=log_lines, filter_fields=[], filter_fields_any=filter_fields_any,
                         min_should_match=0.4),
                     "decision_maker": _decision_maker
                 },
                 {
                     "elastic_results": [(get_fixture(self.log_message_suggest, to_json=True),
-                                         get_fixture(
-                                             self.two_hits_search_rs_explained, to_json=True))],
+                                         get_fixture(self.two_hits_search_rs_explained, to_json=True))],
                     "config": TestBoostingModel.get_default_config(
-                        number_of_log_lines=log_lines,
-                        filter_fields=[],
-                        filter_fields_any=filter_fields_any,
+                        number_of_log_lines=log_lines, filter_fields=[], filter_fields_any=filter_fields_any,
                         min_should_match=0.4),
                     "decision_maker": _decision_maker
                 },
                 {
                     "elastic_results": [(get_fixture(self.log_message_suggest, to_json=True),
-                                         get_fixture(
-                                             self.two_hits_search_rs_explained, to_json=True)),
+                                         get_fixture(self.two_hits_search_rs_explained, to_json=True)),
                                         (get_fixture(self.log_message_suggest, to_json=True),
-                                         get_fixture(
-                                             self.one_hit_search_rs_explained, to_json=True))],
+                                         get_fixture(self.one_hit_search_rs_explained, to_json=True))],
                     "config": TestBoostingModel.get_default_config(
-                        number_of_log_lines=log_lines,
-                        filter_fields=[],
-                        filter_fields_any=filter_fields_any,
+                        number_of_log_lines=log_lines, filter_fields=[], filter_fields_any=filter_fields_any,
                         min_should_match=0.4),
                     "decision_maker": _decision_maker
                 },
                 {
                     "elastic_results": [(get_fixture(self.log_message_only_small_logs, to_json=True),
-                                         get_fixture(
-                                             self.two_hits_search_rs_small_logs, to_json=True))],
+                                         get_fixture(self.two_hits_search_rs_small_logs, to_json=True))],
                     "config": TestBoostingModel.get_default_config(
-                        number_of_log_lines=log_lines,
-                        filter_fields=[],
-                        filter_fields_any=filter_fields_any,
+                        number_of_log_lines=log_lines, filter_fields=[], filter_fields_any=filter_fields_any,
                         min_should_match=0.0),
                     "decision_maker": _decision_maker
                 },
             ])
         for idx, test in enumerate(tests):
-            feature_ids = test["decision_maker"].get_feature_ids()
-            feature_dict_objects = test["decision_maker"].features_dict_with_saved_objects
+            print(f'Running test {idx}')
+            feature_ids = test["decision_maker"].feature_ids
             weight_log_sim = None
             if self.weights_folder.strip():
-                weight_log_sim = weighted_similarity_calculator. \
-                    WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
+                weight_log_sim = WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
                 weight_log_sim.load_model()
             _boosting_featurizer = SuggestBoostingFeaturizer(
                 test["elastic_results"],
                 test["config"],
                 feature_ids,
-                weighted_log_similarity_calculator=weight_log_sim,
-                features_dict_with_saved_objects=feature_dict_objects)
+                weighted_log_similarity_calculator=weight_log_sim)
             if self.global_defect_type_model_folder.strip():
-                model = defect_type_model.DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
+                model = DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
                 model.load_model()
                 _boosting_featurizer.set_defect_type_model(model)
-            with sure.ensure('Error in the test case index: {0}', idx):
-                gathered_data, test_item_ids = _boosting_featurizer.gather_features_info()
-                predict_label, predict_probability = test["decision_maker"].predict(gathered_data)
-                gathered_data.should.equal(boost_model_results[str(idx)][0],
-                                           epsilon=self.epsilon)
-                predict_label.tolist().should.equal(boost_model_results[str(idx)][1],
-                                                    epsilon=self.epsilon)
-                predict_probability.tolist().should.equal(boost_model_results[str(idx)][2],
-                                                          epsilon=self.epsilon)
+
+            gathered_data, test_item_ids = _boosting_featurizer.gather_features_info()
+            predict_label, predict_probability = test["decision_maker"].predict(gathered_data)
+            assert gathered_data == boost_model_results[str(idx)][0]
+            assert predict_label == boost_model_results[str(idx)][1]
+            assert predict_probability == boost_model_results[str(idx)][2]

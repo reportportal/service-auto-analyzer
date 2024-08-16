@@ -12,17 +12,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import requests
 # noinspection PyPackageRequirements
 import pytest
+import requests
 # noinspection PyPackageRequirements
 from moto.server import ThreadedMotoServer
 
+from app.commons.model.launch_objects import ApplicationConfig
 from app.commons.object_saving.minio_client import MinioClient
 from test import random_alphanumeric
 
-
-SERVER_PORT = 5000
+SERVER_PORT = 5123
 REGION = 'us-west-1'
 BUCKET_PREFIX = 'prj-'
 SERVER_HOST = f'localhost:{SERVER_PORT}'
@@ -30,16 +30,15 @@ SERVER_HOST = f'localhost:{SERVER_PORT}'
 
 @pytest.fixture(autouse=True, scope='session')
 def run_s3():
-    server = ThreadedMotoServer(port=SERVER_PORT)
+    server = ThreadedMotoServer(port=SERVER_PORT, verbose=True)
     server.start()
     yield
     server.stop()
 
 
 def create_storage_client():
-    return MinioClient({'minioHost': SERVER_HOST, 'minioRegion': REGION,
-                        'minioBucketPrefix': BUCKET_PREFIX, 'minioAccessKey': 'minio', 'minioSecretKey': 'minio',
-                        'minioUseTls': False})
+    return MinioClient(ApplicationConfig(minioHost=SERVER_HOST, minioRegion=REGION, minioBucketPrefix=BUCKET_PREFIX,
+                                         minioAccessKey='minio', minioSecretKey='minio', minioUseTls=False))
 
 
 def test_object_not_exists():
@@ -125,7 +124,7 @@ def test_remove_existing_folder():
     minio_client = create_storage_client()
     minio_client.put_project_object({'test': True}, bucket, resource)
 
-    assert minio_client.remove_folder_objects(bucket, resource)
+    assert minio_client.remove_folder_objects(bucket, path)
     headers = {
         'x-amz-date': '20231124T123217Z',
         'x-amz-content-sha256': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
@@ -153,7 +152,7 @@ def test_list_existing_folder():
     minio_client = create_storage_client()
     minio_client.put_project_object({'test': True}, bucket, resource, using_json=True)
 
-    assert minio_client.get_folder_objects(bucket, path) == [path]
+    assert minio_client.get_folder_objects(bucket, path) == [resource]
 
 
 def test_list_dir_separators():

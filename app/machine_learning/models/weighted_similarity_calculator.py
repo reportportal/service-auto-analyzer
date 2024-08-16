@@ -25,12 +25,16 @@ MODEL_FILES: list[str] = ['weights.pickle']
 
 class WeightedSimilarityCalculator(MlModel):
     _loaded: bool
+    block_to_split: int
+    min_log_number_in_block: int
+    weights: np.ndarray
+    softmax_weights: np.ndarray
 
-    def __init__(self, object_saver: ObjectSaver, block_to_split=10, min_log_number_in_block=1):
+    def __init__(self, object_saver: ObjectSaver, block_to_split: int = 10, min_log_number_in_block: int = 1):
         super().__init__(object_saver, 'global similarity model')
         self.block_to_split = block_to_split
         self.min_log_number_in_block = min_log_number_in_block
-        self.weights = []
+        self.weights = np.array([])
         self.softmax_weights = np.array([])
         self._loaded = False
 
@@ -45,12 +49,12 @@ class WeightedSimilarityCalculator(MlModel):
         self.block_to_split, self.min_log_number_in_block, self.weights, self.softmax_weights = weights
         self._loaded = True
 
-    def save_model(self):
+    def save_model(self) -> None:
         self._save_models(zip(
             MODEL_FILES,
             [[self.block_to_split, self.min_log_number_in_block, self.weights, self.softmax_weights]]))
 
-    def message_to_array(self, detected_message_res, stacktrace_res):
+    def message_to_array(self, detected_message_res: str, stacktrace_res: str) -> list[str]:
         all_lines = [" ".join(text_processing.split_words(detected_message_res))]
         split_log_lines = text_processing.filter_empty_lines(
             [" ".join(text_processing.split_words(line)) for line in stacktrace_res.split("\n")])
@@ -60,17 +64,15 @@ class WeightedSimilarityCalculator(MlModel):
         blocks_num = math.ceil(split_log_lines_num / data_in_block)
 
         for block in range(blocks_num):
-            all_lines.append("\n".join(
+            all_lines.append('\n'.join(
                 split_log_lines[block * data_in_block: (block + 1) * data_in_block]))
         if len([line for line in all_lines if line.strip()]) == 0:
             return []
         return all_lines
 
-    def weigh_data_rows(self, data_rows, use_softmax=False):
-        padded_data_rows = np.concatenate([data_rows,
-                                           np.zeros((max(0, self.block_to_split + 1 - len(data_rows)),
-                                                     data_rows.shape[1]))], axis=0)
-        result = None
+    def weigh_data_rows(self, data_rows: np.ndarray, use_softmax: bool = False):
+        padded_data_rows = np.concatenate(
+            [data_rows, np.zeros((max(0, self.block_to_split + 1 - len(data_rows)), data_rows.shape[1]))], axis=0)
         if use_softmax:
             result = np.dot(np.reshape(self.softmax_weights, [-1]), padded_data_rows)
         else:

@@ -19,12 +19,13 @@ import traceback
 import warnings
 from collections import Counter
 from functools import wraps
-from typing import Union, Any
+from typing import Any
 
 import numpy as np
 import requests
 
-from app.commons import launch_objects, logging
+from app.commons import logging
+from app.commons.model import launch_objects
 from app.utils.text_processing import split_words, remove_credentials_from_url
 
 logger = logging.getLogger("analyzerApp.utils")
@@ -50,7 +51,7 @@ def read_file(folder: str, filename: str) -> str:
         return file.read()
 
 
-def read_json_file(folder: str, filename: str, to_json: bool = False) -> Union[str, Any]:
+def read_json_file(folder: str, filename: str, to_json: bool = False) -> Any:
     """Read fixture from file."""
     content = read_file(folder, filename)
     return content if not to_json else json.loads(content)
@@ -128,32 +129,51 @@ def extract_all_exceptions(bodies):
     return logs_with_exceptions
 
 
-def calculate_proportions_for_labels(labels):
+MINIMAL_VALUE_FOR_GOOD_PROPORTION = 2
+
+
+def calculate_proportions_for_labels(labels: list[int]) -> float:
     counted_labels = Counter(labels)
     if len(counted_labels.keys()) >= 2:
         min_val = min(counted_labels.values())
         max_val = max(counted_labels.values())
-        if max_val > 0:
+        if min_val > MINIMAL_VALUE_FOR_GOOD_PROPORTION:
             return np.round(min_val / max_val, 3)
     return 0.0
 
 
-def rebalance_data(train_data, train_labels, due_proportion):
-    one_data = [train_data[i] for i in range(len(train_data)) if train_labels[i] == 1]
-    zero_data = [train_data[i] for i in range(len(train_data)) if train_labels[i] == 0]
+def balance_data(train_data_indexes: list[int], train_labels: list[int],
+                 due_proportion: float) -> tuple[list[int], list[int], float]:
+    one_data = [train_data_indexes[i] for i in range(len(train_data_indexes)) if train_labels[i] == 1]
+    zero_data = [train_data_indexes[i] for i in range(len(train_data_indexes)) if train_labels[i] == 0]
     zero_count = len(zero_data)
     one_count = len(one_data)
+    min_count = min(zero_count, one_count)
+    max_count = max(zero_count, one_count)
+    if zero_count > one_count:
+        min_data = one_data
+        max_data = zero_data
+        min_label = 1
+        max_label = 0
+    else:
+        min_data = zero_data
+        max_data = one_data
+        min_label = 0
+        max_label = 1
+
     all_data = []
     all_data_labels = []
-    real_proportion = 0.0 if zero_count < 0.001 else np.round(one_count / zero_count, 3)
-    if zero_count > 0 and real_proportion < due_proportion:
-        all_data.extend(one_data)
-        all_data_labels.extend([1] * len(one_data))
+    real_proportion = 0.0
+    if min_count > MINIMAL_VALUE_FOR_GOOD_PROPORTION:
+        real_proportion = np.round(min_count / max_count, 3)
+    if min_count > 0 and real_proportion < due_proportion:
+        all_data.extend(min_data)
+        all_data_labels.extend([min_label] * len(min_data))
         random.seed(1763)
-        random.shuffle(zero_data)
-        zero_size = int(one_count * (1 / due_proportion) - 1)
-        all_data.extend(zero_data[:zero_size])
-        all_data_labels.extend([0] * zero_size)
+        random.shuffle(max_data)
+        max_size = int(min_count * (1 / due_proportion) - 1)
+        all_data.extend(max_data[:max_size])
+        all_data_labels.extend([max_label] * max_size)
         real_proportion = calculate_proportions_for_labels(all_data_labels)
         if real_proportion / due_proportion >= 0.9:
             real_proportion = due_proportion
@@ -165,7 +185,7 @@ def rebalance_data(train_data, train_labels, due_proportion):
     return all_data, all_data_labels, real_proportion
 
 
-def topological_sort(feature_graph):
+def topological_sort(feature_graph: dict[int, list[int]]) -> list[int]:
     visited = {}
     for key_ in feature_graph:
         visited[key_] = 0
@@ -192,25 +212,26 @@ def topological_sort(feature_graph):
     return stack
 
 
-def to_number_list(features_list):
+def to_int_list(features_list: str) -> list[int]:
     feature_numbers_list = []
     for feature_name in features_list.split(";"):
         feature_name = feature_name.split("_")[0]
-        try:
-            feature_numbers_list.append(int(feature_name))
-        except:  # noqa
-            try:
-                feature_numbers_list.append(float(feature_name))
-            except:  # noqa
-                pass
+        feature_numbers_list.append(int(feature_name))
     return feature_numbers_list
 
 
-def fill_prevously_gathered_features(feature_list, feature_ids):
+def to_float_list(features_list: str) -> list[float]:
+    feature_numbers_list = []
+    for feature_name in features_list.split(";"):
+        feature_name = feature_name.split("_")[0]
+        feature_numbers_list.append(float(feature_name))
+    return feature_numbers_list
+
+
+def fill_previously_gathered_features(feature_list: list[list[float]],
+                                      feature_ids: list[int]) -> dict[int, list[list[float]]]:
     previously_gathered_features = {}
     try:
-        if type(feature_ids) == str:
-            feature_ids = to_number_list(feature_ids)
         for i in range(len(feature_list)):
             for idx, feature in enumerate(feature_ids):
                 if feature not in previously_gathered_features:
@@ -223,8 +244,8 @@ def fill_prevously_gathered_features(feature_list, feature_ids):
     return previously_gathered_features
 
 
-def gather_feature_list(gathered_data_dict, feature_ids, to_list=False):
-    features_array = None
+def gather_feature_list(gathered_data_dict: dict[int, list[list[float]]], feature_ids: list[int]) -> list[list[float]]:
+    features_array: np.array = None
     axis_x_size = max(map(lambda x: len(x), gathered_data_dict.values()))
     if axis_x_size <= 0:
         return []
@@ -235,10 +256,10 @@ def gather_feature_list(gathered_data_dict, feature_ids, to_list=False):
             features_array = np.asarray(gathered_data_dict[feature])
         else:
             features_array = np.concatenate([features_array, gathered_data_dict[feature]], axis=1)
-    return features_array.tolist() if to_list else features_array
+    return features_array.tolist()
 
 
-def extract_exception(err):
+def extract_exception(err: Exception) -> str:
     err_message = traceback.format_exception_only(type(err), err)
     if len(err_message):
         err_message = err_message[-1]
@@ -272,16 +293,16 @@ def calculate_threshold(
 
 
 def calculate_threshold_for_text(text, cur_threshold, min_recalculated_threshold=0.8):
-    text_size = len(split_words(text, only_unique=True))
+    text_size = len(split_words(text))
     return calculate_threshold(
         text_size, cur_threshold,
         min_recalculated_threshold=min_recalculated_threshold)
 
 
-def build_more_like_this_query(min_should_match, log_message,
-                               field_name="message", boost=1.0,
+def build_more_like_this_query(min_should_match: str, log_message,
+                               field_name: str = "message", boost: float = 1.0,
                                override_min_should_match=None,
-                               max_query_terms=50):
+                               max_query_terms: int = 50):
     return {"more_like_this": {
         "fields": [field_name],
         "like": log_message,
@@ -313,3 +334,18 @@ def extract_clustering_setting(cluster_id):
         return False
     last_bit = cluster_id % 10
     return (last_bit % 2) == 1
+
+
+def create_path(query: dict, path: tuple[str, ...], value: Any) -> Any:
+    """Create path in a dictionary and assign passed value on the last element in path."""
+    path_length = len(path)
+    last_element = path[path_length - 1]
+    current_node = query
+    for i in range(path_length - 1):
+        element = path[i]
+        if element not in current_node:
+            current_node[element] = {}
+        current_node = current_node[element]
+    if last_element not in current_node:
+        current_node[last_element] = value
+    return current_node[last_element]

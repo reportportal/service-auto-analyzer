@@ -8,7 +8,7 @@
     "project": 1,
     "logs": [{
     			"logId": 178,
-                "message": "Message  1\r\n Message  2",
+                "message": "Message  1\n Message  2",
                 "logLevel": 40000
             }]
 }

@@ -19,8 +19,9 @@ import shutil
 from typing import Any
 
 from app.commons import logging
-from app.utils import utils
+from app.commons.model.launch_objects import ApplicationConfig
 from app.commons.object_saving.storage import Storage
+from app.utils import utils
 
 logger = logging.getLogger('analyzerApp.filesystemSaver')
 
@@ -28,8 +29,8 @@ logger = logging.getLogger('analyzerApp.filesystemSaver')
 class FilesystemSaver(Storage):
     _base_path: str
 
-    def __init__(self, app_config: dict[str, Any]) -> None:
-        self._base_path = app_config['filesystemDefaultPath'] or ''
+    def __init__(self, app_config: ApplicationConfig) -> None:
+        self._base_path = app_config.filesystemDefaultPath
 
     def remove_project_objects(self, path: str, object_names: list[str]) -> None:
         for filename in object_names:

@@ -21,11 +21,12 @@ from unittest.mock import MagicMock
 
 import httpretty
 
-from app.commons import launch_objects
+from app.commons.model import launch_objects
 from app.service import SuggestInfoService
 from app.utils import utils
 from test import get_fixture
 from test.mock_service import TestService
+from test import APP_CONFIG
 
 
 class TestSuggestInfoService(TestService):
@@ -86,28 +87,7 @@ class TestSuggestInfoService(TestService):
                                     self.delete_suggest_logs_rq_with_prefix),
                                 "rs": get_fixture(self.delete_logs_rs),
                                 }],
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "filesystem",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "rq": launch_objects.CleanIndex(ids=[1], project=1),
                 "expected_count": 1
             }
@@ -119,8 +99,7 @@ class TestSuggestInfoService(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                suggest_info_service = SuggestInfoService(app_config=app_config,
-                                                          search_cfg=self.get_default_search_config())
+                suggest_info_service = SuggestInfoService(app_config=app_config)
 
                 suggest_info_service.es_client.es_client.scroll = MagicMock(
                     return_value=json.loads(get_fixture(self.no_hits_search_rs)))
@@ -162,28 +141,7 @@ class TestSuggestInfoService(TestService):
                                 "content_type": "application/json",
                                 "rs": get_fixture(self.index_not_found_rs),
                                 }, ],
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "filesystem",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "index": 2,
                 "result": False,
             }
@@ -194,8 +152,7 @@ class TestSuggestInfoService(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                suggest_info_service = SuggestInfoService(app_config=app_config,
-                                                          search_cfg=self.get_default_search_config())
+                suggest_info_service = SuggestInfoService(app_config=app_config)
 
                 response = suggest_info_service.remove_suggest_info(test["index"])
 
@@ -317,28 +274,7 @@ class TestSuggestInfoService(TestService):
                                 "content_type": "application/json",
                                 "rs": get_fixture(self.index_logs_rs),
                                 }],
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "filesystem",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "index_rq": get_fixture(self.suggest_info_list),
                 "has_errors": False,
                 "expected_count": 2
@@ -351,8 +287,7 @@ class TestSuggestInfoService(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                suggest_info_service = SuggestInfoService(app_config=app_config,
-                                                          search_cfg=self.get_default_search_config())
+                suggest_info_service = SuggestInfoService(app_config=app_config)
                 response = suggest_info_service.index_suggest_info(
                     [launch_objects.SuggestAnalysisResult(**res) for res in json.loads(test["index_rq"])])
 
@@ -409,28 +344,7 @@ class TestSuggestInfoService(TestService):
                                     self.delete_by_query_suggest_1),
                                 "rs": json.dumps({"deleted": 3}),
                                 }],
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "filesystem",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "item_remove_info": {
                     "project": 1,
                     "itemsToDelete": [1, 2]},
@@ -444,8 +358,7 @@ class TestSuggestInfoService(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                suggest_info_service = SuggestInfoService(app_config=app_config,
-                                                          search_cfg=self.get_default_search_config())
+                suggest_info_service = SuggestInfoService(app_config=app_config)
                 response = suggest_info_service.clean_suggest_info_logs_by_test_item(
                     test["item_remove_info"])
 
@@ -501,28 +414,7 @@ class TestSuggestInfoService(TestService):
                                     self.delete_by_query_suggest_2),
                                 "rs": json.dumps({"deleted": 3}),
                                 }],
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "filesystem",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "launch_remove_info": {
                     "project": 1,
                     "launch_ids": [1, 2]},
@@ -536,8 +428,7 @@ class TestSuggestInfoService(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                suggest_info_service = SuggestInfoService(app_config=app_config,
-                                                          search_cfg=self.get_default_search_config())
+                suggest_info_service = SuggestInfoService(app_config=app_config)
                 response = suggest_info_service.clean_suggest_info_logs_by_launch_id(
                     test["launch_remove_info"])
 
@@ -627,8 +518,7 @@ class TestSuggestInfoService(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                suggest_info_service = SuggestInfoService(app_config=app_config,
-                                                          search_cfg=self.get_default_search_config())
+                suggest_info_service = SuggestInfoService(app_config=app_config)
                 suggest_info_service.es_client.es_client.scroll = MagicMock(return_value=json.loads(
                     get_fixture(self.no_hits_search_rs)))
                 response = suggest_info_service.update_suggest_info(test["defect_update_info"])

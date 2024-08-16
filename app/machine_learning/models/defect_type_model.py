@@ -12,29 +12,53 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import re
 from collections import Counter
+from typing import Optional
 
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics import classification_report, confusion_matrix
-from sklearn.metrics import f1_score, accuracy_score
+from sklearn.metrics import classification_report, confusion_matrix, f1_score
 
+from app.commons import logging
 from app.commons.object_saving.object_saver import ObjectSaver
 from app.machine_learning.models import MlModel
 from app.utils import text_processing
+from app.utils.defaultdict import DefaultDict
 
+LOGGER = logging.getLogger('analyzerApp.DefectTypeModel')
 MODEL_FILES: list[str] = ['count_vectorizer_models.pickle', 'models.pickle']
+DATA_FIELD = 'detected_message_without_params_extended'
+BASE_DEFECT_TYPE_PATTERN = re.compile(r'^([^_]+)_.*|^(\D+)\d+')
+DEFAULT_N_ESTIMATORS = 10
+
+
+def get_model(self: DefaultDict, model_name: str):
+    m = BASE_DEFECT_TYPE_PATTERN.match(model_name)
+    if not m:
+        raise KeyError(model_name)
+    base_model_name = m.group(1)
+    if not base_model_name:
+        base_model_name = m.group(2)
+    if not base_model_name:
+        raise KeyError(model_name)
+    return self[base_model_name]
 
 
 class DefectTypeModel(MlModel):
     _loaded: bool
-    count_vectorizer_models: dict
-    models: dict
+    count_vectorizer_models: DefaultDict[str, TfidfVectorizer]
+    models: DefaultDict[str, RandomForestClassifier]
+    n_estimators: int
 
-    def __init__(self, object_saver: ObjectSaver, tags: str = 'global defect type model') -> None:
+    def __init__(self, object_saver: ObjectSaver, tags: str = 'global defect type model', *,
+                 n_estimators: Optional[int] = None) -> None:
         super().__init__(object_saver, tags)
         self._loaded = False
+        self.count_vectorizer_models = DefaultDict(get_model)
+        self.models = DefaultDict(get_model)
+        self.n_estimators = n_estimators if n_estimators is not None else DEFAULT_N_ESTIMATORS
 
     @property
     def loaded(self) -> bool:
@@ -44,63 +68,53 @@ class DefectTypeModel(MlModel):
         if self.loaded:
             return
         model = self._load_models(MODEL_FILES)
-        self.count_vectorizer_models, self.models = model
+        self.count_vectorizer_models = DefaultDict(get_model, **model[0])
+        self.models = DefaultDict(get_model, **model[1])
         self._loaded = True
 
     def save_model(self):
-        self._save_models(zip(MODEL_FILES, self.count_vectorizer_models, self.models))
+        self._save_models(zip(MODEL_FILES, [self.count_vectorizer_models, self.models]))
 
-    def train_model(self, name, train_data_x, labels):
+    def train_model(self, name: str, train_data_x: list[str], labels: list[int]) -> float:
         self.count_vectorizer_models[name] = TfidfVectorizer(
-            binary=True, stop_words="english", min_df=5,
-            token_pattern=r"[\w\._]+", analyzer=text_processing.preprocess_words)
+            binary=True, min_df=5, analyzer=text_processing.preprocess_words)
         transformed_values = self.count_vectorizer_models[name].fit_transform(train_data_x)
-        print("Length of train data: ", len(labels))
-        print("Label distribution:", Counter(labels))
-        model = RandomForestClassifier(class_weight="balanced")
+        LOGGER.debug(f'Length of train data: {len(labels)}')
+        LOGGER.debug(f'Train data label distribution: {Counter(labels)}')
+        LOGGER.debug(f'Train model name: {name}; estimators number: {self.n_estimators}')
+        model = RandomForestClassifier(self.n_estimators, class_weight='balanced')
         x_train_values = pd.DataFrame(
             transformed_values.toarray(),
             columns=self.count_vectorizer_models[name].get_feature_names_out())
         model.fit(x_train_values, labels)
         self.models[name] = model
         self._loaded = True
-
-    def train_models(self, train_data):
-        for name, train_data_x, labels in train_data:
-            self.train_model(name, train_data_x, labels)
-
-    def validate_model(self, name, test_data_x, labels):
-        assert name in self.models
-        print("Label distribution:", Counter(labels))
-        print("Model name: %s" % name)
-        res, res_prob = self.predict(test_data_x, name)
-        print("Valid dataset F1 score: ", f1_score(y_pred=res, y_true=labels))
-        print(confusion_matrix(y_pred=res, y_true=labels))
-        print(classification_report(y_pred=res, y_true=labels))
+        res = model.predict(x_train_values)
         f1 = f1_score(y_pred=res, y_true=labels)
         if f1 is None:
             f1 = 0.0
-        accuracy = accuracy_score(y_pred=res, y_true=labels)
-        if accuracy is None:
-            accuracy = 0.0
-        return f1, accuracy
+        LOGGER.debug(f'Train dataset F1 score: {f1:.5f}')
+        return f1
 
-    def validate_models(self, test_data):
-        results = []
-        for name, test_data_x, labels in test_data:
-            f1, accuracy = self.validate_model(
-                name, test_data_x, labels)
-            results.append((name, f1, accuracy))
-        return results
+    def validate_model(self, name: str, test_data_x: list[str], labels: list[int]) -> float:
+        assert name in self.models
+        LOGGER.debug(f'Validation data label distribution: {Counter(labels)}')
+        LOGGER.debug(f'Validation model name: {name}')
+        res, res_prob = self.predict(test_data_x, name)
+        f1 = f1_score(y_pred=res, y_true=labels)
+        if f1 is None:
+            f1 = 0.0
+        LOGGER.debug(f'Valid dataset F1 score: {f1:.5f}')
+        LOGGER.debug(f'\n{confusion_matrix(y_pred=res, y_true=labels)}')
+        LOGGER.debug(f'\n{classification_report(y_pred=res, y_true=labels)}')
+        return f1
 
-    def predict(self, data, model_name):
-        assert model_name in self.models
+    def predict(self, data: list, model_name: str) -> tuple[list, list]:
         if len(data) == 0:
             return [], []
         transformed_values = self.count_vectorizer_models[model_name].transform(data)
         x_test_values = pd.DataFrame(
-            transformed_values.toarray(),
-            columns=self.count_vectorizer_models[model_name].get_feature_names_out())
+            transformed_values.toarray(), columns=self.count_vectorizer_models[model_name].get_feature_names_out())
         predicted_labels = self.models[model_name].predict(x_test_values)
         predicted_probs = self.models[model_name].predict_proba(x_test_values)
         return predicted_labels, predicted_probs

@@ -16,8 +16,8 @@ from unittest import mock
 import pytest
 
 from app.commons import esclient
-from app.commons.launch_objects import Launch, TestItem, Log
-from test import DEFAULT_ES_CONFIG, DEFAULT_SEARCH_CONFIG
+from app.commons.model.launch_objects import Launch, TestItem, Log
+from test import DEFAULT_ES_CONFIG
 
 TEST_PROJECT_ID = 2
 
@@ -25,7 +25,7 @@ TEST_PROJECT_ID = 2
 def create_test_es_client():
     es_mock = mock.Mock()
     es_mock.search.return_value = {'hits': {'hits': []}}
-    return esclient.EsClient(DEFAULT_ES_CONFIG, DEFAULT_SEARCH_CONFIG, es_mock)
+    return esclient.EsClient(DEFAULT_ES_CONFIG, es_mock)
 
 
 def create_test_launch_one_item():

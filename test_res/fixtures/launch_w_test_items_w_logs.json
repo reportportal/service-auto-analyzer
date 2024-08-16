@@ -17,13 +17,13 @@
                   "logId": 1,
                   "logLevel": 40000,
                   "logTime": [2020,1,15,10,57,43],
-                  "message": "Message 1 \r\n Message 2 \r\n Message 3 'prod_en' /src/prod/results.html \r\n java.lang.NoClassDefFoundError\r\n de.hybris.platform.servicelayer.interceptor.impl.MandatoryAttributesValidator$1@31ca8ab4 \r\n ca.canadiantire.steps.hybris.ws.WebserviceHybrisCustomerAndCartSteps$$EnhancerByCGLIB$$84837ae7.CGLIB$add_products_to_cart$16(<generated>)"
+                  "message": "Message 1 \n Message 2 \n Message 3 'prod_en' /src/prod/results.html \n java.lang.NoClassDefFoundError\n de.hybris.platform.servicelayer.interceptor.impl.MandatoryAttributesValidator$1@31ca8ab4 \n ca.canadiantire.steps.hybris.ws.WebserviceHybrisCustomerAndCartSteps$$EnhancerByCGLIB$$84837ae7.CGLIB$add_products_to_cart$16(<generated>)"
                 },
                 {
                   "logId": 2,
                   "logLevel": 40000,
                   "logTime": [2020,1,15,10,57,43],
-                  "message": "Message 2 \r\n Message 4 \r\n Message 5 http:localhost/admin \r\n java.lang.NoClassDefFoundError\r\n For documentation on this error, please visit https://www.seleniumhq.org/exceptions/stale_element_reference.html"
+                  "message": "Message 2 \n Message 4 \n Message 5 http:localhost/admin \n java.lang.NoClassDefFoundError\n For documentation on this error, please visit https://www.seleniumhq.org/exceptions/stale_element_reference.html"
                 }
             ]
         }

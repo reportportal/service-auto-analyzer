@@ -1,0 +1,4 @@
+---=== SOFT ASSERT ERROR: ===---
+URL :  https : //example.com/event/
+Reason :  Check select values
+Expected :  contains list in any order

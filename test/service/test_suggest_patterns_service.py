@@ -20,9 +20,10 @@ from unittest.mock import MagicMock
 
 import httpretty
 
-from app.commons import launch_objects
+from app.commons.model import launch_objects
 from app.service import SuggestPatternsService
 from app.utils import utils
+from test import APP_CONFIG
 from test.mock_service import TestService
 
 
@@ -60,28 +61,7 @@ class TestSearchService(TestService):
                                 "status": HTTPStatus.OK,
                                 },
                                ],
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "filesystem",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "rq": 1,
                 "query_data": [],
                 "expected_count_with_labels": [],
@@ -120,28 +100,7 @@ class TestSearchService(TestService):
                                 "status": HTTPStatus.OK,
                                 },
                                ],
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "filesystem",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "rq": 1,
                 "query_data": [("assertionError notFoundError", "ab001"),
                                ("assertionError ifElseError", "pb001"),

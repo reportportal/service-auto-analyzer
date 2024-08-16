@@ -21,6 +21,7 @@ from minio import Minio
 from minio.error import NoSuchKey
 
 from app.commons import logging
+from app.commons.model.launch_objects import ApplicationConfig
 from app.commons.object_saving.storage import Storage
 
 logger = logging.getLogger("analyzerApp.minioClient")
@@ -30,15 +31,15 @@ class MinioClient(Storage):
     region: str
     bucket_prefix: str
 
-    def __init__(self, app_config: dict[str, Any]) -> None:
-        minio_host = app_config['minioHost']
-        self.region = app_config['minioRegion']
-        self.bucket_prefix = app_config['minioBucketPrefix']
+    def __init__(self, app_config: ApplicationConfig) -> None:
+        minio_host = app_config.minioHost
+        self.region = app_config.minioRegion
+        self.bucket_prefix = app_config.minioBucketPrefix
         self.minioClient = Minio(
             minio_host,
-            access_key=app_config['minioAccessKey'],
-            secret_key=app_config['minioSecretKey'],
-            secure=app_config['minioUseTls'],
+            access_key=app_config.minioAccessKey,
+            secret_key=app_config.minioSecretKey,
+            secure=app_config.minioUseTls,
             region=self.region
         )
         logger.info(f'Minio initialized {minio_host}')
@@ -65,13 +66,15 @@ class MinioClient(Storage):
                 logger.debug("Created minio bucket %s" % bucket_name)
         if using_json:
             data_to_save = json.dumps(data).encode("utf-8")
+            content_type = 'application/json'
         else:
             data_to_save = pickle.dumps(data)
+            content_type = 'application/octet-stream'
         data_stream = io.BytesIO(data_to_save)
         data_stream.seek(0)
         self.minioClient.put_object(
-            bucket_name=bucket_name, object_name=object_name,
-            data=data_stream, length=len(data_to_save))
+            bucket_name=bucket_name, object_name=object_name, data=data_stream, length=len(data_to_save),
+            content_type=content_type)
         logger.debug("Saved into bucket '%s' with name '%s': %s", bucket_name, object_name, data)
 
     def get_project_object(self, bucket: str, object_name: str, using_json=False) -> object | None:
@@ -99,7 +102,8 @@ class MinioClient(Storage):
             if not self.minioClient.bucket_exists(bucket_name):
                 return []
         object_names = set()
-        object_list = self.minioClient.list_objects(bucket_name, prefix=folder)
+        object_list = self.minioClient.list_objects(
+            bucket_name, prefix=folder.endswith('/') and folder or folder + '/')
         for obj in object_list:
             object_names.add(obj.object_name.strip('/'))
         return sorted(list(object_names))
@@ -109,6 +113,6 @@ class MinioClient(Storage):
         if bucket_name:
             if not self.minioClient.bucket_exists(bucket_name):
                 return False
-        for obj in self.minioClient.list_objects(bucket_name, prefix=folder):
+        for obj in self.minioClient.list_objects(bucket_name, prefix=folder.endswith('/') and folder or folder + '/'):
             self.minioClient.remove_object(bucket_name=bucket_name, object_name=obj.object_name)
         return True

@@ -1,12 +1,12 @@
 {"update":{"_index":"2","_id":3}}
-{"doc":{"cluster_id":"78342974021039661","cluster_message":"error occured twice \r\nAssertionError error occured \r\n error found","cluster_with_numbers":true}}
+{"doc":{"cluster_id":"60604459849884091","cluster_message":"error occurred twice\nAssertionError error occurred\nerror found","cluster_with_numbers":true}}
 {"update":{"_index":"2","_id":4}}
-{"doc":{"cluster_id":"78342974021039661","cluster_message":"error occured twice \r\nAssertionError error occured \r\n error found","cluster_with_numbers":true}}
+{"doc":{"cluster_id":"60604459849884091","cluster_message":"error occurred twice\nAssertionError error occurred\nerror found","cluster_with_numbers":true}}
 {"update":{"_index":"2","_id":5}}
-{"doc":{"cluster_id":"37054331802624341","cluster_message":"AssertionError status code: 500 error occured","cluster_with_numbers":true}}
+{"doc":{"cluster_id":"9398573272102061","cluster_message":"AssertionError status code SPECIALNUMBER error occurred","cluster_with_numbers":true}}
 {"update":{"_index":"2","_id":9}}
-{"doc":{"cluster_id":"16492834929015971","cluster_message":"NoSuchElementException error occured \r\n error found \r\n assert query","cluster_with_numbers":true}}
+{"doc":{"cluster_id":"86465058569810291","cluster_message":"NoSuchElementException error occurred\nerror found\nassert query","cluster_with_numbers":true}}
 {"update":{"_index":"2","_id":"4_m"}}
-{"doc":{"cluster_id":"78342974021039661","cluster_message":"error occured twice \r\nAssertionError error occured \r\n error found","cluster_with_numbers":true}}
+{"doc":{"cluster_id":"60604459849884091","cluster_message":"error occurred twice\nAssertionError error occurred\nerror found","cluster_with_numbers":true}}
 {"update":{"_index":"2","_id":"5_m"}}
-{"doc":{"cluster_id":"37054331802624341","cluster_message":"AssertionError status code: 500 error occured","cluster_with_numbers":true}}
+{"doc":{"cluster_id":"9398573272102061","cluster_message":"AssertionError status code SPECIALNUMBER error occurred","cluster_with_numbers":true}}

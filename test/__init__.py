@@ -15,24 +15,64 @@
 import os
 import random
 import string
-from typing import List
 
+from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
 from app.utils.utils import read_json_file
 
-DEFAULT_ES_CONFIG = {'esHost': 'http://localhost:9200', 'esVerifyCerts': False, 'esUseSsl': False,
-                     'esSslShowWarn': False, 'esCAcert': None, 'esClientCert': None, 'esClientKey': None,
-                     'esUser': None, 'turnOffSslVerification': True, 'esProjectIndexPrefix': '', 'esChunkNumber': 1000}
+DEFAULT_ES_CONFIG = ApplicationConfig(
+    esHost='http://localhost:9200',
+    esVerifyCerts=False,
+    esUseSsl=False,
+    esSslShowWarn=False,
+    esCAcert='',
+    esClientCert='',
+    esClientKey='',
+    esUser='',
+    turnOffSslVerification=True,
+    esProjectIndexPrefix='',
+    esChunkNumber=1000
+)
+
+APP_CONFIG = ApplicationConfig(
+    esHost='http://localhost:9200',
+    esUser='',
+    esPassword='',
+    esVerifyCerts=False,
+    esUseSsl=False,
+    esSslShowWarn=False,
+    turnOffSslVerification=True,
+    esCAcert='',
+    esClientCert='',
+    esClientKey='',
+    appVersion='',
+    minioRegion='',
+    minioBucketPrefix='',
+    filesystemDefaultPath='',
+    esChunkNumber=1000,
+    binaryStoreType='filesystem',
+    minioHost='',
+    minioAccessKey='',
+    minioSecretKey='',
+    esProjectIndexPrefix='rp_',
+    esChunkNumberUpdateClusters=500
+)
+
 DEFAULT_BOOST_LAUNCH = 8.0
-DEFAULT_SEARCH_CONFIG = {'SimilarityWeightsFolder': '', 'BoostLaunch': DEFAULT_BOOST_LAUNCH}
+DEFAULT_SEARCH_CONFIG = SearchConfig(BoostLaunch=DEFAULT_BOOST_LAUNCH)
 
 
 def get_fixture(fixture_name, to_json=False):
     return read_json_file("test_res/fixtures", fixture_name, to_json)
 
 
-def read_file_lines(folder: str, filename: str) -> List[str]:
+def read_file_lines(folder: str, filename: str) -> list[str]:
     with open(os.path.join(folder, filename), "r") as file:
         return file.readlines()
+
+
+def read_file(folder: str, filename: str) -> str:
+    with open(os.path.join(folder, filename), "r") as file:
+        return file.read()
 
 
 def random_alphanumeric(num: int):

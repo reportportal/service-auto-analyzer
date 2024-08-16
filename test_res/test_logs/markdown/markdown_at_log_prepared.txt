@@ -1,0 +1,15 @@
+And Eventually Text of "Web Element" should contain "My Web Element"
+```
+AssertionError: expected 'Unknown Element' to include 'My Web Element'
+    at [root]/node_modules/@wk/cucumber-steps/step_definitions/content.js:58
+    at Proxy.include (Z:\xml-data\build-dir\SM-TST-PRJ\node_modules\chai\lib\chai\core\assertions.js:585:10)
+    at doAsserterAsyncAndAddThen (Z:\xml-data\build-dir\SM-TST-PRJ\node_modules\chai-as-promised\lib\chai-as-promised.js:289:22)
+    at Proxy.<anonymous> (Z:\xml-data\build-dir\SM-TST-PRJ\node_modules\chai-as-promised\lib\chai-as-promised.js:272:28)
+    at Proxy.overwritingChainableMethodWrapper (Z:\xml-data\build-dir\SM-TST-PRJ\node_modules\chai\lib\chai\utils\overwriteChainableMethod.js:60:34)
+    at Proxy.chainableMethodWrapper (Z:\xml-data\build-dir\SM-TST-PRJ\node_modules\chai\lib\chai\utils\addChainableMethod.js:113:49)
+    at elementCheck (Z:\xml-data\build-dir\SM-TST-PRJ\node_modules\@wk\cucumber-steps\checks\content.js:453:65)
+    at Z:\xml-data\build-dir\SM-TST-PRJ\node_modules\@wk\cucumber-steps\checks\content.js:388:9
+    at Generator.next (<anonymous>)
+    at fulfilled (Z:\xml-data\build-dir\SM-TST-PRJ\node_modules\@wk\cucumber-steps\node_modules\tslib\tslib.js:112:62)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+```

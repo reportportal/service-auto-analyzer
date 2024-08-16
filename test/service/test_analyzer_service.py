@@ -20,12 +20,14 @@ from unittest.mock import MagicMock
 import httpretty
 import sure
 
-from app.commons import launch_objects, object_saving
+from app.commons import object_saving
+from app.commons.model import launch_objects
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.service import AutoAnalyzerService
 from app.utils import utils
 from test import get_fixture
 from test.mock_service import TestService
+from test import APP_CONFIG
 
 
 class TestAutoAnalyzerService(TestService):
@@ -203,28 +205,7 @@ class TestAutoAnalyzerService(TestService):
                     self.launch_w_test_items_w_logs),
                 "expected_count": 1,
                 "expected_issue_type": "AB001",
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "filesystem",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "boost_predict": ([1, 0], [[0.2, 0.8], [0.7, 0.3]])
             },
             {
@@ -340,9 +321,7 @@ class TestAutoAnalyzerService(TestService):
                 analyzer_service = AutoAnalyzerService(self.model_chooser,
                                                        app_config=app_config,
                                                        search_cfg=config)
-                _boosting_decision_maker = BoostingDecisionMaker(object_saving.create_filesystem(""))
-                _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
-                _boosting_decision_maker.get_feature_names = MagicMock(return_value=["0"])
+                _boosting_decision_maker = BoostingDecisionMaker(object_saving.create_filesystem(""), '', features=[0])
                 _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])
                 if "msearch_results" in test:
                     analyzer_service.es_client.es_client.msearch = MagicMock(

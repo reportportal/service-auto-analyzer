@@ -8,7 +8,7 @@ requests==2.32.0
 assertpy==1.1
 bump2version==1.0.1
 flake8==5.0.4
-nltk==3.8.1
+nltk==3.9
 scikit-learn==1.5.0
 numpy==1.23.5
 scipy==1.10.1

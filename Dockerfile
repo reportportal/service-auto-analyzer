@@ -1,4 +1,4 @@
-FROM --platform=${BUILDPLATFORM} python:3.10.14-slim as test
+FROM --platform=${BUILDPLATFORM} bitnami/python:3.10.14 AS test
 RUN apt-get update && apt-get install -y build-essential \
     && rm -rf /var/lib/apt/lists/* \
     && python -m venv /venv \
@@ -14,7 +14,7 @@ RUN "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir -r requirements-dev.txt
 RUN make test-all
 
 
-FROM --platform=${BUILDPLATFORM} python:3.10.14-slim as builder
+FROM --platform=${BUILDPLATFORM} bitnami/python:3.10.14 AS builder
 RUN apt-get update && apt-get install -y build-essential libpcre3 libpcre3-dev \
     && rm -rf /var/lib/apt/lists/* \
     && python -m venv /venv \
@@ -26,8 +26,8 @@ COPY ./ ./
 RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
     && LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "${VIRTUAL_ENV}/bin/pip install --no-cache-dir -r requirements.txt" \
     && "${VIRTUAL_ENV}/bin/python3" -m nltk.downloader -d /usr/share/nltk_data stopwords
-ARG APP_VERSION
-ARG RELEASE_MODE
+ARG APP_VERSION=""
+ARG RELEASE_MODE=false
 ARG GITHUB_TOKEN
 RUN if [ "$RELEASE_MODE" = "true" ]; then make release v=${APP_VERSION} githubtoken=${GITHUB_TOKEN}; else if [ "${APP_VERSION}" != "" ]; then make build-release v=${APP_VERSION}; fi ; fi
 RUN mkdir /backend \
@@ -36,7 +36,7 @@ RUN mkdir /backend \
     && cp -r /build/res /backend/
 
 
-FROM --platform=${BUILDPLATFORM} python:3.10.14-slim
+FROM --platform=${BUILDPLATFORM} bitnami/python:3.10.14
 WORKDIR /backend/
 COPY --from=builder /backend ./
 COPY --from=builder /venv /venv

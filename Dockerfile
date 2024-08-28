@@ -1,4 +1,4 @@
-FROM --platform=${BUILDPLATFORM} python:3.10.14-slim as test
+FROM --platform=${BUILDPLATFORM} python:3.10.14-slim-bullseye as test
 RUN apt-get update && apt-get install -y build-essential \
     && rm -rf /var/lib/apt/lists/* \
     && python -m venv /venv \
@@ -14,7 +14,7 @@ RUN "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir -r requirements-dev.txt
 RUN make test-all
 
 
-FROM --platform=${BUILDPLATFORM} python:3.10.14-slim as builder
+FROM --platform=${BUILDPLATFORM} python:3.10.14-slim-bullseye as builder
 RUN apt-get update && apt-get install -y build-essential libpcre3 libpcre3-dev \
     && rm -rf /var/lib/apt/lists/* \
     && python -m venv /venv \
@@ -36,7 +36,7 @@ RUN mkdir /backend \
     && cp -r /build/res /backend/
 
 
-FROM --platform=${BUILDPLATFORM} python:3.10.14-slim
+FROM --platform=${BUILDPLATFORM} python:3.10.14-slim-bullseye
 WORKDIR /backend/
 COPY --from=builder /backend ./
 COPY --from=builder /venv /venv

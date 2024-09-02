@@ -43,6 +43,8 @@ COPY --from=builder /venv /venv
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
 RUN apt-get update && apt-get -y upgrade \
     && apt-get install -y libxml2 libgomp1 curl libpcre3 libpcre3-dev \
+    && apt-get remove --purge -y libaom3 \
+    && apt-get autoremove --purge -y \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p -m 0700 /backend/storage \
     && groupadd uwsgi && useradd -g uwsgi uwsgi \

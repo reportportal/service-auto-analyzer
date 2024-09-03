@@ -40,15 +40,19 @@ WORKDIR /backend/
 COPY --from=builder /backend ./
 COPY --from=builder /venv /venv
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
+ENV VIRTUAL_ENV="/venv"
 RUN dnf -y upgrade && dnf -y install libgomp pcre-devel \
+    && dnf -y remove emacs libjpeg-turbo libtiff libpng wget \
+    && dnf -y autoremove \
     && dnf clean all \
+    && "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
+    && "${VIRTUAL_ENV}/bin/pip" install --upgrade setuptools \
     && mkdir -p -m 0700 /backend/storage \
     && groupadd uwsgi && useradd -g uwsgi uwsgi \
     && chown -R uwsgi: /usr/share/nltk_data \
     && chown -R uwsgi: /backend
 USER uwsgi
 EXPOSE 5001
-ENV VIRTUAL_ENV="/venv"
 # uWSGI configuration (customize as needed):
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend \
     FLASK_APP=app/main.py UWSGI_WSGI_FILE=app/main.py UWSGI_SOCKET=:3031 UWSGI_HTTP=:5001 \

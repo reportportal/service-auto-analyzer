@@ -42,7 +42,7 @@ COPY --from=builder /venv /venv
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
 ENV VIRTUAL_ENV="/venv"
 RUN dnf -y upgrade && dnf -y install libgomp pcre-devel \
-    && dnf -y remove emacs libjpeg-turbo libtiff libpng wget \
+    && dnf -y remove emacs-filesystem libjpeg-turbo libtiff libpng wget \
     && dnf -y autoremove \
     && dnf clean all \
     && "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \

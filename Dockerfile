@@ -44,7 +44,7 @@ WORKDIR /backend/
 COPY --from=builder /backend ./
 COPY --from=builder /venv /venv
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
-RUN dnf -y upgrade && dnf -y install libgomp pcre-devel \
+RUN dnf -y upgrade && dnf -y install pcre-devel \
     && dnf -y remove emacs-filesystem libjpeg-turbo libtiff libpng wget \
     && dnf -y autoremove \
     && dnf clean all \

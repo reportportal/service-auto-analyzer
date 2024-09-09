@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import copy
+from typing import Any
 
 from app.utils import text_processing
 
@@ -34,8 +35,9 @@ class LogMerger:
                                 "paths", "message_params", "detected_message_without_params_extended",
                                 "whole_message"]
 
-    def merge_big_and_small_logs(self, logs: list[dict], log_level_ids_to_add: dict, log_level_messages: dict,
-                                 log_level_ids_merged, logs_ids_in_merged_logs) -> tuple[list[dict], dict]:
+    def merge_big_and_small_logs(self, logs: list[dict[str, Any]], log_level_ids_to_add: dict,
+                                 log_level_messages: dict[str, dict[int, str]], log_level_ids_merged,
+                                 logs_ids_in_merged_logs) -> tuple[list[dict], dict]:
         """Merge big message logs with small ones"""
         new_logs = []
         for log in logs:
@@ -73,7 +75,7 @@ class LogMerger:
                 new_logs.append(new_log)
         return new_logs, log_ids_for_merged_logs
 
-    def decompose_logs_merged_and_without_duplicates(self, logs: list[dict]) -> tuple[list[dict], dict]:
+    def decompose_logs_merged_and_without_duplicates(self, logs: list[dict[str, Any]]) -> tuple[list[dict], dict]:
         """Merge big logs with small ones without duplicates"""
         log_level_messages = {}
         for field in self.fields_to_merge:

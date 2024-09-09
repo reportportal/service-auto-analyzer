@@ -16,6 +16,7 @@ import hashlib
 import json
 from datetime import datetime
 from time import time
+from typing import Any
 
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
@@ -91,7 +92,9 @@ class ClusterService:
                     queried_log["_source"]["found_exceptions"],
                     field_name="found_exceptions", boost=1.0,
                     override_min_should_match="1",
-                    max_query_terms=self.search_cfg.MaxQueryTerms))
+                    max_query_terms=self.search_cfg.MaxQueryTerms
+                )
+            )
         utils.append_potential_status_codes(query, queried_log, boost=1.0,
                                             max_query_terms=self.search_cfg.MaxQueryTerms)
         return self.add_query_with_start_time_decay(query)
@@ -122,10 +125,9 @@ class ClusterService:
             }
         }
 
-    def find_similar_items_from_es(
-            self, groups, log_dict,
-            log_messages, log_ids, launch_info,
-            additional_results, unique_errors_min_should_match):
+    def find_similar_items_from_es(self, groups: dict[int, list[int]], log_dict: dict[int, dict],
+                                   log_messages: list[str], log_ids: set[str], launch_info: LaunchInfoForClustering,
+                                   unique_errors_min_should_match: float) -> dict[int, ClusterInfo]:
         new_clusters = {}
         _clusterizer = clusterizer.Clusterizer()
         for global_group in groups:
@@ -208,6 +210,7 @@ class ClusterService:
                     break
             if new_group:
                 new_clusters[global_group] = new_group
+        additional_results = {}
         for group in new_clusters:
             if group in additional_results:
                 additional_results[group].logIds.extend(new_clusters[group].logIds)
@@ -216,7 +219,7 @@ class ClusterService:
                 additional_results[group] = new_clusters[group]
         return additional_results
 
-    def calculate_hash(self, group_ids, log_dict, log_messages, launch_info):
+    def calculate_hash(self, group_ids, log_dict: dict[int, dict], log_messages, launch_info):
         group_logs = []
         log_message = ""
         for i in range(min(100, len(group_ids))):
@@ -244,8 +247,10 @@ class ClusterService:
         return hash_message, log_message
 
     def gather_cluster_results(
-            self, groups, additional_results, log_dict, log_messages,
-            log_ids_for_merged_logs, launch_info):
+            self, groups: dict[int, list[int]], additional_results: dict[int, ClusterInfo],
+            log_dict: dict[int, dict[str, Any]], log_messages: list[str],
+            log_ids_for_merged_logs: dict[str, list[int]],
+            launch_info: LaunchInfoForClustering) -> tuple[list[ClusterInfo], int, dict[str, tuple[int, str]]]:
         merged_logs_to_update = {}
         clusters_found = {}
         cluster_message_by_id = {}
@@ -293,7 +298,7 @@ class ClusterService:
                 itemIds=list(set(clusters_found[cluster_id][1]))))
         return results_to_return, len(results_to_return), merged_logs_to_update
 
-    def regroup_by_error_ans_status_codes(self, log_messages, log_dict):
+    def regroup_by_error_and_status_codes(self, log_messages, log_dict):
         regroupped_by_error = {}
         for i in range(len(log_messages)):
             found_exceptions = " ".join(
@@ -306,8 +311,10 @@ class ClusterService:
             regroupped_by_error[group_key].append(i)
         return regroupped_by_error
 
-    def cluster_messages_with_grouping_by_error(self, log_messages, log_dict, unique_errors_min_should_match):
-        regroupped_by_error = self.regroup_by_error_ans_status_codes(
+    def cluster_messages_with_grouping_by_error(
+            self, log_messages: list[str], log_dict: dict[int, dict],
+            unique_errors_min_should_match: float) -> dict[int, list[int]]:
+        regroupped_by_error = self.regroup_by_error_and_status_codes(
             log_messages, log_dict)
         _clusterizer = clusterizer.Clusterizer()
         all_groups = {}
@@ -318,9 +325,7 @@ class ClusterService:
             for i, idx in enumerate(regroupped_by_error[group_key]):
                 log_messages_part.append(log_messages[idx])
                 log_messages_idx_dict[i] = idx
-            groups = _clusterizer.find_clusters(
-                log_messages_part,
-                threshold=unique_errors_min_should_match)
+            groups = _clusterizer.find_clusters(log_messages_part, threshold=unique_errors_min_should_match)
             max_group_id = max(groups.keys())
             for group_id in groups:
                 global_idx = start_group_id + group_id
@@ -347,29 +352,23 @@ class ClusterService:
         errors_count = 0
         cluster_num = 0
         clusters = []
-        log_ids = []
         try:
-            unique_errors_min_should_match = launch_info.launch.analyzerConfig.uniqueErrorsMinShouldMatch / 100  # noqa
+            unique_errors_min_should_match = launch_info.launch.analyzerConfig.uniqueErrorsMinShouldMatch / 100.0  # noqa
             log_messages, log_dict, log_ids_for_merged_logs = self.log_requests.prepare_logs_for_clustering(  # noqa
                 launch_info.launch, launch_info.numberOfLogLines, launch_info.cleanNumbers, index_name)
             log_ids = set([str(log["_id"]) for log in log_dict.values()])
 
             groups = self.cluster_messages_with_grouping_by_error(
-                log_messages, log_dict,
-                unique_errors_min_should_match)
+                log_messages, log_dict, unique_errors_min_should_match)
             logger.debug("Groups: %s", groups)
             additional_results = self.find_similar_items_from_es(
-                groups, log_dict, log_messages,
-                log_ids, launch_info,
-                {}, unique_errors_min_should_match)
+                groups, log_dict, log_messages, log_ids, launch_info, unique_errors_min_should_match)
             clusters, cluster_num, merged_logs_to_update = self.gather_cluster_results(
-                groups, additional_results, log_dict, log_messages,
-                log_ids_for_merged_logs, launch_info)
+                groups, additional_results, log_dict, log_messages, log_ids_for_merged_logs, launch_info)
             if clusters:
                 bodies = []
                 for result in clusters:
-                    logger.debug("Cluster Id: %s, Cluster message: %s",
-                                 result.clusterId, result.clusterMessage)
+                    logger.debug("Cluster Id: %s, Cluster message: %s", result.clusterId, result.clusterMessage)
                     logger.debug("Cluster Ids: %s", result.logIds)
                     for log_id in result.logIds:
                         bodies.append({

@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import copy
+from typing import Any, Optional
 
 from app.utils import text_processing
 
@@ -34,9 +35,11 @@ class LogMerger:
                                 "paths", "message_params", "detected_message_without_params_extended",
                                 "whole_message"]
 
-    def merge_big_and_small_logs(self, logs: list[dict], log_level_ids_to_add: dict, log_level_messages: dict,
-                                 log_level_ids_merged, logs_ids_in_merged_logs) -> tuple[list[dict], dict]:
-        """Merge big message logs with small ones"""
+    def merge_big_and_small_logs(
+            self, logs: list[dict[str, Any]], log_level_ids_to_add: dict[int, list[int]],
+            log_level_messages: dict[str, dict[int, str]], log_level_ids_merged: dict[int, dict[str, Any]],
+            logs_ids_in_merged_logs: dict[int, list[int]]) -> tuple[list[dict[str, Any]], dict[str, list[int]]]:
+        """Merge big message logs with small ones."""
         new_logs = []
         for log in logs:
             if not log["_source"]["message"].strip():
@@ -50,9 +53,7 @@ class LogMerger:
 
         log_ids_for_merged_logs = {}
         for log_level in log_level_messages["message"]:
-
-            if not log_level_ids_to_add[log_level] and \
-                    log_level_messages["message"][log_level].strip():
+            if not log_level_ids_to_add[log_level] and log_level_messages["message"][log_level].strip():
                 log = log_level_ids_merged[log_level]
                 merged_logs_id = str(log["_id"]) + "_m"
                 new_log = self.prepare_new_log(
@@ -73,8 +74,9 @@ class LogMerger:
                 new_logs.append(new_log)
         return new_logs, log_ids_for_merged_logs
 
-    def decompose_logs_merged_and_without_duplicates(self, logs: list[dict]) -> tuple[list[dict], dict]:
-        """Merge big logs with small ones without duplicates"""
+    def decompose_logs_merged_and_without_duplicates(
+            self, logs: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, list[int]]]:
+        """Merge big logs with small ones without duplicates."""
         log_level_messages = {}
         for field in self.fields_to_merge:
             log_level_messages[field] = {}
@@ -127,8 +129,8 @@ class LogMerger:
         return self.merge_big_and_small_logs(
             logs, log_level_ids_to_add, log_level_messages, log_level_ids_merged, logs_ids_in_merged_logs)
 
-    def prepare_new_log(self, old_log: dict, new_id, is_merged: bool, merged_small_logs: str,
-                        fields_to_clean: list[str] | None = None) -> dict:
+    def prepare_new_log(self, old_log: dict[str, Any], new_id, is_merged: bool, merged_small_logs: str,
+                        fields_to_clean: Optional[list[str]] = None) -> dict[str, Any]:
         """Prepare updated log"""
         merged_log = copy.deepcopy(old_log)
         merged_log["_source"]["is_merged"] = is_merged

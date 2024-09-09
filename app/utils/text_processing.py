@@ -324,8 +324,8 @@ def first_lines(log_str: str, n_lines: int) -> str:
     return '\n'.join((log_str.split('\n')[:n_lines])) if n_lines >= 0 else log_str
 
 
-def prepare_message_for_clustering(message, number_of_log_lines, clean_numbers,
-                                   leave_log_structure=False):
+def prepare_message_for_clustering(message: str, number_of_log_lines: int, clean_numbers: bool,
+                                   leave_log_structure: bool = False) -> str:
     potential_status_codes = get_potential_status_codes(message)
     message = remove_starting_datetime(message)
     if clean_numbers:

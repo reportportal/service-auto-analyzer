@@ -21,7 +21,7 @@ from app.commons import logging, similarity_calculator, object_saving
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import SearchLogInfo, Log, SearchConfig, ApplicationConfig
 from app.commons.log_merger import LogMerger
-from app.commons.log_requests import LogRequests
+from app.commons.log_requests import LogRequests, create_log_template
 from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
 from app.utils import utils, text_processing
 
@@ -161,7 +161,7 @@ class SearchService:
             if not message.strip():
                 continue
 
-            queried_log = LogRequests._create_log_template()
+            queried_log = create_log_template()
             queried_log = LogRequests._fill_log_fields(queried_log, Log(logId=global_id, message=message),
                                                        search_req.logLines)
 

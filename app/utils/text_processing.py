@@ -746,7 +746,7 @@ def replace_text_pieces(text: str, text_pieces: Iterable[str]) -> str:
     return result
 
 
-def prepare_es_min_should_match(min_should_match):
+def prepare_es_min_should_match(min_should_match: float) -> str:
     return str(int(min_should_match * 100)) + "%"
 
 

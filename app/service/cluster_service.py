@@ -415,6 +415,7 @@ class ClusterService:
         logger.info("Processed the launch. It took %.2f sec.", time() - t_start)
         logger.info("Finished clustering for the launch with %d clusters.", cluster_num)
         for cluster in clusters:
+            # Set original messages for clusters to show in UI
             log_ids = set(cluster.logIds)
             for test_item in launch_info.launch.testItems:
                 for log in test_item.logs:

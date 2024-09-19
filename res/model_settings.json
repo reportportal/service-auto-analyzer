@@ -1,8 +1,6 @@
 {
-	"BOOST_MODEL_FOLDER": "res/model/auto_2023-08-17",
-	"SUGGEST_BOOST_MODEL_FOLDER": "res/model/suggest_2023-08-17",
-	"SIMILARITY_WEIGHTS_FOLDER": "res/model/weights_24.11.20",
-	"GLOBAL_DEFECT_TYPE_MODEL_FOLDER": "res/model/global_defect_type_model_2023-08-04",
-	"RETRAIN_SUGGEST_BOOST_MODEL_CONFIG": "res/model/suggest_retrain_data_features_config.pickle",
-	"RETRAIN_AUTO_BOOST_MODEL_CONFIG": "res/model/auto_retrain_data_features_config.pickle"
+	"BOOST_MODEL_FOLDER": "res/model/auto_analysis_model_2024-08-14",
+	"SUGGEST_BOOST_MODEL_FOLDER": "res/model/suggestion_model_2024-08-14",
+	"SIMILARITY_WEIGHTS_FOLDER": "res/model/weights_2024-06-12",
+	"GLOBAL_DEFECT_TYPE_MODEL_FOLDER": "res/model/global_defect_type_model_2024-07-11"
 }

@@ -18,12 +18,12 @@ from http import HTTPStatus
 from unittest.mock import MagicMock
 
 import httpretty
-import sure
+from elasticsearch import RequestError
 
-import app.commons.launch_objects as launch_objects
 from app.commons import esclient
+from app.commons.model import launch_objects
 from app.utils import utils
-from test import get_fixture
+from test import get_fixture, APP_CONFIG
 from test.mock_service import TestService
 
 
@@ -61,8 +61,7 @@ class TestEsClient(TestService):
             try:
                 self._start_server(test["test_calls"])
 
-                es_client = esclient.EsClient(app_config=self.app_config,
-                                              search_cfg=self.get_default_search_config())
+                es_client = esclient.EsClient(app_config=self.app_config)
 
                 response = es_client.list_indices()
                 assert test["expected_count"] == len(response)
@@ -72,50 +71,56 @@ class TestEsClient(TestService):
                 raise AssertionError(f'Error in the test case number: {idx}'). \
                     with_traceback(err.__traceback__)
 
-    @utils.ignore_warnings
     def test_create_index(self):
         """Test creating index"""
-        tests = [
-            {
-                "test_calls": [{"method": httpretty.PUT,
-                                "uri": "/idx0",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rs": get_fixture(self.index_created_rs),
-                                }, ],
-                "index": "idx0",
-                "acknowledged": True,
-            },
-            {
-                "test_calls": [{"method": httpretty.PUT,
-                                "uri": "/idx1",
-                                "status": HTTPStatus.BAD_REQUEST,
-                                "content_type": "application/json",
-                                "rs": get_fixture(
-                                    self.index_already_exists_rs),
-                                }, ],
-                "index": "idx1",
-                "acknowledged": False,
-            },
-        ]
-        for idx, test in enumerate(tests):
-            try:
-                self._start_server(test["test_calls"])
+        test = {
+            "test_calls": [{"method": httpretty.PUT,
+                            "uri": "/idx0",
+                            "status": HTTPStatus.OK,
+                            "content_type": "application/json",
+                            "rs": get_fixture(self.index_created_rs),
+                            }, ],
+            "index": "idx0",
+            "acknowledged": True,
+        }
+        self._start_server(test["test_calls"])
 
-                es_client = esclient.EsClient(app_config=self.app_config,
-                                              search_cfg=self.get_default_search_config())
+        es_client = esclient.EsClient(app_config=self.app_config)
 
-                response = es_client.create_index(test["index"])
-                assert test["acknowledged"] == response.acknowledged
+        response = es_client.create_index(test["index"])
+        assert test["acknowledged"] == response.acknowledged
 
-                TestEsClient.shutdown_server(test["test_calls"])
-            except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}'). \
-                    with_traceback(err.__traceback__)
+        TestEsClient.shutdown_server(test["test_calls"])
+
+    def test_create_index_error(self):
+        """Test creating index"""
+        test = {
+            "test_calls": [{"method": httpretty.PUT,
+                            "uri": "/idx1",
+                            "status": HTTPStatus.BAD_REQUEST,
+                            "content_type": "application/json",
+                            "rs": get_fixture(
+                                self.index_already_exists_rs),
+                            }, ],
+            "index": "idx1",
+            "acknowledged": False,
+        }
+        try:
+            self._start_server(test["test_calls"])
+
+            es_client = esclient.EsClient(app_config=self.app_config)
+
+            es_client.create_index(test["index"])
+            raise AssertionError("Expected RequestError")
+
+        except RequestError:
+            pass
+        finally:
+            TestEsClient.shutdown_server(test["test_calls"])
 
     @utils.ignore_warnings
     def test_exists_index(self):
-        """Test existance of a index"""
+        """Test existence of an index"""
         tests = [
             {
                 "test_calls": [{"method": httpretty.GET,
@@ -138,8 +143,7 @@ class TestEsClient(TestService):
             try:
                 self._start_server(test["test_calls"])
 
-                es_client = esclient.EsClient(app_config=self.app_config,
-                                              search_cfg=self.get_default_search_config())
+                es_client = esclient.EsClient(app_config=self.app_config)
 
                 response = es_client.index_exists(test["index"])
                 assert test["exists"] == response
@@ -178,8 +182,7 @@ class TestEsClient(TestService):
             try:
                 self._start_server(test["test_calls"])
 
-                es_client = esclient.EsClient(app_config=self.app_config,
-                                              search_cfg=self.get_default_search_config())
+                es_client = esclient.EsClient(app_config=self.app_config)
 
                 response = es_client.delete_index(test["index"])
 
@@ -305,28 +308,7 @@ class TestEsClient(TestService):
                                 "rs": get_fixture(self.index_logs_rs),
                                 }],
                 "rq": launch_objects.CleanIndex(ids=[1], project=1),
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "minio",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "expected_count": 1
             },
             {
@@ -335,48 +317,25 @@ class TestEsClient(TestService):
                                 "status": HTTPStatus.NOT_FOUND,
                                 }],
                 "rq": launch_objects.CleanIndex(ids=[1], project=2),
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "minio",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "expected_count": 0
             }
         ]
 
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case index: {0}', idx):
-                self._start_server(test["test_calls"])
-                app_config = self.app_config
-                if "app_config" in test:
-                    app_config = test["app_config"]
-                es_client = esclient.EsClient(app_config=app_config,
-                                              search_cfg=self.get_default_search_config())
-                es_client.es_client.scroll = MagicMock(return_value=json.loads(
-                    get_fixture(self.no_hits_search_rs)))
+            print(f"Test index: {idx}")
+            self._start_server(test["test_calls"])
+            app_config = self.app_config
+            if "app_config" in test:
+                app_config = test["app_config"]
+            es_client = esclient.EsClient(app_config=app_config)
+            es_client.es_client.scroll = MagicMock(return_value=json.loads(get_fixture(self.no_hits_search_rs)))
 
-                response = es_client.delete_logs(test["rq"])
+            response = es_client.delete_logs(test["rq"])
 
-                test["expected_count"].should.equal(response)
+            assert test["expected_count"] == response
 
-                TestEsClient.shutdown_server(test["test_calls"])
+            TestEsClient.shutdown_server(test["test_calls"])
 
     @utils.ignore_warnings
     def test_index_logs(self):
@@ -423,6 +382,7 @@ class TestEsClient(TestService):
                                {"method": httpretty.PUT,
                                 "uri": "/2",
                                 "status": HTTPStatus.OK,
+                                "content_type": "application/json",
                                 "rs": get_fixture(self.index_created_rs),
                                 },
                                {"method": httpretty.POST,
@@ -476,6 +436,7 @@ class TestEsClient(TestService):
                                {"method": httpretty.PUT,
                                 "uri": "/2",
                                 "status": HTTPStatus.OK,
+                                "content_type": "application/json",
                                 "rs": get_fixture(self.index_created_rs),
                                 },
                                {"method": httpretty.POST,
@@ -525,6 +486,7 @@ class TestEsClient(TestService):
                                {"method": httpretty.PUT,
                                 "uri": "/rp_2",
                                 "status": HTTPStatus.OK,
+                                "content_type": "application/json",
                                 "rs": get_fixture(self.index_created_rs),
                                 },
                                {"method": httpretty.POST,
@@ -564,28 +526,7 @@ class TestEsClient(TestService):
                 "index_rq": get_fixture(self.launch_w_test_items_w_logs_different_log_level),
                 "has_errors": False,
                 "expected_count": 1,
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "minio",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "expected_log_exceptions": [launch_objects.LogExceptionResult(logId=1, foundExceptions=[])]
             },
             {
@@ -596,6 +537,7 @@ class TestEsClient(TestService):
                                {"method": httpretty.PUT,
                                 "uri": "/2",
                                 "status": HTTPStatus.OK,
+                                "content_type": "application/json",
                                 "rs": get_fixture(self.index_created_rs),
                                 },
                                {"method": httpretty.POST,
@@ -644,21 +586,21 @@ class TestEsClient(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            with sure.ensure('Error in the test case index: {0}', idx):
-                self._start_server(test["test_calls"])
-                app_config = self.app_config
-                if "app_config" in test:
-                    app_config = test["app_config"]
-                es_client = esclient.EsClient(app_config=app_config, search_cfg=self.get_default_search_config())
-                es_client.es_client.scroll = MagicMock(return_value=json.loads(get_fixture(self.no_hits_search_rs)))
-                launches = [launch_objects.Launch(**launch) for launch in json.loads(test["index_rq"])]
-                response = es_client.index_logs(launches)
+            print(f"Test index: {idx}")
+            self._start_server(test["test_calls"])
+            app_config = self.app_config
+            if "app_config" in test:
+                app_config = test["app_config"]
+            es_client = esclient.EsClient(app_config=app_config)
+            es_client.es_client.scroll = MagicMock(return_value=json.loads(get_fixture(self.no_hits_search_rs)))
+            launches = [launch_objects.Launch(**launch) for launch in json.loads(test["index_rq"])]
+            response = es_client.index_logs(launches)
 
-                test["has_errors"].should.equal(response.errors)
-                test["expected_count"].should.equal(response.took)
-                test["expected_log_exceptions"].should.equal(response.logResults)
+            assert test["has_errors"] == response.errors
+            assert test["expected_count"] == response.took
+            assert test["expected_log_exceptions"] == response.logResults
 
-                TestEsClient.shutdown_server(test["test_calls"])
+            TestEsClient.shutdown_server(test["test_calls"])
 
     def test_defect_update(self):
         tests = [
@@ -739,8 +681,7 @@ class TestEsClient(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                es_client = esclient.EsClient(app_config=app_config,
-                                              search_cfg=self.get_default_search_config())
+                es_client = esclient.EsClient(app_config=app_config)
                 es_client.es_client.scroll = MagicMock(return_value=json.loads(
                     get_fixture(self.no_hits_search_rs)))
                 response = es_client.defect_update(test["defect_update_info"])
@@ -797,28 +738,7 @@ class TestEsClient(TestService):
                                     self.delete_by_query_1),
                                 "rs": json.dumps({"deleted": 3}),
                                 }],
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "minio",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "item_remove_info": {
                     "project": 1,
                     "itemsToDelete": [1, 2]},
@@ -831,8 +751,7 @@ class TestEsClient(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                es_client = esclient.EsClient(app_config=app_config,
-                                              search_cfg=self.get_default_search_config())
+                es_client = esclient.EsClient(app_config=app_config)
                 es_client.es_client.scroll = MagicMock(return_value=json.loads(
                     get_fixture(self.no_hits_search_rs)))
                 response = es_client.remove_test_items(test["item_remove_info"])
@@ -888,28 +807,7 @@ class TestEsClient(TestService):
                                 "rq": get_fixture(self.delete_by_query_2),
                                 "rs": json.dumps({"deleted": 3}),
                                 }],
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "minio",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "launch_remove_info": {
                     "project": 1,
                     "launch_ids": [1, 2]},
@@ -922,8 +820,7 @@ class TestEsClient(TestService):
                 app_config = self.app_config
                 if "app_config" in test:
                     app_config = test["app_config"]
-                es_client = esclient.EsClient(app_config=app_config,
-                                              search_cfg=self.get_default_search_config())
+                es_client = esclient.EsClient(app_config=app_config)
                 es_client.es_client.scroll = MagicMock(return_value=json.loads(
                     get_fixture(self.no_hits_search_rs)))
                 response = es_client.remove_launches(test["launch_remove_info"])

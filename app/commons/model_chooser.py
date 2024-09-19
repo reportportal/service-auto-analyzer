@@ -12,72 +12,85 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.boosting_decision_making import (defect_type_model, custom_defect_type_model, custom_boosting_decision_maker,
-                                          boosting_decision_maker)
-from app.commons.object_saving.object_saver import ObjectSaver
-import logging
-import numpy as np
 import os
+
+import numpy as np
+
+from app.commons import logging
+from app.commons import object_saving
+from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
+from app.commons.model.ml import ModelType
+from app.commons.object_saving.object_saver import ObjectSaver
+from app.machine_learning.models import (defect_type_model, custom_defect_type_model, custom_boosting_decision_maker,
+                                         boosting_decision_maker, MlModel)
 
 logger = logging.getLogger("analyzerApp.modelChooser")
 
+CUSTOM_MODEL_MAPPING = {
+    ModelType.defect_type: custom_defect_type_model.CustomDefectTypeModel,
+    ModelType.suggestion: custom_boosting_decision_maker.CustomBoostingDecisionMaker,
+    ModelType.auto_analysis: custom_boosting_decision_maker.CustomBoostingDecisionMaker
+}
+
+GLOBAL_MODEL_MAPPING = {
+    ModelType.defect_type: defect_type_model.DefectTypeModel,
+    ModelType.suggestion: boosting_decision_maker.BoostingDecisionMaker,
+    ModelType.auto_analysis: boosting_decision_maker.BoostingDecisionMaker
+}
+
 
 class ModelChooser:
+    app_config: ApplicationConfig
+    object_saver: ObjectSaver
+    search_cfg: SearchConfig
+    global_models: dict[ModelType, MlModel]
 
-    def __init__(self, app_config=None, search_cfg=None):
-        self.app_config = app_config or {}
-        self.search_cfg = search_cfg or {}
-        self.object_saver = ObjectSaver(self.app_config)
-        self.model_folder_mapping = {
-            "defect_type_model/": custom_defect_type_model.CustomDefectTypeModel,
-            "suggestion_model/": custom_boosting_decision_maker.CustomBoostingDecisionMaker,
-            "auto_analysis_model/": custom_boosting_decision_maker.CustomBoostingDecisionMaker
-        }
-        self.initialize_global_models()
+    def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig):
+        self.app_config = app_config
+        self.search_cfg = search_cfg
+        self.object_saver = object_saving.create(self.app_config)
+        self.global_models = self.initialize_global_models()
 
-    def initialize_global_models(self):
-        self.global_models = {}
-        for model_name, folder, class_to_use in [
-            ("defect_type_model/",
-             self.search_cfg["GlobalDefectTypeModelFolder"], defect_type_model.DefectTypeModel),
-            ("suggestion_model/",
-             self.search_cfg["SuggestBoostModelFolder"], boosting_decision_maker.BoostingDecisionMaker),
-            ("auto_analysis_model/",
-             self.search_cfg["BoostModelFolder"], boosting_decision_maker.BoostingDecisionMaker)]:
+    def initialize_global_models(self) -> dict[ModelType, MlModel]:
+        result = {}
+        for model_type, folder in zip(
+                [ModelType.defect_type, ModelType.suggestion, ModelType.auto_analysis],
+                [self.search_cfg.GlobalDefectTypeModelFolder, self.search_cfg.SuggestBoostModelFolder,
+                 self.search_cfg.BoostModelFolder]):
             if folder.strip():
-                self.global_models[model_name] = class_to_use(folder=folder)
+                model = GLOBAL_MODEL_MAPPING[model_type](object_saving.create_filesystem(folder))
+                model.load_model()
+                result[model_type] = model
             else:
-                self.global_models[model_name] = None
+                result[model_type] = None
+        return result
 
-    def choose_model(self, project_id, model_name_folder, custom_model_prob=1.0):
-        model = self.global_models[model_name_folder]
+    def choose_model(self, project_id: int, model_type: ModelType, custom_model_prob: float = 1.0) -> MlModel:
+        model = self.global_models[model_type]
         prob_for_model = np.random.uniform()
         if prob_for_model > custom_model_prob:
             return model
-        folders = self.object_saver.get_folder_objects(project_id, model_name_folder)
+        folders = self.object_saver.get_folder_objects(f'{model_type.name}_model/', project_id)
         if len(folders):
             try:
-                model = self.model_folder_mapping[model_name_folder](
-                    self.app_config, project_id, folder=folders[0])
+                model = CUSTOM_MODEL_MAPPING[model_type](object_saving.create(self.app_config, project_id, folders[0]))
+                model.load_model()
             except Exception as err:
-                logger.error(err)
+                logger.exception(err)
         return model
 
-    def delete_old_model(self, model_name, project_id):
-        all_folders = self.object_saver.get_folder_objects(
-            project_id, "%s/" % model_name)
+    def delete_old_model(self, model_type: ModelType, project_id: str | int | None = None):
+        all_folders = self.object_saver.get_folder_objects(f'{model_type.name}_model/', project_id)
         deleted_models = 0
         for folder in all_folders:
-            if os.path.basename(
-                    folder.strip("/").strip("\\")).startswith(model_name):
-                deleted_models += self.object_saver.remove_folder_objects(project_id, folder)
+            if os.path.basename(folder.strip("/").strip("\\")).startswith(model_type.name):
+                deleted_models += int(self.object_saver.remove_folder_objects(folder, project_id))
         return deleted_models
 
-    def delete_all_custom_models(self, project_id):
-        for model_name_folder in self.model_folder_mapping:
-            self.delete_old_model(model_name_folder.strip("/").strip("\\"), project_id)
+    def delete_all_custom_models(self, project_id: str | int | None = None):
+        for model in CUSTOM_MODEL_MAPPING.keys():
+            self.delete_old_model(model, project_id)
 
-    def get_model_info(self, model_name, project_id):
-        all_folders = self.object_saver.get_folder_objects(
-            project_id, "%s/" % model_name)
-        return all_folders[0] if len(all_folders) else ""
+    def get_model_info(self, model_type: ModelType, project_id: str | int | None = None):
+        all_folders = self.object_saver.get_folder_objects(f'{model_type.name}_model/', project_id)
+        return all_folders[0] if len(all_folders) else ''

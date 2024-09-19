@@ -19,10 +19,10 @@ from unittest.mock import MagicMock
 
 import httpretty
 
-from app.commons import launch_objects
+from app.commons.model import launch_objects
 from app.service.clean_index_service import CleanIndexService
 from app.utils import utils
-from test import get_fixture
+from test import get_fixture, APP_CONFIG
 from test.mock_service import TestService
 
 
@@ -54,28 +54,7 @@ class TestCleanIndexService(TestService):
                                 "status": HTTPStatus.NOT_FOUND,
                                 }, ],
                 "rq": launch_objects.CleanIndex(ids=[1], project=2),
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "minio",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "expected_count": 0
             },
             {
@@ -278,54 +257,28 @@ class TestCleanIndexService(TestService):
                                 "rs": get_fixture(self.delete_logs_rs),
                                 }],
                 "rq": launch_objects.CleanIndex(ids=[1], project=1),
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "minio",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "expected_count": 1
             }
         ]
 
         for idx, test in enumerate(tests):
-            try:
-                self._start_server(test["test_calls"])
-                app_config = self.app_config
-                if "app_config" in test:
-                    app_config = test["app_config"]
-                _clean_index_service = CleanIndexService(
-                    app_config=app_config,
-                    search_cfg=self.get_default_search_config())
-                _clean_index_service.es_client.es_client.scroll = MagicMock(
-                    return_value=json.loads(get_fixture(self.no_hits_search_rs)))
-                _clean_index_service.suggest_info_service.es_client.es_client.scroll = MagicMock(
-                    return_value=json.loads(get_fixture(self.no_hits_search_rs)))
+            print(f'Test case number: {idx}')
+            self._start_server(test["test_calls"])
+            app_config = self.app_config
+            if "app_config" in test:
+                app_config = test["app_config"]
+            _clean_index_service = CleanIndexService(app_config=app_config)
+            _clean_index_service.es_client.es_client.scroll = MagicMock(
+                return_value=json.loads(get_fixture(self.no_hits_search_rs)))
+            _clean_index_service.suggest_info_service.es_client.es_client.scroll = MagicMock(
+                return_value=json.loads(get_fixture(self.no_hits_search_rs)))
 
-                response = _clean_index_service.delete_logs(test["rq"])
+            response = _clean_index_service.delete_logs(test["rq"])
 
-                assert test["expected_count"] == response
+            assert test["expected_count"] == response
 
-                TestCleanIndexService.shutdown_server(test["test_calls"])
-            except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}'). \
-                    with_traceback(err.__traceback__)
+            TestCleanIndexService.shutdown_server(test["test_calls"])
 
 
 if __name__ == '__main__':

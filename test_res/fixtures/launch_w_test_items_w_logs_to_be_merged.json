@@ -18,7 +18,7 @@
                 {
                   "logId": 3,
                     "logLevel": 40000,
-                    "message": "Message 3 \r\n Message 4"
+                    "message": "Message 3 \n Message 4"
                 }
             ]
         }

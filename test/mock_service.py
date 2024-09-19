@@ -31,11 +31,14 @@ import unittest
 import httpretty
 
 from app.commons import model_chooser
+from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
 from app.utils import utils
 
 
 class TestService(unittest.TestCase):
     ERROR_LOGGING_LEVEL = 40000
+    model_settings: dict
+    app_config: ApplicationConfig
 
     @utils.ignore_warnings
     def setUp(self):
@@ -165,30 +168,34 @@ class TestService(unittest.TestCase):
         self.launch_w_test_items_w_logs_with_clusters = "launch_w_test_items_w_logs_with_clusters.json"
         self.index_logs_rq_big_messages_with_clusters = \
             "index_logs_rq_big_messages_with_clusters.json"
-        self.app_config = {
-            "esHost": "http://localhost:9200",
-            "esUser": "",
-            "esPassword": "",
-            "esVerifyCerts": False,
-            "esUseSsl": False,
-            "esSslShowWarn": False,
-            "turnOffSslVerification": True,
-            "esCAcert": "",
-            "esClientCert": "",
-            "esClientKey": "",
-            "appVersion": "",
-            "minioRegion": "",
-            "minioBucketPrefix": "",
-            "filesystemDefaultPath": "",
-            "esChunkNumber": 1000,
-            "binaryStoreType": "minio",
-            "minioHost": "",
-            "minioAccessKey": "",
-            "minioSecretKey": "",
-            "esProjectIndexPrefix": "",
-            "esChunkNumberUpdateClusters": 500
-        }
-        self.model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
+        self.app_config = ApplicationConfig(
+            esHost='http://localhost:9200',
+            esUser="",
+            esPassword="",
+            esVerifyCerts=False,
+            esUseSsl=False,
+            esSslShowWarn=False,
+            turnOffSslVerification=True,
+            esCAcert="",
+            esClientCert="",
+            esClientKey="",
+            appVersion="",
+            minioRegion="",
+            minioBucketPrefix="",
+            filesystemDefaultPath="",
+            esChunkNumber=1000,
+            binaryStoreType="filesystem",
+            minioHost="",
+            minioAccessKey="",
+            minioSecretKey="",
+            esProjectIndexPrefix="",
+            esChunkNumberUpdateClusters=500
+        )
+        model_settings = utils.read_json_file('res', 'model_settings.json', to_json=True)
+        if model_settings and isinstance(model_settings, dict):
+            self.model_settings = model_settings
+        else:
+            raise RuntimeError('Failed to read model settings')
         self.model_chooser = model_chooser.ModelChooser(self.app_config, self.get_default_search_config())
         logging.disable(logging.CRITICAL)
 
@@ -197,62 +204,44 @@ class TestService(unittest.TestCase):
         logging.disable(logging.DEBUG)
 
     @utils.ignore_warnings
-    def get_default_search_config(self):
+    def get_default_search_config(self) -> SearchConfig:
         """Get default search config"""
-        return {
-            "MinShouldMatch": "80%",
-            "MinTermFreq": 1,
-            "MinDocFreq": 1,
-            "BoostAA": -2,
-            "BoostLaunch": 2,
-            "BoostTestCaseHash": 2,
-            "MaxQueryTerms": 50,
-            "SearchLogsMinShouldMatch": "95%",
-            "SearchLogsMinSimilarity": 0.95,
-            "MinWordLength": 0,
-            "TimeWeightDecay": 0.95,
-            "PatternLabelMinPercentToSuggest": 0.5,
-            "PatternLabelMinCountToSuggest": 5,
-            "PatternMinCountToSuggest": 10,
-            "BoostModelFolder":
-                self.model_settings["BOOST_MODEL_FOLDER"],
-            "SimilarityWeightsFolder":
-                self.model_settings["SIMILARITY_WEIGHTS_FOLDER"],
-            "SuggestBoostModelFolder":
-                self.model_settings["SUGGEST_BOOST_MODEL_FOLDER"],
-            "GlobalDefectTypeModelFolder":
-                self.model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"],
-            "ProbabilityForCustomModelSuggestions": 0.9,
-            "ProbabilityForCustomModelAutoAnalysis": 0.1,
-            "RetrainSuggestBoostModelConfig":
-                self.model_settings["RETRAIN_SUGGEST_BOOST_MODEL_CONFIG"],
-            "RetrainAutoBoostModelConfig":
-                self.model_settings["RETRAIN_AUTO_BOOST_MODEL_CONFIG"],
-            "MaxSuggestionsNumber": 3,
-            "AutoAnalysisTimeout": 300,
-            "MaxAutoAnalysisItemsToProcess": 4000
-        }
+        return SearchConfig(
+            MinShouldMatch='80%',
+            BoostAA=-2,
+            BoostLaunch=2,
+            BoostTestCaseHash=2,
+            MaxQueryTerms=50,
+            SearchLogsMinSimilarity=0.95,
+            MinWordLength=0,
+            TimeWeightDecay=0.95,
+            PatternLabelMinPercentToSuggest=0.5,
+            PatternLabelMinCountToSuggest=5,
+            PatternMinCountToSuggest=10,
+            BoostModelFolder=self.model_settings['BOOST_MODEL_FOLDER'],
+            SimilarityWeightsFolder=self.model_settings['SIMILARITY_WEIGHTS_FOLDER'],
+            SuggestBoostModelFolder=self.model_settings['SUGGEST_BOOST_MODEL_FOLDER'],
+            GlobalDefectTypeModelFolder=self.model_settings['GLOBAL_DEFECT_TYPE_MODEL_FOLDER'],
+            ProbabilityForCustomModelSuggestions=0.9,
+            ProbabilityForCustomModelAutoAnalysis=0.1,
+            MaxSuggestionsNumber=3,
+            AutoAnalysisTimeout=300,
+            MaxAutoAnalysisItemsToProcess=4000
+        )
 
     @utils.ignore_warnings
     def _start_server(self, test_calls):
         httpretty.reset()
         httpretty.enable(allow_net_connect=False)
         for test_info in test_calls:
-            if "content_type" in test_info:
-                httpretty.register_uri(
-                    test_info["method"],
-                    self.app_config["esHost"] + test_info["uri"],
-                    body=test_info["rs"] if "rs" in test_info else "",
-                    status=test_info["status"],
-                    content_type=test_info["content_type"]
-                )
-            else:
-                httpretty.register_uri(
-                    test_info["method"],
-                    self.app_config["esHost"] + test_info["uri"],
-                    body=test_info["rs"] if "rs" in test_info else "",
-                    status=test_info["status"]
-                )
+            content_type = test_info.get('content_type', '')
+            httpretty.register_uri(
+                test_info["method"],
+                self.app_config.esHost + test_info["uri"],
+                body=test_info["rs"] if "rs" in test_info else "",
+                status=test_info["status"],
+                content_type=content_type
+            )
 
     @staticmethod
     @utils.ignore_warnings
@@ -260,14 +249,23 @@ class TestService(unittest.TestCase):
         """Shutdown server and test request calls"""
         actual_calls = httpretty.latest_requests()
         assert len(actual_calls) == len(test_calls)
-        for expected_test_call, test_call in zip(test_calls, actual_calls):
+        for i, calls in enumerate(zip(test_calls, actual_calls)):
+            expected_test_call, test_call = calls
             assert expected_test_call["method"] == test_call.method
             assert expected_test_call["uri"] == test_call.path
             if "rq" in expected_test_call:
                 expected_body = expected_test_call["rq"]
                 real_body = test_call.parse_request_body(test_call.body)
-                if type(expected_body) == str and type(real_body) != str:
+                json_rq = False
+                if type(expected_body) is str and type(real_body) is not str:
                     expected_body = json.loads(expected_body)
-                assert expected_body == real_body
+                    json_rq = True
+                if expected_body != real_body:
+                    print(f'Error in request {i}')
+                    if json_rq:
+                        expected_body = json.dumps(expected_body)
+                        real_body = json.dumps(real_body)
+                    print(f'Expected: {expected_body}')
+                    print(f'Actual: {real_body}')
+                    raise AssertionError(f'Error in request {i}')
         httpretty.disable()
-        httpretty.reset()

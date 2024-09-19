@@ -12,14 +12,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
 import hashlib
 import heapq
+from time import time
+
 import numpy as np
 import sklearn
 from sklearn.feature_extraction.text import CountVectorizer
-from time import time
 
+from app.commons import logging
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.clusterizer")
@@ -30,7 +31,7 @@ class Clusterizer:
     def __init__(self):
         pass
 
-    def calculate_hashes(self, messages, n_gram=2, n_permutations=64):
+    def calculate_hashes(self, messages: list[str], n_gram: int = 2, n_permutations: int = 64) -> list[list[str]]:
         hashes = []
         for message in messages:
             words = message.split()
@@ -38,11 +39,12 @@ class Clusterizer:
             len_words = (len(words) - n_gram) if len(words) > n_gram else len(words)
             for i in range(len_words):
                 hash_print.add(hashlib.md5(" ".join(words[i:i + n_gram]).encode("utf-8")).hexdigest())
-            hash_print = list(heapq.nlargest(n_permutations, hash_print))
-            hashes.append(hash_print)
+            hashes.append(list(heapq.nlargest(n_permutations, hash_print)))
         return hashes
 
-    def find_groups_by_similarity(self, messages, groups_to_check, threshold=0.95):
+    def find_groups_by_similarity(
+            self, messages: list[str], groups_to_check: dict[int, list[int]],
+            threshold: float = 0.95) -> dict[int, list[int]]:
         if len(messages) == 0:
             return {}
         rearranged_groups = {}
@@ -66,7 +68,9 @@ class Clusterizer:
         logger.debug("Time for finding groups: %.2f s", time() - start_time)
         return rearranged_groups
 
-    def similarity_groupping(self, hash_prints, block_size=1000, for_text=True, threshold=0.95):
+    def similarity_groupping(
+            self, hash_prints: list[list[str]] | list[str], block_size: int = 1000, for_text: bool = True,
+            threshold: float = 0.95) -> dict[int, int]:
         num_of_blocks = int(np.ceil(len(hash_prints) / block_size))
         hash_groups = {}
         global_ind = 0
@@ -104,7 +108,7 @@ class Clusterizer:
                                 hash_groups[j] = hash_groups[i]
         return hash_groups
 
-    def unite_groups_by_hashes(self, messages, threshold=0.95):
+    def unite_groups_by_hashes(self, messages: list[str], threshold: float = 0.95) -> dict[int, list[int]]:
         start_time = time()
         hash_prints = self.calculate_hashes(messages)
         has_no_empty = False
@@ -124,7 +128,7 @@ class Clusterizer:
         logger.debug("Time for finding hash groups: %.2f s", time() - start_time)
         return rearranged_groups
 
-    def perform_light_deduplication(self, messages):
+    def perform_light_deduplication(self, messages: list[str]) -> tuple[list[str], dict[int, list[int]]]:
         text_messages_set = {}
         messages_to_cluster = []
         ids_with_duplicates = {}
@@ -141,11 +145,10 @@ class Clusterizer:
                 ids_with_duplicates[text_messages_set[text_message_normalized]].append(idx)
         return messages_to_cluster, ids_with_duplicates
 
-    def find_clusters(self, messages, threshold=0.95):
+    def find_clusters(self, messages: list[str], threshold: float = 0.95) -> dict[int, list[int]]:
         messages_to_cluster, ids_with_duplicates = self.perform_light_deduplication(messages)
         hash_groups = self.unite_groups_by_hashes(messages_to_cluster, threshold=threshold)
-        groups = self.find_groups_by_similarity(
-            messages_to_cluster, hash_groups, threshold=threshold)
+        groups = self.find_groups_by_similarity(messages_to_cluster, hash_groups, threshold=threshold)
         new_groups = {}
         for cluster in groups:
             new_log_ids = []

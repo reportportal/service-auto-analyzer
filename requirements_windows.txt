@@ -1,15 +1,15 @@
 flask==2.3.2
-flask-cors==3.0.10
+flask-cors==5.0.0
 waitress==2.1.2
 pika==1.2.1
 pydantic==1.10.13
 elasticsearch==7.0.0
-requests==2.31.0
+requests==2.32.0
 assertpy==1.1
 bump2version==1.0.1
 flake8==5.0.4
 nltk==3.8.1
-scikit-learn==1.2.1
+scikit-learn==1.5.0
 numpy==1.23.5
 scipy==1.10.1
 xgboost==1.7.3
@@ -17,5 +17,5 @@ python-dateutil==2.8.2
 minio==6.0.0
 gensim==4.3.0
 pandas==1.5.3
-imbalanced-learn==0.9.1
-urllib3==1.26.18
+imbalanced-learn==0.12.3
+urllib3==1.26.19

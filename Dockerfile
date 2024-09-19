@@ -1,6 +1,6 @@
-FROM --platform=${BUILDPLATFORM} bitnami/python:3.10.14 AS test
-RUN apt-get update && apt-get install -y build-essential \
-    && rm -rf /var/lib/apt/lists/* \
+FROM registry.access.redhat.com/ubi8/python-311:latest AS test
+USER root
+RUN dnf -y upgrade \
     && python -m venv /venv \
     && mkdir /build
 ENV VIRTUAL_ENV=/venv
@@ -13,10 +13,12 @@ RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
 RUN "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir -r requirements-dev.txt
 RUN make test-all
 
-
-FROM --platform=${BUILDPLATFORM} bitnami/python:3.10.14 AS builder
-RUN apt-get update && apt-get install -y build-essential libpcre3 libpcre3-dev \
-    && rm -rf /var/lib/apt/lists/* \
+FROM registry.access.redhat.com/ubi8/python-311:latest AS builder
+USER root
+RUN dnf -y upgrade && dnf -y install pcre-devel \
+    && dnf -y remove emacs-filesystem libjpeg-turbo libtiff libpng wget \
+    && dnf -y autoremove \
+    && dnf clean all \
     && python -m venv /venv \
     && mkdir /build
 ENV VIRTUAL_ENV=/venv
@@ -24,6 +26,7 @@ ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 WORKDIR /build
 COPY ./ ./
 RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
+    && "${VIRTUAL_ENV}/bin/pip" install --upgrade setuptools \
     && LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "${VIRTUAL_ENV}/bin/pip install --no-cache-dir -r requirements.txt" \
     && "${VIRTUAL_ENV}/bin/python3" -m nltk.downloader -d /usr/share/nltk_data stopwords
 ARG APP_VERSION=""
@@ -35,15 +38,18 @@ RUN mkdir /backend \
     && cp -r /build/app /backend/ \
     && cp -r /build/res /backend/
 
-
-FROM --platform=${BUILDPLATFORM} bitnami/python:3.10.14
+FROM registry.access.redhat.com/ubi8/python-311:latest
+USER root
 WORKDIR /backend/
 COPY --from=builder /backend ./
 COPY --from=builder /venv /venv
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
-RUN apt-get update && apt-get -y upgrade \
-    && apt-get install -y libxml2 libgomp1 curl libpcre3 libpcre3-dev \
-    && rm -rf /var/lib/apt/lists/* \
+RUN dnf -y upgrade && dnf -y install pcre-devel \
+    && dnf -y remove emacs-filesystem libjpeg-turbo libtiff libpng wget \
+    && dnf -y autoremove \
+    && dnf clean all \
+    && pip install --upgrade pip \
+    && pip install --upgrade setuptools \
     && mkdir -p -m 0700 /backend/storage \
     && groupadd uwsgi && useradd -g uwsgi uwsgi \
     && chown -R uwsgi: /usr/share/nltk_data \

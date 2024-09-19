@@ -1,0 +1,2 @@
+com.epam.reportportal.message.ReportPortalMessage
+org/springframework/boot/actuate/autoconfigure/endpoint/web/ServletEndpointManagementContextConfiguration.WebMvcServletEndpointManagementContextConfiguration.class

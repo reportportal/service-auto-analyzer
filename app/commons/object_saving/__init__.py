@@ -11,3 +11,21 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
+"""Common package for different Storage services (Minio, Filesystem, etc.)."""
+
+from app.commons.model.launch_objects import ApplicationConfig
+from app.commons.object_saving.object_saver import ObjectSaver
+
+
+def create(app_config: ApplicationConfig, project_id: str | int | None = None, path: str | None = None) -> ObjectSaver:
+    return ObjectSaver(app_config=app_config, project_id=project_id, path=path)
+
+
+def create_filesystem(base_path: str, project_id: str | int | None = None, path: str | None = None) -> ObjectSaver:
+    return ObjectSaver(
+        app_config=ApplicationConfig(binaryStoreType='filesystem', filesystemDefaultPath=base_path,
+                                     minioBucketPrefix=''),
+        project_id=project_id,
+        path=path
+    )

@@ -23,13 +23,13 @@
                     "issue_type": "AB001",
                     "launch_name": "Launch 1",
                     "log_level": 40000,
-                    "message": "Message AB \r\n Message AB \r\n Message AB",
+                    "message": "Message AB \n Message AB \n Message AB",
                     "original_message_lines": 3,
                     "original_message_words_number": 2,
                     "test_item": 1,
                     "unique_id": "unique1",
                     "test_case_hash": -1126886180,
-                    "detected_message": "Message AB \r\n Message AB",
+                    "detected_message": "Message AB \n Message AB",
                     "merged_small_logs": ""
                 }
             },
@@ -42,13 +42,13 @@
                     "issue_type": "PB001",
                     "launch_name": "Launch 1",
                     "log_level": 40000,
-                    "message": "Message PB \r\n Message PB \r\n Message PB",
+                    "message": "Message PB \n Message PB \n Message PB",
                     "original_message_lines": 3,
                     "original_message_words_number": 2,
                     "test_item": 1,
                     "unique_id": "unique1",
                     "test_case_hash": -1126886180,
-                    "detected_message": "Message AB \r\n Message AB",
+                    "detected_message": "Message AB \n Message AB",
                     "merged_small_logs": ""
                 }
             }

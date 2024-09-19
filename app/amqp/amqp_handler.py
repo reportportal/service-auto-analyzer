@@ -12,134 +12,156 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
 import json
-import pika
-from app.commons import launch_objects
+import uuid
+from typing import Callable, Any, Optional
+
+from pika.adapters.blocking_connection import BlockingChannel
+from pika.spec import Basic, BasicProperties
+
+from app.commons import logging
+from app.commons.model import launch_objects, ml
 
 logger = logging.getLogger("analyzerApp.amqpHandler")
 
 
-def prepare_launches(launches):
+def prepare_launches(launches: list) -> list[launch_objects.Launch]:
     """Function for deserializing array of launches"""
     return [launch_objects.Launch(**launch) for launch in launches]
 
 
-def prepare_suggest_info_list(suggest_info_list):
+def prepare_suggest_info_list(suggest_info_list: list) -> list[launch_objects.SuggestAnalysisResult]:
     """Function for deserializing array of suggest info results"""
     return [launch_objects.SuggestAnalysisResult(**res) for res in suggest_info_list]
 
 
-def prepare_search_logs(search_data):
+def prepare_search_logs(search_data: dict) -> launch_objects.SearchLogs:
     """Function for deserializing search logs object"""
     return launch_objects.SearchLogs(**search_data)
 
 
-def prepare_launch_info(launch_info):
+def prepare_launch_info(launch_info: dict) -> launch_objects.LaunchInfoForClustering:
     """Function for deserializing search logs object"""
     return launch_objects.LaunchInfoForClustering(**launch_info)
 
 
-def prepare_clean_index(clean_index):
+def prepare_clean_index(clean_index: dict) -> launch_objects.CleanIndex:
     """Function for deserializing clean index object"""
     return launch_objects.CleanIndex(**clean_index)
 
 
-def prepare_delete_index(body):
+def prepare_delete_index(body: Any) -> int:
     """Function for deserializing index id object"""
     return int(body)
 
 
-def prepare_test_item_info(test_item_info):
+def prepare_test_item_info(test_item_info: Any) -> launch_objects.TestItemInfo:
     """Function for deserializing test item info for suggestions"""
     return launch_objects.TestItemInfo(**test_item_info)
 
 
-def prepare_search_response_data(response):
+def prepare_train_info(train_info: dict) -> ml.TrainInfo:
+    """Function for deserializing train info object"""
+    return ml.TrainInfo(**train_info)
+
+
+def prepare_search_response_data(response: list | dict) -> str:
     """Function for serializing response from search request"""
     return json.dumps(response)
 
 
-def prepare_analyze_response_data(response):
+def prepare_analyze_response_data(response: list) -> str:
     """Function for serializing response from analyze request"""
     return json.dumps([resp.dict() for resp in response])
 
 
-def prepare_index_response_data(response):
+def prepare_index_response_data(response: Any) -> str:
     """Function for serializing response from index request
     and other objects, which are pydantic objects"""
     return response.json()
 
 
-def output_result(response):
+def output_result(response: Any) -> str:
     """Function for serializing int object"""
     return str(response)
 
 
-def handle_amqp_request(channel, method, props, body,
-                        request_handler, prepare_data_func=prepare_launches,
-                        prepare_response_data=prepare_search_response_data,
-                        publish_result=True):
-    """Function for handling amqp reuqest: index, search and analyze"""
-    logger.debug("Started processing %s method %s props", method, props)
-    logger.debug("Started processing data %s", body)
+def __get_correlation_id() -> str:
+    return str(uuid.uuid4())
+
+
+def handle_amqp_request(channel: BlockingChannel, method: Basic.Deliver, props: BasicProperties, body: bytes,
+                        request_handler: Callable[[Any], Any],
+                        prepare_data_func: Callable[[Any], Any] = prepare_launches,
+                        prepare_response_data: Callable[[Any], str] = prepare_search_response_data,
+                        publish_result: bool = True) -> None:
+    """Function for handling amqp request: index, search and analyze."""
+    logging.new_correlation_id()
+    logger.debug(f'Started message processing:\n--Method: {method}\n'
+                 f'--Properties: {props}\n--Body: {body}')
     try:
-        launches = json.loads(body, strict=False)
-    except Exception as err:
-        logger.error("Failed to load json from body")
-        logger.error(err)
-        return False
+        message = json.loads(body, strict=False)
+    except Exception as exc:
+        logger.error('Failed to parse message body to JSON')
+        logger.exception(exc)
+        return
     try:
-        launches = prepare_data_func(launches)
-    except Exception as err:
-        logger.error("Failed to transform body into objects")
-        logger.error(err)
-        return False
+        message = prepare_data_func(message)
+    except Exception as exc:
+        logger.error('Failed to prepare message body')
+        logger.exception(exc)
+        return
     try:
-        response = request_handler(launches)
-    except Exception as err:
-        logger.error("Failed to process launches")
-        logger.error(err)
-        return False
+        response = request_handler(message)
+    except Exception as exc:
+        logger.error('Failed to handle message')
+        logger.exception(exc)
+        return
 
     try:
         response_body = prepare_response_data(response)
-    except Exception as err:
-        logger.error("Failed to dump launches result")
-        logger.error(err)
-        return False
+    except Exception as exc:
+        logger.error('Failed to prepare response body')
+        logger.exception(exc)
+        return
     if publish_result:
         try:
             if props.reply_to:
-                channel.basic_publish(exchange='',
-                                      routing_key=props.reply_to,
-                                      properties=pika.BasicProperties(
-                                          correlation_id=props.correlation_id,
-                                          content_type="application/json"),
-                                      mandatory=False,
-                                      body=response_body)
-        except Exception as err:
-            logger.error("Failed to publish result")
-            logger.error(err)
-    logger.debug("Finished processing %s method", method)
-    return True
+                channel.basic_publish(
+                    exchange='', routing_key=props.reply_to,
+                    properties=BasicProperties(correlation_id=props.correlation_id, content_type='application/json'),
+                    mandatory=False, body=bytes(response_body, 'utf-8'))
+        except Exception as exc:
+            logger.error('Failed to publish result')
+            logger.exception(exc)
+            return
+    logger.debug('Finished processing message')
 
 
-def handle_inner_amqp_request(channel, method, props, body, request_handler):
-    """Function for handling inner amqp reuqests"""
-    logger.debug("Started processing %s method %s props", method, props)
-    logger.debug("Started processing data %s", body)
+def handle_inner_amqp_request(_: BlockingChannel, method: Basic.Deliver, props: BasicProperties, body: bytes,
+                              request_handler: Callable[[Any], Any],
+                              prepare_data_func: Optional[Callable[[Any], Any]] = None):
+    """Function for handling inner amqp requests."""
+    logging.new_correlation_id()
+    logger.debug(f'Started inner message processing.\n--Method: {method}\n'
+                 f'--Properties: {props}\n--Body: {body}')
     try:
-        stats_info = json.loads(body, strict=False)
-    except Exception as err:
-        logger.error("Failed to load json from body")
-        logger.error(err)
-        return False
+        message = json.loads(body, strict=False)
+    except Exception as exc:
+        logger.error('Failed to parse message body to JSON')
+        logger.exception(exc)
+        return
+    if prepare_data_func:
+        try:
+            message = prepare_data_func(message)
+        except Exception as exc:
+            logger.error('Failed to prepare message body')
+            logger.exception(exc)
+            return
     try:
-        request_handler(stats_info)
-    except Exception as err:
-        logger.error("Failed to process stats info")
-        logger.error(err)
-        return False
-    logger.debug("Finished processing %s method", method)
-    return True
+        request_handler(message)
+    except Exception as exc:
+        logger.error('Failed to handle message')
+        logger.exception(exc)
+        return
+    logger.debug('Finished processing message')

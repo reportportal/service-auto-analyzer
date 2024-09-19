@@ -5,7 +5,7 @@
 * you may not use this file except in compliance with the License.
 * You may obtain a copy of the License at
 *
-* http://www.apache.org/licenses/LICENSE-2.0
+* https://www.apache.org/licenses/LICENSE-2.0
 *
 * Unless required by applicable law or agreed to in writing, software
 * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,11 +21,12 @@ from unittest.mock import MagicMock
 
 import httpretty
 
-from app.boosting_decision_making.boosting_decision_maker import BoostingDecisionMaker
-from app.commons import launch_objects
+from app.commons import object_saving
+from app.commons.model import launch_objects
+from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.service import SuggestService
 from app.utils import utils
-from test import get_fixture
+from test import get_fixture, APP_CONFIG
 from test.mock_service import TestService
 
 
@@ -527,28 +528,7 @@ class TestSuggestService(TestService):
                                 "uri": "/rp_1",
                                 "status": HTTPStatus.OK,
                                 }],
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "minio",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "msearch_results": [
                     get_fixture(self.one_hit_search_rs_merged, to_json=True),
                     get_fixture(self.one_hit_search_rs_merged, to_json=True),
@@ -630,28 +610,7 @@ class TestSuggestService(TestService):
                                 "content_type": "application/json",
                                 "rs": get_fixture(self.index_logs_rs),
                                 }],
-                "app_config": {
-                    "esHost": "http://localhost:9200",
-                    "esUser": "",
-                    "esPassword": "",
-                    "esVerifyCerts": False,
-                    "esUseSsl": False,
-                    "esSslShowWarn": False,
-                    "turnOffSslVerification": True,
-                    "esCAcert": "",
-                    "esClientCert": "",
-                    "esClientKey": "",
-                    "appVersion": "",
-                    "minioRegion": "",
-                    "minioBucketPrefix": "",
-                    "filesystemDefaultPath": "",
-                    "esChunkNumber": 1000,
-                    "binaryStoreType": "minio",
-                    "minioHost": "",
-                    "minioAccessKey": "",
-                    "minioSecretKey": "",
-                    "esProjectIndexPrefix": "rp_"
-                },
+                "app_config": APP_CONFIG,
                 "msearch_results": [
                     get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True),
                     get_fixture(self.one_hit_search_rs_merged_wrong, to_json=True),
@@ -793,37 +752,29 @@ class TestSuggestService(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            try:
-                self._start_server(test["test_calls"])
-                config = self.get_default_search_config()
-                app_config = self.app_config
-                if "app_config" in test:
-                    app_config = test["app_config"]
-                suggest_service = SuggestService(self.model_chooser,
-                                                 app_config=app_config,
-                                                 search_cfg=config)
-                suggest_service.es_client.es_client.scroll = MagicMock(return_value=json.loads(
-                    get_fixture(self.no_hits_search_rs)))
-                if "msearch_results" in test:
-                    suggest_service.es_client.es_client.msearch = MagicMock(
-                        return_value={"responses": test["msearch_results"]})
-                _boosting_decision_maker = BoostingDecisionMaker()
-                _boosting_decision_maker.get_feature_ids = MagicMock(return_value=[0])
-                _boosting_decision_maker.get_feature_names = MagicMock(return_value=["0"])
-                _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])
-                suggest_service.model_chooser.choose_model = MagicMock(
-                    return_value=_boosting_decision_maker)
-                response = suggest_service.suggest_items(test["test_item_info"])
+            print(f'Running test case idx: {idx}')
+            self._start_server(test["test_calls"])
+            config = self.get_default_search_config()
+            app_config = self.app_config
+            if "app_config" in test:
+                app_config = test["app_config"]
+            suggest_service = SuggestService(self.model_chooser, app_config=app_config, search_cfg=config)
+            suggest_service.es_client.es_client.scroll = MagicMock(return_value=json.loads(
+                get_fixture(self.no_hits_search_rs)))
+            if "msearch_results" in test:
+                suggest_service.es_client.es_client.msearch = MagicMock(
+                    return_value={"responses": test["msearch_results"]})
+            _boosting_decision_maker = BoostingDecisionMaker(object_saving.create_filesystem(""), '', features=[0])
+            _boosting_decision_maker.predict = MagicMock(return_value=test["boost_predict"])
+            suggest_service.model_chooser.choose_model = MagicMock(return_value=_boosting_decision_maker)
+            response = suggest_service.suggest_items(test["test_item_info"])
 
-                assert len(response) == len(test["expected_result"])
-                for real_resp, expected_resp in zip(response, test["expected_result"]):
-                    real_resp.processedTime = 10.0
-                    assert real_resp == expected_resp
+            assert len(response) == len(test["expected_result"])
+            for real_resp, expected_resp in zip(response, test["expected_result"]):
+                real_resp.processedTime = 10.0
+                assert real_resp == expected_resp
 
-                TestSuggestService.shutdown_server(test["test_calls"])
-            except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}'). \
-                    with_traceback(err.__traceback__)
+            TestSuggestService.shutdown_server(test["test_calls"])
 
 
 if __name__ == '__main__':

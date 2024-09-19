@@ -12,24 +12,25 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
-from app.utils import utils
 from time import time
+
+from app.commons import logging
 from app.commons.esclient import EsClient
-from app.commons.launch_objects import CleanIndexStrIds
-from app.service import suggest_info_service
+from app.commons.model.launch_objects import CleanIndexStrIds, ApplicationConfig
+from app.service.suggest_info_service import SuggestInfoService
+from app.utils import utils
 
 logger = logging.getLogger("analyzerApp.cleanIndexService")
 
 
 class CleanIndexService:
+    es_client: EsClient
+    suggest_info_service: SuggestInfoService
 
-    def __init__(self, app_config=None, search_cfg=None):
-        self.app_config = app_config or {}
-        self.search_cfg = search_cfg or {}
-        self.es_client = EsClient(app_config=self.app_config, search_cfg=self.search_cfg)
-        self.suggest_info_service = suggest_info_service.SuggestInfoService(
-            app_config=self.app_config, search_cfg=self.search_cfg)
+    def __init__(self, app_config: ApplicationConfig):
+        self.app_config = app_config
+        self.es_client = EsClient(app_config=self.app_config)
+        self.suggest_info_service = SuggestInfoService(app_config=app_config)
 
     @utils.ignore_warnings
     def delete_logs(self, clean_index):

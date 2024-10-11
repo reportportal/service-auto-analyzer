@@ -190,7 +190,7 @@ class BoostingFeaturizer:
     def set_defect_type_model(self, defect_type_model: DefectTypeModel):
         self.defect_type_predict_model = defect_type_model
 
-    def predict_particular_defect_type(self):
+    def predict_particular_defect_type(self) -> dict[str, float]:
         scores_by_issue_type = self.find_most_relevant_by_type()
         result = {}
         for issue_type, search_rs in scores_by_issue_type.items():

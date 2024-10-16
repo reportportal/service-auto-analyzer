@@ -397,8 +397,7 @@ class BoostingFeaturizer:
         return has_several_logs_by_type
 
     def find_most_relevant_by_type(self) -> dict[str, dict[str, Any]]:
-        """
-        Find most relevant log by issue type from OpenSearch query result.
+        """Find most relevant log by issue type from OpenSearch query result.
 
         :return: dict with issue type as key and value as most relevant log and its metadata
         """
@@ -420,8 +419,7 @@ class BoostingFeaturizer:
         return self.scores_by_type
 
     def _calculate_score(self) -> dict[str, float]:
-        """
-        Calculate Score for every unique Issue Type from OpenSearch query result, normalized by maximum score in the
+        """Calculate Score for every unique Issue Type from OpenSearch query result, normalized by maximum score in the
         result.
 
         :return: dict with issue type as key and value as normalized score
@@ -442,8 +440,7 @@ class BoostingFeaturizer:
         return place_by_issue_type
 
     def _calculate_max_score_and_pos(self, return_val_name: str = 'max_score') -> dict[str, float]:
-        """
-        Calculate maximum Entry score and Inverse order for every issue type in query result.
+        """Calculate maximum Entry score and Inverse order for every issue type in query result.
 
         :param str return_val_name: name of return value, can be 'max_score' or 'max_score_pos'
         :return: dict with issue type as key and value as maximum score or inverse order of this score
@@ -460,8 +457,7 @@ class BoostingFeaturizer:
         return {item: results[return_val_name] for item, results in max_scores_by_issue_type.items()}
 
     def _calculate_min_score_and_pos(self, return_val_name: str = 'min_score') -> dict[str, float]:
-        """
-        Calculate minimum Entry score and Inverse order for every issue type in query result.
+        """Calculate minimum Entry score and Inverse order for every issue type in query result.
 
         :param str return_val_name: name of return value, can be 'min_score' or 'min_score_pos'
         :return: dict with issue type as key and value as minimum score or inverse order of this score

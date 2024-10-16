@@ -33,9 +33,11 @@ class BoostingFeaturizer:
     feature_ids: list[int]
     feature_functions: dict[int, tuple[Callable, dict[str, Any], list[int]]]
     previously_gathered_features: dict[int, list[list[float]]]
+    all_results: list[tuple[dict[str, Any], list[dict[str, Any]]]]
 
-    def __init__(self, all_results, config, feature_ids: str | list[int],
-                 weighted_log_similarity_calculator: WeightedSimilarityCalculator = None):
+    def __init__(self, all_results: list[tuple[dict[str, Any], list[dict[str, Any]]]], config,
+                 feature_ids: str | list[int],
+                 weighted_log_similarity_calculator: WeightedSimilarityCalculator = None) -> None:
         self.config = config
         self.previously_gathered_features = {}
         self.similarity_calculator = similarity_calculator.SimilarityCalculator(
@@ -325,7 +327,7 @@ class BoostingFeaturizer:
             num_of_logs_issue_type[issue_type] = int(self.config["number_of_log_lines"] == -1)
         return num_of_logs_issue_type
 
-    def is_only_merged_small_logs(self):
+    def is_only_merged_small_logs(self) -> dict[str, int]:
         scores_by_issue_type = self.find_most_relevant_by_type()
         similarity_percent_by_type = {}
         for issue_type, search_rs in scores_by_issue_type.items():
@@ -378,7 +380,7 @@ class BoostingFeaturizer:
             percent_by_issue_type[issue_type] = 1 / len(scores_by_issue_type) if len(scores_by_issue_type) else 0
         return percent_by_issue_type
 
-    def _has_test_item_several_logs(self):
+    def _has_test_item_several_logs(self) -> dict[str, int]:
         scores_by_issue_type = self.find_most_relevant_by_type()
         has_several_logs_by_type = {}
         for issue_type, search_rs in scores_by_issue_type.items():
@@ -386,7 +388,7 @@ class BoostingFeaturizer:
             has_several_logs_by_type[issue_type] = int(merged_small_logs.strip() != "")
         return has_several_logs_by_type
 
-    def _has_query_several_logs(self):
+    def _has_query_several_logs(self) -> dict[str, int]:
         scores_by_issue_type = self.find_most_relevant_by_type()
         has_several_logs_by_type = {}
         for issue_type, search_rs in scores_by_issue_type.items():
@@ -395,6 +397,11 @@ class BoostingFeaturizer:
         return has_several_logs_by_type
 
     def find_most_relevant_by_type(self) -> dict[str, dict[str, Any]]:
+        """
+        Find most relevant log by issue type from OpenSearch query result.
+
+        :return: dict with issue type as key and value as most relevant log and its metadata
+        """
         if self.scores_by_type is not None:
             return self.scores_by_type
 
@@ -408,22 +415,39 @@ class BoostingFeaturizer:
                 if hit['_score'] > issue_type_item['mrHit']['_score']:
                     issue_type_item['mrHit'] = hit
                     issue_type_item['compared_log'] = log
-                issue_type_item['score'] += (hit['normalized_score'] / self.total_normalized)
+                issue_type_item['score'] += (hit['normalized_score'] / self.total_normalized_score)
         self.scores_by_type = dict(scores_by_issue_type)
         return self.scores_by_type
 
-    def _calculate_score(self):
+    def _calculate_score(self) -> dict[str, float]:
+        """
+        Calculate Score for every unique Issue Type from OpenSearch query result, normalized by maximum score in the
+        result.
+
+        :return: dict with issue type as key and value as normalized score
+        """
         scores_by_issue_type = self.find_most_relevant_by_type()
         return {item: search_rs['score'] for item, search_rs in scores_by_issue_type.items()}
 
-    def _calculate_place(self):
+    def _calculate_place(self) -> dict[str, float]:
+        """
+        Calculate Inverse order for every unique Issue Type as it returned in OpenSearch result.
+
+        :return: dict with issue type as key and value as inverse order
+        """
         scores_by_issue_type = self._calculate_score()
         place_by_issue_type = {}
         for idx, issue_type_item in enumerate(sorted(scores_by_issue_type.items(), key=lambda x: x[1], reverse=True)):
             place_by_issue_type[issue_type_item[0]] = 1 / (1 + idx)
         return place_by_issue_type
 
-    def _calculate_max_score_and_pos(self, return_val_name="max_score"):
+    def _calculate_max_score_and_pos(self, return_val_name: str = 'max_score') -> dict[str, float]:
+        """
+        Calculate maximum Entry score and Inverse order for every issue type in query result.
+
+        :param str return_val_name: name of return value, can be 'max_score' or 'max_score_pos'
+        :return: dict with issue type as key and value as maximum score or inverse order of this score
+        """
         max_scores_by_issue_type = {}
         for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
@@ -435,7 +459,13 @@ class BoostingFeaturizer:
                                                             "max_score_pos": 1 / (1 + idx), }
         return {item: results[return_val_name] for item, results in max_scores_by_issue_type.items()}
 
-    def _calculate_min_score_and_pos(self, return_val_name="min_score"):
+    def _calculate_min_score_and_pos(self, return_val_name: str = 'min_score') -> dict[str, float]:
+        """
+        Calculate minimum Entry score and Inverse order for every issue type in query result.
+
+        :param str return_val_name: name of return value, can be 'min_score' or 'min_score_pos'
+        :return: dict with issue type as key and value as minimum score or inverse order of this score
+        """
         min_scores_by_issue_type = {}
         for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
@@ -468,21 +498,21 @@ class BoostingFeaturizer:
             issue_scores['cnt_items_percent'] /= cnt_items_glob
         return {item: results[return_val_name] for item, results in cnt_items_by_issue_type.items()}
 
-    def normalize_results(self, all_elastic_results):
+    def normalize_results(self, all_elastic_results) -> list[tuple[dict[str, Any], list[dict[str, Any]]]]:
         all_results = []
         max_score = 0
-        self.total_normalized = 0
-        for log, es_results in all_elastic_results:
+        self.total_normalized_score = 0
+        for query_log, es_results in all_elastic_results:
             for hit in es_results["hits"]["hits"]:
                 max_score = max(max_score, hit["_score"])
-        for log, es_results in all_elastic_results:
+        for query_log, es_results in all_elastic_results:
             for hit in es_results["hits"]["hits"]:
                 hit["normalized_score"] = hit["_score"] / max_score
-                self.total_normalized += hit["normalized_score"]
-            all_results.append((log, es_results["hits"]["hits"]))
+                self.total_normalized_score += hit["normalized_score"]
+            all_results.append((query_log, es_results["hits"]["hits"]))
         return all_results
 
-    def _calculate_similarity_percent(self, field_name="message"):
+    def _calculate_similarity_percent(self, field_name="message") -> dict[str, float]:
         scores_by_issue_type = self.find_most_relevant_by_type()
         if field_name not in self.similarity_calculator.similarity_dict:
             self.similarity_calculator.find_similarity(self.raw_results, [field_name])

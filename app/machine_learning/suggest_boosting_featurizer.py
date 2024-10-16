@@ -21,7 +21,8 @@ from app.machine_learning.models import WeightedSimilarityCalculator
 
 class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
 
-    def __init__(self, all_results, config, feature_ids: str | list[int],
+    def __init__(self, all_results: list[tuple[dict[str, Any], list[dict[str, Any]]]], config,
+                 feature_ids: str | list[int],
                  weighted_log_similarity_calculator: WeightedSimilarityCalculator = None) -> None:
         super().__init__(
             all_results, config, feature_ids, weighted_log_similarity_calculator=weighted_log_similarity_calculator)

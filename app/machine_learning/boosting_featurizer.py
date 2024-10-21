@@ -28,6 +28,7 @@ logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
 
 class BoostingFeaturizer:
+    config: dict[str, Any]
     defect_type_predict_model: Optional[DefectTypeModel]
     scores_by_type: Optional[dict[str, dict[str, Any]]]
     feature_ids: list[int]
@@ -35,9 +36,9 @@ class BoostingFeaturizer:
     previously_gathered_features: dict[int, list[list[float]]]
     all_results: list[tuple[dict[str, Any], list[dict[str, Any]]]]
 
-    def __init__(self, all_results: list[tuple[dict[str, Any], list[dict[str, Any]]]], config,
+    def __init__(self, all_results: list[tuple[dict[str, Any], list[dict[str, Any]]]], config: dict[str, Any],
                  feature_ids: str | list[int],
-                 weighted_log_similarity_calculator: WeightedSimilarityCalculator = None) -> None:
+                 weighted_log_similarity_calculator: Optional[WeightedSimilarityCalculator] = None) -> None:
         self.config = config
         self.previously_gathered_features = {}
         self.similarity_calculator = similarity_calculator.SimilarityCalculator(
@@ -130,14 +131,20 @@ class BoostingFeaturizer:
         self.used_model_info = set()
         self.features_to_recalculate_always = set([51, 58] + list(range(67, 74)))
 
-    def _count_test_item_logs(self):
+    def _count_test_item_logs(self) -> dict[str, int]:
+        """Count the number of requests (error logs) made to DB.
+
+        Analyzer makes requests to DB to get the most relevant logs for the Test Item which it analyses. It takes into
+        account each unique Error Log that is linked to the Item separately and makes a query to DB for each of them.
+        This method counts the number of requests made to DB.
+        """
         scores_by_issue_type = self.find_most_relevant_by_type()
         sim_logs_num_scores = {}
         for issue_type in scores_by_issue_type:
             sim_logs_num_scores[issue_type] = len(self.all_results)
         return sim_logs_num_scores
 
-    def _calculate_test_item_logs_similar_percent(self):
+    def _calculate_test_item_logs_similar_percent(self) -> dict[str, float]:
         scores_by_issue_type = self.find_most_relevant_by_type()
         sim_logs_num_scores = {}
         for issue_type, search_rs in scores_by_issue_type.items():

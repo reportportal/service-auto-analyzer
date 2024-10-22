@@ -272,6 +272,11 @@ class BoostingFeaturizer:
         return new_results
 
     def is_the_same_field(self, field_name: str) -> dict[str, int]:
+        """Check if the query log and search results contain field and its values are equal.
+
+        :param str field_name: field name to compare
+        :return: dict with issue type as key and value as 1 if fields are equal, 0 otherwise
+        """
         scores_by_issue_type = self.find_most_relevant_by_type()
         num_of_logs_issue_type = {}
         for issue_type, search_rs in scores_by_issue_type.items():
@@ -295,12 +300,24 @@ class BoostingFeaturizer:
         return num_of_logs_issue_type
 
     def is_the_same_test_case(self) -> dict[str, int]:
+        """Check if the query log and search results contain the same Test Case Hash.
+
+        :return: dict with issue type as key and value as 1 if Test Case Hashes are equal, 0 otherwise
+        """
         return self.is_the_same_field('test_case_hash')
 
     def is_the_same_launch(self) -> dict[str, int]:
+        """Check if the query log and search results contain the same Launch Name.
+
+        :return: dict with issue type as key and value as 1 if Launch Names are equal, 0 otherwise
+        """
         return self.is_the_same_field('launch_name')
 
     def is_the_same_launch_id(self) -> dict[str, int]:
+        """Check if the query log and search results contain the same Launch ID.
+
+        :return: dict with issue type as key and value as 1 if Launch IDs are equal, 0 otherwise
+        """
         return self.is_the_same_field('launch_id')
 
     def has_the_same_test_case_in_all_results(self):
@@ -336,7 +353,11 @@ class BoostingFeaturizer:
         scores_by_issue_type = self.find_most_relevant_by_type()
         return {item: search_rs['score'] for item, search_rs in scores_by_issue_type.items()}
 
-    def _is_all_log_lines(self):
+    def _is_all_log_lines(self) -> dict[str, int]:
+        """Return if all log lines were used to find the most relevant log.
+
+        :return: dict with issue type as key and value as 1 if all log lines were used, 0 otherwise
+        """
         scores_by_issue_type = self._calculate_score()
         num_of_logs_issue_type = {}
         for issue_type in scores_by_issue_type:
@@ -344,6 +365,10 @@ class BoostingFeaturizer:
         return num_of_logs_issue_type
 
     def is_only_merged_small_logs(self) -> dict[str, int]:
+        """Check if the query log and search results contain only merged small logs.
+
+        :return: dict with issue type as key and value as 1 if both logs contain only merged small logs, 0 otherwise
+        """
         scores_by_issue_type = self.find_most_relevant_by_type()
         similarity_percent_by_type = {}
         for issue_type, search_rs in scores_by_issue_type.items():
@@ -390,6 +415,10 @@ class BoostingFeaturizer:
         return new_results
 
     def _calculate_percent_issue_types(self) -> dict[str, float]:
+        """Calculate weight of every unique Issue Type among all unique Issue Types.
+
+        :return: dict with issue type as key and float value as weight
+        """
         scores_by_issue_type = self._calculate_score()
         percent_by_issue_type = {}
         for issue_type in scores_by_issue_type:
@@ -397,6 +426,11 @@ class BoostingFeaturizer:
         return percent_by_issue_type
 
     def _has_test_item_several_logs(self) -> dict[str, int]:
+        """Calculate if each of the most relevant results' Test Item has several small logs which were merged.
+
+        :return: dict with issue type as key and value as 1 if Test Item has several small logs which were merged,
+                 0 otherwise.
+        """
         scores_by_issue_type = self.find_most_relevant_by_type()
         has_several_logs_by_type = {}
         for issue_type, search_rs in scores_by_issue_type.items():
@@ -405,6 +439,11 @@ class BoostingFeaturizer:
         return has_several_logs_by_type
 
     def _has_query_several_logs(self) -> dict[str, int]:
+        """Calculate if request Test Item has several small logs which were merged.
+
+        :return: dict with issue type as key and value as 1 if request Test Item has several small logs which were
+                 merged, 0 otherwise.
+        """
         scores_by_issue_type = self.find_most_relevant_by_type()
         has_several_logs_by_type = {}
         for issue_type, search_rs in scores_by_issue_type.items():
@@ -516,9 +555,16 @@ class BoostingFeaturizer:
         return all_results
 
     def _calculate_similarity_percent(self, field_name="message") -> dict[str, float]:
+        """Calculate similarity percent by specified filed for every unique Issue Type from OpenSearch query result.
+
+        This method calculates cosine similarity by specified filed by vectors from CountVectorizer of sklearn library
+         under the hood. Text lines are reweighed by the WeightedSimilarityCalculator model.
+
+        :param str field_name: name of field to calculate similarity
+        :return: dict with issue type as key and float value as similarity percent
+        """
         scores_by_issue_type = self.find_most_relevant_by_type()
-        if field_name not in self.similarity_calculator.similarity_dict:
-            self.similarity_calculator.find_similarity(self.raw_results, [field_name])
+        self.similarity_calculator.find_similarity(self.raw_results, [field_name])
         similarity_percent_by_type = {}
         for issue_type, search_rs in scores_by_issue_type.items():
             group_id = (search_rs["mrHit"]["_id"], search_rs["compared_log"]["_id"])

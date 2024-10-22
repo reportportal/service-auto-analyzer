@@ -327,6 +327,15 @@ class BoostingFeaturizer:
                 fields_to_calc_similarity.add(method_params[1]['field_name'])
         return list(fields_to_calc_similarity)
 
+    def _calculate_score(self) -> dict[str, float]:
+        """Calculate Score for every unique Issue Type from OpenSearch query result, normalized by maximum score in the
+        result.
+
+        :return: dict with issue type as key and value as normalized score
+        """
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        return {item: search_rs['score'] for item, search_rs in scores_by_issue_type.items()}
+
     def _is_all_log_lines(self):
         scores_by_issue_type = self._calculate_score()
         num_of_logs_issue_type = {}
@@ -424,15 +433,6 @@ class BoostingFeaturizer:
                 issue_type_item['score'] += (hit['normalized_score'] / self.total_normalized_score)
         self.scores_by_type = dict(scores_by_issue_type)
         return self.scores_by_type
-
-    def _calculate_score(self) -> dict[str, float]:
-        """Calculate Score for every unique Issue Type from OpenSearch query result, normalized by maximum score in the
-        result.
-
-        :return: dict with issue type as key and value as normalized score
-        """
-        scores_by_issue_type = self.find_most_relevant_by_type()
-        return {item: search_rs['score'] for item, search_rs in scores_by_issue_type.items()}
 
     def _calculate_place(self) -> dict[str, float]:
         """

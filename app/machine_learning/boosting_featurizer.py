@@ -34,10 +34,11 @@ class BoostingFeaturizer:
     feature_ids: list[int]
     feature_functions: dict[int, tuple[Callable, dict[str, Any], list[int]]]
     previously_gathered_features: dict[int, list[list[float]]]
+    raw_results: list[tuple[dict[str, Any], dict[str, Any]]]
     all_results: list[tuple[dict[str, Any], list[dict[str, Any]]]]
     total_normalized_score: float
 
-    def __init__(self, all_results: list[tuple[dict[str, Any], list[dict[str, Any]]]], config: dict[str, Any],
+    def __init__(self, results: list[tuple[dict[str, Any], dict[str, Any]]], config: dict[str, Any],
                  feature_ids: str | list[int],
                  weighted_log_similarity_calculator: Optional[WeightedSimilarityCalculator] = None) -> None:
         self.config = config
@@ -105,28 +106,28 @@ class BoostingFeaturizer:
         }
 
         fields_to_calc_similarity = self.find_columns_to_find_similarities_for()
-        all_results = self._perform_additional_text_processing(all_results)
+        processed_results = self._perform_additional_text_processing(results)
 
         if "filter_min_should_match" in self.config and len(self.config["filter_min_should_match"]) > 0:
             self.similarity_calculator.find_similarity(
-                all_results, self.config["filter_min_should_match"] + ["merged_small_logs"])
+                processed_results, self.config["filter_min_should_match"] + ["merged_small_logs"])
             for field in self.config["filter_min_should_match"]:
-                all_results = self.filter_by_min_should_match(all_results, field=field)
+                processed_results = self.filter_by_min_should_match(processed_results, field=field)
         if "filter_min_should_match_any" in self.config and len(self.config["filter_min_should_match_any"]) > 0:
             self.similarity_calculator.find_similarity(
-                all_results, self.config["filter_min_should_match_any"] + ["merged_small_logs"])
-            all_results = self.filter_by_min_should_match_any(
-                all_results, fields=self.config["filter_min_should_match_any"])
-        self.test_item_log_stats = self._calculate_stats_by_test_item_ids(all_results)
+                processed_results, self.config["filter_min_should_match_any"] + ["merged_small_logs"])
+            processed_results = self.filter_by_min_should_match_any(
+                processed_results, fields=self.config["filter_min_should_match_any"])
+        self.test_item_log_stats = self._calculate_stats_by_test_item_ids(processed_results)
         if "filter_by_all_logs_should_be_similar" in self.config:
             if self.config["filter_by_all_logs_should_be_similar"]:
-                all_results = self.filter_by_all_logs_should_be_similar(all_results)
+                processed_results = self.filter_by_all_logs_should_be_similar(processed_results)
         if "filter_by_test_case_hash" in self.config and self.config["filter_by_test_case_hash"]:
-            all_results = self.filter_by_test_case_hash(all_results)
+            processed_results = self.filter_by_test_case_hash(processed_results)
         if "calculate_similarities" not in self.config or self.config["calculate_similarities"]:
-            self.similarity_calculator.find_similarity(all_results, fields_to_calc_similarity)
-        self.raw_results = all_results
-        self.all_results = self.normalize_results(all_results)
+            self.similarity_calculator.find_similarity(processed_results, fields_to_calc_similarity)
+        self.raw_results = processed_results
+        self.all_results = self.normalize_results(processed_results)
         self.scores_by_type = None
         self.defect_type_predict_model = None
         self.used_model_info = set()
@@ -202,7 +203,7 @@ class BoostingFeaturizer:
         return sim_logs_num_scores
 
     @staticmethod
-    def _perform_additional_text_processing(all_results):
+    def _perform_additional_text_processing(all_results: list[tuple[dict[str, Any], dict[str, Any]]]):
         for log, res in all_results:
             for r in res["hits"]["hits"]:
                 if "found_tests_and_methods" in r["_source"]:
@@ -283,7 +284,9 @@ class BoostingFeaturizer:
             issue_type_stats[issue_type] = int(label_type == rel_item_issue_type.lower()[:2])
         return issue_type_stats
 
-    def filter_by_all_logs_should_be_similar(self, all_results):
+    def filter_by_all_logs_should_be_similar(
+            self, all_results: list[tuple[dict[str, Any], dict[str, Any]]]
+    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         new_results = []
         for log, res in all_results:
             new_elastic_res = []
@@ -295,7 +298,8 @@ class BoostingFeaturizer:
         return new_results
 
     @staticmethod
-    def filter_by_test_case_hash(all_results):
+    def filter_by_test_case_hash(
+            all_results: list[tuple[dict[str, Any], dict[str, Any]]]) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         new_results = []
         for log, res in all_results:
             test_case_hash_dict = {}
@@ -435,7 +439,7 @@ class BoostingFeaturizer:
             similarity_percent_by_type[issue_type] = int(sim_obj["both_empty"])
         return similarity_percent_by_type
 
-    def filter_by_min_should_match(self, all_results, field="message"):
+    def filter_by_min_should_match(self, all_results: list[tuple[dict[str, Any], dict[str, Any]]], field="message"):
         new_results = []
         for log, res in all_results:
             new_elastic_res = []
@@ -451,7 +455,9 @@ class BoostingFeaturizer:
             new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
 
-    def filter_by_min_should_match_any(self, all_results, fields: list[str]):
+    def filter_by_min_should_match_any(
+            self, all_results: list[tuple[dict[str, Any], dict[str, Any]]], fields: list[str]
+    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         if not fields:
             return all_results
         new_results = []
@@ -576,7 +582,9 @@ class BoostingFeaturizer:
             issue_scores['cnt_items_percent'] /= cnt_items_glob
         return {item: results[return_val_name] for item, results in cnt_items_by_issue_type.items()}
 
-    def normalize_results(self, all_elastic_results) -> list[tuple[dict[str, Any], list[dict[str, Any]]]]:
+    def normalize_results(
+            self, all_elastic_results: list[tuple[dict[str, Any], dict[str, Any]]]
+    ) -> list[tuple[dict[str, Any], list[dict[str, Any]]]]:
         all_results = []
         max_score = 0
         self.total_normalized_score = 0.0

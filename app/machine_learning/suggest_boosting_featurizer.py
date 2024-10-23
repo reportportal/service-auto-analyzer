@@ -21,11 +21,11 @@ from app.machine_learning.models import WeightedSimilarityCalculator
 
 class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
 
-    def __init__(self, all_results: list[tuple[dict[str, Any], list[dict[str, Any]]]], config,
+    def __init__(self, results: list[tuple[dict[str, Any], dict[str, Any]]], config,
                  feature_ids: str | list[int],
                  weighted_log_similarity_calculator: WeightedSimilarityCalculator = None) -> None:
         super().__init__(
-            all_results, config, feature_ids, weighted_log_similarity_calculator=weighted_log_similarity_calculator)
+            results, config, feature_ids, weighted_log_similarity_calculator=weighted_log_similarity_calculator)
 
     def _calculate_percent_issue_types(self) -> dict[str, float]:
         scores_by_issue_type = self.find_most_relevant_by_type()

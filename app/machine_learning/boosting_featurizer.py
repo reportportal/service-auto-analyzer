@@ -35,6 +35,7 @@ class BoostingFeaturizer:
     feature_functions: dict[int, tuple[Callable, dict[str, Any], list[int]]]
     previously_gathered_features: dict[int, list[list[float]]]
     all_results: list[tuple[dict[str, Any], list[dict[str, Any]]]]
+    total_normalized_score: float
 
     def __init__(self, all_results: list[tuple[dict[str, Any], list[dict[str, Any]]]], config: dict[str, Any],
                  feature_ids: str | list[int],
@@ -130,6 +131,29 @@ class BoostingFeaturizer:
         self.defect_type_predict_model = None
         self.used_model_info = set()
         self.features_to_recalculate_always = set([51, 58] + list(range(67, 74)))
+        self.total_normalized_score = 0.0
+
+    def find_most_relevant_by_type(self) -> dict[str, dict[str, Any]]:
+        """Find most relevant log by issue type from OpenSearch query result.
+
+        :return: dict with issue type as key and value as most relevant log and its metadata
+        """
+        if self.scores_by_type is not None:
+            return self.scores_by_type
+
+        scores_by_issue_type = defaultdict(lambda: {'mrHit': {'_score': -1}, 'score': 0})
+        for log, es_results in self.all_results:
+            for idx, hit in enumerate(es_results):
+                issue_type = hit['_source']['issue_type']
+                hit['es_pos'] = idx
+
+                issue_type_item = scores_by_issue_type[issue_type]
+                if hit['_score'] > issue_type_item['mrHit']['_score']:
+                    issue_type_item['mrHit'] = hit
+                    issue_type_item['compared_log'] = log
+                issue_type_item['score'] += (hit['normalized_score'] / self.total_normalized_score)
+        self.scores_by_type = dict(scores_by_issue_type)
+        return self.scores_by_type
 
     def _count_test_item_logs(self) -> dict[str, int]:
         """Count the number of requests (error logs) made to DB.
@@ -144,7 +168,30 @@ class BoostingFeaturizer:
             sim_logs_num_scores[issue_type] = len(self.all_results)
         return sim_logs_num_scores
 
+    @staticmethod
+    def _calculate_stats_by_test_item_ids(
+            all_results: list[tuple[dict[str, Any], dict[str, Any]]]) -> dict[str, float]:
+        """Calculate relation between the number of logs found and queried for each Test Item.
+
+        :param list[tuple[dict[str, Any], dict[str, Any]]] all_results: list of logs queried and their search results
+        :return: dict with test item id as key and value as the relation between the number of logs found and queried
+        """
+        test_item_log_stats = defaultdict(lambda: 0)
+        for _, res in all_results:
+            for hit in res["hits"]["hits"]:
+                test_item = hit["_source"]["test_item"]
+                test_item_log_stats[test_item] += 1
+        all_query_num = len(all_results)
+        if all_query_num:
+            for test_item_id in test_item_log_stats:
+                test_item_log_stats[test_item_id] /= all_query_num
+        return dict(test_item_log_stats)
+
     def _calculate_test_item_logs_similar_percent(self) -> dict[str, float]:
+        """Calculate relation between the number of logs found and queried for each unique Issue Type.
+
+        :return: dict with issue type as key and value as the relation between the number of logs found and queried
+        """
         scores_by_issue_type = self.find_most_relevant_by_type()
         sim_logs_num_scores = {}
         for issue_type, search_rs in scores_by_issue_type.items():
@@ -153,19 +200,6 @@ class BoostingFeaturizer:
             if test_item_id in self.test_item_log_stats:
                 sim_logs_num_scores[issue_type] = self.test_item_log_stats[test_item_id]
         return sim_logs_num_scores
-
-    def _calculate_stats_by_test_item_ids(self, all_results):
-        test_item_log_stats = {}
-        for log, res in all_results:
-            for r in res["hits"]["hits"]:
-                if r["_source"]["test_item"] not in test_item_log_stats:
-                    test_item_log_stats[r["_source"]["test_item"]] = 0
-                test_item_log_stats[r["_source"]["test_item"]] += 1
-        all_logs = len(all_results)
-        if all_logs:
-            for test_item_id in test_item_log_stats:
-                test_item_log_stats[test_item_id] /= all_logs
-        return test_item_log_stats
 
     @staticmethod
     def _perform_additional_text_processing(all_results):
@@ -176,15 +210,23 @@ class BoostingFeaturizer:
                         r["_source"]["found_tests_and_methods"])
         return all_results
 
-    def _calculate_decay_function_score(self, field_name):
+    def _calculate_decay_function_score(self, field_name: str) -> dict[str, float]:
+        """Calculate the decay function score.
+
+        The function exponentially decrease float value from 1 to 0 depending on time passed from result log to log we
+        analyse.
+
+        :param str field_name: field name to compare, usually 'start_time'
+        :return: dict with issue type as key and value as the decay function float score from 1 to 0.
+        """
         decay_speed = np.log(self.config["time_weight_decay"])
         scores_by_issue_type = self.find_most_relevant_by_type()
         dates_by_issue_types = {}
         for issue_type, search_rs in scores_by_issue_type.items():
-            field_date = search_rs["mrHit"]["_source"][field_name]
-            field_date = datetime.strptime(field_date, '%Y-%m-%d %H:%M:%S')
-            compared_field_date = search_rs["compared_log"]["_source"][field_name]
-            compared_field_date = datetime.strptime(compared_field_date, '%Y-%m-%d %H:%M:%S')
+            field_date_str = search_rs["mrHit"]["_source"][field_name]
+            field_date = datetime.strptime(field_date_str, '%Y-%m-%d %H:%M:%S')
+            compared_field_date_str = search_rs["compared_log"]["_source"][field_name]
+            compared_field_date = datetime.strptime(compared_field_date_str, '%Y-%m-%d %H:%M:%S')
             if compared_field_date < field_date:
                 field_date, compared_field_date = compared_field_date, field_date
             dates_by_issue_types[issue_type] = np.exp(decay_speed * (compared_field_date - field_date).days / 7)
@@ -252,7 +294,8 @@ class BoostingFeaturizer:
             new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
 
-    def filter_by_test_case_hash(self, all_results):
+    @staticmethod
+    def filter_by_test_case_hash(all_results):
         new_results = []
         for log, res in all_results:
             test_case_hash_dict = {}
@@ -466,28 +509,6 @@ class BoostingFeaturizer:
             has_several_logs_by_type[issue_type] = int(merged_small_logs.strip() != "")
         return has_several_logs_by_type
 
-    def find_most_relevant_by_type(self) -> dict[str, dict[str, Any]]:
-        """Find most relevant log by issue type from OpenSearch query result.
-
-        :return: dict with issue type as key and value as most relevant log and its metadata
-        """
-        if self.scores_by_type is not None:
-            return self.scores_by_type
-
-        scores_by_issue_type = defaultdict(lambda: {'mrHit': {'_score': -1}, 'score': 0})
-        for log, es_results in self.all_results:
-            for idx, hit in enumerate(es_results):
-                issue_type = hit['_source']['issue_type']
-                hit['es_pos'] = idx
-
-                issue_type_item = scores_by_issue_type[issue_type]
-                if hit['_score'] > issue_type_item['mrHit']['_score']:
-                    issue_type_item['mrHit'] = hit
-                    issue_type_item['compared_log'] = log
-                issue_type_item['score'] += (hit['normalized_score'] / self.total_normalized_score)
-        self.scores_by_type = dict(scores_by_issue_type)
-        return self.scores_by_type
-
     def _calculate_place(self) -> dict[str, float]:
         """
         Calculate Inverse order for every unique Issue Type as it returned in OpenSearch result.
@@ -558,7 +579,7 @@ class BoostingFeaturizer:
     def normalize_results(self, all_elastic_results) -> list[tuple[dict[str, Any], list[dict[str, Any]]]]:
         all_results = []
         max_score = 0
-        self.total_normalized_score = 0
+        self.total_normalized_score = 0.0
         for query_log, es_results in all_elastic_results:
             for hit in es_results["hits"]["hits"]:
                 max_score = max(max_score, hit["_score"])
@@ -573,7 +594,7 @@ class BoostingFeaturizer:
         """Calculate similarity percent by specified filed for every unique Issue Type from OpenSearch query result.
 
         This method calculates cosine similarity by specified filed by vectors from CountVectorizer of sklearn library
-         under the hood. Text lines are reweighed by the WeightedSimilarityCalculator model.
+        under the hood. Text lines are reweighed by the WeightedSimilarityCalculator model.
 
         :param str field_name: name of field to calculate similarity
         :return: dict with issue type as key and float value as similarity percent

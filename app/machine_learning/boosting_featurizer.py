@@ -193,36 +193,46 @@ class BoostingFeaturizer:
     def fill_previously_gathered_features(self, feature_list: list[list[float]], feature_ids: list[int]) -> None:
         self.previously_gathered_features = utils.fill_previously_gathered_features(feature_list, feature_ids)
 
-    def get_used_model_info(self):
-        return list(self.used_model_info)
-
     def set_defect_type_model(self, defect_type_model: DefectTypeModel):
         self.defect_type_predict_model = defect_type_model
 
+    def get_used_model_info(self):
+        return list(self.used_model_info)
+
     def predict_particular_defect_type(self) -> dict[str, float]:
+        """Predict the probability of the most relevant log to be of a certain defect type.
+
+        The feature uses Defect Type Model to predict the probability of the most relevant log to be of a certain
+        defect type.
+
+        :return: dict with issue type as key and value as the probability of the most relevant log to be of a certain
+                 defect type
+        """
         scores_by_issue_type = self.find_most_relevant_by_type()
         result = {}
         for issue_type, search_rs in scores_by_issue_type.items():
             compared_log = search_rs["compared_log"]
             det_message = compared_log["_source"][DATA_FIELD]
             mr_hit = search_rs["mrHit"]
-            issue_type_to_compare = mr_hit["_source"]["issue_type"]
+            issue_type_to_compare: str = mr_hit["_source"]["issue_type"]
             result[issue_type] = 0.0
             try:
-                model_to_use = issue_type_to_compare.lower()[:2]
-                if model_to_use in ["nd", "ti"]:
+                if issue_type_to_compare.startswith('nd') or issue_type_to_compare.startswith('ti'):
                     continue
-                if issue_type_to_compare in self.defect_type_predict_model.models:
-                    model_to_use = issue_type_to_compare
-                res, res_prob = self.defect_type_predict_model.predict(
-                    [det_message], model_to_use)
+                res, res_prob = self.defect_type_predict_model.predict([det_message], issue_type_to_compare)
                 result[issue_type] = res_prob[0][1] if len(res_prob[0]) == 2 else 0.0
                 self.used_model_info.update(self.defect_type_predict_model.get_model_info())
             except Exception as err:
                 logger.exception(err)
         return result
 
-    def is_text_of_particular_defect_type(self, label_type):
+    def is_text_of_particular_defect_type(self, label_type: str) -> dict[str, int]:
+        """Check if the most relevant search results contain certain type of defect.
+
+        :param str label_type: type of defect to check
+        :return: dict with issue type as key and value as 1 if the most relevant search results contain certain type of
+                 defect, 0 otherwise
+        """
         scores_by_issue_type = self.find_most_relevant_by_type()
         issue_type_stats = {}
         for issue_type, search_rs in scores_by_issue_type.items():
@@ -320,7 +330,12 @@ class BoostingFeaturizer:
         """
         return self.is_the_same_field('launch_id')
 
-    def has_the_same_test_case_in_all_results(self):
+    def has_the_same_test_case_in_all_results(self) -> dict[str, int]:
+        """Check if the query log and search results contain the same Test Case Hash in any of all results.
+
+        :return: dict with issue type as key and value as 1 if Test Case Hashes are equal in any of all results,
+                 0 otherwise
+        """
         scores_by_issue_type = self.find_most_relevant_by_type()
         num_of_logs_issue_type = {}
         has_the_same_test_case = 0

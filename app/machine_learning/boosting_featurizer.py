@@ -127,12 +127,12 @@ class BoostingFeaturizer:
         if "calculate_similarities" not in self.config or self.config["calculate_similarities"]:
             self.similarity_calculator.find_similarity(processed_results, fields_to_calc_similarity)
         self.raw_results = processed_results
+        self.total_normalized_score = 0.0
         self.all_results = self.normalize_results(processed_results)
         self.scores_by_type = None
         self.defect_type_predict_model = None
         self.used_model_info = set()
         self.features_to_recalculate_always = set([51, 58] + list(range(67, 74)))
-        self.total_normalized_score = 0.0
 
     def find_most_relevant_by_type(self) -> dict[str, dict[str, Any]]:
         """Find most relevant log by issue type from OpenSearch query result.
@@ -257,8 +257,7 @@ class BoostingFeaturizer:
             compared_log = search_rs["compared_log"]
             det_message = compared_log["_source"][DATA_FIELD]
             mr_hit = search_rs["mrHit"]
-            issue_type_to_compare: str = mr_hit["_source"]["issue_type"]
-            result[issue_type] = 0.0
+            issue_type_to_compare: str = mr_hit["_source"]["issue_type"].lower()
             try:
                 if issue_type_to_compare.startswith('nd') or issue_type_to_compare.startswith('ti'):
                     continue

@@ -18,7 +18,6 @@ from http import HTTPStatus
 from unittest.mock import MagicMock
 
 import httpretty
-import sure
 
 from app.commons import object_saving
 from app.commons.model import launch_objects

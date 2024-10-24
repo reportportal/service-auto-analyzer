@@ -491,8 +491,8 @@ class BoostingFeaturizer:
     def _has_test_item_several_logs(self) -> dict[str, int]:
         """Calculate if each of the most relevant results' Test Item has several small logs which were merged.
 
-        :return: dict with issue type as key and value as 1 if Test Item has several small logs which were merged,
-                 0 otherwise.
+        :return: dict with issue type as key and value as 0 if Test Item has several small logs which were merged,
+                 1 otherwise.
         """
         scores_by_issue_type = self.find_most_relevant_by_type()
         has_several_logs_by_type = {}

@@ -428,7 +428,7 @@ class BoostingFeaturizer:
     def is_only_merged_small_logs(self) -> dict[str, int]:
         """Check if the query log and search results contain only merged small logs.
 
-        :return: dict with issue type as key and value as 1 if both logs contain only merged small logs, 0 otherwise
+        :return: dict with issue type as key and value as 0 if both logs contain only merged small logs, 1 otherwise
         """
         scores_by_issue_type = self.find_most_relevant_by_type()
         similarity_percent_by_type = {}

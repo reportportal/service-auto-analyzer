@@ -48,8 +48,7 @@ class LogMerger:
 
             if log["_id"] in log_level_ids_to_add[log_level]:
                 merged_small_logs = text_processing.compress(log_level_messages["message"][log_level])
-                new_logs.append(self.prepare_new_log(
-                    log, log["_id"], False, merged_small_logs))
+                new_logs.append(self.prepare_new_log(log, log["_id"], False, merged_small_logs))
 
         log_ids_for_merged_logs = {}
         for log_level in log_level_messages["message"]:

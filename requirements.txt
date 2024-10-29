@@ -1,7 +1,7 @@
 flask==2.3.2
 flask-cors==5.0.0
 Flask-WTF==1.2.1
-waitress==2.1.2
+waitress==3.0.1
 uWSGI==2.0.22
 pika==1.2.1
 pydantic==1.10.13

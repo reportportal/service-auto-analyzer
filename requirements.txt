@@ -20,3 +20,4 @@ pandas==1.5.3
 imbalanced-learn==0.12.3
 urllib3==1.26.19
 certifi>=2023.7.22
+werkzeug>=3.0.6 # not directly required, pinned by Snyk to avoid a vulnerability

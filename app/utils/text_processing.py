@@ -324,8 +324,8 @@ def first_lines(log_str: str, n_lines: int) -> str:
     return '\n'.join((log_str.split('\n')[:n_lines])) if n_lines >= 0 else log_str
 
 
-def prepare_message_for_clustering(message, number_of_log_lines, clean_numbers,
-                                   leave_log_structure=False):
+def prepare_message_for_clustering(message: str, number_of_log_lines: int, clean_numbers: bool,
+                                   leave_log_structure: bool = False) -> str:
     potential_status_codes = get_potential_status_codes(message)
     message = remove_starting_datetime(message)
     if clean_numbers:
@@ -424,7 +424,7 @@ def find_only_numbers(detected_message_with_numbers: str) -> str:
     return " ".join(split_words(detected_message_only_numbers))
 
 
-def enrich_text_with_method_and_classes(text):
+def enrich_text_with_method_and_classes(text: str) -> str:
     new_lines = []
     for line in text.split("\n"):
         new_line = line
@@ -671,7 +671,7 @@ def extract_paths(text):
     return all_paths
 
 
-def extract_message_params(text):
+def extract_message_params(text: str) -> list[str]:
     all_unique = set()
     all_params = []
     for param in re.findall(r"(^|\W)('.+?'|\".+?\")(\W|$|\n)", text):
@@ -746,7 +746,7 @@ def replace_text_pieces(text: str, text_pieces: Iterable[str]) -> str:
     return result
 
 
-def prepare_es_min_should_match(min_should_match):
+def prepare_es_min_should_match(min_should_match: float) -> str:
     return str(int(min_should_match * 100)) + "%"
 
 

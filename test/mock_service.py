@@ -256,7 +256,16 @@ class TestService(unittest.TestCase):
             if "rq" in expected_test_call:
                 expected_body = expected_test_call["rq"]
                 real_body = test_call.parse_request_body(test_call.body)
+                json_rq = False
                 if type(expected_body) is str and type(real_body) is not str:
                     expected_body = json.loads(expected_body)
-                assert expected_body == real_body, f'Error in request {i}'
+                    json_rq = True
+                if expected_body != real_body:
+                    print(f'Error in request {i}')
+                    if json_rq:
+                        expected_body = json.dumps(expected_body)
+                        real_body = json.dumps(real_body)
+                    print(f'Expected: {expected_body}')
+                    print(f'Actual: {real_body}')
+                    raise AssertionError(f'Error in request {i}')
         httpretty.disable()

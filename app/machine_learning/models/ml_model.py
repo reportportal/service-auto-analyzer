@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 from abc import ABCMeta, abstractmethod
-from typing import Any
+from typing import Any, Iterable
 
 from app.commons.object_saving.object_saver import ObjectSaver
 
@@ -36,7 +36,7 @@ class MlModel(metaclass=ABCMeta):
             result.append(model)
         return result
 
-    def _save_models(self, data: dict[str, Any] | list[tuple[str, Any]]) -> None:
+    def _save_models(self, data: dict[str, Any] | Iterable[tuple[str, Any]]) -> None:
         for file_name, object_to_save in dict(data).items():
             self.object_saver.put_project_object(object_to_save, file_name, using_json=False)
 

@@ -313,7 +313,8 @@ def build_more_like_this_query(min_should_match: str, log_message,
         "boost": boost}}
 
 
-def append_potential_status_codes(query, log, *, boost=8.0, max_query_terms=50):
+def append_potential_status_codes(
+        query: dict[str, Any], log: dict[str, Any], *, boost: float = 8.0, max_query_terms: int = 50) -> None:
     potential_status_codes = log["_source"]["potential_status_codes"].strip()
     if potential_status_codes:
         number_of_status_codes = str(len(set(potential_status_codes.split())))

@@ -36,7 +36,7 @@ class SimilarityCalculator:
         }
         self.artificial_columns = ["namespaces_stacktrace"]
 
-    def find_similarity(self, all_results: list[tuple[dict, dict]], fields: list[str]) -> None:
+    def find_similarity(self, all_results: list[tuple[dict[str, Any], dict[str, Any]]], fields: list[str]) -> None:
         for field in fields:
             if field in self.similarity_dict:
                 continue

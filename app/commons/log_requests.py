@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from datetime import datetime
+from typing import Any
 
 from app.commons.model.launch_objects import Launch, TestItem, Log, TestItemInfo
 from app.commons.log_merger import LogMerger
@@ -107,7 +108,7 @@ class LogRequests:
                                                     + prepared_log.stacktrace)
 
     @staticmethod
-    def _fill_log_fields(log_template: dict, log: Log, number_of_lines: int):
+    def _fill_log_fields(log_template: dict, log: Log, number_of_lines: int) -> dict[str, Any]:
         prepared_log = PreparedLogMessage(log.message, number_of_lines)
         LogRequests._fill_common_fields(log_template, log, prepared_log)
         log_template["_source"]["log_time"] = datetime(*log.logTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
@@ -149,7 +150,7 @@ class LogRequests:
         return log_template
 
     @staticmethod
-    def _fill_test_item_info_fields(log_template: dict, test_item_info: TestItemInfo, project: str) -> dict:
+    def _fill_test_item_info_fields(log_template: dict, test_item_info: TestItemInfo, project: str) -> dict[str, Any]:
         log_template["_index"] = project
         log_template["_source"]["launch_id"] = test_item_info.launchId
         log_template["_source"]["launch_name"] = test_item_info.launchName
@@ -190,7 +191,7 @@ class LogRequests:
         return log_words, project
 
     @staticmethod
-    def prepare_log_clustering_light(launch: Launch, test_item: TestItem, log: Log, project: str):
+    def prepare_log_clustering_light(launch: Launch, test_item: TestItem, log: Log, project: str) -> dict[str, Any]:
         log_template = create_log_template()
         log_template = LogRequests._fill_launch_test_item_fields(log_template, launch, test_item, project)
         prepared_log = PreparedLogMessage(log.message, -1)
@@ -198,7 +199,7 @@ class LogRequests:
         return log_template
 
     def prepare_logs_for_clustering(self, launch: Launch, number_of_lines: int, clean_numbers: bool,
-                                    project: str) -> tuple[list, dict, dict]:
+                                    project: str) -> tuple[list[str], dict[int, dict[str, Any]], dict[str, list[int]]]:
         log_messages = []
         log_dict = {}
         ind = 0
@@ -211,8 +212,8 @@ class LogRequests:
                 prepared_logs.append(LogRequests.prepare_log_clustering_light(launch, test_item, log, project))
             merged_logs, log_ids_for_merged_logs = self.log_merger.decompose_logs_merged_and_without_duplicates(
                 prepared_logs)
-            for _id in log_ids_for_merged_logs:
-                full_log_ids_for_merged_logs[_id] = log_ids_for_merged_logs[_id]
+            for _id, merged_list in log_ids_for_merged_logs.items():
+                full_log_ids_for_merged_logs[_id] = merged_list
             for log in merged_logs:
                 number_of_log_lines = number_of_lines
                 if log["_source"]["is_merged"]:

@@ -17,8 +17,6 @@ import re
 from app.commons import logging
 from app.commons.model.launch_objects import SearchConfig, Launch, TestItemInfo, AnalyzerConf
 from app.commons.model.ml import ModelInfo
-from app.commons.log_merger import LogMerger
-from app.commons.log_requests import LogRequests
 from app.commons.model_chooser import ModelChooser
 from app.utils import utils
 
@@ -103,15 +101,11 @@ def add_constraints_for_launches_into_query_suggest(query: dict, test_item_info:
 class AnalyzerService:
     search_cfg: SearchConfig
     launch_boost: float
-    log_requests: LogRequests
-    log_merger: LogMerger
     model_chooser: ModelChooser
 
     def __init__(self, model_chooser: ModelChooser, search_cfg: SearchConfig):
         self.search_cfg = search_cfg
         self.launch_boost = abs(self.search_cfg.BoostLaunch)
-        self.log_requests = LogRequests()
-        self.log_merger = LogMerger()
         self.model_chooser = model_chooser
 
     def find_min_should_match_threshold(self, analyzer_config: AnalyzerConf):

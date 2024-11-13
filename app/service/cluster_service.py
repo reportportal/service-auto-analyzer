@@ -23,10 +23,8 @@ import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 
 from app.amqp.amqp import AmqpClient
-from app.commons import clusterizer, logging
+from app.commons import clusterizer, logging, log_requests, log_merger
 from app.commons.esclient import EsClient
-from app.commons.log_merger import LogMerger
-from app.commons.log_requests import LogRequests
 from app.commons.model.launch_objects import (ClusterResult, ClusterInfo, SearchConfig, ApplicationConfig,
                                               LaunchInfoForClustering)
 from app.utils import utils, text_processing
@@ -38,15 +36,11 @@ class ClusterService:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
     es_client: EsClient
-    log_requests: LogRequests
-    log_merger: LogMerger
 
     def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=self.app_config)
-        self.log_requests = LogRequests()
-        self.log_merger = LogMerger()
 
     def add_query_with_start_time_decay(self, main_query: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -357,8 +351,9 @@ class ClusterService:
         log_ids = {}
         try:
             unique_errors_min_should_match = launch_info.launch.analyzerConfig.uniqueErrorsMinShouldMatch / 100.0  # noqa
-            log_messages, log_dict, log_ids_for_merged_logs = self.log_requests.prepare_logs_for_clustering(  # noqa
-                launch_info.launch, launch_info.numberOfLogLines, launch_info.cleanNumbers, index_name)
+            prepared_logs = log_requests.prepare_logs_for_clustering(launch_info.launch, index_name)
+            log_messages, log_dict, log_ids_for_merged_logs = log_merger.merge_logs(
+                prepared_logs, launch_info.numberOfLogLines, launch_info.cleanNumbers)
             log_ids = set([str(log["_id"]) for log in log_dict.values()])
             groups = self.cluster_messages_with_grouping_by_error(
                 log_messages, log_dict, unique_errors_min_should_match)

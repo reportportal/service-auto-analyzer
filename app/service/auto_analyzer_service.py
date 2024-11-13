@@ -19,10 +19,8 @@ from threading import Thread
 from time import time, sleep
 
 from app.amqp.amqp import AmqpClient
-from app.commons import logging
-from app.commons import object_saving
+from app.commons import logging, log_requests, object_saving, log_merger
 from app.commons.esclient import EsClient
-from app.commons.log_requests import LogRequests
 from app.commons.model.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult, \
     SearchConfig, ApplicationConfig, Launch
 from app.commons.model.ml import ModelType
@@ -337,9 +335,9 @@ class AutoAnalyzerService(AnalyzerService):
                         logger.info("Early finish from analyzer before timeout")
                         break
                     unique_logs = text_processing.leave_only_unique_logs(test_item.logs)
-                    prepared_logs = [LogRequests._prepare_log(launch, test_item, log, index_name)
+                    prepared_logs = [log_requests.prepare_log(launch, test_item, log, index_name)
                                      for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
-                    results, _ = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+                    results, _ = log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
 
                     for log in results:
                         message = log["_source"]["message"].strip()

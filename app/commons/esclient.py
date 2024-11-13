@@ -25,11 +25,9 @@ from elasticsearch import RequestsHttpConnection
 from urllib3.exceptions import InsecureRequestWarning
 
 from app.amqp.amqp import AmqpClient
-from app.commons import logging
+from app.commons import logging, log_requests, log_merger
 from app.commons.model.launch_objects import ApplicationConfig, Response, Launch, TestItem, BulkResponse
 from app.commons.model.ml import TrainInfo, ModelType
-from app.commons.log_merger import LogMerger
-from app.commons.log_requests import LogRequests
 from app.utils import utils, text_processing
 
 logger = logging.getLogger("analyzerApp.esclient")
@@ -40,16 +38,12 @@ class EsClient:
     app_config: ApplicationConfig
     es_client: elasticsearch.Elasticsearch
     host: str
-    log_requests: LogRequests
-    log_merger: LogMerger
     tables_to_recreate: list[str]
 
     def __init__(self, app_config: ApplicationConfig, es_client: elasticsearch.Elasticsearch = None):
         self.app_config = app_config
         self.host = app_config.esHost
         self.es_client = es_client or self.create_es_client(app_config)
-        self.log_requests = LogRequests()
-        self.log_merger = LogMerger()
         self.tables_to_recreate = ["rp_aa_stats", "rp_model_train_stats", "rp_suggestions_info_metrics"]
 
     def create_es_client(self, app_config: ApplicationConfig) -> elasticsearch.Elasticsearch:
@@ -220,7 +214,7 @@ class EsClient:
                 if log.logLevel < utils.ERROR_LOGGING_LEVEL or not log.message.strip():
                     continue
 
-                bodies.append(LogRequests._prepare_log(launch, test_item, log, project_with_prefix))
+                bodies.append(log_requests.prepare_log(launch, test_item, log, project_with_prefix))
                 logs_added = True
             if logs_added:
                 test_item_ids.append(str(test_item.testItemId))
@@ -276,7 +270,7 @@ class EsClient:
                     test_items_dict[test_item_id] = []
                 test_items_dict[test_item_id].append(r)
             for test_item_id in test_items_dict:
-                merged_logs, _ = self.log_merger.decompose_logs_merged_and_without_duplicates(
+                merged_logs, _ = log_merger.decompose_logs_merged_and_without_duplicates(
                     test_items_dict[test_item_id])
                 for log in merged_logs:
                     if log["_source"]["is_merged"]:

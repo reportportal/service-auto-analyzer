@@ -97,8 +97,8 @@ def _fill_common_fields(log_template: dict, log: Log, prepared_log: PreparedLogM
     log_template["_source"]["stacktrace"] = prepared_log.stacktrace
     log_template["_source"]["potential_status_codes"] = prepared_log.exception_message_potential_status_codes
     log_template["_source"]["found_exceptions"] = prepared_log.exception_found
-    log_template["_source"]["whole_message"] = (prepared_log.exception_message_no_params + "\n"
-                                                + prepared_log.stacktrace)
+    log_template["_source"]["whole_message"] = '\n'.join([prepared_log.exception_message_no_params,
+                                                          prepared_log.stacktrace])
 
 
 def _fill_log_fields(log_template: dict, log: Log, number_of_lines: int) -> dict[str, Any]:

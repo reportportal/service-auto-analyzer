@@ -44,6 +44,7 @@ class ClusterService:
 
     def add_query_with_start_time_decay(self, main_query: dict[str, Any]) -> dict[str, Any]:
         return {
+            "_source": main_query["_source"],
             "size": main_query["size"],
             "query": {
                 "function_score": {
@@ -73,8 +74,7 @@ class ClusterService:
             min_should_match: str = "95%") -> dict[str, Any]:
         """Build search query"""
         query = {
-            "_source": ["whole_message", "test_item", "is_merged",
-                        "detected_message", "stacktrace", "launch_id", "cluster_id",
+            "_source": ["whole_message", "test_item", "is_merged", "detected_message", "launch_id", "cluster_id",
                         "cluster_message", "potential_status_codes", "found_exceptions"],
             "size": 10,
             "query": {

@@ -17,9 +17,8 @@ from typing import Any, Optional
 
 from app.utils import text_processing
 
-FIELDS_TO_CLEAN = ["message", "detected_message", "detected_message_with_numbers", "stacktrace",
-                   "detected_message_extended", "stacktrace_extended", "message_extended",
-                   "message_without_params_extended", "message_without_params_and_brackets",
+FIELDS_TO_CLEAN = ["message", "detected_message", "detected_message_with_numbers", "detected_message_extended",
+                   "message_extended", "message_without_params_extended", "message_without_params_and_brackets",
                    "detected_message_without_params_and_brackets"]
 FIELDS_TO_MERGE = ["message", "found_exceptions", "potential_status_codes", "found_tests_and_methods", "only_numbers",
                    "urls", "paths", "message_params", "detected_message_without_params_extended", "whole_message"]
@@ -63,9 +62,9 @@ def merge_big_and_small_logs(
                 fields_to_clean=FIELDS_TO_CLEAN)
             log_ids_for_merged_logs[merged_logs_id] = logs_ids_in_merged_logs[log_level]
             for field in log_level_messages:
-                if field in ["message"]:
+                if field == "message":
                     continue
-                if field in ["whole_message"]:
+                if field == "whole_message":
                     new_log["_source"][field] = log_level_messages[field][log_level]
                 else:
                     new_log["_source"][field] = text_processing.compress(
@@ -122,7 +121,7 @@ def decompose_logs_merged_and_without_duplicates(
 
                 for field in log_level_messages:
                     if field in log["_source"]:
-                        splitter = "\n" if field in ["message", "whole_message"] else " "
+                        splitter = "\n" if field in {"message", "whole_message"} else " "
                         log_level_messages[field][log_level] = \
                             log_level_messages[field][log_level] + log["_source"][field] + splitter
 

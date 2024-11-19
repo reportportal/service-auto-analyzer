@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from app.utils.log_preparation import (basic_prepare, prepare_message, prepare_message_no_params,
+from app.utils.log_preparation import (basic_prepare, clean_message, prepare_message, prepare_message_no_params,
                                        prepare_exception_message_no_params,
                                        prepare_exception_message_and_stacktrace)
 from app.utils import text_processing
@@ -22,6 +22,7 @@ class PreparedLogMessage:
 
     original_message: str
     number_of_lines: int
+    _basic_message: str = None
     _clean_message: str = None
     _test_and_methods: set[str] = None
     _message: str = None
@@ -50,9 +51,15 @@ class PreparedLogMessage:
         return self.original_message
 
     @property
+    def basic_message(self) -> str:
+        if not self._basic_message:
+            self._basic_message = basic_prepare(self.original_message)
+        return self._basic_message
+
+    @property
     def clean_message(self) -> str:
         if not self._clean_message:
-            self._clean_message = basic_prepare(self.original_message)
+            self._clean_message = clean_message(self.basic_message)
         return self._clean_message
 
     @property

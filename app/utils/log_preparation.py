@@ -28,9 +28,12 @@ def basic_prepare(message: str) -> str:
 
     # This should go right after starting garbage clean-up
     cleaned_message = text_processing.unify_line_endings(cleaned_message)
-
     cleaned_message = text_processing.remove_markdown_mode(cleaned_message)
-    cleaned_message = text_processing.replace_code_separators(cleaned_message)
+    return cleaned_message
+
+
+def clean_message(basic_message: str) -> str:
+    cleaned_message = text_processing.replace_code_separators(basic_message)
     cleaned_message = text_processing.remove_webdriver_auxiliary_info(cleaned_message)
     cleaned_message = text_processing.replace_tabs_for_newlines(cleaned_message)
     cleaned_message = text_processing.fix_big_encoded_urls(cleaned_message)

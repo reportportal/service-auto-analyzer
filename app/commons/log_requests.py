@@ -18,7 +18,7 @@ from typing import Any
 from app.commons.model.launch_objects import Launch, TestItem, Log, TestItemInfo
 from app.commons.prepared_log import PreparedLogMessage
 from app.utils import utils, text_processing
-from app.utils.log_preparation import basic_prepare
+from app.utils.log_preparation import clean_message
 
 
 def create_log_template() -> dict:
@@ -176,7 +176,7 @@ def prepare_log_words(launches: list[Launch]) -> tuple[dict[str, int], int]:
             for log in test_item.logs:
                 if log.logLevel < utils.ERROR_LOGGING_LEVEL or not log.message.strip():
                     continue
-                cleaned_message = basic_prepare(log.message)
+                cleaned_message = clean_message(log.message)
                 det_message, stacktrace = text_processing.detect_log_description_and_stacktrace(cleaned_message)
                 for word in text_processing.split_words(stacktrace):
                     if '.' in word and len(word.split('.')) > 2:

@@ -101,8 +101,7 @@ def decompose_logs_merged_and_without_duplicates(
         if log_level not in logs_unique_log_level:
             logs_unique_log_level[log_level] = set()
 
-        if log["_source"]["original_message_lines"] <= 2 and \
-                log["_source"]["original_message_words_number"] <= 100:
+        if log["_source"]["original_message_lines"] <= 2 and log["_source"]["original_message_words_number"] <= 100:
             if log_level not in log_level_ids_merged:
                 log_level_ids_merged[log_level] = log
             if log_level not in logs_ids_in_merged_logs:

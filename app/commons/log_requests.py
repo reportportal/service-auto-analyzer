@@ -65,74 +65,75 @@ def transform_issue_type_into_lowercase(issue_type):
 
 
 def _fill_launch_test_item_fields(log_template: dict, launch: Launch, test_item: TestItem, project: str):
-    log_template["_index"] = project
-    log_template["_source"]["launch_id"] = launch.launchId
-    log_template["_source"]["launch_name"] = launch.launchName
-    log_template["_source"]["launch_number"] = getattr(launch, 'launchNumber', 0)
-    log_template["_source"]["launch_start_time"] = datetime(
-        *launch.launchStartTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
-    log_template["_source"]["test_item"] = test_item.testItemId
-    log_template["_source"]["unique_id"] = test_item.uniqueId
-    log_template["_source"]["test_case_hash"] = test_item.testCaseHash
-    log_template["_source"]["is_auto_analyzed"] = test_item.isAutoAnalyzed
-    log_template["_source"]["test_item_name"] = text_processing.preprocess_test_item_name(test_item.testItemName)
-    log_template["_source"]["issue_type"] = transform_issue_type_into_lowercase(test_item.issueType)
-    log_template["_source"]["start_time"] = datetime(*test_item.startTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
+    log_template['_index'] = project
+    source = log_template['_source']
+    source["launch_id"] = launch.launchId
+    source["launch_name"] = launch.launchName
+    source["launch_number"] = getattr(launch, 'launchNumber', 0)
+    source["launch_start_time"] = datetime(*launch.launchStartTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
+    source["test_item"] = test_item.testItemId
+    source["unique_id"] = test_item.uniqueId
+    source["test_case_hash"] = test_item.testCaseHash
+    source["is_auto_analyzed"] = test_item.isAutoAnalyzed
+    source["test_item_name"] = text_processing.preprocess_test_item_name(test_item.testItemName)
+    source["issue_type"] = transform_issue_type_into_lowercase(test_item.issueType)
+    source["start_time"] = datetime(*test_item.startTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
     return log_template
 
 
 def _fill_common_fields(log_template: dict, log: Log, prepared_log: PreparedLogMessage) -> None:
-    log_template["_source"]["cluster_id"] = str(log.clusterId)
-    log_template["_source"]["cluster_message"] = log.clusterMessage
-    log_template["_id"] = log.logId
-    log_template["_source"]["log_level"] = log.logLevel
-    log_template["_source"]['original_message'] = log.message
-    log_template["_source"]["original_message_lines"] = text_processing.calculate_line_number(
-        prepared_log.clean_message)
-    log_template["_source"]["original_message_words_number"] = len(
+    log_template['_id'] = log.logId
+    source = log_template['_source']
+    source['cluster_id'] = str(log.clusterId)
+    source['cluster_message'] = log.clusterMessage
+    source['log_level'] = log.logLevel
+    source['original_message'] = log.message
+    source['original_message_lines'] = text_processing.calculate_line_number(prepared_log.clean_message)
+    source['original_message_words_number'] = len(
         text_processing.split_words(prepared_log.clean_message, split_urls=False))
-    log_template["_source"]["message"] = prepared_log.message
-    log_template["_source"]["detected_message"] = prepared_log.exception_message_no_numbers
-    log_template["_source"]["detected_message_with_numbers"] = prepared_log.exception_message
-    log_template["_source"]["stacktrace"] = prepared_log.stacktrace
-    log_template["_source"]["potential_status_codes"] = prepared_log.exception_message_potential_status_codes
-    log_template["_source"]["found_exceptions"] = prepared_log.exception_found
-    log_template["_source"]["whole_message"] = '\n'.join([prepared_log.exception_message_no_params,
-                                                          prepared_log.stacktrace])
 
 
 def _fill_log_fields(log_template: dict, log: Log, number_of_lines: int) -> dict[str, Any]:
     prepared_log = PreparedLogMessage(log.message, number_of_lines)
     _fill_common_fields(log_template, log, prepared_log)
-    log_template["_source"]["log_time"] = datetime(*log.logTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
-    log_template["_source"]["cluster_with_numbers"] = utils.extract_clustering_setting(log.clusterId)
-    log_template["_source"]["only_numbers"] = prepared_log.exception_message_numbers
-    log_template["_source"]["urls"] = prepared_log.exception_message_urls
-    log_template["_source"]["paths"] = prepared_log.exception_message_paths
-    log_template["_source"]["message_params"] = prepared_log.exception_message_params
-    log_template["_source"]["found_exceptions_extended"] = prepared_log.exception_found_extended
-    log_template["_source"]["detected_message_extended"] = \
+    source = log_template['_source']
+    source["message"] = prepared_log.message
+    source["detected_message"] = prepared_log.exception_message_no_numbers
+    source["detected_message_with_numbers"] = prepared_log.exception_message
+    source["stacktrace"] = prepared_log.stacktrace
+    source["potential_status_codes"] = prepared_log.exception_message_potential_status_codes
+    source["found_exceptions"] = prepared_log.exception_found
+    source["whole_message"] = '\n'.join([prepared_log.exception_message_no_params,
+                                                          prepared_log.stacktrace])
+    source["log_time"] = datetime(*log.logTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
+    source["cluster_with_numbers"] = utils.extract_clustering_setting(log.clusterId)
+    source["only_numbers"] = prepared_log.exception_message_numbers
+    source["urls"] = prepared_log.exception_message_urls
+    source["paths"] = prepared_log.exception_message_paths
+    source["message_params"] = prepared_log.exception_message_params
+    source["found_exceptions_extended"] = prepared_log.exception_found_extended
+    source["detected_message_extended"] = \
         text_processing.enrich_text_with_method_and_classes(prepared_log.exception_message)
-    log_template["_source"]["detected_message_without_params_extended"] = \
+    source["detected_message_without_params_extended"] = \
         text_processing.enrich_text_with_method_and_classes(prepared_log.exception_message_no_params)
-    log_template["_source"]["stacktrace_extended"] = \
+    source["stacktrace_extended"] = \
         text_processing.enrich_text_with_method_and_classes(prepared_log.stacktrace)
-    log_template["_source"]["message_extended"] = \
+    source["message_extended"] = \
         text_processing.enrich_text_with_method_and_classes(prepared_log.message)
-    log_template["_source"]["message_without_params_extended"] = \
+    source["message_without_params_extended"] = \
         text_processing.enrich_text_with_method_and_classes(prepared_log.message_no_params)
-    log_template["_source"]["detected_message_without_params_and_brackets"] = \
+    source["detected_message_without_params_and_brackets"] = \
         prepared_log.exception_message_no_params
-    log_template["_source"]["message_without_params_and_brackets"] = prepared_log.message_no_params
-    log_template["_source"]["found_tests_and_methods"] = prepared_log.test_and_methods_extended
+    source["message_without_params_and_brackets"] = prepared_log.message_no_params
+    source["found_tests_and_methods"] = prepared_log.test_and_methods_extended
 
     for field in ["message", "detected_message", "detected_message_with_numbers",
                   "stacktrace", "only_numbers", "found_exceptions", "found_exceptions_extended",
                   "detected_message_extended", "detected_message_without_params_extended",
                   "stacktrace_extended", "message_extended", "message_without_params_extended",
                   "detected_message_without_params_and_brackets", "message_without_params_and_brackets"]:
-        log_template["_source"][field] = text_processing.leave_only_unique_lines(log_template["_source"][field])
-        log_template["_source"][field] = text_processing.clean_colon_stacking(log_template["_source"][field])
+        source[field] = text_processing.leave_only_unique_lines(source[field])
+        source[field] = text_processing.clean_colon_stacking(source[field])
     return log_template
 
 
@@ -145,17 +146,18 @@ def prepare_log(launch: Launch, test_item: TestItem, log: Log, project: str) -> 
 
 def _fill_test_item_info_fields(log_template: dict, test_item_info: TestItemInfo, project: str) -> dict[str, Any]:
     log_template["_index"] = project
-    log_template["_source"]["launch_id"] = test_item_info.launchId
-    log_template["_source"]["launch_name"] = test_item_info.launchName
-    log_template["_source"]["launch_number"] = getattr(test_item_info, 'launchNumber', 0)
-    log_template["_source"]["test_item"] = test_item_info.testItemId
-    log_template["_source"]["unique_id"] = test_item_info.uniqueId
-    log_template["_source"]["test_case_hash"] = test_item_info.testCaseHash
-    log_template["_source"]["test_item_name"] = text_processing.preprocess_test_item_name(
+    source = log_template['_source']
+    source["launch_id"] = test_item_info.launchId
+    source["launch_name"] = test_item_info.launchName
+    source["launch_number"] = getattr(test_item_info, 'launchNumber', 0)
+    source["test_item"] = test_item_info.testItemId
+    source["unique_id"] = test_item_info.uniqueId
+    source["test_case_hash"] = test_item_info.testCaseHash
+    source["test_item_name"] = text_processing.preprocess_test_item_name(
         test_item_info.testItemName)
-    log_template["_source"]["is_auto_analyzed"] = False
-    log_template["_source"]["issue_type"] = ""
-    log_template["_source"]["start_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    source["is_auto_analyzed"] = False
+    source["issue_type"] = ""
+    source["start_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     return log_template
 
 
@@ -189,6 +191,9 @@ def prepare_log_clustering_light(launch: Launch, test_item: TestItem, log: Log, 
     log_template = _fill_launch_test_item_fields(log_template, launch, test_item, project)
     prepared_log = PreparedLogMessage(log.message, -1)
     _fill_common_fields(log_template, log, prepared_log)
+    source = log_template['_source']
+    source['message_for_clustering'] = prepared_log.basic_message
+    # TODO: add fields for clustering: whole_message, exception_message_no_params, stacktrace, etc.
     return log_template
 
 

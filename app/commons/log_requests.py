@@ -103,8 +103,7 @@ def _fill_log_fields(log_template: dict, log: Log, number_of_lines: int) -> dict
     source["stacktrace"] = prepared_log.stacktrace
     source["potential_status_codes"] = prepared_log.exception_message_potential_status_codes
     source["found_exceptions"] = prepared_log.exception_found
-    source["whole_message"] = '\n'.join([prepared_log.exception_message_no_params,
-                                                          prepared_log.stacktrace])
+    source["whole_message"] = '\n'.join([prepared_log.exception_message_no_params, prepared_log.stacktrace])
     source["log_time"] = datetime(*log.logTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
     source["cluster_with_numbers"] = utils.extract_clustering_setting(log.clusterId)
     source["only_numbers"] = prepared_log.exception_message_numbers

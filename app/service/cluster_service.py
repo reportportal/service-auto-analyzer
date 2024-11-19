@@ -42,7 +42,7 @@ class ClusterService:
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=self.app_config)
 
-    def add_query_with_start_time_decay(self, main_query: dict[str, Any]) -> dict[str, Any]:
+    def get_query_with_start_time_decay(self, main_query: dict[str, Any]) -> dict[str, Any]:
         return {
             "_source": main_query["_source"],
             "size": main_query["size"],
@@ -123,7 +123,7 @@ class ClusterService:
             )
         utils.append_potential_status_codes(
             query, queried_log, boost=1.0, max_query_terms=self.search_cfg.MaxQueryTerms)
-        return self.add_query_with_start_time_decay(query)
+        return self.get_query_with_start_time_decay(query)
 
     def find_similar_items_from_es(self, groups: dict[int, list[int]], log_dict: dict[int, dict[str, Any]],
                                    log_messages: list[str], log_ids: set[str], launch_info: LaunchInfoForClustering,

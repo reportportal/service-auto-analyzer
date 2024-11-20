@@ -88,10 +88,11 @@ def decompose_logs_merged_and_without_duplicates(
     logs_ids_in_merged_logs = {}
 
     for log in logs:
-        if not log["_source"]["message"].strip():
+        source = log['_source']
+        if not source["message"].strip():
             continue
 
-        log_level = log["_source"]["log_level"]
+        log_level = source["log_level"]
 
         for field in log_level_messages:
             if log_level not in log_level_messages[field]:
@@ -101,7 +102,7 @@ def decompose_logs_merged_and_without_duplicates(
         if log_level not in logs_unique_log_level:
             logs_unique_log_level[log_level] = set()
 
-        if log["_source"]["original_message_lines"] <= 2 and log["_source"]["original_message_words_number"] <= 100:
+        if source['message_lines'] <= 2 and source['message_words_number'] <= 100:
             if log_level not in log_level_ids_merged:
                 log_level_ids_merged[log_level] = log
             if log_level not in logs_ids_in_merged_logs:
@@ -109,20 +110,20 @@ def decompose_logs_merged_and_without_duplicates(
             logs_ids_in_merged_logs[log_level].append(log["_id"])
 
             log_level_representative = log_level_ids_merged[log_level]
-            current_log_word_num = log["_source"]["original_message_words_number"]
-            main_log_word_num = log_level_representative["_source"]["original_message_words_number"]
+            current_log_word_num = source["message_words_number"]
+            main_log_word_num = log_level_representative["_source"]["message_words_number"]
             if current_log_word_num > main_log_word_num:
                 log_level_ids_merged[log_level] = log
 
-            normalized_msg = " ".join(log["_source"]["message"].strip().lower().split())
+            normalized_msg = " ".join(source["message"].strip().lower().split())
             if normalized_msg not in logs_unique_log_level[log_level]:
                 logs_unique_log_level[log_level].add(normalized_msg)
 
                 for field in log_level_messages:
-                    if field in log["_source"]:
+                    if field in source:
                         splitter = "\n" if field in {"message", "whole_message"} else " "
                         log_level_messages[field][log_level] = \
-                            log_level_messages[field][log_level] + log["_source"][field] + splitter
+                            log_level_messages[field][log_level] + source[field] + splitter
 
         else:
             log_level_ids_to_add[log_level].append(log["_id"])

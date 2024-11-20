@@ -41,8 +41,8 @@ def create_log_template() -> dict:
             "log_time": "",
             "log_level": 0,
             'original_message': '',
-            "original_message_lines": 0,
-            "original_message_words_number": 0,
+            'message_lines': 0,
+            'message_words_number': 0,
             "message": "",
             "is_merged": False,
             "start_time": "",
@@ -81,20 +81,25 @@ def _fill_launch_test_item_fields(log_template: dict, launch: Launch, test_item:
     return log_template
 
 
-def _fill_common_fields(log_template: dict, log: Log) -> None:
+def _fill_common_fields(log_template: dict, log: Log, prepared_log: PreparedLogMessage) -> None:
     log_template['_id'] = log.logId
     source = log_template['_source']
     source['cluster_id'] = str(log.clusterId)
     source['cluster_message'] = log.clusterMessage
     source['log_level'] = log.logLevel
     source['original_message'] = log.message
+    source['message'] = prepared_log.message
+    source['stacktrace'] = prepared_log.stacktrace
+    source['message_lines'] = text_processing.calculate_line_number(prepared_log.clean_message)
+    source['message_words_number'] = len(
+        text_processing.split_words(prepared_log.clean_message, split_urls=False))
+    source['whole_message'] = '\n'.join([prepared_log.exception_message_no_params, prepared_log.stacktrace])
 
 
 def _fill_log_fields(log_template: dict, log: Log, number_of_lines: int) -> dict[str, Any]:
     prepared_log = PreparedLogMessage(log.message, number_of_lines)
-    _fill_common_fields(log_template, log)
+    _fill_common_fields(log_template, log, prepared_log)
     source = log_template['_source']
-    source["message"] = prepared_log.message
     source["detected_message"] = prepared_log.exception_message_no_numbers
     source["detected_message_with_numbers"] = prepared_log.exception_message
     source["stacktrace"] = prepared_log.stacktrace
@@ -186,14 +191,7 @@ def prepare_log_clustering_light(launch: Launch, test_item: TestItem, log: Log, 
     log_template = create_log_template()
     log_template = _fill_launch_test_item_fields(log_template, launch, test_item, project)
     prepared_log = PreparedLogMessageClustering(log.message, -1)
-    _fill_common_fields(log_template, log)
-    source = log_template['_source']
-    source['message_clustering'] = prepared_log.message
-    source['stacktrace_clustering'] = prepared_log.stacktrace
-    source['whole_message_clustering'] = '\n'.join([prepared_log.exception_message_no_params, prepared_log.stacktrace])
-    source['original_message_lines'] = text_processing.calculate_line_number(prepared_log.clean_message)
-    source['original_message_words_number'] = len(
-        text_processing.split_words(prepared_log.clean_message, split_urls=False))
+    _fill_common_fields(log_template, log, prepared_log)
     return log_template
 
 

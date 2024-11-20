@@ -12,14 +12,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from typing_extensions import override
+
+from app.utils import text_processing
 from app.utils.log_preparation import (basic_prepare, clean_message, prepare_message, prepare_message_no_params,
                                        prepare_exception_message_no_params,
                                        prepare_exception_message_and_stacktrace)
-from app.utils import text_processing
 
 
 class PreparedLogMessage:
-
     original_message: str
     number_of_lines: int
     _basic_message: str = None
@@ -178,3 +179,14 @@ class PreparedLogMessage:
             self._test_and_methods_extended = text_processing.enrich_text_with_method_and_classes(
                 " ".join(self.test_and_methods))
         return self._test_and_methods_extended
+
+
+class PreparedLogMessageClustering(PreparedLogMessage):
+
+    def __init__(self, message: str, number_of_lines: int) -> None:
+        super().__init__(message, number_of_lines)
+
+    @override
+    @property
+    def clean_message(self) -> str:
+        return self.basic_message

@@ -89,10 +89,12 @@ def _fill_common_fields(log_template: dict, log: Log, prepared_log: PreparedLogM
     source['log_level'] = log.logLevel
     source['original_message'] = log.message
     source['message'] = prepared_log.message
-    source['stacktrace'] = prepared_log.stacktrace
     source['message_lines'] = text_processing.calculate_line_number(prepared_log.clean_message)
     source['message_words_number'] = len(
         text_processing.split_words(prepared_log.clean_message, split_urls=False))
+    source['stacktrace'] = prepared_log.stacktrace
+    source['potential_status_codes'] = prepared_log.exception_message_potential_status_codes
+    source['found_exceptions'] = prepared_log.exception_found
     source['whole_message'] = '\n'.join([prepared_log.exception_message_no_params, prepared_log.stacktrace])
 
 
@@ -102,10 +104,6 @@ def _fill_log_fields(log_template: dict, log: Log, number_of_lines: int) -> dict
     source = log_template['_source']
     source["detected_message"] = prepared_log.exception_message_no_numbers
     source["detected_message_with_numbers"] = prepared_log.exception_message
-    source["stacktrace"] = prepared_log.stacktrace
-    source["potential_status_codes"] = prepared_log.exception_message_potential_status_codes
-    source["found_exceptions"] = prepared_log.exception_found
-    source["whole_message"] = '\n'.join([prepared_log.exception_message_no_params, prepared_log.stacktrace])
     source["log_time"] = datetime(*log.logTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
     source["cluster_with_numbers"] = utils.extract_clustering_setting(log.clusterId)
     source["only_numbers"] = prepared_log.exception_message_numbers

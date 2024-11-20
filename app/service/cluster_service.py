@@ -229,11 +229,11 @@ class ClusterService:
     def cluster_messages_with_grouping_by_error(
             self, log_messages: list[str], log_dict: dict[int, dict[str, Any]],
             unique_errors_min_should_match: float) -> dict[int, list[int]]:
-        regroupped_by_error = self.regroup_by_error_and_status_codes(log_messages, log_dict)
+        regrouped_by_error = self.regroup_by_error_and_status_codes(log_messages, log_dict)
         _clusterizer = clusterizer.Clusterizer()
         all_groups = {}
         start_group_id = 0
-        for group in regroupped_by_error.values():
+        for group in regrouped_by_error.values():
             log_messages_part = []
             log_messages_idx_dict = {}
             for i, idx in enumerate(group):

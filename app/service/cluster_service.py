@@ -229,8 +229,7 @@ class ClusterService:
     def cluster_messages_with_grouping_by_error(
             self, log_messages: list[str], log_dict: dict[int, dict[str, Any]],
             unique_errors_min_should_match: float) -> dict[int, list[int]]:
-        regroupped_by_error = self.regroup_by_error_and_status_codes(
-            log_messages, log_dict)
+        regroupped_by_error = self.regroup_by_error_and_status_codes(log_messages, log_dict)
         _clusterizer = clusterizer.Clusterizer()
         all_groups = {}
         start_group_id = 0
@@ -409,14 +408,6 @@ class ClusterService:
         logger.debug("Stats info %s", results_to_share)
         logger.info("Processed the launch. It took %.2f sec.", time() - t_start)
         logger.info("Finished clustering for the launch with %d clusters.", cluster_num)
-        for cluster in clusters:
-            # Set original messages for clusters to show in UI
-            log_ids = set(cluster.logIds)
-            for test_item in launch_info.launch.testItems:
-                for log in test_item.logs:
-                    if log.logId in log_ids:
-                        cluster.clusterMessage = log.message
-                        break
         return ClusterResult(
             project=launch_info.project,
             launchId=launch_info.launch.launchId,

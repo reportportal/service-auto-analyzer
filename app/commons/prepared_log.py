@@ -16,7 +16,7 @@ from typing_extensions import override
 
 from app.utils import text_processing
 from app.utils.log_preparation import (basic_prepare, clean_message, prepare_message, prepare_message_no_numbers,
-                                       prepare_message_no_params,
+                                       prepare_message_no_params, prepare_exception_message_no_params_no_numbers,
                                        prepare_exception_message_no_params,
                                        prepare_exception_message_and_stacktrace)
 
@@ -123,8 +123,8 @@ class PreparedLogMessage:
     @property
     def exception_message_no_params(self) -> str:
         if not self._exception_message_no_params:
-            self._exception_message_no_params = text_processing.unify_spaces(prepare_exception_message_no_params(
-                self.exception_message))
+            self._exception_message_no_params = prepare_exception_message_no_params_no_numbers(
+                self.exception_message)
         return self._exception_message_no_params
 
     @property
@@ -197,3 +197,9 @@ class PreparedLogMessageClustering(PreparedLogMessage):
         if not self._message:
             self._message = prepare_message(self.clean_message, self.number_of_lines, self.test_and_methods)
         return self._message
+
+    @property
+    def exception_message_no_params(self) -> str:
+        if not self._exception_message_no_params:
+            self._exception_message_no_params = prepare_exception_message_no_params(self.exception_message)
+        return self._exception_message_no_params

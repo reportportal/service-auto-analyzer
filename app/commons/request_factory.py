@@ -21,7 +21,7 @@ from app.commons.model.launch_objects import Launch, TestItem, Log, TestItemInfo
 from app.commons.prepared_log import PreparedLogMessage, PreparedLogMessageClustering
 from app.utils import utils, text_processing
 from app.utils.log_preparation import clean_message
-from utils.utils import compute_if_absent
+from app.utils.utils import compute_if_absent
 
 
 def create_log_template() -> dict:

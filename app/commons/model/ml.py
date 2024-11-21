@@ -29,5 +29,5 @@ class ModelInfo(BaseModel):
 
 
 class TrainInfo(ModelInfo):
-    additional_projects: Optional[Iterable[int]]
+    additional_projects: Optional[Iterable[int]] = None
     gathered_metric_total: int = 0

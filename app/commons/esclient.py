@@ -214,7 +214,7 @@ class EsClient:
                 if log.logLevel < utils.ERROR_LOGGING_LEVEL or not log.message.strip():
                     continue
 
-                bodies.append(log_requests.prepare_log(launch, test_item, log, project_with_prefix))
+                bodies.append(request_factory.prepare_log(launch, test_item, log, project_with_prefix))
                 logs_added = True
             if logs_added:
                 test_item_ids.append(str(test_item.testItemId))

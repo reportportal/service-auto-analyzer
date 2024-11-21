@@ -155,8 +155,8 @@ class SearchService:
             if not message.strip():
                 continue
 
-            queried_log = log_requests.create_log_template()
-            queried_log = log_requests._fill_log_fields(
+            queried_log = request_factory.create_log_template()
+            queried_log = request_factory._fill_log_fields(
                 queried_log, Log(logId=global_id, message=message), search_req.logLines)
 
             msg_words = " ".join(text_processing.split_words(queried_log["_source"]["message"]))

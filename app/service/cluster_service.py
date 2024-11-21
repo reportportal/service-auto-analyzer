@@ -350,7 +350,7 @@ class ClusterService:
         log_ids = {}
         try:
             unique_errors_min_should_match = launch_info.launch.analyzerConfig.uniqueErrorsMinShouldMatch / 100.0  # noqa
-            prepared_logs = log_requests.prepare_logs_for_clustering(launch_info.launch, index_name)
+            prepared_logs = request_factory.prepare_logs_for_clustering(launch_info.launch, index_name)
             log_messages, log_dict, log_ids_for_merged_logs = log_merger.merge_logs(
                 prepared_logs, launch_info.numberOfLogLines, launch_info.cleanNumbers)
             log_ids = set([str(log["_id"]) for log in log_dict.values()])

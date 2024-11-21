@@ -23,7 +23,7 @@ import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 
 from app.amqp.amqp import AmqpClient
-from app.commons import clusterizer, logging, log_requests, log_merger
+from app.commons import clusterizer, logging, request_factory, log_merger
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import (ClusterResult, ClusterInfo, SearchConfig, ApplicationConfig,
                                               LaunchInfoForClustering)

@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+"""This module contains functions for preparing requests to Vector DB such as Elasticsearch and OpenSearch."""
+
 from datetime import datetime
 from typing import Any
 
@@ -19,6 +21,7 @@ from app.commons.model.launch_objects import Launch, TestItem, Log, TestItemInfo
 from app.commons.prepared_log import PreparedLogMessage, PreparedLogMessageClustering
 from app.utils import utils, text_processing
 from app.utils.log_preparation import clean_message
+from utils.utils import compute_if_absent
 
 
 def create_log_template() -> dict:
@@ -66,7 +69,7 @@ def transform_issue_type_into_lowercase(issue_type):
 
 def _fill_launch_test_item_fields(log_template: dict, launch: Launch, test_item: TestItem, project: str):
     log_template['_index'] = project
-    source = log_template['_source']
+    source = compute_if_absent(log_template, '_source', {})
     source["launch_id"] = launch.launchId
     source["launch_name"] = launch.launchName
     source["launch_number"] = getattr(launch, 'launchNumber', 0)
@@ -83,7 +86,7 @@ def _fill_launch_test_item_fields(log_template: dict, launch: Launch, test_item:
 
 def _fill_common_fields(log_template: dict, log: Log, prepared_log: PreparedLogMessage) -> None:
     log_template['_id'] = log.logId
-    source = log_template['_source']
+    source = compute_if_absent(log_template, '_source', {})
     source['cluster_id'] = str(log.clusterId)
     source['cluster_message'] = log.clusterMessage
     source['log_level'] = log.logLevel
@@ -101,7 +104,7 @@ def _fill_common_fields(log_template: dict, log: Log, prepared_log: PreparedLogM
 def _fill_log_fields(log_template: dict, log: Log, number_of_lines: int) -> dict[str, Any]:
     prepared_log = PreparedLogMessage(log.message, number_of_lines)
     _fill_common_fields(log_template, log, prepared_log)
-    source = log_template['_source']
+    source = compute_if_absent(log_template, '_source', {})
     source["detected_message"] = prepared_log.exception_message_no_numbers
     source["detected_message_with_numbers"] = prepared_log.exception_message
     source["log_time"] = datetime(*log.logTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
@@ -145,7 +148,7 @@ def prepare_log(launch: Launch, test_item: TestItem, log: Log, project: str) -> 
 
 def _fill_test_item_info_fields(log_template: dict, test_item_info: TestItemInfo, project: str) -> dict[str, Any]:
     log_template["_index"] = project
-    source = log_template['_source']
+    source = compute_if_absent(log_template, '_source', {})
     source["launch_id"] = test_item_info.launchId
     source["launch_name"] = test_item_info.launchName
     source["launch_number"] = getattr(test_item_info, 'launchNumber', 0)

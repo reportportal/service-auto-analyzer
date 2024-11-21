@@ -19,7 +19,7 @@ from threading import Thread
 from time import time, sleep
 
 from app.amqp.amqp import AmqpClient
-from app.commons import logging, log_requests, object_saving, log_merger
+from app.commons import logging, request_factory, object_saving, log_merger
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult, \
     SearchConfig, ApplicationConfig, Launch

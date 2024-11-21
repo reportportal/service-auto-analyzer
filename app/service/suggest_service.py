@@ -20,7 +20,7 @@ from time import time
 import elasticsearch.helpers
 
 from app.amqp.amqp import AmqpClient
-from app.commons import logging, similarity_calculator, object_saving, log_requests, log_merger
+from app.commons import logging, similarity_calculator, object_saving, request_factory, log_merger
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import SuggestAnalysisResult, SearchConfig, ApplicationConfig, TestItemInfo, \
     AnalyzerConf

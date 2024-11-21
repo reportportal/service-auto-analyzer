@@ -17,7 +17,7 @@ from time import time
 import elasticsearch
 import elasticsearch.helpers
 
-from app.commons import logging, similarity_calculator, object_saving, log_requests, log_merger
+from app.commons import logging, similarity_calculator, object_saving, request_factory, log_merger
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import SearchLogInfo, Log, SearchConfig, ApplicationConfig
 from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator

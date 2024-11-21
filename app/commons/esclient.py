@@ -25,7 +25,7 @@ from elasticsearch import RequestsHttpConnection
 from urllib3.exceptions import InsecureRequestWarning
 
 from app.amqp.amqp import AmqpClient
-from app.commons import logging, log_requests, log_merger
+from app.commons import logging, request_factory, log_merger
 from app.commons.model.launch_objects import ApplicationConfig, Response, Launch, TestItem, BulkResponse
 from app.commons.model.ml import TrainInfo, ModelType
 from app.utils import utils, text_processing

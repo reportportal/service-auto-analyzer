@@ -73,6 +73,7 @@ def prepare_exception_message_and_stacktrace(message: str) -> tuple[str, str]:
 
 
 def prepare_exception_message_no_params(exception_message: str) -> str:
-    cleaned_message = text_processing.clean_from_params(exception_message)
+    cleaned_message = text_processing.remove_numbers(exception_message)
+    cleaned_message = text_processing.clean_from_params(cleaned_message)
     cleaned_message = text_processing.unify_spaces(cleaned_message)
     return cleaned_message

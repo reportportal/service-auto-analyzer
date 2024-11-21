@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from typing import Optional
 
 from typing_extensions import override
 
@@ -24,26 +25,26 @@ from app.utils.log_preparation import (basic_prepare, clean_message, prepare_mes
 class PreparedLogMessage:
     original_message: str
     number_of_lines: int
-    _basic_message: str = None
-    _clean_message: str = None
-    _test_and_methods: set[str] = None
-    _message: str = None
-    _message_no_params: str = None
-    _exception_message: str = None
-    _stacktrace: str = None
-    _exception_message_urls: str = None
-    _exception_message_paths: str = None
-    _exception_message_potential_status_codes: str = None
-    _exception_message_params: str = None
-    _exception_message_no_params: str = None
-    _exception_message_no_numbers: str = None
-    _exception_message_numbers: str = None
-    _exception_found: str = None
-    _exception_found_extended: str = None
-    _test_and_methods_extended: str = None
-    _stacktrace_paths: str = None
-    _stacktrace_no_paths: str = None
-    _stacktrace_no_paths_extended: str = None
+    _basic_message: Optional[str] = None
+    _clean_message: Optional[str] = None
+    _test_and_methods: Optional[set[str]] = None
+    _message: Optional[str] = None
+    _message_no_params: Optional[str] = None
+    _exception_message: Optional[str] = None
+    _stacktrace: Optional[str] = None
+    _exception_message_urls: Optional[str] = None
+    _exception_message_paths: Optional[str] = None
+    _exception_message_potential_status_codes: Optional[str] = None
+    _exception_message_params: Optional[str] = None
+    _exception_message_no_params: Optional[str] = None
+    _exception_message_no_numbers: Optional[str] = None
+    _exception_message_numbers: Optional[str] = None
+    _exception_found: Optional[str] = None
+    _exception_found_extended: Optional[str] = None
+    _test_and_methods_extended: Optional[str] = None
+    _stacktrace_paths: Optional[str] = None
+    _stacktrace_no_paths: Optional[str] = None
+    _stacktrace_no_paths_extended: Optional[str] = None
 
     def __init__(self, message: str, number_of_lines: int):
         self.original_message = message

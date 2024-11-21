@@ -171,6 +171,14 @@ def prepare_log_for_suggests(test_item_info: TestItemInfo, log: Log, project: st
     return log_template
 
 
+def get_words_in_stacktrace(stacktrace: str) -> dict[str, int]:
+    words = {}
+    for word in text_processing.split_words(stacktrace):
+        if '.' in word and len(word.split('.')) > 2:
+            words[word] = 1
+    return words
+
+
 def prepare_log_words(launches: list[Launch]) -> tuple[dict[str, int], int]:
     log_words = {}
     project = None
@@ -181,10 +189,8 @@ def prepare_log_words(launches: list[Launch]) -> tuple[dict[str, int], int]:
                 if log.logLevel < utils.ERROR_LOGGING_LEVEL or not log.message.strip():
                     continue
                 cleaned_message = clean_message(log.message)
-                det_message, stacktrace = text_processing.detect_log_description_and_stacktrace(cleaned_message)
-                for word in text_processing.split_words(stacktrace):
-                    if '.' in word and len(word.split('.')) > 2:
-                        log_words[word] = 1
+                _, stacktrace = text_processing.detect_log_description_and_stacktrace(cleaned_message)
+                log_words.update(get_words_in_stacktrace(stacktrace))
     return log_words, project
 
 

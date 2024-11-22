@@ -14,9 +14,11 @@
 
 import re
 from collections import Counter
-from typing import Optional
+from typing import Optional, Any
 
+import numpy as np
 import pandas as pd
+from scipy.sparse import csr_matrix
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import classification_report, confusion_matrix, f1_score
@@ -34,7 +36,29 @@ BASE_DEFECT_TYPE_PATTERN = re.compile(r'^([^_]+)_.*|^(\D+)\d+')
 DEFAULT_N_ESTIMATORS = 10
 
 
-def get_model(self: DefaultDict, model_name: str):
+# noinspection PyMethodMayBeStatic
+class DummyVectorizer:
+    def transform(self, data: list[str]) -> csr_matrix:
+        return csr_matrix(np.zeros((len(data), 1)))
+
+    def get_feature_names_out(self) -> list[str]:
+        return ['dummy']
+
+
+# noinspection PyMethodMayBeStatic
+class DummyClassifier:
+    def predict(self, data: pd.DataFrame) -> np.ndarray:
+        return np.zeros(data.shape[0])
+
+    def predict_proba(self, data: pd.DataFrame) -> np.ndarray:
+        return np.zeros((data.shape[0], 2))
+
+
+DEFAULT_MODEL = DummyClassifier()
+DEFAULT_VECTORIZER = DummyVectorizer()
+
+
+def get_model(default_value: Any, model_name: str) -> Any:
     m = BASE_DEFECT_TYPE_PATTERN.match(model_name)
     if not m:
         raise KeyError(model_name)
@@ -43,21 +67,29 @@ def get_model(self: DefaultDict, model_name: str):
         base_model_name = m.group(2)
     if not base_model_name:
         raise KeyError(model_name)
-    return self[base_model_name]
+    return default_value
+
+
+def get_vectorizer_model(_: Any, model_name: str) -> Any:
+    return get_model(DEFAULT_VECTORIZER, model_name)
+
+
+def get_classifier_model(_: Any, model_name: str) -> Any:
+    return get_model(DEFAULT_MODEL, model_name)
 
 
 class DefectTypeModel(MlModel):
     _loaded: bool
-    count_vectorizer_models: DefaultDict[str, TfidfVectorizer]
-    models: DefaultDict[str, RandomForestClassifier]
+    count_vectorizer_models: DefaultDict[str, TfidfVectorizer | DummyVectorizer]
+    models: DefaultDict[str, RandomForestClassifier | DummyClassifier]
     n_estimators: int
 
     def __init__(self, object_saver: ObjectSaver, tags: str = 'global defect type model', *,
                  n_estimators: Optional[int] = None) -> None:
         super().__init__(object_saver, tags)
         self._loaded = False
-        self.count_vectorizer_models = DefaultDict(get_model)
-        self.models = DefaultDict(get_model)
+        self.count_vectorizer_models = DefaultDict(get_vectorizer_model)
+        self.models = DefaultDict(get_classifier_model)
         self.n_estimators = n_estimators if n_estimators is not None else DEFAULT_N_ESTIMATORS
 
     @property
@@ -68,8 +100,8 @@ class DefectTypeModel(MlModel):
         if self.loaded:
             return
         model = self._load_models(MODEL_FILES)
-        self.count_vectorizer_models = DefaultDict(get_model, **model[0])
-        self.models = DefaultDict(get_model, **model[1])
+        self.count_vectorizer_models = DefaultDict(get_vectorizer_model, **model[0])
+        self.models = DefaultDict(get_classifier_model, **model[1])
         self._loaded = True
 
     def save_model(self):

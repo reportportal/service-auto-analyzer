@@ -259,8 +259,6 @@ class BoostingFeaturizer:
             mr_hit = search_rs["mrHit"]
             issue_type_to_compare: str = mr_hit["_source"]["issue_type"].lower()
             try:
-                if issue_type_to_compare.startswith('nd') or issue_type_to_compare.startswith('ti'):
-                    continue
                 res, res_prob = self.defect_type_predict_model.predict([det_message], issue_type_to_compare)
                 result[issue_type] = res_prob[0][1] if len(res_prob[0]) == 2 else 0.0
                 self.used_model_info.update(self.defect_type_predict_model.get_model_info())
@@ -652,10 +650,9 @@ class BoostingFeaturizer:
                         gathered_data_dict[feature] = []
                         for idx in sorted(issue_type_by_index.keys()):
                             issue_type = issue_type_by_index[idx]
-                            try:
-                                _ = result[issue_type][0]
+                            if isinstance(result[issue_type], list):
                                 gathered_data_dict[feature].append(result[issue_type])
-                            except:  # noqa
+                            else:
                                 gathered_data_dict[feature].append([round(result[issue_type], 2)])
                     self.previously_gathered_features[feature] = gathered_data_dict[feature]
             gathered_data = utils.gather_feature_list(gathered_data_dict, self.feature_ids)

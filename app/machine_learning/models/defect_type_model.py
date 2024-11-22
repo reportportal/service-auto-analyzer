@@ -58,7 +58,7 @@ DEFAULT_MODEL = DummyClassifier()
 DEFAULT_VECTORIZER = DummyVectorizer()
 
 
-def get_model(default_value: Any, model_name: str) -> Any:
+def get_model(self: DefaultDict, model_name: str, default_value: any) -> Any:
     m = BASE_DEFECT_TYPE_PATTERN.match(model_name)
     if not m:
         raise KeyError(model_name)
@@ -67,15 +67,18 @@ def get_model(default_value: Any, model_name: str) -> Any:
         base_model_name = m.group(2)
     if not base_model_name:
         raise KeyError(model_name)
-    return default_value
+    if base_model_name in self:
+        return self[base_model_name]
+    else:
+        return default_value
 
 
-def get_vectorizer_model(_: Any, model_name: str) -> Any:
-    return get_model(DEFAULT_VECTORIZER, model_name)
+def get_vectorizer_model(self: Any, model_name: str) -> Any:
+    return get_model(self, model_name, DEFAULT_VECTORIZER)
 
 
-def get_classifier_model(_: Any, model_name: str) -> Any:
-    return get_model(DEFAULT_MODEL, model_name)
+def get_classifier_model(self: Any, model_name: str) -> Any:
+    return get_model(self, model_name, DEFAULT_MODEL)
 
 
 class DefectTypeModel(MlModel):

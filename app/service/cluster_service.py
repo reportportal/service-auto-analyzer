@@ -73,7 +73,7 @@ class ClusterService:
             self, queried_log: dict[str, Any], message: str, launch_info: LaunchInfoForClustering,
             min_should_match: str = "95%") -> dict[str, Any]:
         """Build search query"""
-        query = {
+        query: dict[str, Any] = {
             "_source": ["whole_message", "test_item", "is_merged", "detected_message", "launch_id", "cluster_id",
                         "cluster_message", "potential_status_codes", "found_exceptions"],
             "size": 10,
@@ -191,7 +191,7 @@ class ClusterService:
                         if log_dict_part[ind]["_source"]["launch_id"] != launch_info.launch.launchId:
                             continue
                         log_ids.add(str(log_dict_part[ind]["_id"]))
-                        new_group_log_ids.append(str(log_dict_part[ind]["_id"]))
+                        new_group_log_ids.append(log_dict_part[ind]["_id"])
                         new_test_items.add(int(log_dict_part[ind]["_source"]["test_item"]))
                     if not cluster_id or not cluster_message:
                         continue
@@ -231,7 +231,7 @@ class ClusterService:
             unique_errors_min_should_match: float) -> dict[int, list[int]]:
         regrouped_by_error = self.regroup_by_error_and_status_codes(log_messages, log_dict)
         _clusterizer = clusterizer.Clusterizer()
-        all_groups = {}
+        all_groups: dict[int, list[int]] = {}
         start_group_id = 0
         for group in regrouped_by_error.values():
             log_messages_part = []
@@ -285,7 +285,7 @@ class ClusterService:
             log_ids_for_merged_logs: dict[str, list[int]],
             launch_info: LaunchInfoForClustering) -> tuple[list[ClusterInfo], int, dict[str, tuple[int, str]]]:
         merged_logs_to_update = {}
-        clusters_found = {}
+        clusters_found: dict[int, tuple[list[int], list[int]]] = {}
         cluster_message_by_id = {}
         for group in groups:
             cnt_items = len(groups[group])

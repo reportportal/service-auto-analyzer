@@ -18,7 +18,6 @@ from app.commons import object_saving
 from app.machine_learning.models.defect_type_model import DefectTypeModel
 from app.utils import utils
 
-
 WEB_DRIVER_ERROR = ("org.openqa.selenium.TimeoutException: Expected condition failed: waiting for visibility of "
                     "element located by By.xpath: "
                     "//*[contains(@class,'nav-bar_menu-items') and contains(text(),'Blog')] "

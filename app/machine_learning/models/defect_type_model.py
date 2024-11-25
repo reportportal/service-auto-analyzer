@@ -62,7 +62,7 @@ def get_model(self: DefaultDict, model_name: str, default_value: any) -> Any:
     m = BASE_DEFECT_TYPE_PATTERN.match(model_name)
     if not m:
         raise KeyError(model_name)
-    base_model_name = m.group(1) or m.group(2)
+    base_model_name = (m.group(1) or m.group(2)).strip()
     if not base_model_name:
         raise KeyError(model_name)
     if base_model_name in self:

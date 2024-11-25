@@ -53,7 +53,15 @@ def test_different_defect_type_predict(
     assert result[0][0] == expected
 
 
-@pytest.mark.parametrize('defect_type', ['ndabc', 'asdfcas', 'pb00a', 'nd_abc abc'])
+@pytest.mark.parametrize('defect_type', ['ndabc', 'asdfcas', 'pb00a', 'nd_abc abc', '\n_asdcas', ' _aab'])
 def test_invalid_type_error(defect_type_model: DefectTypeModel, defect_type: str) -> None:
     with pytest.raises(KeyError):
         defect_type_model.predict([WEB_DRIVER_ERROR], defect_type)
+
+
+def test_load_model_again_not_loads_model(defect_type_model: DefectTypeModel):
+    models = defect_type_model.models
+    count_vectorizer_models = defect_type_model.count_vectorizer_models
+    defect_type_model.load_model()
+    assert models is defect_type_model.models
+    assert count_vectorizer_models is defect_type_model.count_vectorizer_models

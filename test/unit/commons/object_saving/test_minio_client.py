@@ -36,8 +36,8 @@ def run_s3():
     server.stop()
 
 
-def create_storage_client():
-    return MinioClient(ApplicationConfig(minioHost=SERVER_HOST, minioRegion=REGION, minioBucketPrefix=BUCKET_PREFIX,
+def create_storage_client(bucket_prefix=BUCKET_PREFIX):
+    return MinioClient(ApplicationConfig(minioHost=SERVER_HOST, minioRegion=REGION, minioBucketPrefix=bucket_prefix,
                                          minioAccessKey='minio', minioSecretKey='minio', minioUseTls=False))
 
 
@@ -48,9 +48,12 @@ def test_object_not_exists():
     assert not minio_client.does_object_exists('2', object_name)
 
 
-def test_object_exists():
-    object_name = f'{random_alphanumeric(16)}.pickle'
-    minio_client = create_storage_client()
+@pytest.mark.parametrize('bucket_prefix, bucket, object_name', [
+    (BUCKET_PREFIX, '2', f'{random_alphanumeric(16)}.pickle'),
+    (f'test/{BUCKET_PREFIX}', '2', f'{random_alphanumeric(16)}.json'),
+])
+def test_object_exists(bucket_prefix, bucket, object_name):
+    minio_client = create_storage_client(bucket_prefix)
 
     minio_client.put_project_object({'test': True}, '2', object_name)
 
@@ -99,20 +102,24 @@ def test_json_read():
     assert result['test'] is True
 
 
-def test_not_existing_file_get():
-    object_name = f'{random_alphanumeric(16)}.json'
-    minio_client = create_storage_client()
+@pytest.mark.parametrize('bucket_prefix, bucket, bucket_name, object_name, object_path', [
+    (BUCKET_PREFIX, '2', f'{BUCKET_PREFIX}2', 'my_test_file.json', 'my_test_file.json',),
+    (f'test/{BUCKET_PREFIX}', '2', 'test', f'my_test_file.json', f'{BUCKET_PREFIX}2/my_test_file.json',),
+])
+def test_not_existing_file_get(bucket_prefix, bucket, bucket_name, object_name, object_path):
+    minio_client = create_storage_client(bucket_prefix)
 
     with pytest.raises(ValueError) as exc:
         minio_client.get_project_object('2', object_name)
-    assert exc.value.args[0] == f'Unable to get file: {object_name}'
+    assert exc.value.args[0] == f'Unable to get file in bucket "{bucket_name}" with path "{object_path}"'
 
 
-def test_remove_not_existing_folder():
-    path = 'test'
+@pytest.mark.parametrize('bucket', ['2', '3'])
+def test_remove_not_existing_folder(bucket):
+    path = 'test-remove-not-existing'
     minio_client = create_storage_client()
 
-    assert not minio_client.remove_folder_objects('3', path)
+    assert not minio_client.remove_folder_objects(bucket, path)
 
 
 def test_remove_existing_folder():

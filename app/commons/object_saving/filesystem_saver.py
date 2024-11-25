@@ -47,7 +47,7 @@ class FilesystemSaver(Storage):
         filename = unify_path_separator(os.path.join(self._base_path, path, object_name))
         if folder_to_save:
             os.makedirs(folder_to_save, exist_ok=True)
-        with open(filename, "wb") as f:
+        with open(filename, 'wb') as f:
             if using_json:
                 f.write(json.dumps(data).encode('utf-8'))
             else:
@@ -59,7 +59,7 @@ class FilesystemSaver(Storage):
         filename = unify_path_separator(os.path.join(self._base_path, path, object_name))
         if not utils.validate_file(filename):
             raise ValueError(f'Unable to get file: {filename}')
-        with open(filename, "rb") as f:
+        with open(filename, 'rb') as f:
             return json.loads(f.read()) if using_json else pickle.load(f)
 
     def does_object_exists(self, path: str, object_name: str) -> bool:

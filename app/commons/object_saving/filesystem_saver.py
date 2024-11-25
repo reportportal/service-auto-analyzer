@@ -69,7 +69,7 @@ class FilesystemSaver(Storage):
         root_path = self._base_path
         if not root_path and not path:
             root_path = os.getcwd()
-        if folder.endswith('/'):
+        if unify_path_separator(folder).endswith('/'):
             folder_to_check = unify_path_separator(os.path.join(root_path, path, folder))
             if os.path.exists(folder_to_check):
                 return [os.path.join(folder, file_name) for file_name in os.listdir(folder_to_check)]

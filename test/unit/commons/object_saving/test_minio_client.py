@@ -104,7 +104,7 @@ def test_json_read():
 
 @pytest.mark.parametrize('bucket_prefix, bucket, bucket_name, object_name, object_path', [
     (BUCKET_PREFIX, '2', f'{BUCKET_PREFIX}2', 'my_test_file.json', 'my_test_file.json',),
-    (f'test/{BUCKET_PREFIX}', '2', 'test', f'my_test_file.json', f'{BUCKET_PREFIX}2/my_test_file.json',),
+    (f'test/{BUCKET_PREFIX}', '2', 'test', 'my_test_file.json', f'{BUCKET_PREFIX}2/my_test_file.json',),
 ])
 def test_not_existing_file_get(bucket_prefix, bucket, bucket_name, object_name, object_path):
     minio_client = create_storage_client(bucket_prefix)

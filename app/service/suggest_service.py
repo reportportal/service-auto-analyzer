@@ -220,8 +220,8 @@ class SuggestService(AnalyzerService):
             for j in range(i + 1, len(gathered_results)):
                 test_item_id_first = test_item_ids[gathered_results[i][0]]
                 test_item_id_second = test_item_ids[gathered_results[j][0]]
-                group_id = (scores_by_test_items[test_item_id_first]["mrHit"]["_id"],
-                            scores_by_test_items[test_item_id_second]["mrHit"]["_id"])
+                group_id = (str(scores_by_test_items[test_item_id_first]["mrHit"]["_id"]),
+                            str(scores_by_test_items[test_item_id_second]["mrHit"]["_id"]))
                 if group_id not in sim_dict["detected_message_with_numbers"]:
                     continue
                 det_message = sim_dict["detected_message_with_numbers"]

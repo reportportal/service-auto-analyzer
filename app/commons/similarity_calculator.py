@@ -41,10 +41,10 @@ class SimilarityCalculator:
 
     def _calculate_field_similarity(
             self, log: dict, res: dict, log_field_ids: dict, count_vector_matrix: Optional[np.ndarray],
-            needs_reweighting_wc: bool, field: str) -> dict:
+            needs_reweighting_wc: bool, field: str) -> dict[tuple[str, str], dict[str, Any]]:
         all_results_similarity = {}
         for obj in res["hits"]["hits"]:
-            group_id = (obj["_id"], log["_id"])
+            group_id = (str(obj["_id"]), str(log["_id"]))
             index_query_message = log_field_ids[log["_id"]]
             index_log_message = log_field_ids[obj["_id"]]
             if ((isinstance(index_query_message, int) and index_query_message < 0)
@@ -77,13 +77,12 @@ class SimilarityCalculator:
                     all_results_similarity[group_id] = {"similarity": 0.0, "both_empty": False}
         return all_results_similarity
 
-    def _find_similarity_for_field(self, all_results: list[tuple[dict[str, Any], dict[str, Any]]], field: str) -> dict:
+    def _find_similarity_for_field(self, all_results: list[tuple[dict[str, Any], dict[str, Any]]],
+                                   field: str) -> dict[tuple[str, str], dict[str, Any]]:
         log_field_ids: dict = {}
         index_in_message_array = 0
-        count_vector_matrix: np.ndarray | None = None
         all_messages: list[str] = []
         all_messages_needs_reweighting: list[int] = []
-        needs_reweighting_wc: bool = False
         for log, res in all_results:
             for obj in [log] + res["hits"]["hits"]:
                 if obj["_id"] not in log_field_ids:
@@ -133,6 +132,9 @@ class SimilarityCalculator:
                             all_messages_needs_reweighting.append(needs_reweighting)
                             log_field_ids[obj["_id"]] = [index_in_message_array, len(all_messages) - 1]
                             index_in_message_array += len(text)
+
+        needs_reweighting_wc: bool = False
+        count_vector_matrix: np.ndarray | None = None
         if all_messages:
             needs_reweighting_wc = (all_messages_needs_reweighting
                                     and sum(all_messages_needs_reweighting) == len(all_messages_needs_reweighting))
@@ -143,16 +145,16 @@ class SimilarityCalculator:
             except ValueError:
                 # All messages are empty or contains only stop words
                 pass
+
         similarity = {}
         for log, res in all_results:
             sim_dict = self._calculate_field_similarity(
                 log, res, log_field_ids, count_vector_matrix, needs_reweighting_wc, field)
-            for key, value in sim_dict.items():
-                similarity[key] = value
+            similarity.update(sim_dict)
         return similarity
 
     def find_similarity(self, all_results: list[tuple[dict[str, Any], dict[str, Any]]],
-                        fields: list[str]) -> dict[str, dict]:
+                        fields: list[str]) -> dict[str, dict[tuple[str, str], dict[str, Any]]]:
         for field in fields:
             if field in self.__similarity_dict:
                 continue

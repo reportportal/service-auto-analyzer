@@ -430,7 +430,7 @@ class BoostingFeaturizer:
         scores_by_issue_type = self.find_most_relevant_by_type()
         similarity_percent_by_type = {}
         for issue_type, search_rs in scores_by_issue_type.items():
-            group_id = (search_rs["mrHit"]["_id"], search_rs["compared_log"]["_id"])
+            group_id = (str(search_rs["mrHit"]["_id"]), str(search_rs["compared_log"]["_id"]))
             sim_obj = self.similarity_calculator.find_similarity(self.raw_results, ["message"])["message"][group_id]
             similarity_percent_by_type[issue_type] = int(sim_obj["both_empty"])
         return similarity_percent_by_type
@@ -440,13 +440,13 @@ class BoostingFeaturizer:
         for log, res in all_results:
             new_elastic_res = []
             for elastic_res in res["hits"]["hits"]:
-                group_id = (elastic_res["_id"], log["_id"])
+                group_id = (str(elastic_res["_id"]), str(log["_id"]))
                 sim_dict = self.similarity_calculator.find_similarity(all_results, [field])
                 sim_obj = sim_dict[field][group_id]
                 similarity = sim_obj["similarity"]
                 if sim_obj["both_empty"] and field in self.fields_to_replace_with_merged_logs:
                     sim_obj = self.similarity_calculator.find_similarity(
-                        all_results, ['merged_small_logs'])["merged_small_logs"][group_id]
+                        all_results, ['merged_small_logs'])['merged_small_logs'][group_id]
                     similarity = sim_obj["similarity"]
                 if similarity >= self.config["min_should_match"]:
                     new_elastic_res.append(elastic_res)
@@ -462,7 +462,7 @@ class BoostingFeaturizer:
         for log, res in all_results:
             new_elastic_res = []
             for elastic_res in res["hits"]["hits"]:
-                group_id = (elastic_res["_id"], log["_id"])
+                group_id = (str(elastic_res["_id"]), str(log["_id"]))
                 max_similarity = 0.0
                 sim_dict = self.similarity_calculator.find_similarity(all_results, fields)
                 for field in fields:
@@ -611,7 +611,7 @@ class BoostingFeaturizer:
         similarity_dict = self.similarity_calculator.find_similarity(self.raw_results, [field_name])
         similarity_percent_by_type = {}
         for issue_type, search_rs in scores_by_issue_type.items():
-            group_id = (search_rs["mrHit"]["_id"], search_rs["compared_log"]["_id"])
+            group_id = (str(search_rs["mrHit"]["_id"]), str(search_rs["compared_log"]["_id"]))
             sim_obj = similarity_dict[field_name][group_id]
             similarity_percent_by_type[issue_type] = sim_obj["similarity"]
         return similarity_percent_by_type

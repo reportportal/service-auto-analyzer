@@ -222,7 +222,7 @@ class AutoAnalyzerService(AnalyzerService):
                 sim_dict = _similarity_calculator.find_similarity(
                     [(log_info, search_res)], ["message", "merged_small_logs"])
                 for obj in search_res["hits"]["hits"]:
-                    group_id = (obj["_id"], log_info["_id"])
+                    group_id = (str(obj["_id"]), str(log_info["_id"]))
                     if group_id in sim_dict["message"]:
                         sim_val = sim_dict["message"][group_id]
                         if sim_val["both_empty"]:

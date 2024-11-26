@@ -39,7 +39,45 @@ class SimilarityCalculator:
         self.__similarity_dict = {}
         self.object_id_weights = {}
 
-    def find_similarity_for_field(self, all_results: list[tuple[dict[str, Any], dict[str, Any]]], field: str) -> dict:
+    def _calculate_field_similarity(
+            self, log: dict, res: dict, log_field_ids: dict, count_vector_matrix: Optional[np.ndarray],
+            needs_reweighting_wc: bool, field: str) -> dict:
+        all_results_similarity = {}
+        for obj in res["hits"]["hits"]:
+            group_id = (obj["_id"], log["_id"])
+            index_query_message = log_field_ids[log["_id"]]
+            index_log_message = log_field_ids[obj["_id"]]
+            if ((isinstance(index_query_message, int) and index_query_message < 0)
+                    and (isinstance(index_log_message, int) and index_log_message < 0)):
+                all_results_similarity[group_id] = {"similarity": 1.0, "both_empty": True}
+            elif ((isinstance(index_query_message, int) and index_query_message < 0)
+                  or (isinstance(index_log_message, int) and index_log_message < 0)):
+                all_results_similarity[group_id] = {"similarity": 0.0, "both_empty": False}
+            else:
+                if count_vector_matrix is not None:
+                    query_vector = count_vector_matrix[index_query_message[0]:index_query_message[1] + 1]
+                    log_vector = count_vector_matrix[index_log_message[0]:index_log_message[1] + 1]
+                    if field == "namespaces_stacktrace":
+                        query_vector = self.multiply_vectors_by_weight(
+                            query_vector, self.normalize_weights(self.object_id_weights[log["_id"]]))
+                        log_vector = self.multiply_vectors_by_weight(
+                            log_vector, self.normalize_weights(self.object_id_weights[obj["_id"]]))
+                    else:
+                        if needs_reweighting_wc:
+                            query_vector = self.reweight_words_weights_by_summing(query_vector)
+                            log_vector = self.reweight_words_weights_by_summing(log_vector)
+                        query_vector = self.similarity_model.weigh_data_rows(query_vector)
+                        log_vector = self.similarity_model.weigh_data_rows(log_vector)
+                        if needs_reweighting_wc:
+                            query_vector *= 2
+                            log_vector *= 2
+                    similarity = round(1 - spatial.distance.cosine(query_vector, log_vector), 2)
+                    all_results_similarity[group_id] = {"similarity": similarity, "both_empty": False}
+                else:
+                    all_results_similarity[group_id] = {"similarity": 0.0, "both_empty": False}
+        return all_results_similarity
+
+    def _find_similarity_for_field(self, all_results: list[tuple[dict[str, Any], dict[str, Any]]], field: str) -> dict:
         log_field_ids: dict = {}
         index_in_message_array = 0
         count_vector_matrix: np.ndarray | None = None
@@ -118,7 +156,7 @@ class SimilarityCalculator:
         for field in fields:
             if field in self.__similarity_dict:
                 continue
-            self.__similarity_dict[field] = self.find_similarity_for_field(all_results, field)
+            self.__similarity_dict[field] = self._find_similarity_for_field(all_results, field)
         return self.__similarity_dict
 
     def reweight_words_weights_by_summing(self, count_vector_matrix):
@@ -138,41 +176,3 @@ class SimilarityCalculator:
     def normalize_weights(self, weights):
         normalized_weights = np.asarray(weights) / np.min(weights)
         return np.clip(normalized_weights, a_min=1.0, a_max=3.0)
-
-    def _calculate_field_similarity(
-            self, log: dict, res: dict, log_field_ids: dict, count_vector_matrix: Optional[np.ndarray],
-            needs_reweighting_wc: bool, field: str) -> dict:
-        all_results_similarity = {}
-        for obj in res["hits"]["hits"]:
-            group_id = (obj["_id"], log["_id"])
-            index_query_message = log_field_ids[log["_id"]]
-            index_log_message = log_field_ids[obj["_id"]]
-            if ((isinstance(index_query_message, int) and index_query_message < 0)
-                    and (isinstance(index_log_message, int) and index_log_message < 0)):
-                all_results_similarity[group_id] = {"similarity": 1.0, "both_empty": True}
-            elif ((isinstance(index_query_message, int) and index_query_message < 0)
-                  or (isinstance(index_log_message, int) and index_log_message < 0)):
-                all_results_similarity[group_id] = {"similarity": 0.0, "both_empty": False}
-            else:
-                if count_vector_matrix is not None:
-                    query_vector = count_vector_matrix[index_query_message[0]:index_query_message[1] + 1]
-                    log_vector = count_vector_matrix[index_log_message[0]:index_log_message[1] + 1]
-                    if field == "namespaces_stacktrace":
-                        query_vector = self.multiply_vectors_by_weight(
-                            query_vector, self.normalize_weights(self.object_id_weights[log["_id"]]))
-                        log_vector = self.multiply_vectors_by_weight(
-                            log_vector, self.normalize_weights(self.object_id_weights[obj["_id"]]))
-                    else:
-                        if needs_reweighting_wc:
-                            query_vector = self.reweight_words_weights_by_summing(query_vector)
-                            log_vector = self.reweight_words_weights_by_summing(log_vector)
-                        query_vector = self.similarity_model.weigh_data_rows(query_vector)
-                        log_vector = self.similarity_model.weigh_data_rows(log_vector)
-                        if needs_reweighting_wc:
-                            query_vector *= 2
-                            log_vector *= 2
-                    similarity = round(1 - spatial.distance.cosine(query_vector, log_vector), 2)
-                    all_results_similarity[group_id] = {"similarity": similarity, "both_empty": False}
-                else:
-                    all_results_similarity[group_id] = {"similarity": 0.0, "both_empty": False}
-        return all_results_similarity

@@ -80,11 +80,10 @@ class MinioClient(Storage):
     def put_project_object(self, data: Any, bucket: str, object_name: str, using_json=False) -> None:
         bucket_name = self.get_bucket(bucket)
         path = self.get_path(object_name, bucket_name, bucket)
-        if bucket_name:
-            if not self.minio_client.bucket_exists(bucket_name):
-                logger.debug("Creating minio bucket %s" % bucket_name)
-                self.minio_client.make_bucket(bucket_name=bucket_name, location=self.region)
-                logger.debug("Created minio bucket %s" % bucket_name)
+        if bucket_name and not self.minio_client.bucket_exists(bucket_name):
+            logger.debug("Creating minio bucket %s" % bucket_name)
+            self.minio_client.make_bucket(bucket_name=bucket_name, location=self.region)
+            logger.debug("Created minio bucket %s" % bucket_name)
         if using_json:
             data_to_save = json.dumps(data).encode("utf-8")
             content_type = 'application/json'
@@ -111,9 +110,8 @@ class MinioClient(Storage):
     def does_object_exists(self, bucket: str, object_name: str) -> bool:
         bucket_name = self.get_bucket(bucket)
         path = self.get_path(object_name, bucket_name, bucket)
-        if bucket_name:
-            if not self.minio_client.bucket_exists(bucket_name):
-                return False
+        if bucket_name and not self.minio_client.bucket_exists(bucket_name):
+            return False
         try:
             self.minio_client.stat_object(bucket_name=bucket_name, object_name=path)
         except NoSuchKey:
@@ -123,9 +121,8 @@ class MinioClient(Storage):
     def get_folder_objects(self, bucket: str, folder: str) -> list[str]:
         bucket_name = self.get_bucket(bucket)
         path = self.get_path(folder, bucket_name, bucket)
-        if bucket_name:
-            if not self.minio_client.bucket_exists(bucket_name):
-                return []
+        if bucket_name and not self.minio_client.bucket_exists(bucket_name):
+            return []
         object_names = set()
         object_list = self.minio_client.list_objects(bucket_name, prefix=path.endswith('/') and path or path + '/')
         for obj in object_list:
@@ -140,9 +137,8 @@ class MinioClient(Storage):
     def remove_folder_objects(self, bucket: str, folder: str) -> bool:
         bucket_name = self.get_bucket(bucket)
         path = self.get_path(folder, bucket_name, bucket)
-        if bucket_name:
-            if not self.minio_client.bucket_exists(bucket_name):
-                return False
+        if bucket_name and not self.minio_client.bucket_exists(bucket_name):
+            return False
         result = False
         for obj in self.minio_client.list_objects(bucket_name, prefix=path.endswith('/') and path or path + '/'):
             self.minio_client.remove_object(bucket_name=bucket_name, object_name=obj.object_name)

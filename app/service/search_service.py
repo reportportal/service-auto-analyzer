@@ -220,19 +220,19 @@ class SearchService:
                     "number_of_log_lines": search_req.logLines
                 },
                 similarity_model=self.similarity_model)
-            _similarity_calculator.find_similarity(
+            sim_dict = _similarity_calculator.find_similarity(
                 [(queried_log, search_results)], ["message", "potential_status_codes", "merged_small_logs"])
 
-            for group_id, similarity_obj in _similarity_calculator.similarity_dict["message"].items():
+            for group_id, similarity_obj in sim_dict["message"].items():
                 log_id, _ = group_id
                 similarity_percent = similarity_obj["similarity"]
                 if similarity_obj["both_empty"]:
-                    similarity_obj = _similarity_calculator.similarity_dict["merged_small_logs"][group_id]
+                    similarity_obj = sim_dict["merged_small_logs"][group_id]
                     similarity_percent = similarity_obj["similarity"]
                 logger.debug("Log with id %s has %.3f similarity with the queried log '%s'",
                              log_id, similarity_percent, message_to_use)
                 potential_status_codes_match = 0.0
-                _similarity_dict = _similarity_calculator.similarity_dict["potential_status_codes"]
+                _similarity_dict = sim_dict["potential_status_codes"]
                 if group_id in _similarity_dict:
                     potential_status_codes_match = _similarity_dict[group_id]["similarity"]
                 if potential_status_codes_match < 0.99:

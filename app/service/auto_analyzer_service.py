@@ -219,15 +219,14 @@ class AutoAnalyzerService(AnalyzerService):
                 boosting_config,
                 similarity_model=self.similarity_model)
             if no_defect_candidate_exists:
-                _similarity_calculator.find_similarity(
-                    [(log_info, search_res)],
-                    ["message", "merged_small_logs"])
+                sim_dict = _similarity_calculator.find_similarity(
+                    [(log_info, search_res)], ["message", "merged_small_logs"])
                 for obj in search_res["hits"]["hits"]:
                     group_id = (obj["_id"], log_info["_id"])
-                    if group_id in _similarity_calculator.similarity_dict["message"]:
-                        sim_val = _similarity_calculator.similarity_dict["message"][group_id]
+                    if group_id in sim_dict["message"]:
+                        sim_val = sim_dict["message"][group_id]
                         if sim_val["both_empty"]:
-                            sim_val = _similarity_calculator.similarity_dict["merged_small_logs"][group_id]
+                            sim_val = sim_dict["merged_small_logs"][group_id]
                         threshold = boosting_config["min_should_match"]
                         if not sim_val["both_empty"] and sim_val["similarity"] >= threshold:
                             new_search_res.append(obj)

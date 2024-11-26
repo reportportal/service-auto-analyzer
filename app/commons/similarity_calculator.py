@@ -20,27 +20,32 @@ from sklearn.feature_extraction.text import CountVectorizer
 from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
 from app.utils import text_processing
 
+FIELDS_MAPPING_FOR_WEIGHTING = {
+    'message_without_params_extended': ['detected_message_without_params_extended', 'stacktrace_extended'],
+    'message_extended': ['detected_message_extended', 'stacktrace_extended']
+}
+ARTIFICIAL_COLUMNS = ['namespaces_stacktrace']
+
 
 class SimilarityCalculator:
+    __similarity_dict: dict[str, dict]
     similarity_model: WeightedSimilarityCalculator
+    config: dict[str, Any]
+    object_id_weights: dict[str, list[float]]
 
     def __init__(self, config: dict[str, Any], similarity_model: WeightedSimilarityCalculator):
         self.similarity_model = similarity_model
         self.config = config
-        self.similarity_dict = {}
+        self.__similarity_dict = {}
         self.object_id_weights = {}
-        self.fields_mapping_for_weighting = {
-            "message_without_params_extended": [
-                "detected_message_without_params_extended", "stacktrace_extended"],
-            "message_extended": ["detected_message_extended", "stacktrace_extended"]
-        }
-        self.artificial_columns = ["namespaces_stacktrace"]
 
-    def find_similarity(self, all_results: list[tuple[dict[str, Any], dict[str, Any]]], fields: list[str]) -> None:
+    def find_similarity(self, all_results: list[tuple[dict[str, Any], dict[str, Any]]],
+                        fields: list[str]) -> dict[str, dict]:
         for field in fields:
-            if field in self.similarity_dict:
+            if field in self.__similarity_dict:
                 continue
-            self.similarity_dict[field] = {}
+            similarity = {}
+            self.__similarity_dict[field] = similarity
             log_field_ids: dict = {}
             index_in_message_array = 0
             count_vector_matrix: np.ndarray | None = None
@@ -50,15 +55,15 @@ class SimilarityCalculator:
             for log, res in all_results:
                 for obj in [log] + res["hits"]["hits"]:
                     if obj["_id"] not in log_field_ids:
-                        if field not in self.artificial_columns and (
+                        if field not in ARTIFICIAL_COLUMNS and (
                                 field not in obj["_source"] or not obj["_source"][field].strip()):
                             log_field_ids[obj["_id"]] = -1
                         else:
                             text = []
                             needs_reweighting = 0
                             if (self.config["number_of_log_lines"] == -1
-                                    and field in self.fields_mapping_for_weighting):
-                                fields_to_use = self.fields_mapping_for_weighting[field]
+                                    and field in FIELDS_MAPPING_FOR_WEIGHTING):
+                                fields_to_use = FIELDS_MAPPING_FOR_WEIGHTING[field]
                                 text = self.similarity_model.message_to_array(
                                     obj["_source"][fields_to_use[0]], obj["_source"][fields_to_use[1]])
                             elif field == "namespaces_stacktrace":
@@ -88,8 +93,8 @@ class SimilarityCalculator:
                                 text = self.similarity_model.message_to_array("", obj["_source"][field])
                             else:
                                 text = [" ".join(
-                                        text_processing.split_words(
-                                            obj["_source"][field], min_word_length=self.config["min_word_length"]))]
+                                    text_processing.split_words(
+                                        obj["_source"][field], min_word_length=self.config["min_word_length"]))]
                             if not text:
                                 log_field_ids[obj["_id"]] = -1
                             else:
@@ -111,7 +116,8 @@ class SimilarityCalculator:
                 sim_dict = self._calculate_field_similarity(
                     log, res, log_field_ids, count_vector_matrix, needs_reweighting_wc, field)
                 for key, value in sim_dict.items():
-                    self.similarity_dict[field][key] = value
+                    similarity[key] = value
+        return self.__similarity_dict
 
     def reweight_words_weights_by_summing(self, count_vector_matrix):
         count_vector_matrix_weighted = np.zeros_like(count_vector_matrix, dtype=float)
@@ -143,7 +149,7 @@ class SimilarityCalculator:
                     and (isinstance(index_log_message, int) and index_log_message < 0)):
                 all_results_similarity[group_id] = {"similarity": 1.0, "both_empty": True}
             elif ((isinstance(index_query_message, int) and index_query_message < 0)
-                    or (isinstance(index_log_message, int) and index_log_message < 0)):
+                  or (isinstance(index_log_message, int) and index_log_message < 0)):
                 all_results_similarity[group_id] = {"similarity": 0.0, "both_empty": False}
             else:
                 if count_vector_matrix is not None:

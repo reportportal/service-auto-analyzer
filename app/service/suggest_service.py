@@ -209,9 +209,8 @@ class SuggestService(AnalyzerService):
                 items_to_compare = {"hits": {"hits": [scores_by_test_items[test_item_id_first]["mrHit"]]}}
                 all_pairs_to_check.append((scores_by_test_items[test_item_id_second]["mrHit"],
                                            items_to_compare))
-        _similarity_calculator.find_similarity(
-            all_pairs_to_check,
-            ["detected_message_with_numbers", "stacktrace", "merged_small_logs"])
+        sim_dict = _similarity_calculator.find_similarity(
+            all_pairs_to_check, ["detected_message_with_numbers", "stacktrace", "merged_small_logs"])
 
         filtered_results = []
         deleted_indices = set()
@@ -223,12 +222,12 @@ class SuggestService(AnalyzerService):
                 test_item_id_second = test_item_ids[gathered_results[j][0]]
                 group_id = (scores_by_test_items[test_item_id_first]["mrHit"]["_id"],
                             scores_by_test_items[test_item_id_second]["mrHit"]["_id"])
-                if group_id not in _similarity_calculator.similarity_dict["detected_message_with_numbers"]:
+                if group_id not in sim_dict["detected_message_with_numbers"]:
                     continue
-                det_message = _similarity_calculator.similarity_dict["detected_message_with_numbers"]
+                det_message = sim_dict["detected_message_with_numbers"]
                 detected_message_sim = det_message[group_id]
-                stacktrace_sim = _similarity_calculator.similarity_dict["stacktrace"][group_id]
-                merged_logs_sim = _similarity_calculator.similarity_dict["merged_small_logs"][group_id]
+                stacktrace_sim = sim_dict["stacktrace"][group_id]
+                merged_logs_sim = sim_dict["merged_small_logs"][group_id]
                 if detected_message_sim["similarity"] >= 0.98 and \
                         stacktrace_sim["similarity"] >= 0.98 and merged_logs_sim["similarity"] >= 0.98:
                     deleted_indices.add(j)

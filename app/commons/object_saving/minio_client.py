@@ -93,10 +93,11 @@ class MinioClient(Storage):
             content_type = 'application/octet-stream'
         data_stream = io.BytesIO(data_to_save)
         data_stream.seek(0)
-        self.minio_client.put_object(
+        result = self.minio_client.put_object(
             bucket_name=bucket_name, object_name=path, data=data_stream, length=len(data_to_save),
             content_type=content_type)
-        logger.debug(f'Saved into bucket "{bucket_name}" with path "{path}": {data}')
+        etag = result[0]
+        logger.debug(f'Saved into bucket "{bucket_name}" with path "{path}", etag "{etag}": {data}')
 
     def get_project_object(self, bucket: str, object_name: str, using_json=False) -> object | None:
         bucket_name = self.get_bucket(bucket)
@@ -128,7 +129,12 @@ class MinioClient(Storage):
         object_names = set()
         object_list = self.minio_client.list_objects(bucket_name, prefix=path.endswith('/') and path or path + '/')
         for obj in object_list:
-            object_names.add(obj.object_name.strip('/'))
+            object_name = obj.object_name.strip('/')
+            if folder != path:
+                # Bucket prefix includes path to the project
+                prefix = path[0: -(len(folder))]
+                object_name = object_name[len(prefix):]
+            object_names.add(object_name)
         return sorted(list(object_names))
 
     def remove_folder_objects(self, bucket: str, folder: str) -> bool:

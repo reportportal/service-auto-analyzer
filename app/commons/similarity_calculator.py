@@ -124,6 +124,54 @@ class SimilarityCalculator:
             similarity.update(sim_dict)
         return similarity
 
+    def _process_weighted_field(self, obj: dict, field: str) -> list[str]:
+        fields_to_use = FIELDS_MAPPING_FOR_WEIGHTING[field]
+        return self.similarity_model.message_to_array(
+            obj["_source"][fields_to_use[0]], obj["_source"][fields_to_use[1]])
+
+    def _process_namespaces_stacktrace(self, obj: dict) -> list[str]:
+        gathered_lines = []
+        weights = []
+        for line in obj["_source"]["stacktrace"].split("\n"):
+            line_words = text_processing.split_words(
+                line, min_word_length=self.config["min_word_length"])
+            for word in line_words:
+                part_of_namespace = ".".join(word.split(".")[:2])
+                if part_of_namespace in self.config["chosen_namespaces"]:
+                    gathered_lines.append(" ".join(line_words))
+                    weights.append(self.config["chosen_namespaces"][part_of_namespace])
+        if len(gathered_lines):
+            self.object_id_weights[obj["_id"]] = weights
+            return gathered_lines
+        else:
+            text = []
+            for line in obj["_source"]["stacktrace"].split("\n"):
+                text.append(" ".join(text_processing.split_words(
+                    line, min_word_length=self.config["min_word_length"])))
+            text = text_processing.filter_empty_lines(text)
+            self.object_id_weights[obj["_id"]] = [1] * len(text)
+            return text
+
+    def _process_stacktrace_field(self, obj: dict, field: str) -> tuple[bool, list[str]]:
+        needs_reweighting = text_processing.does_stacktrace_need_words_reweighting(obj["_source"][field])
+        text = self.similarity_model.message_to_array("", obj["_source"][field])
+        return needs_reweighting, text
+
+    def _process_generic_field(self, obj: dict, field: str) -> list[str]:
+        return [" ".join(
+            text_processing.split_words(
+                obj["_source"][field], min_word_length=self.config["min_word_length"]))]
+
+    def _process_field(self, obj: dict, field: str) -> tuple[bool, list[str]]:
+        if self.config["number_of_log_lines"] == -1 and field in FIELDS_MAPPING_FOR_WEIGHTING:
+            return False, self._process_weighted_field(obj, field)
+        elif field == "namespaces_stacktrace":
+            return False, self._process_namespaces_stacktrace(obj)
+        elif field.startswith("stacktrace"):
+            return self._process_stacktrace_field(obj, field)
+        else:
+            return False, self._process_generic_field(obj, field)
+
     def _prepare_log_field_ids_and_messages(self, all_results: list[tuple[dict[str, Any], dict[str, Any]]],
                                             field: str) -> tuple[dict[str, int], list[str], bool]:
         log_field_ids: dict = {}
@@ -139,40 +187,7 @@ class SimilarityCalculator:
                     log_field_ids[obj["_id"]] = -1
                     continue
 
-                needs_reweighting = False
-                if self.config["number_of_log_lines"] == -1 and field in FIELDS_MAPPING_FOR_WEIGHTING:
-                    fields_to_use = FIELDS_MAPPING_FOR_WEIGHTING[field]
-                    text = self.similarity_model.message_to_array(
-                        obj["_source"][fields_to_use[0]], obj["_source"][fields_to_use[1]])
-                elif field == "namespaces_stacktrace":
-                    gathered_lines = []
-                    weights = []
-                    for line in obj["_source"]["stacktrace"].split("\n"):
-                        line_words = text_processing.split_words(
-                            line, min_word_length=self.config["min_word_length"])
-                        for word in line_words:
-                            part_of_namespace = ".".join(word.split(".")[:2])
-                            if part_of_namespace in self.config["chosen_namespaces"]:
-                                gathered_lines.append(" ".join(line_words))
-                                weights.append(self.config["chosen_namespaces"][part_of_namespace])
-                    if len(gathered_lines):
-                        text = gathered_lines
-                        self.object_id_weights[obj["_id"]] = weights
-                    else:
-                        text = []
-                        for line in obj["_source"]["stacktrace"].split("\n"):
-                            text.append(" ".join(text_processing.split_words(
-                                line, min_word_length=self.config["min_word_length"])))
-                        text = text_processing.filter_empty_lines(text)
-                        self.object_id_weights[obj["_id"]] = [1] * len(text)
-                elif field.startswith("stacktrace"):
-                    if text_processing.does_stacktrace_need_words_reweighting(obj["_source"][field]):
-                        needs_reweighting = True
-                    text = self.similarity_model.message_to_array("", obj["_source"][field])
-                else:
-                    text = [" ".join(
-                        text_processing.split_words(
-                            obj["_source"][field], min_word_length=self.config["min_word_length"]))]
+                needs_reweighting, text = self._process_field(obj, field)
                 if not text:
                     log_field_ids[obj["_id"]] = -1
                 else:

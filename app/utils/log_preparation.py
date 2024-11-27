@@ -28,9 +28,13 @@ def basic_prepare(message: str) -> str:
 
     # This should go right after starting garbage clean-up
     cleaned_message = text_processing.unify_line_endings(cleaned_message)
-
     cleaned_message = text_processing.remove_markdown_mode(cleaned_message)
-    cleaned_message = text_processing.replace_code_separators(cleaned_message)
+    cleaned_message = text_processing.delete_empty_lines(cleaned_message)
+    return cleaned_message
+
+
+def clean_message(basic_message: str) -> str:
+    cleaned_message = text_processing.replace_code_separators(basic_message)
     cleaned_message = text_processing.remove_webdriver_auxiliary_info(cleaned_message)
     cleaned_message = text_processing.replace_tabs_for_newlines(cleaned_message)
     cleaned_message = text_processing.fix_big_encoded_urls(cleaned_message)
@@ -43,28 +47,38 @@ def basic_prepare(message: str) -> str:
     return cleaned_message
 
 
-def prepare_message(clean_message: str, number_of_lines: int, test_and_methods: set[str]) -> str:
-    message = text_processing.first_lines(clean_message, number_of_lines)
-    message = text_processing.replace_text_pieces(message, test_and_methods)
-    message = text_processing.delete_empty_lines(text_processing.remove_numbers(message))
-    return message
+def prepare_message(message: str, number_of_lines: int, test_and_methods: set[str]) -> str:
+    cleaned_message = text_processing.first_lines(message, number_of_lines)
+    cleaned_message = text_processing.replace_text_pieces(cleaned_message, test_and_methods)
+    return cleaned_message
+
+
+def prepare_message_no_numbers(message: str, number_of_lines: int, test_and_methods: set[str]) -> str:
+    cleaned_message = prepare_message(message, number_of_lines, test_and_methods)
+    cleaned_message = text_processing.delete_empty_lines(text_processing.remove_numbers(cleaned_message))
+    return cleaned_message
 
 
 def prepare_message_no_params(message: str) -> str:
-    message_without_params = text_processing.remove_numbers(message)
-    message_without_params = text_processing.clean_from_params(message_without_params)
-    return message_without_params
+    cleaned_message = text_processing.clean_from_params(message)
+    return cleaned_message
 
 
-def prepare_exception_message_and_stacktrace(clean_message: str) -> tuple[str, str]:
-    exception_message, stacktrace = text_processing.detect_log_description_and_stacktrace(clean_message)
+def prepare_exception_message_and_stacktrace(message: str) -> tuple[str, str]:
+    exception_message, stacktrace = text_processing.detect_log_description_and_stacktrace(message)
     stacktrace = text_processing.clean_from_brackets(stacktrace)
     stacktrace = text_processing.remove_numbers(stacktrace)
     return exception_message, stacktrace
 
 
 def prepare_exception_message_no_params(exception_message: str) -> str:
-    result = text_processing.remove_numbers(exception_message)
-    result = text_processing.clean_from_params(result)
-    result = text_processing.unify_spaces(result)
-    return result
+    cleaned_message = text_processing.clean_from_params(exception_message)
+    cleaned_message = text_processing.unify_spaces(cleaned_message)
+    return cleaned_message
+
+
+def prepare_exception_message_no_params_no_numbers(exception_message: str) -> str:
+    cleaned_message = text_processing.remove_numbers(exception_message)
+    cleaned_message = text_processing.clean_from_params(cleaned_message)
+    cleaned_message = text_processing.unify_spaces(cleaned_message)
+    return cleaned_message

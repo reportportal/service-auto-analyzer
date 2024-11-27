@@ -11,23 +11,3 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from enum import Enum, auto
-from typing import Iterable, Optional
-
-from pydantic import BaseModel
-
-
-class ModelType(Enum):
-    defect_type = auto()
-    suggestion = auto()
-    auto_analysis = auto()
-
-
-class ModelInfo(BaseModel):
-    model_type: ModelType
-    project: int
-
-
-class TrainInfo(ModelInfo):
-    additional_projects: Optional[Iterable[int]] = None
-    gathered_metric_total: int = 0

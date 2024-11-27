@@ -17,11 +17,9 @@ from time import time
 import elasticsearch
 import elasticsearch.helpers
 
-from app.commons import logging, similarity_calculator, object_saving
+from app.commons import logging, similarity_calculator, object_saving, request_factory, log_merger
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import SearchLogInfo, Log, SearchConfig, ApplicationConfig
-from app.commons.log_merger import LogMerger
-from app.commons.log_requests import LogRequests, create_log_template
 from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
 from app.utils import utils, text_processing
 
@@ -32,16 +30,12 @@ class SearchService:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
     es_client: EsClient
-    log_requests: LogRequests
-    log_merger: LogMerger
     similarity_model: WeightedSimilarityCalculator
 
     def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=self.app_config)
-        self.log_requests = LogRequests()
-        self.log_merger = LogMerger()
         if not self.search_cfg.SimilarityWeightsFolder:
             raise ValueError('SimilarityWeightsFolder is not set')
         self.similarity_model = (
@@ -161,9 +155,9 @@ class SearchService:
             if not message.strip():
                 continue
 
-            queried_log = create_log_template()
-            queried_log = LogRequests._fill_log_fields(queried_log, Log(logId=global_id, message=message),
-                                                       search_req.logLines)
+            queried_log = request_factory.create_log_template()
+            queried_log = request_factory._fill_log_fields(
+                queried_log, Log(logId=global_id, message=message), search_req.logLines)
 
             msg_words = " ".join(text_processing.split_words(queried_log["_source"]["message"]))
             if not msg_words.strip() or msg_words in searched_logs:
@@ -172,7 +166,7 @@ class SearchService:
             logs_to_query.append(queried_log)
             global_id += 1
 
-        logs_to_query, _ = self.log_merger.decompose_logs_merged_and_without_duplicates(logs_to_query)
+        logs_to_query, _ = log_merger.decompose_logs_merged_and_without_duplicates(logs_to_query)
         return logs_to_query
 
     def search_similar_items_for_log(self, search_req, queried_log,
@@ -226,19 +220,19 @@ class SearchService:
                     "number_of_log_lines": search_req.logLines
                 },
                 similarity_model=self.similarity_model)
-            _similarity_calculator.find_similarity(
+            sim_dict = _similarity_calculator.find_similarity(
                 [(queried_log, search_results)], ["message", "potential_status_codes", "merged_small_logs"])
 
-            for group_id, similarity_obj in _similarity_calculator.similarity_dict["message"].items():
+            for group_id, similarity_obj in sim_dict["message"].items():
                 log_id, _ = group_id
                 similarity_percent = similarity_obj["similarity"]
                 if similarity_obj["both_empty"]:
-                    similarity_obj = _similarity_calculator.similarity_dict["merged_small_logs"][group_id]
+                    similarity_obj = sim_dict["merged_small_logs"][group_id]
                     similarity_percent = similarity_obj["similarity"]
                 logger.debug("Log with id %s has %.3f similarity with the queried log '%s'",
                              log_id, similarity_percent, message_to_use)
                 potential_status_codes_match = 0.0
-                _similarity_dict = _similarity_calculator.similarity_dict["potential_status_codes"]
+                _similarity_dict = sim_dict["potential_status_codes"]
                 if group_id in _similarity_dict:
                     potential_status_codes_match = _similarity_dict[group_id]["similarity"]
                 if potential_status_codes_match < 0.99:

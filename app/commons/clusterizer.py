@@ -23,7 +23,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from app.commons import logging
 from app.utils import utils, text_processing
 
-logger = logging.getLogger("analyzerApp.clusterizer")
+LOGGER = logging.getLogger("analyzerApp.clusterizer")
 
 
 class Clusterizer:
@@ -65,7 +65,7 @@ class Clusterizer:
                 rearranged_groups[cluster].append(real_id)
             new_group_id += 1
             group_id = new_group_id
-        logger.debug("Time for finding groups: %.2f s", time() - start_time)
+        LOGGER.debug("Time for finding groups: %.2f s", time() - start_time)
         return rearranged_groups
 
     def similarity_groupping(
@@ -125,7 +125,7 @@ class Clusterizer:
             if cluster not in rearranged_groups:
                 rearranged_groups[cluster] = []
             rearranged_groups[cluster].append(key)
-        logger.debug("Time for finding hash groups: %.2f s", time() - start_time)
+        LOGGER.debug("Time for finding hash groups: %.2f s", time() - start_time)
         return rearranged_groups
 
     def perform_light_deduplication(self, messages: list[str]) -> tuple[list[str], dict[int, list[int]]]:

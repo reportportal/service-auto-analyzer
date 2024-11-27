@@ -124,8 +124,8 @@ class SimilarityCalculator:
             similarity.update(sim_dict)
         return similarity
 
-    def _find_similarity_for_field(self, all_results: list[tuple[dict[str, Any], dict[str, Any]]],
-                                   field: str) -> dict[tuple[str, str], dict[str, Any]]:
+    def _prepare_log_field_ids_and_messages(self, all_results: list[tuple[dict[str, Any], dict[str, Any]]],
+                                            field: str) -> tuple[dict[str, int], list[str], bool]:
         log_field_ids: dict = {}
         index_in_message_array = 0
         all_messages: list[str] = []
@@ -181,6 +181,12 @@ class SimilarityCalculator:
                     log_field_ids[obj["_id"]] = (index_in_message_array, len(all_messages) - 1)
                     index_in_message_array += len(text)
 
+        return log_field_ids, all_messages, all_messages_needs_reweighting
+
+    def _find_similarity_for_field(self, all_results: list[tuple[dict[str, Any], dict[str, Any]]],
+                                   field: str) -> dict[tuple[str, str], dict[str, Any]]:
+        log_field_ids, all_messages, all_messages_needs_reweighting = self._prepare_log_field_ids_and_messages(
+            all_results, field)
         return self._calculate_similarity_for_all_results(
             all_results, log_field_ids, all_messages, all_messages_needs_reweighting, field)
 

@@ -24,7 +24,7 @@ FIELDS_MAPPING_FOR_WEIGHTING = {
     'message_without_params_extended': ['detected_message_without_params_extended', 'stacktrace_extended'],
     'message_extended': ['detected_message_extended', 'stacktrace_extended']
 }
-ARTIFICIAL_COLUMNS = ['namespaces_stacktrace']
+ARTIFICIAL_COLUMNS = {'namespaces_stacktrace'}
 
 
 def multiply_vectors_by_weight(rows, weights):
@@ -100,29 +100,27 @@ class SimilarityCalculator:
 
     @staticmethod
     def _create_count_vector_matrix(all_messages: list[str],
-                                    all_messages_needs_reweighting: list[int]) -> tuple[bool, Optional[np.ndarray]]:
-        needs_reweighting_wc: bool = False
+                                    all_messages_needs_reweighting: bool) -> Optional[np.ndarray]:
         count_vector_matrix: Optional[np.ndarray] = None
         if all_messages:
-            needs_reweighting_wc = (all_messages_needs_reweighting
-                                    and sum(all_messages_needs_reweighting) == len(all_messages_needs_reweighting))
             vectorizer = CountVectorizer(
-                binary=not needs_reweighting_wc, analyzer="word", token_pattern="[^ ]+")
+                binary=not all_messages_needs_reweighting, analyzer="word", token_pattern="[^ ]+")
             try:
                 count_vector_matrix = np.asarray(vectorizer.fit_transform(all_messages).toarray())
             except ValueError:
                 # All messages are empty or contains only stop words
                 pass
-        return needs_reweighting_wc, count_vector_matrix
+        return count_vector_matrix
 
     def _calculate_similarity_for_all_results(
             self, all_results: list[tuple[dict[str, Any], dict[str, Any]]], log_field_ids: dict,
-            count_vector_matrix: Optional[np.ndarray], needs_reweighting_wc: bool,
+            all_messages: list[str], all_messages_needs_reweighting: bool,
             field: str) -> dict[tuple[str, str], dict[str, Any]]:
+        count_vector_matrix = self._create_count_vector_matrix(all_messages, all_messages_needs_reweighting)
         similarity = {}
         for log, res in all_results:
             sim_dict = self._calculate_field_similarity(
-                log, res, log_field_ids, count_vector_matrix, needs_reweighting_wc, field)
+                log, res, log_field_ids, count_vector_matrix, all_messages_needs_reweighting, field)
             similarity.update(sim_dict)
         return similarity
 
@@ -131,17 +129,15 @@ class SimilarityCalculator:
         log_field_ids: dict = {}
         index_in_message_array = 0
         all_messages: list[str] = []
-        all_messages_needs_reweighting: list[int] = []
+        all_messages_needs_reweighting: bool = True
         for log, res in all_results:
             for obj in [log] + res["hits"]["hits"]:
                 if obj["_id"] not in log_field_ids:
-                    if field not in ARTIFICIAL_COLUMNS and (
-                            field not in obj["_source"] or not obj["_source"][field].strip()):
+                    if field not in ARTIFICIAL_COLUMNS and not obj['_source'].get(field, '').strip():
                         log_field_ids[obj["_id"]] = -1
                     else:
-                        needs_reweighting = 0
-                        if (self.config["number_of_log_lines"] == -1
-                                and field in FIELDS_MAPPING_FOR_WEIGHTING):
+                        needs_reweighting = False
+                        if self.config["number_of_log_lines"] == -1 and field in FIELDS_MAPPING_FOR_WEIGHTING:
                             fields_to_use = FIELDS_MAPPING_FOR_WEIGHTING[field]
                             text = self.similarity_model.message_to_array(
                                 obj["_source"][fields_to_use[0]], obj["_source"][fields_to_use[1]])
@@ -168,7 +164,7 @@ class SimilarityCalculator:
                                 self.object_id_weights[obj["_id"]] = [1] * len(text)
                         elif field.startswith("stacktrace"):
                             if text_processing.does_stacktrace_need_words_reweighting(obj["_source"][field]):
-                                needs_reweighting = 1
+                                needs_reweighting = True
                             text = self.similarity_model.message_to_array("", obj["_source"][field])
                         else:
                             text = [" ".join(
@@ -178,14 +174,12 @@ class SimilarityCalculator:
                             log_field_ids[obj["_id"]] = -1
                         else:
                             all_messages.extend(text)
-                            all_messages_needs_reweighting.append(needs_reweighting)
+                            all_messages_needs_reweighting = all_messages_needs_reweighting and needs_reweighting
                             log_field_ids[obj["_id"]] = (index_in_message_array, len(all_messages) - 1)
                             index_in_message_array += len(text)
 
-        needs_reweighting_wc, count_vector_matrix = self._create_count_vector_matrix(
-            all_messages, all_messages_needs_reweighting)
         return self._calculate_similarity_for_all_results(
-            all_results, log_field_ids, count_vector_matrix, needs_reweighting_wc, field)
+            all_results, log_field_ids, all_messages, all_messages_needs_reweighting, field)
 
     def find_similarity(self, all_results: list[tuple[dict[str, Any], dict[str, Any]]],
                         fields: list[str]) -> dict[str, dict[tuple[str, str], dict[str, Any]]]:

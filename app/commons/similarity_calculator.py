@@ -27,6 +27,15 @@ FIELDS_MAPPING_FOR_WEIGHTING = {
 ARTIFICIAL_COLUMNS = ['namespaces_stacktrace']
 
 
+def multiply_vectors_by_weight(rows, weights):
+    return np.dot(np.reshape(weights, [-1]), rows)
+
+
+def normalize_weights(weights):
+    normalized_weights = np.asarray(weights) / np.min(weights)
+    return np.clip(normalized_weights, a_min=1.0, a_max=3.0)
+
+
 class SimilarityCalculator:
     __similarity_dict: dict[str, dict]
     similarity_model: WeightedSimilarityCalculator
@@ -38,6 +47,18 @@ class SimilarityCalculator:
         self.config = config
         self.__similarity_dict = {}
         self.object_id_weights = {}
+
+    @staticmethod
+    def reweight_words_weights_by_summing(count_vector_matrix):
+        count_vector_matrix_weighted = np.zeros_like(count_vector_matrix, dtype=float)
+        whole_sum_vector = np.sum(count_vector_matrix, axis=0)
+        for i in range(len(count_vector_matrix)):
+            for j in range(len(count_vector_matrix[i])):
+                if whole_sum_vector[j] > 1 and count_vector_matrix[i][j] > 0:
+                    count_vector_matrix_weighted[i][j] = max(0.1, 1 - whole_sum_vector[j] * 0.2)
+                else:
+                    count_vector_matrix_weighted[i][j] = count_vector_matrix[i][j]
+        return count_vector_matrix_weighted
 
     def _calculate_field_similarity(
             self, log: dict, res: dict, log_field_ids: dict, count_vector_matrix: Optional[np.ndarray],
@@ -58,14 +79,14 @@ class SimilarityCalculator:
                     query_vector = count_vector_matrix[index_query_message[0]:index_query_message[1] + 1]
                     log_vector = count_vector_matrix[index_log_message[0]:index_log_message[1] + 1]
                     if field == "namespaces_stacktrace":
-                        query_vector = self.multiply_vectors_by_weight(
-                            query_vector, self.normalize_weights(self.object_id_weights[log["_id"]]))
-                        log_vector = self.multiply_vectors_by_weight(
-                            log_vector, self.normalize_weights(self.object_id_weights[obj["_id"]]))
+                        query_vector = multiply_vectors_by_weight(
+                            query_vector, normalize_weights(self.object_id_weights[log["_id"]]))
+                        log_vector = multiply_vectors_by_weight(
+                            log_vector, normalize_weights(self.object_id_weights[obj["_id"]]))
                     else:
                         if needs_reweighting_wc:
-                            query_vector = self.reweight_words_weights_by_summing(query_vector)
-                            log_vector = self.reweight_words_weights_by_summing(log_vector)
+                            query_vector = SimilarityCalculator.reweight_words_weights_by_summing(query_vector)
+                            log_vector = SimilarityCalculator.reweight_words_weights_by_summing(log_vector)
                         query_vector = self.similarity_model.weigh_data_rows(query_vector)
                         log_vector = self.similarity_model.weigh_data_rows(log_vector)
                         if needs_reweighting_wc:
@@ -76,6 +97,34 @@ class SimilarityCalculator:
                 else:
                     all_results_similarity[group_id] = {"similarity": 0.0, "both_empty": False}
         return all_results_similarity
+
+    @staticmethod
+    def _create_count_vector_matrix(all_messages: list[str],
+                                    all_messages_needs_reweighting: list[int]) -> tuple[bool, Optional[np.ndarray]]:
+        needs_reweighting_wc: bool = False
+        count_vector_matrix: Optional[np.ndarray] = None
+        if all_messages:
+            needs_reweighting_wc = (all_messages_needs_reweighting
+                                    and sum(all_messages_needs_reweighting) == len(all_messages_needs_reweighting))
+            vectorizer = CountVectorizer(
+                binary=not needs_reweighting_wc, analyzer="word", token_pattern="[^ ]+")
+            try:
+                count_vector_matrix = np.asarray(vectorizer.fit_transform(all_messages).toarray())
+            except ValueError:
+                # All messages are empty or contains only stop words
+                pass
+        return needs_reweighting_wc, count_vector_matrix
+
+    def _calculate_similarity_for_all_results(
+            self, all_results: list[tuple[dict[str, Any], dict[str, Any]]], log_field_ids: dict,
+            count_vector_matrix: Optional[np.ndarray], needs_reweighting_wc: bool,
+            field: str) -> dict[tuple[str, str], dict[str, Any]]:
+        similarity = {}
+        for log, res in all_results:
+            sim_dict = self._calculate_field_similarity(
+                log, res, log_field_ids, count_vector_matrix, needs_reweighting_wc, field)
+            similarity.update(sim_dict)
+        return similarity
 
     def _find_similarity_for_field(self, all_results: list[tuple[dict[str, Any], dict[str, Any]]],
                                    field: str) -> dict[tuple[str, str], dict[str, Any]]:
@@ -130,28 +179,13 @@ class SimilarityCalculator:
                         else:
                             all_messages.extend(text)
                             all_messages_needs_reweighting.append(needs_reweighting)
-                            log_field_ids[obj["_id"]] = [index_in_message_array, len(all_messages) - 1]
+                            log_field_ids[obj["_id"]] = (index_in_message_array, len(all_messages) - 1)
                             index_in_message_array += len(text)
 
-        needs_reweighting_wc: bool = False
-        count_vector_matrix: np.ndarray | None = None
-        if all_messages:
-            needs_reweighting_wc = (all_messages_needs_reweighting
-                                    and sum(all_messages_needs_reweighting) == len(all_messages_needs_reweighting))
-            vectorizer = CountVectorizer(
-                binary=not needs_reweighting_wc, analyzer="word", token_pattern="[^ ]+")
-            try:
-                count_vector_matrix = np.asarray(vectorizer.fit_transform(all_messages).toarray())
-            except ValueError:
-                # All messages are empty or contains only stop words
-                pass
-
-        similarity = {}
-        for log, res in all_results:
-            sim_dict = self._calculate_field_similarity(
-                log, res, log_field_ids, count_vector_matrix, needs_reweighting_wc, field)
-            similarity.update(sim_dict)
-        return similarity
+        needs_reweighting_wc, count_vector_matrix = self._create_count_vector_matrix(
+            all_messages, all_messages_needs_reweighting)
+        return self._calculate_similarity_for_all_results(
+            all_results, log_field_ids, count_vector_matrix, needs_reweighting_wc, field)
 
     def find_similarity(self, all_results: list[tuple[dict[str, Any], dict[str, Any]]],
                         fields: list[str]) -> dict[str, dict[tuple[str, str], dict[str, Any]]]:
@@ -160,21 +194,3 @@ class SimilarityCalculator:
                 continue
             self.__similarity_dict[field] = self._find_similarity_for_field(all_results, field)
         return self.__similarity_dict
-
-    def reweight_words_weights_by_summing(self, count_vector_matrix):
-        count_vector_matrix_weighted = np.zeros_like(count_vector_matrix, dtype=float)
-        whole_sum_vector = np.sum(count_vector_matrix, axis=0)
-        for i in range(len(count_vector_matrix)):
-            for j in range(len(count_vector_matrix[i])):
-                if whole_sum_vector[j] > 1 and count_vector_matrix[i][j] > 0:
-                    count_vector_matrix_weighted[i][j] = max(0.1, 1 - whole_sum_vector[j] * 0.2)
-                else:
-                    count_vector_matrix_weighted[i][j] = count_vector_matrix[i][j]
-        return count_vector_matrix_weighted
-
-    def multiply_vectors_by_weight(self, rows, weights):
-        return np.dot(np.reshape(weights, [-1]), rows)
-
-    def normalize_weights(self, weights):
-        normalized_weights = np.asarray(weights) / np.min(weights)
-        return np.clip(normalized_weights, a_min=1.0, a_max=3.0)

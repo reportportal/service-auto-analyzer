@@ -116,26 +116,3 @@ Perform next steps inside source directory of the analyzer.
 ```bash
   /analyzer-train/bin/uwsgi --ini res/analyzer-train.ini
 ```
-
-### For Windows:
-1. Create a virtual environment with any name (in the example **env**)
-```
-python -m venv env
-```
-2. Activate the virtual environment
-```
-call env\Scripts\activate.bat
-```
-3. Install python libraries
-```
-python -m pip install -r requirements_windows.txt
-```
-4. Install stopwords package from the nltk library
-```
-python -m nltk.downloader stopwords
-```
-5. Start the program.
-```
-python app/app.py
-```
-

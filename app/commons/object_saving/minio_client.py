@@ -19,7 +19,7 @@ import pickle
 from typing import Any
 
 from minio import Minio
-from minio.error import NoSuchKey
+from minio.error import MinioException, S3Error
 
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig
@@ -95,7 +95,7 @@ class MinioClient(Storage):
         result = self.minio_client.put_object(
             bucket_name=bucket_name, object_name=path, data=data_stream, length=len(data_to_save),
             content_type=content_type)
-        etag = result[0]
+        etag = result.etag
         logger.debug(f'Saved into bucket "{bucket_name}" with path "{path}", etag "{etag}": {data}')
 
     def get_project_object(self, bucket: str, object_name: str, using_json=False) -> object | None:
@@ -103,7 +103,7 @@ class MinioClient(Storage):
         path = self.get_path(object_name, bucket_name, bucket)
         try:
             obj = self.minio_client.get_object(bucket_name=bucket_name, object_name=path)
-        except NoSuchKey as exc:
+        except MinioException as exc:
             raise ValueError(f'Unable to get file in bucket "{bucket_name}" with path "{path}"', exc)
         return json.loads(obj.data) if using_json else pickle.loads(obj.data)
 
@@ -114,8 +114,10 @@ class MinioClient(Storage):
             return False
         try:
             self.minio_client.stat_object(bucket_name=bucket_name, object_name=path)
-        except NoSuchKey:
-            return False
+        except S3Error as e:
+            if e.response.status == 404:
+                return False
+            raise e
         return True
 
     def get_folder_objects(self, bucket: str, folder: str) -> list[str]:

@@ -9,15 +9,15 @@ elasticsearch==7.0.0
 requests==2.32.2
 bump2version==1.0.1
 nltk==3.9.1
-scikit-learn==1.5.0
-numpy==1.23.5
 scipy==1.10.1
+scikit-learn==1.5.0
+imbalanced-learn==0.12.3
+numpy==1.23.5
 xgboost==1.7.3
 python-dateutil==2.8.2
 minio==7.2.11
 gensim==4.3.2
 pandas==1.5.3
-imbalanced-learn==0.12.3
 urllib3==1.26.19
 werkzeug==3.0.6 # not directly required, pinned by Snyk to avoid a vulnerability
 certifi>=2024.8.30

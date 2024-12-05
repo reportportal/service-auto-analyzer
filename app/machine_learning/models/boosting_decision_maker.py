@@ -57,6 +57,11 @@ class BoostingDecisionMaker(MlModel):
     def loaded(self) -> bool:
         return self._loaded
 
+    @property
+    def feature_importances(self) -> Optional[dict[int, float]]:
+        if self.loaded:
+            return dict(zip(self.feature_ids, self.boost_model.feature_importances_.tolist()))
+
     def load_model(self) -> None:
         if self.loaded:
             return

@@ -29,6 +29,7 @@ import logging
 import unittest
 
 import httpretty
+from jsondiff import diff
 
 from app.commons import model_chooser
 from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
@@ -150,15 +151,19 @@ class TestService(unittest.TestCase):
             "search_not_merged_logs_by_test_item.json"
         self.launch_w_items_clustering_with_prefix = \
             "launch_w_items_clustering_with_prefix.json"
-        self.launch_w_small_logs_for_clustering = \
-            "launch_w_small_logs_for_clustering.json"
-        self.search_logs_rq_first_group_small_logs = \
-            "search_logs_rq_first_group_small_logs.json"
-        self.search_logs_rq_second_group_small_logs = \
-            "search_logs_rq_second_group_small_logs.json"
+        self.launch_w_small_logs_for_clustering = "launch_w_small_logs_for_clustering.json"
+        self.launch_w_small_logs_for_clustering_numbers = "launch_w_small_logs_for_clustering_numbers.json"
+        self.search_logs_rq_first_group_small_logs = "search_logs_rq_first_group_small_logs.json"
+        self.search_logs_rq_first_group_small_logs_no_numbers = "search_logs_rq_first_group_small_logs_no_numbers.json"
+        self.search_logs_rq_second_group_small_logs = "search_logs_rq_second_group_small_logs.json"
+        self.search_logs_rq_second_group_small_logs_no_numbers = \
+            "search_logs_rq_second_group_small_logs_no_numbers.json"
         self.cluster_update_small_logs = "cluster_update_small_logs.json"
+        self.cluster_update_small_logs_no_numbers = "cluster_update_small_logs_no_numbers.json"
         self.search_logs_rq_first_group_no_such_element_all_log_lines = \
             "search_logs_rq_first_group_no_such_element_all_log_lines.json"
+        self.search_logs_rq_first_group_no_such_element_no_numbers_all_log_lines = \
+            "search_logs_rq_first_group_no_such_element_no_numbers_all_log_lines.json"
         self.suggest_test_item_info_cluster = "suggest_test_item_info_cluster.json"
         self.three_hits_search_rs_for_cluster_suggestions = \
             "three_hits_search_rs_for_cluster_suggestions.json"
@@ -260,12 +265,26 @@ class TestService(unittest.TestCase):
                 if type(expected_body) is str and type(real_body) is not str:
                     expected_body = json.loads(expected_body)
                     json_rq = True
-                if expected_body != real_body:
-                    print(f'Error in request {i}')
-                    if json_rq:
-                        expected_body = json.dumps(expected_body)
-                        real_body = json.dumps(real_body)
-                    print(f'Expected: {expected_body}')
-                    print(f'Actual: {real_body}')
-                    raise AssertionError(f'Error in request {i}')
+                if json_rq:
+                    expected_body_str = json.dumps(expected_body)
+                    real_body_str = json.dumps(real_body)
+                else:
+                    expected_body_str = expected_body
+                    real_body_str = real_body
+
+                if json_rq:
+                    result = diff(expected_body, real_body)
+                    if result:
+                        print(f'Error in request {i}')
+                        print(f'JSON: {json_rq}')
+                        print(f'Diff: {result}')
+                        print(f'Expected: {expected_body_str}')
+                        print(f'Actual: {real_body_str}')
+                        raise AssertionError(f'Error in request {i}')
+                else:
+                    if expected_body_str != real_body_str:
+                        print(f'Error in request {i}')
+                        print(f'Expected: {expected_body}')
+                        print(f'Actual: {real_body}')
+                        raise AssertionError(f'Error in request {i}')
         httpretty.disable()

@@ -408,6 +408,9 @@ class ClusterService:
         logger.debug("Stats info %s", results_to_share)
         logger.info("Processed the launch. It took %.2f sec.", time() - t_start)
         logger.info("Finished clustering for the launch with %d clusters.", cluster_num)
+        for cluster in clusters:
+            # Put readable text instead of tokens
+            cluster.clusterMessage = text_processing.replace_tokens_with_readable_text(cluster.clusterMessage)
         return ClusterResult(
             project=launch_info.project,
             launchId=launch_info.launch.launchId,

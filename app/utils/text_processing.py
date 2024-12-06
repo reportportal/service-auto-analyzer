@@ -825,3 +825,10 @@ WEBDRIVER_AUXILIARY_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
 
 def remove_webdriver_auxiliary_info(text: str) -> str:
     return replace_patterns(text, WEBDRIVER_AUXILIARY_PATTERNS)
+
+
+READABLE_NUMBER = '[EXCLUDED NUMBER]'
+
+
+def replace_tokens_with_readable_text(text: str) -> str:
+    return text.replace(NUMBER_TAG, READABLE_NUMBER)

@@ -11,36 +11,40 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from typing import Optional
 
-from app.utils.log_preparation import (basic_prepare, prepare_message, prepare_message_no_params,
+from typing_extensions import override
+
+from app.utils import text_processing
+from app.utils.log_preparation import (basic_prepare, clean_message, prepare_message, prepare_message_no_numbers,
+                                       prepare_message_no_params, prepare_exception_message_no_params_no_numbers,
                                        prepare_exception_message_no_params,
                                        prepare_exception_message_and_stacktrace)
-from app.utils import text_processing
 
 
 class PreparedLogMessage:
-
     original_message: str
     number_of_lines: int
-    _clean_message: str = None
-    _test_and_methods: set[str] = None
-    _message: str = None
-    _message_no_params: str = None
-    _exception_message: str = None
-    _stacktrace: str = None
-    _exception_message_urls: str = None
-    _exception_message_paths: str = None
-    _exception_message_potential_status_codes: str = None
-    _exception_message_params: str = None
-    _exception_message_no_params: str = None
-    _exception_message_no_numbers: str = None
-    _exception_message_numbers: str = None
-    _exception_found: str = None
-    _exception_found_extended: str = None
-    _test_and_methods_extended: str = None
-    _stacktrace_paths: str = None
-    _stacktrace_no_paths: str = None
-    _stacktrace_no_paths_extended: str = None
+    _basic_message: Optional[str] = None
+    _clean_message: Optional[str] = None
+    _test_and_methods: Optional[set[str]] = None
+    _message: Optional[str] = None
+    _message_no_params: Optional[str] = None
+    _exception_message: Optional[str] = None
+    _stacktrace: Optional[str] = None
+    _exception_message_urls: Optional[str] = None
+    _exception_message_paths: Optional[str] = None
+    _exception_message_potential_status_codes: Optional[str] = None
+    _exception_message_params: Optional[str] = None
+    _exception_message_no_params: Optional[str] = None
+    _exception_message_no_numbers: Optional[str] = None
+    _exception_message_numbers: Optional[str] = None
+    _exception_found: Optional[str] = None
+    _exception_found_extended: Optional[str] = None
+    _test_and_methods_extended: Optional[str] = None
+    _stacktrace_paths: Optional[str] = None
+    _stacktrace_no_paths: Optional[str] = None
+    _stacktrace_no_paths_extended: Optional[str] = None
 
     def __init__(self, message: str, number_of_lines: int):
         self.original_message = message
@@ -50,9 +54,15 @@ class PreparedLogMessage:
         return self.original_message
 
     @property
+    def basic_message(self) -> str:
+        if not self._basic_message:
+            self._basic_message = basic_prepare(self.original_message)
+        return self._basic_message
+
+    @property
     def clean_message(self) -> str:
         if not self._clean_message:
-            self._clean_message = basic_prepare(self.original_message)
+            self._clean_message = clean_message(self.basic_message)
         return self._clean_message
 
     @property
@@ -64,7 +74,7 @@ class PreparedLogMessage:
     @property
     def message(self) -> str:
         if not self._message:
-            self._message = prepare_message(self.clean_message, self.number_of_lines, self.test_and_methods)
+            self._message = prepare_message_no_numbers(self.clean_message, self.number_of_lines, self.test_and_methods)
         return self._message
 
     @property
@@ -82,8 +92,7 @@ class PreparedLogMessage:
     @property
     def stacktrace(self) -> str:
         if not self._stacktrace:
-            self._raw_exception_message, self._stacktrace = prepare_exception_message_and_stacktrace(
-                self.clean_message)
+            self._exception_message, self._stacktrace = prepare_exception_message_and_stacktrace(self.clean_message)
         return self._stacktrace
 
     @property
@@ -115,8 +124,8 @@ class PreparedLogMessage:
     @property
     def exception_message_no_params(self) -> str:
         if not self._exception_message_no_params:
-            self._exception_message_no_params = text_processing.unify_spaces(prepare_exception_message_no_params(
-                self.exception_message))
+            self._exception_message_no_params = prepare_exception_message_no_params_no_numbers(
+                self.exception_message)
         return self._exception_message_no_params
 
     @property
@@ -171,3 +180,27 @@ class PreparedLogMessage:
             self._test_and_methods_extended = text_processing.enrich_text_with_method_and_classes(
                 " ".join(self.test_and_methods))
         return self._test_and_methods_extended
+
+
+class PreparedLogMessageClustering(PreparedLogMessage):
+
+    def __init__(self, message: str, number_of_lines: int) -> None:
+        super().__init__(message, number_of_lines)
+
+    @override
+    @property
+    def clean_message(self) -> str:
+        return self.basic_message
+
+    @override
+    @property
+    def message(self) -> str:
+        if not self._message:
+            self._message = prepare_message(self.clean_message, self.number_of_lines, self.test_and_methods)
+        return self._message
+
+    @property
+    def exception_message_no_params(self) -> str:
+        if not self._exception_message_no_params:
+            self._exception_message_no_params = prepare_exception_message_no_params(self.exception_message)
+        return self._exception_message_no_params

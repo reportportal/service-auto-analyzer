@@ -20,9 +20,8 @@ from time import time
 import elasticsearch.helpers
 
 from app.amqp.amqp import AmqpClient
-from app.commons import logging, similarity_calculator, object_saving
+from app.commons import logging, similarity_calculator, object_saving, request_factory, log_merger
 from app.commons.esclient import EsClient
-from app.commons.log_requests import LogRequests
 from app.commons.model.launch_objects import SuggestAnalysisResult, SearchConfig, ApplicationConfig, TestItemInfo, \
     AnalyzerConf
 from app.commons.model.ml import ModelType, TrainInfo
@@ -210,9 +209,8 @@ class SuggestService(AnalyzerService):
                 items_to_compare = {"hits": {"hits": [scores_by_test_items[test_item_id_first]["mrHit"]]}}
                 all_pairs_to_check.append((scores_by_test_items[test_item_id_second]["mrHit"],
                                            items_to_compare))
-        _similarity_calculator.find_similarity(
-            all_pairs_to_check,
-            ["detected_message_with_numbers", "stacktrace", "merged_small_logs"])
+        sim_dict = _similarity_calculator.find_similarity(
+            all_pairs_to_check, ["detected_message_with_numbers", "stacktrace", "merged_small_logs"])
 
         filtered_results = []
         deleted_indices = set()
@@ -222,14 +220,14 @@ class SuggestService(AnalyzerService):
             for j in range(i + 1, len(gathered_results)):
                 test_item_id_first = test_item_ids[gathered_results[i][0]]
                 test_item_id_second = test_item_ids[gathered_results[j][0]]
-                group_id = (scores_by_test_items[test_item_id_first]["mrHit"]["_id"],
-                            scores_by_test_items[test_item_id_second]["mrHit"]["_id"])
-                if group_id not in _similarity_calculator.similarity_dict["detected_message_with_numbers"]:
+                group_id = (str(scores_by_test_items[test_item_id_first]["mrHit"]["_id"]),
+                            str(scores_by_test_items[test_item_id_second]["mrHit"]["_id"]))
+                if group_id not in sim_dict["detected_message_with_numbers"]:
                     continue
-                det_message = _similarity_calculator.similarity_dict["detected_message_with_numbers"]
+                det_message = sim_dict["detected_message_with_numbers"]
                 detected_message_sim = det_message[group_id]
-                stacktrace_sim = _similarity_calculator.similarity_dict["stacktrace"][group_id]
-                merged_logs_sim = _similarity_calculator.similarity_dict["merged_small_logs"][group_id]
+                stacktrace_sim = sim_dict["stacktrace"][group_id]
+                merged_logs_sim = sim_dict["merged_small_logs"][group_id]
                 if detected_message_sim["similarity"] >= 0.98 and \
                         stacktrace_sim["similarity"] >= 0.98 and merged_logs_sim["similarity"] >= 0.98:
                     deleted_indices.add(j)
@@ -330,9 +328,9 @@ class SuggestService(AnalyzerService):
             prepared_logs, test_item_id_for_suggest = self.query_logs_for_cluster(test_item_info, index_name)
         else:
             unique_logs = text_processing.leave_only_unique_logs(test_item_info.logs)
-            prepared_logs = [LogRequests._prepare_log_for_suggests(test_item_info, log, index_name)
+            prepared_logs = [request_factory.prepare_log_for_suggests(test_item_info, log, index_name)
                              for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
-        logs, _ = self.log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+        logs, _ = log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
         return logs, test_item_id_for_suggest
 
     def suggest_items(self, test_item_info: TestItemInfo):

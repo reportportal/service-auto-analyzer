@@ -3,10 +3,10 @@
 {"update":{"_index":"2","_id":4}}
 {"doc":{"cluster_id":"60604459849884091","cluster_message":"error occurred twice\nAssertionError error occurred\nerror found","cluster_with_numbers":true}}
 {"update":{"_index":"2","_id":5}}
-{"doc":{"cluster_id":"9398573272102061","cluster_message":"AssertionError status code SPECIALNUMBER error occurred","cluster_with_numbers":true}}
+{"doc":{"cluster_id":"58202398056526781","cluster_message":"AssertionError status code 500 error occurred","cluster_with_numbers":true}}
 {"update":{"_index":"2","_id":9}}
 {"doc":{"cluster_id":"86465058569810291","cluster_message":"NoSuchElementException error occurred\nerror found\nassert query","cluster_with_numbers":true}}
 {"update":{"_index":"2","_id":"4_m"}}
 {"doc":{"cluster_id":"60604459849884091","cluster_message":"error occurred twice\nAssertionError error occurred\nerror found","cluster_with_numbers":true}}
 {"update":{"_index":"2","_id":"5_m"}}
-{"doc":{"cluster_id":"9398573272102061","cluster_message":"AssertionError status code SPECIALNUMBER error occurred","cluster_with_numbers":true}}
+{"doc":{"cluster_id":"58202398056526781","cluster_message":"AssertionError status code 500 error occurred","cluster_with_numbers":true}}

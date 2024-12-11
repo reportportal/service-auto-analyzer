@@ -33,7 +33,7 @@
 | MINIO_ACCESS_KEY                | string   | minio                      | you need to set a minio access key here                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | MINIO_SECRET_KEY                | string   | minio123                   | you need to set a minio secret key here                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | MINIO_USE_TLS                   | boolean  | false                      | Flag to indicate to use secure (TLS) connection to S3 service or not.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| ANALYZER_BINSTORE_BUCKETPREFIX  | string   | prj-                       | the prefix for buckets which are added to each project filepath.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ANALYZER_BINSTORE_BUCKETPREFIX  | string   | prj-                       | The prefix for buckets which will be transformed to project folder by appending Project ID, E.G. `prj-2`. It can contain root path, like: `my-bucket/reportportal/prj-`, then the service will operate in single bucket mode and will put everything to `my-bucket` bucket, under `reportportal/prj-2` (for default project of default user) path.                                                                                                                                                                                                                                     |
 | ANALYZER_BINSTORE_MINIO_REGION  | string   |                            | the region which you can specify for saving in AWS S3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | INSTANCE_TASK_TYPE              | string   |                            | if you want to run a standard analyzer instance, leave it as blank. If you want to run an instance for training, set "train" here.                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | FILESYSTEM_DEFAULT_PATH         | string   | storage                    | the path where will be stored all the information connected with analyzer, if `ANALYZER_BINARYSTORE_TYPE` is set to `filesystem`. If you want to mount this folder to some folder on your machine, you can use this instruction in the docker compose:<br/><code>volumes:<br/>&nbsp;&nbsp;- ./data/analyzer:/backend/storage</code>                                                                                                                                                                                                                                                    |
@@ -116,26 +116,3 @@ Perform next steps inside source directory of the analyzer.
 ```bash
   /analyzer-train/bin/uwsgi --ini res/analyzer-train.ini
 ```
-
-### For Windows:
-1. Create a virtual environment with any name (in the example **env**)
-```
-python -m venv env
-```
-2. Activate the virtual environment
-```
-call env\Scripts\activate.bat
-```
-3. Install python libraries
-```
-python -m pip install -r requirements_windows.txt
-```
-4. Install stopwords package from the nltk library
-```
-python -m nltk.downloader stopwords
-```
-5. Start the program.
-```
-python app/app.py
-```
-

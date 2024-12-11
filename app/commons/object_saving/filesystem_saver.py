@@ -26,6 +26,10 @@ from app.utils import utils
 logger = logging.getLogger('analyzerApp.filesystemSaver')
 
 
+def unify_path_separator(path: str) -> str:
+    return path.replace('\\', '/')
+
+
 class FilesystemSaver(Storage):
     _base_path: str
 
@@ -34,48 +38,49 @@ class FilesystemSaver(Storage):
 
     def remove_project_objects(self, path: str, object_names: list[str]) -> None:
         for filename in object_names:
-            object_name_full = os.path.join(self._base_path, path, filename).replace("\\", "/")
+            object_name_full = unify_path_separator(os.path.join(self._base_path, path, filename))
             if os.path.exists(object_name_full):
                 os.remove(object_name_full)
 
     def put_project_object(self, data: Any, path: str, object_name: str, using_json: bool = False) -> None:
-        folder_to_save = os.path.join(self._base_path, path, os.path.dirname(object_name)).replace("\\", "/")
-        filename = os.path.join(self._base_path, path, object_name).replace("\\", "/")
+        folder_to_save = unify_path_separator(os.path.join(self._base_path, path, os.path.dirname(object_name)))
+        filename = unify_path_separator(os.path.join(self._base_path, path, object_name))
         if folder_to_save:
             os.makedirs(folder_to_save, exist_ok=True)
-        with open(filename, "wb") as f:
+        with open(filename, 'wb') as f:
             if using_json:
-                f.write(json.dumps(data).encode("utf-8"))
+                f.write(json.dumps(data).encode('utf-8'))
             else:
+                # noinspection PyTypeChecker
                 pickle.dump(data, f)
         logger.debug("Saved into folder '%s' with name '%s': %s", path, object_name, data)
 
     def get_project_object(self, path: str, object_name: str, using_json: bool = False) -> object | None:
-        filename = os.path.join(self._base_path, path, object_name).replace("\\", "/")
+        filename = unify_path_separator(os.path.join(self._base_path, path, object_name))
         if not utils.validate_file(filename):
             raise ValueError(f'Unable to get file: {filename}')
-        with open(filename, "rb") as f:
+        with open(filename, 'rb') as f:
             return json.loads(f.read()) if using_json else pickle.load(f)
 
     def does_object_exists(self, path: str, object_name: str) -> bool:
-        return os.path.exists(os.path.join(self._base_path, path, object_name).replace("\\", "/"))
+        return os.path.exists(unify_path_separator(os.path.join(self._base_path, path, object_name)))
 
     def get_folder_objects(self, path: str, folder: str) -> list[str]:
         root_path = self._base_path
         if not root_path and not path:
             root_path = os.getcwd()
-        if folder.endswith('/'):
-            folder_to_check = os.path.join(root_path, path, folder).replace("\\", "/")
+        if unify_path_separator(folder).endswith('/'):
+            folder_to_check = unify_path_separator(os.path.join(root_path, path, folder))
             if os.path.exists(folder_to_check):
                 return [os.path.join(folder, file_name) for file_name in os.listdir(folder_to_check)]
         else:
-            folder_to_check = os.path.join(root_path, path).replace("\\", "/")
+            folder_to_check = unify_path_separator(os.path.join(root_path, path))
             if os.path.exists(folder_to_check):
                 return [file_name for file_name in os.listdir(folder_to_check) if file_name.startswith(folder)]
         return []
 
     def remove_folder_objects(self, path: str, folder: str) -> bool:
-        folder_name = os.path.join(self._base_path, path, folder).replace("\\", "/")
+        folder_name = unify_path_separator(os.path.join(self._base_path, path, folder))
         if os.path.exists(folder_name):
             shutil.rmtree(folder_name, ignore_errors=True)
             return True

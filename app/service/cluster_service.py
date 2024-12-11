@@ -23,10 +23,8 @@ import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 
 from app.amqp.amqp import AmqpClient
-from app.commons import clusterizer, logging
+from app.commons import clusterizer, logging, request_factory, log_merger
 from app.commons.esclient import EsClient
-from app.commons.log_merger import LogMerger
-from app.commons.log_requests import LogRequests
 from app.commons.model.launch_objects import (ClusterResult, ClusterInfo, SearchConfig, ApplicationConfig,
                                               LaunchInfoForClustering)
 from app.utils import utils, text_processing
@@ -38,18 +36,15 @@ class ClusterService:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
     es_client: EsClient
-    log_requests: LogRequests
-    log_merger: LogMerger
 
     def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=self.app_config)
-        self.log_requests = LogRequests()
-        self.log_merger = LogMerger()
 
-    def add_query_with_start_time_decay(self, main_query: dict[str, Any]) -> dict[str, Any]:
+    def get_query_with_start_time_decay(self, main_query: dict[str, Any]) -> dict[str, Any]:
         return {
+            "_source": main_query["_source"],
             "size": main_query["size"],
             "query": {
                 "function_score": {
@@ -78,9 +73,8 @@ class ClusterService:
             self, queried_log: dict[str, Any], message: str, launch_info: LaunchInfoForClustering,
             min_should_match: str = "95%") -> dict[str, Any]:
         """Build search query"""
-        query = {
-            "_source": ["whole_message", "test_item", "is_merged",
-                        "detected_message", "stacktrace", "launch_id", "cluster_id",
+        query: dict[str, Any] = {
+            "_source": ["whole_message", "test_item", "is_merged", "detected_message", "launch_id", "cluster_id",
                         "cluster_message", "potential_status_codes", "found_exceptions"],
             "size": 10,
             "query": {
@@ -129,7 +123,7 @@ class ClusterService:
             )
         utils.append_potential_status_codes(
             query, queried_log, boost=1.0, max_query_terms=self.search_cfg.MaxQueryTerms)
-        return self.add_query_with_start_time_decay(query)
+        return self.get_query_with_start_time_decay(query)
 
     def find_similar_items_from_es(self, groups: dict[int, list[int]], log_dict: dict[int, dict[str, Any]],
                                    log_messages: list[str], log_ids: set[str], launch_info: LaunchInfoForClustering,
@@ -197,7 +191,7 @@ class ClusterService:
                         if log_dict_part[ind]["_source"]["launch_id"] != launch_info.launch.launchId:
                             continue
                         log_ids.add(str(log_dict_part[ind]["_id"]))
-                        new_group_log_ids.append(str(log_dict_part[ind]["_id"]))
+                        new_group_log_ids.append(log_dict_part[ind]["_id"])
                         new_test_items.add(int(log_dict_part[ind]["_source"]["test_item"]))
                     if not cluster_id or not cluster_message:
                         continue
@@ -235,12 +229,11 @@ class ClusterService:
     def cluster_messages_with_grouping_by_error(
             self, log_messages: list[str], log_dict: dict[int, dict[str, Any]],
             unique_errors_min_should_match: float) -> dict[int, list[int]]:
-        regroupped_by_error = self.regroup_by_error_and_status_codes(
-            log_messages, log_dict)
+        regrouped_by_error = self.regroup_by_error_and_status_codes(log_messages, log_dict)
         _clusterizer = clusterizer.Clusterizer()
-        all_groups = {}
+        all_groups: dict[int, list[int]] = {}
         start_group_id = 0
-        for group in regroupped_by_error.values():
+        for group in regrouped_by_error.values():
             log_messages_part = []
             log_messages_idx_dict = {}
             for i, idx in enumerate(group):
@@ -292,7 +285,7 @@ class ClusterService:
             log_ids_for_merged_logs: dict[str, list[int]],
             launch_info: LaunchInfoForClustering) -> tuple[list[ClusterInfo], int, dict[str, tuple[int, str]]]:
         merged_logs_to_update = {}
-        clusters_found = {}
+        clusters_found: dict[int, tuple[list[int], list[int]]] = {}
         cluster_message_by_id = {}
         for group in groups:
             cnt_items = len(groups[group])
@@ -357,8 +350,9 @@ class ClusterService:
         log_ids = {}
         try:
             unique_errors_min_should_match = launch_info.launch.analyzerConfig.uniqueErrorsMinShouldMatch / 100.0  # noqa
-            log_messages, log_dict, log_ids_for_merged_logs = self.log_requests.prepare_logs_for_clustering(  # noqa
-                launch_info.launch, launch_info.numberOfLogLines, launch_info.cleanNumbers, index_name)
+            prepared_logs = request_factory.prepare_logs_for_clustering(launch_info.launch, index_name)
+            log_messages, log_dict, log_ids_for_merged_logs = log_merger.merge_logs(
+                prepared_logs, launch_info.numberOfLogLines, launch_info.cleanNumbers)
             log_ids = set([str(log["_id"]) for log in log_dict.values()])
             groups = self.cluster_messages_with_grouping_by_error(
                 log_messages, log_dict, unique_errors_min_should_match)
@@ -415,13 +409,8 @@ class ClusterService:
         logger.info("Processed the launch. It took %.2f sec.", time() - t_start)
         logger.info("Finished clustering for the launch with %d clusters.", cluster_num)
         for cluster in clusters:
-            # Set original messages for clusters to show in UI
-            log_ids = set(cluster.logIds)
-            for test_item in launch_info.launch.testItems:
-                for log in test_item.logs:
-                    if log.logId in log_ids:
-                        cluster.clusterMessage = log.message
-                        break
+            # Put readable text instead of tokens
+            cluster.clusterMessage = text_processing.replace_tokens_with_readable_text(cluster.clusterMessage)
         return ClusterResult(
             project=launch_info.project,
             launchId=launch_info.launch.launchId,

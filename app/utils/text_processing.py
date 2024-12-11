@@ -424,7 +424,7 @@ def find_only_numbers(detected_message_with_numbers: str) -> str:
     return " ".join(split_words(detected_message_only_numbers))
 
 
-def enrich_text_with_method_and_classes(text):
+def enrich_text_with_method_and_classes(text: str) -> str:
     new_lines = []
     for line in text.split("\n"):
         new_line = line
@@ -671,7 +671,7 @@ def extract_paths(text):
     return all_paths
 
 
-def extract_message_params(text):
+def extract_message_params(text: str) -> list[str]:
     all_unique = set()
     all_params = []
     for param in re.findall(r"(^|\W)('.+?'|\".+?\")(\W|$|\n)", text):
@@ -825,3 +825,10 @@ WEBDRIVER_AUXILIARY_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
 
 def remove_webdriver_auxiliary_info(text: str) -> str:
     return replace_patterns(text, WEBDRIVER_AUXILIARY_PATTERNS)
+
+
+READABLE_NUMBER = '[EXCLUDED NUMBER]'
+
+
+def replace_tokens_with_readable_text(text: str) -> str:
+    return text.replace(NUMBER_TAG, READABLE_NUMBER)

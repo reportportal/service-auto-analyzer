@@ -57,15 +57,14 @@ RUN dnf -y upgrade && dnf -y install python3.11 python3.11-pip ca-certificates p
     && groupadd uwsgi && useradd -g uwsgi uwsgi \
     && chown -R uwsgi:uwsgi ${VIRTUAL_ENV} \
     && chown -R uwsgi:uwsgi /usr/share/nltk_data \
-    && chown -R uwsgi:uwsgi /backend
-
-USER uwsgi
-EXPOSE 5001
-
-RUN mkdir -p -m 0644 /backend/storage \
+    && mkdir -p -m 0644 /backend/storage \
+    && chown -R uwsgi:uwsgi /backend\
     && source "${VIRTUAL_ENV}/bin/activate" \
     && pip install --upgrade pip \
     && pip install --upgrade setuptools
+
+USER uwsgi
+EXPOSE 5001
 
 # Start uWSGI
 CMD ["/venv/bin/uwsgi", "--http-auto-chunked", "--http-keepalive"]

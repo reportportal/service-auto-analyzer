@@ -44,7 +44,7 @@ WORKDIR /backend/
 COPY --from=builder /backend ./
 COPY --from=builder /venv /venv
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
-RUN dnf -y upgrade && dnf -y install python3.11 ca-certificates pcre-devel \
+RUN dnf -y upgrade && dnf -y install python3.11 python3.11-pip ca-certificates pcre-devel \
     && dnf clean all \
     && pip install --upgrade pip \
     && pip install --upgrade setuptools \

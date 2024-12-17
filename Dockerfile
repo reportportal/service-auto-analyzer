@@ -38,15 +38,13 @@ RUN mkdir /backend \
     && cp -r /build/app /backend/ \
     && cp -r /build/res /backend/
 
-FROM registry.access.redhat.com/ubi9/python-311:latest
+FROM registry.access.redhat.com/ubi9:latest
 USER root
 WORKDIR /backend/
 COPY --from=builder /backend ./
 COPY --from=builder /venv /venv
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
-RUN dnf -y upgrade && dnf -y install pcre-devel \
-    && dnf -y remove emacs-filesystem libjpeg-turbo libtiff libpng wget \
-    && dnf -y autoremove \
+RUN dnf -y upgrade && dnf -y install python3.11 ca-certificates pcre-devel \
     && dnf clean all \
     && pip install --upgrade pip \
     && pip install --upgrade setuptools \

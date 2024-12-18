@@ -37,7 +37,7 @@ def run_s3():
 
 
 def create_storage_client(bucket_prefix=BUCKET_PREFIX):
-    return MinioClient(ApplicationConfig(minioHost=SERVER_HOST, minioRegion=REGION, minioBucketPrefix=bucket_prefix,
+    return MinioClient(ApplicationConfig(minioHost=SERVER_HOST, minioRegion=REGION, bucketPrefix=bucket_prefix,
                                          minioAccessKey='minio', minioSecretKey='minio', minioUseTls=False))
 
 

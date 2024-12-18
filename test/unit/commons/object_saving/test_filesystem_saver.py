@@ -128,9 +128,9 @@ def test_list_existing_folder():
     object_name = f'{random_alphanumeric(16)}.json'
     path = 'test'
     resource = '/'.join([path, object_name])
-    CREATED_FILES_AND_FOLDERS.append('/'.join([base_path, bucket, path, object_name]))
-    CREATED_FILES_AND_FOLDERS.append('/'.join([base_path, bucket, path]))
-    CREATED_FILES_AND_FOLDERS.append('/'.join([base_path, bucket]))
+    CREATED_FILES_AND_FOLDERS.append(os.path.join(base_path, f'prj-{bucket}', path, object_name))
+    CREATED_FILES_AND_FOLDERS.append(os.path.join(base_path, f'prj-{bucket}', path))
+    CREATED_FILES_AND_FOLDERS.append(os.path.join(base_path, f'prj-{bucket}'))
     CREATED_FILES_AND_FOLDERS.append(base_path)
 
     file_system = create_storage_client(base_path)
@@ -144,9 +144,9 @@ def test_list_dir_separators():
     object_name = f'{random_alphanumeric(16)}.json'
     path = 'test/'
     resource = path + object_name
-    CREATED_FILES_AND_FOLDERS.append('/'.join([bucket, path, object_name]))
-    CREATED_FILES_AND_FOLDERS.append('/'.join([bucket, path]))
-    CREATED_FILES_AND_FOLDERS.append('/'.join([bucket]))
+    CREATED_FILES_AND_FOLDERS.append(os.path.join(f'prj-{bucket}', path, object_name))
+    CREATED_FILES_AND_FOLDERS.append(os.path.join(f'prj-{bucket}', path))
+    CREATED_FILES_AND_FOLDERS.append(os.path.join(f'prj-{bucket}'))
 
     file_system = create_storage_client('')
     file_system.put_project_object({'test': True}, bucket, resource, using_json=True)
@@ -162,6 +162,8 @@ def test_remove_project_objects():
 
     file_system = create_storage_client('')
     file_system.put_project_object({'test': True}, bucket, resource, using_json=True)
+    CREATED_FILES_AND_FOLDERS.append(os.path.join(f'prj-{bucket}', path))
+    CREATED_FILES_AND_FOLDERS.append(os.path.join(f'prj-{bucket}'))
 
     file_system.remove_project_objects(bucket, [resource])
     with pytest.raises(ValueError):

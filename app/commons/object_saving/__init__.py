@@ -24,8 +24,7 @@ def create(app_config: ApplicationConfig, project_id: str | int | None = None, p
 
 def create_filesystem(base_path: str, project_id: str | int | None = None, path: str | None = None) -> ObjectSaver:
     return ObjectSaver(
-        app_config=ApplicationConfig(binaryStoreType='filesystem', filesystemDefaultPath=base_path,
-                                     minioBucketPrefix=''),
+        app_config=ApplicationConfig(binaryStoreType='filesystem', filesystemDefaultPath=base_path, bucketPrefix=''),
         project_id=project_id,
         path=path
     )

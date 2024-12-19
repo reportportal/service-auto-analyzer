@@ -24,8 +24,11 @@ from test import random_alphanumeric
 CREATED_FILES_AND_FOLDERS = []
 
 
-def create_storage_client(path):
-    return FilesystemSaver(ApplicationConfig(filesystemDefaultPath=path))
+def create_storage_client(path, bucket_prefix=None):
+    if bucket_prefix is None:
+        return FilesystemSaver(ApplicationConfig(filesystemDefaultPath=path))
+    else:
+        return FilesystemSaver(ApplicationConfig(filesystemDefaultPath=path, bucketPrefix=bucket_prefix))
 
 
 def test_object_not_exists():
@@ -193,6 +196,26 @@ def test_base_path(base_path):
     assert result['test']
 
     assert file_system.get_folder_objects('', '') == os.listdir(expected_directory)
+
+
+def test_bucket_prefix():
+    bucket = '8'
+    base_path = f'storage_{random_alphanumeric(16)}'
+    bucket_prefix = f'test_{random_alphanumeric(16)}/prj-'
+    object_name = f'{random_alphanumeric(16)}.json'
+
+    file_system = create_storage_client(base_path, bucket_prefix)
+    file_system.put_project_object({'test': True}, bucket, object_name, using_json=True)
+
+    resource = os.path.join(base_path, f'{bucket_prefix}{bucket}', object_name)
+    CREATED_FILES_AND_FOLDERS.append(resource)
+    CREATED_FILES_AND_FOLDERS.append(os.path.join(base_path, f'{bucket_prefix}{bucket}'))
+    CREATED_FILES_AND_FOLDERS.append(base_path)
+
+    assert file_system.get_folder_objects(bucket, '') == [object_name]
+    assert file_system.does_object_exists(bucket, object_name)
+    assert file_system.get_project_object(bucket, object_name, using_json=True) == {'test': True}
+    assert os.path.exists(resource)
 
 
 @pytest.fixture(autouse=True, scope='session')

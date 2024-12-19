@@ -39,4 +39,5 @@ jobs:
       build-platforms: ${{ needs.variables-setup.outputs.platforms }}
       version: ${{ needs.variables-setup.outputs.version }}
       date: ${{ needs.variables-setup.outputs.date }}
+      scan-image: true
     secrets: inherit

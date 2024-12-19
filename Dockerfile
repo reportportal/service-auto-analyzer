@@ -53,16 +53,9 @@ ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend \
     UWSGI_LAZY_APPS=1 UWSGI_WSGI_ENV_BEHAVIOR=holy PYTHONDONTWRITEBYTECODE=1
 
 RUN dnf -y upgrade && dnf -y install python3.11 python3.11-pip ca-certificates pcre-devel \
+    && dnf -y autoremove \
     && dnf clean all \
-    && groupadd uwsgi && useradd -g uwsgi uwsgi \
-    && chown -R uwsgi:uwsgi ${VIRTUAL_ENV} \
-    && chown -R uwsgi:uwsgi /usr/share/nltk_data \
-    && chown -R uwsgi:uwsgi /backend
-
-USER uwsgi
-EXPOSE 5001
-
-RUN mkdir -p -m 0644 /backend/storage \
+    && mkdir -p -m 0744 /backend/storage \
     && source "${VIRTUAL_ENV}/bin/activate" \
     && pip install --upgrade pip \
     && pip install --upgrade setuptools

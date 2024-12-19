@@ -13,12 +13,26 @@
 #  limitations under the License.
 
 """Common interface class for Storage types."""
-
 from abc import ABCMeta, abstractmethod
 from typing import Any
 
+from app.commons.model.launch_objects import ApplicationConfig
+
+
+def unify_path_separator(path: str) -> str:
+    return path.replace('\\', '/')
+
 
 class Storage(metaclass=ABCMeta):
+    _bucket_prefix: str
+
+    def __init__(self, app_config: ApplicationConfig) -> None:
+        self._bucket_prefix = app_config.bucketPrefix
+
+    def _get_project_name(self, project_id: str | None) -> str:
+        if not project_id:
+            return ''
+        return self._bucket_prefix + project_id
 
     @abstractmethod
     def remove_project_objects(self, path: str, object_names: list[str]) -> None:

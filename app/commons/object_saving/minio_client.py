@@ -23,20 +23,19 @@ from minio.error import MinioException, S3Error
 
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig
-from app.commons.object_saving.storage import Storage
+from app.commons.object_saving.storage import Storage, unify_path_separator
 
 logger = logging.getLogger("analyzerApp.minioClient")
 
 
 class MinioClient(Storage):
     region: str
-    bucket_prefix: str
     minio_client: Minio
 
     def __init__(self, app_config: ApplicationConfig) -> None:
+        super().__init__(app_config)
         minio_host = app_config.minioHost
         self.region = app_config.minioRegion
-        self.bucket_prefix = app_config.minioBucketPrefix
         self.minio_client = Minio(
             minio_host,
             access_key=app_config.minioAccessKey,
@@ -45,11 +44,6 @@ class MinioClient(Storage):
             region=self.region
         )
         logger.info(f'Minio initialized {minio_host}')
-
-    def _get_project_name(self, project_id: str | None) -> str:
-        if not project_id:
-            return ''
-        return self.bucket_prefix + project_id
 
     def get_bucket(self, bucket_id: str | None) -> str:
         path = self._get_project_name(bucket_id)
@@ -67,7 +61,7 @@ class MinioClient(Storage):
             return object_name
 
         path_octets = os.path.split(path)[1:]
-        return str(os.path.join(path_octets[0], *path_octets[1:], object_name))
+        return unify_path_separator(str(os.path.join(path_octets[0], *path_octets[1:], object_name)))
 
     def remove_project_objects(self, bucket: str, object_names: list[str]) -> None:
         bucket_name = self.get_bucket(bucket)

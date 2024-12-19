@@ -186,7 +186,7 @@ class TestService(unittest.TestCase):
             esClientKey="",
             appVersion="",
             minioRegion="",
-            minioBucketPrefix="",
+            bucketPrefix="",
             filesystemDefaultPath="",
             esChunkNumber=1000,
             binaryStoreType="filesystem",

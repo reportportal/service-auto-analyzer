@@ -55,7 +55,7 @@ class ApplicationConfig(BaseModel):
     minioUseTls: bool = False
     appVersion: str = ''
     binaryStoreType: str = 'filesystem'
-    minioBucketPrefix: str = 'prj-'
+    bucketPrefix: str = 'prj-'
     minioRegion: str | None = None
     instanceTaskType: str = ''
     filesystemDefaultPath: str = 'storage'

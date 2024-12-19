@@ -38,30 +38,28 @@ RUN mkdir /backend \
     && cp -r /build/app /backend/ \
     && cp -r /build/res /backend/
 
-FROM registry.access.redhat.com/ubi9/python-311:latest
+FROM registry.access.redhat.com/ubi9:latest
 USER root
 WORKDIR /backend/
 COPY --from=builder /backend ./
 COPY --from=builder /venv /venv
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
-RUN dnf -y upgrade && dnf -y install pcre-devel \
-    && dnf -y remove emacs-filesystem libjpeg-turbo libtiff libpng wget \
-    && dnf -y autoremove \
-    && dnf clean all \
-    && pip install --upgrade pip \
-    && pip install --upgrade setuptools \
-    && mkdir -p -m 0700 /backend/storage \
-    && groupadd uwsgi && useradd -g uwsgi uwsgi \
-    && chown -R uwsgi: /usr/share/nltk_data \
-    && chown -R uwsgi: /backend
-USER uwsgi
-EXPOSE 5001
+
 ENV VIRTUAL_ENV="/venv"
 # uWSGI configuration (customize as needed):
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend \
     FLASK_APP=app/main.py UWSGI_WSGI_FILE=app/main.py UWSGI_SOCKET=:3031 UWSGI_HTTP=:5001 \
-    UWSGI_VIRTUALENV=${VIRTUAL_ENV} UWSGI_MASTER=1 UWSGI_WORKERS=4 UWSGI_THREADS=8 UWSGI_MAX_FD=10000 UWSGI_LAZY_APPS=1 \
-    UWSGI_WSGI_ENV_BEHAVIOR=holy PYTHONDONTWRITEBYTECODE=1
+    UWSGI_VIRTUALENV=${VIRTUAL_ENV} UWSGI_MASTER=1 UWSGI_WORKERS=4 UWSGI_THREADS=8 UWSGI_MAX_FD=10000 \
+    UWSGI_LAZY_APPS=1 UWSGI_WSGI_ENV_BEHAVIOR=holy PYTHONDONTWRITEBYTECODE=1
+
+RUN dnf -y upgrade && dnf -y install python3.11 python3.11-pip ca-certificates pcre-devel \
+    && dnf -y autoremove \
+    && dnf clean all \
+    && mkdir -p -m 0744 /backend/storage \
+    && source "${VIRTUAL_ENV}/bin/activate" \
+    && pip install --upgrade pip \
+    && pip install --upgrade setuptools
+
 # Start uWSGI
 CMD ["/venv/bin/uwsgi", "--http-auto-chunked", "--http-keepalive"]
 HEALTHCHECK --interval=1m --timeout=5s --retries=2 CMD ["curl", "-s", "-f", "--show-error", "http://localhost:5001/"]

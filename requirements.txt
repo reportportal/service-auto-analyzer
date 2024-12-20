@@ -21,3 +21,4 @@ pandas==1.5.3
 urllib3==1.26.19
 werkzeug==3.0.6 # not directly required, pinned by Snyk to avoid a vulnerability
 certifi>=2024.8.30
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability

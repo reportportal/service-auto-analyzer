@@ -53,14 +53,14 @@ class MinioClient(Storage):
         basename = os.path.basename(path)
         if basename == path:
             return path
-        return os.path.split(path)[0]
+        return os.path.normpath(path).split(os.sep)[0]
 
     def get_path(self, object_name: str, bucket_name: str, bucket_id: str | None) -> str:
         path = self._get_project_name(bucket_id)
         if not path or path == bucket_name:
             return object_name
 
-        path_octets = os.path.split(path)[1:]
+        path_octets = os.path.normpath(path).split(os.sep)[1:]
         return unify_path_separator(str(os.path.join(path_octets[0], *path_octets[1:], object_name)))
 
     def remove_project_objects(self, bucket: str, object_names: list[str]) -> None:

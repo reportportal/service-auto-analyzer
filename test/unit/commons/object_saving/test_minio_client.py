@@ -69,8 +69,10 @@ def get_url(bucket, object_name):
 
 
 @pytest.mark.parametrize('bucket_prefix, bucket, bucket_name, object_name, object_path', [
-    (BUCKET_PREFIX, '2', f'{BUCKET_PREFIX}2', 'my_test_file_write.json', 'my_test_file_write.json',),
-    (f'test/{BUCKET_PREFIX}', '2', 'test', 'my_test_file_write.json', f'{BUCKET_PREFIX}2/my_test_file_write.json',),
+    (BUCKET_PREFIX, '2', f'{BUCKET_PREFIX}2', 'my_test_file_write.json', 'my_test_file_write.json'),
+    (f'test/{BUCKET_PREFIX}', '2', 'test', 'my_test_file_write.json', f'{BUCKET_PREFIX}2/my_test_file_write.json'),
+    (f'test/reportportal/{BUCKET_PREFIX}', '2', 'test', 'my_test_file_write.json',
+     f'reportportal/{BUCKET_PREFIX}2/my_test_file_write.json'),
 ])
 def test_json_write(bucket_prefix, bucket, bucket_name, object_name, object_path):
     minio_client = create_storage_client(bucket_prefix)
@@ -89,8 +91,10 @@ def test_json_write(bucket_prefix, bucket, bucket_name, object_name, object_path
 
 
 @pytest.mark.parametrize('bucket_prefix, bucket, bucket_name, object_name, object_path', [
-    (BUCKET_PREFIX, '2', f'{BUCKET_PREFIX}2', 'my_test_file_read.json', 'my_test_file_read.json',),
-    (f'test/{BUCKET_PREFIX}', '2', 'test', 'my_test_file_read.json', f'{BUCKET_PREFIX}2/my_test_file_read.json',),
+    (BUCKET_PREFIX, '2', f'{BUCKET_PREFIX}2', 'my_test_file_read.json', 'my_test_file_read.json'),
+    (f'test/{BUCKET_PREFIX}', '2', 'test', 'my_test_file_read.json', f'{BUCKET_PREFIX}2/my_test_file_read.json'),
+    (f'test/reportportal/{BUCKET_PREFIX}', '2', 'test', 'my_test_file_write.json',
+     f'reportportal/{BUCKET_PREFIX}2/my_test_file_write.json'),
 ])
 def test_json_read(bucket_prefix, bucket, bucket_name, object_name, object_path):
     minio_client = create_storage_client(bucket_prefix)

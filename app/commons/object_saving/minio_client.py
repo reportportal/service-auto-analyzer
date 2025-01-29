@@ -25,7 +25,8 @@ from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig
 from app.commons.object_saving.storage import Storage, unify_path_separator
 
-logger = logging.getLogger("analyzerApp.minioClient")
+LOGGER = logging.getLogger("analyzerApp.minioClient")
+PATH_SEPARATOR = '/'  # Despite the possibility of deploying on Windows, all our configurations use Unix-like paths
 
 
 class MinioClient(Storage):
@@ -43,7 +44,7 @@ class MinioClient(Storage):
             secure=app_config.minioUseTls,
             region=self.region
         )
-        logger.info(f'Minio initialized {minio_host}')
+        LOGGER.info(f'Minio initialized {minio_host}')
 
     def get_bucket(self, bucket_id: str | None) -> str:
         path = self._get_project_name(bucket_id)
@@ -53,14 +54,14 @@ class MinioClient(Storage):
         basename = os.path.basename(path)
         if basename == path:
             return path
-        return os.path.normpath(path).split(os.sep)[0]
+        return os.path.normpath(path).split(PATH_SEPARATOR)[0]
 
     def get_path(self, object_name: str, bucket_name: str, bucket_id: str | None) -> str:
         path = self._get_project_name(bucket_id)
         if not path or path == bucket_name:
             return object_name
 
-        path_octets = os.path.normpath(path).split(os.sep)[1:]
+        path_octets = os.path.normpath(path).split(PATH_SEPARATOR)[1:]
         return unify_path_separator(str(os.path.join(path_octets[0], *path_octets[1:], object_name)))
 
     def remove_project_objects(self, bucket: str, object_names: list[str]) -> None:
@@ -75,9 +76,9 @@ class MinioClient(Storage):
         bucket_name = self.get_bucket(bucket)
         path = self.get_path(object_name, bucket_name, bucket)
         if bucket_name and not self.minio_client.bucket_exists(bucket_name):
-            logger.debug("Creating minio bucket %s" % bucket_name)
+            LOGGER.debug("Creating minio bucket %s" % bucket_name)
             self.minio_client.make_bucket(bucket_name=bucket_name, location=self.region)
-            logger.debug("Created minio bucket %s" % bucket_name)
+            LOGGER.debug("Created minio bucket %s" % bucket_name)
         if using_json:
             data_to_save = json.dumps(data).encode("utf-8")
             content_type = 'application/json'
@@ -90,7 +91,7 @@ class MinioClient(Storage):
             bucket_name=bucket_name, object_name=path, data=data_stream, length=len(data_to_save),
             content_type=content_type)
         etag = result.etag
-        logger.debug(f'Saved into bucket "{bucket_name}" with path "{path}", etag "{etag}": {data}')
+        LOGGER.debug(f'Saved into bucket "{bucket_name}" with path "{path}", etag "{etag}": {data}')
 
     def get_project_object(self, bucket: str, object_name: str, using_json=False) -> object | None:
         bucket_name = self.get_bucket(bucket)
@@ -120,9 +121,10 @@ class MinioClient(Storage):
         if bucket_name and not self.minio_client.bucket_exists(bucket_name):
             return []
         object_names = set()
-        object_list = self.minio_client.list_objects(bucket_name, prefix=path.endswith('/') and path or path + '/')
+        object_list = self.minio_client.list_objects(bucket_name, prefix=path.endswith(
+            PATH_SEPARATOR) and path or path + PATH_SEPARATOR)
         for obj in object_list:
-            object_name = obj.object_name.strip('/')
+            object_name = obj.object_name.strip(PATH_SEPARATOR)
             if folder != path:
                 # Bucket prefix includes path to the project
                 prefix = path[0: -(len(folder))]
@@ -136,7 +138,8 @@ class MinioClient(Storage):
         if bucket_name and not self.minio_client.bucket_exists(bucket_name):
             return False
         result = False
-        for obj in self.minio_client.list_objects(bucket_name, prefix=path.endswith('/') and path or path + '/'):
+        for obj in self.minio_client.list_objects(bucket_name, prefix=path.endswith(
+                PATH_SEPARATOR) and path or path + PATH_SEPARATOR):
             self.minio_client.remove_object(bucket_name=bucket_name, object_name=obj.object_name)
             result = True
         return result

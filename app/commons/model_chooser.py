@@ -26,6 +26,8 @@ from app.machine_learning.models import (defect_type_model, custom_defect_type_m
 
 logger = logging.getLogger("analyzerApp.modelChooser")
 
+DEFAULT_RANDOM_SEED = 1337
+
 CUSTOM_MODEL_MAPPING = {
     ModelType.defect_type: custom_defect_type_model.CustomDefectTypeModel,
     ModelType.suggestion: custom_boosting_decision_maker.CustomBoostingDecisionMaker,
@@ -51,7 +53,7 @@ class ModelChooser:
         self.search_cfg = search_cfg
         self.object_saver = object_saving.create(self.app_config)
         self.global_models = self.initialize_global_models()
-        self.random_generator = np.random.Generator(bit_generator=np.random.PCG64())
+        self.random_generator = np.random.Generator(bit_generator=np.random.PCG64(DEFAULT_RANDOM_SEED))
 
     def initialize_global_models(self) -> dict[ModelType, MlModel]:
         result = {}

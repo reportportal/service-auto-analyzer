@@ -137,7 +137,7 @@ def train_several_times(
         for random_state in my_random_states:
             x_train, x_test, y_train, y_test = split_train_test(
                 logs_to_train_idx, data, labels_filtered, additional_logs, label, random_state=random_state)
-            new_model.train_model(label, x_train, y_train)
+            new_model.train_model(label, x_train, y_train, random_state)
             LOGGER.debug('New model results')
             new_model_results.append(new_model.validate_model(label, x_test, y_test))
             LOGGER.debug('Baseline model results')

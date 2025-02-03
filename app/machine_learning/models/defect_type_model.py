@@ -108,14 +108,14 @@ class DefectTypeModel(MlModel):
     def save_model(self):
         self._save_models(zip(MODEL_FILES, [self.count_vectorizer_models, self.models]))
 
-    def train_model(self, name: str, train_data_x: list[str], labels: list[int]) -> float:
+    def train_model(self, name: str, train_data_x: list[str], labels: list[int], random_state: int) -> float:
         self.count_vectorizer_models[name] = TfidfVectorizer(
             binary=True, min_df=5, analyzer=text_processing.preprocess_words)
         transformed_values = self.count_vectorizer_models[name].fit_transform(train_data_x)
         LOGGER.debug(f'Length of train data: {len(labels)}')
         LOGGER.debug(f'Train data label distribution: {Counter(labels)}')
         LOGGER.debug(f'Train model name: {name}; estimators number: {self.n_estimators}')
-        model = RandomForestClassifier(self.n_estimators, class_weight='balanced')
+        model = RandomForestClassifier(self.n_estimators, class_weight='balanced', random_state=random_state)
         x_train_values = pd.DataFrame(
             transformed_values.toarray(),
             columns=self.count_vectorizer_models[name].get_feature_names_out())

@@ -109,7 +109,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
         for issue_type in test["result"]:
             elastic_res = scores_by_issue_type[issue_type]
             for field in test["result"][issue_type]:
-                if type(test["result"][issue_type][field]) != dict:
+                if not isinstance(test["result"][issue_type][field], dict):
                     assert abs(elastic_res[field] - test["result"][issue_type][field]) <= self.epsilon
                 else:
                     for field_dict in test["result"][issue_type][field]:

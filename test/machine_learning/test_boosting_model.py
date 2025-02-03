@@ -18,9 +18,9 @@ import unittest
 import numpy as np
 
 from app.commons.object_saving import create_filesystem
+from app.machine_learning.boosting_featurizer import BoostingFeaturizer
 from app.machine_learning.models import DefectTypeModel, WeightedSimilarityCalculator
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
-from app.machine_learning.boosting_featurizer import BoostingFeaturizer
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import utils
 from test import get_fixture
@@ -79,7 +79,8 @@ class TestBoostingModel(unittest.TestCase):
             decision_maker = BoostingDecisionMaker(create_filesystem(folder))
             decision_maker.load_model()
             test_data_size = 5
-            random_data = np.random.rand(test_data_size, len(decision_maker.feature_ids)).tolist()
+            random_data = np.random.Generator(np.random.PCG64(1337)).random(
+                size=(test_data_size, len(decision_maker.feature_ids))).tolist()
             result, result_probability = decision_maker.predict(random_data)
             assert len(result) == test_data_size
             assert len(result_probability) == test_data_size

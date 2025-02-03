@@ -499,7 +499,7 @@ def compress(text):
 
 def preprocess_words(text):
     all_words = []
-    for w in re.finditer(r"[\w._]+", text):
+    for w in re.finditer(r"[\w.]+", text):
         word_normalized = re.sub(r"^\w\.", "", w.group(0))
         word = word_normalized.replace("_", "")
         if len(word) >= 3:
@@ -648,7 +648,7 @@ def clean_from_params(text: str) -> str:
 
 
 def clean_from_paths(text: str):
-    return re.sub(r"(^|(?<=[^\w:\\/]))(\w:)?([\w.\-_]+)?([\\/]+[\w.\-_]+){2,}", " ", text)
+    return re.sub(r"(^|(?<=[^\w:\\/]))(\w:)?([\w.\-]+)?([\\/]+[\w.\-]+){2,}", " ", text)
 
 
 URL_PATTERN = re.compile(r'[a-z]+:/+\S+', re.IGNORECASE)
@@ -668,7 +668,7 @@ def extract_urls(text: str) -> list[str]:
 def extract_paths(text):
     all_unique = set()
     all_paths = []
-    for param in re.findall(r"((^|(?<=[^\w:\\/]))(\w:)?([\w.\-_ ]+)?([\\/]+[\w.\-_ ]+){2,})", text):
+    for param in re.findall(r"((^|(?<=[^\w:\\/]))(\w:)?([\w.\- ]+)?([\\/]+[\w.\- ]+){2,})", text):
         path = param[0].strip()
         if path not in all_unique:
             all_unique.add(path)

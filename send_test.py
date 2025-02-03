@@ -28,7 +28,7 @@ ERROR_OCCURRED = "assertionError occurred"
 # This file can be used for checking app functionality locally
 
 
-class RpcClient():
+class RpcClient:
     """RpcClient helps to use RPC type of communication with rabbitmq"""
 
     def __init__(self):
@@ -67,7 +67,8 @@ class RpcClient():
 
         while self.response is None:
             self.connection.process_data_events()
-        return json.loads(self.response)
+        if self.response:
+            return json.loads(self.response)
 
     def call_without_wait(self, message, method):
         """RpcClient sends a message to a queue and doesn't wait for the answer"""

@@ -447,18 +447,21 @@ def enrich_text_with_method_and_classes(text: str) -> str:
     return "\n".join(new_lines)
 
 
+SPLIT_WORDS_PATTERN = "([A-Z][^A-Z]+)"
+
+
 def preprocess_test_item_name(text: str) -> str:
     result = text.replace("-", " ").replace("_", " ")
     all_words = []
     words = split_words(result, to_lower=False, only_unique=False)
     for w in words:
         if "." not in w:
-            all_words.extend([s.strip() for s in re.split("([A-Z][^A-Z]+)", w) if s.strip()])
+            all_words.extend([s.strip() for s in re.split(SPLIT_WORDS_PATTERN, w) if s.strip()])
         else:
             all_words.extend(
                 [s.strip() for s in enrich_text_with_method_and_classes(w).split(" ") if s.strip()])
             all_words.extend(
-                [s.strip() for s in re.split("([A-Z][^A-Z]+)", w.split(".")[-1]) if s.strip()])
+                [s.strip() for s in re.split(SPLIT_WORDS_PATTERN, w.split(".")[-1]) if s.strip()])
     return " ".join(all_words)
 
 
@@ -483,7 +486,7 @@ def preprocess_found_test_methods(text: str) -> str:
     words = split_words(text, to_lower=False, only_unique=False)
     for w in words:
         if "." not in w:
-            all_words.extend([s.strip() for s in re.split("([A-Z][^A-Z]+)", w) if s.strip()])
+            all_words.extend([s.strip() for s in re.split(SPLIT_WORDS_PATTERN, w) if s.strip()])
         else:
             all_words.append(w)
     return " ".join(all_words)
@@ -510,7 +513,7 @@ def preprocess_words(text):
             all_words.extend(split_words_list)
         if "." not in word_normalized:
             split_words_list = []
-            split_parts = [s.strip() for s in re.split("([A-Z][^A-Z]+)", word) if s.strip()]
+            split_parts = [s.strip() for s in re.split(SPLIT_WORDS_PATTERN, word) if s.strip()]
             if len(split_parts) > 2:
                 for idx in range(len(split_parts)):
                     if idx != len(split_parts) - 1:

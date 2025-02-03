@@ -5,7 +5,7 @@
 * you may not use this file except in compliance with the License.
 * You may obtain a copy of the License at
 *
-* http://www.apache.org/licenses/LICENSE-2.0
+* https://www.apache.org/licenses/LICENSE-2.0
 *
 * Unless required by applicable law or agreed to in writing, software
 * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,17 +14,23 @@
 * limitations under the License.
 """
 
+import json
+import os
 import sys
 import uuid
-import json
+
 import pika
-import os
+
+LAUNCH_NAME = "Launch name"
+ERROR_OCCURRED = "assertionError occurred"
+
 
 # This file can be used for checking app functionality locally
 
 
 class RpcClient():
     """RpcClient helps to use RPC type of communication with rabbitmq"""
+
     def __init__(self):
         self.connection = pika.BlockingConnection(
             pika.connection.
@@ -101,11 +107,11 @@ index_data = [{
                        {"logId": 3,
                         "logLevel": 40000,
                         "logTime": [2021, 11, 8, 11, 23, 13],
-                        "message": "assertionError occured"},
+                        "message": ERROR_OCCURRED},
                        {"logId": 4,
                         "logLevel": 40000,
                         "logTime": [2021, 11, 9, 11, 23, 13],
-                        "message": "assertionError occured \r\n error found \r\n error mined \r\n"}, ]
+                        "message": f"{ERROR_OCCURRED}\r\n error found\r\n error mined\r\n"}, ]
                    },
                   {"testItemId": 5,
                    "uniqueId": "df1",
@@ -116,7 +122,7 @@ index_data = [{
                        {"logId": 5,
                         "logLevel": 40000,
                         "logTime": [2021, 11, 10, 11, 23, 13],
-                        "message": "assertionError occured \r\n error found \r\n error mined"}, ]
+                        "message": f"{ERROR_OCCURRED}\r\n error found\r\n error mined"}, ]
                    }, ],
 }, {
     "launchId": 2,
@@ -141,11 +147,11 @@ index_data = [{
                        {"logId": 6,
                         "logLevel": 40000,
                         "logTime": [2021, 9, 8, 11, 23, 13],
-                        "message": "assertionError occured"},
+                        "message": ERROR_OCCURRED},
                        {"logId": 8,
                         "logLevel": 40000,
                         "logTime": [2021, 9, 9, 11, 23, 13],
-                        "message": "assertionError occured \r\n error found \r\n error mined"}, ]
+                        "message": f"{ERROR_OCCURRED}\r\n error found\r\n error mined"}, ]
                    },
                   {"testItemId": 78,
                    "uniqueId": "df5",
@@ -156,11 +162,11 @@ index_data = [{
                        {"logId": 45,
                         "logLevel": 40000,
                         "logTime": [2021, 9, 10, 11, 23, 13],
-                        "message": "assertionError occured"},
+                        "message": ERROR_OCCURRED},
                        {"logId": 81,
                         "logLevel": 40000,
                         "logTime": [2021, 9, 11, 11, 23, 13],
-                        "message": "assertionError occured \r\n error found \r\n error mined"}, ]
+                        "message": f"{ERROR_OCCURRED}\r\n error found\r\n error mined"}, ]
                    },
                   {"testItemId": 10,
                    "uniqueId": "df12",
@@ -171,7 +177,7 @@ index_data = [{
                        {"logId": 38,
                         "logLevel": 40000,
                         "logTime": [2021, 9, 12, 11, 23, 13],
-                        "message": "assertionError occured \r\n error found \r\n error mined"}]
+                        "message": f"{ERROR_OCCURRED}\r\n error found\r\n error mined"}]
                    },
                   {"testItemId": 15,
                    "uniqueId": "df",
@@ -182,11 +188,11 @@ index_data = [{
                        {"logId": 555,
                         "logLevel": 40000,
                         "logTime": [2021, 9, 13, 11, 23, 13],
-                        "message": "assertionError occured"},
+                        "message": ERROR_OCCURRED},
                        {"logId": 556,
                         "logLevel": 40000,
                         "logTime": [2021, 9, 14, 11, 23, 13],
-                        "message": "nullpointerException occured"}]
+                        "message": "nullpointerException occurred"}]
                    }],
 }, {
     "launchId": 1,
@@ -211,11 +217,11 @@ index_data = [{
                        {"logId": 32,
                         "logLevel": 40000,
                         "logTime": [2021, 11, 10, 11, 23, 13],
-                        "message": "assertionError occured"},
+                        "message": ERROR_OCCURRED},
                        {"logId": 46,
                         "logLevel": 40000,
                         "logTime": [2021, 11, 11, 11, 23, 13],
-                        "message": "assertionError occured \r\n error found \r\n error mined"}, ]
+                        "message": f"{ERROR_OCCURRED}\r\n error found\r\n error mined"}, ]
                    },
                   {"testItemId": 13,
                    "uniqueId": "df",
@@ -226,11 +232,11 @@ index_data = [{
                        {"logId": 78,
                         "logLevel": 40000,
                         "logTime": [2021, 11, 12, 11, 23, 13],
-                        "message": "assertionError occured \r\n error found \r\n error mined"},
+                        "message": f"{ERROR_OCCURRED}\r\n error found\r\n error mined"},
                        {"logId": 113,
                         "logLevel": 40000,
                         "logTime": [2021, 11, 13, 12, 23, 13],
-                        "message": "nullpointerException occured \r\n error occurred \r\n error mined"}]
+                        "message": "nullpointerException occurred \r\n error occurred \r\n error mined"}]
                    },
                   {"testItemId": 14,
                    "uniqueId": "df",
@@ -241,11 +247,11 @@ index_data = [{
                        {"logId": 111,
                         "logLevel": 40000,
                         "logTime": [2021, 11, 14, 11, 23, 13],
-                        "message": "assertionError occured"},
+                        "message": ERROR_OCCURRED},
                        {"logId": 112,
                         "logLevel": 40000,
                         "logTime": [2021, 11, 15, 11, 23, 13],
-                        "message": "nullpointerException occured"}]
+                        "message": "nullpointerException occurred"}]
                    }]}]
 
 search_data = {
@@ -254,7 +260,7 @@ search_data = {
     "itemId": 3,
     "projectId": 34,
     "filteredLaunchIds": [1],
-    "logMessages": ["assertionError error occured found mined", ],
+    "logMessages": [f"{ERROR_OCCURRED} found mined", ],
     "logLines": -1, }
 
 clean_index_data = {
@@ -267,7 +273,7 @@ test_item_info = {
     "uniqueId": "unique",
     "testCaseHash": 111,
     "launchId": 3,
-    "launchName": "Launch name",
+    "launchName": LAUNCH_NAME,
     "project": 34,
     "analyzerConfig": {
         "minDocFreq": 1.0,
@@ -280,10 +286,10 @@ test_item_info = {
     },
     "logs": [{"logId": 3,
               "logLevel": 40000,
-              "message": "assertionError occured"},
+              "message": ERROR_OCCURRED},
              {"logId": 4,
               "logLevel": 40000,
-              "message": "assertionError occured \r\n error found \r\n error mined"}]
+              "message": f"{ERROR_OCCURRED}\r\n error found\r\n error mined"}]
 }
 
 test_item_info_cluster = {
@@ -291,7 +297,7 @@ test_item_info_cluster = {
     "uniqueId": "",
     "testCaseHash": 0,
     "launchId": 2,
-    "launchName": "Launch name",
+    "launchName": LAUNCH_NAME,
     "project": 34,
     "analyzerConfig": {
         "minDocFreq": 1.0,
@@ -331,7 +337,7 @@ index_suggest_info_items = [{
     "testItem": 5,
     "testItemLogId": 1,
     "launchId": 2,
-    "launchName": "Launch name",
+    "launchName": LAUNCH_NAME,
     "issueType": "pb001",
     "relevantItem": 3,
     "relevantLogId": 4,

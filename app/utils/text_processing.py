@@ -282,18 +282,20 @@ def clean_special_chars(text: str) -> str:
     return SPECIAL_CHARACTER_PATTERN.sub(' ', text)
 
 
-def get_potential_status_codes(text):
+STATUS_CODES_PATTERNS = [
+    re.compile(r"\bcode[^\w.]+(\d+)\D*(\d*)|\bcode[^\w.]+(\d+?)$", flags=re.IGNORECASE),  # NOSONAR
+    re.compile(r"\w+_code[^\w.]+(\d+)\D*(\d*)|\w+_code[^\w.]+(\d+?)$", flags=re.IGNORECASE),  # NOSONAR
+    re.compile(r"\bstatus[^\w.]+(\d+)\D*(\d*)|\bstatus[^\w.]+(\d+?)$", flags=re.IGNORECASE),  # NOSONAR
+    re.compile(r"\w+_status[^\w.]+(\d+)\D*(\d*)|\w+_status[^\w.]+(\d+?)$", flags=re.IGNORECASE)  # NOSONAR
+]
+
+
+def get_potential_status_codes(text: str) -> list[str]:
     potential_codes = set()
     potential_codes_list = []
     for line in text.split("\n"):
         line = clean_from_brackets(line)
-        patterns_to_check = [
-            re.compile(r"\bcode[^\w.]+(\d+)\D*(\d*)|\bcode[^\w.]+(\d+?)$", flags=re.IGNORECASE),
-            re.compile(r"\w+_code[^\w.]+(\d+)\D*(\d*)|\w+_code[^\w.]+(\d+?)$", flags=re.IGNORECASE),
-            re.compile(r"\bstatus[^\w.]+(\d+)\D*(\d*)|\bstatus[^\w.]+(\d+?)$", flags=re.IGNORECASE),
-            re.compile(r"\w+_status[^\w.]+(\d+)\D*(\d*)|\w+_status[^\w.]+(\d+?)$", flags=re.IGNORECASE)
-        ]
-        for pattern in patterns_to_check:
+        for pattern in STATUS_CODES_PATTERNS:
             result = pattern.search(line)
             for i in range(1, 4):
                 try:
@@ -674,7 +676,7 @@ def extract_paths(text):
 def extract_message_params(text: str) -> list[str]:
     all_unique = set()
     all_params = []
-    for param in re.findall(r"(^|\W)('.+?'|\".+?\")(\W|$|\n)", text):
+    for param in re.findall(r"(^|\W)('.+?'|\".+?\")(\W|$)", text):
         param = re.search(r"[^\'\"]+", param[1].strip())
         if param is not None:
             param = param.group(0).strip()

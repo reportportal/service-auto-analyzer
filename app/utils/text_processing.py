@@ -241,28 +241,6 @@ def detect_log_description_and_stacktrace(message: str) -> tuple[str, str]:
     return message, ""
 
 
-def detect_log_description_and_stacktrace_light(message):
-    """Split a log into a log message and stacktrace in a light way"""
-    message = delete_empty_lines(message)
-    if calculate_line_number(message) > 2:
-        if is_python_log(message):
-            return detect_log_parts_python(message)
-        split_lines = message.split("\n")
-        stacktrace_start_idx = len(split_lines)
-        for idx, line in enumerate(split_lines):
-            if is_line_from_stacktrace(line):
-                stacktrace_start_idx = idx
-                break
-
-        if stacktrace_start_idx == 0:
-            stacktrace_start_idx = 1
-
-        return "\n".join(
-            split_lines[:stacktrace_start_idx]), "\n".join(
-            split_lines[stacktrace_start_idx:])
-    return message, ""
-
-
 SQR_BRCKTS = r'\[[^]]*]'
 RND_BRCKTS = r'\([^)]*\)'
 CRL_BRCKTS = r'\{[^}]*}'

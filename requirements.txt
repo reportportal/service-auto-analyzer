@@ -20,4 +20,4 @@ gensim==4.3.2
 pandas==1.5.3
 urllib3==1.26.19
 werkzeug==3.0.6 # not directly required, pinned by Snyk to avoid a vulnerability
-certifi>=2024.8.30
+certifi>=2025.1.31

@@ -26,6 +26,8 @@ from app.machine_learning.models import (defect_type_model, custom_defect_type_m
 
 logger = logging.getLogger("analyzerApp.modelChooser")
 
+DEFAULT_RANDOM_SEED = 1337
+
 CUSTOM_MODEL_MAPPING = {
     ModelType.defect_type: custom_defect_type_model.CustomDefectTypeModel,
     ModelType.suggestion: custom_boosting_decision_maker.CustomBoostingDecisionMaker,
@@ -44,12 +46,14 @@ class ModelChooser:
     object_saver: ObjectSaver
     search_cfg: SearchConfig
     global_models: dict[ModelType, MlModel]
+    random_generator: np.random.Generator
 
     def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.object_saver = object_saving.create(self.app_config)
         self.global_models = self.initialize_global_models()
+        self.random_generator = np.random.Generator(bit_generator=np.random.PCG64(DEFAULT_RANDOM_SEED))
 
     def initialize_global_models(self) -> dict[ModelType, MlModel]:
         result = {}
@@ -67,7 +71,7 @@ class ModelChooser:
 
     def choose_model(self, project_id: int, model_type: ModelType, custom_model_prob: float = 1.0) -> MlModel:
         model = self.global_models[model_type]
-        prob_for_model = np.random.uniform()
+        prob_for_model = self.random_generator.uniform(0.0, 1.0)
         if prob_for_model > custom_model_prob:
             return model
         folders = self.object_saver.get_folder_objects(f'{model_type.name}_model/', project_id)

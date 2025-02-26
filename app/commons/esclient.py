@@ -30,6 +30,8 @@ from app.commons.model.launch_objects import ApplicationConfig, Response, Launch
 from app.commons.model.ml import TrainInfo, ModelType
 from app.utils import utils, text_processing
 
+ES_URL_MESSAGE = "ES Url %s"
+
 logger = logging.getLogger("analyzerApp.esclient")
 
 
@@ -139,7 +141,7 @@ class EsClient:
     def create_index(self, index_name: str) -> Response:
         """Create index in elasticsearch"""
         logger.info("Creating '%s' Elasticsearch index", index_name)
-        logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.host))
+        logger.info(ES_URL_MESSAGE, text_processing.remove_credentials_from_url(self.host))
         response = self.es_client.indices.create(index=index_name, body={
             'settings': utils.read_json_file("res", "index_settings.json", to_json=True),
             'mappings': utils.read_json_file("res", "index_mapping_settings.json", to_json=True)
@@ -161,7 +163,7 @@ class EsClient:
         except Exception as err:
             if print_error:
                 logger.error("Index %s was not found", str(index_name))
-                logger.error("ES Url %s", self.host)
+                logger.error(ES_URL_MESSAGE, self.host)
                 logger.error(err)
             return False
 
@@ -169,12 +171,12 @@ class EsClient:
         """Delete the whole index"""
         try:
             self.es_client.indices.delete(index=str(index_name))
-            logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.host))
+            logger.info(ES_URL_MESSAGE, text_processing.remove_credentials_from_url(self.host))
             logger.debug("Deleted index %s", str(index_name))
             return True
         except Exception as err:
             logger.error("Not found %s for deleting", str(index_name))
-            logger.error("ES Url %s", text_processing.remove_credentials_from_url(self.host))
+            logger.error(ES_URL_MESSAGE, text_processing.remove_credentials_from_url(self.host))
             logger.error(err)
             return False
 
@@ -223,7 +225,7 @@ class EsClient:
     def index_logs(self, launches):
         """Index launches to the index with project name"""
         logger.info("Indexing logs for %d launches", len(launches))
-        logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.host))
+        logger.info(ES_URL_MESSAGE, text_processing.remove_credentials_from_url(self.host))
         t_start = time()
         launch_ids = set(map(lambda launch_obj: launch_obj.launchId, launches))
         project = next(map(lambda launch_obj: launch_obj.project, launches))
@@ -350,7 +352,7 @@ class EsClient:
             return BulkResponse(took=success_count, errors=len(errors) > 0)
         except Exception as exc:
             logger.error("Error in bulk")
-            logger.error("ES Url %s", text_processing.remove_credentials_from_url(self.host))
+            logger.error(ES_URL_MESSAGE, text_processing.remove_credentials_from_url(self.host))
             logger.exception(exc)
             return BulkResponse(took=0, errors=True)
 
@@ -359,7 +361,7 @@ class EsClient:
         index_name = text_processing.unite_project_name(clean_index.project, self.app_config.esProjectIndexPrefix)
         logger.info("Delete logs %s for the project %s",
                     clean_index.ids, index_name)
-        logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.host))
+        logger.info(ES_URL_MESSAGE, text_processing.remove_credentials_from_url(self.host))
         t_start = time()
         if not self.index_exists(index_name):
             return 0

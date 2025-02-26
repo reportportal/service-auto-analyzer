@@ -241,28 +241,6 @@ def detect_log_description_and_stacktrace(message: str) -> tuple[str, str]:
     return message, ""
 
 
-def detect_log_description_and_stacktrace_light(message):
-    """Split a log into a log message and stacktrace in a light way"""
-    message = delete_empty_lines(message)
-    if calculate_line_number(message) > 2:
-        if is_python_log(message):
-            return detect_log_parts_python(message)
-        split_lines = message.split("\n")
-        stacktrace_start_idx = len(split_lines)
-        for idx, line in enumerate(split_lines):
-            if is_line_from_stacktrace(line):
-                stacktrace_start_idx = idx
-                break
-
-        if stacktrace_start_idx == 0:
-            stacktrace_start_idx = 1
-
-        return "\n".join(
-            split_lines[:stacktrace_start_idx]), "\n".join(
-            split_lines[stacktrace_start_idx:])
-    return message, ""
-
-
 SQR_BRCKTS = r'\[[^]]*]'
 RND_BRCKTS = r'\([^)]*\)'
 CRL_BRCKTS = r'\{[^}]*}'
@@ -282,18 +260,20 @@ def clean_special_chars(text: str) -> str:
     return SPECIAL_CHARACTER_PATTERN.sub(' ', text)
 
 
-def get_potential_status_codes(text):
+STATUS_CODES_PATTERNS = [
+    re.compile(r"\bcode[^\w.]+(\d+)\D*(\d*)|\bcode[^\w.]+(\d+?)$", flags=re.IGNORECASE),  # NOSONAR
+    re.compile(r"\w+_code[^\w.]+(\d+)\D*(\d*)|\w+_code[^\w.]+(\d+?)$", flags=re.IGNORECASE),  # NOSONAR
+    re.compile(r"\bstatus[^\w.]+(\d+)\D*(\d*)|\bstatus[^\w.]+(\d+?)$", flags=re.IGNORECASE),  # NOSONAR
+    re.compile(r"\w+_status[^\w.]+(\d+)\D*(\d*)|\w+_status[^\w.]+(\d+?)$", flags=re.IGNORECASE)  # NOSONAR
+]
+
+
+def get_potential_status_codes(text: str) -> list[str]:
     potential_codes = set()
     potential_codes_list = []
     for line in text.split("\n"):
         line = clean_from_brackets(line)
-        patterns_to_check = [
-            re.compile(r"\bcode[^\w.]+(\d+)\D*(\d*)|\bcode[^\w.]+(\d+?)$", flags=re.IGNORECASE),
-            re.compile(r"\w+_code[^\w.]+(\d+)\D*(\d*)|\w+_code[^\w.]+(\d+?)$", flags=re.IGNORECASE),
-            re.compile(r"\bstatus[^\w.]+(\d+)\D*(\d*)|\bstatus[^\w.]+(\d+?)$", flags=re.IGNORECASE),
-            re.compile(r"\w+_status[^\w.]+(\d+)\D*(\d*)|\w+_status[^\w.]+(\d+?)$", flags=re.IGNORECASE)
-        ]
-        for pattern in patterns_to_check:
+        for pattern in STATUS_CODES_PATTERNS:
             result = pattern.search(line)
             for i in range(1, 4):
                 try:
@@ -445,18 +425,21 @@ def enrich_text_with_method_and_classes(text: str) -> str:
     return "\n".join(new_lines)
 
 
+SPLIT_WORDS_PATTERN = "([A-Z][^A-Z]+)"
+
+
 def preprocess_test_item_name(text: str) -> str:
     result = text.replace("-", " ").replace("_", " ")
     all_words = []
     words = split_words(result, to_lower=False, only_unique=False)
     for w in words:
         if "." not in w:
-            all_words.extend([s.strip() for s in re.split("([A-Z][^A-Z]+)", w) if s.strip()])
+            all_words.extend([s.strip() for s in re.split(SPLIT_WORDS_PATTERN, w) if s.strip()])
         else:
             all_words.extend(
                 [s.strip() for s in enrich_text_with_method_and_classes(w).split(" ") if s.strip()])
             all_words.extend(
-                [s.strip() for s in re.split("([A-Z][^A-Z]+)", w.split(".")[-1]) if s.strip()])
+                [s.strip() for s in re.split(SPLIT_WORDS_PATTERN, w.split(".")[-1]) if s.strip()])
     return " ".join(all_words)
 
 
@@ -481,7 +464,7 @@ def preprocess_found_test_methods(text: str) -> str:
     words = split_words(text, to_lower=False, only_unique=False)
     for w in words:
         if "." not in w:
-            all_words.extend([s.strip() for s in re.split("([A-Z][^A-Z]+)", w) if s.strip()])
+            all_words.extend([s.strip() for s in re.split(SPLIT_WORDS_PATTERN, w) if s.strip()])
         else:
             all_words.append(w)
     return " ".join(all_words)
@@ -494,7 +477,7 @@ def compress(text):
 
 def preprocess_words(text):
     all_words = []
-    for w in re.finditer(r"[\w._]+", text):
+    for w in re.finditer(r"[\w.]+", text):
         word_normalized = re.sub(r"^\w\.", "", w.group(0))
         word = word_normalized.replace("_", "")
         if len(word) >= 3:
@@ -508,7 +491,7 @@ def preprocess_words(text):
             all_words.extend(split_words_list)
         if "." not in word_normalized:
             split_words_list = []
-            split_parts = [s.strip() for s in re.split("([A-Z][^A-Z]+)", word) if s.strip()]
+            split_parts = [s.strip() for s in re.split(SPLIT_WORDS_PATTERN, word) if s.strip()]
             if len(split_parts) > 2:
                 for idx in range(len(split_parts)):
                     if idx != len(split_parts) - 1:
@@ -643,7 +626,7 @@ def clean_from_params(text: str) -> str:
 
 
 def clean_from_paths(text: str):
-    return re.sub(r"(^|(?<=[^\w:\\/]))(\w:)?([\w.\-_]+)?([\\/]+[\w.\-_]+){2,}", " ", text)
+    return re.sub(r"(^|(?<=[^\w:\\/]))(\w:)?([\w.\-]+)?([\\/]+[\w.\-]+){2,}", " ", text)
 
 
 URL_PATTERN = re.compile(r'[a-z]+:/+\S+', re.IGNORECASE)
@@ -663,7 +646,7 @@ def extract_urls(text: str) -> list[str]:
 def extract_paths(text):
     all_unique = set()
     all_paths = []
-    for param in re.findall(r"((^|(?<=[^\w:\\/]))(\w:)?([\w.\-_ ]+)?([\\/]+[\w.\-_ ]+){2,})", text):
+    for param in re.findall(r"((^|(?<=[^\w:\\/]))(\w:)?([\w.\- ]+)?([\\/]+[\w.\- ]+){2,})", text):
         path = param[0].strip()
         if path not in all_unique:
             all_unique.add(path)
@@ -674,7 +657,7 @@ def extract_paths(text):
 def extract_message_params(text: str) -> list[str]:
     all_unique = set()
     all_params = []
-    for param in re.findall(r"(^|\W)('.+?'|\".+?\")(\W|$|\n)", text):
+    for param in re.findall(r"(^|\W)('.+?'|\".+?\")(\W|$)", text):
         param = re.search(r"[^\'\"]+", param[1].strip())
         if param is not None:
             param = param.group(0).strip()

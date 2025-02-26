@@ -34,6 +34,8 @@ MODEL_FILES: list[str] = ['count_vectorizer_models.pickle', 'models.pickle']
 DATA_FIELD = 'detected_message_without_params_extended'
 BASE_DEFECT_TYPE_PATTERN = re.compile(r'^(?:([^_]+)_\S+|(\D+)\d+)$')
 DEFAULT_N_ESTIMATORS = 10
+DEFAULT_MIN_SAMPLES_LEAF = 1
+DEFAULT_MAX_FEATURES = 'sqrt'
 
 
 # noinspection PyMethodMayBeStatic
@@ -108,14 +110,16 @@ class DefectTypeModel(MlModel):
     def save_model(self):
         self._save_models(zip(MODEL_FILES, [self.count_vectorizer_models, self.models]))
 
-    def train_model(self, name: str, train_data_x: list[str], labels: list[int]) -> float:
+    def train_model(self, name: str, train_data_x: list[str], labels: list[int], random_state: int) -> float:
         self.count_vectorizer_models[name] = TfidfVectorizer(
             binary=True, min_df=5, analyzer=text_processing.preprocess_words)
         transformed_values = self.count_vectorizer_models[name].fit_transform(train_data_x)
         LOGGER.debug(f'Length of train data: {len(labels)}')
         LOGGER.debug(f'Train data label distribution: {Counter(labels)}')
         LOGGER.debug(f'Train model name: {name}; estimators number: {self.n_estimators}')
-        model = RandomForestClassifier(self.n_estimators, class_weight='balanced')
+        model = RandomForestClassifier(self.n_estimators, class_weight='balanced',
+                                       min_samples_leaf=DEFAULT_MIN_SAMPLES_LEAF, max_features=DEFAULT_MAX_FEATURES,
+                                       random_state=random_state)
         x_train_values = pd.DataFrame(
             transformed_values.toarray(),
             columns=self.count_vectorizer_models[name].get_feature_names_out())

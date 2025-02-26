@@ -28,9 +28,6 @@ LOGGER = logging.getLogger("analyzerApp.clusterizer")
 
 class Clusterizer:
 
-    def __init__(self):
-        pass
-
     def calculate_hashes(self, messages: list[str], n_gram: int = 2, n_permutations: int = 64) -> list[list[str]]:
         hashes = []
         for message in messages:

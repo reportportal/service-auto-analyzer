@@ -1,4 +1,33 @@
 # Changelog
+## [Unreleased]
+### Fixed
+- Issue [#196](https://github.com/reportportal/service-auto-analyzer/issues/196): Analyzer picks all path tokens as bucket name except the first one, by @HardNorth
+
+## [5.13.1]
+### Fixed
+- Data storing permissions and path issues for Filesystem binary storage type, by @HardNorth
+
+## [5.13.0]
+### Added:
+- Issue [#149](https://github.com/reportportal/service-auto-analyzer/issues/149): Support of single bucket binary storage, by @HardNorth
+### Changed
+- Dockerfile updated to use `ubi9` as base image, by @raikbitters
+- Dependency versions updated to address vulnerabilities, by @HardNorth
+### Fixed
+- Unique error view, by @HardNorth
+
+## [5.12.0]
+### Added:
+- Message-through logging with Correlation ID, to ease debugging and understanding of logs, by @HardNorth
+
+### Updated:
+- Refactoring: data-preparation logic joined and put into common place, by @HardNorth
+- Refactoring: model train logic standardised and prepared for future join, by @HardNorth
+- Lots of type annotations added, by @HardNorth
+
+### Fixed
+- Re-train logic. Custom re-trained models for big enough projects do not affect negatively auto-analysis now, by @HardNorth
+- CVE addressed: CVE-2023-45853, CVE-2023-6246, CVE-2023-6779, CVE-2023-6780, CVE-2023-49468, CVE-2023-49467, CVE-2023-49465 
 
 ## [5.11.0]
 ### Added

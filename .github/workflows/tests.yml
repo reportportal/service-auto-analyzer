@@ -33,7 +33,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r ./requirements.txt
           python -m pip install -r ./requirements-dev.txt
-          python -m nltk.downloader stopwords
+          python -c "import nltk; nltk.download('stopwords')"
 
       - name: Checkstyle
         run: python -m flake8

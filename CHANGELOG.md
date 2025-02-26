@@ -1,5 +1,7 @@
 # Changelog
 ## [Unreleased]
+
+## [5.13.2]
 ### Fixed
 - Issue [#196](https://github.com/reportportal/service-auto-analyzer/issues/196): Analyzer picks all path tokens as bucket name except the first one, by @HardNorth
 

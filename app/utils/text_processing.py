@@ -211,6 +211,7 @@ def is_line_from_stacktrace(text: str) -> bool:
         return True
     result = re.search(r"^\s*at\s[^(]*\([^)]*\)\s*$", res)
     if result and result.group(0) == res:
+        # Java stacktrace line
         return True
     else:
         result = re.search(r"^\s*\w+([./]\s*\w+)+\s*\(.*?\)\s*$", res)
@@ -327,12 +328,12 @@ def prepare_message_for_clustering(message: str, number_of_log_lines: int, clean
     return " ".join(words)
 
 
-REGEX_STYLE_TAG = re.compile('<style.*?>[\\s\\S]*?</style>')
-REGEX_SCRIPT_TAG = re.compile('<script.*?>[\\s\\S]*?</script>')
-REGEX_HTML_TAGS = re.compile('<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
+REGEX_STYLE_TAG = re.compile(r'<style[^>]*>[^<]*</style>')
+REGEX_SCRIPT_TAG = re.compile(r'<script[^>]*>[^<]*</script>')
+REGEX_HTML_TAGS = re.compile(r'<[^>]*>|&([a-zA-Z0-9]+|#[0-9]{1,6}|#x[0-9a-fA-F]{1,6});')
 
 
-def clean_text_from_html_tags(message):
+def clean_text_from_html_tags(message: str) -> str:
     """Removes style and script tags together with inner text and removes html tags"""
     message = re.sub(REGEX_STYLE_TAG, " ", message)
     message = re.sub(REGEX_SCRIPT_TAG, " ", message)

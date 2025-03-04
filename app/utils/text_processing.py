@@ -209,7 +209,7 @@ def is_line_from_stacktrace(text: str) -> bool:
     res = re.sub("|".join([r"\.%s(?!\.)\b" % ext for ext in FILE_EXTENSIONS]), " ", res, flags=re.I)
     if res != text:
         return True
-    result = re.search(r"^\s*at\s+[^(]*\([^)]*\)\s*$", res)
+    result = re.search(r"^\s*at\s[^(]*\([^)]*\)\s*$", res)
     if result and result.group(0) == res:
         return True
     else:

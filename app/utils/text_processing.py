@@ -330,7 +330,7 @@ def prepare_message_for_clustering(message: str, number_of_log_lines: int, clean
 
 REGEX_STYLE_TAG = re.compile(r'<style(?:\s+\S+\s*=\s*"[^"]*")*\s*>[^<]*</style>')
 REGEX_SCRIPT_TAG = re.compile(r'<script(?:\s+\S+\s*=\s*"[^"]*")*\s*>[^<]*</script>')
-REGEX_HTML_TAGS = re.compile(r'<\w+(?:\s+[^>\s]+\s*=\s*"[^"]*"\s?|\s+[^>\s]+\s*)*>'
+REGEX_HTML_TAGS = re.compile(r'</?\w+(?:\s+[^>\s]+\s*=\s*"[^"]*"\s?|\s+[^>\s]+\s*)*>'
                              r'|&([a-zA-Z0-9]+'
                              r'|#[0-9]{1,6}'
                              r'|#x[0-9a-fA-F]{1,6});')
@@ -450,11 +450,11 @@ def preprocess_test_item_name(text: str) -> str:
 def find_test_methods_in_text(text: str) -> set[str]:
     test_methods = set()
     for m in re.findall(
-            r"([^ ()/\\:]+(Test|Step)s*\.[^ ()/\\:]+)|([^ ()/\\:]+\.spec\.js)", text):
+            r"([^ ()/\\:]+(?:Test|Step)s?\.[^ ()/\\:]+)|([^ ()/\\:]+\.spec\.js)", text):
         if m[0].strip():
             test_methods.add(m[0].strip())
-        if m[2].strip():
-            test_methods.add(m[2].strip())
+        if m[1].strip():
+            test_methods.add(m[1].strip())
     final_test_methods = set()
     for method in test_methods:
         exceptions = get_found_exceptions(method)

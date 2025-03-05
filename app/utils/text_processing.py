@@ -633,7 +633,7 @@ def clean_from_paths(text: str):
     return re.sub(r"(^|(?<=[^\w:\\/]))(\w:)?([\w.\-]+)?([\\/]+[\w.\-]+){2,}", " ", text)
 
 
-URL_PATTERN = re.compile(r'\b[\w+]+:/\S+', re.IGNORECASE)
+URL_PATTERN = re.compile(r'\b[\w+]+:/\S+\b', re.IGNORECASE)
 
 
 def extract_urls(text: str) -> list[str]:

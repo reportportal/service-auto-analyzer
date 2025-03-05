@@ -204,6 +204,7 @@ def is_line_from_stacktrace(text: str) -> bool:
         return True
     res = re.sub(r"line\s*\d+\s*(?:(?=, in)|(?=,in)|(?=\n)|(?=$))", "line ", res, flags=re.I)
     if res != text:
+        # C# stacktrace line
         return True
     res = re.sub("|".join([r"\.%s(?!\.)\b" % ext for ext in FILE_EXTENSIONS]), " ", res, flags=re.I)
     if res != text:

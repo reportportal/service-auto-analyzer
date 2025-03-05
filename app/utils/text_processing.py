@@ -202,8 +202,7 @@ def is_line_from_stacktrace(text: str) -> bool:
     res = re.sub(r"(?<=:)\d+(?=\)?]?(\n|$))", " ", res)
     if res != text:
         return True
-    res = re.sub(r"((?<=line )|(?<=line))\s*\d+\s*((?=, in)|(?=,in)|(?=\n)|(?=$))",
-                 " ", res, flags=re.I)
+    res = re.sub(r"line\s*\d+\s*(?:(?=, in)|(?=,in)|(?=\n)|(?=$))", "line ", res, flags=re.I)
     if res != text:
         return True
     res = re.sub("|".join([r"\.%s(?!\.)\b" % ext for ext in FILE_EXTENSIONS]), " ", res, flags=re.I)

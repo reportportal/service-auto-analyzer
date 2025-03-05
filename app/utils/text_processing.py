@@ -348,7 +348,7 @@ def clean_html(message):
     finished_with_html_tag = False
     html_part = []
     for idx, line in enumerate(message.split("\n")):
-        if re.search(r"<html[^>]*>", line):
+        if re.search(r'<html(?:\s*\S+\s*=\s*"[^"]*")*\s*>', line):
             started_html = True
             html_part.append(line)
         else:

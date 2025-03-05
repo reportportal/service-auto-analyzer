@@ -382,7 +382,7 @@ def split_words(text: str, min_word_length: int = 0, only_unique: bool = True, s
         result = text.translate(text.maketrans(PUNCTUATION_MAP_SPLIT_URLS))
     else:
         result = text.translate(text.maketrans(PUNCTUATION_MAP_NO_SPLIT_URLS))
-    result = result.strip().strip('.')
+    result = result.strip().strip('.').strip()
     if to_lower:
         result = result.lower()
     for w in result.split():
@@ -633,7 +633,7 @@ def clean_from_paths(text: str):
     return re.sub(r"(^|(?<=[^\w:\\/]))(\w:)?([\w.\-]+)?([\\/]+[\w.\-]+){2,}", " ", text)
 
 
-URL_PATTERN = re.compile(r'[a-z]+:/+\S+', re.IGNORECASE)
+URL_PATTERN = re.compile(r'[a-z]+:/\S+', re.IGNORECASE)
 
 
 def extract_urls(text: str) -> list[str]:

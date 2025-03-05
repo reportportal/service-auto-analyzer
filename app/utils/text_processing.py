@@ -328,7 +328,9 @@ def prepare_message_for_clustering(message: str, number_of_log_lines: int, clean
     return " ".join(words)
 
 
-REGEX_HTML_TAGS = re.compile(r'<\w+(?:\s+[^>\s]+\s*=\s*"[^"]*"\s?|\s+[^>\s]+\s*)*\s?>'
+REGEX_STYLE_TAG = re.compile(r'<style(?:\s+\S+\s*=\s*"[^"]*")*\s*>[^<]*</style>')
+REGEX_SCRIPT_TAG = re.compile(r'<script(?:\s+\S+\s*=\s*"[^"]*")*\s*>[^<]*</script>')
+REGEX_HTML_TAGS = re.compile(r'<\w+(?:\s+[^>\s]+\s*=\s*"[^"]*"\s?|\s+[^>\s]+\s*)*>'
                              r'|&([a-zA-Z0-9]+'
                              r'|#[0-9]{1,6}'
                              r'|#x[0-9a-fA-F]{1,6});')
@@ -336,6 +338,8 @@ REGEX_HTML_TAGS = re.compile(r'<\w+(?:\s+[^>\s]+\s*=\s*"[^"]*"\s?|\s+[^>\s]+\s*)
 
 def clean_text_from_html_tags(message: str) -> str:
     """Removes style and script tags together with inner text and removes html tags"""
+    message = re.sub(REGEX_STYLE_TAG, " ", message)
+    message = re.sub(REGEX_SCRIPT_TAG, " ", message)
     message = re.sub(REGEX_HTML_TAGS, " ", message)
     return message
 

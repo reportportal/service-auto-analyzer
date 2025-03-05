@@ -450,7 +450,7 @@ def preprocess_test_item_name(text: str) -> str:
 def find_test_methods_in_text(text: str) -> set[str]:
     test_methods = set()
     for m in re.findall(
-            r"([^ ()/\\:]+(?:Test|Step)s?\.[^ ()/\\:]+)|([^ ()/\\:]+\.spec\.js)", text):
+            r"((?:(?![ ()/\\:]).)+(?:Test|Step)s?\.(?:(?![ ()/\\:]).)+)|([^ ()/\\:]+\.spec\.js)", text):
         if m[0].strip():
             test_methods.add(m[0].strip())
         if m[1].strip():

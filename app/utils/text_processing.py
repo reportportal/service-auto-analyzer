@@ -462,8 +462,7 @@ def find_test_methods_in_text(text: str) -> set[str]:
             residual = residual[match.end():]
         test_methods.add(match_str)
 
-    for m in re.findall(
-            r"([^ ()/\\:]+\.spec\.js)", text):
+    for m in re.findall(r"([^\s()/\\:]+\.spec\.[jt]s\b)", text):
         if m[0].strip():
             test_methods.add(m[0].strip())
         if m[1].strip():

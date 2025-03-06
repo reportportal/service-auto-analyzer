@@ -24,6 +24,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import json
+
 import pytest
 
 from app.utils import utils, text_processing
@@ -166,3 +168,9 @@ def test_remove_webdriver_auxiliary_info_big(test_file, expected_file):
     log = read_file('test_res/test_logs', test_file)
     expected_log = read_file('test_res/test_logs', expected_file)
     assert text_processing.remove_webdriver_auxiliary_info(log) == expected_log
+
+
+def test_find_test_methods_in_text():
+    logs = json.loads(read_file('test_res/fixtures', 'example_logs.json'))
+    for log in logs:
+        assert text_processing.find_test_methods_in_text(log['log']) == set(log['expected_test_methods'])

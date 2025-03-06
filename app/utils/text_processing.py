@@ -449,8 +449,21 @@ def preprocess_test_item_name(text: str) -> str:
 
 def find_test_methods_in_text(text: str) -> set[str]:
     test_methods = set()
+    residual = text
+    while True:
+        match = re.search(r"\b[^\s()/\\:]+(?:Test|Step)s?\.", residual)
+        if not match:
+            break
+        match_str = residual[match.start():match.end()]
+        residual = residual[match.end():]
+        match = re.search(r"^[^\s()/\\:]+", residual)
+        if match:
+            match_str += residual[match.start():match.end()]
+            residual = residual[match.end():]
+        test_methods.add(match_str)
+
     for m in re.findall(
-            r"\b([^\s()/\\:]+(?:Test|Step)s?\.[^\s()/\\:]+)|([^ ()/\\:]+\.spec\.js)", text):
+            r"([^ ()/\\:]+\.spec\.js)", text):
         if m[0].strip():
             test_methods.add(m[0].strip())
         if m[1].strip():

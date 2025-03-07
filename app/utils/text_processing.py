@@ -655,14 +655,46 @@ def extract_urls(text: str) -> list[str]:
     return all_urls
 
 
+def _find_paths(all_paths: list[str], all_unique: set[str], text: str, start_pattern: re.Pattern,
+                path_pattern: re.Pattern, end_pattern: re.Pattern):
+    residual = text
+    while True:
+        match = start_pattern.search(residual)
+        if not match:
+            break
+
+        start = path = match.group(0)
+        residual = residual[match.end():]
+        path_match = path_pattern.search(residual)
+        if path_match:
+            path += path_match.group(0)
+            residual = residual[path_match.end():]
+        end_match = end_pattern.search(residual)
+        if end_match:
+            path += end_match.group(0)
+            residual = residual[end_match.end():]
+        if start != path:
+            if path not in all_unique:
+                all_unique.add(path)
+                all_paths.append(path)
+
+
+UNIX_PATH_START = re.compile(
+    r"(?:(?<=^)|(?<=\s))(?:./|/|(?:[^\x00 !$`&*()+\n\\/:]|(?:\\:|\\/|\\\\|\\ |\\!|\\$|\\`|\\&|\\*|\(|\)|\\+|\\\n))+/)")
+UNIX_PATH = re.compile(r"^(?:(?:[^\x00 !$`&*()+\n\\/]|(?:\\/|\\\\|\\ |\\!|\\$|\\`|\\&|\\*|\(|\)|\\+|\\\n))+/)+")
+UNIX_PATH_END = re.compile(
+    r"^(?:(?:[^\x00 !$`&*()+\n\\/]|(?:\\/|\\\\|\\ |\\!|\\$|\\`|\\&|\\*|\(|\)|\\+|\\\n))+)*(?:(?=$)|(?=\s))")
+
+WINDOWS_PATH_START = re.compile(r"(?:(?<=^)|(?<=\s))[a-zA-Z]:[\\/]")
+WINDOWS_PATH = re.compile(r"^(?:[^\\\s\"]+[\\/]|\"[^\"]+\"[\\/])+")
+WINDOWS_PATH_END = re.compile(r"^(?:[^\\\s\"]+|\"[^\"]+\")(?:(?=$)|(?=\s))")
+
+
 def extract_paths(text: str) -> list[str]:
     all_unique = set()
     all_paths = []
-    for param in re.findall(r"((^|(?<=[^\w:\\/]))(\w:)?([\w.\- ]+)?([\\/]+[\w.\- ]+){2,})", text):
-        path = param[0].strip()
-        if path not in all_unique:
-            all_unique.add(path)
-            all_paths.append(path)
+    _find_paths(all_paths, all_unique, text, UNIX_PATH_START, UNIX_PATH, UNIX_PATH_END)
+    _find_paths(all_paths, all_unique, text, WINDOWS_PATH_START, WINDOWS_PATH, WINDOWS_PATH_END)
     return all_paths
 
 

@@ -655,7 +655,7 @@ def extract_urls(text: str) -> list[str]:
     return all_urls
 
 
-def extract_paths(text):
+def extract_paths(text: str) -> list[str]:
     all_unique = set()
     all_paths = []
     for param in re.findall(r"((^|(?<=[^\w:\\/]))(\w:)?([\w.\- ]+)?([\\/]+[\w.\- ]+){2,})", text):

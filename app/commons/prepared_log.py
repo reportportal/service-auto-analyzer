@@ -152,28 +152,6 @@ class PreparedLogMessage:
             self._exception_found_extended = text_processing.enrich_found_exceptions(self.exception_found)
         return self._exception_found_extended
 
-    # TODO: This is used in training only, subject to remove
-    @property
-    def stacktrace_paths(self) -> str:
-        if not self._stacktrace_paths:
-            self._stacktrace_paths = " ".join(text_processing.extract_paths(self.stacktrace))
-        return self._stacktrace_paths
-
-    # TODO: This is used in training only, subject to remove
-    @property
-    def stacktrace_no_paths(self) -> str:
-        if not self._stacktrace_no_paths:
-            self._stacktrace_no_paths = text_processing.unify_spaces(text_processing.clean_from_paths(self.stacktrace))
-        return self._stacktrace_no_paths
-
-    # TODO: This is used in training only, subject to remove
-    @property
-    def stacktrace_no_paths_extended(self) -> str:
-        if not self._stacktrace_no_paths_extended:
-            self._stacktrace_no_paths_extended = text_processing.enrich_text_with_method_and_classes(
-                self.stacktrace_no_paths)
-        return self._stacktrace_no_paths_extended
-
     @property
     def test_and_methods_extended(self) -> str:
         if not self._test_and_methods_extended:

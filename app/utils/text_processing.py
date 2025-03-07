@@ -641,10 +641,6 @@ def clean_from_params(text: str) -> str:
     return clean_special_chars(text)
 
 
-def clean_from_paths(text: str):
-    return re.sub(r"(^|(?<=[^\w:\\/]))(\w:)?([\w.\-]+)?([\\/]+[\w.\-]+){2,}", " ", text)
-
-
 URL_PATTERN = re.compile(r'\b[\w+]+:/\S+\b', re.IGNORECASE)
 
 

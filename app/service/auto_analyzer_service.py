@@ -17,6 +17,7 @@ from datetime import datetime
 from queue import Queue
 from threading import Thread
 from time import time, sleep
+from typing import Any
 
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory, object_saving, log_merger
@@ -87,78 +88,60 @@ class AutoAnalyzerService(AnalyzerService):
         return fields
 
     def get_min_should_match_setting(self, launch: Launch) -> str:
-        return "{}%".format(launch.analyzerConfig.minShouldMatch) \
+        return f"{launch.analyzerConfig.minShouldMatch}%" \
             if launch.analyzerConfig.minShouldMatch > 0 else self.search_cfg.MinShouldMatch
 
-    def build_analyze_query(self, launch: Launch, log: dict, size=10):
-        """Build analyze query"""
+    def build_analyze_query(self, launch: Launch, log: dict[str, Any], size=10):
+        """Build query to get similar log entries for the given log entry.
+
+        This query is used to find similar log entries for the given log entry, the results of this query then will be
+        used to find the most relevant log entry with the issue type, and then in the Gradient Boosting model to
+        predict the issue type for the given log entry.
+        """
         min_should_match = self.get_min_should_match_setting(launch)
 
         query = self.build_common_query(log, size=size)
         query = self.add_constraints_for_launches_into_query(query, launch)
 
+        must = utils.create_path(query, ('query', 'bool', 'must'), [])
+        must_not = utils.create_path(query, ('query', 'bool', 'must_not'), [])
+        should = utils.create_path(query, ('query', 'bool', 'should'), [])
+        filter_ = utils.create_path(query, ('query', 'bool', 'filter'), [])
         if log["_source"]["message"].strip():
             log_lines = launch.analyzerConfig.numberOfLogLines
-            query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
+            filter_.append({"term": {"is_merged": False}})
             if log_lines == -1:
-                must = utils.create_path(query, ('query', 'bool', 'must'), [])
-                must.append(self.build_more_like_this_query(min_should_match,
-                                                            log["_source"]["detected_message"],
-                                                            field_name="detected_message",
-                                                            boost=4.0))
+                must.append(self.build_more_like_this_query(
+                    min_should_match, log["_source"]["detected_message"], field_name="detected_message", boost=4.0))
                 if log["_source"]["stacktrace"].strip():
-                    query["query"]["bool"]["must"].append(
-                        self.build_more_like_this_query(min_should_match,
-                                                        log["_source"]["stacktrace"],
-                                                        field_name="stacktrace",
-                                                        boost=2.0))
+                    must.append(self.build_more_like_this_query(
+                        min_should_match, log["_source"]["stacktrace"], field_name="stacktrace", boost=2.0))
                 else:
-                    query["query"]["bool"]["must_not"].append({"wildcard": {"stacktrace": "*"}})
+                    must_not.append({"wildcard": {"stacktrace": "*"}})
             else:
-                must = utils.create_path(query, ('query', 'bool', 'must'), [])
-                must.append(self.build_more_like_this_query(min_should_match,
-                                                            log["_source"]["message"],
-                                                            field_name="message",
-                                                            boost=4.0))
-                query["query"]["bool"]["should"].append(
-                    self.build_more_like_this_query("80%",
-                                                    log["_source"]["detected_message"],
-                                                    field_name="detected_message",
-                                                    boost=2.0))
-                query["query"]["bool"]["should"].append(
-                    self.build_more_like_this_query("60%",
-                                                    log["_source"]["stacktrace"],
-                                                    field_name="stacktrace", boost=1.0))
-            query["query"]["bool"]["should"].append(
-                self.build_more_like_this_query("80%",
-                                                log["_source"]["merged_small_logs"],
-                                                field_name="merged_small_logs",
-                                                boost=0.5))
+                must.append(self.build_more_like_this_query(
+                    min_should_match, log["_source"]["message"], field_name="message", boost=4.0))
+                should.append(self.build_more_like_this_query(
+                    "80%", log["_source"]["detected_message"], field_name="detected_message", boost=2.0))
+                should.append(self.build_more_like_this_query(
+                    "60%", log["_source"]["stacktrace"], field_name="stacktrace", boost=1.0))
+            should.append(self.build_more_like_this_query(
+                "80%", log["_source"]["merged_small_logs"], field_name="merged_small_logs", boost=0.5))
         else:
-            query["query"]["bool"]["filter"].append({"term": {"is_merged": True}})
-            query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
-            must = utils.create_path(query, ("query", "bool", "must"), [])
-            must.append(self.build_more_like_this_query(min_should_match,
-                                                        log["_source"]["merged_small_logs"],
-                                                        field_name="merged_small_logs",
-                                                        boost=2.0))
+            filter_.append({"term": {"is_merged": True}})
+            must_not.append({"wildcard": {"message": "*"}})
+            must.append(self.build_more_like_this_query(
+                min_should_match, log["_source"]["merged_small_logs"], field_name="merged_small_logs", boost=2.0))
 
         if log["_source"]["found_exceptions"].strip():
-            query["query"]["bool"]["must"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["found_exceptions"],
-                                                field_name="found_exceptions",
-                                                boost=8.0,
-                                                override_min_should_match="1"))
+            must.append(self.build_more_like_this_query(
+                "1", log["_source"]["found_exceptions"], field_name="found_exceptions", boost=8.0,
+                override_min_should_match="1"))
         for field, boost_score in SPECIAL_FIELDS_BOOST_SCORES:
             if log["_source"][field].strip():
-                should = utils.create_path(query, ('query', 'bool', 'should'), [])
-                should.append(
-                    self.build_more_like_this_query("1",
-                                                    log["_source"][field],
-                                                    field_name=field,
-                                                    boost=boost_score,
-                                                    override_min_should_match="1"))
+                should.append(self.build_more_like_this_query(
+                    "1", log["_source"][field], field_name=field, boost=boost_score,
+                    override_min_should_match="1"))
 
         return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 

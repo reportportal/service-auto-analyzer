@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import re
+from typing import Any
 
 from app.commons import logging
 from app.commons.model.launch_objects import SearchConfig, Launch, TestItemInfo, AnalyzerConf
@@ -140,7 +141,7 @@ class AnalyzerService:
                 {"wildcard": {"issue_type": "nd*"}}]
         return [{"term": {"issue_type": "ti001"}}]
 
-    def build_common_query(self, log, size=10, filter_no_defect=True) -> dict:
+    def build_common_query(self, log: dict[str, Any], size=10, filter_no_defect=True) -> dict[str, Any]:
         issue_type_conditions = self.prepare_restrictions_by_issue_type(
             filter_no_defect=filter_no_defect)
         return {"size": size,

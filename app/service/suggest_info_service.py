@@ -260,14 +260,14 @@ class SuggestInfoService:
                         }
                     })
         result = self.es_client._bulk_index(log_update_queries)
-        try:
-            if self.app_config.amqpUrl:
-                for model_type in [ModelType.suggestion, ModelType.auto_analysis]:
-                    AmqpClient(self.app_config.amqpUrl).send_to_inner_queue(
-                        self.app_config.exchangeName, 'train_models',
-                        TrainInfo(model_type=model_type, project=defect_update_info['project'],
-                                  gathered_metric_total=result.took).json())
-        except Exception as exc:
-            logger.exception(exc)
+        if self.app_config.amqpUrl:
+            amqp_client = AmqpClient(self.app_config.amqpUrl)
+            for model_type in [ModelType.suggestion, ModelType.auto_analysis]:
+                amqp_client.send_to_inner_queue(
+                    self.app_config.exchangeName, 'train_models',
+                    TrainInfo(model_type=model_type, project=defect_update_info['project'],
+                              gathered_metric_total=result.took).json())
+            amqp_client.close()
+
         logger.info("Finished updating suggest info for %.2f sec.", time() - t_start)
         return result.took

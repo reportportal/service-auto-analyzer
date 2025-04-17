@@ -94,3 +94,11 @@ class AmqpClient:
         except Exception as exc:
             logger.error("Failed to publish messages in queue %s", queue)
             logger.exception(exc)
+
+    def close(self):
+        """AmqpClient closes the connection"""
+        try:
+            self.connection.close()
+        except Exception as exc:
+            logger.error("Failed to close connection")
+            logger.exception(exc)

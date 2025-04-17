@@ -455,19 +455,17 @@ class SuggestService(AnalyzerService):
                 "_source": self.prepare_not_found_object_info(
                     test_item_info, time() - t_start, feature_names, model_info_tags)
             }])
-        try:
-            if self.app_config.amqpUrl:
-                amqp_client = AmqpClient(self.app_config.amqpUrl)
-                amqp_client.send_to_inner_queue(
-                    self.app_config.exchangeName, "stats_info", json.dumps(results_to_share))
-                if results:
-                    for model_type in [ModelType.suggestion, ModelType.auto_analysis]:
-                        amqp_client.send_to_inner_queue(
-                            self.app_config.exchangeName, 'train_models',
-                            TrainInfo(model_type=model_type, project=test_item_info.project,
-                                      gathered_metric_total=len(results)).json())
-        except Exception as exc:
-            logger.exception(exc)
+        if self.app_config.amqpUrl:
+            amqp_client = AmqpClient(self.app_config.amqpUrl)
+            amqp_client.send_to_inner_queue(
+                self.app_config.exchangeName, "stats_info", json.dumps(results_to_share))
+            if results:
+                for model_type in [ModelType.suggestion, ModelType.auto_analysis]:
+                    amqp_client.send_to_inner_queue(
+                        self.app_config.exchangeName, 'train_models',
+                        TrainInfo(model_type=model_type, project=test_item_info.project,
+                                  gathered_metric_total=len(results)).json())
+            amqp_client.close()
         logger.debug("Stats info %s", results_to_share)
         logger.info("Processed the test item. It took %.2f sec.", time() - t_start)
         logger.info("Finished suggesting for test item with %d results.", len(results))

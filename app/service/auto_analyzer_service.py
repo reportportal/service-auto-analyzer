@@ -551,6 +551,7 @@ class AutoAnalyzerService(AnalyzerService):
                     results_to_share[launch_id]['model_info'] = list(results_to_share[launch_id]['model_info'])
                 amqp_client.send_to_inner_queue(
                     self.app_config.exchangeName, 'stats_info', json.dumps(results_to_share))
+                amqp_client.close()
         except Exception as exc:
             logger.exception(exc)
         es_query_thread.join()

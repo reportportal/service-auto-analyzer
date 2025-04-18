@@ -161,8 +161,7 @@ class SuggestInfoService:
                                                   scroll="5m"):
                 suggest_log_ids.add(res["_id"])
         except Exception as exc:
-            logger.error("Couldn't find logs with specified ids")
-            logger.exception(exc)
+            logger.exception("Couldn't find logs with specified ids", exc_info=exc)
         bodies = []
         for _id in suggest_log_ids:
             bodies.append({

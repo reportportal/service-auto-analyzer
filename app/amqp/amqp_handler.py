@@ -102,27 +102,23 @@ def handle_amqp_request(channel: BlockingChannel, method: Basic.Deliver, props: 
     try:
         message = json.loads(body, strict=False)
     except Exception as exc:
-        logger.error('Failed to parse message body to JSON')
-        logger.exception(exc)
+        logger.exception('Failed to parse message body to JSON', exc_info=exc)
         return
     try:
         message = prepare_data_func(message)
     except Exception as exc:
-        logger.error('Failed to prepare message body')
-        logger.exception(exc)
+        logger.exception('Failed to prepare message body', exc_info=exc)
         return
     try:
         response = request_handler(message)
     except Exception as exc:
-        logger.error('Failed to handle message')
-        logger.exception(exc)
+        logger.exception('Failed to handle message', exc_info=exc)
         return
 
     try:
         response_body = prepare_response_data(response)
     except Exception as exc:
-        logger.error('Failed to prepare response body')
-        logger.exception(exc)
+        logger.exception('Failed to prepare response body', exc_info=exc)
         return
     if publish_result:
         try:
@@ -132,8 +128,7 @@ def handle_amqp_request(channel: BlockingChannel, method: Basic.Deliver, props: 
                     properties=BasicProperties(correlation_id=props.correlation_id, content_type='application/json'),
                     mandatory=False, body=bytes(response_body, 'utf-8'))
         except Exception as exc:
-            logger.error('Failed to publish result')
-            logger.exception(exc)
+            logger.exception('Failed to publish result', exc_info=exc)
             return
     logger.debug('Finished processing message')
 
@@ -148,20 +143,18 @@ def handle_inner_amqp_request(_: BlockingChannel, method: Basic.Deliver, props: 
     try:
         message = json.loads(body, strict=False)
     except Exception as exc:
-        logger.error('Failed to parse message body to JSON')
-        logger.exception(exc)
+        logger.exception('Failed to parse message body to JSON', exc_info=exc)
         return
     if prepare_data_func:
         try:
             message = prepare_data_func(message)
         except Exception as exc:
-            logger.error('Failed to prepare message body')
-            logger.exception(exc)
+            logger.exception('Failed to prepare message body', exc_info=exc)
             return
     try:
         request_handler(message)
     except Exception as exc:
-        logger.error('Failed to handle message')
-        logger.exception(exc)
+        logger.exception('Failed to handle message', exc_info=exc)
         return
     logger.debug('Finished processing message')
+

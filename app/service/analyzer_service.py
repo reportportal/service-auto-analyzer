@@ -201,8 +201,7 @@ class AnalyzerService:
                         model_info.model_type.name, model_info.project)
             return deleted_models
         except Exception as err:
-            logger.error("Error while removing models.")
-            logger.exception(err)
+            logger.exception("Error while removing models.", exc_info=err)
             return 0
 
     def get_model_info(self, model_info: ModelInfo):
@@ -215,6 +214,5 @@ class AnalyzerService:
                         model_info.model_type.name, model_info.project)
             return {"model_folder": model_folder}
         except Exception as err:
-            logger.error("Error while getting info for models.")
-            logger.exception(err)
+            logger.exception("Error while getting info for models.", exc_info=err)
             return ""

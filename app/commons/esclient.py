@@ -162,9 +162,9 @@ class EsClient:
             return index is not None
         except Exception as err:
             if print_error:
-                logger.error("Index %s was not found", str(index_name))
-                logger.error(ES_URL_MESSAGE, self.host)
-                logger.error(err)
+                logger.exception(
+                    f"Index '{index_name}' was not found. ES Url: {text_processing.remove_credentials_from_url(self.host)}",
+                    exc_info=err)
             return False
 
     def delete_index(self, index_name):
@@ -352,9 +352,8 @@ class EsClient:
             logger.debug("Finished indexing for %.2f s", time() - start_time)
             return BulkResponse(took=success_count, errors=len(errors) > 0)
         except Exception as exc:
-            logger.error("Error in bulk")
-            logger.error(ES_URL_MESSAGE, text_processing.remove_credentials_from_url(self.host))
-            logger.exception(exc)
+            logger.exception(f"Error in bulk. ES Url: {text_processing.remove_credentials_from_url(self.host)}",
+                             exc_info=exc)
             return BulkResponse(took=0, errors=True)
 
     def delete_logs(self, clean_index):

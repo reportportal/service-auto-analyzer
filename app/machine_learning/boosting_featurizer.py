@@ -14,6 +14,7 @@
 
 from collections import deque, defaultdict
 from datetime import datetime
+from sys import exc_info
 from typing import Optional, Any, Callable
 
 import numpy as np
@@ -660,6 +661,5 @@ class BoostingFeaturizer:
                     self.previously_gathered_features[feature] = gathered_data_dict[feature]
             gathered_data = utils.gather_feature_list(gathered_data_dict, self.feature_ids)
         except Exception as err:
-            logger.error("Errors in boosting features calculation")
-            logger.exception(err)
+            logger.exception("Errors in boosting features calculation", exc_info=err)
         return gathered_data, issue_type_names

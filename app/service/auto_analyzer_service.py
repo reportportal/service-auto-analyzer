@@ -362,8 +362,7 @@ class AutoAnalyzerService(AnalyzerService):
                 self._send_result_to_queue(test_item_dict, batches, batch_logs)
 
         except Exception as exc:
-            logger.error("Error in ES query")
-            logger.exception(exc)
+            logger.exception("Error in ES query", exc_info=exc)
         self.finished_queue.put("Finished")
         logger.info("Es queries finished %.2f s.", time() - t_start)
 

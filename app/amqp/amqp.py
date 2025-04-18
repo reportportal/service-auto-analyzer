@@ -13,8 +13,11 @@
 #  limitations under the License.
 
 import os
+from collections.abc import Callable
 
 import pika
+from pika.adapters.blocking_connection import BlockingChannel, BlockingConnection
+from pika.spec import Basic, BasicProperties
 
 from app.commons import logging
 from app.utils import text_processing
@@ -25,20 +28,20 @@ logger = logging.getLogger("analyzerApp.amqp")
 class AmqpClient:
     """AmqpClient handles communication with rabbitmq"""
 
-    connection: pika.BlockingConnection
+    connection: BlockingConnection
 
-    def __init__(self, amqp_url):
+    def __init__(self, amqp_url: str) -> None:
         self.connection = AmqpClient.create_ampq_connection(amqp_url)
 
     @staticmethod
-    def create_ampq_connection(amqp_url):
+    def create_ampq_connection(amqp_url: str) -> BlockingConnection:
         """Creates AMQP client"""
         amqp_full_url = amqp_url.rstrip("\\").rstrip("/") + "?heartbeat=600"
         logger.info("Try connect to %s" % text_processing.remove_credentials_from_url(amqp_full_url))
         return pika.BlockingConnection(pika.connection.URLParameters(amqp_full_url))
 
     @staticmethod
-    def bind_queue(channel, name, exchange_name):
+    def bind_queue(channel: BlockingChannel, name: str, exchange_name: str) -> bool:
         """AmqpClient binds a queue with an exchange for rabbitmq"""
         try:
             result = channel.queue_declare(queue=name, durable=False, exclusive=False, auto_delete=True,
@@ -58,7 +61,13 @@ class AmqpClient:
         return True
 
     @staticmethod
-    def consume_queue(channel, queue, auto_ack, exclusive, msg_callback):
+    def consume_queue(channel: BlockingChannel, queue: str, auto_ack: bool, exclusive: bool,
+                      msg_callback: Callable[[
+                          BlockingChannel,
+                          Basic.Deliver,
+                          BasicProperties,
+                          bytes,
+                      ], None]) -> None:
         """AmqpClient shows how to handle a message from the queue"""
         try:
             channel.basic_qos(prefetch_count=1, prefetch_size=0)
@@ -67,14 +76,19 @@ class AmqpClient:
             logger.exception(exc)
             os.kill(os.getpid(), 9)
         try:
-            channel.basic_consume(queue=queue, auto_ack=auto_ack, exclusive=exclusive,
-                                  on_message_callback=msg_callback)
+            channel.basic_consume(queue=queue, auto_ack=auto_ack, exclusive=exclusive, on_message_callback=msg_callback)
         except Exception as exc:
             logger.error("Failed to register a consumer pid(%d)", os.getpid())
             logger.exception(exc)
             os.kill(os.getpid(), 9)
 
-    def receive(self, exchange_name, queue, auto_ack, exclusive, msg_callback):
+    def receive(self, exchange_name: str, queue: str, auto_ack: bool, exclusive: bool,
+                msg_callback: Callable[[
+                    BlockingChannel,
+                    Basic.Deliver,
+                    BasicProperties,
+                    bytes,
+                ], None]) -> None:
         """AmqpClient starts consuming messages from a specific queue"""
         try:
             channel = self.connection.channel()
@@ -95,7 +109,7 @@ class AmqpClient:
             logger.error("Failed to publish messages in queue %s", queue)
             logger.exception(exc)
 
-    def close(self):
+    def close(self) -> None:
         """AmqpClient closes the connection"""
         try:
             self.connection.close()

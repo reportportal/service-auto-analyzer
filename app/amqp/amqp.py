@@ -30,6 +30,9 @@ logger = logging.getLogger("analyzerApp.amqp")
 class AmqpClient:
     """AmqpClient handles communication with rabbitmq"""
 
+    amqp_url: str
+    retry_interval: int
+    max_retry_time: int
     connection: BlockingConnection
 
     def __init__(self, amqp_url: str, retry_interval: int = 10, max_retry_time: int = 300) -> None:
@@ -40,6 +43,9 @@ class AmqpClient:
             retry_interval: Time in seconds between connection retry attempts (default: 10)
             max_retry_time: Maximum time in seconds to keep retrying (default: 300)
         """
+        self.amqp_url = amqp_url
+        self.retry_interval = retry_interval
+        self.max_retry_time = max_retry_time
         self.connection = self.create_ampq_connection_with_retry(
             amqp_url, retry_interval, max_retry_time)
 

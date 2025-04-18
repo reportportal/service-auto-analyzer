@@ -16,7 +16,6 @@ import json
 import logging.config
 import os
 import threading
-import time
 from signal import signal, SIGINT
 from sys import exit
 
@@ -79,6 +78,10 @@ APP_CONFIG = ApplicationConfig(
     analyzerHttpPort=int(os.getenv("ANALYZER_HTTP_PORT", "5001")),
     analyzerPathToLog=os.getenv("ANALYZER_FILE_LOGGING_PATH", "/tmp/config.log")
 )
+
+# Add AMQP connection retry configurations
+AMQP_RETRY_INTERVAL = int(os.getenv("AMQP_RETRY_INTERVAL", "10"))
+AMQP_MAX_RETRY_TIME = int(os.getenv("AMQP_MAX_RETRY_TIME", "300"))
 
 SEARCH_CONFIG = SearchConfig(
     SearchLogsMinSimilarity=float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.95")),
@@ -400,7 +403,6 @@ es_client = EsClient(APP_CONFIG)
 read_model_settings()
 
 application = create_application()
-threads = []
 
 
 @application.route('/', methods=['GET'])
@@ -428,22 +430,10 @@ def start_http_server():
 
 signal(SIGINT, handler)
 logger.info("The analyzer has started")
-while True:
-    try:
-        logger.info("Starting waiting for AMQP connection")
-        try:
-            amqp_client = AmqpClient(APP_CONFIG.amqpUrl)
-        except Exception as exc:
-            logger.error("Amqp connection was not established")
-            logger.exception(exc)
-            time.sleep(10)
-            continue
-        threads = init_amqp(amqp_client)
-        logger.info("Analyzer has started")
-        break
-    except Exception as exc:
-        logger.error("The analyzer has failed")
-        logger.exception(exc)
+logger.info("Starting waiting for AMQP connection")
+amqp_client = AmqpClient(APP_CONFIG.amqpUrl, retry_interval=AMQP_RETRY_INTERVAL, max_retry_time=AMQP_MAX_RETRY_TIME)
+threads = init_amqp(amqp_client)
+logger.info("Analyzer has started")
 
 if __name__ == '__main__':
     logger.info("Program started")
@@ -452,3 +442,4 @@ if __name__ == '__main__':
 
     logger.info("The analyzer has finished")
     exit(0)
+

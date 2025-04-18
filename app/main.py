@@ -22,7 +22,6 @@ from sys import exit
 from flask import Flask, Response, jsonify
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
-from pika.adapters.blocking_connection import BlockingChannel
 
 from app.amqp import amqp_handler
 from app.amqp.amqp import AmqpClient
@@ -126,38 +125,8 @@ def create_thread(func, args):
     return thread
 
 
-def declare_exchange(channel: BlockingChannel, config: ApplicationConfig):
-    """Declares exchange for rabbitmq"""
-    logger.info("ExchangeName: %s", config.exchangeName)
-    try:
-        channel.exchange_declare(exchange=config.exchangeName, exchange_type='direct',
-                                 durable=False, auto_delete=True, internal=False,
-                                 arguments={
-                                     "analyzer": config.exchangeName,
-                                     "analyzer_index": config.analyzerIndex,
-                                     "analyzer_priority": config.analyzerPriority,
-                                     "analyzer_log_search": config.analyzerLogSearch,
-                                     "analyzer_suggest": config.analyzerSuggest,
-                                     "analyzer_cluster": config.analyzerCluster,
-                                     "version": config.appVersion
-                                 })
-    except Exception as err:
-        logger.error("Failed to declare exchange")
-        logger.error(err)
-        return False
-    logger.info("Exchange '%s' has been declared", config.exchangeName)
-    return True
-
-
-def init_amqp(_amqp_client: AmqpClient):
+def init_amqp_queues():
     """Initialize rabbitmq queues, exchange and stars threads for queue messages processing"""
-    with _amqp_client.connection.channel() as channel:
-        try:
-            declare_exchange(channel, APP_CONFIG)
-        except Exception as err:
-            logger.error('Failed to declare amqp objects')
-            logger.error(err)
-            return
     _threads = []
     _model_chooser = model_chooser.ModelChooser(APP_CONFIG, SEARCH_CONFIG)
     if APP_CONFIG.instanceTaskType == 'train':
@@ -432,7 +401,8 @@ signal(SIGINT, handler)
 logger.info("The analyzer has started")
 logger.info("Starting waiting for AMQP connection")
 amqp_client = AmqpClient(APP_CONFIG.amqpUrl, retry_interval=AMQP_RETRY_INTERVAL, max_retry_time=AMQP_MAX_RETRY_TIME)
-threads = init_amqp(amqp_client)
+amqp_client.declare_exchange(APP_CONFIG)
+threads = init_amqp_queues()
 logger.info("Analyzer has started")
 
 if __name__ == '__main__':
@@ -442,4 +412,3 @@ if __name__ == '__main__':
 
     logger.info("The analyzer has finished")
     exit(0)
-

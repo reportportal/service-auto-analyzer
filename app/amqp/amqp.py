@@ -21,6 +21,7 @@ from pika.adapters.blocking_connection import BlockingChannel, BlockingConnectio
 from pika.spec import Basic, BasicProperties
 
 from app.commons import logging
+from app.commons.model.launch_objects import ApplicationConfig
 from app.utils import text_processing
 
 logger = logging.getLogger("analyzerApp.amqp")
@@ -48,9 +49,9 @@ class AmqpClient:
         amqp_full_url = amqp_url.rstrip("\\").rstrip("/") + "?heartbeat=600"
         logger.info(f"Try connect to {text_processing.remove_credentials_from_url(amqp_full_url)}")
         return pika.BlockingConnection(pika.connection.URLParameters(amqp_full_url))
-    
+
     @staticmethod
-    def create_ampq_connection_with_retry(amqp_url: str, retry_interval: int = 10, 
+    def create_ampq_connection_with_retry(amqp_url: str, retry_interval: int = 10,
                                           max_retry_time: int = 300) -> BlockingConnection:
         """Creates AMQP client with retry mechanism
         
@@ -67,7 +68,7 @@ class AmqpClient:
         """
         start_time = time.time()
         last_exception = None
-        
+
         while time.time() - start_time < max_retry_time:
             try:
                 connection = AmqpClient.create_ampq_connection(amqp_url)
@@ -78,12 +79,40 @@ class AmqpClient:
                 logger.error("Failed to connect to AMQP, retrying in %d seconds...", retry_interval)
                 logger.debug("Connection error details: %s", str(exc))
                 time.sleep(retry_interval)
-        
+
         # If we get here, we've exceeded the maximum retry time
         logger.error("Failed to establish AMQP connection after %d seconds", max_retry_time)
         if last_exception:
             logger.exception("Last connection error", exc_info=last_exception)
         raise RuntimeError(f"Could not establish AMQP connection after {max_retry_time} seconds")
+
+    def declare_exchange(self, config: ApplicationConfig) -> None:
+        """Declares exchange for rabbitmq
+        
+        Args:
+            config: Application configuration object with exchange settings
+            
+        Returns:
+            bool: True if exchange was successfully declared, False otherwise
+        """
+        logger.info("ExchangeName: %s", config.exchangeName)
+        try:
+            with self.connection.channel() as channel:
+                channel.exchange_declare(exchange=config.exchangeName, exchange_type='direct',
+                                         durable=False, auto_delete=True, internal=False,
+                                         arguments={
+                                             "analyzer": config.exchangeName,
+                                             "analyzer_index": config.analyzerIndex,
+                                             "analyzer_priority": config.analyzerPriority,
+                                             "analyzer_log_search": config.analyzerLogSearch,
+                                             "analyzer_suggest": config.analyzerSuggest,
+                                             "analyzer_cluster": config.analyzerCluster,
+                                             "version": config.appVersion
+                                         })
+                logger.info("Exchange '%s' has been declared", config.exchangeName)
+        except Exception as err:
+            logger.exception("Failed to declare exchange", exc_info=err)
+            raise err
 
     @staticmethod
     def bind_queue(channel: BlockingChannel, name: str, exchange_name: str) -> bool:
@@ -143,8 +172,8 @@ class AmqpClient:
 
     def send_to_inner_queue(self, exchange_name: str, queue: str, data: str) -> None:
         try:
-            channel = self.connection.channel()
-            channel.basic_publish(exchange=exchange_name, routing_key=queue, body=bytes(data, 'utf-8'))
+            with self.connection.channel() as channel:
+                channel.basic_publish(exchange=exchange_name, routing_key=queue, body=bytes(data, 'utf-8'))
         except Exception as exc:
             logger.exception(f"Failed to publish messages in queue '{queue}'", exc_info=exc)
 

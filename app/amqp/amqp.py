@@ -62,6 +62,7 @@ class AmqpClient:
         initial_retry_interval: int = 1,
         max_retry_time: int = 300,
         backoff_factor: int = 2,
+        heartbeat: int = 50,
     ) -> None:
         """Initialize the AMQP client with retry mechanism.
 
@@ -70,7 +71,7 @@ class AmqpClient:
         :param int max_retry_time: Maximum time in seconds to keep retrying
         :param int backoff_factor: Multiplier for the retry interval on each attempt
         """
-        self._amqp_url = amqp_url.rstrip("\\/") + "?heartbeat=600"
+        self._amqp_url = amqp_url.rstrip("\\/") + f"?heartbeat={heartbeat}"
         self._initial_retry_interval = initial_retry_interval
         self._max_retry_time = max_retry_time
         self._backoff_factor = backoff_factor

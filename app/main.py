@@ -136,7 +136,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -172,7 +172,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -196,7 +196,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -220,7 +220,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -245,7 +245,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -270,7 +270,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -295,7 +295,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -320,7 +320,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -345,7 +345,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -364,7 +364,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -388,7 +388,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -413,7 +413,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -438,7 +438,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -463,7 +463,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -487,7 +487,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -512,7 +512,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -536,7 +536,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -561,7 +561,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -586,7 +586,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -611,7 +611,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -636,7 +636,7 @@ def init_amqp_queues():
                     APP_CONFIG.amqpUrl,
                     initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
                     max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT
+                    heartbeat=AMQP_HEARTBEAT,
                 ).receive,
                 (
                     APP_CONFIG.exchangeName,
@@ -729,8 +729,10 @@ signal(SIGINT, handler)
 logger.info("The analyzer has started")
 logger.info("Starting waiting for AMQP connection")
 amqp_client = AmqpClient(
-    APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, max_retry_time=AMQP_MAX_RETRY_TIME,
-    heartbeat=AMQP_HEARTBEAT
+    APP_CONFIG.amqpUrl,
+    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
+    max_retry_time=AMQP_MAX_RETRY_TIME,
+    heartbeat=AMQP_HEARTBEAT,
 )
 amqp_client.declare_exchange(APP_CONFIG)
 amqp_client.close()

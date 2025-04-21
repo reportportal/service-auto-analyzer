@@ -1,3 +1,5 @@
+black
+isort
 pytest
 pytest-cov
 moto[server,s3]
@@ -7,3 +9,4 @@ flake8==5.0.4
 sure==2.0.1
 freezegun==1.2.2
 jsondiff
+testcontainers[rabbitmq]

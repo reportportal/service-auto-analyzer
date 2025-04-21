@@ -79,7 +79,7 @@ APP_CONFIG = ApplicationConfig(
 )
 
 # Add AMQP connection retry configurations
-AMQP_RETRY_INTERVAL = int(os.getenv("AMQP_RETRY_INTERVAL", "10"))
+AMQP_INITIAL_RETRY_INTERVAL = int(os.getenv("AMQP_INITIAL_RETRY_INTERVAL", "1"))
 AMQP_MAX_RETRY_TIME = int(os.getenv("AMQP_MAX_RETRY_TIME", "300"))
 
 SEARCH_CONFIG = SearchConfig(
@@ -133,7 +133,8 @@ def init_amqp_queues():
         _retraining_service = RetrainingService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
         _threads.append(
             create_thread(
-                AmqpClient(APP_CONFIG.amqpUrl).receive,
+                AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                          max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                 (APP_CONFIG.exchangeName, 'train_models', True, False,
                  lambda current_channel, method, props, body: amqp_handler.handle_inner_amqp_request(
                      current_channel, method, props, body, _retraining_service.train_models,
@@ -150,20 +151,23 @@ def init_amqp_queues():
         _cluster_service = ClusterService(APP_CONFIG, SEARCH_CONFIG)
         _namespace_finder_service = NamespaceFinderService(APP_CONFIG)
         _suggest_patterns_service = SuggestPatternsService(APP_CONFIG, SEARCH_CONFIG)
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
+        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                                               max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                                       (APP_CONFIG.exchangeName, 'index', True, False,
                                        lambda current_channel, method, props, body:
                                        amqp_handler.handle_amqp_request(
                                            current_channel, method, props, body, _es_client.index_logs,
                                            prepare_response_data=amqp_handler.prepare_index_response_data))))
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
+        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                                               max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                                       (APP_CONFIG.exchangeName, 'analyze', True, False,
                                        lambda current_channel, method, props, body:
                                        amqp_handler.handle_amqp_request(current_channel, method, props, body,
                                                                         _auto_analyzer_service.analyze_logs,
                                                                         prepare_response_data=amqp_handler.
                                                                         prepare_analyze_response_data))))
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
+        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                                               max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                                       (APP_CONFIG.exchangeName, 'delete', True, False,
                                        lambda current_channel, method, props, body:
                                        amqp_handler.handle_amqp_request(current_channel, method, props, body,
@@ -172,7 +176,8 @@ def init_amqp_queues():
                                                                         prepare_delete_index,
                                                                         prepare_response_data=amqp_handler.
                                                                         output_result))))
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
+        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                                               max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                                       (APP_CONFIG.exchangeName, 'clean', True, False,
                                        lambda current_channel, method, props, body:
                                        amqp_handler.handle_amqp_request(current_channel, method, props, body,
@@ -181,7 +186,8 @@ def init_amqp_queues():
                                                                         prepare_clean_index,
                                                                         prepare_response_data=amqp_handler.
                                                                         output_result))))
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
+        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                                               max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                                       (APP_CONFIG.exchangeName, 'search', True, False,
                                        lambda current_channel, method, props, body:
                                        amqp_handler.handle_amqp_request(current_channel, method, props, body,
@@ -190,7 +196,8 @@ def init_amqp_queues():
                                                                         prepare_search_logs,
                                                                         prepare_response_data=amqp_handler.
                                                                         prepare_analyze_response_data))))
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
+        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                                               max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                                       (APP_CONFIG.exchangeName, 'suggest', True, False,
                                        lambda current_channel, method, props, body:
                                        amqp_handler.handle_amqp_request(current_channel, method, props, body,
@@ -199,7 +206,8 @@ def init_amqp_queues():
                                                                         prepare_test_item_info,
                                                                         prepare_response_data=amqp_handler.
                                                                         prepare_analyze_response_data))))
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
+        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                                               max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                                       (APP_CONFIG.exchangeName, 'cluster', True, False,
                                        lambda current_channel, method, props, body:
                                        amqp_handler.handle_amqp_request(current_channel, method, props, body,
@@ -208,20 +216,23 @@ def init_amqp_queues():
                                                                         prepare_launch_info,
                                                                         prepare_response_data=amqp_handler.
                                                                         prepare_index_response_data))))
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
+        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                                               max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                                       (APP_CONFIG.exchangeName, 'stats_info', True, False,
                                        lambda current_channel, method, props, body:
                                        amqp_handler.handle_inner_amqp_request(current_channel, method, props,
                                                                               body,
                                                                               _es_client.send_stats_info))))
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
+        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                                               max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                                       (APP_CONFIG.exchangeName, 'namespace_finder', True, False,
                                        lambda current_channel, method, props, body:
                                        amqp_handler.handle_amqp_request(
                                            current_channel, method, props, body,
                                            _namespace_finder_service.update_chosen_namespaces,
                                            publish_result=False))))
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
+        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                                               max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                                       (APP_CONFIG.exchangeName, 'suggest_patterns', True, False,
                                        lambda current_channel, method, props, body:
                                        amqp_handler.handle_amqp_request(
@@ -229,7 +240,8 @@ def init_amqp_queues():
                                            _suggest_patterns_service.suggest_patterns,
                                            prepare_data_func=amqp_handler.prepare_delete_index,
                                            prepare_response_data=amqp_handler.prepare_index_response_data))))
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
+        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                                               max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                                       (APP_CONFIG.exchangeName, 'index_suggest_info', True, False,
                                        lambda current_channel, method, props, body:
                                        amqp_handler.handle_amqp_request(
@@ -237,7 +249,8 @@ def init_amqp_queues():
                                            _suggest_info_service.index_suggest_info,
                                            prepare_data_func=amqp_handler.prepare_suggest_info_list,
                                            prepare_response_data=amqp_handler.prepare_index_response_data))))
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
+        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                                               max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                                       (APP_CONFIG.exchangeName, 'remove_suggest_info', True, False,
                                        lambda current_channel, method, props, body:
                                        amqp_handler.handle_amqp_request(
@@ -245,14 +258,16 @@ def init_amqp_queues():
                                            _suggest_info_service.remove_suggest_info,
                                            prepare_data_func=amqp_handler.prepare_delete_index,
                                            prepare_response_data=amqp_handler.output_result))))
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
+        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                                               max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                                       (APP_CONFIG.exchangeName, 'update_suggest_info', True, False,
                                        lambda current_channel, method, props, body:
                                        amqp_handler.handle_amqp_request(
                                            current_channel, method, props, body,
                                            _suggest_info_service.update_suggest_info,
                                            prepare_data_func=lambda x: x))))
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
+        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                                               max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                                       (APP_CONFIG.exchangeName, 'remove_models', True, False,
                                        lambda current_channel, method, props, body:
                                        amqp_handler.handle_amqp_request(current_channel, method, props, body,
@@ -260,13 +275,15 @@ def init_amqp_queues():
                                                                         prepare_data_func=lambda x: x,
                                                                         prepare_response_data=amqp_handler.
                                                                         output_result))))
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
+        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                                               max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                                       (APP_CONFIG.exchangeName, 'get_model_info', True, False,
                                        lambda current_channel, method, props, body:
                                        amqp_handler.handle_amqp_request(current_channel, method, props, body,
                                                                         _analyzer_service.get_model_info,
                                                                         prepare_data_func=lambda x: x))))
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
+        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                                               max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                                       (APP_CONFIG.exchangeName, 'defect_update', True, False,
                                        lambda current_channel, method, props, body:
                                        amqp_handler.handle_amqp_request(current_channel, method, props, body,
@@ -274,7 +291,8 @@ def init_amqp_queues():
                                                                         prepare_data_func=lambda x: x,
                                                                         prepare_response_data=amqp_handler.
                                                                         prepare_search_response_data))))
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
+        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                                               max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                                       (APP_CONFIG.exchangeName, 'item_remove', True, False,
                                        lambda current_channel, method, props, body:
                                        amqp_handler.handle_amqp_request(
@@ -282,7 +300,8 @@ def init_amqp_queues():
                                            _clean_index_service.delete_test_items,
                                            prepare_data_func=lambda x: x,
                                            prepare_response_data=amqp_handler.output_result))))
-        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl).receive,
+        _threads.append(create_thread(AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                                               max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                                       (APP_CONFIG.exchangeName, 'launch_remove', True, False,
                                        lambda current_channel, method, props, body:
                                        amqp_handler.handle_amqp_request(current_channel, method, props, body,
@@ -292,7 +311,8 @@ def init_amqp_queues():
                                                                         output_result))))
         _threads.append(
             create_thread(
-                AmqpClient(APP_CONFIG.amqpUrl).receive,
+                AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                          max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                 (
                     APP_CONFIG.exchangeName,
                     'remove_by_launch_start_time',
@@ -312,7 +332,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(APP_CONFIG.amqpUrl).receive,
+                AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                          max_retry_time=AMQP_MAX_RETRY_TIME).receive,
                 (
                     APP_CONFIG.exchangeName,
                     'remove_by_log_time',
@@ -400,8 +421,10 @@ def start_http_server():
 signal(SIGINT, handler)
 logger.info("The analyzer has started")
 logger.info("Starting waiting for AMQP connection")
-amqp_client = AmqpClient(APP_CONFIG.amqpUrl, retry_interval=AMQP_RETRY_INTERVAL, max_retry_time=AMQP_MAX_RETRY_TIME)
+amqp_client = AmqpClient(APP_CONFIG.amqpUrl, initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL, 
+                        max_retry_time=AMQP_MAX_RETRY_TIME)
 amqp_client.declare_exchange(APP_CONFIG)
+amqp_client.close()
 threads = init_amqp_queues()
 logger.info("Analyzer has started")
 
@@ -412,3 +435,4 @@ if __name__ == '__main__':
 
     logger.info("The analyzer has finished")
     exit(0)
+

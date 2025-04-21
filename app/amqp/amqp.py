@@ -50,32 +50,17 @@ class AmqpClientConnectionException(Exception):
 class AmqpClient:
     """AMQP client wrapper able to recover from transient network failures."""
 
+    _config: Final[ApplicationConfig]
     _amqp_url: Final[str]
-    _initial_retry_interval: Final[int]
-    _max_retry_time: Final[int]
-    _backoff_factor: Final[int]
     __connection: Optional[BlockingConnection]
 
-    def __init__(
-        self,
-        amqp_url: str,
-        initial_retry_interval: int = 1,
-        max_retry_time: int = 300,
-        backoff_factor: int = 2,
-        heartbeat: int = 50,
-    ) -> None:
+    def __init__(self, config: ApplicationConfig) -> None:
         """Initialize the AMQP client with retry mechanism.
 
-        :param str amqp_url: The AMQP URL to connect to
-        :param int initial_retry_interval: Time in seconds between connection retry attempts at the very first retry
-        :param int max_retry_time: Maximum time in seconds to keep retrying
-        :param int backoff_factor: Multiplier for the retry interval on each attempt
+        :param ApplicationConfig config: the application config object
         """
-        self._amqp_url = amqp_url.rstrip("\\/") + f"?heartbeat={heartbeat}"
-        self._initial_retry_interval = initial_retry_interval
-        self._max_retry_time = max_retry_time
-        self._backoff_factor = backoff_factor
-
+        self._config = config
+        self._amqp_url = config.amqpUrl.rstrip("\\/") + f"?heartbeat={config.amqpHeartbeatInterval}"
         self.__connection = None
 
     def close(self) -> None:
@@ -103,7 +88,7 @@ class AmqpClient:
         :return: The AMQP connection
         """
         start_time = time.time()
-        interval = self._initial_retry_interval
+        interval = self._config.amqpInitialRetryInterval
         while True:
             try:
                 connection = self._connect()
@@ -111,13 +96,13 @@ class AmqpClient:
                 return connection
             except Exception as exc:  # pylint: disable=broad-except
                 elapsed = time.time() - start_time
-                if elapsed >= self._max_retry_time:
-                    logger.error(f"Exceeded max retry time ({self._max_retry_time} s).")
+                if elapsed >= self._config.amqpMaxRetryTime:
+                    logger.error(f"Exceeded max retry time ({self._config.amqpMaxRetryTime} s).")
                     raise AmqpClientConnectionException("Could not establish AMQP connection") from exc
                 logger.warning(f"Connection failed ({exc}). Retrying in {interval} s.")
                 logger.debug("Exception details", exc_info=exc)
                 time.sleep(interval)
-                interval = min(interval * self._backoff_factor, _MAX_SLEEP)
+                interval = min(interval * self._config.amqpBackoffFactor, _MAX_SLEEP)
 
     @property
     def _connection(self) -> BlockingConnection:
@@ -129,29 +114,26 @@ class AmqpClient:
             self.__connection = self._connect_with_retry()
         return self.__connection
 
-    def declare_exchange(self, config: ApplicationConfig) -> None:
-        """Declares exchange for rabbitmq.
-
-        :param ApplicationConfig config: Application configuration object with exchange settings
-        """
+    def declare_exchange(self) -> None:
+        """Declare application exchange on AMQP server."""
         with self._connection.channel() as channel:
             channel.exchange_declare(
-                exchange=config.exchangeName,
+                exchange=self._config.amqpExchangeName,
                 exchange_type="direct",
                 durable=False,
                 auto_delete=True,
                 internal=False,
                 arguments={
-                    "analyzer": config.exchangeName,
-                    "analyzer_index": config.analyzerIndex,
-                    "analyzer_priority": config.analyzerPriority,
-                    "analyzer_log_search": config.analyzerLogSearch,
-                    "analyzer_suggest": config.analyzerSuggest,
-                    "analyzer_cluster": config.analyzerCluster,
-                    "version": config.appVersion,
+                    "analyzer": self._config.amqpExchangeName,
+                    "analyzer_index": self._config.analyzerIndex,
+                    "analyzer_priority": self._config.analyzerPriority,
+                    "analyzer_log_search": self._config.analyzerLogSearch,
+                    "analyzer_suggest": self._config.analyzerSuggest,
+                    "analyzer_cluster": self._config.analyzerCluster,
+                    "version": self._config.appVersion,
                 },
             )
-            logger.info(f"Exchange '{config.exchangeName}' declared")
+            logger.info(f"Exchange '{self._config.amqpExchangeName}' declared")
 
     @staticmethod
     def _bind_queue(channel: BlockingChannel, name: str, exchange_name: str) -> None:
@@ -190,7 +172,6 @@ class AmqpClient:
 
     def receive(
         self,
-        exchange_name: str,
         queue: str,
         auto_ack: bool,
         exclusive: bool,
@@ -198,7 +179,6 @@ class AmqpClient:
     ) -> None:
         """Continuously consume messages, reconnect on failure.
 
-        :param str exchange_name: Name of the exchange
         :param str queue: Name of the queue to consume
         :param bool auto_ack: Whether to automatically acknowledge messages
         :param bool exclusive: Whether to set exclusive consumer
@@ -207,7 +187,7 @@ class AmqpClient:
         while True:
             try:
                 channel = self._connection.channel()
-                self._bind_queue(channel, queue, exchange_name)
+                self._bind_queue(channel, queue, self._config.amqpExchangeName)
                 self._consume_queue(channel, queue, auto_ack, exclusive, msg_callback)
                 logger.info(f"Start consuming on queue '{queue}'")
                 channel.start_consuming()
@@ -221,10 +201,9 @@ class AmqpClient:
                 logger.info("Consumer interrupted by user. Exiting.")
                 break
 
-    def send_to_inner_queue(self, exchange_name: str, queue: str, data: str) -> None:
+    def send_to_inner_queue(self, queue: str, data: str) -> None:
         """Publish message with automatic reconnection.
 
-        :param str exchange_name: Name of the exchange
         :param str queue: Name of the queue to publish to
         :param str data: Message data to publish
         """
@@ -232,7 +211,7 @@ class AmqpClient:
             try:
                 with self._connection.channel() as channel:
                     channel.basic_publish(
-                        exchange=exchange_name,
+                        exchange=self._config.amqpExchangeName,
                         routing_key=queue,
                         body=data.encode("utf‑8"),
                     )

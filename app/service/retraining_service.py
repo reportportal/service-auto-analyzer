@@ -47,9 +47,8 @@ class RetrainingService:
             gathered_data, training_log_info = _retraining.train(train_info)
             _retraining_triggering.clean_triggering_info(train_info.project, gathered_data)
             logger.debug(training_log_info)
-            if self.app_config.amqpUrl:
-                amqp_client = AmqpClient(self.app_config.amqpUrl)
-                amqp_client.send_to_inner_queue(
-                    self.app_config.exchangeName, 'stats_info', json.dumps(training_log_info))
+            if self.app_config.amqpUrl.strip():
+                amqp_client = AmqpClient(self.app_config)
+                amqp_client.send_to_inner_queue('stats_info', json.dumps(training_log_info))
                 amqp_client.close()
         logger.info("Finished training %.2f s", time() - t_start)

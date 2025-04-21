@@ -542,14 +542,12 @@ class AutoAnalyzerService(AnalyzerService):
                         results_to_share[launch_id]["errors"].append(utils.extract_exception(exc))
                         results_to_share[launch_id]["errors_count"] += 1
             if self.app_config.amqpUrl and analyzed_results_for_index:
-                amqp_client = AmqpClient(self.app_config.amqpUrl)
-                amqp_client.send_to_inner_queue(
-                    self.app_config.exchangeName, 'index_suggest_info',
+                amqp_client = AmqpClient(self.app_config)
+                amqp_client.send_to_inner_queue('index_suggest_info',
                     json.dumps([_info.dict() for _info in analyzed_results_for_index]))
                 for launch_id in results_to_share:
                     results_to_share[launch_id]['model_info'] = list(results_to_share[launch_id]['model_info'])
-                amqp_client.send_to_inner_queue(
-                    self.app_config.exchangeName, 'stats_info', json.dumps(results_to_share))
+                amqp_client.send_to_inner_queue('stats_info', json.dumps(results_to_share))
                 amqp_client.close()
         except Exception as exc:
             logger.exception(exc)

@@ -260,10 +260,9 @@ class SuggestInfoService:
                     })
         result = self.es_client._bulk_index(log_update_queries)
         if self.app_config.amqpUrl:
-            amqp_client = AmqpClient(self.app_config.amqpUrl)
+            amqp_client = AmqpClient(self.app_config)
             for model_type in [ModelType.suggestion, ModelType.auto_analysis]:
-                amqp_client.send_to_inner_queue(
-                    self.app_config.exchangeName, 'train_models',
+                amqp_client.send_to_inner_queue('train_models',
                     TrainInfo(model_type=model_type, project=defect_update_info['project'],
                               gathered_metric_total=result.took).json())
             amqp_client.close()

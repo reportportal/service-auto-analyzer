@@ -243,9 +243,8 @@ class EsClient:
         _, num_logs_with_defect_types = self._merge_logs(test_item_ids, project_with_prefix)
 
         if self.app_config.amqpUrl:
-            amqp_client = AmqpClient(self.app_config.amqpUrl)
-            amqp_client.send_to_inner_queue(
-                self.app_config.exchangeName, 'train_models',
+            amqp_client = AmqpClient(self.app_config)
+            amqp_client.send_to_inner_queue('train_models',
                 TrainInfo(model_type=ModelType.defect_type, project=project,
                           gathered_metric_total=num_logs_with_defect_types).json())
             amqp_client.close()
@@ -485,9 +484,8 @@ class EsClient:
         items_not_updated = list(set(test_item_ids) - found_test_items)
         logger.debug("Not updated test items: %s", items_not_updated)
         if self.app_config.amqpUrl:
-            amqp_client = AmqpClient(self.app_config.amqpUrl)
-            amqp_client.send_to_inner_queue(
-                self.app_config.exchangeName, "update_suggest_info", json.dumps(defect_update_info))
+            amqp_client = AmqpClient(self.app_config)
+            amqp_client.send_to_inner_queue("update_suggest_info", json.dumps(defect_update_info))
             amqp_client.close()
         logger.info("Finished updating defect types. It took %.2f sec", time() - t_start)
         return items_not_updated

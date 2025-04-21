@@ -456,13 +456,11 @@ class SuggestService(AnalyzerService):
                     test_item_info, time() - t_start, feature_names, model_info_tags)
             }])
         if self.app_config.amqpUrl:
-            amqp_client = AmqpClient(self.app_config.amqpUrl)
-            amqp_client.send_to_inner_queue(
-                self.app_config.exchangeName, "stats_info", json.dumps(results_to_share))
+            amqp_client = AmqpClient(self.app_config)
+            amqp_client.send_to_inner_queue("stats_info", json.dumps(results_to_share))
             if results:
                 for model_type in [ModelType.suggestion, ModelType.auto_analysis]:
-                    amqp_client.send_to_inner_queue(
-                        self.app_config.exchangeName, 'train_models',
+                    amqp_client.send_to_inner_queue('train_models',
                         TrainInfo(model_type=model_type, project=test_item_info.project,
                                   gathered_metric_total=len(results)).json())
             amqp_client.close()

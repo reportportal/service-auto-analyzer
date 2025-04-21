@@ -35,8 +35,14 @@ class ApplicationConfig(BaseModel):
     esUser: str = ''
     esPassword: str = ''
     logLevel: str = 'DEBUG'
+
     amqpUrl: str = ''
-    exchangeName: str = 'analyzer'
+    amqpExchangeName: str = 'analyzer'
+    amqpHeartbeatInterval: int
+    amqpInitialRetryInterval: int
+    amqpMaxRetryTime: int
+    amqpBackoffFactor: int
+
     analyzerPriority: int = 1
     analyzerIndex: bool = True
     analyzerLogSearch: bool = True

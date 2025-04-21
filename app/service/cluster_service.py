@@ -402,9 +402,8 @@ class ClusterService:
             "errors": errors_found,
             "errors_count": errors_count}}
         if self.app_config.amqpUrl.strip():
-            amqp_client = AmqpClient(self.app_config.amqpUrl)
-            amqp_client.send_to_inner_queue(
-                self.app_config.exchangeName, 'stats_info', json.dumps(results_to_share))
+            amqp_client = AmqpClient(self.app_config)
+            amqp_client.send_to_inner_queue('stats_info', json.dumps(results_to_share))
             amqp_client.close()
 
         logger.debug("Stats info %s", results_to_share)

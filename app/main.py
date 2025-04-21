@@ -16,7 +16,7 @@ import json
 import logging.config
 import os
 import threading
-from signal import signal, SIGINT
+from signal import SIGINT, signal
 from sys import exit
 
 from flask import Flask, Response, jsonify
@@ -25,20 +25,23 @@ from flask_wtf.csrf import CSRFProtect
 
 from app.amqp import amqp_handler
 from app.amqp.amqp import AmqpClient
-from app.commons import model_chooser, logging as my_logging
+from app.commons import logging as my_logging
+from app.commons import model_chooser
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
-from app.service import AnalyzerService
-from app.service import AutoAnalyzerService
-from app.service import CleanIndexService
-from app.service import ClusterService
-from app.service import DeleteIndexService
-from app.service import NamespaceFinderService
-from app.service import RetrainingService
-from app.service import SearchService
-from app.service import SuggestInfoService
-from app.service import SuggestPatternsService
-from app.service import SuggestService
+from app.service import (
+    AnalyzerService,
+    AutoAnalyzerService,
+    CleanIndexService,
+    ClusterService,
+    DeleteIndexService,
+    NamespaceFinderService,
+    RetrainingService,
+    SearchService,
+    SuggestInfoService,
+    SuggestPatternsService,
+    SuggestService,
+)
 from app.utils import utils
 
 APP_CONFIG = ApplicationConfig(
@@ -47,7 +50,11 @@ APP_CONFIG = ApplicationConfig(
     esPassword=os.getenv("ES_PASSWORD", "").strip(),
     logLevel=os.getenv("LOGGING_LEVEL", "DEBUG").strip(),
     amqpUrl=os.getenv("AMQP_URL", "").strip("/").strip("\\") + "/" + os.getenv("AMQP_VIRTUAL_HOST", "analyzer"),
-    exchangeName=os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
+    amqpExchangeName=os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
+    amqpInitialRetryInterval=int(os.getenv("AMQP_INITIAL_RETRY_INTERVAL", "1")),
+    amqpMaxRetryTime=int(os.getenv("AMQP_MAX_RETRY_TIME", "300")),
+    amqpHeartbeatInterval=int(os.getenv("AMQP_HEARTBEAT_INTERVAL", "30")),
+    amqpBackoffFactor=int(os.getenv("AMQP_BACKOFF_FACTOR", "2")),
     analyzerPriority=int(os.getenv("ANALYZER_PRIORITY", "1")),
     analyzerIndex=json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),
     analyzerLogSearch=json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower()),
@@ -76,11 +83,6 @@ APP_CONFIG = ApplicationConfig(
     analyzerHttpPort=int(os.getenv("ANALYZER_HTTP_PORT", "5001")),
     analyzerPathToLog=os.getenv("ANALYZER_FILE_LOGGING_PATH", "/tmp/config.log"),
 )
-
-# Add AMQP connection retry configurations
-AMQP_INITIAL_RETRY_INTERVAL = int(os.getenv("AMQP_INITIAL_RETRY_INTERVAL", "1"))
-AMQP_MAX_RETRY_TIME = int(os.getenv("AMQP_MAX_RETRY_TIME", "300"))
-AMQP_HEARTBEAT = int(os.getenv("AMQP_HEARTBEAT", "50"))
 
 SEARCH_CONFIG = SearchConfig(
     SearchLogsMinSimilarity=float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.95")),
@@ -132,14 +134,8 @@ def init_amqp_queues():
         _retraining_service = RetrainingService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "train_models",
                     True,
                     False,
@@ -168,14 +164,8 @@ def init_amqp_queues():
         _suggest_patterns_service = SuggestPatternsService(APP_CONFIG, SEARCH_CONFIG)
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "index",
                     True,
                     False,
@@ -192,14 +182,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "analyze",
                     True,
                     False,
@@ -216,14 +200,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "delete",
                     True,
                     False,
@@ -241,14 +219,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "clean",
                     True,
                     False,
@@ -266,14 +238,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "search",
                     True,
                     False,
@@ -291,14 +257,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "suggest",
                     True,
                     False,
@@ -316,14 +276,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "cluster",
                     True,
                     False,
@@ -341,14 +295,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "stats_info",
                     True,
                     False,
@@ -360,14 +308,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "namespace_finder",
                     True,
                     False,
@@ -384,14 +326,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "suggest_patterns",
                     True,
                     False,
@@ -409,14 +345,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "index_suggest_info",
                     True,
                     False,
@@ -434,14 +364,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "remove_suggest_info",
                     True,
                     False,
@@ -459,14 +383,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "update_suggest_info",
                     True,
                     False,
@@ -483,14 +401,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "remove_models",
                     True,
                     False,
@@ -508,14 +420,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "get_model_info",
                     True,
                     False,
@@ -532,14 +438,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "defect_update",
                     True,
                     False,
@@ -557,14 +457,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "item_remove",
                     True,
                     False,
@@ -582,14 +476,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "launch_remove",
                     True,
                     False,
@@ -607,14 +495,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "remove_by_launch_start_time",
                     True,
                     False,
@@ -632,14 +514,8 @@ def init_amqp_queues():
         )
         _threads.append(
             create_thread(
-                AmqpClient(
-                    APP_CONFIG.amqpUrl,
-                    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-                    max_retry_time=AMQP_MAX_RETRY_TIME,
-                    heartbeat=AMQP_HEARTBEAT,
-                ).receive,
+                AmqpClient(APP_CONFIG).receive,
                 (
-                    APP_CONFIG.exchangeName,
                     "remove_by_log_time",
                     True,
                     False,
@@ -728,13 +604,8 @@ def start_http_server():
 signal(SIGINT, handler)
 logger.info("The analyzer has started")
 logger.info("Starting waiting for AMQP connection")
-amqp_client = AmqpClient(
-    APP_CONFIG.amqpUrl,
-    initial_retry_interval=AMQP_INITIAL_RETRY_INTERVAL,
-    max_retry_time=AMQP_MAX_RETRY_TIME,
-    heartbeat=AMQP_HEARTBEAT,
-)
-amqp_client.declare_exchange(APP_CONFIG)
+amqp_client = AmqpClient(APP_CONFIG)
+amqp_client.declare_exchange()
 amqp_client.close()
 threads = init_amqp_queues()
 logger.info("Analyzer has started")

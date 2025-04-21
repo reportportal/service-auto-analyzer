@@ -38,10 +38,10 @@ class ApplicationConfig(BaseModel):
 
     amqpUrl: str = ''
     amqpExchangeName: str = 'analyzer'
-    amqpHeartbeatInterval: int
-    amqpInitialRetryInterval: int
-    amqpMaxRetryTime: int
-    amqpBackoffFactor: int
+    amqpHeartbeatInterval: int = 30
+    amqpInitialRetryInterval: int = 1
+    amqpMaxRetryTime: int = 300
+    amqpBackoffFactor: int = 2
 
     analyzerPriority: int = 1
     analyzerIndex: bool = True

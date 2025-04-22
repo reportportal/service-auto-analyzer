@@ -174,3 +174,16 @@ def test_find_test_methods_in_text():
     logs = json.loads(read_file('test_res/fixtures', 'example_logs.json'))
     for log in logs:
         assert text_processing.find_test_methods_in_text(log['log']) == set(log['expected_test_methods'])
+
+
+@pytest.mark.parametrize(
+    'url, expected_url',
+    [
+        ('amqp://user:password@10.68.56.88:5672/analyzer?heartbeat=30', 'amqp://10.68.56.88:5672/analyzer?heartbeat=30'),
+        ('amqps://rpuser:fkkf0+4pUn@192.68.56.88:5672', 'amqps://192.68.56.88:5672'),
+        ('https://test123:aa-bb_cc@msgbroker.example.com/', 'https://msgbroker.example.com/'),
+        ('https://test123:aa%20bb%40cc@msgbroker.example.com/', 'https://msgbroker.example.com/'),
+    ]
+)
+def test_remove_credentials_from_url(url, expected_url):
+    assert text_processing.remove_credentials_from_url(url) == expected_url

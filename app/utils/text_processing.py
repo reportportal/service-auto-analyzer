@@ -716,9 +716,11 @@ def build_url(main_url: str, url_params: list) -> str:
     return main_url + "/" + "/".join(url_params)
 
 
-def remove_credentials_from_url(url):
+def remove_credentials_from_url(url: str) -> str:
     parsed_url = urlparse(url)
     new_netloc = re.sub("^[^:]+:[^@]*@", "", parsed_url.netloc)
+    if parsed_url.netloc == new_netloc:
+        return url
     return url.replace(parsed_url.netloc, new_netloc)
 
 

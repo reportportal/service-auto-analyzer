@@ -90,29 +90,48 @@ def __get_correlation_id() -> str:
     return str(uuid.uuid4())
 
 
+def handle_request(channel: BlockingChannel, method: Basic.Deliver, props: BasicProperties, body: bytes,
+                              request_handler: Callable[[Any], Any],
+                              prepare_data_func: Optional[Callable[[Any], Any]] = None) -> Optional[Any]:
+    """Function for handling amqp requests."""
+    channel.basic_ack(delivery_tag=method.delivery_tag)
+    logging.new_correlation_id()
+    logger.debug(f'Processing message: --Method: {method} --Properties: {props} --Body: {body}')
+    try:
+        message = json.loads(body, strict=False)
+    except Exception as exc:
+        logger.exception('Failed to parse message body to JSON', exc_info=exc)
+        return None
+    if prepare_data_func:
+        try:
+            message = prepare_data_func(message)
+        except Exception as exc:
+            logger.exception('Failed to prepare message body', exc_info=exc)
+            return None
+    try:
+        result = request_handler(message)
+    except Exception as exc:
+        logger.exception('Failed to handle message', exc_info=exc)
+        return None
+    logger.debug('Finished processing request')
+    return result
+
+
+def handle_inner_amqp_request(channel: BlockingChannel, method: Basic.Deliver, props: BasicProperties, body: bytes,
+                              request_handler: Callable[[Any], Any],
+                              prepare_data_func: Optional[Callable[[Any], Any]] = None):
+    """Function for handling inner amqp requests."""
+    handle_request(channel, method, props, body, request_handler, prepare_data_func)
+
+
 def handle_amqp_request(channel: BlockingChannel, method: Basic.Deliver, props: BasicProperties, body: bytes,
                         request_handler: Callable[[Any], Any],
                         prepare_data_func: Callable[[Any], Any] = prepare_launches,
                         prepare_response_data: Callable[[Any], str] = prepare_search_response_data,
                         publish_result: bool = True) -> None:
     """Function for handling amqp request: index, search and analyze."""
-    logging.new_correlation_id()
-    logger.debug(f'Started message processing:\n--Method: {method}\n'
-                 f'--Properties: {props}\n--Body: {body}')
-    try:
-        message = json.loads(body, strict=False)
-    except Exception as exc:
-        logger.exception('Failed to parse message body to JSON', exc_info=exc)
-        return
-    try:
-        message = prepare_data_func(message)
-    except Exception as exc:
-        logger.exception('Failed to prepare message body', exc_info=exc)
-        return
-    try:
-        response = request_handler(message)
-    except Exception as exc:
-        logger.exception('Failed to handle message', exc_info=exc)
+    response = handle_request(channel, method, props, body, request_handler, prepare_data_func)
+    if response is None:
         return
 
     try:
@@ -130,31 +149,4 @@ def handle_amqp_request(channel: BlockingChannel, method: Basic.Deliver, props: 
         except Exception as exc:
             logger.exception('Failed to publish result', exc_info=exc)
             return
-    logger.debug('Finished processing message')
-
-
-def handle_inner_amqp_request(_: BlockingChannel, method: Basic.Deliver, props: BasicProperties, body: bytes,
-                              request_handler: Callable[[Any], Any],
-                              prepare_data_func: Optional[Callable[[Any], Any]] = None):
-    """Function for handling inner amqp requests."""
-    logging.new_correlation_id()
-    logger.debug(f'Started inner message processing.\n--Method: {method}\n'
-                 f'--Properties: {props}\n--Body: {body}')
-    try:
-        message = json.loads(body, strict=False)
-    except Exception as exc:
-        logger.exception('Failed to parse message body to JSON', exc_info=exc)
-        return
-    if prepare_data_func:
-        try:
-            message = prepare_data_func(message)
-        except Exception as exc:
-            logger.exception('Failed to prepare message body', exc_info=exc)
-            return
-    try:
-        request_handler(message)
-    except Exception as exc:
-        logger.exception('Failed to handle message', exc_info=exc)
-        return
-    logger.debug('Finished processing message')
-
+    logger.debug('Finished processing response')

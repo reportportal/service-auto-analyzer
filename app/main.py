@@ -137,8 +137,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "train_models",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_inner_amqp_request(
                         current_channel,
                         method,
@@ -167,8 +165,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "index",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,
@@ -185,8 +181,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "analyze",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,
@@ -203,8 +197,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "delete",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,
@@ -222,8 +214,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "clean",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,
@@ -241,8 +231,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "search",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,
@@ -260,8 +248,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "suggest",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,
@@ -279,8 +265,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "cluster",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,
@@ -298,8 +282,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "stats_info",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_inner_amqp_request(
                         current_channel, method, props, body, _es_client.send_stats_info
                     ),
@@ -311,8 +293,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "namespace_finder",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,
@@ -329,8 +309,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "suggest_patterns",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,
@@ -348,8 +326,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "index_suggest_info",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,
@@ -367,8 +343,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "remove_suggest_info",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,
@@ -386,8 +360,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "update_suggest_info",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,
@@ -404,8 +376,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "remove_models",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,
@@ -423,8 +393,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "get_model_info",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,
@@ -441,8 +409,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "defect_update",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,
@@ -460,8 +426,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "item_remove",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,
@@ -479,8 +443,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "launch_remove",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,
@@ -498,8 +460,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "remove_by_launch_start_time",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,
@@ -517,8 +477,6 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "remove_by_log_time",
-                    True,
-                    False,
                     lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
                         current_channel,
                         method,

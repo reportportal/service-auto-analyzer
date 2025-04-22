@@ -173,22 +173,18 @@ class AmqpClient:
     def receive(
         self,
         queue: str,
-        auto_ack: bool,
-        exclusive: bool,
         msg_callback: Callable[[BlockingChannel, Basic.Deliver, BasicProperties, bytes], None],
     ) -> None:
         """Continuously consume messages, reconnect on failure.
 
         :param str queue: Name of the queue to consume
-        :param bool auto_ack: Whether to automatically acknowledge messages
-        :param bool exclusive: Whether to set exclusive consumer
         :param callable msg_callback: Callback function to handle received messages
         """
         while True:
             try:
                 channel = self._connection.channel()
                 self._bind_queue(channel, queue, self._config.amqpExchangeName)
-                self._consume_queue(channel, queue, auto_ack, exclusive, msg_callback)
+                self._consume_queue(channel, queue, False, True, msg_callback)
                 logger.info(f"Start consuming on queue '{queue}'")
                 channel.start_consuming()
             except (StreamLostError, AMQPConnectionError, ChannelClosedByBroker) as exc:

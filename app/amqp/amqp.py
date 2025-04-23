@@ -180,6 +180,7 @@ class AmqpClient:
         :param str queue: Name of the queue to consume
         :param callable msg_callback: Callback function to handle received messages
         """
+        connection_info = f"Exchange: '{self._config.amqpExchangeName}'. Queue: '{queue}'."
         while True:
             try:
                 channel = self._connection.channel()
@@ -188,13 +189,13 @@ class AmqpClient:
                 logger.info(f"Start consuming on queue '{queue}'")
                 channel.start_consuming()
             except (StreamLostError, AMQPConnectionError, ChannelClosedByBroker) as exc:
-                logger.exception("Connection/channel lost. Reconnecting.", exc_info=exc)
+                logger.exception(f"Connection/channel lost. Reconnecting. {connection_info}", exc_info=exc)
                 self.close()
             except Exception as exc:  # pylint: disable=broad-except
-                logger.exception("Unexpected error in consumer", exc_info=exc)
+                logger.exception(f"Unexpected error in consumer. Reconnecting. {connection_info}", exc_info=exc)
                 self.close()
             except KeyboardInterrupt:
-                logger.info("Consumer interrupted by user. Exiting.")
+                logger.info(f"Consumer interrupted by user. Exiting. {connection_info}")
                 break
 
     def send_to_inner_queue(self, queue: str, data: str) -> None:

@@ -185,7 +185,7 @@ class AmqpClient:
             try:
                 channel = self._connection.channel()
                 self._bind_queue(channel, queue, self._config.amqpExchangeName)
-                self._consume_queue(channel, queue, False, True, msg_callback)
+                self._consume_queue(channel, queue, False, False, msg_callback)
                 logger.info(f"Start consuming on queue '{queue}'")
                 channel.start_consuming()
             except (StreamLostError, AMQPConnectionError, ChannelClosedByBroker) as exc:

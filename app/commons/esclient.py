@@ -64,8 +64,7 @@ class EsClient:
         }
 
         if app_config.esUser:
-            kwargs["http_auth"] = (app_config.esUser,
-                                   app_config.esPassword)
+            kwargs["http_auth"] = (app_config.esUser, app_config.esPassword)
 
         if app_config.turnOffSslVerification:
             kwargs["connection_class"] = RequestsHttpConnection
@@ -162,9 +161,8 @@ class EsClient:
             return index is not None
         except Exception as err:
             if print_error:
-                logger.exception(
-                    f"Index '{index_name}' was not found. ES Url: {text_processing.remove_credentials_from_url(self.host)}",
-                    exc_info=err)
+                es_url = text_processing.remove_credentials_from_url(self.host)
+                logger.exception(f"Index '{index_name}' was not found. ES Url: {es_url}", exc_info=err)
             return False
 
     def delete_index(self, index_name):
@@ -244,7 +242,8 @@ class EsClient:
 
         if self.app_config.amqpUrl:
             amqp_client = AmqpClient(self.app_config)
-            amqp_client.send_to_inner_queue('train_models',
+            amqp_client.send_to_inner_queue(
+                'train_models',
                 TrainInfo(model_type=ModelType.defect_type, project=project,
                           gathered_metric_total=num_logs_with_defect_types).json())
             amqp_client.close()

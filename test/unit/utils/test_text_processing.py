@@ -179,7 +179,8 @@ def test_find_test_methods_in_text():
 @pytest.mark.parametrize(
     'url, expected_url',
     [
-        ('amqp://user:password@10.68.56.88:5672/analyzer?heartbeat=30', 'amqp://10.68.56.88:5672/analyzer?heartbeat=30'),
+        ('amqp://user:password@10.68.56.88:5672/analyzer?heartbeat=30',
+         'amqp://10.68.56.88:5672/analyzer?heartbeat=30'),
         ('amqps://rpuser:fkkf0+4pUn@192.68.56.88:5672', 'amqps://192.68.56.88:5672'),
         ('https://test123:aa-bb_cc@msgbroker.example.com/', 'https://msgbroker.example.com/'),
         ('https://test123:aa%20bb%40cc@msgbroker.example.com/', 'https://msgbroker.example.com/'),

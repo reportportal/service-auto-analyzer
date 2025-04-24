@@ -460,7 +460,8 @@ class SuggestService(AnalyzerService):
             amqp_client.send_to_inner_queue("stats_info", json.dumps(results_to_share))
             if results:
                 for model_type in [ModelType.suggestion, ModelType.auto_analysis]:
-                    amqp_client.send_to_inner_queue('train_models',
+                    amqp_client.send_to_inner_queue(
+                        'train_models',
                         TrainInfo(model_type=model_type, project=test_item_info.project,
                                   gathered_metric_total=len(results)).json())
             amqp_client.close()

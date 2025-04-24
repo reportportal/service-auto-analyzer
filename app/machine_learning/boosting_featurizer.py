@@ -14,7 +14,6 @@
 
 from collections import deque, defaultdict
 from datetime import datetime
-from sys import exc_info
 from typing import Optional, Any, Callable
 
 import numpy as np

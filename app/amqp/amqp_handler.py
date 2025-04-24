@@ -91,8 +91,8 @@ def __get_correlation_id() -> str:
 
 
 def handle_request(channel: BlockingChannel, method: Basic.Deliver, props: BasicProperties, body: bytes,
-                              request_handler: Callable[[Any], Any],
-                              prepare_data_func: Optional[Callable[[Any], Any]] = None) -> Optional[Any]:
+                   request_handler: Callable[[Any], Any],
+                   prepare_data_func: Optional[Callable[[Any], Any]] = None) -> Optional[Any]:
     """Function for handling amqp requests."""
     channel.basic_ack(delivery_tag=method.delivery_tag)
     logging.new_correlation_id()

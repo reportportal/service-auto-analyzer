@@ -94,9 +94,9 @@ def handle_request(channel: BlockingChannel, method: Basic.Deliver, props: Basic
                    request_handler: Callable[[Any], Any],
                    prepare_data_func: Optional[Callable[[Any], Any]] = None) -> Optional[Any]:
     """Function for handling amqp requests."""
-    channel.basic_ack(delivery_tag=method.delivery_tag)
     logging.new_correlation_id()
     logger.debug(f'Processing message: --Method: {method} --Properties: {props} --Body: {body}')
+    channel.basic_ack(delivery_tag=method.delivery_tag)
     try:
         message = json.loads(body, strict=False)
     except Exception as exc:

@@ -45,6 +45,11 @@ class EsClient:
     def __init__(self, app_config: ApplicationConfig, es_client: elasticsearch.Elasticsearch = None):
         self.app_config = app_config
         self.host = app_config.esHost
+        if es_client:
+            logger.info("Creating service using provided client")
+        else:
+            logger.info(
+                f"Creating service using host URL: {text_processing.remove_credentials_from_url(self.host)}")
         self.es_client = es_client or self.create_es_client(app_config)
         self.tables_to_recreate = ["rp_aa_stats", "rp_model_train_stats", "rp_suggestions_info_metrics"]
 
@@ -139,13 +144,12 @@ class EsClient:
 
     def create_index(self, index_name: str) -> Response:
         """Create index in elasticsearch"""
-        logger.info("Creating '%s' Elasticsearch index", index_name)
-        logger.info(ES_URL_MESSAGE, text_processing.remove_credentials_from_url(self.host))
+        logger.info(f"Creating index: {index_name}")
         response = self.es_client.indices.create(index=index_name, body={
             'settings': utils.read_json_file("res", "index_settings.json", to_json=True),
             'mappings': utils.read_json_file("res", "index_mapping_settings.json", to_json=True)
         })
-        logger.debug("Created '%s' Elasticsearch index", index_name)
+        logger.debug(f"Index '{index_name}' created")
         return Response(**response)
 
     def list_indices(self):
@@ -161,21 +165,18 @@ class EsClient:
             return index is not None
         except Exception as err:
             if print_error:
-                es_url = text_processing.remove_credentials_from_url(self.host)
-                logger.exception(f"Index '{index_name}' was not found. ES Url: {es_url}", exc_info=err)
+                logger.exception(f"Index '{index_name}' was not found", exc_info=err)
             return False
 
     def delete_index(self, index_name):
         """Delete the whole index"""
+        logger.info(f"Deleting index: {index_name}")
         try:
             self.es_client.indices.delete(index=str(index_name))
-            logger.info(ES_URL_MESSAGE, text_processing.remove_credentials_from_url(self.host))
-            logger.debug("Deleted index %s", str(index_name))
+            logger.debug(f"Index '{str(index_name)}' deleted")
             return True
         except Exception as err:
-            logger.error("Not found %s for deleting", str(index_name))
-            logger.error(ES_URL_MESSAGE, text_processing.remove_credentials_from_url(self.host))
-            logger.error(err)
+            logger.exception(f"Failed to delete index: {str(index_name)}", exc_info=err)
             return False
 
     def create_index_if_not_exists(self, index_name: str) -> bool:
@@ -220,13 +221,13 @@ class EsClient:
                 test_item_ids.append(str(test_item.testItemId))
         return test_item_ids, bodies
 
-    def index_logs(self, launches):
+    def index_logs(self, launches: list[Launch]):
         """Index launches to the index with project name"""
-        logger.info("Indexing logs for %d launches", len(launches))
-        logger.info(ES_URL_MESSAGE, text_processing.remove_credentials_from_url(self.host))
-        t_start = time()
-        launch_ids = set(map(lambda launch_obj: launch_obj.launchId, launches))
+        launch_ids = set(map(lambda launch_obj: str(launch_obj.launchId), launches))
+        launch_ids_str = ", ".join(launch_ids)
         project = next(map(lambda launch_obj: launch_obj.project, launches))
+        logger.info(f"Indexing {len(launch_ids)} launches of project '{project}': {launch_ids_str}")
+        t_start = time()
         test_item_queue = self._to_launch_test_item_list(launches)
         del launches
         if project is None:
@@ -248,8 +249,10 @@ class EsClient:
                           gathered_metric_total=num_logs_with_defect_types).json())
             amqp_client.close()
 
-        logger.info("Finished indexing logs for %d launches %s. It took %.2f sec.",
-                    len(launch_ids), launch_ids, time() - t_start)
+        time_passed = round(time() - t_start, 2)
+        logger.info(
+            f"Indexing {len(launch_ids)} launches of project '{project}' finished: {launch_ids_str}. "
+            f"It took {time_passed} sec.")
         return result
 
     def _merge_logs(self, test_item_ids, project):
@@ -324,7 +327,7 @@ class EsClient:
         if not bodies:
             return BulkResponse(took=0, errors=False)
         start_time = time()
-        logger.debug("Indexing %d logs...", len(bodies))
+        logger.debug(f"Indexing {len(bodies)} logs")
         es_chunk_number = self.app_config.esChunkNumber
         if chunk_size is not None:
             es_chunk_number = chunk_size
@@ -344,37 +347,32 @@ class EsClient:
                                                                    chunk_size=es_chunk_number,
                                                                    request_timeout=30,
                                                                    refresh=refresh)
-            logger.debug("Processed %d logs", success_count)
+            error_str = ""
             if errors:
-                logger.debug("Occured errors %s", errors)
+                error_str = ", ".join([str(error) for error in errors])
+            logger.debug(
+                f"{success_count} logs were successfully indexed{'. Errors:' + error_str if error_str else ''}")
             logger.debug("Finished indexing for %.2f s", time() - start_time)
             return BulkResponse(took=success_count, errors=len(errors) > 0)
         except Exception as exc:
-            logger.exception(f"Error in bulk. ES Url: {text_processing.remove_credentials_from_url(self.host)}",
-                             exc_info=exc)
+            logger.exception(f"Error in bulk indexing", exc_info=exc)
             return BulkResponse(took=0, errors=True)
 
     def delete_logs(self, clean_index):
         """Delete logs from elasticsearch"""
         index_name = text_processing.unite_project_name(clean_index.project, self.app_config.esProjectIndexPrefix)
-        logger.info("Delete logs %s for the project %s",
-                    clean_index.ids, index_name)
-        logger.info(ES_URL_MESSAGE, text_processing.remove_credentials_from_url(self.host))
+        log_ids = ', '.join(map(lambda log_id: str(log_id), clean_index.ids))
+        logger.info(f"Delete project '{index_name}' logs: {log_ids}")
         t_start = time()
         if not self.index_exists(index_name):
             return 0
         test_item_ids = set()
         try:
-            search_query = self.build_search_test_item_ids_query(
-                clean_index.ids)
-            for res in elasticsearch.helpers.scan(self.es_client,
-                                                  query=search_query,
-                                                  index=index_name,
-                                                  scroll="5m"):
+            search_query = self.build_search_test_item_ids_query(clean_index.ids)
+            for res in elasticsearch.helpers.scan(self.es_client, query=search_query, index=index_name, scroll="5m"):
                 test_item_ids.add(res["_source"]["test_item"])
         except Exception as err:
-            logger.error("Couldn't find test items for logs")
-            logger.error(err)
+            logger.exception("Couldn't find test items for logs", exc_info=err)
 
         bodies = []
         for _id in clean_index.ids:
@@ -385,8 +383,8 @@ class EsClient:
             })
         result = self._bulk_index(bodies)
         self._merge_logs(list(test_item_ids), index_name)
-        logger.info("Finished deleting logs %s for the project %s. It took %.2f sec",
-                    clean_index.ids, index_name, time() - t_start)
+        logger.info(
+            f"Finished deleting project '{index_name}' logs: {log_ids}. It took {round(time() - t_start, 2)} sec")
         return result.took
 
     def create_index_for_stats_info(self, rp_aa_stats_index, override_index_name=None):

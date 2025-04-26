@@ -355,7 +355,7 @@ class EsClient:
             logger.debug("Finished indexing for %.2f s", time() - start_time)
             return BulkResponse(took=success_count, errors=len(errors) > 0)
         except Exception as exc:
-            logger.exception(f"Error in bulk indexing", exc_info=exc)
+            logger.exception("Error in bulk indexing", exc_info=exc)
             return BulkResponse(took=0, errors=True)
 
     def delete_logs(self, clean_index):

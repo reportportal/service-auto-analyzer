@@ -108,7 +108,8 @@ class PreparedLogMessage:
     @property
     def exception_message_no_urls(self) -> str:
         if not self._exception_message_no_urls:
-            self._exception_message_no_urls = text_processing.remove_urls(self.exception_message, self._exception_message_urls_list)
+            self._exception_message_no_urls = text_processing.remove_urls(
+                self.exception_message, self._exception_message_urls_list)
         return self._exception_message_no_urls
 
     @property

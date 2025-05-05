@@ -837,9 +837,9 @@ URL_TAG = "SPECIALURL"
 def remove_urls(exception_message: str, exception_message_urls_list: list[str]) -> str:
     """
     Remove URLs from exception message.
-    
+
     Replace URLs with a special tag to normalize exception messages.
-    
+
     :param str exception_message: Exception message to process
     :param list[str] exception_message_urls_list: List of URLs to be removed
 

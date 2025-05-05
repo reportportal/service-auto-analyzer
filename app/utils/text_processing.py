@@ -830,7 +830,9 @@ READABLE_NUMBER = '[EXCLUDED NUMBER]'
 def replace_tokens_with_readable_text(text: str) -> str:
     return text.replace(NUMBER_TAG, READABLE_NUMBER)
 
+
 URL_TAG = "SPECIALURL"
+
 
 def remove_urls(exception_message: str, exception_message_urls_list: list[str]) -> str:
     """

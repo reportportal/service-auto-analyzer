@@ -1,0 +1,4 @@
+com.example.error.DynamoException: Unexpected Error; uniqueErrorCode=1; info=An unexpected error occurred
+Caused by: org.springframework.web.client.ResourceAccessException: I/O error on POST request for "https://a.b.c.example.com/v1/incentives/card-tx": timeout; nested exception is java.io.InterruptedIOException: timeout
+Caused by: java.io.InterruptedIOException: timeout
+Caused by: java.io.IOException: Canceled

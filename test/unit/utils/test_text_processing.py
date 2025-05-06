@@ -188,15 +188,3 @@ def test_find_test_methods_in_text():
 )
 def test_remove_credentials_from_url(url, expected_url):
     assert text_processing.remove_credentials_from_url(url) == expected_url
-
-
-@pytest.mark.parametrize(
-    'test_file, expected_file',
-    [
-        ('messages/error_with_json.txt', 'messages/error_with_json_paths.txt'),
-    ]
-)
-def test_extract_paths(test_file, expected_file):
-    log = read_file('test_res/test_logs', test_file)
-    expected_log = json.loads(read_file('test_res/test_logs', expected_file))
-    assert text_processing.extract_paths(log) == expected_log

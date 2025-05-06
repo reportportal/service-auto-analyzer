@@ -475,8 +475,8 @@ class AutoAnalyzerService(AnalyzerService):
                                 label = predicted_labels[i]
                                 probability = round(predicted_labels_probability[i][1], 3)
                                 logger.debug(
-                                    f"Issue type '{issue_type_name}' has label '{label}' and probability {probability} "
-                                    f"with calculated feature values: {feature_data[i]}")
+                                    f"Issue type '{issue_type_name}' has label '{label}' and probability {probability}"
+                                    f" with calculated feature values: {feature_data[i]}")
 
                             predicted_issue_type, prob, global_idx = utils.choose_issue_type(
                                 predicted_labels,

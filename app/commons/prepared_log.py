@@ -16,10 +16,16 @@ from typing import Optional
 from typing_extensions import override
 
 from app.utils import text_processing
-from app.utils.log_preparation import (basic_prepare, clean_message, prepare_message, prepare_message_no_numbers,
-                                       prepare_message_no_params, prepare_exception_message_no_params_no_numbers,
-                                       prepare_exception_message_no_params,
-                                       prepare_exception_message_and_stacktrace)
+from app.utils.log_preparation import (
+    basic_prepare,
+    clean_message,
+    prepare_exception_message_and_stacktrace,
+    prepare_exception_message_no_params,
+    prepare_exception_message_no_params_no_numbers,
+    prepare_message,
+    prepare_message_no_numbers,
+    prepare_message_no_params,
+)
 
 
 class PreparedLogMessage:
@@ -113,7 +119,8 @@ class PreparedLogMessage:
     def exception_message_no_urls(self) -> str:
         if not self._exception_message_no_urls:
             self._exception_message_no_urls = text_processing.remove_urls(
-                self.exception_message, self.exception_message_urls_list)
+                self.exception_message, self.exception_message_urls_list
+            )
         return self._exception_message_no_urls
 
     @property
@@ -126,21 +133,20 @@ class PreparedLogMessage:
     def exception_message_potential_status_codes(self) -> str:
         if not self._exception_message_potential_status_codes:
             self._exception_message_potential_status_codes = " ".join(
-                text_processing.get_potential_status_codes(self.exception_message))
+                text_processing.get_potential_status_codes(self.exception_message)
+            )
         return self._exception_message_potential_status_codes
 
     @property
     def exception_message_params(self) -> str:
         if not self._exception_message_params:
-            self._exception_message_params = " ".join(text_processing.extract_message_params(
-                self.exception_message))
+            self._exception_message_params = " ".join(text_processing.extract_message_params(self.exception_message))
         return self._exception_message_params
 
     @property
     def exception_message_no_params(self) -> str:
         if not self._exception_message_no_params:
-            self._exception_message_no_params = prepare_exception_message_no_params_no_numbers(
-                self.exception_message)
+            self._exception_message_no_params = prepare_exception_message_no_params_no_numbers(self.exception_message)
         return self._exception_message_no_params
 
     @property
@@ -171,7 +177,8 @@ class PreparedLogMessage:
     def test_and_methods_extended(self) -> str:
         if not self._test_and_methods_extended:
             self._test_and_methods_extended = text_processing.enrich_text_with_method_and_classes(
-                " ".join(self.test_and_methods))
+                " ".join(self.test_and_methods)
+            )
         return self._test_and_methods_extended
 
 

@@ -14,7 +14,7 @@
 
 import json
 import uuid
-from typing import Callable, Any, Optional
+from typing import Any, Callable, Optional
 
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
@@ -90,45 +90,60 @@ def __get_correlation_id() -> str:
     return str(uuid.uuid4())
 
 
-def handle_request(channel: BlockingChannel, method: Basic.Deliver, props: BasicProperties, body: bytes,
-                   request_handler: Callable[[Any], Any],
-                   prepare_data_func: Optional[Callable[[Any], Any]] = None) -> Optional[Any]:
+def handle_request(
+    channel: BlockingChannel,
+    method: Basic.Deliver,
+    props: BasicProperties,
+    body: bytes,
+    request_handler: Callable[[Any], Any],
+    prepare_data_func: Optional[Callable[[Any], Any]] = None,
+) -> Optional[Any]:
     """Function for handling amqp requests."""
     logging.new_correlation_id()
-    logger.debug(f'Processing message: --Method: {method} --Properties: {props} --Body: {body}')
+    logger.debug(f"Processing message: --Method: {method} --Properties: {props} --Body: {body}")
     channel.basic_ack(delivery_tag=method.delivery_tag)
     try:
         message = json.loads(body, strict=False)
     except Exception as exc:
-        logger.exception('Failed to parse message body to JSON', exc_info=exc)
+        logger.exception("Failed to parse message body to JSON", exc_info=exc)
         return None
     if prepare_data_func:
         try:
             message = prepare_data_func(message)
         except Exception as exc:
-            logger.exception('Failed to prepare message body', exc_info=exc)
+            logger.exception("Failed to prepare message body", exc_info=exc)
             return None
     try:
         result = request_handler(message)
     except Exception as exc:
-        logger.exception('Failed to handle message', exc_info=exc)
+        logger.exception("Failed to handle message", exc_info=exc)
         return None
-    logger.debug('Finished processing request')
+    logger.debug("Finished processing request")
     return result
 
 
-def handle_inner_amqp_request(channel: BlockingChannel, method: Basic.Deliver, props: BasicProperties, body: bytes,
-                              request_handler: Callable[[Any], Any],
-                              prepare_data_func: Optional[Callable[[Any], Any]] = None):
+def handle_inner_amqp_request(
+    channel: BlockingChannel,
+    method: Basic.Deliver,
+    props: BasicProperties,
+    body: bytes,
+    request_handler: Callable[[Any], Any],
+    prepare_data_func: Optional[Callable[[Any], Any]] = None,
+):
     """Function for handling inner amqp requests."""
     handle_request(channel, method, props, body, request_handler, prepare_data_func)
 
 
-def handle_amqp_request(channel: BlockingChannel, method: Basic.Deliver, props: BasicProperties, body: bytes,
-                        request_handler: Callable[[Any], Any],
-                        prepare_data_func: Callable[[Any], Any] = prepare_launches,
-                        prepare_response_data: Callable[[Any], str] = prepare_search_response_data,
-                        publish_result: bool = True) -> None:
+def handle_amqp_request(
+    channel: BlockingChannel,
+    method: Basic.Deliver,
+    props: BasicProperties,
+    body: bytes,
+    request_handler: Callable[[Any], Any],
+    prepare_data_func: Callable[[Any], Any] = prepare_launches,
+    prepare_response_data: Callable[[Any], str] = prepare_search_response_data,
+    publish_result: bool = True,
+) -> None:
     """Function for handling amqp request: index, search and analyze."""
     response = handle_request(channel, method, props, body, request_handler, prepare_data_func)
     if response is None:
@@ -137,16 +152,19 @@ def handle_amqp_request(channel: BlockingChannel, method: Basic.Deliver, props: 
     try:
         response_body = prepare_response_data(response)
     except Exception as exc:
-        logger.exception('Failed to prepare response body', exc_info=exc)
+        logger.exception("Failed to prepare response body", exc_info=exc)
         return
     if publish_result:
         try:
             if props.reply_to:
                 channel.basic_publish(
-                    exchange='', routing_key=props.reply_to,
-                    properties=BasicProperties(correlation_id=props.correlation_id, content_type='application/json'),
-                    mandatory=False, body=bytes(response_body, 'utf-8'))
+                    exchange="",
+                    routing_key=props.reply_to,
+                    properties=BasicProperties(correlation_id=props.correlation_id, content_type="application/json"),
+                    mandatory=False,
+                    body=bytes(response_body, "utf-8"),
+                )
         except Exception as exc:
-            logger.exception('Failed to publish result', exc_info=exc)
+            logger.exception("Failed to publish result", exc_info=exc)
             return
-    logger.debug('Finished processing response')
+    logger.debug("Finished processing response")

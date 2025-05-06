@@ -14,7 +14,7 @@
 from typing import Any
 
 from app.commons import logging
-from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
+from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType
 from app.commons.model_chooser import ModelChooser
 from app.commons.triggering_training.retraining_triggering import RetrainingTriggering
@@ -29,16 +29,24 @@ class TriggerManager:
 
     def __init__(self, model_chooser: ModelChooser, app_config: ApplicationConfig, search_cfg: SearchConfig):
         self.model_training_triggering = {
-            ModelType.defect_type: (RetrainingTriggering(app_config, 'defect_type_trigger_info',
-                                                         start_number=100, accumulated_difference=100),
-                                    DefectTypeModelTraining(app_config, search_cfg, model_chooser)),
-            ModelType.suggestion: (RetrainingTriggering(app_config, 'suggestion_trigger_info',
-                                                        start_number=100, accumulated_difference=50),
-                                   AnalysisModelTraining(app_config, search_cfg, ModelType.suggestion, model_chooser)),
-            ModelType.auto_analysis: (RetrainingTriggering(app_config, 'auto_analysis_trigger_info',
-                                                           start_number=300, accumulated_difference=100),
-                                      AnalysisModelTraining(app_config, search_cfg, ModelType.auto_analysis,
-                                                            model_chooser))
+            ModelType.defect_type: (
+                RetrainingTriggering(
+                    app_config, "defect_type_trigger_info", start_number=100, accumulated_difference=100
+                ),
+                DefectTypeModelTraining(app_config, search_cfg, model_chooser),
+            ),
+            ModelType.suggestion: (
+                RetrainingTriggering(
+                    app_config, "suggestion_trigger_info", start_number=100, accumulated_difference=50
+                ),
+                AnalysisModelTraining(app_config, search_cfg, ModelType.suggestion, model_chooser),
+            ),
+            ModelType.auto_analysis: (
+                RetrainingTriggering(
+                    app_config, "auto_analysis_trigger_info", start_number=300, accumulated_difference=100
+                ),
+                AnalysisModelTraining(app_config, search_cfg, ModelType.auto_analysis, model_chooser),
+            ),
         }
 
     def does_trigger_exist(self, model: ModelType):

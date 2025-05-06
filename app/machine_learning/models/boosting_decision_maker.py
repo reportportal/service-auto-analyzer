@@ -24,7 +24,7 @@ from app.utils import text_processing
 
 LOGGER = logging.getLogger("analyzerApp.boosting_decision_maker")
 
-MODEL_FILES: list[str] = ['boost_model.pickle', 'data_features_config.pickle']
+MODEL_FILES: list[str] = ["boost_model.pickle", "data_features_config.pickle"]
 DEFAULT_RANDOM_STATE = 43
 DEFAULT_N_ESTIMATORS = 75
 DEFAULT_MAX_DEPTH = 5
@@ -39,16 +39,24 @@ class BoostingDecisionMaker(MlModel):
     monotonous_features: set[int]
     boost_model: Any
 
-    def __init__(self, object_saver: ObjectSaver, tags: str = 'global boosting model', *,
-                 features: Optional[list[int]] = None, monotonous_features: Optional[list[int]] = None,
-                 n_estimators: Optional[int] = None, max_depth: Optional[int] = None,
-                 random_state: Optional[int] = None) -> None:
+    def __init__(
+        self,
+        object_saver: ObjectSaver,
+        tags: str = "global boosting model",
+        *,
+        features: Optional[list[int]] = None,
+        monotonous_features: Optional[list[int]] = None,
+        n_estimators: Optional[int] = None,
+        max_depth: Optional[int] = None,
+        random_state: Optional[int] = None,
+    ) -> None:
         super().__init__(object_saver, tags)
         self.n_estimators = n_estimators if n_estimators is not None else DEFAULT_N_ESTIMATORS
         self.max_depth = max_depth if max_depth is not None else DEFAULT_MAX_DEPTH
         self.random_state = random_state if random_state is not None else DEFAULT_RANDOM_STATE
         self.boost_model = XGBClassifier(
-            n_estimators=n_estimators, max_depth=max_depth, random_state=self.random_state)
+            n_estimators=n_estimators, max_depth=max_depth, random_state=self.random_state
+        )
         self.feature_ids = features if features else []
         self.monotonous_features = set(monotonous_features) if monotonous_features else {}
         self._loaded = False
@@ -79,26 +87,36 @@ class BoostingDecisionMaker(MlModel):
         self._loaded = True
 
     def save_model(self):
-        self._save_models(zip(MODEL_FILES, [[self.n_estimators, self.max_depth, self.random_state, self.boost_model],
-                                            [self.feature_ids, self.monotonous_features]]))
+        self._save_models(
+            zip(
+                MODEL_FILES,
+                [
+                    [self.n_estimators, self.max_depth, self.random_state, self.boost_model],
+                    [self.feature_ids, self.monotonous_features],
+                ],
+            )
+        )
 
     def train_model(self, train_data: list[list[float]], labels: list[int]) -> float:
-        mon_features = [
-            (1 if feature in self.monotonous_features else 0) for feature in self.feature_ids]
+        mon_features = [(1 if feature in self.monotonous_features else 0) for feature in self.feature_ids]
         mon_features_prepared = "(" + ",".join([str(f) for f in mon_features]) + ")"
         self.boost_model = XGBClassifier(
-            n_estimators=self.n_estimators, max_depth=self.max_depth, random_state=self.random_state,
-            monotone_constraints=mon_features_prepared)
+            n_estimators=self.n_estimators,
+            max_depth=self.max_depth,
+            random_state=self.random_state,
+            monotone_constraints=mon_features_prepared,
+        )
         self.boost_model.fit(train_data, labels)
         self._loaded = True
         res = self.boost_model.predict(train_data)
         f1 = f1_score(y_pred=res, y_true=labels)
         if f1 is None:
             f1 = 0.0
-        LOGGER.debug(f'Train dataset F1 score: {f1:.5f}')
+        LOGGER.debug(f"Train dataset F1 score: {f1:.5f}")
         LOGGER.debug(
-            'Feature importances: %s',
-            json.dumps(dict(zip(self.feature_ids, self.boost_model.feature_importances_.tolist()))))
+            "Feature importances: %s",
+            json.dumps(dict(zip(self.feature_ids, self.boost_model.feature_importances_.tolist()))),
+        )
         return f1
 
     def predict(self, data: list[list[float]]) -> tuple[list[int], list[list[float]]]:
@@ -111,7 +129,7 @@ class BoostingDecisionMaker(MlModel):
         f1 = f1_score(y_pred=res, y_true=valid_test_labels)
         if f1 is None:
             f1 = 0.0
-        LOGGER.debug(f'Valid dataset F1 score: {f1:.5f}')
-        LOGGER.debug(f'\n{confusion_matrix(valid_test_labels, res)}')
-        LOGGER.debug(f'\n{classification_report(valid_test_labels, res)}')
+        LOGGER.debug(f"Valid dataset F1 score: {f1:.5f}")
+        LOGGER.debug(f"\n{confusion_matrix(valid_test_labels, res)}")
+        LOGGER.debug(f"\n{classification_report(valid_test_labels, res)}")
         return f1

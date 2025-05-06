@@ -20,7 +20,7 @@ from app.commons.model.launch_objects import ApplicationConfig
 
 
 def unify_path_separator(path: str) -> str:
-    return path.replace('\\', '/')
+    return path.replace("\\", "/")
 
 
 class Storage(metaclass=ABCMeta):
@@ -31,7 +31,7 @@ class Storage(metaclass=ABCMeta):
 
     def _get_project_name(self, project_id: str | None) -> str:
         if not project_id:
-            return ''
+            return ""
         return self._bucket_prefix + project_id
 
     @abstractmethod

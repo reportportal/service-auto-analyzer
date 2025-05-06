@@ -16,13 +16,17 @@ import os
 
 import numpy as np
 
-from app.commons import logging
-from app.commons import object_saving
-from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
+from app.commons import logging, object_saving
+from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType
 from app.commons.object_saving.object_saver import ObjectSaver
-from app.machine_learning.models import (defect_type_model, custom_defect_type_model, custom_boosting_decision_maker,
-                                         boosting_decision_maker, MlModel)
+from app.machine_learning.models import (
+    MlModel,
+    boosting_decision_maker,
+    custom_boosting_decision_maker,
+    custom_defect_type_model,
+    defect_type_model,
+)
 
 logger = logging.getLogger("analyzerApp.modelChooser")
 
@@ -31,13 +35,13 @@ DEFAULT_RANDOM_SEED = 1337
 CUSTOM_MODEL_MAPPING = {
     ModelType.defect_type: custom_defect_type_model.CustomDefectTypeModel,
     ModelType.suggestion: custom_boosting_decision_maker.CustomBoostingDecisionMaker,
-    ModelType.auto_analysis: custom_boosting_decision_maker.CustomBoostingDecisionMaker
+    ModelType.auto_analysis: custom_boosting_decision_maker.CustomBoostingDecisionMaker,
 }
 
 GLOBAL_MODEL_MAPPING = {
     ModelType.defect_type: defect_type_model.DefectTypeModel,
     ModelType.suggestion: boosting_decision_maker.BoostingDecisionMaker,
-    ModelType.auto_analysis: boosting_decision_maker.BoostingDecisionMaker
+    ModelType.auto_analysis: boosting_decision_maker.BoostingDecisionMaker,
 }
 
 
@@ -58,9 +62,13 @@ class ModelChooser:
     def initialize_global_models(self) -> dict[ModelType, MlModel]:
         result = {}
         for model_type, folder in zip(
-                [ModelType.defect_type, ModelType.suggestion, ModelType.auto_analysis],
-                [self.search_cfg.GlobalDefectTypeModelFolder, self.search_cfg.SuggestBoostModelFolder,
-                 self.search_cfg.BoostModelFolder]):
+            [ModelType.defect_type, ModelType.suggestion, ModelType.auto_analysis],
+            [
+                self.search_cfg.GlobalDefectTypeModelFolder,
+                self.search_cfg.SuggestBoostModelFolder,
+                self.search_cfg.BoostModelFolder,
+            ],
+        ):
             if folder.strip():
                 model = GLOBAL_MODEL_MAPPING[model_type](object_saving.create_filesystem(folder))
                 model.load_model()
@@ -74,7 +82,7 @@ class ModelChooser:
         prob_for_model = self.random_generator.uniform(0.0, 1.0)
         if prob_for_model > custom_model_prob:
             return model
-        folders = self.object_saver.get_folder_objects(f'{model_type.name}_model/', project_id)
+        folders = self.object_saver.get_folder_objects(f"{model_type.name}_model/", project_id)
         if len(folders):
             try:
                 model = CUSTOM_MODEL_MAPPING[model_type](object_saving.create(self.app_config, project_id, folders[0]))
@@ -84,7 +92,7 @@ class ModelChooser:
         return model
 
     def delete_old_model(self, model_type: ModelType, project_id: str | int | None = None):
-        all_folders = self.object_saver.get_folder_objects(f'{model_type.name}_model/', project_id)
+        all_folders = self.object_saver.get_folder_objects(f"{model_type.name}_model/", project_id)
         deleted_models = 0
         for folder in all_folders:
             if os.path.basename(folder.strip("/").strip("\\")).startswith(model_type.name):
@@ -96,5 +104,5 @@ class ModelChooser:
             self.delete_old_model(model, project_id)
 
     def get_model_info(self, model_type: ModelType, project_id: str | int | None = None):
-        all_folders = self.object_saver.get_folder_objects(f'{model_type.name}_model/', project_id)
-        return all_folders[0] if len(all_folders) else ''
+        all_folders = self.object_saver.get_folder_objects(f"{model_type.name}_model/", project_id)
+        return all_folders[0] if len(all_folders) else ""

@@ -14,6 +14,7 @@
 
 import logging
 import unittest
+from test import get_fixture
 
 import numpy as np
 
@@ -23,7 +24,6 @@ from app.machine_learning.models import DefectTypeModel, WeightedSimilarityCalcu
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import utils
-from test import get_fixture
 
 
 class TestBoostingModel(unittest.TestCase):
@@ -53,10 +53,11 @@ class TestBoostingModel(unittest.TestCase):
 
     @staticmethod
     def get_default_config(
-            number_of_log_lines,
-            filter_fields=["detected_message", "stacktrace"],
-            filter_fields_any=[],
-            min_should_match=0.0):
+        number_of_log_lines,
+        filter_fields=["detected_message", "stacktrace"],
+        filter_fields_any=[],
+        min_should_match=0.0,
+    ):
         """Get default config"""
         return {
             "max_query_terms": 50,
@@ -66,9 +67,8 @@ class TestBoostingModel(unittest.TestCase):
             "filter_min_should_match_any": filter_fields_any,
             "number_of_log_lines": number_of_log_lines,
             "chosen_namespaces": {"tv.horizon": 25, "sun.reflect": 10},
-            "boosting_model": utils.read_json_file(
-                "res", "model_settings.json", to_json=True)["BOOST_MODEL_FOLDER"],
-            "time_weight_decay": 0.95
+            "boosting_model": utils.read_json_file("res", "model_settings.json", to_json=True)["BOOST_MODEL_FOLDER"],
+            "time_weight_decay": 0.95,
         }
 
     @utils.ignore_warnings
@@ -79,8 +79,11 @@ class TestBoostingModel(unittest.TestCase):
             decision_maker = BoostingDecisionMaker(create_filesystem(folder))
             decision_maker.load_model()
             test_data_size = 5
-            random_data = np.random.Generator(np.random.PCG64(1337)).random(
-                size=(test_data_size, len(decision_maker.feature_ids))).tolist()
+            random_data = (
+                np.random.Generator(np.random.PCG64(1337))
+                .random(size=(test_data_size, len(decision_maker.feature_ids)))
+                .tolist()
+            )
             result, result_probability = decision_maker.predict(random_data)
             assert len(result) == test_data_size
             assert len(result_probability) == test_data_size
@@ -96,41 +99,57 @@ class TestBoostingModel(unittest.TestCase):
         tests = []
         for log_lines, filter_fields, _decision_maker in [
             (-1, ["detected_message", "stacktrace"], decision_maker),
-            (2, ["message"], decision_maker)
+            (2, ["message"], decision_maker),
         ]:
-            tests.extend([
-                {
-                    "elastic_results": [(get_fixture(self.log_message, to_json=True),
-                                         get_fixture(self.one_hit_search_rs_explained, to_json=True))],
-                    "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
-                    "decision_maker": _decision_maker
-                },
-                {
-                    "elastic_results": [(get_fixture(self.log_message, to_json=True),
-                                         get_fixture(self.two_hits_search_rs_explained, to_json=True))],
-                    "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
-                    "decision_maker": _decision_maker
-                },
-                {
-                    "elastic_results": [(get_fixture(self.log_message, to_json=True),
-                                         get_fixture(self.two_hits_search_rs_explained, to_json=True)),
-                                        (get_fixture(self.log_message, to_json=True),
-                                         get_fixture(self.one_hit_search_rs_explained, to_json=True))],
-                    "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
-                    "decision_maker": _decision_maker
-                },
-            ])
+            tests.extend(
+                [
+                    {
+                        "elastic_results": [
+                            (
+                                get_fixture(self.log_message, to_json=True),
+                                get_fixture(self.one_hit_search_rs_explained, to_json=True),
+                            )
+                        ],
+                        "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
+                        "decision_maker": _decision_maker,
+                    },
+                    {
+                        "elastic_results": [
+                            (
+                                get_fixture(self.log_message, to_json=True),
+                                get_fixture(self.two_hits_search_rs_explained, to_json=True),
+                            )
+                        ],
+                        "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
+                        "decision_maker": _decision_maker,
+                    },
+                    {
+                        "elastic_results": [
+                            (
+                                get_fixture(self.log_message, to_json=True),
+                                get_fixture(self.two_hits_search_rs_explained, to_json=True),
+                            ),
+                            (
+                                get_fixture(self.log_message, to_json=True),
+                                get_fixture(self.one_hit_search_rs_explained, to_json=True),
+                            ),
+                        ],
+                        "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
+                        "decision_maker": _decision_maker,
+                    },
+                ]
+            )
 
         for idx, test in enumerate(tests):
-            print(f'Running test {idx}')
+            print(f"Running test {idx}")
             feature_ids = test["decision_maker"].feature_ids
             weight_log_sim = None
             if self.weights_folder.strip():
                 weight_log_sim = WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
                 weight_log_sim.load_model()
             _boosting_featurizer = BoostingFeaturizer(
-                test["elastic_results"], test["config"], feature_ids,
-                weighted_log_similarity_calculator=weight_log_sim)
+                test["elastic_results"], test["config"], feature_ids, weighted_log_similarity_calculator=weight_log_sim
+            )
             if self.global_defect_type_model_folder.strip():
                 model = DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
                 model.load_model()
@@ -150,63 +169,101 @@ class TestBoostingModel(unittest.TestCase):
         decision_maker.load_model()
         boost_model_results = get_fixture(self.suggest_boost_model_results, to_json=True)
         tests = []
-        all_configs = [(-1,
-                        ["detected_message_extended", "detected_message_without_params_extended",
-                         "detected_message_without_params_and_brackets"],
-                        decision_maker),
-                       (2,
-                        ["message_extended", "message_without_params_extended",
-                         "message_without_params_and_brackets"],
-                        decision_maker)]
+        all_configs = [
+            (
+                -1,
+                [
+                    "detected_message_extended",
+                    "detected_message_without_params_extended",
+                    "detected_message_without_params_and_brackets",
+                ],
+                decision_maker,
+            ),
+            (
+                2,
+                ["message_extended", "message_without_params_extended", "message_without_params_and_brackets"],
+                decision_maker,
+            ),
+        ]
         for log_lines, filter_fields_any, _decision_maker in all_configs:
-            tests.extend([
-                {
-                    "elastic_results": [(get_fixture(self.log_message_suggest, to_json=True),
-                                         get_fixture(self.one_hit_search_rs_explained, to_json=True))],
-                    "config": TestBoostingModel.get_default_config(
-                        number_of_log_lines=log_lines, filter_fields=[], filter_fields_any=filter_fields_any,
-                        min_should_match=0.4),
-                    "decision_maker": _decision_maker
-                },
-                {
-                    "elastic_results": [(get_fixture(self.log_message_suggest, to_json=True),
-                                         get_fixture(self.two_hits_search_rs_explained, to_json=True))],
-                    "config": TestBoostingModel.get_default_config(
-                        number_of_log_lines=log_lines, filter_fields=[], filter_fields_any=filter_fields_any,
-                        min_should_match=0.4),
-                    "decision_maker": _decision_maker
-                },
-                {
-                    "elastic_results": [(get_fixture(self.log_message_suggest, to_json=True),
-                                         get_fixture(self.two_hits_search_rs_explained, to_json=True)),
-                                        (get_fixture(self.log_message_suggest, to_json=True),
-                                         get_fixture(self.one_hit_search_rs_explained, to_json=True))],
-                    "config": TestBoostingModel.get_default_config(
-                        number_of_log_lines=log_lines, filter_fields=[], filter_fields_any=filter_fields_any,
-                        min_should_match=0.4),
-                    "decision_maker": _decision_maker
-                },
-                {
-                    "elastic_results": [(get_fixture(self.log_message_only_small_logs, to_json=True),
-                                         get_fixture(self.two_hits_search_rs_small_logs, to_json=True))],
-                    "config": TestBoostingModel.get_default_config(
-                        number_of_log_lines=log_lines, filter_fields=[], filter_fields_any=filter_fields_any,
-                        min_should_match=0.0),
-                    "decision_maker": _decision_maker
-                },
-            ])
+            tests.extend(
+                [
+                    {
+                        "elastic_results": [
+                            (
+                                get_fixture(self.log_message_suggest, to_json=True),
+                                get_fixture(self.one_hit_search_rs_explained, to_json=True),
+                            )
+                        ],
+                        "config": TestBoostingModel.get_default_config(
+                            number_of_log_lines=log_lines,
+                            filter_fields=[],
+                            filter_fields_any=filter_fields_any,
+                            min_should_match=0.4,
+                        ),
+                        "decision_maker": _decision_maker,
+                    },
+                    {
+                        "elastic_results": [
+                            (
+                                get_fixture(self.log_message_suggest, to_json=True),
+                                get_fixture(self.two_hits_search_rs_explained, to_json=True),
+                            )
+                        ],
+                        "config": TestBoostingModel.get_default_config(
+                            number_of_log_lines=log_lines,
+                            filter_fields=[],
+                            filter_fields_any=filter_fields_any,
+                            min_should_match=0.4,
+                        ),
+                        "decision_maker": _decision_maker,
+                    },
+                    {
+                        "elastic_results": [
+                            (
+                                get_fixture(self.log_message_suggest, to_json=True),
+                                get_fixture(self.two_hits_search_rs_explained, to_json=True),
+                            ),
+                            (
+                                get_fixture(self.log_message_suggest, to_json=True),
+                                get_fixture(self.one_hit_search_rs_explained, to_json=True),
+                            ),
+                        ],
+                        "config": TestBoostingModel.get_default_config(
+                            number_of_log_lines=log_lines,
+                            filter_fields=[],
+                            filter_fields_any=filter_fields_any,
+                            min_should_match=0.4,
+                        ),
+                        "decision_maker": _decision_maker,
+                    },
+                    {
+                        "elastic_results": [
+                            (
+                                get_fixture(self.log_message_only_small_logs, to_json=True),
+                                get_fixture(self.two_hits_search_rs_small_logs, to_json=True),
+                            )
+                        ],
+                        "config": TestBoostingModel.get_default_config(
+                            number_of_log_lines=log_lines,
+                            filter_fields=[],
+                            filter_fields_any=filter_fields_any,
+                            min_should_match=0.0,
+                        ),
+                        "decision_maker": _decision_maker,
+                    },
+                ]
+            )
         for idx, test in enumerate(tests):
-            print(f'Running test {idx}')
+            print(f"Running test {idx}")
             feature_ids = test["decision_maker"].feature_ids
             weight_log_sim = None
             if self.weights_folder.strip():
                 weight_log_sim = WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
                 weight_log_sim.load_model()
             _boosting_featurizer = SuggestBoostingFeaturizer(
-                test["elastic_results"],
-                test["config"],
-                feature_ids,
-                weighted_log_similarity_calculator=weight_log_sim)
+                test["elastic_results"], test["config"], feature_ids, weighted_log_similarity_calculator=weight_log_sim
+            )
             if self.global_defect_type_model_folder.strip():
                 model = DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
                 model.load_model()

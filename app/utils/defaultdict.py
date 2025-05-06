@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 from collections import defaultdict as _defaultdict
-from typing import TypeVar, Callable, Optional
+from typing import Callable, Optional, TypeVar
 
 _KT = TypeVar("_KT")
 _RT = TypeVar("_RT")
@@ -21,9 +21,9 @@ _RT = TypeVar("_RT")
 
 class DefaultDict(_defaultdict):
     _checked_keys: set[_KT]
-    _default_factory: Optional[Callable[['DefaultDict', _KT], _RT]]
+    _default_factory: Optional[Callable[["DefaultDict", _KT], _RT]]
 
-    def __init__(self, default_factory: Optional[Callable[['DefaultDict', _KT], _RT]] = None, **kwargs):
+    def __init__(self, default_factory: Optional[Callable[["DefaultDict", _KT], _RT]] = None, **kwargs):
         super().__init__(**kwargs)
         self._default_factory = default_factory
         self._checked_keys = set()

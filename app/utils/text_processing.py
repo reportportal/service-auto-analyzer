@@ -37,8 +37,8 @@ FILE_EXTENSIONS = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "p
 def create_punctuation_map(split_urls) -> dict[str, str]:
     translate_map = {}
     for punct in string.punctuation + "<>{}[];=()'\"":
-        if punct != '.' and (split_urls or punct not in ['/', '\\']):
-            translate_map[punct] = ' '
+        if punct != "." and (split_urls or punct not in ["/", "\\"]):
+            translate_map[punct] = " "
     return translate_map
 
 
@@ -56,25 +56,25 @@ def replace_patterns(text: str, patterns: Iterable[tuple[re.Pattern, str]]) -> s
 
 def remove_patterns(text: str, patterns: Iterable[re.Pattern]) -> str:
     """Removes starting patterns from the text."""
-    return replace_patterns(text, map(lambda p: (p, ''), patterns))
+    return replace_patterns(text, map(lambda p: (p, ""), patterns))
 
 
-EU_DATE: str = r'\d+-\d+-\d+'
-EU_TIME: str = r'\d+:\d+:\d+(?:[.,]\d+)?'
-US_DATE: str = r'\d+/\d+/\d+'
+EU_DATE: str = r"\d+-\d+-\d+"
+EU_TIME: str = r"\d+:\d+:\d+(?:[.,]\d+)?"
+US_DATE: str = r"\d+/\d+/\d+"
 US_TIME: str = EU_TIME
 
-EU_DATETIME: str = fr'{EU_DATE}\s+{EU_TIME}'
-US_DATETIME: str = fr'{US_DATE}\s+{US_TIME}'
+EU_DATETIME: str = rf"{EU_DATE}\s+{EU_TIME}"
+US_DATETIME: str = rf"{US_DATE}\s+{US_TIME}"
 
-DELIM: str = r'(?:\s*-\s*)|(?:\s*\|\s*)'
+DELIM: str = r"(?:\s*-\s*)|(?:\s*\|\s*)"
 
 DATETIME_PATTERNS: Iterable[re.Pattern] = [
-    re.compile(fr'^{EU_DATETIME}(?:{DELIM})?\s*'),
-    re.compile(fr'^{US_DATETIME}(?:{DELIM})?\s*'),
-    re.compile(fr'^{EU_TIME}(?:{DELIM})?\s*'),
-    re.compile(fr'^\[{EU_TIME}](?:{DELIM})?\s*'),
-    re.compile(fr'^\[{EU_DATETIME}](?:{DELIM})?\s*')
+    re.compile(rf"^{EU_DATETIME}(?:{DELIM})?\s*"),
+    re.compile(rf"^{US_DATETIME}(?:{DELIM})?\s*"),
+    re.compile(rf"^{EU_TIME}(?:{DELIM})?\s*"),
+    re.compile(rf"^\[{EU_TIME}](?:{DELIM})?\s*"),
+    re.compile(rf"^\[{EU_DATETIME}](?:{DELIM})?\s*"),
 ]
 
 
@@ -83,22 +83,22 @@ def remove_starting_datetime(text: str) -> str:
     return remove_patterns(text, DATETIME_PATTERNS)
 
 
-LOG_LEVEL: str = r'(?:TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\s?'
+LOG_LEVEL: str = r"(?:TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\s?"
 LOG_LEVEL_PATTERNS: Iterable[re.Pattern] = [
-    re.compile(fr'^{LOG_LEVEL}(?:{DELIM})?\s+'),
-    re.compile(fr'^\[{LOG_LEVEL}](?:{DELIM})?\s+'),
-    re.compile(fr'^\({LOG_LEVEL}\)(?:{DELIM})?\s+'),
+    re.compile(rf"^{LOG_LEVEL}(?:{DELIM})?\s+"),
+    re.compile(rf"^\[{LOG_LEVEL}](?:{DELIM})?\s+"),
+    re.compile(rf"^\({LOG_LEVEL}\)(?:{DELIM})?\s+"),
 ]
 
 
 def remove_starting_log_level(text: str) -> str:
-    """ Removes log level at the beginning of the text."""
+    """Removes log level at the beginning of the text."""
     return remove_patterns(text, LOG_LEVEL_PATTERNS)
 
 
-THREAD_ID_PATTERN: str = r'\d+\s+-+\s*'
+THREAD_ID_PATTERN: str = r"\d+\s+-+\s*"
 THREAD_ID_PATTERNS: Iterable[re.Pattern] = [
-    re.compile(fr'^{THREAD_ID_PATTERN}(?:{DELIM})?\s+'),
+    re.compile(rf"^{THREAD_ID_PATTERN}(?:{DELIM})?\s+"),
 ]
 
 
@@ -107,10 +107,8 @@ def remove_starting_thread_id(text: str) -> str:
     return remove_patterns(text, THREAD_ID_PATTERNS)
 
 
-THREAD_NAME_PATTERN: str = r'\[[^\]]*]'
-THREAD_NAME_PATTERNS: Iterable[re.Pattern] = [
-    re.compile(fr'^{THREAD_NAME_PATTERN}(?:{DELIM})?\s+')
-]
+THREAD_NAME_PATTERN: str = r"\[[^\]]*]"
+THREAD_NAME_PATTERNS: Iterable[re.Pattern] = [re.compile(rf"^{THREAD_NAME_PATTERN}(?:{DELIM})?\s+")]
 
 
 def remove_starting_thread_name(text: str) -> str:
@@ -124,7 +122,7 @@ def filter_empty_lines(log_lines: list[str]) -> list[str]:
 
 def delete_empty_lines(log: str) -> str:
     """Delete empty lines"""
-    return '\n'.join(filter_empty_lines(log.split('\n')))
+    return "\n".join(filter_empty_lines(log.split("\n")))
 
 
 def calculate_line_number(text):
@@ -242,15 +240,15 @@ def detect_log_description_and_stacktrace(message: str) -> tuple[str, str]:
     return message, ""
 
 
-SQR_BRCKTS = r'\[[^]]*]'
-RND_BRCKTS = r'\([^)]*\)'
-CRL_BRCKTS = r'\{[^}]*}'
-BRCKTS_TXT = re.compile(fr'{SQR_BRCKTS}|{RND_BRCKTS}|{CRL_BRCKTS}')
+SQR_BRCKTS = r"\[[^]]*]"
+RND_BRCKTS = r"\([^)]*\)"
+CRL_BRCKTS = r"\{[^}]*}"
+BRCKTS_TXT = re.compile(rf"{SQR_BRCKTS}|{RND_BRCKTS}|{CRL_BRCKTS}")
 
 
 def clean_from_brackets(text: str) -> str:
     """Removes all brackets and text inside them from the given text."""
-    return BRCKTS_TXT.sub('', text)
+    return BRCKTS_TXT.sub("", text)
 
 
 SPECIAL_CHARACTER_PATTERN = re.compile(r'[/?&=#@:.*!$%^+~\\|,;<>\[\]{}()`"\'_]')
@@ -258,14 +256,14 @@ SPECIAL_CHARACTER_PATTERN = re.compile(r'[/?&=#@:.*!$%^+~\\|,;<>\[\]{}()`"\'_]')
 
 def clean_special_chars(text: str) -> str:
     """Removes all special characters in the given text."""
-    return SPECIAL_CHARACTER_PATTERN.sub(' ', text)
+    return SPECIAL_CHARACTER_PATTERN.sub(" ", text)
 
 
 STATUS_CODES_PATTERNS = [
     re.compile(r"\bcode[^\w.]+(\d+)\D*(\d*)|\bcode[^\w.]+(\d+?)$", flags=re.IGNORECASE),  # NOSONAR
     re.compile(r"\w+_code[^\w.]+(\d+)\D*(\d*)|\w+_code[^\w.]+(\d+?)$", flags=re.IGNORECASE),  # NOSONAR
     re.compile(r"\bstatus[^\w.]+(\d+)\D*(\d*)|\bstatus[^\w.]+(\d+?)$", flags=re.IGNORECASE),  # NOSONAR
-    re.compile(r"\w+_status[^\w.]+(\d+)\D*(\d*)|\w+_status[^\w.]+(\d+?)$", flags=re.IGNORECASE)  # NOSONAR
+    re.compile(r"\w+_status[^\w.]+(\d+)\D*(\d*)|\w+_status[^\w.]+(\d+?)$", flags=re.IGNORECASE),  # NOSONAR
 ]
 
 
@@ -288,25 +286,26 @@ def get_potential_status_codes(text: str) -> list[str]:
     return potential_codes_list
 
 
-NUMBER_PATTERN = re.compile(r'\b\d+\b')
-NUMBER_PART_PATTERN = re.compile(r'\d+')
+NUMBER_PATTERN = re.compile(r"\b\d+\b")
+NUMBER_PART_PATTERN = re.compile(r"\d+")
 NUMBER_TAG = "SPECIALNUMBER"
 
 
 def remove_numbers(text: str) -> str:
     """Sanitize text by deleting all numbers"""
     result = NUMBER_PATTERN.sub(NUMBER_TAG, text)
-    result = NUMBER_PART_PATTERN.sub('', result)
+    result = NUMBER_PART_PATTERN.sub("", result)
     return result
 
 
 def first_lines(log_str: str, n_lines: int) -> str:
     """Take n first lines."""
-    return '\n'.join((log_str.split('\n')[:n_lines])) if n_lines >= 0 else log_str
+    return "\n".join((log_str.split("\n")[:n_lines])) if n_lines >= 0 else log_str
 
 
-def prepare_message_for_clustering(message: str, number_of_log_lines: int, clean_numbers: bool,
-                                   leave_log_structure: bool = False) -> str:
+def prepare_message_for_clustering(
+    message: str, number_of_log_lines: int, clean_numbers: bool, leave_log_structure: bool = False
+) -> str:
     potential_status_codes = get_potential_status_codes(message)
     message = remove_starting_datetime(message)
     if clean_numbers:
@@ -314,7 +313,7 @@ def prepare_message_for_clustering(message: str, number_of_log_lines: int, clean
         for idx, code in enumerate(potential_status_codes):
             replaced_code = "#&#" * (idx + 1)
             status_codes_replaced[replaced_code] = code
-            message = re.sub(fr"\b{code}\b", replaced_code, message)
+            message = re.sub(rf"\b{code}\b", replaced_code, message)
         message = remove_numbers(message)
         for code_replaced in sorted(status_codes_replaced.keys(), reverse=True):
             message = re.sub(code_replaced, str(status_codes_replaced[code_replaced]), message)
@@ -330,10 +329,12 @@ def prepare_message_for_clustering(message: str, number_of_log_lines: int, clean
 
 REGEX_STYLE_TAG = re.compile(r'<style(?:\s+\S+\s*=\s*"[^"]*")*\s*>[^<]*</style>')
 REGEX_SCRIPT_TAG = re.compile(r'<script(?:\s+\S+\s*=\s*"[^"]*")*\s*>[^<]*</script>')
-REGEX_HTML_TAGS = re.compile(r'</?\w+(?:\s+[^>\s]+\s*=\s*"[^"]*"\s?|\s+[^>\s]+\s*)*>'
-                             r'|&([a-zA-Z0-9]+'
-                             r'|#[0-9]{1,6}'
-                             r'|#x[0-9a-fA-F]{1,6});')
+REGEX_HTML_TAGS = re.compile(
+    r'</?\w+(?:\s+[^>\s]+\s*=\s*"[^"]*"\s?|\s+[^>\s]+\s*)*>'
+    r"|&([a-zA-Z0-9]+"
+    r"|#[0-9]{1,6}"
+    r"|#x[0-9a-fA-F]{1,6});"
+)
 
 
 def clean_text_from_html_tags(message: str) -> str:
@@ -371,8 +372,9 @@ def clean_html(message):
     return delete_empty_lines("\n".join(all_lines))
 
 
-def split_words(text: str, min_word_length: int = 0, only_unique: bool = True, split_urls: bool = True,
-                to_lower: bool = True) -> list[str]:
+def split_words(
+    text: str, min_word_length: int = 0, only_unique: bool = True, split_urls: bool = True, to_lower: bool = True
+) -> list[str]:
     if not text:
         return []
     all_unique_words = set()
@@ -382,11 +384,11 @@ def split_words(text: str, min_word_length: int = 0, only_unique: bool = True, s
         result = text.translate(text.maketrans(PUNCTUATION_MAP_SPLIT_URLS))
     else:
         result = text.translate(text.maketrans(PUNCTUATION_MAP_NO_SPLIT_URLS))
-    result = result.strip().strip('.').strip()
+    result = result.strip().strip(".").strip()
     if to_lower:
         result = result.lower()
     for w in result.split():
-        w = w.strip().strip('.')
+        w = w.strip().strip(".")
         if w != "" and len(w) >= min_word_length:
             if w in STOPWORDS_ALL:
                 continue
@@ -404,7 +406,7 @@ def normalize_message(message: str) -> str:
 
 def find_only_numbers(detected_message_with_numbers: str) -> str:
     """Removes all non digit symbols and concatenates unique numbers"""
-    detected_message_only_numbers = re.sub(r'[^\d ._]', '', detected_message_with_numbers)
+    detected_message_only_numbers = re.sub(r"[^\d ._]", "", detected_message_with_numbers)
     return " ".join(split_words(detected_message_only_numbers))
 
 
@@ -424,7 +426,7 @@ def enrich_text_with_method_and_classes(text: str) -> str:
             for i in [2, 1]:
                 full_path = full_path + " " + ".".join(words[-i:])
             full_path = full_path + " "
-            new_line = re.sub(fr'\b(?<!\.){val}(?!\.)\b', full_path, new_line)
+            new_line = re.sub(rf"\b(?<!\.){val}(?!\.)\b", full_path, new_line)
         new_lines.append(new_line)
     return "\n".join(new_lines)
 
@@ -440,10 +442,8 @@ def preprocess_test_item_name(text: str) -> str:
         if "." not in w:
             all_words.extend([s.strip() for s in re.split(SPLIT_WORDS_PATTERN, w) if s.strip()])
         else:
-            all_words.extend(
-                [s.strip() for s in enrich_text_with_method_and_classes(w).split(" ") if s.strip()])
-            all_words.extend(
-                [s.strip() for s in re.split(SPLIT_WORDS_PATTERN, w.split(".")[-1]) if s.strip()])
+            all_words.extend([s.strip() for s in enrich_text_with_method_and_classes(w).split(" ") if s.strip()])
+            all_words.extend([s.strip() for s in re.split(SPLIT_WORDS_PATTERN, w.split(".")[-1]) if s.strip()])
     return " ".join(all_words)
 
 
@@ -454,12 +454,12 @@ def find_test_methods_in_text(text: str) -> set[str]:
         match = re.search(r"\b[^\s()/\\:]+(?:Test|Step)s?\.", residual)
         if not match:
             break
-        match_str = residual[match.start():match.end()]
-        residual = residual[match.end():]
+        match_str = residual[match.start() : match.end()]
+        residual = residual[match.end() :]
         match = re.search(r"^[^\s()/\\:]+", residual)
         if match:
-            match_str += residual[match.start():match.end()]
-            residual = residual[match.end():]
+            match_str += residual[match.start() : match.end()]
+            residual = residual[match.end() :]
         test_methods.add(match_str)
 
     for m in re.findall(r"(\b[^\s()/\\:]+\.(?:spec|cy)\.[jt]s\b)", text):
@@ -503,7 +503,7 @@ def preprocess_words(text):
         if len(split_parts) > 2:
             for idx in range(len(split_parts)):
                 if idx != len(split_parts) - 1:
-                    split_words_list.append("".join(split_parts[idx:idx + 2]).lower())
+                    split_words_list.append("".join(split_parts[idx : idx + 2]).lower())
             all_words.extend(split_words_list)
         if "." not in word_normalized:
             split_words_list = []
@@ -511,20 +511,20 @@ def preprocess_words(text):
             if len(split_parts) > 2:
                 for idx in range(len(split_parts)):
                     if idx != len(split_parts) - 1:
-                        if len("".join(split_parts[idx:idx + 2]).lower()) > 3:
-                            split_words_list.append("".join(split_parts[idx:idx + 2]).lower())
+                        if len("".join(split_parts[idx : idx + 2]).lower()) > 3:
+                            split_words_list.append("".join(split_parts[idx : idx + 2]).lower())
             all_words.extend(split_words_list)
     return all_words
 
 
-UUID = r'[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}'
-TRUNCATED_UUID = r'[0-9a-fA-F]{16,48}|[0-9a-fA-F]{10,48}\.\.\.'
-NAMED_UUID = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-(\w+)'
+UUID = r"[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}"
+TRUNCATED_UUID = r"[0-9a-fA-F]{16,48}|[0-9a-fA-F]{10,48}\.\.\."
+NAMED_UUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-(\w+)"
 UUID_TAG = "SPECIALUUID"
 GUID_UUID_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
-    (re.compile(fr'\b{UUID}\b'), UUID_TAG),
-    (re.compile(fr'\b{TRUNCATED_UUID}\b'), UUID_TAG),
-    (re.compile(fr'\b{NAMED_UUID}\b'), fr'{UUID_TAG} \1'),
+    (re.compile(rf"\b{UUID}\b"), UUID_TAG),
+    (re.compile(rf"\b{TRUNCATED_UUID}\b"), UUID_TAG),
+    (re.compile(rf"\b{NAMED_UUID}\b"), rf"{UUID_TAG} \1"),
 ]
 
 
@@ -533,22 +533,23 @@ def remove_guid_uuids_from_text(text: str) -> str:
 
 
 def replace_tabs_for_newlines(message: str) -> str:
-    return message.replace('\t', '\n')
+    return message.replace("\t", "\n")
 
 
-HORIZONTAL_WHITESPACE = (r' \t\u00A0\u1680\u180E\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A'
-                         r'\u202F\u205F\u3000')
-LINE_ENDING_PATTERN = re.compile(fr'[{HORIZONTAL_WHITESPACE}]*\r?\n')
+HORIZONTAL_WHITESPACE = (
+    r" \t\u00A0\u1680\u180E\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A" r"\u202F\u205F\u3000"
+)
+LINE_ENDING_PATTERN = re.compile(rf"[{HORIZONTAL_WHITESPACE}]*\r?\n")
 
 
 def unify_line_endings(message: str) -> str:
-    return LINE_ENDING_PATTERN.sub(r'\n', message)
+    return LINE_ENDING_PATTERN.sub(r"\n", message)
 
 
-SPACE_PATTERN = re.compile(fr'[{HORIZONTAL_WHITESPACE}]+')
-NEWLINE_SPACE_PATTERN = re.compile(fr'[{HORIZONTAL_WHITESPACE}]*\n[{HORIZONTAL_WHITESPACE}]*')
-SPACE_REPLACEMENT = ' '
-NEWLINE_SPACE_REPLACEMENT = '\n'
+SPACE_PATTERN = re.compile(rf"[{HORIZONTAL_WHITESPACE}]+")
+NEWLINE_SPACE_PATTERN = re.compile(rf"[{HORIZONTAL_WHITESPACE}]*\n[{HORIZONTAL_WHITESPACE}]*")
+SPACE_REPLACEMENT = " "
+NEWLINE_SPACE_REPLACEMENT = "\n"
 SPACE_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
     (SPACE_PATTERN, SPACE_REPLACEMENT),
     (NEWLINE_SPACE_PATTERN, NEWLINE_SPACE_REPLACEMENT),
@@ -589,18 +590,22 @@ def has_more_lines_pattern(line):
     return False
 
 
-INNER_CLASS_EXTERNAL_PATTERN = re.compile(r'\b((?:[a-zA-Z0-9_-]+/|\\)+)([a-zA-Z0-9_-]+)\$([a-zA-Z0-9_-]+\.class)\b')
-INNER_CLASS_INTERNAL_PATTERN = re.compile(r'(?<=[.$])([a-zA-Z0-9_-]+)\$(?=[a-zA-Z0-9_-]+[.$(@])')
-GENERATED_LINE_PATTERN = re.compile((r'\s*(?:at\s*)?(?:[a-zA-Z0-9_-]+\.)+(?:[a-zA-Z0-9_-]+\$\$)+[0-9a-f]+\.'
-                                     r'(?:[a-zA-Z0-9_-]+\$|\.)*[a-zA-Z0-9_-]+\(<generated>\).*'))
-CLASS_NAME_WITH_MEMORY_REFERENCE_PATTERN = re.compile(r'\b((?:[a-zA-Z0-9_-]+\.)+)([a-zA-Z0-9_-]+)@[0-9a-f]+\b')
-TRUNCATED_STACKTRACE_PATTERN = re.compile(r'\s*\.\.\. \d+ more.*')
+INNER_CLASS_EXTERNAL_PATTERN = re.compile(r"\b((?:[a-zA-Z0-9_-]+/|\\)+)([a-zA-Z0-9_-]+)\$([a-zA-Z0-9_-]+\.class)\b")
+INNER_CLASS_INTERNAL_PATTERN = re.compile(r"(?<=[.$])([a-zA-Z0-9_-]+)\$(?=[a-zA-Z0-9_-]+[.$(@])")
+GENERATED_LINE_PATTERN = re.compile(
+    (
+        r"\s*(?:at\s*)?(?:[a-zA-Z0-9_-]+\.)+(?:[a-zA-Z0-9_-]+\$\$)+[0-9a-f]+\."
+        r"(?:[a-zA-Z0-9_-]+\$|\.)*[a-zA-Z0-9_-]+\(<generated>\).*"
+    )
+)
+CLASS_NAME_WITH_MEMORY_REFERENCE_PATTERN = re.compile(r"\b((?:[a-zA-Z0-9_-]+\.)+)([a-zA-Z0-9_-]+)@[0-9a-f]+\b")
+TRUNCATED_STACKTRACE_PATTERN = re.compile(r"\s*\.\.\. \d+ more.*")
 STACKTRACE_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
-    (GENERATED_LINE_PATTERN, r''),
-    (INNER_CLASS_EXTERNAL_PATTERN, r'\1\2.\3'),
-    (INNER_CLASS_INTERNAL_PATTERN, r'\1.'),
-    (CLASS_NAME_WITH_MEMORY_REFERENCE_PATTERN, r'\1\2'),
-    (TRUNCATED_STACKTRACE_PATTERN, r''),
+    (GENERATED_LINE_PATTERN, r""),
+    (INNER_CLASS_EXTERNAL_PATTERN, r"\1\2.\3"),
+    (INNER_CLASS_INTERNAL_PATTERN, r"\1."),
+    (CLASS_NAME_WITH_MEMORY_REFERENCE_PATTERN, r"\1\2"),
+    (TRUNCATED_STACKTRACE_PATTERN, r""),
 ]
 
 
@@ -641,7 +646,7 @@ def clean_from_params(text: str) -> str:
     return clean_special_chars(text)
 
 
-URL_PATTERN = re.compile(r'\b[\w+]+:/\S+\b', re.IGNORECASE)
+URL_PATTERN = re.compile(r"\b[\w+]+:/\S+\b", re.IGNORECASE)
 
 
 def extract_urls(text: str) -> list[str]:
@@ -694,8 +699,7 @@ def remove_credentials_from_url(url: str) -> str:
 
 def does_stacktrace_need_words_reweighting(log):
     found_file_extensions = []
-    all_extensions_to_find = "|".join(
-        ["py", "java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "scala"])
+    all_extensions_to_find = "|".join(["py", "java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "scala"])
     for m in re.findall(r"\.(%s)(?!\.)\b" % all_extensions_to_find, log):
         found_file_extensions.append(m)
     if len(found_file_extensions) == 1 and found_file_extensions[0] in ["js", "c", "h", "rb", "cpp"]:
@@ -733,7 +737,7 @@ def transform_string_feature_range_into_list(text: str) -> list[int]:
 
 
 def unite_project_name(project_id: str | int, prefix: str) -> str:
-    return f'{prefix}{project_id}'
+    return f"{prefix}{project_id}"
 
 
 def replace_text_pieces(text: str, text_pieces: Iterable[str]) -> str:
@@ -747,12 +751,13 @@ def prepare_es_min_should_match(min_should_match: float) -> str:
     return str(int(min_should_match * 100)) + "%"
 
 
-ACCESS_OR_REFRESH_TOKEN_PATTERN = r'(?:access|refresh|biometric|jwt)_?token'
-JSON_ACCESS_TOKEN = fr'("{ACCESS_OR_REFRESH_TOKEN_PATTERN}"\s*:\s*")[^"]+'
-HTTP_ACCESS_TOKEN = (r'(Authorization\s*:\s*'
-                     r'(?:Bearer|Basic|Digest|HOBA|Mutual|Negotiate|NTLM|VAPID|SCRAM|AWS4-HMAC-SHA256)) .*')
-TOKEN_TAG = 'SPECIALTOKEN'
-TOKEN_REPLACEMENT = fr'\1{TOKEN_TAG}'
+ACCESS_OR_REFRESH_TOKEN_PATTERN = r"(?:access|refresh|biometric|jwt)_?token"
+JSON_ACCESS_TOKEN = rf'("{ACCESS_OR_REFRESH_TOKEN_PATTERN}"\s*:\s*")[^"]+'
+HTTP_ACCESS_TOKEN = (
+    r"(Authorization\s*:\s*" r"(?:Bearer|Basic|Digest|HOBA|Mutual|Negotiate|NTLM|VAPID|SCRAM|AWS4-HMAC-SHA256)) .*"
+)
+TOKEN_TAG = "SPECIALTOKEN"
+TOKEN_REPLACEMENT = rf"\1{TOKEN_TAG}"
 ACCESS_TOKEN_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
     (re.compile(JSON_ACCESS_TOKEN, re.RegexFlag.IGNORECASE), TOKEN_REPLACEMENT),
     (re.compile(HTTP_ACCESS_TOKEN, re.RegexFlag.IGNORECASE), TOKEN_REPLACEMENT),
@@ -763,36 +768,36 @@ def remove_access_tokens(text: str) -> str:
     return replace_patterns(text, ACCESS_TOKEN_PATTERNS)
 
 
-MARKDOWN_MODE_PATTERN = re.compile(r'!!!MARKDOWN_MODE!!!\s*')
-MARKDOWN_MODE_REPLACEMENT = ''
-MARKDOWN_MODE_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
-    (MARKDOWN_MODE_PATTERN, MARKDOWN_MODE_REPLACEMENT)
-]
+MARKDOWN_MODE_PATTERN = re.compile(r"!!!MARKDOWN_MODE!!!\s*")
+MARKDOWN_MODE_REPLACEMENT = ""
+MARKDOWN_MODE_PATTERNS: Iterable[tuple[re.Pattern, str]] = [(MARKDOWN_MODE_PATTERN, MARKDOWN_MODE_REPLACEMENT)]
 
 
 def remove_markdown_mode(text: str) -> str:
     return replace_patterns(text, MARKDOWN_MODE_PATTERNS)
 
 
-MARKDOWN_CODE_SEPARATOR: str = r'`{3}'
-FANCY_TEXT_SEPARATOR_START: str = r'-{3,}=+'
-FANCY_TEXT_SEPARATOR_END: str = r'={3,}-+'
-MARKDOWN_TEXT_SEPARATOR: str = r'-{3,}'
-EQUALITY_TEXT_SEPARATOR: str = r'={3,}'
-UNDERSCORE_TEXT_SEPARATOR: str = r'_{3,}'
-TEXT_SEPARATORS_PATTERN: str = (fr'(?:{FANCY_TEXT_SEPARATOR_START}|{FANCY_TEXT_SEPARATOR_END}'
-                                fr'|{MARKDOWN_CODE_SEPARATOR}|{MARKDOWN_TEXT_SEPARATOR}|{EQUALITY_TEXT_SEPARATOR}'
-                                fr'|{UNDERSCORE_TEXT_SEPARATOR})')
-CODE_SEPARATOR_REPLACEMENT: str = 'TEXTDELIMITER'
+MARKDOWN_CODE_SEPARATOR: str = r"`{3}"
+FANCY_TEXT_SEPARATOR_START: str = r"-{3,}=+"
+FANCY_TEXT_SEPARATOR_END: str = r"={3,}-+"
+MARKDOWN_TEXT_SEPARATOR: str = r"-{3,}"
+EQUALITY_TEXT_SEPARATOR: str = r"={3,}"
+UNDERSCORE_TEXT_SEPARATOR: str = r"_{3,}"
+TEXT_SEPARATORS_PATTERN: str = (
+    rf"(?:{FANCY_TEXT_SEPARATOR_START}|{FANCY_TEXT_SEPARATOR_END}"
+    rf"|{MARKDOWN_CODE_SEPARATOR}|{MARKDOWN_TEXT_SEPARATOR}|{EQUALITY_TEXT_SEPARATOR}"
+    rf"|{UNDERSCORE_TEXT_SEPARATOR})"
+)
+CODE_SEPARATOR_REPLACEMENT: str = "TEXTDELIMITER"
 CODE_SEPARATOR_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
-    (re.compile(fr'\n{TEXT_SEPARATORS_PATTERN}\n'), fr' {CODE_SEPARATOR_REPLACEMENT}\n'),
-    (re.compile(fr'^{TEXT_SEPARATORS_PATTERN}\n'), fr' {CODE_SEPARATOR_REPLACEMENT}\n'),
-    (re.compile(fr'\s*{TEXT_SEPARATORS_PATTERN}\n'), fr' {CODE_SEPARATOR_REPLACEMENT}\n'),
-    (re.compile(fr'\n{TEXT_SEPARATORS_PATTERN}\s+'), fr'\n{CODE_SEPARATOR_REPLACEMENT} '),
-    (re.compile(fr'\s+{TEXT_SEPARATORS_PATTERN}\s+'), fr' {CODE_SEPARATOR_REPLACEMENT} '),
-    (re.compile(fr'^{TEXT_SEPARATORS_PATTERN}\s*'), fr'{CODE_SEPARATOR_REPLACEMENT} '),
-    (re.compile(fr'\s+{TEXT_SEPARATORS_PATTERN}$'), fr' {CODE_SEPARATOR_REPLACEMENT}'),
-    (re.compile(fr'{TEXT_SEPARATORS_PATTERN}$'), fr' {CODE_SEPARATOR_REPLACEMENT}'),
+    (re.compile(rf"\n{TEXT_SEPARATORS_PATTERN}\n"), rf" {CODE_SEPARATOR_REPLACEMENT}\n"),
+    (re.compile(rf"^{TEXT_SEPARATORS_PATTERN}\n"), rf" {CODE_SEPARATOR_REPLACEMENT}\n"),
+    (re.compile(rf"\s*{TEXT_SEPARATORS_PATTERN}\n"), rf" {CODE_SEPARATOR_REPLACEMENT}\n"),
+    (re.compile(rf"\n{TEXT_SEPARATORS_PATTERN}\s+"), rf"\n{CODE_SEPARATOR_REPLACEMENT} "),
+    (re.compile(rf"\s+{TEXT_SEPARATORS_PATTERN}\s+"), rf" {CODE_SEPARATOR_REPLACEMENT} "),
+    (re.compile(rf"^{TEXT_SEPARATORS_PATTERN}\s*"), rf"{CODE_SEPARATOR_REPLACEMENT} "),
+    (re.compile(rf"\s+{TEXT_SEPARATORS_PATTERN}$"), rf" {CODE_SEPARATOR_REPLACEMENT}"),
+    (re.compile(rf"{TEXT_SEPARATORS_PATTERN}$"), rf" {CODE_SEPARATOR_REPLACEMENT}"),
 ]
 
 
@@ -800,15 +805,15 @@ def replace_code_separators(text: str) -> str:
     return replace_patterns(text, CODE_SEPARATOR_PATTERNS)
 
 
-WEBDRIVER_SCREENSHOT_PATTERN = re.compile(r'(?:\s*-*>\s*)?Webdriver screenshot captured: [^/\0\n.]+\.\w+')
-WEBDRIVER_SCREENSHOT_REFERENCE_PATTERN = re.compile(r'\s*Screenshot: file:/(?:[^/\0\n]+/)*[^/\0\n]+')
-WEBDRIVER_PAGE_SOURCE_REFERENCE_PATTERN = re.compile(r'\s*Page source: file:/(?:[^/\0\n]+/)*[^/\0\n]+')
+WEBDRIVER_SCREENSHOT_PATTERN = re.compile(r"(?:\s*-*>\s*)?Webdriver screenshot captured: [^/\0\n.]+\.\w+")
+WEBDRIVER_SCREENSHOT_REFERENCE_PATTERN = re.compile(r"\s*Screenshot: file:/(?:[^/\0\n]+/)*[^/\0\n]+")
+WEBDRIVER_PAGE_SOURCE_REFERENCE_PATTERN = re.compile(r"\s*Page source: file:/(?:[^/\0\n]+/)*[^/\0\n]+")
 WEBDRIVER_BUILD_INFO_PATTERN = re.compile(r"\s*Build info: version: '[^']+', revision: '[^']+'")
-WEBDRIVER_DRIVER_INFO_PATTERN = re.compile(r'\s*Driver info: [\w.]+')
+WEBDRIVER_DRIVER_INFO_PATTERN = re.compile(r"\s*Driver info: [\w.]+")
 WEBDRIVER_SYSTEM_INFO_PATTERN = re.compile(r"\s*System info: (?:[\w.]+: '[^']+', )+[\w.]+: '[^']+'")
-WEBDRIVER_DRIVER_CAPABILITIES_PATTERN = re.compile(r'\s*Capabilities {\w+: [^\n]+')
+WEBDRIVER_DRIVER_CAPABILITIES_PATTERN = re.compile(r"\s*Capabilities {\w+: [^\n]+")
 
-WEBDRIVER_AUXILIARY_INFO_REPLACEMENT = ''
+WEBDRIVER_AUXILIARY_INFO_REPLACEMENT = ""
 WEBDRIVER_AUXILIARY_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
     (WEBDRIVER_SCREENSHOT_PATTERN, WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
     (WEBDRIVER_SCREENSHOT_REFERENCE_PATTERN, WEBDRIVER_AUXILIARY_INFO_REPLACEMENT),
@@ -824,7 +829,7 @@ def remove_webdriver_auxiliary_info(text: str) -> str:
     return replace_patterns(text, WEBDRIVER_AUXILIARY_PATTERNS)
 
 
-READABLE_NUMBER = '[EXCLUDED NUMBER]'
+READABLE_NUMBER = "[EXCLUDED NUMBER]"
 
 
 def replace_tokens_with_readable_text(text: str) -> str:

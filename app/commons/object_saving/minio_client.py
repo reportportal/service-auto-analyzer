@@ -26,7 +26,7 @@ from app.commons.model.launch_objects import ApplicationConfig
 from app.commons.object_saving.storage import Storage, unify_path_separator
 
 LOGGER = logging.getLogger("analyzerApp.minioClient")
-PATH_SEPARATOR = '/'  # Despite the possibility of deploying on Windows, all our configurations use Unix-like paths
+PATH_SEPARATOR = "/"  # Despite the possibility of deploying on Windows, all our configurations use Unix-like paths
 
 
 class MinioClient(Storage):
@@ -42,9 +42,9 @@ class MinioClient(Storage):
             access_key=app_config.minioAccessKey,
             secret_key=app_config.minioSecretKey,
             secure=app_config.minioUseTls,
-            region=self.region
+            region=self.region,
         )
-        LOGGER.info(f'Minio initialized {minio_host}')
+        LOGGER.info(f"Minio initialized {minio_host}")
 
     def get_bucket(self, bucket_id: str | None) -> str:
         path = self._get_project_name(bucket_id)
@@ -81,15 +81,19 @@ class MinioClient(Storage):
             LOGGER.debug("Created minio bucket %s" % bucket_name)
         if using_json:
             data_to_save = json.dumps(data).encode("utf-8")
-            content_type = 'application/json'
+            content_type = "application/json"
         else:
             data_to_save = pickle.dumps(data)
-            content_type = 'application/octet-stream'
+            content_type = "application/octet-stream"
         data_stream = io.BytesIO(data_to_save)
         data_stream.seek(0)
         result = self.minio_client.put_object(
-            bucket_name=bucket_name, object_name=path, data=data_stream, length=len(data_to_save),
-            content_type=content_type)
+            bucket_name=bucket_name,
+            object_name=path,
+            data=data_stream,
+            length=len(data_to_save),
+            content_type=content_type,
+        )
         etag = result.etag
         LOGGER.debug(f'Saved into bucket "{bucket_name}" with path "{path}", etag "{etag}": {data}')
 
@@ -121,14 +125,15 @@ class MinioClient(Storage):
         if bucket_name and not self.minio_client.bucket_exists(bucket_name):
             return []
         object_names = set()
-        object_list = self.minio_client.list_objects(bucket_name, prefix=path.endswith(
-            PATH_SEPARATOR) and path or path + PATH_SEPARATOR)
+        object_list = self.minio_client.list_objects(
+            bucket_name, prefix=path.endswith(PATH_SEPARATOR) and path or path + PATH_SEPARATOR
+        )
         for obj in object_list:
             object_name = obj.object_name.strip(PATH_SEPARATOR)
             if folder != path:
                 # Bucket prefix includes path to the project
-                prefix = path[0: -(len(folder))]
-                object_name = object_name[len(prefix):]
+                prefix = path[0 : -(len(folder))]
+                object_name = object_name[len(prefix) :]
             object_names.add(object_name)
         return sorted(list(object_names))
 
@@ -138,8 +143,9 @@ class MinioClient(Storage):
         if bucket_name and not self.minio_client.bucket_exists(bucket_name):
             return False
         result = False
-        for obj in self.minio_client.list_objects(bucket_name, prefix=path.endswith(
-                PATH_SEPARATOR) and path or path + PATH_SEPARATOR):
+        for obj in self.minio_client.list_objects(
+            bucket_name, prefix=path.endswith(PATH_SEPARATOR) and path or path + PATH_SEPARATOR
+        ):
             self.minio_client.remove_object(bucket_name=bucket_name, object_name=obj.object_name)
             result = True
         return result

@@ -29,7 +29,7 @@
 
 ### Fixed
 - Re-train logic. Custom re-trained models for big enough projects do not affect negatively auto-analysis now, by @HardNorth
-- CVE addressed: CVE-2023-45853, CVE-2023-6246, CVE-2023-6779, CVE-2023-6780, CVE-2023-49468, CVE-2023-49467, CVE-2023-49465 
+- CVE addressed: CVE-2023-45853, CVE-2023-6246, CVE-2023-6779, CVE-2023-6780, CVE-2023-49468, CVE-2023-49467, CVE-2023-49465
 
 ## [5.11.0]
 ### Added

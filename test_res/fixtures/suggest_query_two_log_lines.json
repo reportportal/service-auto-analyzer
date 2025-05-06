@@ -137,6 +137,6 @@
                 }],
             "score_mode": "max",
             "boost_mode": "multiply"
-        } 
+        }
     }
 }

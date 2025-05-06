@@ -38,12 +38,12 @@ def test_exception_message_no_params_and_brackets(test_file, expected_file):
 @pytest.mark.parametrize(
     "test_file, expected_file",
     [
-        ("messages/error_base64.txt", "messages/result_error_no_data.txt"),
-        ("messages/error_with_json.txt", "messages/result_error_no_data.txt"),
-        ("messages/error_with_url_1.txt", "messages/result_error_with_url_1.txt"),
-        ("messages/error_with_url_2.txt", "messages/result_error_with_url_2.txt"),
-        ("messages/error_with_url_3.txt", "messages/result_error_with_url_3.txt"),
-        ("messages/error_with_url_4.txt", "messages/result_error_with_url_4.txt"),
+        ("messages/error_base64.txt", "messages/result_error_no_data.json"),
+        ("messages/error_with_json.txt", "messages/result_error_no_data.json"),
+        ("messages/error_with_url_1.txt", "messages/result_error_with_url_1.json"),
+        ("messages/error_with_url_2.txt", "messages/result_error_with_url_2.json"),
+        ("messages/error_with_url_3.txt", "messages/result_error_with_url_3.json"),
+        ("messages/error_with_url_4.txt", "messages/result_error_with_url_4.json"),
     ],
 )
 def test_extract_urls(test_file, expected_file):
@@ -58,11 +58,11 @@ def test_extract_urls(test_file, expected_file):
     "test_file, expected_file",
     [
         ("messages/error_base64.txt", "messages/result_error_base64_path_1.txt"),
-        ("messages/error_with_json.txt", "messages/result_error_no_data.txt"),
-        ("messages/error_with_url_1.txt", "messages/result_error_no_data.txt"),
-        ("messages/error_with_url_2.txt", "messages/result_error_no_data.txt"),
-        ("messages/error_with_url_3.txt", "messages/result_error_no_data.txt"),
-        ("messages/error_with_url_4.txt", "messages/result_error_no_data.txt"),
+        ("messages/error_with_json.txt", "messages/result_error_no_data.json"),
+        ("messages/error_with_url_1.txt", "messages/result_error_no_data.json"),
+        ("messages/error_with_url_2.txt", "messages/result_error_no_data.json"),
+        ("messages/error_with_url_3.txt", "messages/result_error_no_data.json"),
+        ("messages/error_with_url_4.txt", "messages/result_error_no_data.json"),
     ],
 )
 def test_extract_paths(test_file, expected_file):

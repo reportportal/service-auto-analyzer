@@ -29,7 +29,7 @@ checkstyle: install-dev-dependencies venv
 	${PYTHON} -m flake8
 
 release: install-dependencies
-	git config --global user.email "Jenkins"                                                                    
+	git config --global user.email "Jenkins"
 	git config --global user.name "Jenkins"
 	${PYTHON} -m bumpversion --new-version ${v} build --tag --tag-name ${v} --allow-dirty
 	${PYTHON} -m bumpversion --new-version ${v}-SNAPSHOT build --no-tag --allow-dirty

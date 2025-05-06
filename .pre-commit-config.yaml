@@ -4,7 +4,6 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
-      - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-added-large-files
@@ -12,7 +11,7 @@ repos:
     rev: 24.10.0
     hooks:
       - id: black
-        args: [ '--check', 'app', 'tests' ]
+        args: [ '--check', 'app', 'test' ]
   - repo: https://github.com/pycqa/isort
     rev: 6.0.0
     hooks:

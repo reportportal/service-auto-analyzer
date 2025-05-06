@@ -98,18 +98,22 @@ class PreparedLogMessage:
         return self._stacktrace
 
     @property
+    def exception_message_urls_list(self) -> list[str]:
+        if not self._exception_message_urls_list:
+            self._exception_message_urls_list = text_processing.extract_urls(self.exception_message)
+        return self._exception_message_urls_list
+
+    @property
     def exception_message_urls(self) -> str:
         if not self._exception_message_urls:
-            if not self._exception_message_urls_list:
-                self._exception_message_urls_list = text_processing.extract_urls(self.exception_message)
-            self._exception_message_urls = " ".join(self._exception_message_urls_list)
+            self._exception_message_urls = " ".join(self.exception_message_urls_list)
         return self._exception_message_urls
 
     @property
     def exception_message_no_urls(self) -> str:
         if not self._exception_message_no_urls:
             self._exception_message_no_urls = text_processing.remove_urls(
-                self.exception_message, self._exception_message_urls_list)
+                self.exception_message, self.exception_message_urls_list)
         return self._exception_message_no_urls
 
     @property

@@ -1,0 +1,1 @@
+["https://a.b.c.example.com/proxy/kafka/offset-query"]

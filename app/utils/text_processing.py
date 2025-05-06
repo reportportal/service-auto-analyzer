@@ -648,7 +648,7 @@ def extract_urls(text: str) -> list[str]:
     all_unique = set()
     all_urls = []
     for param in URL_PATTERN.findall(text):
-        url = param[0].strip()
+        url = param.strip()
         if url not in all_unique:
             all_unique.add(url)
             all_urls.append(url)
@@ -658,7 +658,7 @@ def extract_urls(text: str) -> list[str]:
 def extract_paths(text_without_urls: str) -> list[str]:
     all_unique = set()
     all_paths = []
-    for param in re.findall(r"((^|(?<=[^\w:\\/]))(\w:)?([\w.\- ]+)?([\\/]+[\w.\- ]+){2,})", text_without_urls):
+    for param in re.findall(r"((^|(?<=[^\w:\\/]))(\w:)?([\w.\- ]+)?([\\/]+[\w.\-=+ ]+){2,})", text_without_urls):
         path = param[0].strip()
         if path not in all_unique:
             all_unique.add(path)
@@ -834,24 +834,24 @@ def replace_tokens_with_readable_text(text: str) -> str:
 URL_TAG = "SPECIALURL"
 
 
-def remove_urls(exception_message: str, exception_message_urls_list: list[str]) -> str:
+def remove_urls(message: str, urls_list: list[str]) -> str:
     """
     Remove URLs from exception message.
 
     Replace URLs with a special tag to normalize exception messages.
 
-    :param str exception_message: Exception message to process
-    :param list[str] exception_message_urls_list: List of URLs to be removed
+    :param str message: Exception message to process
+    :param list[str] urls_list: List of URLs to be removed
 
     :return: Exception message with URLs replaced by special tag
     :rtype: str
     """
-    result = exception_message
-    if not exception_message or not exception_message_urls_list:
+    result = message
+    if not message or not urls_list:
         return result
 
     # Sort URLs by length in descending order to avoid partial replacements
-    for url in sorted(exception_message_urls_list, key=len, reverse=True):
+    for url in sorted(urls_list, key=len, reverse=True):
         result = result.replace(url, URL_TAG)
         # Also try with URL-encoded version
         # noinspection PyBroadException

@@ -1,0 +1,1 @@
+["https://a.b.c.example.com/v1/incentives/card-tx"]

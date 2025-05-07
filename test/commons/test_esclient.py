@@ -15,8 +15,6 @@
 import json
 import unittest
 from http import HTTPStatus
-from test import APP_CONFIG, get_fixture
-from test.mock_service import TestService
 from unittest.mock import MagicMock
 
 import httpretty
@@ -25,6 +23,8 @@ from elasticsearch import RequestError
 from app.commons import esclient
 from app.commons.model import launch_objects
 from app.utils import utils
+from test import APP_CONFIG, get_fixture
+from test.mock_service import TestService
 
 
 class TestEsClient(TestService):

@@ -24,9 +24,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from test import get_fixture
-
 from app.utils import text_processing
+from test import get_fixture
 
 
 def test_detecting_messages():

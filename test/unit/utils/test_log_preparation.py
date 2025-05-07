@@ -12,11 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from test import read_file, read_file_lines
-
 import pytest
 
 from app.utils import log_preparation
+from test import read_file, read_file_lines
 
 
 def test_remove_starting_thread_name():

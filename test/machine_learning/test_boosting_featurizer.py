@@ -13,13 +13,13 @@
 #  limitations under the License.
 
 import unittest
-from test import get_fixture
 
 from app.commons.object_saving import create_filesystem
 from app.machine_learning.boosting_featurizer import BoostingFeaturizer
 from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import utils
+from test import get_fixture
 
 
 class TestBoostingFeaturizer(unittest.TestCase):

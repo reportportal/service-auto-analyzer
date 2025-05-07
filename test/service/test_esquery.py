@@ -14,13 +14,13 @@
 
 import logging
 import unittest
-from test import get_fixture
 
 from app.commons import model_chooser
 from app.commons.model import launch_objects
 from app.commons.model.launch_objects import SearchConfig
 from app.service import AutoAnalyzerService, SearchService, SuggestService
 from app.utils import utils
+from test import get_fixture
 
 
 class TestEsQuery(unittest.TestCase):

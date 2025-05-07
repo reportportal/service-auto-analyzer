@@ -16,8 +16,6 @@
 
 import unittest
 from http import HTTPStatus
-from test import APP_CONFIG
-from test.mock_service import TestService
 from unittest.mock import MagicMock
 
 import httpretty
@@ -25,6 +23,8 @@ import httpretty
 from app.commons.model import launch_objects
 from app.service import SuggestPatternsService
 from app.utils import utils
+from test import APP_CONFIG
+from test.mock_service import TestService
 
 
 class TestSearchService(TestService):

@@ -13,11 +13,11 @@
 #  limitations under the License.
 
 import json
-from test import read_file
 
 import pytest
 
 from app.commons.prepared_log import PreparedLogMessage
+from test import read_file
 
 
 @pytest.mark.parametrize(

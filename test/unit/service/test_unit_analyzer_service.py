@@ -12,12 +12,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from test import DEFAULT_BOOST_LAUNCH, DEFAULT_SEARCH_CONFIG
 from unittest import mock
 
 import pytest
 
 from app.service.analyzer_service import AnalyzerService
+from test import DEFAULT_BOOST_LAUNCH, DEFAULT_SEARCH_CONFIG
 
 DEFAULT_LAUNCH_NAME = "Test Launch"
 DEFAULT_LAUNCH_ID = 3

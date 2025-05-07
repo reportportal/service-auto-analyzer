@@ -14,8 +14,6 @@
 
 import unittest
 from http import HTTPStatus
-from test import APP_CONFIG, get_fixture
-from test.mock_service import TestService
 
 import httpretty
 from freezegun import freeze_time
@@ -23,6 +21,8 @@ from freezegun import freeze_time
 from app.commons.model import launch_objects
 from app.service import ClusterService
 from app.utils import utils
+from test import APP_CONFIG, get_fixture
+from test.mock_service import TestService
 
 
 class TestClusterService(TestService):

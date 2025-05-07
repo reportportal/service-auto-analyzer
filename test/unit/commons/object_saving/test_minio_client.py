@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from test import random_alphanumeric
-
 # noinspection PyPackageRequirements
 import pytest
 import requests
@@ -23,6 +21,7 @@ from moto.server import ThreadedMotoServer
 
 from app.commons.model.launch_objects import ApplicationConfig
 from app.commons.object_saving.minio_client import MinioClient
+from test import random_alphanumeric
 
 SERVER_PORT = 5123
 REGION = "us-west-1"

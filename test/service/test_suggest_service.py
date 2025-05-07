@@ -17,8 +17,6 @@
 import json
 import unittest
 from http import HTTPStatus
-from test import APP_CONFIG, get_fixture
-from test.mock_service import TestService
 from unittest.mock import MagicMock
 
 import httpretty
@@ -28,6 +26,8 @@ from app.commons.model import launch_objects
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.service import SuggestService
 from app.utils import utils
+from test import APP_CONFIG, get_fixture
+from test.mock_service import TestService
 
 
 class TestSuggestService(TestService):

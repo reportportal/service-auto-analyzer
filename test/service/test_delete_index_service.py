@@ -14,13 +14,13 @@
 
 import unittest
 from http import HTTPStatus
-from test import APP_CONFIG, get_fixture
-from test.mock_service import TestService
 
 import httpretty
 
 from app.service import DeleteIndexService
 from app.utils import utils
+from test import APP_CONFIG, get_fixture
+from test.mock_service import TestService
 
 
 class TestDeleteIndexService(TestService):

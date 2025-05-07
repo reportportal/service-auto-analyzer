@@ -25,11 +25,11 @@
 #  limitations under the License.
 
 import json
-from test import read_file, read_file_lines
 
 import pytest
 
 from app.utils import text_processing, utils
+from test import read_file, read_file_lines
 
 
 def test_delete_empty_lines():

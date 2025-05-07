@@ -14,7 +14,6 @@
 
 import logging
 import unittest
-from test import get_fixture
 
 import numpy as np
 
@@ -24,6 +23,7 @@ from app.machine_learning.models import DefectTypeModel, WeightedSimilarityCalcu
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import utils
+from test import get_fixture
 
 
 class TestBoostingModel(unittest.TestCase):

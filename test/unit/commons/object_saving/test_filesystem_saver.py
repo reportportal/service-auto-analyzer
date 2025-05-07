@@ -13,13 +13,13 @@
 #  limitations under the License.
 
 import os
-from test import random_alphanumeric
 
 # noinspection PyPackageRequirements
 import pytest
 
 from app.commons.model.launch_objects import ApplicationConfig
 from app.commons.object_saving.filesystem_saver import FilesystemSaver
+from test import random_alphanumeric
 
 CREATED_FILES_AND_FOLDERS = []
 

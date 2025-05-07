@@ -11,13 +11,13 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from test import DEFAULT_ES_CONFIG
 from unittest import mock
 
 import pytest
 
 from app.commons import esclient
 from app.commons.model.launch_objects import Launch, Log, TestItem
+from test import DEFAULT_ES_CONFIG
 
 TEST_PROJECT_ID = 2
 

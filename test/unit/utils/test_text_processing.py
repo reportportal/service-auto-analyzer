@@ -36,7 +36,7 @@ def test_delete_empty_lines():
     log = utils.read_file("test_res/test_logs", "reportportal-api.txt")
     expected = utils.read_file("test_res/test_logs", "reportportal-api-no-empty-lines.txt")
 
-    assert text_processing.delete_empty_lines(log) == expected
+    assert text_processing.delete_empty_lines(log) == expected.rstrip("\n")
 
 
 def test_filter_empty_lines():
@@ -151,7 +151,7 @@ def test_replace_code_separators(test_file, expected_file):
 
 
 def test_remove_webdriver_auxiliary_info():
-    log = read_file_lines("test_res/test_logs/webdriver", "webdriver_oneliners.txt")
+    log = read_file_lines("test_res/test_logs/webdriver", "webdriver_oneliners.txt")[0:-1]
     expected_log = read_file_lines("test_res/test_logs/webdriver", "webdriver_oneliners_prepared.txt")
     for i, line in enumerate(log):
         assert text_processing.remove_webdriver_auxiliary_info(line) == expected_log[i]

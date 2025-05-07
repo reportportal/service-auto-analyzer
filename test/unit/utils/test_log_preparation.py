@@ -14,27 +14,27 @@
 
 import pytest
 
-from test import read_file_lines, read_file
 from app.utils import log_preparation
+from test import read_file, read_file_lines
 
 
 def test_remove_starting_thread_name():
-    log = read_file_lines('test_res/test_logs', 'log_line_timestamps.txt')
-    expected_log = read_file_lines('test_res/test_logs', 'log_line_prepared.txt')
+    log = read_file_lines("test_res/test_logs", "log_line_timestamps.txt")
+    expected_log = read_file_lines("test_res/test_logs", "log_line_prepared.txt")
     for i, line in enumerate(log):
         assert log_preparation.clean_message(log_preparation.basic_prepare(line)) == expected_log[i].strip()
 
 
 @pytest.mark.parametrize(
-    'test_file, expected_file',
+    "test_file, expected_file",
     [
-        ('separators/mixed_markdown_separators.txt', 'separators/mixed_markdown_separators_prepared.txt'),
-        ('stacktraces/webdriver_selenide_stacktrace.txt', 'stacktraces/webdriver_selenide_stacktrace_prepared.txt'),
-        ('stacktraces/log_stacktrace_js.txt', 'stacktraces/log_stacktrace_js_prepared.txt'),
-        ('webdriver/webdriver_exception_info.txt', 'webdriver/webdriver_exception_info_prepared.txt'),
-    ]
+        ("separators/mixed_markdown_separators.txt", "separators/mixed_markdown_separators_prepared.txt"),
+        ("stacktraces/webdriver_selenide_stacktrace.txt", "stacktraces/webdriver_selenide_stacktrace_prepared.txt"),
+        ("stacktraces/log_stacktrace_js.txt", "stacktraces/log_stacktrace_js_prepared.txt"),
+        ("webdriver/webdriver_exception_info.txt", "webdriver/webdriver_exception_info_prepared.txt"),
+    ],
 )
 def test_separators_log_prepare(test_file, expected_file):
-    log = read_file('test_res/test_logs', test_file)
-    expected_log = read_file('test_res/test_logs', expected_file)
+    log = read_file("test_res/test_logs", test_file)
+    expected_log = read_file("test_res/test_logs", expected_file)
     assert log_preparation.clean_message(log_preparation.basic_prepare(log)) == expected_log.strip()

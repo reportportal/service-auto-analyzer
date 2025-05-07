@@ -88,7 +88,7 @@
                     "message_extended": "",
                     "detected_message_without_params_and_brackets": "",
                     "message_without_params_and_brackets": "",
-                    "potential_status_codes": "200"              
+                    "potential_status_codes": "200"
               }
             }
         ]

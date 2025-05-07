@@ -8,5 +8,4 @@ Docker*
 Jenkins*
 **/*.md
 **/*.bat
-send_test.py
 requirements_windows.txt

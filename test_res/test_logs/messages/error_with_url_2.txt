@@ -1,0 +1,2 @@
+org.springframework.web.client.ResourceAccessException: I/O error on POST request for "https://a.b.c.example.com/proxy/kafka/offset-query": Socket closed; nested exception is java.net.SocketException: Socket closed
+Caused by: java.net.SocketException: Socket closed

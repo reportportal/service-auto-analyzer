@@ -20,8 +20,8 @@ from app.commons.object_saving.object_saver import ObjectSaver
 
 logger = logging.getLogger("analyzerApp.namespace_finder")
 
-UNIQUE_WORDS_OBJECT = 'project_log_unique_words'
-CHOSEN_NAMESPACES_OBJECT = 'chosen_namespaces'
+UNIQUE_WORDS_OBJECT = "project_log_unique_words"
+CHOSEN_NAMESPACES_OBJECT = "chosen_namespaces"
 
 
 class NamespaceFinder:
@@ -47,11 +47,11 @@ class NamespaceFinder:
         for word in log_words:
             all_words[word] = 1
         self.object_saver.put_project_object(all_words, UNIQUE_WORDS_OBJECT, project_id, using_json=True)
-        phrases = Phrases([w.split('.') for w in all_words], min_count=1, threshold=1)
+        phrases = Phrases([w.split(".") for w in all_words], min_count=1, threshold=1)
         potential_project_namespaces = {}
         for word in all_words:
-            potential_namespace = phrases[word.split('.')][0]
-            if '_' not in potential_namespace:
+            potential_namespace = phrases[word.split(".")][0]
+            if "_" not in potential_namespace:
                 continue
             if potential_namespace not in potential_project_namespaces:
                 potential_project_namespaces[potential_namespace] = 0
@@ -59,6 +59,6 @@ class NamespaceFinder:
         chosen_namespaces = {}
         for item, cnt in potential_project_namespaces.items():
             if cnt > 10:
-                chosen_namespaces[item.replace('_', '.')] = cnt
+                chosen_namespaces[item.replace("_", ".")] = cnt
         logger.debug("Chosen namespaces %s", chosen_namespaces)
         self.object_saver.put_project_object(chosen_namespaces, CHOSEN_NAMESPACES_OBJECT, project_id, using_json=True)

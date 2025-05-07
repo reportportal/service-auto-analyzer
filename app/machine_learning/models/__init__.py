@@ -15,17 +15,17 @@
 """Common package for ML models."""
 
 from app.machine_learning.models.ml_model import MlModel
-from app.machine_learning.models.defect_type_model import DefectTypeModel
-from app.machine_learning.models.custom_defect_type_model import CustomDefectTypeModel
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.machine_learning.models.custom_boosting_decision_maker import CustomBoostingDecisionMaker
+from app.machine_learning.models.custom_defect_type_model import CustomDefectTypeModel
+from app.machine_learning.models.defect_type_model import DefectTypeModel
 from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
 
 __all__ = [
-    'MlModel',
-    'DefectTypeModel',
-    'CustomDefectTypeModel',
-    'BoostingDecisionMaker',
-    'CustomBoostingDecisionMaker',
-    'WeightedSimilarityCalculator'
+    "MlModel",
+    "DefectTypeModel",
+    "CustomDefectTypeModel",
+    "BoostingDecisionMaker",
+    "CustomBoostingDecisionMaker",
+    "WeightedSimilarityCalculator",
 ]

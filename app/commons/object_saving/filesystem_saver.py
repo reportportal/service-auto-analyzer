@@ -23,7 +23,7 @@ from app.commons.model.launch_objects import ApplicationConfig
 from app.commons.object_saving.storage import Storage, unify_path_separator
 from app.utils import utils
 
-logger = logging.getLogger('analyzerApp.filesystemSaver')
+logger = logging.getLogger("analyzerApp.filesystemSaver")
 
 
 class FilesystemSaver(Storage):
@@ -47,9 +47,9 @@ class FilesystemSaver(Storage):
         folder_to_save = unify_path_separator(os.path.dirname(path))
         if folder_to_save:
             os.makedirs(folder_to_save, exist_ok=True)
-        with open(path, 'wb') as f:
+        with open(path, "wb") as f:
             if using_json:
-                f.write(json.dumps(data).encode('utf-8'))
+                f.write(json.dumps(data).encode("utf-8"))
             else:
                 # noinspection PyTypeChecker
                 pickle.dump(data, f)
@@ -58,8 +58,8 @@ class FilesystemSaver(Storage):
     def get_project_object(self, bucket: str, object_name: str, using_json: bool = False) -> object | None:
         filename = self.get_path(object_name, bucket)
         if not utils.validate_file(filename):
-            raise ValueError(f'Unable to get file: {filename}')
-        with open(filename, 'rb') as f:
+            raise ValueError(f"Unable to get file: {filename}")
+        with open(filename, "rb") as f:
             return json.loads(f.read()) if using_json else pickle.load(f)
 
     def does_object_exists(self, bucket: str, object_name: str) -> bool:
@@ -67,7 +67,7 @@ class FilesystemSaver(Storage):
 
     def get_folder_objects(self, bucket: str, folder: str) -> list[str]:
         path = self.get_path(folder, bucket)
-        if unify_path_separator(folder).endswith('/'):
+        if unify_path_separator(folder).endswith("/"):
             # The "folder" is a folder, list it
             if os.path.exists(path):
                 return [os.path.join(folder, file_name) for file_name in os.listdir(path)]

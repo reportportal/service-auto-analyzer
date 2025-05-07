@@ -29,10 +29,12 @@ class NamespaceFinderService:
 
     @utils.ignore_warnings
     def update_chosen_namespaces(self, launches: list[Launch]):
-        logger.info("Started updating chosen namespaces")
+        project_ids_str = ", ".join({str(launch.project) for launch in launches})
+        launch_ids_str = ", ".join({str(launch.launchId) for launch in launches})
+        logger.info(f"Started updating chosen namespaces for projects '{project_ids_str}', launches: {launch_ids_str}")
         t_start = time()
         log_words, project_id = request_factory.prepare_log_words(launches)
-        logger.debug(f'Project id {project_id}')
+        logger.debug(f"Project id {project_id}")
         if project_id is not None:
             self.namespace_finder.update_namespaces(project_id, log_words)
-        logger.info('Finished updating chosen namespaces %.2f s', time() - t_start)
+        logger.info("Finished updating chosen namespaces %.2f s", time() - t_start)

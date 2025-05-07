@@ -16,29 +16,38 @@ import json
 from datetime import datetime
 from queue import Queue
 from threading import Thread
-from time import time, sleep
+from time import sleep, time
 from typing import Any
 
 from app.amqp.amqp import AmqpClient
-from app.commons import logging, request_factory, object_saving, log_merger
+from app.commons import log_merger, logging, object_saving, request_factory
 from app.commons.esclient import EsClient
-from app.commons.model.launch_objects import AnalysisResult, BatchLogInfo, AnalysisCandidate, SuggestAnalysisResult, \
-    SearchConfig, ApplicationConfig, Launch
+from app.commons.model.launch_objects import (
+    AnalysisCandidate,
+    AnalysisResult,
+    ApplicationConfig,
+    BatchLogInfo,
+    Launch,
+    SearchConfig,
+    SuggestAnalysisResult,
+)
 from app.commons.model.ml import ModelType
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.similarity_calculator import SimilarityCalculator
 from app.machine_learning import boosting_featurizer
-from app.machine_learning.models import WeightedSimilarityCalculator, BoostingDecisionMaker, DefectTypeModel
+from app.machine_learning.models import BoostingDecisionMaker, DefectTypeModel, WeightedSimilarityCalculator
 from app.service.analyzer_service import AnalyzerService
-from app.utils import utils, text_processing
+from app.utils import text_processing, utils
 
 logger = logging.getLogger("analyzerApp.autoAnalyzerService")
 EARLY_FINISH = False
 SPECIAL_FIELDS_BOOST_SCORES = [
     ("detected_message_without_params_extended", 2.0),
-    ("only_numbers", 2.0), ("potential_status_codes", 8.0),
-    ("found_tests_and_methods", 2), ("test_item_name", 2.0)
+    ("only_numbers", 2.0),
+    ("potential_status_codes", 8.0),
+    ("found_tests_and_methods", 2),
+    ("test_item_name", 2.0),
 ]
 
 
@@ -49,8 +58,13 @@ class AutoAnalyzerService(AnalyzerService):
     namespace_finder: NamespaceFinder
     similarity_model: WeightedSimilarityCalculator
 
-    def __init__(self, model_chooser: ModelChooser, app_config: ApplicationConfig, search_cfg: SearchConfig,
-                 es_client: EsClient = None):
+    def __init__(
+        self,
+        model_chooser: ModelChooser,
+        app_config: ApplicationConfig,
+        search_cfg: SearchConfig,
+        es_client: EsClient = None,
+    ):
         self.app_config = app_config
         self.search_cfg = search_cfg
         super().__init__(model_chooser, search_cfg=self.search_cfg)
@@ -58,9 +72,9 @@ class AutoAnalyzerService(AnalyzerService):
         self.namespace_finder = NamespaceFinder(app_config)
         weights_folder = self.search_cfg.SimilarityWeightsFolder
         if not weights_folder:
-            raise ValueError('SimilarityWeightsFolder is not set')
+            raise ValueError("SimilarityWeightsFolder is not set")
         if weights_folder:
-            self.similarity_model = (WeightedSimilarityCalculator(object_saving.create_filesystem(weights_folder)))
+            self.similarity_model = WeightedSimilarityCalculator(object_saving.create_filesystem(weights_folder))
             self.similarity_model.load_model()
 
     def get_config_for_boosting(self, analyzer_config):
@@ -71,25 +85,31 @@ class AutoAnalyzerService(AnalyzerService):
             "min_word_length": self.search_cfg.MinWordLength,
             "filter_min_should_match_any": [],
             "filter_min_should_match": self.choose_fields_to_filter_strict(
-                analyzer_config.numberOfLogLines, min_should_match),
+                analyzer_config.numberOfLogLines, min_should_match
+            ),
             "number_of_log_lines": analyzer_config.numberOfLogLines,
             "filter_by_test_case_hash": True,
             "boosting_model": self.search_cfg.BoostModelFolder,
             "filter_by_all_logs_should_be_similar": analyzer_config.allMessagesShouldMatch,
-            "time_weight_decay": self.search_cfg.TimeWeightDecay
+            "time_weight_decay": self.search_cfg.TimeWeightDecay,
         }
 
     def choose_fields_to_filter_strict(self, log_lines, min_should_match):
-        fields = [
-            "detected_message", "message", "potential_status_codes"] \
-            if log_lines == -1 else ["message", "potential_status_codes"]
+        fields = (
+            ["detected_message", "message", "potential_status_codes"]
+            if log_lines == -1
+            else ["message", "potential_status_codes"]
+        )
         if min_should_match > 0.99:
             fields.append("found_tests_and_methods")
         return fields
 
     def get_min_should_match_setting(self, launch: Launch) -> str:
-        return f"{launch.analyzerConfig.minShouldMatch}%" \
-            if launch.analyzerConfig.minShouldMatch > 0 else self.search_cfg.MinShouldMatch
+        return (
+            f"{launch.analyzerConfig.minShouldMatch}%"
+            if launch.analyzerConfig.minShouldMatch > 0
+            else self.search_cfg.MinShouldMatch
+        )
 
     def build_analyze_query(self, launch: Launch, log: dict[str, Any], size=10):
         """Build query to get similar log entries for the given log entry.
@@ -103,45 +123,74 @@ class AutoAnalyzerService(AnalyzerService):
         query = self.build_common_query(log, size=size)
         query = self.add_constraints_for_launches_into_query(query, launch)
 
-        must = utils.create_path(query, ('query', 'bool', 'must'), [])
-        must_not = utils.create_path(query, ('query', 'bool', 'must_not'), [])
-        should = utils.create_path(query, ('query', 'bool', 'should'), [])
-        filter_ = utils.create_path(query, ('query', 'bool', 'filter'), [])
+        must = utils.create_path(query, ("query", "bool", "must"), [])
+        must_not = utils.create_path(query, ("query", "bool", "must_not"), [])
+        should = utils.create_path(query, ("query", "bool", "should"), [])
+        filter_ = utils.create_path(query, ("query", "bool", "filter"), [])
         if log["_source"]["message"].strip():
             log_lines = launch.analyzerConfig.numberOfLogLines
             filter_.append({"term": {"is_merged": False}})
             if log_lines == -1:
-                must.append(self.build_more_like_this_query(
-                    min_should_match, log["_source"]["detected_message"], field_name="detected_message", boost=4.0))
+                must.append(
+                    self.build_more_like_this_query(
+                        min_should_match, log["_source"]["detected_message"], field_name="detected_message", boost=4.0
+                    )
+                )
                 if log["_source"]["stacktrace"].strip():
-                    must.append(self.build_more_like_this_query(
-                        min_should_match, log["_source"]["stacktrace"], field_name="stacktrace", boost=2.0))
+                    must.append(
+                        self.build_more_like_this_query(
+                            min_should_match, log["_source"]["stacktrace"], field_name="stacktrace", boost=2.0
+                        )
+                    )
                 else:
                     must_not.append({"wildcard": {"stacktrace": "*"}})
             else:
-                must.append(self.build_more_like_this_query(
-                    min_should_match, log["_source"]["message"], field_name="message", boost=4.0))
-                should.append(self.build_more_like_this_query(
-                    "80%", log["_source"]["detected_message"], field_name="detected_message", boost=2.0))
-                should.append(self.build_more_like_this_query(
-                    "60%", log["_source"]["stacktrace"], field_name="stacktrace", boost=1.0))
-            should.append(self.build_more_like_this_query(
-                "80%", log["_source"]["merged_small_logs"], field_name="merged_small_logs", boost=0.5))
+                must.append(
+                    self.build_more_like_this_query(
+                        min_should_match, log["_source"]["message"], field_name="message", boost=4.0
+                    )
+                )
+                should.append(
+                    self.build_more_like_this_query(
+                        "80%", log["_source"]["detected_message"], field_name="detected_message", boost=2.0
+                    )
+                )
+                should.append(
+                    self.build_more_like_this_query(
+                        "60%", log["_source"]["stacktrace"], field_name="stacktrace", boost=1.0
+                    )
+                )
+            should.append(
+                self.build_more_like_this_query(
+                    "80%", log["_source"]["merged_small_logs"], field_name="merged_small_logs", boost=0.5
+                )
+            )
         else:
             filter_.append({"term": {"is_merged": True}})
             must_not.append({"wildcard": {"message": "*"}})
-            must.append(self.build_more_like_this_query(
-                min_should_match, log["_source"]["merged_small_logs"], field_name="merged_small_logs", boost=2.0))
+            must.append(
+                self.build_more_like_this_query(
+                    min_should_match, log["_source"]["merged_small_logs"], field_name="merged_small_logs", boost=2.0
+                )
+            )
 
         if log["_source"]["found_exceptions"].strip():
-            must.append(self.build_more_like_this_query(
-                "1", log["_source"]["found_exceptions"], field_name="found_exceptions", boost=8.0,
-                override_min_should_match="1"))
+            must.append(
+                self.build_more_like_this_query(
+                    "1",
+                    log["_source"]["found_exceptions"],
+                    field_name="found_exceptions",
+                    boost=8.0,
+                    override_min_should_match="1",
+                )
+            )
         for field, boost_score in SPECIAL_FIELDS_BOOST_SCORES:
             if log["_source"][field].strip():
-                should.append(self.build_more_like_this_query(
-                    "1", log["_source"][field], field_name=field, boost=boost_score,
-                    override_min_should_match="1"))
+                should.append(
+                    self.build_more_like_this_query(
+                        "1", log["_source"][field], field_name=field, boost=boost_score, override_min_should_match="1"
+                    )
+                )
 
         return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
@@ -149,44 +198,46 @@ class AutoAnalyzerService(AnalyzerService):
         min_should_match = self.get_min_should_match_setting(launch)
         query = {
             "size": size,
-            "sort": ["_score",
-                     {"start_time": "desc"}],
+            "sort": ["_score", {"start_time": "desc"}],
             "query": {
                 "bool": {
                     "filter": [
                         {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
-                        {"exists": {"field": "issue_type"}}
+                        {"exists": {"field": "issue_type"}},
                     ],
                     "must_not": [
                         {"term": {"issue_type": "ti001"}},
-                        {"term": {"test_item": log["_source"]["test_item"]}}
+                        {"term": {"test_item": log["_source"]["test_item"]}},
                     ],
-                    "must": [
-                        {"term": {"test_case_hash": log["_source"]["test_case_hash"]}}
-                    ],
-                    "should": []
-                }}}
+                    "must": [{"term": {"test_case_hash": log["_source"]["test_case_hash"]}}],
+                    "should": [],
+                }
+            },
+        }
         query = self.add_constraints_for_launches_into_query(query, launch)
         if log["_source"]["message"].strip():
             query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
             query["query"]["bool"]["must"].append(
-                self.build_more_like_this_query(min_should_match,
-                                                log["_source"]["message"],
-                                                field_name="message"))
+                self.build_more_like_this_query(min_should_match, log["_source"]["message"], field_name="message")
+            )
         else:
             query["query"]["bool"]["filter"].append({"term": {"is_merged": True}})
             query["query"]["bool"]["must_not"].append({"wildcard": {"message": "*"}})
             query["query"]["bool"]["must"].append(
-                self.build_more_like_this_query(min_should_match,
-                                                log["_source"]["merged_small_logs"],
-                                                field_name="merged_small_logs"))
+                self.build_more_like_this_query(
+                    min_should_match, log["_source"]["merged_small_logs"], field_name="merged_small_logs"
+                )
+            )
         if log["_source"]["found_exceptions"].strip():
             query["query"]["bool"]["must"].append(
-                self.build_more_like_this_query("1",
-                                                log["_source"]["found_exceptions"],
-                                                field_name="found_exceptions",
-                                                boost=8.0,
-                                                override_min_should_match="1"))
+                self.build_more_like_this_query(
+                    "1",
+                    log["_source"]["found_exceptions"],
+                    field_name="found_exceptions",
+                    boost=8.0,
+                    override_min_should_match="1",
+                )
+            )
         utils.append_potential_status_codes(query, log, max_query_terms=self.search_cfg.MaxQueryTerms)
         return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
@@ -198,12 +249,11 @@ class AutoAnalyzerService(AnalyzerService):
                 if log["_source"]["issue_type"][:2].lower() in ["nd", "ti"]:
                     no_defect_candidate_exists = True
             new_search_res = []
-            _similarity_calculator = SimilarityCalculator(
-                boosting_config,
-                similarity_model=self.similarity_model)
+            _similarity_calculator = SimilarityCalculator(boosting_config, similarity_model=self.similarity_model)
             if no_defect_candidate_exists:
                 sim_dict = _similarity_calculator.find_similarity(
-                    [(log_info, search_res)], ["message", "merged_small_logs"])
+                    [(log_info, search_res)], ["message", "merged_small_logs"]
+                )
                 for obj in search_res["hits"]["hits"]:
                     group_id = (str(obj["_id"]), str(log_info["_id"]))
                     if group_id in sim_dict["message"]:
@@ -236,18 +286,19 @@ class AutoAnalyzerService(AnalyzerService):
         return candidates_with_no_defect
 
     def find_relevant_with_no_defect(self, candidates_with_no_defect, boosting_config):
-        candidates_with_no_defect = self.leave_only_similar_logs(
-            candidates_with_no_defect, boosting_config)
+        candidates_with_no_defect = self.leave_only_similar_logs(candidates_with_no_defect, boosting_config)
         candidates_with_no_defect = self.filter_by_all_logs_should_be_similar(
-            candidates_with_no_defect, boosting_config)
+            candidates_with_no_defect, boosting_config
+        )
         for log_info, search_res in candidates_with_no_defect:
             latest_type = None
             latest_item = None
             latest_date = None
             for obj in search_res["hits"]["hits"]:
-                logger.debug("%s %s %s", obj["_source"]["start_time"], obj["_source"]["issue_type"],
-                             obj["_source"]["test_item"])
-                start_time = datetime.strptime(obj["_source"]["start_time"], '%Y-%m-%d %H:%M:%S')
+                logger.debug(
+                    "%s %s %s", obj["_source"]["start_time"], obj["_source"]["issue_type"], obj["_source"]["test_item"]
+                )
+                start_time = datetime.strptime(obj["_source"]["start_time"], "%Y-%m-%d %H:%M:%S")
                 if latest_date is None or latest_date < start_time:
                     latest_type = obj["_source"]["issue_type"]
                     latest_item = obj
@@ -268,24 +319,24 @@ class AutoAnalyzerService(AnalyzerService):
             for idx in test_item_dict[test_item_id]:
                 batch_log_info = batch_logs[idx]
                 if batch_log_info.query_type == "without no defect":
-                    candidates.append(
-                        (batch_log_info.log_info, partial_res[idx]))
+                    candidates.append((batch_log_info.log_info, partial_res[idx]))
                 if batch_log_info.query_type == "with no defect":
-                    candidates_with_no_defect.append(
-                        (batch_log_info.log_info, partial_res[idx]))
+                    candidates_with_no_defect.append((batch_log_info.log_info, partial_res[idx]))
                 time_processed += avg_time_processed
             if batch_log_info:
-                self.queue.put(AnalysisCandidate(
-                    analyzerConfig=batch_log_info.analyzerConfig,
-                    testItemId=batch_log_info.testItemId,
-                    project=batch_log_info.project,
-                    launchId=batch_log_info.launchId,
-                    launchName=batch_log_info.launchName,
-                    launchNumber=batch_log_info.launchNumber,
-                    timeProcessed=time_processed,
-                    candidates=candidates,
-                    candidatesWithNoDefect=candidates_with_no_defect
-                ))
+                self.queue.put(
+                    AnalysisCandidate(
+                        analyzerConfig=batch_log_info.analyzerConfig,
+                        testItemId=batch_log_info.testItemId,
+                        project=batch_log_info.project,
+                        launchId=batch_log_info.launchId,
+                        launchName=batch_log_info.launchName,
+                        launchNumber=batch_log_info.launchNumber,
+                        timeProcessed=time_processed,
+                        candidates=candidates,
+                        candidatesWithNoDefect=candidates_with_no_defect,
+                    )
+                )
 
     def _query_elasticsearch(self, launches: list[Launch], max_batch_size=30):
         t_start = time()
@@ -302,48 +353,53 @@ class AutoAnalyzerService(AnalyzerService):
                 if not self.es_client.index_exists(index_name):
                     continue
                 if test_items_number_to_process >= self.search_cfg.MaxAutoAnalysisItemsToProcess:
-                    logger.info("Only first %d test items were taken",
-                                self.search_cfg.MaxAutoAnalysisItemsToProcess)
+                    logger.info("Only first %d test items were taken", self.search_cfg.MaxAutoAnalysisItemsToProcess)
                     break
                 if EARLY_FINISH:
                     logger.info("Early finish from analyzer before timeout")
                     break
                 for test_item in launch.testItems:
                     if test_items_number_to_process >= self.search_cfg.MaxAutoAnalysisItemsToProcess:
-                        logger.info("Only first %d test items were taken",
-                                    self.search_cfg.MaxAutoAnalysisItemsToProcess)
+                        logger.info(
+                            "Only first %d test items were taken", self.search_cfg.MaxAutoAnalysisItemsToProcess
+                        )
                         break
                     if EARLY_FINISH:
                         logger.info("Early finish from analyzer before timeout")
                         break
                     unique_logs = text_processing.leave_only_unique_logs(test_item.logs)
-                    prepared_logs = [request_factory.prepare_log(launch, test_item, log, index_name)
-                                     for log in unique_logs if log.logLevel >= utils.ERROR_LOGGING_LEVEL]
+                    prepared_logs = [
+                        request_factory.prepare_log(launch, test_item, log, index_name)
+                        for log in unique_logs
+                        if log.logLevel >= utils.ERROR_LOGGING_LEVEL
+                    ]
                     results, _ = log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
 
                     for log in results:
                         message = log["_source"]["message"].strip()
                         merged_logs = log["_source"]["merged_small_logs"].strip()
-                        if log["_source"]["log_level"] < utils.ERROR_LOGGING_LEVEL or \
-                                (not message and not merged_logs):
+                        if log["_source"]["log_level"] < utils.ERROR_LOGGING_LEVEL or (
+                            not message and not merged_logs
+                        ):
                             continue
                         for query_type, query in [
                             ("without no defect", self.build_analyze_query(launch, log)),
-                            ("with no defect", self.build_query_with_no_defect(launch, log))
+                            ("with no defect", self.build_query_with_no_defect(launch, log)),
                         ]:
-                            full_query = "{}\n{}".format(
-                                json.dumps({"index": index_name}), json.dumps(query))
+                            full_query = "{}\n{}".format(json.dumps({"index": index_name}), json.dumps(query))
                             batches.append(full_query)
-                            batch_logs.append(BatchLogInfo(
-                                analyzerConfig=launch.analyzerConfig,
-                                testItemId=test_item.testItemId,
-                                log_info=log,
-                                query_type=query_type,
-                                project=launch.project,
-                                launchId=launch.launchId,
-                                launchName=launch.launchName,
-                                launchNumber=launch.launchNumber
-                            ))
+                            batch_logs.append(
+                                BatchLogInfo(
+                                    analyzerConfig=launch.analyzerConfig,
+                                    testItemId=test_item.testItemId,
+                                    log_info=log,
+                                    query_type=query_type,
+                                    project=launch.project,
+                                    launchId=launch.launchId,
+                                    launchName=launch.launchName,
+                                    launchNumber=launch.launchNumber,
+                                )
+                            )
                             if test_item.testItemId not in test_item_dict:
                                 test_item_dict[test_item.testItemId] = []
                             test_item_dict[test_item.testItemId].append(index_in_batch)
@@ -362,8 +418,7 @@ class AutoAnalyzerService(AnalyzerService):
                 self._send_result_to_queue(test_item_dict, batches, batch_logs)
 
         except Exception as exc:
-            logger.error("Error in ES query")
-            logger.exception(exc)
+            logger.exception("Error in ES query", exc_info=exc)
         self.finished_queue.put("Finished")
         logger.info("Es queries finished %.2f s.", time() - t_start)
 
@@ -390,8 +445,9 @@ class AutoAnalyzerService(AnalyzerService):
             results_to_share = {}
             chosen_namespaces = {}
             while self.finished_queue.empty() or not self.queue.empty():
-                if (self.search_cfg.AutoAnalysisTimeout - (
-                        time() - t_start)) <= 5:  # check whether we are running out of time # noqa
+                if (
+                    self.search_cfg.AutoAnalysisTimeout - (time() - t_start)
+                ) <= 5:  # check whether we are running out of time # noqa
                     EARLY_FINISH = True
                     break
                 if self.queue.empty():
@@ -404,7 +460,9 @@ class AutoAnalyzerService(AnalyzerService):
                     launch_id = analyzer_candidates.launchId
                     if launch_id not in results_to_share:
                         results_to_share[launch_id] = {
-                            "not_found": 0, "items_to_process": 0, "processed_time": 0,
+                            "not_found": 0,
+                            "items_to_process": 0,
+                            "processed_time": 0,
                             "launch_id": launch_id,
                             "launch_name": analyzer_candidates.launchName,
                             "project_id": project_id,
@@ -413,11 +471,13 @@ class AutoAnalyzerService(AnalyzerService):
                             "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                             "number_of_log_lines": analyzer_candidates.analyzerConfig.numberOfLogLines,
                             "min_should_match": self.find_min_should_match_threshold(
-                                analyzer_candidates.analyzerConfig),
+                                analyzer_candidates.analyzerConfig
+                            ),
                             "model_info": set(),
                             "module_version": [self.app_config.appVersion],
                             "errors": [],
-                            "errors_count": 0}
+                            "errors_count": 0,
+                        }
 
                     t_start_item = time()
                     cnt_items_to_process += 1
@@ -426,20 +486,23 @@ class AutoAnalyzerService(AnalyzerService):
                     boosting_config = self.get_config_for_boosting(analyzer_candidates.analyzerConfig)
 
                     if project_id not in chosen_namespaces:
-                        chosen_namespaces[project_id] = self.namespace_finder.get_chosen_namespaces(
-                            project_id)
+                        chosen_namespaces[project_id] = self.namespace_finder.get_chosen_namespaces(project_id)
                     boosting_config["chosen_namespaces"] = chosen_namespaces[project_id]
                     # noinspection PyTypeChecker
                     _boosting_decision_maker: BoostingDecisionMaker = self.model_chooser.choose_model(
-                        project_id, ModelType.auto_analysis,
-                        custom_model_prob=self.search_cfg.ProbabilityForCustomModelAutoAnalysis)
+                        project_id,
+                        ModelType.auto_analysis,
+                        custom_model_prob=self.search_cfg.ProbabilityForCustomModelAutoAnalysis,
+                    )
                     if project_id not in defect_type_model_to_use:
                         # noinspection PyTypeChecker
                         defect_type_model_to_use[project_id] = self.model_chooser.choose_model(
-                            project_id, ModelType.defect_type)
+                            project_id, ModelType.defect_type
+                        )
 
                     relevant_with_no_defect_candidate = self.find_relevant_with_no_defect(
-                        analyzer_candidates.candidatesWithNoDefect, boosting_config)
+                        analyzer_candidates.candidatesWithNoDefect, boosting_config
+                    )
 
                     candidates_to_check = []
                     if relevant_with_no_defect_candidate:
@@ -453,104 +516,112 @@ class AutoAnalyzerService(AnalyzerService):
                             candidates,
                             boosting_config,
                             feature_ids=_boosting_decision_maker.feature_ids,
-                            weighted_log_similarity_calculator=self.similarity_model)
+                            weighted_log_similarity_calculator=self.similarity_model,
+                        )
                         boosting_data_gatherer.set_defect_type_model(defect_type_model_to_use[project_id])
                         feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
-                        model_info_tags = (boosting_data_gatherer.get_used_model_info()
-                                           + _boosting_decision_maker.get_model_info())
+                        model_info_tags = (
+                            boosting_data_gatherer.get_used_model_info() + _boosting_decision_maker.get_model_info()
+                        )
                         results_to_share[launch_id]["model_info"].update(model_info_tags)
 
                         if len(feature_data) > 0:
 
                             # noinspection PyUnresolvedReferences
                             predicted_labels, predicted_labels_probability = _boosting_decision_maker.predict(
-                                feature_data)
+                                feature_data
+                            )
 
                             scores_by_issue_type = boosting_data_gatherer.find_most_relevant_by_type()
 
                             for i in range(len(issue_type_names)):
+                                issue_type_name = issue_type_names[i]
+                                log_id = scores_by_issue_type[issue_type_name]["mrHit"]["_id"]
                                 logger.debug(
-                                    "Most relevant item with issue type %s has id %s",
-                                    issue_type_names[i],
-                                    boosting_data_gatherer
-                                    .find_most_relevant_by_type()[issue_type_names[i]]["mrHit"]["_id"])
+                                    f"Most relevant item with issue type '{issue_type_name}' has log id: {log_id}"
+                                )
+                                label = predicted_labels[i]
+                                probability = round(predicted_labels_probability[i][1], 3)
                                 logger.debug(
-                                    "Issue type %s has label %d and probability %.3f for features %s",
-                                    issue_type_names[i],
-                                    predicted_labels[i],
-                                    predicted_labels_probability[i][1],
-                                    feature_data[i])
+                                    f"Issue type '{issue_type_name}' has label '{label}' and probability {probability}"
+                                    f" with calculated feature values: {feature_data[i]}"
+                                )
 
                             predicted_issue_type, prob, global_idx = utils.choose_issue_type(
-                                predicted_labels,
-                                predicted_labels_probability,
-                                issue_type_names,
-                                boosting_data_gatherer.find_most_relevant_by_type())
+                                predicted_labels, predicted_labels_probability, issue_type_names, scores_by_issue_type
+                            )
 
                             if predicted_issue_type:
                                 chosen_type = scores_by_issue_type[predicted_issue_type]
                                 relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
                                 analysis_result = AnalysisResult(
-                                    testItem=analyzer_candidates.testItemId, issueType=predicted_issue_type,
-                                    relevantItem=relevant_item)
-                                relevant_log_id = utils.extract_real_id(chosen_type["mrHit"]["_id"])
-                                test_item_log_id = utils.extract_real_id(chosen_type["compared_log"]["_id"])
-                                analyzed_results_for_index.append(SuggestAnalysisResult(
-                                    project=analyzer_candidates.project,
                                     testItem=analyzer_candidates.testItemId,
-                                    testItemLogId=test_item_log_id,
-                                    launchId=analyzer_candidates.launchId,
-                                    launchName=analyzer_candidates.launchName,
-                                    launchNumber=analyzer_candidates.launchNumber,
                                     issueType=predicted_issue_type,
                                     relevantItem=relevant_item,
-                                    relevantLogId=relevant_log_id,
-                                    isMergedLog=chosen_type["compared_log"]["_source"]["is_merged"],
-                                    matchScore=round(prob * 100, 2),
-                                    esScore=round(chosen_type["mrHit"]["_score"], 2),
-                                    esPosition=chosen_type["mrHit"]["es_pos"],
-                                    modelFeatureNames=";".join([str(i) for i in _boosting_decision_maker.feature_ids]),
-                                    modelFeatureValues=";".join(
-                                        [str(feature) for feature in feature_data[global_idx]]),
-                                    modelInfo=";".join(model_info_tags),
-                                    resultPosition=0,
-                                    usedLogLines=analyzer_candidates.analyzerConfig.numberOfLogLines,
-                                    minShouldMatch=self.find_min_should_match_threshold(
-                                        analyzer_candidates.analyzerConfig),
-                                    processedTime=time() - t_start_item,
-                                    methodName="auto_analysis",
-                                    userChoice=1))  # default choice in AA, user will change via defect change
+                                )
+                                relevant_log_id = utils.extract_real_id(chosen_type["mrHit"]["_id"])
+                                test_item_log_id = utils.extract_real_id(chosen_type["compared_log"]["_id"])
+                                analyzed_results_for_index.append(
+                                    SuggestAnalysisResult(
+                                        project=analyzer_candidates.project,
+                                        testItem=analyzer_candidates.testItemId,
+                                        testItemLogId=test_item_log_id,
+                                        launchId=analyzer_candidates.launchId,
+                                        launchName=analyzer_candidates.launchName,
+                                        launchNumber=analyzer_candidates.launchNumber,
+                                        issueType=predicted_issue_type,
+                                        relevantItem=relevant_item,
+                                        relevantLogId=relevant_log_id,
+                                        isMergedLog=chosen_type["compared_log"]["_source"]["is_merged"],
+                                        matchScore=round(prob * 100, 2),
+                                        esScore=round(chosen_type["mrHit"]["_score"], 2),
+                                        esPosition=chosen_type["mrHit"]["es_pos"],
+                                        modelFeatureNames=";".join(
+                                            [str(i) for i in _boosting_decision_maker.feature_ids]
+                                        ),
+                                        modelFeatureValues=";".join(
+                                            [str(feature) for feature in feature_data[global_idx]]
+                                        ),
+                                        modelInfo=";".join(model_info_tags),
+                                        resultPosition=0,
+                                        usedLogLines=analyzer_candidates.analyzerConfig.numberOfLogLines,
+                                        minShouldMatch=self.find_min_should_match_threshold(
+                                            analyzer_candidates.analyzerConfig
+                                        ),
+                                        processedTime=time() - t_start_item,
+                                        methodName="auto_analysis",
+                                        userChoice=1,
+                                    )
+                                )  # default choice in AA, user will change via defect change
 
                                 results.append(analysis_result)
                                 found_result = True
                                 logger.debug(analysis_result)
                             else:
-                                logger.debug("Test item %s has no relevant items",
-                                             analyzer_candidates.testItemId)
+                                logger.debug("Test item %s has no relevant items", analyzer_candidates.testItemId)
                         else:
-                            logger.debug("There are no results for test item %s",
-                                         analyzer_candidates.testItemId)
+                            logger.debug("There are no results for test item %s", analyzer_candidates.testItemId)
 
                         if found_result:
                             break
 
                     if not found_result:
                         results_to_share[launch_id]["not_found"] += 1
-                    results_to_share[launch_id]["processed_time"] += (time() - t_start_item)
+                    results_to_share[launch_id]["processed_time"] += time() - t_start_item
                 except Exception as exc:
                     logger.exception(exc)
                     if launch_id in results_to_share:
                         results_to_share[launch_id]["errors"].append(utils.extract_exception(exc))
                         results_to_share[launch_id]["errors_count"] += 1
             if self.app_config.amqpUrl and analyzed_results_for_index:
-                amqp_client = AmqpClient(self.app_config.amqpUrl)
+                amqp_client = AmqpClient(self.app_config)
                 amqp_client.send_to_inner_queue(
-                    self.app_config.exchangeName, 'index_suggest_info',
-                    json.dumps([_info.dict() for _info in analyzed_results_for_index]))
+                    "index_suggest_info", json.dumps([_info.dict() for _info in analyzed_results_for_index])
+                )
                 for launch_id in results_to_share:
-                    results_to_share[launch_id]['model_info'] = list(results_to_share[launch_id]['model_info'])
-                amqp_client.send_to_inner_queue(
-                    self.app_config.exchangeName, 'stats_info', json.dumps(results_to_share))
+                    results_to_share[launch_id]["model_info"] = list(results_to_share[launch_id]["model_info"])
+                amqp_client.send_to_inner_queue("stats_info", json.dumps(results_to_share))
+                amqp_client.close()
         except Exception as exc:
             logger.exception(exc)
         es_query_thread.join()

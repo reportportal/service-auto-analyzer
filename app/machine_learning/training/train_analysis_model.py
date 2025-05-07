@@ -15,7 +15,7 @@
 import os
 from datetime import datetime
 from time import time
-from typing import Optional, Any, Type
+from typing import Any, Optional, Type
 
 import elasticsearch
 import elasticsearch.helpers
@@ -26,14 +26,17 @@ from sklearn.model_selection import train_test_split
 
 from app.commons import logging, namespace_finder, object_saving
 from app.commons.esclient import EsClient
-from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
-from app.commons.model.ml import TrainInfo, ModelType
+from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
+from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model_chooser import ModelChooser
 from app.machine_learning.boosting_featurizer import BoostingFeaturizer
-from app.machine_learning.models import (BoostingDecisionMaker, CustomBoostingDecisionMaker,
-                                         WeightedSimilarityCalculator)
+from app.machine_learning.models import (
+    BoostingDecisionMaker,
+    CustomBoostingDecisionMaker,
+    WeightedSimilarityCalculator,
+)
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
-from app.utils import utils, text_processing
+from app.utils import text_processing, utils
 from app.utils.defaultdict import DefaultDict
 
 LOGGER = logging.getLogger("analyzerApp.trainingAnalysisModel")
@@ -41,7 +44,7 @@ TRAIN_DATA_RANDOM_STATES = [1257, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427,
 DUE_PROPORTION = 0.05
 SMOTE_PROPORTION = 0.4
 MIN_P_VALUE = 0.05
-METRIC = 'F1'
+METRIC = "F1"
 
 
 def deduplicate_data(data: list[list[float]], labels: list[int]) -> tuple[list[list[float]], list[int]]:
@@ -58,38 +61,44 @@ def deduplicate_data(data: list[list[float]], labels: list[int]) -> tuple[list[l
 
 
 def split_data(
-        data: list[list[float]], labels: list[int], random_state: int
+    data: list[list[float]], labels: list[int], random_state: int
 ) -> tuple[list[list[float]], list[list[float]], list[int], list[int]]:
     x_ids: list[int] = [i for i in range(len(data))]
     x_train_ids, x_test_ids, y_train, y_test = train_test_split(
-        x_ids, labels, test_size=0.1, random_state=random_state, stratify=labels)
+        x_ids, labels, test_size=0.1, random_state=random_state, stratify=labels
+    )
     x_train = [data[idx] for idx in x_train_ids]
     x_test = [data[idx] for idx in x_test_ids]
     return x_train, x_test, y_train, y_test
 
 
-def transform_data_from_feature_lists(feature_list: list[list[float]], cur_features: list[int],
-                                      desired_features: list[int]) -> list[list[float]]:
+def transform_data_from_feature_lists(
+    feature_list: list[list[float]], cur_features: list[int], desired_features: list[int]
+) -> list[list[float]]:
     previously_gathered_features = utils.fill_previously_gathered_features(feature_list, cur_features)
     gathered_data = utils.gather_feature_list(previously_gathered_features, desired_features)
     return gathered_data
 
 
-def fill_metric_stats(baseline_model_metric_result: list[float], new_model_metric_results: list[float],
-                      info_dict: dict[str, Any]) -> None:
+def fill_metric_stats(
+    baseline_model_metric_result: list[float], new_model_metric_results: list[float], info_dict: dict[str, Any]
+) -> None:
     _, p_value = stats.f_oneway(baseline_model_metric_result, new_model_metric_results)
     p_value = p_value if p_value is not None else 1.0
-    info_dict['p_value'] = p_value
+    info_dict["p_value"] = p_value
     mean_metric = np.mean(new_model_metric_results)
     baseline_mean_metric = np.mean(baseline_model_metric_result)
-    info_dict['baseline_mean_metric'] = baseline_mean_metric
-    info_dict['new_model_mean_metric'] = mean_metric
-    info_dict['gather_date'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    info_dict["baseline_mean_metric"] = baseline_mean_metric
+    info_dict["new_model_mean_metric"] = mean_metric
+    info_dict["gather_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def train_several_times(
-        new_model: BoostingDecisionMaker, data: list[list[float]], labels: list[int],
-        random_states: Optional[list[int]] = None, baseline_model: Optional[BoostingDecisionMaker] = None
+    new_model: BoostingDecisionMaker,
+    data: list[list[float]],
+    labels: list[int],
+    random_states: Optional[list[int]] = None,
+    baseline_model: Optional[BoostingDecisionMaker] = None,
 ) -> tuple[dict[str, list[float]], dict[str, list[float]], bool, float]:
     new_model_results = DefaultDict(lambda _, __: [])
     baseline_model_results = DefaultDict(lambda _, __: [])
@@ -113,8 +122,11 @@ def train_several_times(
             LOGGER.debug("New model results")
             new_model_results[METRIC].append(new_model.validate_model(x_test, y_test))
             LOGGER.debug("Baseline results")
-            x_test_for_baseline = transform_data_from_feature_lists(
-                x_test, new_model.feature_ids, baseline_model.feature_ids) if baseline_model else x_test
+            x_test_for_baseline = (
+                transform_data_from_feature_lists(x_test, new_model.feature_ids, baseline_model.feature_ids)
+                if baseline_model
+                else x_test
+            )
             baseline_model_results[METRIC].append(baseline_model.validate_model(x_test_for_baseline, y_test))
     return baseline_model_results, new_model_results, bad_data, proportion_binary_labels
 
@@ -132,9 +144,15 @@ class AnalysisModelTraining:
     n_estimators: int
     max_depth: int
 
-    def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig, model_type: ModelType,
-                 model_chooser: ModelChooser, model_class: Optional[Type[BoostingDecisionMaker]] = None,
-                 use_baseline_features: bool = True) -> None:
+    def __init__(
+        self,
+        app_config: ApplicationConfig,
+        search_cfg: SearchConfig,
+        model_type: ModelType,
+        model_chooser: ModelChooser,
+        model_class: Optional[Type[BoostingDecisionMaker]] = None,
+        use_baseline_features: bool = True,
+    ) -> None:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.due_proportion = 0.05
@@ -144,27 +162,30 @@ class AnalysisModelTraining:
         if model_type is ModelType.suggestion:
             self.baseline_folder = self.search_cfg.SuggestBoostModelFolder
             self.features = text_processing.transform_string_feature_range_into_list(
-                self.search_cfg.SuggestBoostModelFeatures)
+                self.search_cfg.SuggestBoostModelFeatures
+            )
             self.monotonous_features = text_processing.transform_string_feature_range_into_list(
-                self.search_cfg.SuggestBoostModelMonotonousFeatures)
+                self.search_cfg.SuggestBoostModelMonotonousFeatures
+            )
             self.n_estimators = self.search_cfg.SuggestBoostModelNumEstimators
             self.max_depth = self.search_cfg.SuggestBoostModelMaxDepth
         elif model_type is ModelType.auto_analysis:
             self.baseline_folder = self.search_cfg.BoostModelFolder
             self.features = text_processing.transform_string_feature_range_into_list(
-                self.search_cfg.AutoBoostModelFeatures)
+                self.search_cfg.AutoBoostModelFeatures
+            )
             self.monotonous_features = text_processing.transform_string_feature_range_into_list(
-                self.search_cfg.AutoBoostModelMonotonousFeatures)
+                self.search_cfg.AutoBoostModelMonotonousFeatures
+            )
             self.n_estimators = self.search_cfg.AutoBoostModelNumEstimators
             self.max_depth = self.search_cfg.AutoBoostModelMaxDepth
         else:
-            raise ValueError(f'Incorrect model type {model_type}')
+            raise ValueError(f"Incorrect model type {model_type}")
 
         self.model_class = model_class if model_class else CustomBoostingDecisionMaker
 
         if self.baseline_folder:
-            self.baseline_model = BoostingDecisionMaker(
-                object_saving.create_filesystem(self.baseline_folder))
+            self.baseline_model = BoostingDecisionMaker(object_saving.create_filesystem(self.baseline_folder))
             self.baseline_model.load_model()
             # Take features from baseline model if this is retrain
             if use_baseline_features:
@@ -177,7 +198,8 @@ class AnalysisModelTraining:
         self.weighted_log_similarity_calculator = None
         if self.search_cfg.SimilarityWeightsFolder.strip():
             self.weighted_log_similarity_calculator = WeightedSimilarityCalculator(
-                object_saving.create_filesystem(self.search_cfg.SimilarityWeightsFolder))
+                object_saving.create_filesystem(self.search_cfg.SimilarityWeightsFolder)
+            )
             self.weighted_log_similarity_calculator.load_model()
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.model_chooser = model_chooser
@@ -194,38 +216,48 @@ class AnalysisModelTraining:
             "boosting_model": self.baseline_folder,
             "chosen_namespaces": namespaces,
             "calculate_similarities": False,
-            "time_weight_decay": self.search_cfg.TimeWeightDecay}
+            "time_weight_decay": self.search_cfg.TimeWeightDecay,
+        }
 
     @staticmethod
-    def get_info_template(project_info: TrainInfo, baseline_model: str, model_name: str,
-                          metric_name: str) -> dict[str, Any]:
-        return {'method': 'training', 'sub_model_type': 'all', 'model_type': project_info.model_type.name,
-                'baseline_model': [baseline_model], 'new_model': [model_name],
-                'project_id': str(project_info.project), 'model_saved': 0, 'p_value': 1.0, 'data_size': 0,
-                'data_proportion': 0.0, 'baseline_mean_metric': 0.0, 'new_model_mean_metric': 0.0,
-                'bad_data_proportion': 0, 'metric_name': metric_name, 'errors': [], 'errors_count': 0}
+    def get_info_template(
+        project_info: TrainInfo, baseline_model: str, model_name: str, metric_name: str
+    ) -> dict[str, Any]:
+        return {
+            "method": "training",
+            "sub_model_type": "all",
+            "model_type": project_info.model_type.name,
+            "baseline_model": [baseline_model],
+            "new_model": [model_name],
+            "project_id": str(project_info.project),
+            "model_saved": 0,
+            "p_value": 1.0,
+            "data_size": 0,
+            "data_proportion": 0.0,
+            "baseline_mean_metric": 0.0,
+            "new_model_mean_metric": 0.0,
+            "bad_data_proportion": 0,
+            "metric_name": metric_name,
+            "errors": [],
+            "errors_count": 0,
+        }
 
     def query_logs(self, project_id: int, log_ids_to_find: list[str]) -> dict[str, Any]:
         log_ids_to_find = list(log_ids_to_find)
-        project_index_name = text_processing.unite_project_name(
-            str(project_id), self.app_config.esProjectIndexPrefix)
+        project_index_name = text_processing.unite_project_name(str(project_id), self.app_config.esProjectIndexPrefix)
         batch_size = 1000
         log_id_dict = {}
         for i in range(int(len(log_ids_to_find) / batch_size) + 1):
-            log_ids = log_ids_to_find[i * batch_size: (i + 1) * batch_size]
+            log_ids = log_ids_to_find[i * batch_size : (i + 1) * batch_size]
             if not log_ids:
                 continue
             ids_query = {
                 "size": self.app_config.esChunkNumber,
-                "query": {
-                    "bool": {
-                        "filter": [
-                            {"terms": {"_id": log_ids}}
-                        ]
-                    }
-                }}
+                "query": {"bool": {"filter": [{"terms": {"_id": log_ids}}]}},
+            }
             for r in elasticsearch.helpers.scan(
-                    self.es_client.es_client, query=ids_query, index=project_index_name, scroll="5m"):
+                self.es_client.es_client, query=ids_query, index=project_index_name, scroll="5m"
+            ):
                 log_id_dict[str(r["_id"])] = r
         return log_id_dict
 
@@ -233,13 +265,7 @@ class AnalysisModelTraining:
         return {
             "sort": {"savedDate": "desc"},
             "size": self.app_config.esChunkNumber,
-            "query": {
-                "bool": {
-                    "must": [
-                        {"term": {"methodName": "suggestion"}}
-                    ]
-                }
-            }
+            "query": {"bool": {"must": [{"term": {"methodName": "suggestion"}}]}},
         }
 
     def get_search_query_aa(self, user_choice: int) -> dict[str, Any]:
@@ -247,13 +273,8 @@ class AnalysisModelTraining:
             "sort": {"savedDate": "desc"},
             "size": self.app_config.esChunkNumber,
             "query": {
-                "bool": {
-                    "must": [
-                        {"term": {"methodName": "auto_analysis"}},
-                        {"term": {"userChoice": user_choice}}
-                    ]
-                }
-            }
+                "bool": {"must": [{"term": {"methodName": "auto_analysis"}}, {"term": {"userChoice": user_choice}}]}
+            },
         }
 
     @staticmethod
@@ -271,7 +292,8 @@ class AnalysisModelTraining:
         gathered_suggested_data = []
         log_id_pairs_set = set()
         index_name = text_processing.unite_project_name(
-            str(project_id) + "_suggest", self.app_config.esProjectIndexPrefix)
+            str(project_id) + "_suggest", self.app_config.esProjectIndexPrefix
+        )
         max_number_of_logs = 30000
         cur_number_of_logs = 0
         cur_number_of_logs_0 = 0
@@ -280,12 +302,13 @@ class AnalysisModelTraining:
         for query_name, query in [
             ("auto_analysis 0s", self.get_search_query_aa(0)),
             ("suggestion", self.get_search_query_suggest()),
-            ("auto_analysis 1s", self.get_search_query_aa(1))
+            ("auto_analysis 1s", self.get_search_query_aa(1)),
         ]:
             if cur_number_of_logs >= max_number_of_logs:
                 break
-            for res in elasticsearch.helpers.scan(self.es_client.es_client, query=query, index=index_name,
-                                                  scroll="5m"):
+            for res in elasticsearch.helpers.scan(
+                self.es_client.es_client, query=query, index=index_name, scroll="5m"
+            ):
                 if cur_number_of_logs >= max_number_of_logs:
                     break
                 saved_model_features = f'{res["_source"]["modelFeatureNames"]}|{res["_source"]["modelFeatureValues"]}'
@@ -308,10 +331,15 @@ class AnalysisModelTraining:
                 else:
                     cur_number_of_logs_0 += 1
                 if query_name == "suggestion" and self.stop_gathering_info_from_suggest_query(
-                        cur_number_of_logs_1, cur_number_of_logs_0, max_number_of_logs):
+                    cur_number_of_logs_1, cur_number_of_logs_0, max_number_of_logs
+                ):
                     break
-            LOGGER.debug("Query: '%s', results number: %d, number of 1s: %d",
-                         query_name, cur_number_of_logs, cur_number_of_logs_1)
+            LOGGER.debug(
+                "Query: '%s', results number: %d, number of 1s: %d",
+                query_name,
+                cur_number_of_logs,
+                cur_number_of_logs_1,
+            )
         log_id_dict = self.query_logs(project_id, list(log_ids_to_find))
         return gathered_suggested_data, log_id_dict
 
@@ -340,29 +368,36 @@ class AnalysisModelTraining:
                             searched_res,
                             self.get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
                             feature_ids=features,
-                            weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
+                            weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
+                        )
                     else:
                         _boosting_data_gatherer = BoostingFeaturizer(
                             searched_res,
                             self.get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
                             feature_ids=features,
-                            weighted_log_similarity_calculator=self.weighted_log_similarity_calculator)
+                            weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
+                        )
 
                     # noinspection PyTypeChecker
                     _boosting_data_gatherer.set_defect_type_model(
-                        self.model_chooser.choose_model(project_id, ModelType.defect_type))
+                        self.model_chooser.choose_model(project_id, ModelType.defect_type)
+                    )
                     _boosting_data_gatherer.fill_previously_gathered_features(
-                        [utils.to_float_list(_suggest_res['_source']['modelFeatureValues'])],
-                        [int(_id) for _id in _suggest_res['_source']['modelFeatureNames'].split(';')])
+                        [utils.to_float_list(_suggest_res["_source"]["modelFeatureValues"])],
+                        [int(_id) for _id in _suggest_res["_source"]["modelFeatureNames"].split(";")],
+                    )
                     feature_data, _ = _boosting_data_gatherer.gather_features_info()
                     if feature_data:
                         full_data_features.extend(feature_data)
-                        labels.append(_suggest_res['_source']['userChoice'])
+                        labels.append(_suggest_res["_source"]["userChoice"])
         return full_data_features, labels
 
     def train_several_times(
-            self, new_model: BoostingDecisionMaker, data: list[list[float]], labels: list[int],
-            random_states: Optional[list[int]] = None
+        self,
+        new_model: BoostingDecisionMaker,
+        data: list[list[float]],
+        labels: list[int],
+        random_states: Optional[list[int]] = None,
     ) -> tuple[dict[str, list[float]], dict[str, list[float]], bool, float]:
         return train_several_times(new_model, data, labels, random_states, self.baseline_model)
 
@@ -370,48 +405,53 @@ class AnalysisModelTraining:
         time_training = time()
         model_name = f'{project_info.model_type.name}_model_{datetime.now().strftime("%Y-%m-%d")}'
         baseline_model = os.path.basename(self.baseline_folder)
-        new_model_folder = f'{project_info.model_type.name}_model/{model_name}/'
+        new_model_folder = f"{project_info.model_type.name}_model/{model_name}/"
 
         LOGGER.info(f'Train "{self.model_type.name}" model using class: {self.model_class}')
         new_model = self.model_class(
             object_saving.create(self.app_config, project_id=project_info.project, path=new_model_folder),
-            features=self.features, monotonous_features=self.monotonous_features, n_estimators=self.n_estimators,
-            max_depth=self.max_depth)
+            features=self.features,
+            monotonous_features=self.monotonous_features,
+            n_estimators=self.n_estimators,
+            max_depth=self.max_depth,
+        )
 
         train_log_info = DefaultDict(lambda _, k: self.get_info_template(project_info, baseline_model, model_name, k))
 
-        LOGGER.debug(f'Initialized model training {project_info.model_type.name}')
+        LOGGER.debug(f"Initialized model training {project_info.model_type.name}")
         projects = [project_info.project]
         if project_info.additional_projects:
             projects.extend(project_info.additional_projects)
         train_data, labels = self.query_data(projects, new_model.feature_ids)
-        LOGGER.debug(f'Loaded data for model training {self.model_type.name}')
+        LOGGER.debug(f"Loaded data for model training {self.model_type.name}")
 
         baseline_model_results, new_model_results, bad_data, data_proportion = self.train_several_times(
-            new_model, train_data, labels)
+            new_model, train_data, labels
+        )
         for metric in new_model_results:
-            train_log_info[metric]['data_size'] = len(labels)
-            train_log_info[metric]['bad_data_proportion'] = int(bad_data)
-            train_log_info[metric]['data_proportion'] = data_proportion
+            train_log_info[metric]["data_size"] = len(labels)
+            train_log_info[metric]["bad_data_proportion"] = int(bad_data)
+            train_log_info[metric]["data_proportion"] = data_proportion
 
         use_custom_model = False
         mean_metric_results: Optional[list[float]] = None
         if not bad_data:
-            LOGGER.debug(f'Baseline test results {baseline_model_results}')
-            LOGGER.debug(f'New model test results {new_model_results}')
+            LOGGER.debug(f"Baseline test results {baseline_model_results}")
+            LOGGER.debug(f"New model test results {new_model_results}")
             p_values = []
             new_metrics_better = True
             for metric, metric_results in new_model_results.items():
                 info_dict = train_log_info[metric]
                 fill_metric_stats(baseline_model_results[metric], metric_results, info_dict)
-                p_value = info_dict['p_value']
+                p_value = info_dict["p_value"]
                 p_values.append(p_value)
-                mean_metric = info_dict['new_model_mean_metric']
-                baseline_mean_metric = info_dict['baseline_mean_metric']
+                mean_metric = info_dict["new_model_mean_metric"]
+                baseline_mean_metric = info_dict["baseline_mean_metric"]
                 new_metrics_better = new_metrics_better and mean_metric > baseline_mean_metric and mean_metric >= 0.4
                 LOGGER.info(
-                    f'Model training validation results: p-value={p_value:.3f}; mean {metric} metric '
-                    f'baseline={baseline_mean_metric:.3f}; mean new model={mean_metric:.3f}.')
+                    f"Model training validation results: p-value={p_value:.3f}; mean {metric} metric "
+                    f"baseline={baseline_mean_metric:.3f}; mean new model={mean_metric:.3f}."
+                )
                 if mean_metric_results:
                     for i in range(len(metric_results)):
                         mean_metric_results[i] = mean_metric_results[i] * metric_results[i]
@@ -422,23 +462,22 @@ class AnalysisModelTraining:
                 use_custom_model = True
 
         if use_custom_model:
-            LOGGER.debug('Custom model should be saved')
+            LOGGER.debug("Custom model should be saved")
             max_train_result_idx = int(np.argmax(mean_metric_results))
             best_random_state = TRAIN_DATA_RANDOM_STATES[max_train_result_idx]
 
-            LOGGER.info(f'Perform final training with random state: {best_random_state}')
-            self.train_several_times(
-                new_model, train_data, labels, [best_random_state])
+            LOGGER.info(f"Perform final training with random state: {best_random_state}")
+            self.train_several_times(new_model, train_data, labels, [best_random_state])
             if self.model_chooser:
                 self.model_chooser.delete_old_model(project_info.model_type, project_info.project)
             new_model.save_model()
-            train_log_info[METRIC]['model_saved'] = 1
+            train_log_info[METRIC]["model_saved"] = 1
         else:
-            train_log_info[METRIC]['model_saved'] = 0
+            train_log_info[METRIC]["model_saved"] = 0
 
-        time_spent = (time() - time_training)
-        train_log_info[METRIC]['time_spent'] = time_spent
-        train_log_info[METRIC]['module_version'] = [self.app_config.appVersion]
+        time_spent = time() - time_training
+        train_log_info[METRIC]["time_spent"] = time_spent
+        train_log_info[METRIC]["module_version"] = [self.app_config.appVersion]
 
-        LOGGER.info(f'Finished for {time_spent} s')
+        LOGGER.info(f"Finished for {time_spent} s")
         return len(train_data), train_log_info

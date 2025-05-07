@@ -22,7 +22,7 @@ A clear and concise description of what you expected to happen.
 What actually happened.
 
 **Artifact version**
-Include version info of the service. 
+Include version info of the service.
 
 **Additional context**
 Add any other context about the problem here.

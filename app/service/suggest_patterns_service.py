@@ -19,8 +19,8 @@ import elasticsearch.helpers
 
 from app.commons import logging
 from app.commons.esclient import EsClient
-from app.commons.model.launch_objects import SuggestPattern, SuggestPatternLabel, SearchConfig, ApplicationConfig
-from app.utils import utils, text_processing
+from app.commons.model.launch_objects import ApplicationConfig, SearchConfig, SuggestPattern, SuggestPatternLabel
+from app.utils import text_processing, utils
 
 logger = logging.getLogger("analyzerApp.suggestPatternsService")
 
@@ -38,31 +38,32 @@ class SuggestPatternsService:
     def query_data(self, project, label):
         data = []
         for d in elasticsearch.helpers.scan(
-                self.es_client.es_client,
-                index=project,
-                query={
-                    "_source": ["detected_message", "issue_type"],
-                    "sort": {"start_time": "desc"},
-                    "size": self.app_config.esChunkNumber,
-                    "query": {
-                        "bool": {
-                            "must": [
-                                {
-                                    "bool": {
-                                        "should": [
-                                            {"wildcard": {"issue_type": "{}*".format(label.upper())}},
-                                            {"wildcard": {"issue_type": "{}*".format(label.lower())}},
-                                            {"wildcard": {"issue_type": "{}*".format(label)}},
-                                        ]
-                                    }
+            self.es_client.es_client,
+            index=project,
+            query={
+                "_source": ["detected_message", "issue_type"],
+                "sort": {"start_time": "desc"},
+                "size": self.app_config.esChunkNumber,
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "bool": {
+                                    "should": [
+                                        {"wildcard": {"issue_type": "{}*".format(label.upper())}},
+                                        {"wildcard": {"issue_type": "{}*".format(label.lower())}},
+                                        {"wildcard": {"issue_type": "{}*".format(label)}},
+                                    ]
                                 }
-                            ],
-                            "should": [
-                                {"term": {"is_auto_analyzed": {"value": "false", "boost": 1.0}}},
-                            ]
-                        }
+                            }
+                        ],
+                        "should": [
+                            {"term": {"is_auto_analyzed": {"value": "false", "boost": 1.0}}},
+                        ],
                     }
-                }):
+                },
+            },
+        ):
             data.append((d["_source"]["detected_message"], d["_source"]["issue_type"]))
         return data
 
@@ -76,20 +77,23 @@ class SuggestPatternsService:
                 percent_for_label = round(exceptions_with_labels[exception][issue_type] / sum_all, 2)
                 count_for_exception_with_label = exceptions_with_labels[exception][issue_type]
                 if percent_for_label >= min_percent and count_for_exception_with_label >= min_count:
-                    suggested_patterns_with_labels.append(SuggestPatternLabel(
-                        pattern=exception,
-                        totalCount=sum_all,
-                        percentTestItemsWithLabel=percent_for_label,
-                        label=issue_type))
+                    suggested_patterns_with_labels.append(
+                        SuggestPatternLabel(
+                            pattern=exception,
+                            totalCount=sum_all,
+                            percentTestItemsWithLabel=percent_for_label,
+                            label=issue_type,
+                        )
+                    )
         return suggested_patterns_with_labels
 
     def get_patterns_without_labels(self, all_exceptions):
         suggested_patterns_without_labels = []
         for exception in all_exceptions:
             if all_exceptions[exception] >= self.search_cfg.PatternMinCountToSuggest:
-                suggested_patterns_without_labels.append(SuggestPatternLabel(
-                    pattern=exception,
-                    totalCount=all_exceptions[exception]))
+                suggested_patterns_without_labels.append(
+                    SuggestPatternLabel(pattern=exception, totalCount=all_exceptions[exception])
+                )
         return suggested_patterns_without_labels
 
     @utils.ignore_warnings
@@ -101,9 +105,7 @@ class SuggestPatternsService:
         exceptions_with_labels = {}
         all_exceptions = {}
         if not self.es_client.index_exists(index_name):
-            return SuggestPattern(
-                suggestionsWithLabels=[],
-                suggestionsWithoutLabels=[])
+            return SuggestPattern(suggestionsWithLabels=[], suggestionsWithoutLabels=[])
         for label in ["ab", "pb", "si", "ti"]:
             found_data.extend(self.query_data(index_name, label))
         for log, label in found_data:
@@ -124,4 +126,5 @@ class SuggestPatternsService:
         logger.info("Finished suggesting patterns %.2f s", time() - t_start)
         return SuggestPattern(
             suggestionsWithLabels=suggested_patterns_with_labels,
-            suggestionsWithoutLabels=suggested_patterns_without_labels)
+            suggestionsWithoutLabels=suggested_patterns_without_labels,
+        )

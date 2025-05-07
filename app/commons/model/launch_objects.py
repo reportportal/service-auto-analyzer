@@ -20,7 +20,8 @@ from pydantic import BaseModel
 
 class AnalyzerConf(BaseModel):
     """Analyzer config object"""
-    analyzerMode: str = 'ALL'
+
+    analyzerMode: str = "ALL"
     minShouldMatch: int = 80
     numberOfLogLines: int = -1
     isAutoAnalyzerEnabled: bool = True
@@ -31,12 +32,18 @@ class AnalyzerConf(BaseModel):
 
 
 class ApplicationConfig(BaseModel):
-    esHost: str = ''
-    esUser: str = ''
-    esPassword: str = ''
-    logLevel: str = 'DEBUG'
-    amqpUrl: str = ''
-    exchangeName: str = 'analyzer'
+    esHost: str = ""
+    esUser: str = ""
+    esPassword: str = ""
+    logLevel: str = "DEBUG"
+
+    amqpUrl: str = ""
+    amqpExchangeName: str = "analyzer"
+    amqpHeartbeatInterval: int = 30
+    amqpInitialRetryInterval: int = 1
+    amqpMaxRetryTime: int = 300
+    amqpBackoffFactor: int = 2
+
     analyzerPriority: int = 1
     analyzerIndex: bool = True
     analyzerLogSearch: bool = True
@@ -46,30 +53,31 @@ class ApplicationConfig(BaseModel):
     esVerifyCerts: bool = False
     esUseSsl: bool = False
     esSslShowWarn: bool = False
-    esCAcert: str = ''
-    esClientCert: str = ''
-    esClientKey: str = ''
-    minioHost: str = 'minio:9000'
-    minioAccessKey: str = 'minio'
-    minioSecretKey: str = 'minio123'
+    esCAcert: str = ""
+    esClientCert: str = ""
+    esClientKey: str = ""
+    minioHost: str = "minio:9000"
+    minioAccessKey: str = "minio"
+    minioSecretKey: str = "minio123"
     minioUseTls: bool = False
-    appVersion: str = ''
-    binaryStoreType: str = 'filesystem'
-    bucketPrefix: str = 'prj-'
+    appVersion: str = ""
+    binaryStoreType: str = "filesystem"
+    bucketPrefix: str = "prj-"
     minioRegion: str | None = None
-    instanceTaskType: str = ''
-    filesystemDefaultPath: str = 'storage'
+    instanceTaskType: str = ""
+    filesystemDefaultPath: str = "storage"
     esChunkNumber: int = 1000
     esChunkNumberUpdateClusters: int = 500
-    esProjectIndexPrefix: str = ''
+    esProjectIndexPrefix: str = ""
     analyzerHttpPort: int = 5001
-    analyzerPathToLog: str = '/tmp/config.log'
+    analyzerPathToLog: str = "/tmp/config.log"
 
 
 class SearchConfig(BaseModel):
     """Search config object"""
+
     SearchLogsMinSimilarity: float = 0.95
-    MinShouldMatch: str = '80%'
+    MinShouldMatch: str = "80%"
     BoostAA: float = 2.0
     BoostLaunch: float = 2.0
     BoostTestCaseHash: float = 2.0
@@ -82,14 +90,14 @@ class SearchConfig(BaseModel):
     MaxLogsForDefectTypeModel: int = 10
     ProbabilityForCustomModelSuggestions: float = 0.7
     ProbabilityForCustomModelAutoAnalysis: float = 0.5
-    BoostModelFolder: str = ''
-    SuggestBoostModelFolder: str = ''
-    SimilarityWeightsFolder: str = ''
-    GlobalDefectTypeModelFolder: str = ''
-    SuggestBoostModelFeatures: str = ''
-    AutoBoostModelFeatures: str = ''
-    SuggestBoostModelMonotonousFeatures: str = ''
-    AutoBoostModelMonotonousFeatures: str = ''
+    BoostModelFolder: str = ""
+    SuggestBoostModelFolder: str = ""
+    SimilarityWeightsFolder: str = ""
+    GlobalDefectTypeModelFolder: str = ""
+    SuggestBoostModelFeatures: str = ""
+    AutoBoostModelFeatures: str = ""
+    SuggestBoostModelMonotonousFeatures: str = ""
+    AutoBoostModelMonotonousFeatures: str = ""
     MaxSuggestionsNumber: int = 3
     AutoAnalysisTimeout: int = 300
     MaxAutoAnalysisItemsToProcess: int = 4000
@@ -102,6 +110,7 @@ class SearchConfig(BaseModel):
 
 class SearchLogInfo(BaseModel):
     """Search log info"""
+
     logId: int
     testItemId: int
     matchScore: float
@@ -109,27 +118,29 @@ class SearchLogInfo(BaseModel):
 
 class Log(BaseModel):
     """Log object"""
+
     logId: int
     logLevel: int = 0
     logTime: list[int] = list(datetime.now().timetuple())[:7]
     message: str
     clusterId: int = 0
-    clusterMessage: str = ''
+    clusterMessage: str = ""
 
 
 class TestItem(BaseModel):
     """Test item object"""
+
     testItemId: int
     isAutoAnalyzed: bool
-    uniqueId: str = ''
-    issueType: str = ''
-    issueDescription: str = ''
-    originalIssueType: str = ''
+    uniqueId: str = ""
+    issueType: str = ""
+    issueDescription: str = ""
+    originalIssueType: str = ""
     startTime: list[int] = list(datetime.now().timetuple())[:7]
     endTime: Optional[list[int]] = None
     lastModified: Optional[list[int]] = None
     testCaseHash: int = 0
-    testItemName: str = ''
+    testItemName: str = ""
     description: Optional[str] = None
     linksToBts: list[str] = []
     logs: list[Log] = []
@@ -137,15 +148,16 @@ class TestItem(BaseModel):
 
 class TestItemInfo(BaseModel):
     """Test item info object"""
+
     testItemId: int = 0
-    uniqueId: str = ''
+    uniqueId: str = ""
     testCaseHash: int = 0
     clusterId: int = 0
     launchId: int
-    launchName: str = ''
+    launchName: str = ""
     launchNumber: int = 0
     previousLaunchId: int = 0
-    testItemName: str = ''
+    testItemName: str = ""
     project: int
     analyzerConfig: AnalyzerConf = AnalyzerConf()
     logs: list[Log] = []
@@ -153,9 +165,10 @@ class TestItemInfo(BaseModel):
 
 class Launch(BaseModel):
     """Launch object"""
+
     launchId: int
     project: int
-    launchName: str = ''
+    launchName: str = ""
     launchNumber: int = 0
     previousLaunchId: int = 0
     launchStartTime: list[int] = list(datetime.now().timetuple())[:7]
@@ -174,6 +187,7 @@ class LaunchInfoForClustering(BaseModel):
 
 class AnalysisResult(BaseModel):
     """Analysis result object"""
+
     testItem: int
     issueType: str
     relevantItem: int
@@ -188,6 +202,7 @@ class ClusterInfo(BaseModel):
 
 class ClusterResult(BaseModel):
     """Analysis result object"""
+
     project: int
     launchId: int
     clusters: list[ClusterInfo]
@@ -195,6 +210,7 @@ class ClusterResult(BaseModel):
 
 class SuggestAnalysisResult(BaseModel):
     """Analysis result object"""
+
     project: int
     testItem: int
     testItemLogId: int
@@ -222,18 +238,21 @@ class SuggestAnalysisResult(BaseModel):
 
 class CleanIndex(BaseModel):
     """Clean index object"""
+
     ids: list[int]
     project: int
 
 
 class CleanIndexStrIds(BaseModel):
     """Clean index object that supports string ids"""
+
     ids: list[str]
     project: int
 
 
 class SearchLogs(BaseModel):
     """Search logs object"""
+
     launchId: int
     launchName: str
     itemId: int
@@ -246,19 +265,22 @@ class SearchLogs(BaseModel):
 
 class Response(BaseModel):
     """Response object"""
+
     acknowledged: bool = False
-    error: str = ''
+    error: str = ""
     status: int = 0
 
 
 class LogExceptionResult(BaseModel):
     """Log object with exceptions"""
+
     logId: int
     foundExceptions: list[str] = []
 
 
 class BulkResponse(BaseModel):
     """Bulk response object"""
+
     took: int
     errors: bool
     items: list[str] = []
@@ -268,14 +290,16 @@ class BulkResponse(BaseModel):
 
 class SuggestPatternLabel(BaseModel):
     """Suggested pattern with labels"""
+
     pattern: str
     totalCount: int
     percentTestItemsWithLabel: float = 0.0
-    label: str = ''
+    label: str = ""
 
 
 class SuggestPattern(BaseModel):
     """Suggest pattern object with 2 lists of suggestions"""
+
     suggestionsWithLabels: list[SuggestPatternLabel] = []
     suggestionsWithoutLabels: list[SuggestPatternLabel] = []
 

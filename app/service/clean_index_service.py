@@ -16,7 +16,7 @@ from time import time
 
 from app.commons import logging
 from app.commons.esclient import EsClient
-from app.commons.model.launch_objects import CleanIndexStrIds, ApplicationConfig
+from app.commons.model.launch_objects import ApplicationConfig, CleanIndexStrIds
 from app.service.suggest_info_service import SuggestInfoService
 from app.utils import utils
 
@@ -66,20 +66,11 @@ class CleanIndexService:
         end_date: str = remove_by_launch_start_time_info["interval_end_date"]
         logger.info("Started removing logs by launch start time")
         t_start = time()
-        launch_ids = self.es_client.get_launch_ids_by_start_time_range(
-            project, start_date, end_date
-        )
-        deleted_logs_cnt = self.es_client.remove_by_launch_start_time_range(
-            project, start_date, end_date
-        )
-        launch_remove_info = {
-            "project": project,
-            "launch_ids": launch_ids
-        }
+        launch_ids = self.es_client.get_launch_ids_by_start_time_range(project, start_date, end_date)
+        deleted_logs_cnt = self.es_client.remove_by_launch_start_time_range(project, start_date, end_date)
+        launch_remove_info = {"project": project, "launch_ids": launch_ids}
         self.suggest_info_service.clean_suggest_info_logs_by_launch_id(launch_remove_info)
-        logger.info(
-            "Finished removing logs by launch start time %.2f s", time() - t_start
-        )
+        logger.info("Finished removing logs by launch start time %.2f s", time() - t_start)
         return deleted_logs_cnt
 
     @utils.ignore_warnings
@@ -89,15 +80,9 @@ class CleanIndexService:
         end_date: str = remove_by_log_time_info["interval_end_date"]
         logger.info("Started removing logs by log time range")
         t_start = time()
-        log_ids = self.es_client.get_log_ids_by_log_time_range(
-            project, start_date, end_date
-        )
-        deleted_logs_cnt = self.es_client.remove_by_log_time_range(
-            project, start_date, end_date
-        )
+        log_ids = self.es_client.get_log_ids_by_log_time_range(project, start_date, end_date)
+        deleted_logs_cnt = self.es_client.remove_by_log_time_range(project, start_date, end_date)
         clean_index = CleanIndexStrIds(ids=log_ids, project=project)
         self.suggest_info_service.clean_suggest_info_logs(clean_index)
-        logger.info(
-            "Finished removing logs by log time range %.2f s", time() - t_start
-        )
+        logger.info("Finished removing logs by log time range %.2f s", time() - t_start)
         return deleted_logs_cnt

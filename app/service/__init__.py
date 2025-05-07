@@ -24,6 +24,16 @@ from app.service.suggest_info_service import SuggestInfoService
 from app.service.suggest_patterns_service import SuggestPatternsService
 from app.service.suggest_service import SuggestService
 
-__all__ = ['AnalyzerService', 'AutoAnalyzerService', 'CleanIndexService', 'ClusterService', 'DeleteIndexService',
-           'NamespaceFinderService', 'RetrainingService', 'SearchService', 'SuggestInfoService',
-           'SuggestPatternsService', 'SuggestService']
+__all__ = [
+    "AnalyzerService",
+    "AutoAnalyzerService",
+    "CleanIndexService",
+    "ClusterService",
+    "DeleteIndexService",
+    "NamespaceFinderService",
+    "RetrainingService",
+    "SearchService",
+    "SuggestInfoService",
+    "SuggestPatternsService",
+    "SuggestService",
+]

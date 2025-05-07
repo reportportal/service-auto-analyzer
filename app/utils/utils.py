@@ -26,7 +26,7 @@ import requests
 
 from app.commons import logging
 from app.commons.model import launch_objects
-from app.utils.text_processing import split_words, remove_credentials_from_url
+from app.utils.text_processing import remove_credentials_from_url, split_words
 
 logger = logging.getLogger("analyzerApp.utils")
 ERROR_LOGGING_LEVEL = 40000
@@ -78,8 +78,7 @@ def jaccard_similarity(s1, s2):
     return len(s1.intersection(s2)) / len(s1.union(s2)) if len(s1.union(s2)) > 0 else 0
 
 
-def choose_issue_type(predicted_labels, predicted_labels_probability,
-                      issue_type_names, scores_by_issue_type):
+def choose_issue_type(predicted_labels, predicted_labels_probability, issue_type_names, scores_by_issue_type):
     predicted_issue_type = ""
     max_prob = 0.0
     max_val_start_time = None
@@ -90,9 +89,10 @@ def choose_issue_type(predicted_labels, predicted_labels_probability,
             chosen_type = scores_by_issue_type[issue_type]
             start_time = chosen_type["mrHit"]["_source"]["start_time"]
             predicted_prob = round(predicted_labels_probability[i][1], 4)
-            if (predicted_prob > max_prob) or \
-                    ((predicted_prob == max_prob) and  # noqa
-                     (max_val_start_time is None or start_time > max_val_start_time)):
+            if (predicted_prob > max_prob) or (
+                (predicted_prob == max_prob)  # noqa
+                and (max_val_start_time is None or start_time > max_val_start_time)
+            ):
                 max_prob = predicted_prob
                 predicted_issue_type = issue_type
                 global_idx = i
@@ -111,8 +111,7 @@ def send_request(url, method, username, password):
         content = json.loads(data, strict=False)
         return content
     except Exception as err:
-        logger.error("Error with loading url: %s",
-                     remove_credentials_from_url(url))
+        logger.error("Error with loading url: %s", remove_credentials_from_url(url))
         logger.error(err)
     return []
 
@@ -120,12 +119,10 @@ def send_request(url, method, username, password):
 def extract_all_exceptions(bodies):
     logs_with_exceptions = []
     for log_body in bodies:
-        exceptions = [
-            exc.strip() for exc in log_body["_source"]["found_exceptions"].split()]
+        exceptions = [exc.strip() for exc in log_body["_source"]["found_exceptions"].split()]
         logs_with_exceptions.append(
-            launch_objects.LogExceptionResult(
-                logId=int(log_body["_id"]),
-                foundExceptions=exceptions))
+            launch_objects.LogExceptionResult(logId=int(log_body["_id"]), foundExceptions=exceptions)
+        )
     return logs_with_exceptions
 
 
@@ -142,8 +139,9 @@ def calculate_proportions_for_labels(labels: list[int]) -> float:
     return 0.0
 
 
-def balance_data(train_data_indexes: list[int], train_labels: list[int],
-                 due_proportion: float) -> tuple[list[int], list[int], float]:
+def balance_data(
+    train_data_indexes: list[int], train_labels: list[int], due_proportion: float
+) -> tuple[list[int], list[int], float]:
     one_data = [train_data_indexes[i] for i in range(len(train_data_indexes)) if train_labels[i] == 1]
     zero_data = [train_data_indexes[i] for i in range(len(train_data_indexes)) if train_labels[i] == 0]
     zero_count = len(zero_data)
@@ -228,8 +226,9 @@ def to_float_list(features_list: str) -> list[float]:
     return feature_numbers_list
 
 
-def fill_previously_gathered_features(feature_list: list[list[float]],
-                                      feature_ids: list[int]) -> dict[int, list[list[float]]]:
+def fill_previously_gathered_features(
+    feature_list: list[list[float]], feature_ids: list[int]
+) -> dict[int, list[list[float]]]:
     previously_gathered_features = {}
     try:
         for i in range(len(feature_list)):
@@ -278,8 +277,7 @@ def get_allowed_number_of_missed(cur_threshold):
     return 0
 
 
-def calculate_threshold(
-        text_size, cur_threshold, min_recalculated_threshold=0.8):
+def calculate_threshold(text_size, cur_threshold, min_recalculated_threshold=0.8):
     if not text_size:
         return cur_threshold
     allowed_words_missed = get_allowed_number_of_missed(cur_threshold)
@@ -294,27 +292,33 @@ def calculate_threshold(
 
 def calculate_threshold_for_text(text, cur_threshold, min_recalculated_threshold=0.8):
     text_size = len(split_words(text))
-    return calculate_threshold(
-        text_size, cur_threshold,
-        min_recalculated_threshold=min_recalculated_threshold)
+    return calculate_threshold(text_size, cur_threshold, min_recalculated_threshold=min_recalculated_threshold)
 
 
-def build_more_like_this_query(min_should_match: str, log_message,
-                               field_name: str = "message", boost: float = 1.0,
-                               override_min_should_match=None,
-                               max_query_terms: int = 50):
-    return {"more_like_this": {
-        "fields": [field_name],
-        "like": log_message,
-        "min_doc_freq": 1,
-        "min_term_freq": 1,
-        "minimum_should_match": override_min_should_match or "5<" + min_should_match,
-        "max_query_terms": max_query_terms,
-        "boost": boost}}
+def build_more_like_this_query(
+    min_should_match: str,
+    log_message,
+    field_name: str = "message",
+    boost: float = 1.0,
+    override_min_should_match=None,
+    max_query_terms: int = 50,
+):
+    return {
+        "more_like_this": {
+            "fields": [field_name],
+            "like": log_message,
+            "min_doc_freq": 1,
+            "min_term_freq": 1,
+            "minimum_should_match": override_min_should_match or "5<" + min_should_match,
+            "max_query_terms": max_query_terms,
+            "boost": boost,
+        }
+    }
 
 
 def append_potential_status_codes(
-        query: dict[str, Any], log: dict[str, Any], *, boost: float = 8.0, max_query_terms: int = 50) -> None:
+    query: dict[str, Any], log: dict[str, Any], *, boost: float = 8.0, max_query_terms: int = 50
+) -> None:
     potential_status_codes = log["_source"]["potential_status_codes"].strip()
     if potential_status_codes:
         number_of_status_codes = str(len(set(potential_status_codes.split())))
@@ -325,7 +329,7 @@ def append_potential_status_codes(
                 field_name="potential_status_codes",
                 boost=boost,
                 override_min_should_match=number_of_status_codes,
-                max_query_terms=max_query_terms
+                max_query_terms=max_query_terms,
             )
         )
 

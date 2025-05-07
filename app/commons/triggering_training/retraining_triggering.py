@@ -13,15 +13,15 @@
 #  limitations under the License.
 
 from app.commons import logging
-from app.commons.model.ml import TrainInfo
 from app.commons.model.launch_objects import ApplicationConfig
+from app.commons.model.ml import TrainInfo
 from app.commons.object_saving.object_saver import ObjectSaver
 
-METRIC_SINCE_TRAINING = 'gathered_metric_since_training'
-GATHERED_METRIC_TOTAL = 'gathered_metric_total'
+METRIC_SINCE_TRAINING = "gathered_metric_since_training"
+GATHERED_METRIC_TOTAL = "gathered_metric_total"
 REQUIRED_FIELDS = [METRIC_SINCE_TRAINING, GATHERED_METRIC_TOTAL]
 
-logger = logging.getLogger('analyzerApp.retraining_triggering')
+logger = logging.getLogger("analyzerApp.retraining_triggering")
 
 
 class RetrainingTriggering:
@@ -30,8 +30,13 @@ class RetrainingTriggering:
     accumulated_difference: int
     trigger_saving_name: str
 
-    def __init__(self, app_config: ApplicationConfig, trigger_saving_name: str, start_number: int = 100,
-                 accumulated_difference: int = 100):
+    def __init__(
+        self,
+        app_config: ApplicationConfig,
+        trigger_saving_name: str,
+        start_number: int = 100,
+        accumulated_difference: int = 100,
+    ):
         self.object_saver = ObjectSaver(app_config)
         self.start_number = start_number
         self.accumulated_difference = accumulated_difference
@@ -68,5 +73,7 @@ class RetrainingTriggering:
         metric_since_training = trigger_info.get(METRIC_SINCE_TRAINING, 0)
         trigger_info[METRIC_SINCE_TRAINING] = metric_since_training + train_info.gathered_metric_total
         self.save_triggering_info(trigger_info, train_info.project)
-        return trigger_info[GATHERED_METRIC_TOTAL] >= self.start_number \
+        return (
+            trigger_info[GATHERED_METRIC_TOTAL] >= self.start_number
             and trigger_info[METRIC_SINCE_TRAINING] >= self.accumulated_difference
+        )

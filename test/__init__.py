@@ -16,45 +16,45 @@ import os
 import random
 import string
 
-from app.commons.model.launch_objects import SearchConfig, ApplicationConfig
+from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.utils.utils import read_json_file
 
 DEFAULT_ES_CONFIG = ApplicationConfig(
-    esHost='http://localhost:9200',
+    esHost="http://localhost:9200",
     esVerifyCerts=False,
     esUseSsl=False,
     esSslShowWarn=False,
-    esCAcert='',
-    esClientCert='',
-    esClientKey='',
-    esUser='',
+    esCAcert="",
+    esClientCert="",
+    esClientKey="",
+    esUser="",
     turnOffSslVerification=True,
-    esProjectIndexPrefix='',
-    esChunkNumber=1000
+    esProjectIndexPrefix="",
+    esChunkNumber=1000,
 )
 
 APP_CONFIG = ApplicationConfig(
-    esHost='http://localhost:9200',
-    esUser='',
-    esPassword='',
+    esHost="http://localhost:9200",
+    esUser="",
+    esPassword="",
     esVerifyCerts=False,
     esUseSsl=False,
     esSslShowWarn=False,
     turnOffSslVerification=True,
-    esCAcert='',
-    esClientCert='',
-    esClientKey='',
-    appVersion='',
-    minioRegion='',
-    bucketPrefix='',
-    filesystemDefaultPath='',
+    esCAcert="",
+    esClientCert="",
+    esClientKey="",
+    appVersion="",
+    minioRegion="",
+    bucketPrefix="",
+    filesystemDefaultPath="",
     esChunkNumber=1000,
-    binaryStoreType='filesystem',
-    minioHost='',
-    minioAccessKey='',
-    minioSecretKey='',
-    esProjectIndexPrefix='rp_',
-    esChunkNumberUpdateClusters=500
+    binaryStoreType="filesystem",
+    minioHost="",
+    minioAccessKey="",
+    minioSecretKey="",
+    esProjectIndexPrefix="rp_",
+    esChunkNumberUpdateClusters=500,
 )
 
 DEFAULT_BOOST_LAUNCH = 8.0
@@ -76,4 +76,4 @@ def read_file(folder: str, filename: str) -> str:
 
 
 def random_alphanumeric(num: int):
-    return ''.join(random.choices(string.ascii_letters + string.digits, k=num))
+    return "".join(random.choices(string.ascii_letters + string.digits, k=num))

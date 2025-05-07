@@ -1,0 +1,15 @@
+Error: expect.not.toHaveText: Error: strict mode violation: locator('//th[@data-label=\'Example Number\']//thunder-primitive-custom-cell//a') resolved to 28 elements:
+    1) <a title="20653479" jkl-55cn3457sdfa="" class="slds-truncate" href="/thunder/r/123FY111119oRgqYAE/view">…</a> aka getByTitle('20653479')
+    2) <a title="20653478" jkl-55cn3457sdfa="" class="slds-truncate" href="/thunder/r/123FY111119oRglYAE/view">…</a> aka getByTitle('20653478')
+    3) <a title="20653431" jkl-55cn3457sdfa="" class="slds-truncate" href="/thunder/r/123FY111119oRdIYAU/view">…</a> aka getByTitle('20653431')
+    4) <a title="20653407" jkl-55cn3457sdfa="" class="slds-truncate" href="/thunder/r/123FY111119oRbgYAE/view">…</a> aka getByTitle('20653407')
+    5) <a title="20653270" jkl-55cn3457sdfa="" class="slds-truncate" href="/thunder/r/123FY111119oQx7YAE/view">…</a> aka getByTitle('20653270')
+    6) <a title="20653269" jkl-55cn3457sdfa="" class="slds-truncate" href="/thunder/r/123FY111119oR0oYAE/view">…</a> aka getByTitle('20653269')
+    7) <a title="20653243" jkl-55cn3457sdfa="" class="slds-truncate" href="/thunder/r/123FY111119oQz7YAE/view">…</a> aka getByTitle('20653243')
+    8) <a title="20653223" jkl-55cn3457sdfa="" class="slds-truncate" href="/thunder/r/123FY111119oQy9YAE/view">…</a> aka getByTitle('20653223')
+    9) <a title="20653248" jkl-55cn3457sdfa="" class="slds-truncate" href="/thunder/r/123FY111119oQzRYAU/view">…</a> aka getByTitle('20653248')
+    10) <a title="20653225" jkl-55cn3457sdfa="" class="slds-truncate" href="/thunder/r/123FY111119oQyJYAU/view">…</a> aka getByTitle('20653225')
+    ...
+Call log:
+  - expect.not.toHaveText with timeout 30000ms
+  - waiting for locator('//th[@data-label=\'Example Number\']//thunder-primitive-custom-cell//a')

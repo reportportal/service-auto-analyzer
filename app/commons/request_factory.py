@@ -17,9 +17,9 @@
 from datetime import datetime
 from typing import Any
 
-from app.commons.model.launch_objects import Launch, TestItem, Log, TestItemInfo
+from app.commons.model.launch_objects import Launch, Log, TestItem, TestItemInfo
 from app.commons.prepared_log import PreparedLogMessage, PreparedLogMessageClustering
-from app.utils import utils, text_processing
+from app.utils import text_processing, utils
 from app.utils.log_preparation import clean_message
 from app.utils.utils import compute_if_absent
 
@@ -43,9 +43,9 @@ def create_log_template() -> dict:
             "issue_type": "",
             "log_time": "",
             "log_level": 0,
-            'original_message': '',
-            'message_lines': 0,
-            'message_words_number': 0,
+            "original_message": "",
+            "message_lines": 0,
+            "message_words_number": 0,
             "message": "",
             "is_merged": False,
             "start_time": "",
@@ -58,8 +58,8 @@ def create_log_template() -> dict:
             "whole_message": "",
             "potential_status_codes": "",
             "found_tests_and_methods": "",
-            "cluster_with_numbers": False
-        }
+            "cluster_with_numbers": False,
+        },
     }
 
 
@@ -68,11 +68,11 @@ def transform_issue_type_into_lowercase(issue_type):
 
 
 def _fill_launch_test_item_fields(log_template: dict, launch: Launch, test_item: TestItem, project: str):
-    log_template['_index'] = project
-    source = compute_if_absent(log_template, '_source', {})
+    log_template["_index"] = project
+    source = compute_if_absent(log_template, "_source", {})
     source["launch_id"] = launch.launchId
     source["launch_name"] = launch.launchName
-    source["launch_number"] = getattr(launch, 'launchNumber', 0)
+    source["launch_number"] = getattr(launch, "launchNumber", 0)
     source["launch_start_time"] = datetime(*launch.launchStartTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
     source["test_item"] = test_item.testItemId
     source["unique_id"] = test_item.uniqueId
@@ -85,26 +85,25 @@ def _fill_launch_test_item_fields(log_template: dict, launch: Launch, test_item:
 
 
 def _fill_common_fields(log_template: dict, log: Log, prepared_log: PreparedLogMessage) -> None:
-    log_template['_id'] = log.logId
-    source = compute_if_absent(log_template, '_source', {})
-    source['cluster_id'] = str(log.clusterId)
-    source['cluster_message'] = log.clusterMessage
-    source['log_level'] = log.logLevel
-    source['original_message'] = log.message
-    source['message'] = prepared_log.message
-    source['message_lines'] = text_processing.calculate_line_number(prepared_log.clean_message)
-    source['message_words_number'] = len(
-        text_processing.split_words(prepared_log.clean_message, split_urls=False))
-    source['stacktrace'] = prepared_log.stacktrace
-    source['potential_status_codes'] = prepared_log.exception_message_potential_status_codes
-    source['found_exceptions'] = prepared_log.exception_found
-    source['whole_message'] = '\n'.join([prepared_log.exception_message_no_params, prepared_log.stacktrace])
+    log_template["_id"] = log.logId
+    source = compute_if_absent(log_template, "_source", {})
+    source["cluster_id"] = str(log.clusterId)
+    source["cluster_message"] = log.clusterMessage
+    source["log_level"] = log.logLevel
+    source["original_message"] = log.message
+    source["message"] = prepared_log.message
+    source["message_lines"] = text_processing.calculate_line_number(prepared_log.clean_message)
+    source["message_words_number"] = len(text_processing.split_words(prepared_log.clean_message, split_urls=False))
+    source["stacktrace"] = prepared_log.stacktrace
+    source["potential_status_codes"] = prepared_log.exception_message_potential_status_codes
+    source["found_exceptions"] = prepared_log.exception_found
+    source["whole_message"] = "\n".join([prepared_log.exception_message_no_params, prepared_log.stacktrace])
 
 
 def _fill_log_fields(log_template: dict, log: Log, number_of_lines: int) -> dict[str, Any]:
     prepared_log = PreparedLogMessage(log.message, number_of_lines)
     _fill_common_fields(log_template, log, prepared_log)
-    source = compute_if_absent(log_template, '_source', {})
+    source = compute_if_absent(log_template, "_source", {})
     source["detected_message"] = prepared_log.exception_message_no_numbers
     source["detected_message_with_numbers"] = prepared_log.exception_message
     source["log_time"] = datetime(*log.logTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
@@ -114,26 +113,37 @@ def _fill_log_fields(log_template: dict, log: Log, number_of_lines: int) -> dict
     source["paths"] = prepared_log.exception_message_paths
     source["message_params"] = prepared_log.exception_message_params
     source["found_exceptions_extended"] = prepared_log.exception_found_extended
-    source["detected_message_extended"] = \
-        text_processing.enrich_text_with_method_and_classes(prepared_log.exception_message)
-    source["detected_message_without_params_extended"] = \
-        text_processing.enrich_text_with_method_and_classes(prepared_log.exception_message_no_params)
-    source["stacktrace_extended"] = \
-        text_processing.enrich_text_with_method_and_classes(prepared_log.stacktrace)
-    source["message_extended"] = \
-        text_processing.enrich_text_with_method_and_classes(prepared_log.message)
-    source["message_without_params_extended"] = \
-        text_processing.enrich_text_with_method_and_classes(prepared_log.message_no_params)
-    source["detected_message_without_params_and_brackets"] = \
+    source["detected_message_extended"] = text_processing.enrich_text_with_method_and_classes(
+        prepared_log.exception_message
+    )
+    source["detected_message_without_params_extended"] = text_processing.enrich_text_with_method_and_classes(
         prepared_log.exception_message_no_params
+    )
+    source["stacktrace_extended"] = text_processing.enrich_text_with_method_and_classes(prepared_log.stacktrace)
+    source["message_extended"] = text_processing.enrich_text_with_method_and_classes(prepared_log.message)
+    source["message_without_params_extended"] = text_processing.enrich_text_with_method_and_classes(
+        prepared_log.message_no_params
+    )
+    source["detected_message_without_params_and_brackets"] = prepared_log.exception_message_no_params
     source["message_without_params_and_brackets"] = prepared_log.message_no_params
     source["found_tests_and_methods"] = prepared_log.test_and_methods_extended
 
-    for field in ["message", "detected_message", "detected_message_with_numbers",
-                  "stacktrace", "only_numbers", "found_exceptions", "found_exceptions_extended",
-                  "detected_message_extended", "detected_message_without_params_extended",
-                  "stacktrace_extended", "message_extended", "message_without_params_extended",
-                  "detected_message_without_params_and_brackets", "message_without_params_and_brackets"]:
+    for field in [
+        "message",
+        "detected_message",
+        "detected_message_with_numbers",
+        "stacktrace",
+        "only_numbers",
+        "found_exceptions",
+        "found_exceptions_extended",
+        "detected_message_extended",
+        "detected_message_without_params_extended",
+        "stacktrace_extended",
+        "message_extended",
+        "message_without_params_extended",
+        "detected_message_without_params_and_brackets",
+        "message_without_params_and_brackets",
+    ]:
         source[field] = text_processing.leave_only_unique_lines(source[field])
         source[field] = text_processing.clean_colon_stacking(source[field])
     return log_template
@@ -148,15 +158,14 @@ def prepare_log(launch: Launch, test_item: TestItem, log: Log, project: str) -> 
 
 def _fill_test_item_info_fields(log_template: dict, test_item_info: TestItemInfo, project: str) -> dict[str, Any]:
     log_template["_index"] = project
-    source = compute_if_absent(log_template, '_source', {})
+    source = compute_if_absent(log_template, "_source", {})
     source["launch_id"] = test_item_info.launchId
     source["launch_name"] = test_item_info.launchName
-    source["launch_number"] = getattr(test_item_info, 'launchNumber', 0)
+    source["launch_number"] = getattr(test_item_info, "launchNumber", 0)
     source["test_item"] = test_item_info.testItemId
     source["unique_id"] = test_item_info.uniqueId
     source["test_case_hash"] = test_item_info.testCaseHash
-    source["test_item_name"] = text_processing.preprocess_test_item_name(
-        test_item_info.testItemName)
+    source["test_item_name"] = text_processing.preprocess_test_item_name(test_item_info.testItemName)
     source["is_auto_analyzed"] = False
     source["issue_type"] = ""
     source["start_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -166,15 +175,14 @@ def _fill_test_item_info_fields(log_template: dict, test_item_info: TestItemInfo
 def prepare_log_for_suggests(test_item_info: TestItemInfo, log: Log, project: str) -> dict:
     log_template = create_log_template()
     log_template = _fill_test_item_info_fields(log_template, test_item_info, project)
-    log_template = _fill_log_fields(
-        log_template, log, test_item_info.analyzerConfig.numberOfLogLines)
+    log_template = _fill_log_fields(log_template, log, test_item_info.analyzerConfig.numberOfLogLines)
     return log_template
 
 
 def get_words_in_stacktrace(stacktrace: str) -> dict[str, int]:
     words = {}
     for word in text_processing.split_words(stacktrace):
-        if '.' in word and len(word.split('.')) > 2:
+        if "." in word and len(word.split(".")) > 2:
             words[word] = 1
     return words
 

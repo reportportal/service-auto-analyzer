@@ -1,4 +1,4 @@
 [flake8]
-ignore = E741, W503
+ignore = E203, E741, W503
 exclude = .git,venv,env,fixtures
 max-line-length = 119

@@ -33,8 +33,8 @@ def create_filesystem_client(app_config: ApplicationConfig) -> Storage:
 
 
 STORAGE_FACTORIES: dict[str, Callable[[ApplicationConfig], Storage]] = {
-    'minio': create_minio_client,
-    'filesystem': create_filesystem_client
+    "minio": create_minio_client,
+    "filesystem": create_filesystem_client,
 }
 
 
@@ -43,8 +43,9 @@ class ObjectSaver:
     project_id: str | int | None = None
     path: str
 
-    def __init__(self, app_config: ApplicationConfig, project_id: str | int | None = None,
-                 path: str | None = None) -> None:
+    def __init__(
+        self, app_config: ApplicationConfig, project_id: str | int | None = None, path: str | None = None
+    ) -> None:
         self.project_id = project_id
         self.path = path or ""
         if app_config.binaryStoreType in STORAGE_FACTORIES:
@@ -66,18 +67,23 @@ class ObjectSaver:
         return os.path.join(self.path, object_names)
 
     def remove_project_objects(self, object_names: list[str], project_id: str | int | None = None) -> None:
-        self.storage.remove_project_objects(self.get_project_id(project_id),
-                                            [self.get_object_name(n) for n in object_names])
+        self.storage.remove_project_objects(
+            self.get_project_id(project_id), [self.get_object_name(n) for n in object_names]
+        )
 
-    def put_project_object(self, data: Any, object_name: str, project_id: str | int | None = None,
-                           using_json: bool = False) -> None:
-        self.storage.put_project_object(data, self.get_project_id(project_id), self.get_object_name(object_name),
-                                        using_json=using_json)
+    def put_project_object(
+        self, data: Any, object_name: str, project_id: str | int | None = None, using_json: bool = False
+    ) -> None:
+        self.storage.put_project_object(
+            data, self.get_project_id(project_id), self.get_object_name(object_name), using_json=using_json
+        )
 
-    def get_project_object(self, object_name: str, project_id: str | int | None = None,
-                           using_json: bool = False) -> Any:
-        return self.storage.get_project_object(self.get_project_id(project_id), self.get_object_name(object_name),
-                                               using_json=using_json)
+    def get_project_object(
+        self, object_name: str, project_id: str | int | None = None, using_json: bool = False
+    ) -> Any:
+        return self.storage.get_project_object(
+            self.get_project_id(project_id), self.get_object_name(object_name), using_json=using_json
+        )
 
     def does_object_exists(self, object_name: str, project_id: str | int | None = None) -> bool:
         return self.storage.does_object_exists(self.get_project_id(project_id), self.get_object_name(object_name))

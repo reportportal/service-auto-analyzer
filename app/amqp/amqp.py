@@ -143,7 +143,7 @@ class AmqpClient:
         :param str name: Name of the queue
         :param str exchange_name: Name of the exchange
         """
-        channel.queue_declare(queue=name, durable=False, exclusive=False, auto_delete=True, arguments=None)
+        channel.queue_declare(queue=name, durable=True, exclusive=False, auto_delete=True, arguments=None)
         channel.queue_bind(exchange=exchange_name, queue=name, routing_key=name)
 
     @staticmethod

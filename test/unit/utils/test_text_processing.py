@@ -182,12 +182,12 @@ def test_find_test_methods_in_text():
     "url, expected_url",
     [
         (
-            "amqp://user:password@10.68.56.88:5672/analyzer?heartbeat=30",
-            "amqp://10.68.56.88:5672/analyzer?heartbeat=30",
+            "amqp://user:password@10.68.56.88:5672/analyzer?heartbeat=30",  # NOSONAR
+            "amqp://10.68.56.88:5672/analyzer?heartbeat=30",  # NOSONAR
         ),
-        ("amqps://rpuser:fkkf0+4pUn@192.68.56.88:5672", "amqps://192.68.56.88:5672"),
-        ("https://test123:aa-bb_cc@msgbroker.example.com/", "https://msgbroker.example.com/"),
-        ("https://test123:aa%20bb%40cc@msgbroker.example.com/", "https://msgbroker.example.com/"),
+        ("amqps://rpuser:fkkf0+4pUn@192.68.56.88:5672", "amqps://192.68.56.88:5672"),  # NOSONAR
+        ("https://test123:aa-bb_cc@msgbroker.example.com/", "https://msgbroker.example.com/"),  # NOSONAR
+        ("https://test123:aa%20bb%40cc@msgbroker.example.com/", "https://msgbroker.example.com/"),  # NOSONAR
     ],
 )
 def test_remove_credentials_from_url(url, expected_url):

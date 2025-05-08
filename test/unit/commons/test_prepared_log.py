@@ -71,3 +71,68 @@ def test_extract_paths(test_file, expected_file):
     prepared_log = PreparedLogMessage("", -1)
     prepared_log._exception_message = log
     assert prepared_log.exception_message_paths == " ".join(expected_log)
+
+
+SYNTHETIC_TESTS = [
+    "Failed to load file from C:\\Users\\username\\Documents\\project\\file.txt",
+    "Error reading C:\\Program Files\\App\\logs\\error.log and D:\\Backup\\logs\\app.log",
+    "Could not open /home/user/projects/app/config.yml",
+    "Error reading files /var/log/app.log and /opt/app/data/file.json",
+    "Failed to fetch https://example.com/api/v1/data and access /etc/app/config.json",
+    "Error loading configuration from C:\\config\\app.ini and data from https://api.example.org/v2/users",
+    "Failed to access http://localhost:8080/api/v1/path/to/resource and https://192.168.1.1/admin",
+    "Application could not read C:\\Users\\Admin\\config.ini or /etc/app/settings.json",
+    "Error in C:\\Program Files (x86)\\My App\\data files\\log-2023-01.txt",
+    "Error in directory /home/user/http_modules/config but not in https://example.com/path",
+]
+
+SYNTHETIC_TESTS_URLS = [
+    [],
+    [],
+    [],
+    [],
+    ["https://example.com/api/v1/data"],
+    ["https://api.example.org/v2/users"],
+    ["http://localhost:8080/api/v1/path/to/resource", "https://192.168.1.1/admin"],
+    [],
+    [],
+    ["https://example.com/path"],
+]
+
+SYNTHETIC_TESTS_PATHS = [
+    ["C:\\Users\\username\\Documents\\project\\file.txt"],
+    ["C:\\Program Files\\App\\logs\\error.log", "D:\\Backup\\logs\\app.log"],
+    ["/home/user/projects/app/config.yml"],
+    ["/var/log/app.log", "/opt/app/data/file.json"],
+    ["/etc/app/config.json"],
+    ["C:\\config\\app.ini"],
+    [],
+    ["C:\\Users\\Admin\\config.ini", "/etc/app/settings.json"],
+    ["C:\\Program Files (x86)\\My App\\data files\\log-2023-01.txt"],
+    ["/home/user/http_modules/config"],
+]
+
+SYNTHETIC_URL_TEST_CASES = zip(SYNTHETIC_TESTS, SYNTHETIC_TESTS_URLS)
+SYNTHETIC_PATH_TEST_CASES = zip(SYNTHETIC_TESTS, SYNTHETIC_TESTS_PATHS)
+
+
+@pytest.mark.parametrize(
+    "message, expected_urls",
+    SYNTHETIC_URL_TEST_CASES,
+)
+def test_extract_urls_synthetic(message, expected_urls):
+    prepared_log = PreparedLogMessage("", -1)
+    prepared_log._exception_message = message
+
+    assert prepared_log.exception_message_urls == " ".join(expected_urls)
+
+
+@pytest.mark.parametrize(
+    "message, expected_paths",
+    SYNTHETIC_PATH_TEST_CASES,
+)
+def test_extract_paths_synthetic(message, expected_paths):
+    prepared_log = PreparedLogMessage("", -1)
+    prepared_log._exception_message = message
+
+    assert prepared_log.exception_message_paths == " ".join(expected_paths)

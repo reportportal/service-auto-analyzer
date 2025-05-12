@@ -660,12 +660,29 @@ def extract_urls(text: str) -> list[str]:
     return all_urls
 
 
+WINDOWS_PATHS = r"""
+        (?:^|\s|"|'|`)      # start of line, space, quote
+        [A-Za-z]:\\         # drive letter + back-slash
+        (?:[^:\\\r\n]+\\)*  # zero or more sub-dirs — NO colon allowed!
+        [^\s\\:\r\n]+       # final component: no space, back-slash or colon
+    """
+POSIX_PATHS = r"""
+        (?:^|\s|"|'|`)             # start of line, space, quote
+        /                          # leading slash
+        (?:                        # 0+ "segment/" blocks
+            (?:\\.|[^/\s\r\n])+ /  # seg may contain backslash-escapes
+        )*                         # 0+ segments
+        (?:\\.|[^/\s\r\n])+        # final segment
+    """
+PATH_REGEX = re.compile(rf"{WINDOWS_PATHS}|{POSIX_PATHS}", re.VERBOSE)
+
+
 def extract_paths(text_without_urls: str) -> list[str]:
     all_unique = set()
     all_paths = []
-    for param in re.findall(r"((^|(?<=[^\w:\\/]))(\w:)?([\w.\- ]+)?([\\/]+[\w.\-=+ ]+){2,})", text_without_urls):
-        path = param[0].strip()
-        if path not in all_unique:
+    for param in PATH_REGEX.findall(text_without_urls):
+        path = param.strip()
+        if path and path not in all_unique:
             all_unique.add(path)
             all_paths.append(path)
     return all_paths

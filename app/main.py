@@ -22,6 +22,7 @@ from sys import exit
 from flask import Flask, Response, jsonify
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
+from werkzeug.middleware.profiler import ProfilerMiddleware
 
 from app.amqp import amqp_handler
 from app.amqp.amqp import AmqpClient
@@ -82,6 +83,7 @@ APP_CONFIG = ApplicationConfig(
     esProjectIndexPrefix=os.getenv("ES_PROJECT_INDEX_PREFIX", "").strip(),
     analyzerHttpPort=int(os.getenv("ANALYZER_HTTP_PORT", "5001")),
     analyzerPathToLog=os.getenv("ANALYZER_FILE_LOGGING_PATH", "/tmp/config.log"),
+    enableProfiler=json.loads(os.getenv("ANALYZER_ENABLE_PROFILER", "false").lower()),
 )
 
 SEARCH_CONFIG = SearchConfig(
@@ -116,6 +118,13 @@ def create_application():
     _application = Flask(__name__)
     CORS(_application)
     CSRFProtect(_application)
+    if APP_CONFIG.enableProfiler:
+        _application.wsgi_app = ProfilerMiddleware(
+            _application.wsgi_app,
+            profile_dir=os.path.join(APP_CONFIG.filesystemDefaultPath, "profiler"),
+            sort_by=("cumulative", "time"),
+            restrictions=(30,),
+        )
     return _application
 
 

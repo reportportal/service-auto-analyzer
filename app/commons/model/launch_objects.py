@@ -71,6 +71,7 @@ class ApplicationConfig(BaseModel):
     esProjectIndexPrefix: str = ""
     analyzerHttpPort: int = 5001
     analyzerPathToLog: str = "/tmp/config.log"
+    enableProfiler: bool = False
 
 
 class SearchConfig(BaseModel):

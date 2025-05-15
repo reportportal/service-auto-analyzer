@@ -12,17 +12,19 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import gc
 import json
 import logging.config
 import os
+import sys
 import threading
 from signal import SIGINT, signal
 from sys import exit
+from typing import Any
 
-from flask import Flask, Response, jsonify
+from flask import Flask, Response
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
-from werkzeug.middleware.profiler import ProfilerMiddleware
 
 from app.amqp import amqp_handler
 from app.amqp.amqp import AmqpClient
@@ -83,7 +85,7 @@ APP_CONFIG = ApplicationConfig(
     esProjectIndexPrefix=os.getenv("ES_PROJECT_INDEX_PREFIX", "").strip(),
     analyzerHttpPort=int(os.getenv("ANALYZER_HTTP_PORT", "5001")),
     analyzerPathToLog=os.getenv("ANALYZER_FILE_LOGGING_PATH", "/tmp/config.log"),
-    enableProfiler=json.loads(os.getenv("ANALYZER_ENABLE_PROFILER", "false").lower()),
+    enableMemoryDump=json.loads(os.getenv("ANALYZER_ENABLE_MEMORY_DUMP", "false").lower()),
 )
 
 SEARCH_CONFIG = SearchConfig(
@@ -118,13 +120,6 @@ def create_application():
     _application = Flask(__name__)
     CORS(_application)
     CSRFProtect(_application)
-    if APP_CONFIG.enableProfiler:
-        _application.wsgi_app = ProfilerMiddleware(
-            _application.wsgi_app,
-            profile_dir=os.path.join(APP_CONFIG.filesystemDefaultPath, "profiler"),
-            sort_by=("cumulative", "time"),
-            restrictions=(30,),
-        )
     return _application
 
 
@@ -547,13 +542,45 @@ application = create_application()
 
 @application.route("/", methods=["GET"])
 def get_health_status():
-    status = ""
+    status: dict[str, Any] = {"status": "healthy"}
+    status_code = 200
     if not es_client.is_healthy():
-        status += "Elasticsearch is not healthy;"
-    if status:
         logger.error("Analyzer health check status failed: %s", status)
-        return Response(json.dumps({"status": status}), status=503, mimetype="application/json")
-    return jsonify({"status": "healthy"})
+        status["status"] = "Elasticsearch is not healthy"
+        status_code = 503
+
+    if APP_CONFIG.enableMemoryDump:
+        xs = []
+        for obj in gc.get_objects():
+            i = id(obj)
+            size = sys.getsizeof(obj, 0)
+            referents = [id(o) for o in gc.get_referents(obj) if hasattr(o, "__class__")]
+            if hasattr(obj, "__class__"):
+                cls = str(obj.__class__)
+                stat = {"id": i, "class": cls, "size": size, "referents": referents}
+                try:
+                    if hasattr(obj, "__name__"):
+                        stat["name"] = obj.__name__
+                except ModuleNotFoundError:
+                    pass
+                xs.append(stat)
+        status["memory"] = {}
+        status["memory"]["all"] = xs
+        status["memory"]["total"] = len(xs)
+        by_class = {}
+        for stat in xs:
+            if stat["class"] not in by_class:
+                by_class[stat["class"]] = {"size": stat["size"], "count": 1}
+            else:
+                by_class[stat["class"]]["size"] += stat["size"]
+                by_class[stat["class"]]["count"] += 1
+        by_class_list = sorted(
+            [{"class": k, "size": v["size"], "count": v["count"]} for k, v in by_class.items()],
+            key=lambda x: x["size"],
+            reverse=True,
+        )
+        status["memory"]["by_class"] = by_class_list
+    return Response(json.dumps(status), status=status_code, mimetype="application/json")
 
 
 # noinspection PyUnusedLocal

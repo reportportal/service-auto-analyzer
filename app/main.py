@@ -568,19 +568,6 @@ def get_health_status():
         status["memory"] = {}
         status["memory"]["all"] = xs
         status["memory"]["total"] = len(xs)
-        by_class = {}
-        for stat in xs:
-            if stat["class"] not in by_class:
-                by_class[stat["class"]] = {"size": stat["size"], "count": 1}
-            else:
-                by_class[stat["class"]]["size"] += stat["size"]
-                by_class[stat["class"]]["count"] += 1
-        by_class_list = sorted(
-            [{"class": k, "size": v["size"], "count": v["count"]} for k, v in by_class.items()],
-            key=lambda x: x["size"],
-            reverse=True,
-        )
-        status["memory"]["by_class"] = by_class_list
     return Response(json.dumps(status), status=status_code, mimetype="application/json")
 
 

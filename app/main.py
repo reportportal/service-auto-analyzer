@@ -550,6 +550,7 @@ def get_health_status():
         status_code = 503
 
     if APP_CONFIG.enableMemoryDump:
+        gc.collect()
         xs = []
         for obj in gc.get_objects():
             i = id(obj)

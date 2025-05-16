@@ -588,7 +588,7 @@ class BoostingFeaturizer:
         :param str return_val_name: name of return value, can be 'mean_score' or 'cnt_items_percent'
         :return: dict with issue type as key and value as mean score or percent of items
         """
-        cnt_items_by_issue_type: dict[str, dict[str:int]] = defaultdict(lambda: defaultdict(lambda: 0))
+        cnt_items_by_issue_type: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
         cnt_items_glob = 0
         for log, es_results in self.all_results:
             cnt_items_glob += len(es_results)

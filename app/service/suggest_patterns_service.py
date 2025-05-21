@@ -58,7 +58,7 @@ class SuggestPatternsService:
                             }
                         ],
                         "should": [
-                            {"term": {"is_auto_analyzed": {"value": "false", "boost": 1.0}}},
+                            {"term": {"is_auto_analyzed": {"value": False, "boost": 1.0}}},
                         ],
                     }
                 },

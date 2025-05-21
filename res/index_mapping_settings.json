@@ -107,7 +107,7 @@
             "type": "keyword"
         },
         "is_auto_analyzed": {
-            "type": "keyword"
+            "type": "boolean"
         },
         "is_merged": {
             "type": "boolean"

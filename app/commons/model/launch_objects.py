@@ -79,7 +79,8 @@ class SearchConfig(BaseModel):
 
     SearchLogsMinSimilarity: float = 0.95
     MinShouldMatch: str = "80%"
-    BoostAA: float = 2.0
+    BoostAA: float = 0.0
+    BoostMA: float = 5.0
     BoostLaunch: float = 2.0
     BoostTestCaseHash: float = 2.0
     MaxQueryTerms: int = 50

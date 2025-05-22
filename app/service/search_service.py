@@ -73,12 +73,12 @@ class SearchService:
                         },
                         {"terms": {"launch_id": search_req.filteredLaunchIds}},
                     ],
-                    "should": [
-                        {"term": {"is_auto_analyzed": {"value": False, "boost": 1.0}}},
-                    ],
                 }
             },
         }
+
+        utils.append_aa_ma_boosts(query, self.search_cfg)
+
         if queried_log["_source"]["message"].strip():
             query["query"]["bool"]["filter"].append({"term": {"is_merged": False}})
             query["query"]["bool"]["must"].append(

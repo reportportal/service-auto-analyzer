@@ -364,3 +364,36 @@ def compute_if_absent(on: dict[str, Any], key: str, default_value: Any) -> Any:
     if key not in on:
         on[key] = default_value
     return on[key]
+
+
+def append_aa_ma_boosts(query: dict[str, Any], search_cfg: launch_objects.SearchConfig) -> None:
+    """Append boosts for auto-analyzed and manually-analyzed fields to ES/OS query.
+
+    :param query: ES/OS query
+    :param search_cfg: Search configuration
+    """
+    should = create_path(query, ("query", "bool", "should"), [])
+    boost_aa = search_cfg.BoostAA
+    boost_ma = search_cfg.BoostMA
+    if boost_aa > boost_ma:
+        should.append(
+            {
+                "term": {
+                    "is_auto_analyzed": {
+                        "value": True,
+                        "boost": boost_aa - boost_ma,
+                    }
+                }
+            }
+        )
+    else:
+        should.append(
+            {
+                "term": {
+                    "is_auto_analyzed": {
+                        "value": False,
+                        "boost": boost_ma - boost_aa,
+                    }
+                }
+            }
+        )

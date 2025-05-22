@@ -176,31 +176,7 @@ class AnalyzerService:
             },
         }
 
-        should = utils.create_path(common_query, ("query", "bool", "should"), [])
-        boost_aa = self.search_cfg.BoostAA
-        boost_ma = self.search_cfg.BoostMA
-        if boost_aa > boost_ma:
-            should.append(
-                {
-                    "term": {
-                        "is_auto_analyzed": {
-                            "value": True,
-                            "boost": boost_aa - boost_ma,
-                        }
-                    }
-                }
-            )
-        else:
-            should.append(
-                {
-                    "term": {
-                        "is_auto_analyzed": {
-                            "value": False,
-                            "boost": boost_ma - boost_aa,
-                        }
-                    }
-                }
-            )
+        utils.append_aa_ma_boosts(common_query, self.search_cfg)
         return common_query
 
     def add_query_with_start_time_decay(self, main_query: dict, start_time: int) -> dict:

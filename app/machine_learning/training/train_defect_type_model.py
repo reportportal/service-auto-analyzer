@@ -211,9 +211,8 @@ class DefectTypeModelTraining:
         self.model_chooser = model_chooser
         self.model_class = model_class if model_class else CustomDefectTypeModel
 
-    @staticmethod
-    def get_messages_by_issue_type(issue_type_pattern: str) -> dict[str, Any]:
-        return {
+    def get_messages_by_issue_type(self, issue_type_pattern: str) -> dict[str, Any]:
+        query = {
             "_source": [DATA_FIELD, "issue_type", "launch_id", "_id"],
             "sort": {"start_time": "desc"},
             "query": {
@@ -236,12 +235,11 @@ class DefectTypeModelTraining:
                             }
                         }
                     ],
-                    "should": [
-                        {"term": {"is_auto_analyzed": {"value": False, "boost": 1.0}}},
-                    ],
                 }
             },
         }
+        utils.append_aa_ma_boosts(query, self.search_cfg)
+        return query
 
     def execute_data_query(self, project_index_name: str, query: str) -> QueryResult:
         errors = []

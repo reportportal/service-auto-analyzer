@@ -37,33 +37,28 @@ class SuggestPatternsService:
 
     def query_data(self, project, label):
         data = []
-        for d in elasticsearch.helpers.scan(
-            self.es_client.es_client,
-            index=project,
-            query={
-                "_source": ["detected_message", "issue_type"],
-                "sort": {"start_time": "desc"},
-                "size": self.app_config.esChunkNumber,
-                "query": {
-                    "bool": {
-                        "must": [
-                            {
-                                "bool": {
-                                    "should": [
-                                        {"wildcard": {"issue_type": "{}*".format(label.upper())}},
-                                        {"wildcard": {"issue_type": "{}*".format(label.lower())}},
-                                        {"wildcard": {"issue_type": "{}*".format(label)}},
-                                    ]
-                                }
+        query = {
+            "_source": ["detected_message", "issue_type"],
+            "sort": {"start_time": "desc"},
+            "size": self.app_config.esChunkNumber,
+            "query": {
+                "bool": {
+                    "must": [
+                        {
+                            "bool": {
+                                "should": [
+                                    {"wildcard": {"issue_type": "{}*".format(label.upper())}},
+                                    {"wildcard": {"issue_type": "{}*".format(label.lower())}},
+                                    {"wildcard": {"issue_type": "{}*".format(label)}},
+                                ]
                             }
-                        ],
-                        "should": [
-                            {"term": {"is_auto_analyzed": {"value": False, "boost": 1.0}}},
-                        ],
-                    }
-                },
+                        }
+                    ]
+                }
             },
-        ):
+        }
+        utils.append_aa_ma_boosts(query, self.search_cfg)
+        for d in elasticsearch.helpers.scan(self.es_client.es_client, index=project, query=query):
             data.append((d["_source"]["detected_message"], d["_source"]["issue_type"]))
         return data
 

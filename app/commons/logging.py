@@ -85,5 +85,5 @@ def get_correlation_id() -> str:
 
 
 # noinspection PyPep8Naming
-def getLogger(logger_name: str) -> Logger:  # NOSONAR
+def getLogger(logger_name: str) -> Logger:
     return Logger(logging.getLogger(logger_name))

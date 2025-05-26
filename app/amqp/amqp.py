@@ -21,7 +21,6 @@ from pika.adapters.blocking_connection import BlockingChannel, BlockingConnectio
 from pika.exceptions import (
     AMQPConnectionError,
     ChannelClosedByBroker,
-    StreamLostError,
 )
 from pika.spec import Basic, BasicProperties
 
@@ -188,7 +187,7 @@ class AmqpClient:
                 self._consume_queue(channel, queue, False, False, msg_callback)
                 logger.info(f"Start consuming on queue '{queue}'")
                 channel.start_consuming()
-            except (StreamLostError, AMQPConnectionError, ChannelClosedByBroker) as exc:
+            except (AMQPConnectionError, ChannelClosedByBroker) as exc:
                 logger.exception(f"Connection/channel lost. Reconnecting. {connection_info}", exc_info=exc)
                 self.close()
             except Exception as exc:  # pylint: disable=broad-except
@@ -213,7 +212,7 @@ class AmqpClient:
                         body=data.encode("utf‑8"),
                     )
                 return  # success
-            except (AMQPConnectionError, StreamLostError) as exc:
+            except AMQPConnectionError as exc:
                 logger.warning(f"Publish failed: {exc}. Reconnecting.", exc_info=exc)
                 self.close()
             except AmqpClientConnectionException:

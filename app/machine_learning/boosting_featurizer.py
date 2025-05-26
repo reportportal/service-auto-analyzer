@@ -269,7 +269,7 @@ class BoostingFeaturizer:
             mr_hit = search_rs["mrHit"]
             issue_type_to_compare: str = mr_hit["_source"]["issue_type"].lower()
             try:
-                res, res_prob = self.defect_type_predict_model.predict([det_message], issue_type_to_compare)
+                _, res_prob = self.defect_type_predict_model.predict([det_message], issue_type_to_compare)
                 result[issue_type] = res_prob[0][1] if len(res_prob[0]) == 2 else 0.0
                 self.used_model_info.update(self.defect_type_predict_model.get_model_info())
             except Exception as err:
@@ -288,7 +288,7 @@ class BoostingFeaturizer:
         for issue_type, search_rs in scores_by_issue_type.items():
             mr_hit = search_rs["mrHit"]
             rel_item_issue_type = mr_hit["_source"]["issue_type"]
-            issue_type_stats[issue_type] = int(label_type == rel_item_issue_type.lower()[:2])
+            issue_type_stats[issue_type] = int(rel_item_issue_type.lower().startswith(label_type))
         return issue_type_stats
 
     def filter_by_all_logs_should_be_similar(

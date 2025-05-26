@@ -317,10 +317,9 @@ class EsClient:
         if (
             "'type': 'mapper_parsing_exception'" in formatted_exception
             or "RequestError(400, 'illegal_argument_exception'" in formatted_exception
-        ):
-            if index_name in self.tables_to_recreate:
-                self.delete_index(index_name)
-                self.create_index_for_stats_info(index_name)
+        ) and index_name in self.tables_to_recreate:
+            self.delete_index(index_name)
+            self.create_index_for_stats_info(index_name)
 
     def _bulk_index(self, bodies, refresh=True, chunk_size=None):
         if not bodies:

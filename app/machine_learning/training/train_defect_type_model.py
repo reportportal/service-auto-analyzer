@@ -60,7 +60,7 @@ def return_similar_objects_into_sample(
         label_to_use = y_train[idx]
         if ind in additional_logs and label_to_use != 1:
             for idx_ in additional_logs[ind]:
-                log_res, label_res, real_label = data[idx_]
+                _, label_res, _ = data[idx_]
                 if label_res == label:
                     label_to_use = 1
                     break
@@ -398,7 +398,7 @@ class DefectTypeModelTraining:
             if not bad_data_proportion:
                 LOGGER.debug(f"Baseline test results {baseline_model_results}")
                 LOGGER.debug(f"New model test results {new_model_results}")
-                f_value, p_value = stats.f_oneway(baseline_model_results, new_model_results)
+                _, p_value = stats.f_oneway(baseline_model_results, new_model_results)
                 if p_value is None:
                     p_value = 1.0
                 train_log_info[label]["p_value"] = p_value

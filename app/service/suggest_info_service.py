@@ -195,7 +195,7 @@ class SuggestInfoService:
             index_name, launch_ids, self.build_suggest_info_ids_query_by_launch_ids
         )
         logger.info(
-            "Finished deleting launches %s for the index %s. It took %.2f sec. " "%s logs deleted",
+            "Finished deleting launches %s for the index %s. It took %.2f sec. %s logs deleted",
             launch_ids,
             index_name,
             time() - t_start,

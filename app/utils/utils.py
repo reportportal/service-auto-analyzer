@@ -69,7 +69,7 @@ def validate_file(file_path: str) -> bool:
 
 def extract_real_id(elastic_id):
     real_id = str(elastic_id)
-    if real_id[-2:] == "_m":
+    if real_id.endswith("_m"):
         return int(real_id[:-2])
     return int(real_id)
 
@@ -282,7 +282,7 @@ def calculate_threshold(text_size, cur_threshold, min_recalculated_threshold=0.8
         return cur_threshold
     allowed_words_missed = get_allowed_number_of_missed(cur_threshold)
     new_threshold = cur_threshold
-    for words_num in range(allowed_words_missed, 0, -1):
+    for _ in range(allowed_words_missed, 0, -1):
         threshold = (text_size - allowed_words_missed) / text_size
         if threshold >= min_recalculated_threshold:
             new_threshold = round(threshold, 2)

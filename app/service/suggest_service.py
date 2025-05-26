@@ -429,7 +429,7 @@ class SuggestService(AnalyzerService):
             )
             feature_names = ";".join([str(i) for i in _suggest_decision_maker_to_use.feature_ids])
             if feature_data:
-                predicted_labels, predicted_labels_probability = _suggest_decision_maker_to_use.predict(feature_data)
+                _, predicted_labels_probability = _suggest_decision_maker_to_use.predict(feature_data)
                 sorted_results = self.sort_results(scores_by_test_items, test_item_ids, predicted_labels_probability)
 
                 logger.debug("Found %d results for test items ", len(sorted_results))

@@ -260,10 +260,10 @@ def clean_special_chars(text: str) -> str:
 
 
 STATUS_CODES_PATTERNS = [
-    re.compile(r"\bcode[^\w.]+(\d+)\D*(\d*)|\bcode[^\w.]+(\d+?)$", flags=re.IGNORECASE),
-    re.compile(r"\w+_code[^\w.]+(\d+)\D*(\d*)|\w+_code[^\w.]+(\d+?)$", flags=re.IGNORECASE),
-    re.compile(r"\bstatus[^\w.]+(\d+)\D*(\d*)|\bstatus[^\w.]+(\d+?)$", flags=re.IGNORECASE),
-    re.compile(r"\w+_status[^\w.]+(\d+)\D*(\d*)|\w+_status[^\w.]+(\d+?)$", flags=re.IGNORECASE),
+    re.compile(r"\bcode[^\w.]+(\d+)\D*(\d*)|\bcode[^\w.]+(\d*)$", flags=re.IGNORECASE),
+    re.compile(r"\w+_code[^\w.]+(\d+)\D*(\d*)|\w+_code[^\w.]+(\d*)$", flags=re.IGNORECASE),
+    re.compile(r"\bstatus[^\w.]+(\d+)\D*(\d*)|\bstatus[^\w.]+(\d*)$", flags=re.IGNORECASE),
+    re.compile(r"\w+_status[^\w.]+(\d+)\D*(\d*)|\w+_status[^\w.]+(\d*)$", flags=re.IGNORECASE),
 ]
 
 

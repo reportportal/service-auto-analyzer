@@ -537,7 +537,7 @@ def replace_tabs_for_newlines(message: str) -> str:
 
 
 HORIZONTAL_WHITESPACE = (
-    r" \t\u00A0\u1680\u180E\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A" r"\u202F\u205F\u3000"
+    r" \t\u00A0\u1680\u180E\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u202F\u205F\u3000"
 )
 LINE_ENDING_PATTERN = re.compile(rf"[{HORIZONTAL_WHITESPACE}]*\r?\n")
 
@@ -691,7 +691,7 @@ def extract_paths(text_without_urls: str) -> list[str]:
 def extract_message_params(text: str) -> list[str]:
     all_unique = set()
     all_params = []
-    for param in re.findall(r"(^|\W)('.+?'|\".+?\")(\W|$)", text):
+    for param in re.findall(r"(^|\W)('.*'|\".*\")(\W|$)", text):
         param = re.search(r"[^\'\"]+", param[1].strip())
         if param is not None:
             param = param.group(0).strip()
@@ -771,7 +771,7 @@ def prepare_es_min_should_match(min_should_match: float) -> str:
 ACCESS_OR_REFRESH_TOKEN_PATTERN = r"(?:access|refresh|biometric|jwt)_?token"
 JSON_ACCESS_TOKEN = rf'("{ACCESS_OR_REFRESH_TOKEN_PATTERN}"\s*:\s*")[^"]+'
 HTTP_ACCESS_TOKEN = (
-    r"(Authorization\s*:\s*" r"(?:Bearer|Basic|Digest|HOBA|Mutual|Negotiate|NTLM|VAPID|SCRAM|AWS4-HMAC-SHA256)) .*"
+    r"(Authorization\s*:\s*(?:Bearer|Basic|Digest|HOBA|Mutual|Negotiate|NTLM|VAPID|SCRAM|AWS4-HMAC-SHA256)) .*"
 )
 TOKEN_TAG = "SPECIALTOKEN"
 TOKEN_REPLACEMENT = rf"\1{TOKEN_TAG}"

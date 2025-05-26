@@ -79,6 +79,7 @@ def test_object_exists(bucket_prefix, bucket, object_name):
 
 
 def get_url(bucket, object_name):
+    # Mute Sonar warning about hardcoded HTTP URL, since this is a test setup
     # noinspection HttpUrlsUsage
     return f"http://{SERVER_HOST}/{bucket}/{object_name}"  # NOSONAR
 

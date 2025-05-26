@@ -48,6 +48,7 @@ from app.service import (
 from app.utils import utils
 
 APP_CONFIG = ApplicationConfig(
+    # Mute Sonar about hardcoded HTTP URL, since this is a hostname inside a docker-compose file
     esHost=os.getenv("ES_HOSTS", "http://elasticsearch:9200").strip("/").strip("\\"),  # NOSONAR
     esUser=os.getenv("ES_USER", "").strip(),
     esPassword=os.getenv("ES_PASSWORD", "").strip(),

@@ -96,7 +96,8 @@ SYNTHETIC_TESTS_URLS = [
     [],
     ["https://example.com/api/v1/data"],
     ["https://api.example.org/v2/users"],
-    ["http://localhost:8080/api/v1/path/to/resource", "https://192.168.1.1/admin"],
+    # Mute Sonar about hardcoding IP addresses. because this is test data
+    ["http://localhost:8080/api/v1/path/to/resource", "https://192.168.1.1/admin"],  # NOSONAR
     [],
     [],
     [],

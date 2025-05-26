@@ -80,7 +80,7 @@ def test_object_exists(bucket_prefix, bucket, object_name):
 
 def get_url(bucket, object_name):
     # noinspection HttpUrlsUsage
-    return f"http://{SERVER_HOST}/{bucket}/{object_name}"
+    return f"http://{SERVER_HOST}/{bucket}/{object_name}"  # NOSONAR
 
 
 @pytest.mark.parametrize(

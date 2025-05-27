@@ -259,11 +259,12 @@ def clean_special_chars(text: str) -> str:
     return SPECIAL_CHARACTER_PATTERN.sub(" ", text)
 
 
+# Mute Sonar's "Group parts of the regex together to make the intended operator precedence explicit." which is invalid
 STATUS_CODES_PATTERNS = [
-    re.compile(r"\bcode[^\w.]+(\d+)\D*(\d*)|\bcode[^\w.]+(\d*)$", flags=re.IGNORECASE),
-    re.compile(r"\w+_code[^\w.]+(\d+)\D*(\d*)|\w+_code[^\w.]+(\d*)$", flags=re.IGNORECASE),
-    re.compile(r"\bstatus[^\w.]+(\d+)\D*(\d*)|\bstatus[^\w.]+(\d*)$", flags=re.IGNORECASE),
-    re.compile(r"\w+_status[^\w.]+(\d+)\D*(\d*)|\w+_status[^\w.]+(\d*)$", flags=re.IGNORECASE),
+    re.compile(r"\bcode[^\w.]+(\d+)\D*(\d*)|\bcode[^\w.]+(\d*)$", flags=re.IGNORECASE),  # NOSONAR
+    re.compile(r"\w+_code[^\w.]+(\d+)\D*(\d*)|\w+_code[^\w.]+(\d*)$", flags=re.IGNORECASE),  # NOSONAR
+    re.compile(r"\bstatus[^\w.]+(\d+)\D*(\d*)|\bstatus[^\w.]+(\d*)$", flags=re.IGNORECASE),  # NOSONAR
+    re.compile(r"\w+_status[^\w.]+(\d+)\D*(\d*)|\w+_status[^\w.]+(\d*)$", flags=re.IGNORECASE),  # NOSONAR
 ]
 
 

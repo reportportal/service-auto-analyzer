@@ -32,14 +32,16 @@ def get_index_found_call(index_name: str) -> dict:
     """
     Returns a dictionary representing an HTTP call that simulates a successful index retrieval.
     """
-    return get_index_call(index_name, HTTPStatus.OK)
+    # Mute invalid Sonar's "Change this argument; Function "get_index_call" expects a different type"
+    return get_index_call(index_name, HTTPStatus.OK)  # NOSONAR
 
 
 def get_index_not_found_call(index_name: str) -> dict:
     """
     Returns a dictionary representing an HTTP call that simulates an index not found error.
     """
-    return get_index_call(index_name, HTTPStatus.NOT_FOUND)
+    # Mute invalid Sonar's "Change this argument; Function "get_index_call" expects a different type"
+    return get_index_call(index_name, HTTPStatus.NOT_FOUND)  # NOSONAR
 
 
 def get_search_for_logs_call(index_name: str, query_parameters: str, rq: Any, rs: Any) -> dict:

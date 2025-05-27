@@ -15,6 +15,7 @@
 import json
 import unittest
 from http import HTTPStatus
+from typing import Any
 from unittest.mock import MagicMock
 
 import httpretty
@@ -51,6 +52,17 @@ def get_index_not_found_call(index_name: str) -> dict:
     return get_index_call(index_name, HTTPStatus.NOT_FOUND)
 
 
+def get_search_for_logs_call(index_name: str, rq: Any, rs: Any) -> dict:
+    return {
+        "method": httpretty.GET,
+        "uri": f"/{index_name}/_search?scroll=5m&size=1000",
+        "status": HTTPStatus.OK,
+        "content_type": "application/json",
+        "rq": rq,
+        "rs": rs,
+    }
+
+
 class TestCleanIndexService(TestService):
 
     @utils.ignore_warnings
@@ -58,14 +70,9 @@ class TestCleanIndexService(TestService):
         """Test cleaning index logs"""
         common_index_steps: list[dict] = [
             get_index_found_call("1"),
-            {
-                "method": httpretty.GET,
-                "uri": "/1/_search?scroll=5m&size=1000",
-                "status": HTTPStatus.OK,
-                "content_type": "application/json",
-                "rq": get_fixture(self.search_not_merged_logs_for_delete),
-                "rs": get_fixture(self.one_hit_search_rs),
-            },
+            get_search_for_logs_call(
+                "1", get_fixture(self.search_not_merged_logs_for_delete), get_fixture(self.one_hit_search_rs)
+            ),
             {
                 "method": httpretty.POST,
                 "uri": "/_bulk?refresh=true",
@@ -73,14 +80,7 @@ class TestCleanIndexService(TestService):
                 "content_type": "application/json",
                 "rs": get_fixture(self.delete_logs_rs),
             },
-            {
-                "method": httpretty.GET,
-                "uri": "/1/_search?scroll=5m&size=1000",
-                "status": HTTPStatus.OK,
-                "content_type": "application/json",
-                "rq": get_fixture(self.search_merged_logs),
-                "rs": get_fixture(self.one_hit_search_rs),
-            },
+            get_search_for_logs_call("1", get_fixture(self.search_merged_logs), get_fixture(self.one_hit_search_rs)),
             {
                 "method": httpretty.POST,
                 "uri": "/_bulk?refresh=true",
@@ -88,14 +88,9 @@ class TestCleanIndexService(TestService):
                 "content_type": "application/json",
                 "rs": get_fixture(self.delete_logs_rs),
             },
-            {
-                "method": httpretty.GET,
-                "uri": "/1/_search?scroll=5m&size=1000",
-                "status": HTTPStatus.OK,
-                "content_type": "application/json",
-                "rq": get_fixture(self.search_not_merged_logs),
-                "rs": get_fixture(self.one_hit_search_rs),
-            },
+            get_search_for_logs_call(
+                "1", get_fixture(self.search_not_merged_logs), get_fixture(self.one_hit_search_rs)
+            ),
             {
                 "method": httpretty.POST,
                 "uri": "/_bulk?refresh=true",
@@ -123,14 +118,11 @@ class TestCleanIndexService(TestService):
                     "uri": "/1_suggest",
                     "status": HTTPStatus.OK,
                 },
-                {
-                    "method": httpretty.GET,
-                    "uri": "/1_suggest/_search?scroll=5m&size=1000",
-                    "status": HTTPStatus.OK,
-                    "content_type": "application/json",
-                    "rq": get_fixture(self.search_suggest_info_ids_query),
-                    "rs": get_fixture(self.one_hit_search_suggest_info_rs),
-                },
+                get_search_for_logs_call(
+                    "1_suggest",
+                    get_fixture(self.search_suggest_info_ids_query),
+                    get_fixture(self.one_hit_search_suggest_info_rs),
+                ),
                 {
                     "method": httpretty.POST,
                     "uri": "/_bulk?refresh=true",
@@ -172,14 +164,11 @@ class TestCleanIndexService(TestService):
             {
                 "test_calls": [
                     get_index_found_call("rp_1"),
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/rp_1/_search?scroll=5m&size=1000",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.search_not_merged_logs_for_delete),
-                        "rs": get_fixture(self.one_hit_search_rs),
-                    },
+                    get_search_for_logs_call(
+                        "rp_1",
+                        get_fixture(self.search_not_merged_logs_for_delete),
+                        get_fixture(self.one_hit_search_rs),
+                    ),
                     {
                         "method": httpretty.POST,
                         "uri": "/_bulk?refresh=true",
@@ -187,14 +176,9 @@ class TestCleanIndexService(TestService):
                         "content_type": "application/json",
                         "rs": get_fixture(self.delete_logs_rs),
                     },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/rp_1/_search?scroll=5m&size=1000",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.search_merged_logs),
-                        "rs": get_fixture(self.one_hit_search_rs),
-                    },
+                    get_search_for_logs_call(
+                        "rp_1", get_fixture(self.search_merged_logs), get_fixture(self.one_hit_search_rs)
+                    ),
                     {
                         "method": httpretty.POST,
                         "uri": "/_bulk?refresh=true",
@@ -202,14 +186,9 @@ class TestCleanIndexService(TestService):
                         "content_type": "application/json",
                         "rs": get_fixture(self.delete_logs_rs),
                     },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/rp_1/_search?scroll=5m&size=1000",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.search_not_merged_logs),
-                        "rs": get_fixture(self.one_hit_search_rs),
-                    },
+                    get_search_for_logs_call(
+                        "rp_1", get_fixture(self.search_not_merged_logs), get_fixture(self.one_hit_search_rs)
+                    ),
                     {
                         "method": httpretty.POST,
                         "uri": "/_bulk?refresh=true",
@@ -223,14 +202,11 @@ class TestCleanIndexService(TestService):
                         "uri": "/rp_1_suggest",
                         "status": HTTPStatus.OK,
                     },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/rp_1_suggest/_search?scroll=5m&size=1000",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.search_suggest_info_ids_query),
-                        "rs": get_fixture(self.one_hit_search_suggest_info_rs),
-                    },
+                    get_search_for_logs_call(
+                        "rp_1_suggest",
+                        get_fixture(self.search_suggest_info_ids_query),
+                        get_fixture(self.one_hit_search_suggest_info_rs),
+                    ),
                     {
                         "method": httpretty.POST,
                         "uri": "/_bulk?refresh=true",

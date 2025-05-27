@@ -12,17 +12,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from collections import deque, defaultdict
+from collections import defaultdict, deque
 from datetime import datetime
-from typing import Optional, Any, Callable
+from typing import Any, Callable, Optional
 
 import numpy as np
 
 from app.commons import logging, similarity_calculator
 from app.machine_learning.models import WeightedSimilarityCalculator
-from app.machine_learning.models.defect_type_model import DATA_FIELD
-from app.machine_learning.models.defect_type_model import DefectTypeModel
-from app.utils import utils, text_processing
+from app.machine_learning.models.defect_type_model import DATA_FIELD, DefectTypeModel
+from app.utils import text_processing, utils
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
@@ -38,25 +37,31 @@ class BoostingFeaturizer:
     all_results: list[tuple[dict[str, Any], list[dict[str, Any]]]]
     total_normalized_score: float
 
-    def __init__(self, results: list[tuple[dict[str, Any], dict[str, Any]]], config: dict[str, Any],
-                 feature_ids: str | list[int],
-                 weighted_log_similarity_calculator: Optional[WeightedSimilarityCalculator] = None) -> None:
+    def __init__(
+        self,
+        results: list[tuple[dict[str, Any], dict[str, Any]]],
+        config: dict[str, Any],
+        feature_ids: str | list[int],
+        weighted_log_similarity_calculator: Optional[WeightedSimilarityCalculator] = None,
+    ) -> None:
         self.config = config
         self.previously_gathered_features = {}
         self.similarity_calculator = similarity_calculator.SimilarityCalculator(
-            self.config, similarity_model=weighted_log_similarity_calculator)
+            self.config, similarity_model=weighted_log_similarity_calculator
+        )
         if type(feature_ids) is str:
             self.feature_ids = text_processing.transform_string_feature_range_into_list(feature_ids)
         else:
             self.feature_ids = feature_ids
         self.fields_to_replace_with_merged_logs = [
-            "message", "detected_message",
+            "message",
+            "detected_message",
             "detected_message_without_params_extended",
             "message_without_params_extended",
             "message_extended",
             "detected_message_extended",
             "message_without_params_and_brackets",
-            "detected_message_without_params_and_brackets"
+            "detected_message_without_params_and_brackets",
         ]
 
         self.feature_functions = {
@@ -93,8 +98,11 @@ class BoostingFeaturizer:
             50: (self.is_text_of_particular_defect_type, {"label_type": "si"}, []),
             51: (self.predict_particular_defect_type, {}, []),
             52: (self._calculate_similarity_percent, {"field_name": "namespaces_stacktrace"}, []),
-            53: (self._calculate_similarity_percent, {"field_name": "detected_message_without_params_and_brackets"},
-                 []),
+            53: (
+                self._calculate_similarity_percent,
+                {"field_name": "detected_message_without_params_and_brackets"},
+                [],
+            ),
             55: (self._calculate_similarity_percent, {"field_name": "potential_status_codes"}, []),
             56: (self.is_the_same_launch, {}, []),
             57: (self.is_the_same_launch_id, {}, []),
@@ -102,7 +110,7 @@ class BoostingFeaturizer:
             61: (self._calculate_similarity_percent, {"field_name": "test_item_name"}, []),
             64: (self._calculate_decay_function_score, {"field_name": "start_time"}, []),
             65: (self._calculate_test_item_logs_similar_percent, {}, []),
-            66: (self._count_test_item_logs, {}, [])
+            66: (self._count_test_item_logs, {}, []),
         }
 
         fields_to_calc_similarity = self.find_columns_to_find_similarities_for()
@@ -115,7 +123,8 @@ class BoostingFeaturizer:
         filter_min_should_match_any: Optional[list[str]] = self.config.get("filter_min_should_match_any", None)
         if filter_min_should_match_any:
             processed_results = self.filter_by_min_should_match_any(
-                processed_results, fields=filter_min_should_match_any)
+                processed_results, fields=filter_min_should_match_any
+            )
         self.test_item_log_stats = self._calculate_stats_by_test_item_ids(processed_results)
         filter_by_all_logs_should_be_similar = self.config.get("filter_by_all_logs_should_be_similar", None)
         if filter_by_all_logs_should_be_similar:
@@ -141,17 +150,17 @@ class BoostingFeaturizer:
         if self.scores_by_type is not None:
             return self.scores_by_type
 
-        scores_by_issue_type = defaultdict(lambda: {'mrHit': {'_score': -1}, 'score': 0})
+        scores_by_issue_type = defaultdict(lambda: {"mrHit": {"_score": -1}, "score": 0})
         for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
-                issue_type = hit['_source']['issue_type']
-                hit['es_pos'] = idx
+                issue_type = hit["_source"]["issue_type"]
+                hit["es_pos"] = idx
 
                 issue_type_item = scores_by_issue_type[issue_type]
-                if hit['_score'] > issue_type_item['mrHit']['_score']:
-                    issue_type_item['mrHit'] = hit
-                    issue_type_item['compared_log'] = log
-                issue_type_item['score'] += (hit['normalized_score'] / self.total_normalized_score)
+                if hit["_score"] > issue_type_item["mrHit"]["_score"]:
+                    issue_type_item["mrHit"] = hit
+                    issue_type_item["compared_log"] = log
+                issue_type_item["score"] += hit["normalized_score"] / self.total_normalized_score
         self.scores_by_type = dict(scores_by_issue_type)
         return self.scores_by_type
 
@@ -170,7 +179,8 @@ class BoostingFeaturizer:
 
     @staticmethod
     def _calculate_stats_by_test_item_ids(
-            all_results: list[tuple[dict[str, Any], dict[str, Any]]]) -> dict[str, float]:
+        all_results: list[tuple[dict[str, Any], dict[str, Any]]],
+    ) -> dict[str, float]:
         """Calculate relation between the number of logs found and queried for each Test Item.
 
         :param list[tuple[dict[str, Any], dict[str, Any]]] all_results: list of logs queried and their search results
@@ -207,7 +217,8 @@ class BoostingFeaturizer:
             for r in res["hits"]["hits"]:
                 if "found_tests_and_methods" in r["_source"]:
                     r["_source"]["found_tests_and_methods"] = text_processing.preprocess_found_test_methods(
-                        r["_source"]["found_tests_and_methods"])
+                        r["_source"]["found_tests_and_methods"]
+                    )
         return all_results
 
     def _calculate_decay_function_score(self, field_name: str) -> dict[str, float]:
@@ -224,9 +235,9 @@ class BoostingFeaturizer:
         dates_by_issue_types = {}
         for issue_type, search_rs in scores_by_issue_type.items():
             field_date_str = search_rs["mrHit"]["_source"][field_name]
-            field_date = datetime.strptime(field_date_str, '%Y-%m-%d %H:%M:%S')
+            field_date = datetime.strptime(field_date_str, "%Y-%m-%d %H:%M:%S")
             compared_field_date_str = search_rs["compared_log"]["_source"][field_name]
-            compared_field_date = datetime.strptime(compared_field_date_str, '%Y-%m-%d %H:%M:%S')
+            compared_field_date = datetime.strptime(compared_field_date_str, "%Y-%m-%d %H:%M:%S")
             if compared_field_date < field_date:
                 field_date, compared_field_date = compared_field_date, field_date
             dates_by_issue_types[issue_type] = np.exp(decay_speed * (compared_field_date - field_date).days / 7)
@@ -281,7 +292,7 @@ class BoostingFeaturizer:
         return issue_type_stats
 
     def filter_by_all_logs_should_be_similar(
-            self, all_results: list[tuple[dict[str, Any], dict[str, Any]]]
+        self, all_results: list[tuple[dict[str, Any], dict[str, Any]]]
     ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         new_results = []
         for log, res in all_results:
@@ -295,7 +306,8 @@ class BoostingFeaturizer:
 
     @staticmethod
     def filter_by_test_case_hash(
-            all_results: list[tuple[dict[str, Any], dict[str, Any]]]) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+        all_results: list[tuple[dict[str, Any], dict[str, Any]]],
+    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         new_results = []
         for log, res in all_results:
             test_case_hash_dict = {}
@@ -304,14 +316,13 @@ class BoostingFeaturizer:
                 if test_case_hash not in test_case_hash_dict:
                     test_case_hash_dict[test_case_hash] = []
                 test_case_hash_dict[test_case_hash].append(
-                    (r["_id"], int(r["_score"]), datetime.strptime(
-                        r["_source"]["start_time"], '%Y-%m-%d %H:%M:%S')))
+                    (r["_id"], int(r["_score"]), datetime.strptime(r["_source"]["start_time"], "%Y-%m-%d %H:%M:%S"))
+                )
             log_ids_to_take = set()
             for test_case_hash in test_case_hash_dict:
                 test_case_hash_dict[test_case_hash] = sorted(
-                    test_case_hash_dict[test_case_hash],
-                    key=lambda x: (x[1], x[2]),
-                    reverse=True)
+                    test_case_hash_dict[test_case_hash], key=lambda x: (x[1], x[2]), reverse=True
+                )
                 scores_used = set()
                 for sorted_score in test_case_hash_dict[test_case_hash]:
                     if sorted_score[1] not in scores_used:
@@ -345,7 +356,7 @@ class BoostingFeaturizer:
             if type(rel_item_value) is str:
                 rel_item_value = rel_item_value.strip().lower()
 
-            if rel_item_value == '' and queried_item_value == '':
+            if rel_item_value == "" and queried_item_value == "":
                 num_of_logs_issue_type[issue_type] = 0
                 continue
 
@@ -357,21 +368,21 @@ class BoostingFeaturizer:
 
         :return: dict with issue type as key and value as 1 if Test Case Hashes are equal, 0 otherwise
         """
-        return self.is_the_same_field('test_case_hash')
+        return self.is_the_same_field("test_case_hash")
 
     def is_the_same_launch(self) -> dict[str, int]:
         """Check if the query log and search results contain the same Launch Name.
 
         :return: dict with issue type as key and value as 1 if Launch Names are equal, 0 otherwise
         """
-        return self.is_the_same_field('launch_name')
+        return self.is_the_same_field("launch_name")
 
     def is_the_same_launch_id(self) -> dict[str, int]:
         """Check if the query log and search results contain the same Launch ID.
 
         :return: dict with issue type as key and value as 1 if Launch IDs are equal, 0 otherwise
         """
-        return self.is_the_same_field('launch_id')
+        return self.is_the_same_field("launch_id")
 
     def has_the_same_test_case_in_all_results(self) -> dict[str, int]:
         """Check if the query log and search results contain the same Test Case Hash in any of all results.
@@ -398,8 +409,8 @@ class BoostingFeaturizer:
         fields_to_calc_similarity = set()
         for feature in self.feature_ids:
             method_params = self.feature_functions[feature]
-            if 'field_name' in method_params[1]:
-                fields_to_calc_similarity.add(method_params[1]['field_name'])
+            if "field_name" in method_params[1]:
+                fields_to_calc_similarity.add(method_params[1]["field_name"])
         return list(fields_to_calc_similarity)
 
     def _calculate_score(self) -> dict[str, float]:
@@ -409,7 +420,7 @@ class BoostingFeaturizer:
         :return: dict with issue type as key and value as normalized score
         """
         scores_by_issue_type = self.find_most_relevant_by_type()
-        return {item: search_rs['score'] for item, search_rs in scores_by_issue_type.items()}
+        return {item: search_rs["score"] for item, search_rs in scores_by_issue_type.items()}
 
     def _is_all_log_lines(self) -> dict[str, int]:
         """Return if all log lines were used to find the most relevant log.
@@ -445,8 +456,9 @@ class BoostingFeaturizer:
                 sim_obj = sim_dict[field][group_id]
                 similarity = sim_obj["similarity"]
                 if sim_obj["both_empty"] and field in self.fields_to_replace_with_merged_logs:
-                    sim_obj = self.similarity_calculator.find_similarity(
-                        all_results, ['merged_small_logs'])['merged_small_logs'][group_id]
+                    sim_obj = self.similarity_calculator.find_similarity(all_results, ["merged_small_logs"])[
+                        "merged_small_logs"
+                    ][group_id]
                     similarity = sim_obj["similarity"]
                 if similarity >= self.config["min_should_match"]:
                     new_elastic_res.append(elastic_res)
@@ -454,7 +466,7 @@ class BoostingFeaturizer:
         return new_results
 
     def filter_by_min_should_match_any(
-            self, all_results: list[tuple[dict[str, Any], dict[str, Any]]], fields: list[str]
+        self, all_results: list[tuple[dict[str, Any], dict[str, Any]]], fields: list[str]
     ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         if not fields:
             return all_results
@@ -469,9 +481,10 @@ class BoostingFeaturizer:
                     sim_obj = sim_dict[field][group_id]
                     similarity = sim_obj["similarity"]
                     if sim_obj["both_empty"] and field in self.fields_to_replace_with_merged_logs:
-                        sim_obj = self.similarity_calculator.find_similarity(
-                            all_results, ['merged_small_logs'])['merged_small_logs'][group_id]
-                        similarity = sim_obj['similarity']
+                        sim_obj = self.similarity_calculator.find_similarity(all_results, ["merged_small_logs"])[
+                            "merged_small_logs"
+                        ][group_id]
+                        similarity = sim_obj["similarity"]
                     max_similarity = max(max_similarity, similarity)
                 if max_similarity >= self.config["min_should_match"]:
                     new_elastic_res.append(elastic_res)
@@ -527,7 +540,7 @@ class BoostingFeaturizer:
             place_by_issue_type[issue_type_item[0]] = 1 / (1 + idx)
         return place_by_issue_type
 
-    def _calculate_max_score_and_pos(self, return_val_name: str = 'max_score') -> dict[str, float]:
+    def _calculate_max_score_and_pos(self, return_val_name: str = "max_score") -> dict[str, float]:
         """Calculate maximum Entry score and Inverse order for every issue type in query result.
 
         :param str return_val_name: name of return value, can be 'max_score' or 'max_score_pos'
@@ -538,13 +551,17 @@ class BoostingFeaturizer:
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
 
-                if issue_type not in max_scores_by_issue_type \
-                        or hit["normalized_score"] > max_scores_by_issue_type[issue_type]["max_score"]:
-                    max_scores_by_issue_type[issue_type] = {"max_score": hit["normalized_score"],
-                                                            "max_score_pos": 1 / (1 + idx), }
+                if (
+                    issue_type not in max_scores_by_issue_type
+                    or hit["normalized_score"] > max_scores_by_issue_type[issue_type]["max_score"]
+                ):
+                    max_scores_by_issue_type[issue_type] = {
+                        "max_score": hit["normalized_score"],
+                        "max_score_pos": 1 / (1 + idx),
+                    }
         return {item: results[return_val_name] for item, results in max_scores_by_issue_type.items()}
 
-    def _calculate_min_score_and_pos(self, return_val_name: str = 'min_score') -> dict[str, float]:
+    def _calculate_min_score_and_pos(self, return_val_name: str = "min_score") -> dict[str, float]:
         """Calculate minimum Entry score and Inverse order for every issue type in query result.
 
         :param str return_val_name: name of return value, can be 'min_score' or 'min_score_pos'
@@ -555,35 +572,39 @@ class BoostingFeaturizer:
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
 
-                if issue_type not in min_scores_by_issue_type \
-                        or hit["normalized_score"] < min_scores_by_issue_type[issue_type]["min_score"]:
-                    min_scores_by_issue_type[issue_type] = {"min_score": hit["normalized_score"],
-                                                            "min_score_pos": 1 / (1 + idx), }
+                if (
+                    issue_type not in min_scores_by_issue_type
+                    or hit["normalized_score"] < min_scores_by_issue_type[issue_type]["min_score"]
+                ):
+                    min_scores_by_issue_type[issue_type] = {
+                        "min_score": hit["normalized_score"],
+                        "min_score_pos": 1 / (1 + idx),
+                    }
         return {item: results[return_val_name] for item, results in min_scores_by_issue_type.items()}
 
-    def _calculate_percent_count_items_and_mean(self, return_val_name: str = 'mean_score') -> dict[str, float]:
+    def _calculate_percent_count_items_and_mean(self, return_val_name: str = "mean_score") -> dict[str, float]:
         """Calculate percent of items by issue type and mean score of this issue type.
 
         :param str return_val_name: name of return value, can be 'mean_score' or 'cnt_items_percent'
         :return: dict with issue type as key and value as mean score or percent of items
         """
-        cnt_items_by_issue_type: dict[str, dict[str: int]] = defaultdict(lambda: defaultdict(lambda: 0))
+        cnt_items_by_issue_type: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
         cnt_items_glob = 0
         for log, es_results in self.all_results:
             cnt_items_glob += len(es_results)
 
             for idx, hit in enumerate(es_results):
-                issue_type = hit['_source']['issue_type']
-                cnt_items_by_issue_type[issue_type]['cnt_items_percent'] += 1
-                cnt_items_by_issue_type[issue_type]['mean_score'] += hit['normalized_score']
+                issue_type = hit["_source"]["issue_type"]
+                cnt_items_by_issue_type[issue_type]["cnt_items_percent"] += 1
+                cnt_items_by_issue_type[issue_type]["mean_score"] += hit["normalized_score"]
 
         for issue_scores in cnt_items_by_issue_type.values():
-            issue_scores['mean_score'] /= issue_scores['cnt_items_percent']
-            issue_scores['cnt_items_percent'] /= cnt_items_glob
+            issue_scores["mean_score"] /= issue_scores["cnt_items_percent"]
+            issue_scores["cnt_items_percent"] /= cnt_items_glob
         return {item: results[return_val_name] for item, results in cnt_items_by_issue_type.items()}
 
     def normalize_results(
-            self, all_elastic_results: list[tuple[dict[str, Any], dict[str, Any]]]
+        self, all_elastic_results: list[tuple[dict[str, Any], dict[str, Any]]]
     ) -> list[tuple[dict[str, Any], list[dict[str, Any]]]]:
         all_results = []
         max_score = 0
@@ -660,6 +681,5 @@ class BoostingFeaturizer:
                     self.previously_gathered_features[feature] = gathered_data_dict[feature]
             gathered_data = utils.gather_feature_list(gathered_data_dict, self.feature_ids)
         except Exception as err:
-            logger.error("Errors in boosting features calculation")
-            logger.exception(err)
+            logger.exception("Errors in boosting features calculation", exc_info=err)
         return gathered_data, issue_type_names

@@ -32,53 +32,53 @@ class Logger:
         """
         Delegate a debug call to the underlying logger.
         """
-        kwargs['extra'] = {'correlation_id': get_correlation_id()}
+        kwargs["extra"] = {"correlation_id": get_correlation_id()}
         self.__logger.debug(msg, *args, **kwargs)
 
     def info(self, msg, *args, **kwargs):
         """
         Delegate an info call to the underlying logger.
         """
-        kwargs['extra'] = {'correlation_id': get_correlation_id()}
+        kwargs["extra"] = {"correlation_id": get_correlation_id()}
         self.__logger.info(msg, *args, **kwargs)
 
     def warning(self, msg, *args, **kwargs):
         """
         Delegate a warning call to the underlying logger.
         """
-        kwargs['extra'] = {'correlation_id': get_correlation_id()}
+        kwargs["extra"] = {"correlation_id": get_correlation_id()}
         self.__logger.warning(msg, *args, **kwargs)
 
     def error(self, msg, *args, **kwargs):
         """
         Delegate an error call to the underlying logger.
         """
-        kwargs['extra'] = {'correlation_id': get_correlation_id()}
+        kwargs["extra"] = {"correlation_id": get_correlation_id()}
         self.__logger.error(msg, *args, **kwargs)
 
     def exception(self, msg, *args, exc_info=True, **kwargs):
         """
         Delegate an exception call to the underlying logger.
         """
-        kwargs['extra'] = {'correlation_id': get_correlation_id()}
+        kwargs["extra"] = {"correlation_id": get_correlation_id()}
         self.__logger.error(msg, *args, exc_info=exc_info, **kwargs)
 
     def critical(self, msg, *args, **kwargs):
         """
         Delegate a critical call to the underlying logger.
         """
-        kwargs['extra'] = {'correlation_id': get_correlation_id()}
+        kwargs["extra"] = {"correlation_id": get_correlation_id()}
         self.__logger.critical(msg, *args, **kwargs)
 
 
 def new_correlation_id() -> str:
-    corr_id = base64.urlsafe_b64encode(uuid.uuid4().bytes).decode('utf-8').rstrip('=')
+    corr_id = base64.urlsafe_b64encode(uuid.uuid4().bytes).decode("utf-8").rstrip("=")
     __INSTANCES.correlation_id = corr_id
     return corr_id
 
 
 def get_correlation_id() -> str:
-    corr_id = getattr(__INSTANCES, 'correlation_id', None)
+    corr_id = getattr(__INSTANCES, "correlation_id", None)
     if corr_id is None:
         corr_id = new_correlation_id()
     return corr_id

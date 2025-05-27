@@ -21,7 +21,7 @@ import sklearn
 from sklearn.feature_extraction.text import CountVectorizer
 
 from app.commons import logging
-from app.utils import utils, text_processing
+from app.utils import text_processing, utils
 
 LOGGER = logging.getLogger("analyzerApp.clusterizer")
 
@@ -35,13 +35,13 @@ class Clusterizer:
             hash_print = set()
             len_words = (len(words) - n_gram) if len(words) > n_gram else len(words)
             for i in range(len_words):
-                hash_print.add(hashlib.md5(" ".join(words[i:i + n_gram]).encode("utf-8")).hexdigest())
+                hash_print.add(hashlib.md5(" ".join(words[i : i + n_gram]).encode("utf-8")).hexdigest())
             hashes.append(list(heapq.nlargest(n_permutations, hash_print)))
         return hashes
 
     def find_groups_by_similarity(
-            self, messages: list[str], groups_to_check: dict[int, list[int]],
-            threshold: float = 0.95) -> dict[int, list[int]]:
+        self, messages: list[str], groups_to_check: dict[int, list[int]], threshold: float = 0.95
+    ) -> dict[int, list[int]]:
         if len(messages) == 0:
             return {}
         rearranged_groups = {}
@@ -66,8 +66,12 @@ class Clusterizer:
         return rearranged_groups
 
     def similarity_groupping(
-            self, hash_prints: list[list[str]] | list[str], block_size: int = 1000, for_text: bool = True,
-            threshold: float = 0.95) -> dict[int, int]:
+        self,
+        hash_prints: list[list[str]] | list[str],
+        block_size: int = 1000,
+        for_text: bool = True,
+        threshold: float = 0.95,
+    ) -> dict[int, int]:
         num_of_blocks = int(np.ceil(len(hash_prints) / block_size))
         hash_groups = {}
         global_ind = 0
@@ -75,19 +79,21 @@ class Clusterizer:
             for jdx in range((idx + 1 if num_of_blocks > 1 else idx), num_of_blocks):
                 if for_text:
                     _count_vector = CountVectorizer(
-                        binary=True, analyzer="word", token_pattern="[^ ]+", ngram_range=(2, 2))
+                        binary=True, analyzer="word", token_pattern="[^ ]+", ngram_range=(2, 2)
+                    )
                 else:
                     _count_vector = CountVectorizer(binary=True, analyzer=lambda x: x)
 
-                block_i = hash_prints[idx * block_size: (idx + 1) * block_size]
-                block_j = hash_prints[jdx * block_size: (jdx + 1) * block_size] if num_of_blocks > 1 else []
+                block_i = hash_prints[idx * block_size : (idx + 1) * block_size]
+                block_j = hash_prints[jdx * block_size : (jdx + 1) * block_size] if num_of_blocks > 1 else []
 
                 transformed_hashes = _count_vector.fit_transform(block_i + block_j).astype(np.int8)
                 transformed_hashes_count_words = np.asarray(np.sum(transformed_hashes, axis=1))
                 similarities = sklearn.metrics.pairwise.cosine_similarity(transformed_hashes)
 
                 indices_looked = list(range(idx * block_size, idx * block_size + len(block_i))) + list(
-                    range(jdx * block_size, jdx * block_size + len(block_j)))
+                    range(jdx * block_size, jdx * block_size + len(block_j))
+                )
 
                 for seq_num_i in range(len(indices_looked)):
                     i = indices_looked[seq_num_i]
@@ -97,10 +103,11 @@ class Clusterizer:
                     for seq_num_j in range(seq_num_i + 1, len(indices_looked)):
                         j = indices_looked[seq_num_j]
                         if j not in hash_groups:
-                            min_words_num = min(transformed_hashes_count_words[seq_num_i][0],
-                                                transformed_hashes_count_words[seq_num_j][0])
-                            recalculated_threshold = utils.calculate_threshold(
-                                min_words_num, threshold)
+                            min_words_num = min(
+                                transformed_hashes_count_words[seq_num_i][0],
+                                transformed_hashes_count_words[seq_num_j][0],
+                            )
+                            recalculated_threshold = utils.calculate_threshold(min_words_num, threshold)
                             if similarities[seq_num_i][seq_num_j] >= recalculated_threshold:
                                 hash_groups[j] = hash_groups[i]
         return hash_groups
@@ -131,8 +138,7 @@ class Clusterizer:
         ids_with_duplicates = {}
         new_id = 0
         for idx, text_message in enumerate(messages):
-            text_message_normalized = " ".join(sorted(
-                text_processing.split_words(text_message, to_lower=True)))
+            text_message_normalized = " ".join(sorted(text_processing.split_words(text_message, to_lower=True)))
             if text_message_normalized not in text_messages_set:
                 messages_to_cluster.append(text_message)
                 text_messages_set[text_message_normalized] = new_id

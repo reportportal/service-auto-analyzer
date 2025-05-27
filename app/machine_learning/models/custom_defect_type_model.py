@@ -17,8 +17,7 @@ from typing import Optional
 from app.commons.object_saving.object_saver import ObjectSaver
 from app.machine_learning.models.defect_type_model import DefectTypeModel
 
-
-MODEL_TAG = 'custom defect type model'
+MODEL_TAG = "custom defect type model"
 
 
 class CustomDefectTypeModel(DefectTypeModel):

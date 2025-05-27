@@ -24,9 +24,8 @@ import httpretty
 from app.commons.model import launch_objects
 from app.service import SuggestInfoService
 from app.utils import utils
-from test import get_fixture
+from test import APP_CONFIG, get_fixture
 from test.mock_service import TestService
-from test import APP_CONFIG
 
 
 class TestSuggestInfoService(TestService):
@@ -36,61 +35,71 @@ class TestSuggestInfoService(TestService):
         """Test cleaning suggest info logs"""
         tests = [
             {
-                "test_calls": [{"method": httpretty.GET,
-                                "uri": "/2_suggest",
-                                "status": HTTPStatus.NOT_FOUND,
-                                }, ],
+                "test_calls": [
+                    {
+                        "method": httpretty.GET,
+                        "uri": "/2_suggest",
+                        "status": HTTPStatus.NOT_FOUND,
+                    },
+                ],
                 "rq": launch_objects.CleanIndex(ids=[1], project=2),
-                "expected_count": 0
+                "expected_count": 0,
             },
             {
-                "test_calls": [{"method": httpretty.GET,
-                                "uri": "/1_suggest",
-                                "status": HTTPStatus.OK,
-                                },
-                               {"method": httpretty.GET,
-                                "uri": "/1_suggest/_search?scroll=5m&size=1000",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rq": get_fixture(self.search_suggest_info_ids_query),
-                                "rs": get_fixture(
-                                    self.one_hit_search_suggest_info_rs),
-                                },
-                               {"method": httpretty.POST,
-                                "uri": "/_bulk?refresh=true",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rq": get_fixture(self.delete_suggest_logs_rq),
-                                "rs": get_fixture(self.delete_logs_rs),
-                                }],
+                "test_calls": [
+                    {
+                        "method": httpretty.GET,
+                        "uri": "/1_suggest",
+                        "status": HTTPStatus.OK,
+                    },
+                    {
+                        "method": httpretty.GET,
+                        "uri": "/1_suggest/_search?scroll=5m&size=1000",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rq": get_fixture(self.search_suggest_info_ids_query),
+                        "rs": get_fixture(self.one_hit_search_suggest_info_rs),
+                    },
+                    {
+                        "method": httpretty.POST,
+                        "uri": "/_bulk?refresh=true",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rq": get_fixture(self.delete_suggest_logs_rq),
+                        "rs": get_fixture(self.delete_logs_rs),
+                    },
+                ],
                 "rq": launch_objects.CleanIndex(ids=[1], project=1),
-                "expected_count": 1
+                "expected_count": 1,
             },
             {
-                "test_calls": [{"method": httpretty.GET,
-                                "uri": "/rp_1_suggest",
-                                "status": HTTPStatus.OK,
-                                },
-                               {"method": httpretty.GET,
-                                "uri": "/rp_1_suggest/_search?scroll=5m&size=1000",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rq": get_fixture(self.search_suggest_info_ids_query),
-                                "rs": get_fixture(
-                                    self.one_hit_search_suggest_info_rs),
-                                },
-                               {"method": httpretty.POST,
-                                "uri": "/_bulk?refresh=true",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.delete_suggest_logs_rq_with_prefix),
-                                "rs": get_fixture(self.delete_logs_rs),
-                                }],
+                "test_calls": [
+                    {
+                        "method": httpretty.GET,
+                        "uri": "/rp_1_suggest",
+                        "status": HTTPStatus.OK,
+                    },
+                    {
+                        "method": httpretty.GET,
+                        "uri": "/rp_1_suggest/_search?scroll=5m&size=1000",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rq": get_fixture(self.search_suggest_info_ids_query),
+                        "rs": get_fixture(self.one_hit_search_suggest_info_rs),
+                    },
+                    {
+                        "method": httpretty.POST,
+                        "uri": "/_bulk?refresh=true",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rq": get_fixture(self.delete_suggest_logs_rq_with_prefix),
+                        "rs": get_fixture(self.delete_logs_rs),
+                    },
+                ],
                 "app_config": APP_CONFIG,
                 "rq": launch_objects.CleanIndex(ids=[1], project=1),
-                "expected_count": 1
-            }
+                "expected_count": 1,
+            },
         ]
 
         for idx, test in enumerate(tests):
@@ -102,49 +111,58 @@ class TestSuggestInfoService(TestService):
                 suggest_info_service = SuggestInfoService(app_config=app_config)
 
                 suggest_info_service.es_client.es_client.scroll = MagicMock(
-                    return_value=json.loads(get_fixture(self.no_hits_search_rs)))
+                    return_value=json.loads(get_fixture(self.no_hits_search_rs))
+                )
                 response = suggest_info_service.clean_suggest_info_logs(test["rq"])
                 assert test["expected_count"] == response
                 TestSuggestInfoService.shutdown_server(test["test_calls"])
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}'). \
-                    with_traceback(err.__traceback__)
+                raise AssertionError(f"Error in the test case number: {idx}").with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_delete_suggest_info_index(self):
         """Test deleting an index"""
         tests = [
             {
-                "test_calls": [{"method": httpretty.DELETE,
-                                "uri": "/1_suggest",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rs": get_fixture(self.index_deleted_rs),
-                                }, ],
+                "test_calls": [
+                    {
+                        "method": httpretty.DELETE,
+                        "uri": "/1_suggest",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rs": get_fixture(self.index_deleted_rs),
+                    },
+                ],
                 "index": 1,
                 "result": True,
             },
             {
-                "test_calls": [{"method": httpretty.DELETE,
-                                "uri": "/2_suggest",
-                                "status": HTTPStatus.NOT_FOUND,
-                                "content_type": "application/json",
-                                "rs": get_fixture(self.index_not_found_rs),
-                                }, ],
+                "test_calls": [
+                    {
+                        "method": httpretty.DELETE,
+                        "uri": "/2_suggest",
+                        "status": HTTPStatus.NOT_FOUND,
+                        "content_type": "application/json",
+                        "rs": get_fixture(self.index_not_found_rs),
+                    },
+                ],
                 "index": 2,
                 "result": False,
             },
             {
-                "test_calls": [{"method": httpretty.DELETE,
-                                "uri": "/rp_2_suggest",
-                                "status": HTTPStatus.NOT_FOUND,
-                                "content_type": "application/json",
-                                "rs": get_fixture(self.index_not_found_rs),
-                                }, ],
+                "test_calls": [
+                    {
+                        "method": httpretty.DELETE,
+                        "uri": "/rp_2_suggest",
+                        "status": HTTPStatus.NOT_FOUND,
+                        "content_type": "application/json",
+                        "rs": get_fixture(self.index_not_found_rs),
+                    },
+                ],
                 "app_config": APP_CONFIG,
                 "index": 2,
                 "result": False,
-            }
+            },
         ]
         for idx, test in enumerate(tests):
             try:
@@ -160,125 +178,119 @@ class TestSuggestInfoService(TestService):
 
                 TestSuggestInfoService.shutdown_server(test["test_calls"])
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}'). \
-                    with_traceback(err.__traceback__)
+                raise AssertionError(f"Error in the test case number: {idx}").with_traceback(err.__traceback__)
 
     @utils.ignore_warnings
     def test_index_suggest_info_logs(self):
         """Test indexing suggest info"""
         tests = [
+            {"test_calls": [], "index_rq": "[]", "has_errors": False, "expected_count": 0},
             {
-                "test_calls": [],
-                "index_rq": "[]",
-                "has_errors": False,
-                "expected_count": 0
-            },
-            {
-                "test_calls": [{"method": httpretty.GET,
-                                "uri": "/rp_suggestions_info_metrics",
-                                "status": HTTPStatus.NOT_FOUND
-                                },
-                               {"method": httpretty.PUT,
-                                "uri": "/rp_suggestions_info_metrics",
-                                "status": HTTPStatus.OK,
-                                "rs": get_fixture(self.index_created_rs),
-                                },
-                               {"method": httpretty.GET,
-                                "uri": "/1_suggest",
-                                "status": HTTPStatus.NOT_FOUND
-                                },
-                               {"method": httpretty.PUT,
-                                "uri": "/1_suggest",
-                                "status": HTTPStatus.OK,
-                                "rs": get_fixture(self.index_created_rs),
-                                },
-                               {"method": httpretty.POST,
-                                "uri": "/_bulk?refresh=true",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rs": get_fixture(self.index_logs_rs),
-                                },
-                               {"method": httpretty.POST,
-                                "uri": "/_bulk?refresh=true",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rs": get_fixture(self.index_logs_rs),
-                                }],
+                "test_calls": [
+                    {"method": httpretty.GET, "uri": "/rp_suggestions_info_metrics", "status": HTTPStatus.NOT_FOUND},
+                    {
+                        "method": httpretty.PUT,
+                        "uri": "/rp_suggestions_info_metrics",
+                        "status": HTTPStatus.OK,
+                        "rs": get_fixture(self.index_created_rs),
+                    },
+                    {"method": httpretty.GET, "uri": "/1_suggest", "status": HTTPStatus.NOT_FOUND},
+                    {
+                        "method": httpretty.PUT,
+                        "uri": "/1_suggest",
+                        "status": HTTPStatus.OK,
+                        "rs": get_fixture(self.index_created_rs),
+                    },
+                    {
+                        "method": httpretty.POST,
+                        "uri": "/_bulk?refresh=true",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rs": get_fixture(self.index_logs_rs),
+                    },
+                    {
+                        "method": httpretty.POST,
+                        "uri": "/_bulk?refresh=true",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rs": get_fixture(self.index_logs_rs),
+                    },
+                ],
                 "index_rq": get_fixture(self.suggest_info_list),
                 "has_errors": False,
-                "expected_count": 2
+                "expected_count": 2,
             },
             {
-                "test_calls": [{"method": httpretty.GET,
-                                "uri": "/rp_suggestions_info_metrics",
-                                "status": HTTPStatus.OK
-                                },
-                               {"method": httpretty.PUT,
-                                "uri": "/rp_suggestions_info_metrics/_mapping",
-                                "status": HTTPStatus.OK,
-                                "rs": get_fixture(self.index_created_rs),
-                                },
-                               {"method": httpretty.GET,
-                                "uri": "/1_suggest",
-                                "status": HTTPStatus.OK
-                                },
-                               {"method": httpretty.PUT,
-                                "uri": "/1_suggest/_mapping",
-                                "status": HTTPStatus.OK,
-                                "rs": get_fixture(self.index_created_rs),
-                                },
-                               {"method": httpretty.POST,
-                                "uri": "/_bulk?refresh=true",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rs": get_fixture(self.index_logs_rs),
-                                },
-                               {"method": httpretty.POST,
-                                "uri": "/_bulk?refresh=true",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rs": get_fixture(self.index_logs_rs),
-                                }],
+                "test_calls": [
+                    {"method": httpretty.GET, "uri": "/rp_suggestions_info_metrics", "status": HTTPStatus.OK},
+                    {
+                        "method": httpretty.PUT,
+                        "uri": "/rp_suggestions_info_metrics/_mapping",
+                        "status": HTTPStatus.OK,
+                        "rs": get_fixture(self.index_created_rs),
+                    },
+                    {"method": httpretty.GET, "uri": "/1_suggest", "status": HTTPStatus.OK},
+                    {
+                        "method": httpretty.PUT,
+                        "uri": "/1_suggest/_mapping",
+                        "status": HTTPStatus.OK,
+                        "rs": get_fixture(self.index_created_rs),
+                    },
+                    {
+                        "method": httpretty.POST,
+                        "uri": "/_bulk?refresh=true",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rs": get_fixture(self.index_logs_rs),
+                    },
+                    {
+                        "method": httpretty.POST,
+                        "uri": "/_bulk?refresh=true",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rs": get_fixture(self.index_logs_rs),
+                    },
+                ],
                 "index_rq": get_fixture(self.suggest_info_list),
                 "has_errors": False,
-                "expected_count": 2
+                "expected_count": 2,
             },
             {
-                "test_calls": [{"method": httpretty.GET,
-                                "uri": "/rp_suggestions_info_metrics",
-                                "status": HTTPStatus.OK
-                                },
-                               {"method": httpretty.PUT,
-                                "uri": "/rp_suggestions_info_metrics/_mapping",
-                                "status": HTTPStatus.OK,
-                                "rs": get_fixture(self.index_created_rs),
-                                },
-                               {"method": httpretty.GET,
-                                "uri": "/rp_1_suggest",
-                                "status": HTTPStatus.OK
-                                },
-                               {"method": httpretty.PUT,
-                                "uri": "/rp_1_suggest/_mapping",
-                                "status": HTTPStatus.OK,
-                                "rs": get_fixture(self.index_created_rs),
-                                },
-                               {"method": httpretty.POST,
-                                "uri": "/_bulk?refresh=true",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rs": get_fixture(self.index_logs_rs),
-                                },
-                               {"method": httpretty.POST,
-                                "uri": "/_bulk?refresh=true",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rs": get_fixture(self.index_logs_rs),
-                                }],
+                "test_calls": [
+                    {"method": httpretty.GET, "uri": "/rp_suggestions_info_metrics", "status": HTTPStatus.OK},
+                    {
+                        "method": httpretty.PUT,
+                        "uri": "/rp_suggestions_info_metrics/_mapping",
+                        "status": HTTPStatus.OK,
+                        "rs": get_fixture(self.index_created_rs),
+                    },
+                    {"method": httpretty.GET, "uri": "/rp_1_suggest", "status": HTTPStatus.OK},
+                    {
+                        "method": httpretty.PUT,
+                        "uri": "/rp_1_suggest/_mapping",
+                        "status": HTTPStatus.OK,
+                        "rs": get_fixture(self.index_created_rs),
+                    },
+                    {
+                        "method": httpretty.POST,
+                        "uri": "/_bulk?refresh=true",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rs": get_fixture(self.index_logs_rs),
+                    },
+                    {
+                        "method": httpretty.POST,
+                        "uri": "/_bulk?refresh=true",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rs": get_fixture(self.index_logs_rs),
+                    },
+                ],
                 "app_config": APP_CONFIG,
                 "index_rq": get_fixture(self.suggest_info_list),
                 "has_errors": False,
-                "expected_count": 2
-            }
+                "expected_count": 2,
+            },
         ]
 
         for idx, test in enumerate(tests):
@@ -289,67 +301,71 @@ class TestSuggestInfoService(TestService):
                     app_config = test["app_config"]
                 suggest_info_service = SuggestInfoService(app_config=app_config)
                 response = suggest_info_service.index_suggest_info(
-                    [launch_objects.SuggestAnalysisResult(**res) for res in json.loads(test["index_rq"])])
+                    [launch_objects.SuggestAnalysisResult(**res) for res in json.loads(test["index_rq"])]
+                )
 
                 assert test["has_errors"] == response.errors
                 assert test["expected_count"] == response.took
 
                 TestSuggestInfoService.shutdown_server(test["test_calls"])
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}'). \
-                    with_traceback(err.__traceback__)
+                raise AssertionError(f"Error in the test case number: {idx}").with_traceback(err.__traceback__)
 
     def test_remove_test_items_suggests(self):
         tests = [
             {
-                "test_calls": [{"method": httpretty.GET,
-                                "uri": "/1_suggest",
-                                "status": HTTPStatus.NOT_FOUND,
-                                "content_type": "application/json",
-                                }],
-                "item_remove_info": {
-                    "project": 1,
-                    "itemsToDelete": [1, 2]},
-                "result": 0
+                "test_calls": [
+                    {
+                        "method": httpretty.GET,
+                        "uri": "/1_suggest",
+                        "status": HTTPStatus.NOT_FOUND,
+                        "content_type": "application/json",
+                    }
+                ],
+                "item_remove_info": {"project": 1, "itemsToDelete": [1, 2]},
+                "result": 0,
             },
             {
-                "test_calls": [{"method": httpretty.GET,
-                                "uri": "/1_suggest",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                },
-                               {"method": httpretty.POST,
-                                "uri": "/1_suggest/_delete_by_query",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.delete_by_query_suggest_1),
-                                "rs": json.dumps({"deleted": 1})}],
-                "item_remove_info": {
-                    "project": 1,
-                    "itemsToDelete": [1, 2]},
-                "result": 1
+                "test_calls": [
+                    {
+                        "method": httpretty.GET,
+                        "uri": "/1_suggest",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                    },
+                    {
+                        "method": httpretty.POST,
+                        "uri": "/1_suggest/_delete_by_query",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rq": get_fixture(self.delete_by_query_suggest_1),
+                        "rs": json.dumps({"deleted": 1}),
+                    },
+                ],
+                "item_remove_info": {"project": 1, "itemsToDelete": [1, 2]},
+                "result": 1,
             },
             {
-                "test_calls": [{"method": httpretty.GET,
-                                "uri": "/rp_1_suggest",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                },
-                               {"method": httpretty.POST,
-                                "uri": "/rp_1_suggest/_delete_by_query",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.delete_by_query_suggest_1),
-                                "rs": json.dumps({"deleted": 3}),
-                                }],
+                "test_calls": [
+                    {
+                        "method": httpretty.GET,
+                        "uri": "/rp_1_suggest",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                    },
+                    {
+                        "method": httpretty.POST,
+                        "uri": "/rp_1_suggest/_delete_by_query",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rq": get_fixture(self.delete_by_query_suggest_1),
+                        "rs": json.dumps({"deleted": 3}),
+                    },
+                ],
                 "app_config": APP_CONFIG,
-                "item_remove_info": {
-                    "project": 1,
-                    "itemsToDelete": [1, 2]},
-                "result": 3
-            }
+                "item_remove_info": {"project": 1, "itemsToDelete": [1, 2]},
+                "result": 3,
+            },
         ]
 
         for idx, test in enumerate(tests):
@@ -359,67 +375,69 @@ class TestSuggestInfoService(TestService):
                 if "app_config" in test:
                     app_config = test["app_config"]
                 suggest_info_service = SuggestInfoService(app_config=app_config)
-                response = suggest_info_service.clean_suggest_info_logs_by_test_item(
-                    test["item_remove_info"])
+                response = suggest_info_service.clean_suggest_info_logs_by_test_item(test["item_remove_info"])
 
                 assert test["result"] == response
 
                 TestSuggestInfoService.shutdown_server(test["test_calls"])
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}'). \
-                    with_traceback(err.__traceback__)
+                raise AssertionError(f"Error in the test case number: {idx}").with_traceback(err.__traceback__)
 
     def test_remove_launches_suggests(self):
         tests = [
             {
-                "test_calls": [{"method": httpretty.GET,
-                                "uri": "/1_suggest",
-                                "status": HTTPStatus.NOT_FOUND,
-                                "content_type": "application/json",
-                                }],
-                "launch_remove_info": {
-                    "project": 1,
-                    "launch_ids": [1, 2]},
-                "result": 0
+                "test_calls": [
+                    {
+                        "method": httpretty.GET,
+                        "uri": "/1_suggest",
+                        "status": HTTPStatus.NOT_FOUND,
+                        "content_type": "application/json",
+                    }
+                ],
+                "launch_remove_info": {"project": 1, "launch_ids": [1, 2]},
+                "result": 0,
             },
             {
-                "test_calls": [{"method": httpretty.GET,
-                                "uri": "/1_suggest",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                },
-                               {"method": httpretty.POST,
-                                "uri": "/1_suggest/_delete_by_query",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.delete_by_query_suggest_2),
-                                "rs": json.dumps({"deleted": 1})}],
-                "launch_remove_info": {
-                    "project": 1,
-                    "launch_ids": [1, 2]},
-                "result": 1
+                "test_calls": [
+                    {
+                        "method": httpretty.GET,
+                        "uri": "/1_suggest",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                    },
+                    {
+                        "method": httpretty.POST,
+                        "uri": "/1_suggest/_delete_by_query",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rq": get_fixture(self.delete_by_query_suggest_2),
+                        "rs": json.dumps({"deleted": 1}),
+                    },
+                ],
+                "launch_remove_info": {"project": 1, "launch_ids": [1, 2]},
+                "result": 1,
             },
             {
-                "test_calls": [{"method": httpretty.GET,
-                                "uri": "/rp_1_suggest",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                },
-                               {"method": httpretty.POST,
-                                "uri": "/rp_1_suggest/_delete_by_query",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.delete_by_query_suggest_2),
-                                "rs": json.dumps({"deleted": 3}),
-                                }],
+                "test_calls": [
+                    {
+                        "method": httpretty.GET,
+                        "uri": "/rp_1_suggest",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                    },
+                    {
+                        "method": httpretty.POST,
+                        "uri": "/rp_1_suggest/_delete_by_query",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rq": get_fixture(self.delete_by_query_suggest_2),
+                        "rs": json.dumps({"deleted": 3}),
+                    },
+                ],
                 "app_config": APP_CONFIG,
-                "launch_remove_info": {
-                    "project": 1,
-                    "launch_ids": [1, 2]},
-                "result": 3
-            }
+                "launch_remove_info": {"project": 1, "launch_ids": [1, 2]},
+                "result": 3,
+            },
         ]
 
         for idx, test in enumerate(tests):
@@ -429,86 +447,83 @@ class TestSuggestInfoService(TestService):
                 if "app_config" in test:
                     app_config = test["app_config"]
                 suggest_info_service = SuggestInfoService(app_config=app_config)
-                response = suggest_info_service.clean_suggest_info_logs_by_launch_id(
-                    test["launch_remove_info"])
+                response = suggest_info_service.clean_suggest_info_logs_by_launch_id(test["launch_remove_info"])
 
                 assert test["result"] == response
 
                 TestSuggestInfoService.shutdown_server(test["test_calls"])
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}'). \
-                    with_traceback(err.__traceback__)
+                raise AssertionError(f"Error in the test case number: {idx}").with_traceback(err.__traceback__)
 
     def test_suggest_info_update(self):
         tests = [
             {
-                "test_calls": [{"method": httpretty.GET,
-                                "uri": "/1_suggest",
-                                "status": HTTPStatus.NOT_FOUND,
-                                "content_type": "application/json",
-                                }],
-                "defect_update_info": {
-                    "project": 1,
-                    "itemsToUpdate": {1: "pb001", 2: "ab001"}},
-                "result": 0
+                "test_calls": [
+                    {
+                        "method": httpretty.GET,
+                        "uri": "/1_suggest",
+                        "status": HTTPStatus.NOT_FOUND,
+                        "content_type": "application/json",
+                    }
+                ],
+                "defect_update_info": {"project": 1, "itemsToUpdate": {1: "pb001", 2: "ab001"}},
+                "result": 0,
             },
             {
-                "test_calls": [{"method": httpretty.GET,
-                                "uri": "/1_suggest",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                },
-                               {"method": httpretty.GET,
-                                "uri": "/1_suggest/_search?scroll=5m&size=1000",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.get_suggest_info_by_test_item_ids_query),
-                                "rs": get_fixture(
-                                    self.suggest_info_test_items_by_id_1),
-                                },
-                               {"method": httpretty.POST,
-                                "uri": "/_bulk?refresh=true",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.suggest_index_test_item_update),
-                                "rs": get_fixture(
-                                    self.index_logs_rs),
-                                }],
-                "defect_update_info": {
-                    "project": 1,
-                    "itemsToUpdate": {1: "pb001", 2: "ab001"}},
-                "result": 1
+                "test_calls": [
+                    {
+                        "method": httpretty.GET,
+                        "uri": "/1_suggest",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                    },
+                    {
+                        "method": httpretty.GET,
+                        "uri": "/1_suggest/_search?scroll=5m&size=1000",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rq": get_fixture(self.get_suggest_info_by_test_item_ids_query),
+                        "rs": get_fixture(self.suggest_info_test_items_by_id_1),
+                    },
+                    {
+                        "method": httpretty.POST,
+                        "uri": "/_bulk?refresh=true",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rq": get_fixture(self.suggest_index_test_item_update),
+                        "rs": get_fixture(self.index_logs_rs),
+                    },
+                ],
+                "defect_update_info": {"project": 1, "itemsToUpdate": {1: "pb001", 2: "ab001"}},
+                "result": 1,
             },
             {
-                "test_calls": [{"method": httpretty.GET,
-                                "uri": "/1_suggest",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                },
-                               {"method": httpretty.GET,
-                                "uri": "/1_suggest/_search?scroll=5m&size=1000",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.get_suggest_info_by_test_item_ids_query),
-                                "rs": get_fixture(
-                                    self.suggest_info_test_items_by_id_2),
-                                },
-                               {"method": httpretty.POST,
-                                "uri": "/_bulk?refresh=true",
-                                "status": HTTPStatus.OK,
-                                "content_type": "application/json",
-                                "rq": get_fixture(
-                                    self.suggest_index_test_item_update_2),
-                                "rs": get_fixture(
-                                    self.index_logs_rs),
-                                }],
-                "defect_update_info": {
-                    "project": 1,
-                    "itemsToUpdate": {1: "pb001", 2: "ab001"}},
-                "result": 2
+                "test_calls": [
+                    {
+                        "method": httpretty.GET,
+                        "uri": "/1_suggest",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                    },
+                    {
+                        "method": httpretty.GET,
+                        "uri": "/1_suggest/_search?scroll=5m&size=1000",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rq": get_fixture(self.get_suggest_info_by_test_item_ids_query),
+                        "rs": get_fixture(self.suggest_info_test_items_by_id_2),
+                    },
+                    {
+                        "method": httpretty.POST,
+                        "uri": "/_bulk?refresh=true",
+                        "status": HTTPStatus.OK,
+                        "content_type": "application/json",
+                        "rq": get_fixture(self.suggest_index_test_item_update_2),
+                        "rs": get_fixture(self.index_logs_rs),
+                    },
+                ],
+                "defect_update_info": {"project": 1, "itemsToUpdate": {1: "pb001", 2: "ab001"}},
+                "result": 2,
             },
         ]
 
@@ -519,17 +534,17 @@ class TestSuggestInfoService(TestService):
                 if "app_config" in test:
                     app_config = test["app_config"]
                 suggest_info_service = SuggestInfoService(app_config=app_config)
-                suggest_info_service.es_client.es_client.scroll = MagicMock(return_value=json.loads(
-                    get_fixture(self.no_hits_search_rs)))
+                suggest_info_service.es_client.es_client.scroll = MagicMock(
+                    return_value=json.loads(get_fixture(self.no_hits_search_rs))
+                )
                 response = suggest_info_service.update_suggest_info(test["defect_update_info"])
 
                 assert test["result"] == response
 
                 TestSuggestInfoService.shutdown_server(test["test_calls"])
             except AssertionError as err:
-                raise AssertionError(f'Error in the test case number: {idx}'). \
-                    with_traceback(err.__traceback__)
+                raise AssertionError(f"Error in the test case number: {idx}").with_traceback(err.__traceback__)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -20,11 +20,12 @@ from app.commons.object_saving.object_saver import ObjectSaver
 
 class MlModel(metaclass=ABCMeta):
     """Base class for ML models."""
+
     tags: list[str]
     object_saver: ObjectSaver
 
     def __init__(self, object_saver: ObjectSaver, tags: str) -> None:
-        self.tags = [tag.strip() for tag in tags.split(',')]
+        self.tags = [tag.strip() for tag in tags.split(",")]
         self.object_saver = object_saver
 
     def _load_models(self, model_files: list[str]) -> list[Any]:

@@ -21,11 +21,16 @@ from app.machine_learning.models import WeightedSimilarityCalculator
 
 class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
 
-    def __init__(self, results: list[tuple[dict[str, Any], dict[str, Any]]], config,
-                 feature_ids: str | list[int],
-                 weighted_log_similarity_calculator: WeightedSimilarityCalculator = None) -> None:
+    def __init__(
+        self,
+        results: list[tuple[dict[str, Any], dict[str, Any]]],
+        config,
+        feature_ids: str | list[int],
+        weighted_log_similarity_calculator: WeightedSimilarityCalculator = None,
+    ) -> None:
         super().__init__(
-            results, config, feature_ids, weighted_log_similarity_calculator=weighted_log_similarity_calculator)
+            results, config, feature_ids, weighted_log_similarity_calculator=weighted_log_similarity_calculator
+        )
 
     def _calculate_percent_issue_types(self) -> dict[str, float]:
         scores_by_issue_type = self.find_most_relevant_by_type()
@@ -41,18 +46,18 @@ class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
     def find_most_relevant_by_type(self) -> dict[str, dict[str, Any]]:
         if self.scores_by_type is not None:
             return self.scores_by_type
-        scores_by_type = defaultdict(lambda: {'mrHit': {'_score': -1}, 'score': 0})
+        scores_by_type = defaultdict(lambda: {"mrHit": {"_score": -1}, "score": 0})
         for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
-                test_item = str(hit['_source']['test_item'])
-                hit['es_pos'] = idx
+                test_item = str(hit["_source"]["test_item"])
+                hit["es_pos"] = idx
 
                 issue_type_item = scores_by_type[test_item]
-                if hit['_score'] > issue_type_item['mrHit']['_score']:
-                    issue_type_item['mrHit'] = hit
-                    issue_type_item['compared_log'] = log
+                if hit["_score"] > issue_type_item["mrHit"]["_score"]:
+                    issue_type_item["mrHit"] = hit
+                    issue_type_item["compared_log"] = log
 
-                issue_type_item['score'] = max(issue_type_item['score'], hit['normalized_score'])
+                issue_type_item["score"] = max(issue_type_item["score"], hit["normalized_score"])
         self.scores_by_type = dict(scores_by_type)
         return self.scores_by_type
 

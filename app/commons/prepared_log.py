@@ -16,10 +16,16 @@ from typing import Optional
 from typing_extensions import override
 
 from app.utils import text_processing
-from app.utils.log_preparation import (basic_prepare, clean_message, prepare_message, prepare_message_no_numbers,
-                                       prepare_message_no_params, prepare_exception_message_no_params_no_numbers,
-                                       prepare_exception_message_no_params,
-                                       prepare_exception_message_and_stacktrace)
+from app.utils.log_preparation import (
+    basic_prepare,
+    clean_message,
+    prepare_exception_message_and_stacktrace,
+    prepare_exception_message_no_params,
+    prepare_exception_message_no_params_no_numbers,
+    prepare_message,
+    prepare_message_no_numbers,
+    prepare_message_no_params,
+)
 
 
 class PreparedLogMessage:
@@ -32,7 +38,9 @@ class PreparedLogMessage:
     _message_no_params: Optional[str] = None
     _exception_message: Optional[str] = None
     _stacktrace: Optional[str] = None
+    _exception_message_urls_list: Optional[list[str]] = None
     _exception_message_urls: Optional[str] = None
+    _exception_message_no_urls: Optional[str] = None
     _exception_message_paths: Optional[str] = None
     _exception_message_potential_status_codes: Optional[str] = None
     _exception_message_params: Optional[str] = None
@@ -96,36 +104,49 @@ class PreparedLogMessage:
         return self._stacktrace
 
     @property
+    def exception_message_urls_list(self) -> list[str]:
+        if not self._exception_message_urls_list:
+            self._exception_message_urls_list = text_processing.extract_urls(self.exception_message)
+        return self._exception_message_urls_list
+
+    @property
     def exception_message_urls(self) -> str:
         if not self._exception_message_urls:
-            self._exception_message_urls = " ".join(text_processing.extract_urls(self.exception_message))
+            self._exception_message_urls = " ".join(self.exception_message_urls_list)
         return self._exception_message_urls
+
+    @property
+    def exception_message_no_urls(self) -> str:
+        if not self._exception_message_no_urls:
+            self._exception_message_no_urls = text_processing.remove_urls(
+                self.exception_message, self.exception_message_urls_list
+            )
+        return self._exception_message_no_urls
 
     @property
     def exception_message_paths(self) -> str:
         if not self._exception_message_paths:
-            self._exception_message_paths = " ".join(text_processing.extract_paths(self.exception_message))
+            self._exception_message_paths = " ".join(text_processing.extract_paths(self.exception_message_no_urls))
         return self._exception_message_paths
 
     @property
     def exception_message_potential_status_codes(self) -> str:
         if not self._exception_message_potential_status_codes:
             self._exception_message_potential_status_codes = " ".join(
-                text_processing.get_potential_status_codes(self.exception_message))
+                text_processing.get_potential_status_codes(self.exception_message)
+            )
         return self._exception_message_potential_status_codes
 
     @property
     def exception_message_params(self) -> str:
         if not self._exception_message_params:
-            self._exception_message_params = " ".join(text_processing.extract_message_params(
-                self.exception_message))
+            self._exception_message_params = " ".join(text_processing.extract_message_params(self.exception_message))
         return self._exception_message_params
 
     @property
     def exception_message_no_params(self) -> str:
         if not self._exception_message_no_params:
-            self._exception_message_no_params = prepare_exception_message_no_params_no_numbers(
-                self.exception_message)
+            self._exception_message_no_params = prepare_exception_message_no_params_no_numbers(self.exception_message)
         return self._exception_message_no_params
 
     @property
@@ -152,33 +173,12 @@ class PreparedLogMessage:
             self._exception_found_extended = text_processing.enrich_found_exceptions(self.exception_found)
         return self._exception_found_extended
 
-    # TODO: This is used in training only, subject to remove
-    @property
-    def stacktrace_paths(self) -> str:
-        if not self._stacktrace_paths:
-            self._stacktrace_paths = " ".join(text_processing.extract_paths(self.stacktrace))
-        return self._stacktrace_paths
-
-    # TODO: This is used in training only, subject to remove
-    @property
-    def stacktrace_no_paths(self) -> str:
-        if not self._stacktrace_no_paths:
-            self._stacktrace_no_paths = text_processing.unify_spaces(text_processing.clean_from_paths(self.stacktrace))
-        return self._stacktrace_no_paths
-
-    # TODO: This is used in training only, subject to remove
-    @property
-    def stacktrace_no_paths_extended(self) -> str:
-        if not self._stacktrace_no_paths_extended:
-            self._stacktrace_no_paths_extended = text_processing.enrich_text_with_method_and_classes(
-                self.stacktrace_no_paths)
-        return self._stacktrace_no_paths_extended
-
     @property
     def test_and_methods_extended(self) -> str:
         if not self._test_and_methods_extended:
             self._test_and_methods_extended = text_processing.enrich_text_with_method_and_classes(
-                " ".join(self.test_and_methods))
+                " ".join(self.test_and_methods)
+            )
         return self._test_and_methods_extended
 
 

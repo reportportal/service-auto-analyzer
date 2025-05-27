@@ -14,7 +14,7 @@
 
 import re
 from collections import Counter
-from typing import Optional, Any
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -29,13 +29,13 @@ from app.machine_learning.models import MlModel
 from app.utils import text_processing
 from app.utils.defaultdict import DefaultDict
 
-LOGGER = logging.getLogger('analyzerApp.DefectTypeModel')
-MODEL_FILES: list[str] = ['count_vectorizer_models.pickle', 'models.pickle']
-DATA_FIELD = 'detected_message_without_params_extended'
-BASE_DEFECT_TYPE_PATTERN = re.compile(r'^(?:([^_]+)_\S+|(\D+)\d+)$')
+LOGGER = logging.getLogger("analyzerApp.DefectTypeModel")
+MODEL_FILES: list[str] = ["count_vectorizer_models.pickle", "models.pickle"]
+DATA_FIELD = "detected_message_without_params_extended"
+BASE_DEFECT_TYPE_PATTERN = re.compile(r"^(?:([^_]+)_\S+|(\D+)\d+)$")
 DEFAULT_N_ESTIMATORS = 10
 DEFAULT_MIN_SAMPLES_LEAF = 1
-DEFAULT_MAX_FEATURES = 'sqrt'
+DEFAULT_MAX_FEATURES = "sqrt"
 
 
 # noinspection PyMethodMayBeStatic
@@ -44,7 +44,7 @@ class DummyVectorizer:
         return csr_matrix(np.zeros((len(data), 1)))
 
     def get_feature_names_out(self) -> list[str]:
-        return ['dummy']
+        return ["dummy"]
 
 
 # noinspection PyMethodMayBeStatic
@@ -87,8 +87,9 @@ class DefectTypeModel(MlModel):
     models: DefaultDict[str, RandomForestClassifier | DummyClassifier]
     n_estimators: int
 
-    def __init__(self, object_saver: ObjectSaver, tags: str = 'global defect type model', *,
-                 n_estimators: Optional[int] = None) -> None:
+    def __init__(
+        self, object_saver: ObjectSaver, tags: str = "global defect type model", *, n_estimators: Optional[int] = None
+    ) -> None:
         super().__init__(object_saver, tags)
         self._loaded = False
         self.count_vectorizer_models = DefaultDict(get_vectorizer_model)
@@ -112,17 +113,22 @@ class DefectTypeModel(MlModel):
 
     def train_model(self, name: str, train_data_x: list[str], labels: list[int], random_state: int) -> float:
         self.count_vectorizer_models[name] = TfidfVectorizer(
-            binary=True, min_df=5, analyzer=text_processing.preprocess_words)
+            binary=True, min_df=5, analyzer=text_processing.preprocess_words
+        )
         transformed_values = self.count_vectorizer_models[name].fit_transform(train_data_x)
-        LOGGER.debug(f'Length of train data: {len(labels)}')
-        LOGGER.debug(f'Train data label distribution: {Counter(labels)}')
-        LOGGER.debug(f'Train model name: {name}; estimators number: {self.n_estimators}')
-        model = RandomForestClassifier(self.n_estimators, class_weight='balanced',
-                                       min_samples_leaf=DEFAULT_MIN_SAMPLES_LEAF, max_features=DEFAULT_MAX_FEATURES,
-                                       random_state=random_state)
+        LOGGER.debug(f"Length of train data: {len(labels)}")
+        LOGGER.debug(f"Train data label distribution: {Counter(labels)}")
+        LOGGER.debug(f"Train model name: {name}; estimators number: {self.n_estimators}")
+        model = RandomForestClassifier(
+            self.n_estimators,
+            class_weight="balanced",
+            min_samples_leaf=DEFAULT_MIN_SAMPLES_LEAF,
+            max_features=DEFAULT_MAX_FEATURES,
+            random_state=random_state,
+        )
         x_train_values = pd.DataFrame(
-            transformed_values.toarray(),
-            columns=self.count_vectorizer_models[name].get_feature_names_out())
+            transformed_values.toarray(), columns=self.count_vectorizer_models[name].get_feature_names_out()
+        )
         model.fit(x_train_values, labels)
         self.models[name] = model
         self._loaded = True
@@ -130,20 +136,20 @@ class DefectTypeModel(MlModel):
         f1 = f1_score(y_pred=res, y_true=labels)
         if f1 is None:
             f1 = 0.0
-        LOGGER.debug(f'Train dataset F1 score: {f1:.5f}')
+        LOGGER.debug(f"Train dataset F1 score: {f1:.5f}")
         return f1
 
     def validate_model(self, name: str, test_data_x: list[str], labels: list[int]) -> float:
         assert name in self.models
-        LOGGER.debug(f'Validation data label distribution: {Counter(labels)}')
-        LOGGER.debug(f'Validation model name: {name}')
+        LOGGER.debug(f"Validation data label distribution: {Counter(labels)}")
+        LOGGER.debug(f"Validation model name: {name}")
         res, res_prob = self.predict(test_data_x, name)
         f1 = f1_score(y_pred=res, y_true=labels)
         if f1 is None:
             f1 = 0.0
-        LOGGER.debug(f'Valid dataset F1 score: {f1:.5f}')
-        LOGGER.debug(f'\n{confusion_matrix(y_pred=res, y_true=labels)}')
-        LOGGER.debug(f'\n{classification_report(y_pred=res, y_true=labels)}')
+        LOGGER.debug(f"Valid dataset F1 score: {f1:.5f}")
+        LOGGER.debug(f"\n{confusion_matrix(y_pred=res, y_true=labels)}")
+        LOGGER.debug(f"\n{classification_report(y_pred=res, y_true=labels)}")
         return f1
 
     def predict(self, data: list, model_name: str) -> tuple[list, list]:
@@ -151,7 +157,8 @@ class DefectTypeModel(MlModel):
             return [], []
         transformed_values = self.count_vectorizer_models[model_name].transform(data)
         x_test_values = pd.DataFrame(
-            transformed_values.toarray(), columns=self.count_vectorizer_models[model_name].get_feature_names_out())
+            transformed_values.toarray(), columns=self.count_vectorizer_models[model_name].get_feature_names_out()
+        )
         predicted_labels = self.models[model_name].predict(x_test_values)
         predicted_probs = self.models[model_name].predict_proba(x_test_values)
         return predicted_labels, predicted_probs

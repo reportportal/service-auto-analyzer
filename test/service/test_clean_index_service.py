@@ -63,6 +63,19 @@ def get_search_for_logs_call(index_name: str, rq: Any, rs: Any) -> dict:
     }
 
 
+def get_bulk_call(rq: Any, rs: Any) -> dict:
+    call = {
+        "method": httpretty.POST,
+        "uri": "/_bulk?refresh=true",
+        "status": HTTPStatus.OK,
+        "content_type": "application/json",
+        "rs": rs,
+    }
+    if rq is not None:
+        call["rq"] = rq
+    return call
+
+
 class TestCleanIndexService(TestService):
 
     @utils.ignore_warnings
@@ -73,64 +86,28 @@ class TestCleanIndexService(TestService):
             get_search_for_logs_call(
                 "1", get_fixture(self.search_not_merged_logs_for_delete), get_fixture(self.one_hit_search_rs)
             ),
-            {
-                "method": httpretty.POST,
-                "uri": "/_bulk?refresh=true",
-                "status": HTTPStatus.OK,
-                "content_type": "application/json",
-                "rs": get_fixture(self.delete_logs_rs),
-            },
+            get_bulk_call(None, get_fixture(self.delete_logs_rs)),
             get_search_for_logs_call("1", get_fixture(self.search_merged_logs), get_fixture(self.one_hit_search_rs)),
-            {
-                "method": httpretty.POST,
-                "uri": "/_bulk?refresh=true",
-                "status": HTTPStatus.OK,
-                "content_type": "application/json",
-                "rs": get_fixture(self.delete_logs_rs),
-            },
+            get_bulk_call(None, get_fixture(self.delete_logs_rs)),
             get_search_for_logs_call(
                 "1", get_fixture(self.search_not_merged_logs), get_fixture(self.one_hit_search_rs)
             ),
-            {
-                "method": httpretty.POST,
-                "uri": "/_bulk?refresh=true",
-                "status": HTTPStatus.OK,
-                "content_type": "application/json",
-                "rq": get_fixture(self.index_logs_rq),
-                "rs": get_fixture(self.index_logs_rs),
-            },
+            get_bulk_call(get_fixture(self.index_logs_rq), get_fixture(self.index_logs_rs)),
         ]
 
         clean_index_test = common_index_steps.copy()
-        clean_index_test.append(
-            {
-                "method": httpretty.GET,
-                "uri": "/1_suggest",
-                "status": HTTPStatus.NOT_FOUND,
-            }
-        )
+        clean_index_test.append(get_index_not_found_call("1_suggest"))
 
         clean_index_once_again_test = common_index_steps.copy()
         clean_index_once_again_test.extend(
             [
-                {
-                    "method": httpretty.GET,
-                    "uri": "/1_suggest",
-                    "status": HTTPStatus.OK,
-                },
+                get_index_found_call("1_suggest"),
                 get_search_for_logs_call(
                     "1_suggest",
                     get_fixture(self.search_suggest_info_ids_query),
                     get_fixture(self.one_hit_search_suggest_info_rs),
                 ),
-                {
-                    "method": httpretty.POST,
-                    "uri": "/_bulk?refresh=true",
-                    "status": HTTPStatus.OK,
-                    "content_type": "application/json",
-                    "rq": get_fixture(self.delete_suggest_logs_rq),
-                    "rs": get_fixture(self.delete_logs_rs),
-                },
+                get_bulk_call(get_fixture(self.delete_suggest_logs_rq), get_fixture(self.delete_logs_rs)),
             ]
         )
         tests = [
@@ -169,52 +146,24 @@ class TestCleanIndexService(TestService):
                         get_fixture(self.search_not_merged_logs_for_delete),
                         get_fixture(self.one_hit_search_rs),
                     ),
-                    {
-                        "method": httpretty.POST,
-                        "uri": "/_bulk?refresh=true",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rs": get_fixture(self.delete_logs_rs),
-                    },
+                    get_bulk_call(None, get_fixture(self.delete_logs_rs)),
                     get_search_for_logs_call(
                         "rp_1", get_fixture(self.search_merged_logs), get_fixture(self.one_hit_search_rs)
                     ),
-                    {
-                        "method": httpretty.POST,
-                        "uri": "/_bulk?refresh=true",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rs": get_fixture(self.delete_logs_rs),
-                    },
+                    get_bulk_call(None, get_fixture(self.delete_logs_rs)),
                     get_search_for_logs_call(
                         "rp_1", get_fixture(self.search_not_merged_logs), get_fixture(self.one_hit_search_rs)
                     ),
-                    {
-                        "method": httpretty.POST,
-                        "uri": "/_bulk?refresh=true",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.index_logs_rq),
-                        "rs": get_fixture(self.index_logs_rs),
-                    },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/rp_1_suggest",
-                        "status": HTTPStatus.OK,
-                    },
+                    get_bulk_call(get_fixture(self.index_logs_rq), get_fixture(self.index_logs_rs)),
+                    get_index_found_call("rp_1_suggest"),
                     get_search_for_logs_call(
                         "rp_1_suggest",
                         get_fixture(self.search_suggest_info_ids_query),
                         get_fixture(self.one_hit_search_suggest_info_rs),
                     ),
-                    {
-                        "method": httpretty.POST,
-                        "uri": "/_bulk?refresh=true",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.delete_suggest_logs_rq_with_prefix),
-                        "rs": get_fixture(self.delete_logs_rs),
-                    },
+                    get_bulk_call(
+                        get_fixture(self.delete_suggest_logs_rq_with_prefix), get_fixture(self.delete_logs_rs)
+                    ),
                 ],
                 "rq": launch_objects.CleanIndex(ids=[1], project=1),
                 "app_config": APP_CONFIG,

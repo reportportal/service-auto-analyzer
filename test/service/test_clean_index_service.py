@@ -14,66 +14,19 @@
 
 import json
 import unittest
-from http import HTTPStatus
-from typing import Any
 from unittest.mock import MagicMock
-
-import httpretty
 
 from app.commons.model import launch_objects
 from app.service.clean_index_service import CleanIndexService
 from app.utils import utils
 from test import APP_CONFIG, get_fixture
 from test.mock_service import TestService
-
-
-def get_index_call(index_name: str, status: HTTPStatus) -> dict:
-    """
-    Returns a dictionary representing an HTTP call that simulates getting index.
-    """
-    return {
-        "method": httpretty.GET,
-        "uri": f"/{index_name}",
-        "status": status,
-    }
-
-
-def get_index_found_call(index_name: str) -> dict:
-    """
-    Returns a dictionary representing an HTTP call that simulates a successful index retrieval.
-    """
-    return get_index_call(index_name, HTTPStatus.OK)
-
-
-def get_index_not_found_call(index_name: str) -> dict:
-    """
-    Returns a dictionary representing an HTTP call that simulates an index not found error.
-    """
-    return get_index_call(index_name, HTTPStatus.NOT_FOUND)
-
-
-def get_search_for_logs_call(index_name: str, rq: Any, rs: Any) -> dict:
-    return {
-        "method": httpretty.GET,
-        "uri": f"/{index_name}/_search?scroll=5m&size=1000",
-        "status": HTTPStatus.OK,
-        "content_type": "application/json",
-        "rq": rq,
-        "rs": rs,
-    }
-
-
-def get_bulk_call(rq: Any, rs: Any) -> dict:
-    call = {
-        "method": httpretty.POST,
-        "uri": "/_bulk?refresh=true",
-        "status": HTTPStatus.OK,
-        "content_type": "application/json",
-        "rs": rs,
-    }
-    if rq is not None:
-        call["rq"] = rq
-    return call
+from test.service import (
+    get_bulk_call,
+    get_index_found_call,
+    get_index_not_found_call,
+    get_search_for_logs_call_with_parameters,
+)
 
 
 class TestCleanIndexService(TestService):
@@ -83,13 +36,15 @@ class TestCleanIndexService(TestService):
         """Test cleaning index logs"""
         common_index_steps: list[dict] = [
             get_index_found_call("1"),
-            get_search_for_logs_call(
+            get_search_for_logs_call_with_parameters(
                 "1", get_fixture(self.search_not_merged_logs_for_delete), get_fixture(self.one_hit_search_rs)
             ),
             get_bulk_call(None, get_fixture(self.delete_logs_rs)),
-            get_search_for_logs_call("1", get_fixture(self.search_merged_logs), get_fixture(self.one_hit_search_rs)),
+            get_search_for_logs_call_with_parameters(
+                "1", get_fixture(self.search_merged_logs), get_fixture(self.one_hit_search_rs)
+            ),
             get_bulk_call(None, get_fixture(self.delete_logs_rs)),
-            get_search_for_logs_call(
+            get_search_for_logs_call_with_parameters(
                 "1", get_fixture(self.search_not_merged_logs), get_fixture(self.one_hit_search_rs)
             ),
             get_bulk_call(get_fixture(self.index_logs_rq), get_fixture(self.index_logs_rs)),
@@ -102,7 +57,7 @@ class TestCleanIndexService(TestService):
         clean_index_once_again_test.extend(
             [
                 get_index_found_call("1_suggest"),
-                get_search_for_logs_call(
+                get_search_for_logs_call_with_parameters(
                     "1_suggest",
                     get_fixture(self.search_suggest_info_ids_query),
                     get_fixture(self.one_hit_search_suggest_info_rs),
@@ -141,22 +96,22 @@ class TestCleanIndexService(TestService):
             {
                 "test_calls": [
                     get_index_found_call("rp_1"),
-                    get_search_for_logs_call(
+                    get_search_for_logs_call_with_parameters(
                         "rp_1",
                         get_fixture(self.search_not_merged_logs_for_delete),
                         get_fixture(self.one_hit_search_rs),
                     ),
                     get_bulk_call(None, get_fixture(self.delete_logs_rs)),
-                    get_search_for_logs_call(
+                    get_search_for_logs_call_with_parameters(
                         "rp_1", get_fixture(self.search_merged_logs), get_fixture(self.one_hit_search_rs)
                     ),
                     get_bulk_call(None, get_fixture(self.delete_logs_rs)),
-                    get_search_for_logs_call(
+                    get_search_for_logs_call_with_parameters(
                         "rp_1", get_fixture(self.search_not_merged_logs), get_fixture(self.one_hit_search_rs)
                     ),
                     get_bulk_call(get_fixture(self.index_logs_rq), get_fixture(self.index_logs_rs)),
                     get_index_found_call("rp_1_suggest"),
-                    get_search_for_logs_call(
+                    get_search_for_logs_call_with_parameters(
                         "rp_1_suggest",
                         get_fixture(self.search_suggest_info_ids_query),
                         get_fixture(self.one_hit_search_suggest_info_rs),

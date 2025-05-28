@@ -15,8 +15,8 @@
 import time
 from collections import defaultdict
 from collections.abc import Callable
-from typing import Final, Optional
 from threading import Lock
+from typing import Final, Optional
 
 import pika
 from pika.adapters.blocking_connection import BlockingChannel, BlockingConnection

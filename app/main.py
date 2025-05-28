@@ -588,9 +588,6 @@ def start_http_server():
 signal(SIGINT, handler)
 logger.info("The analyzer has started")
 logger.info("Starting waiting for AMQP connection")
-amqp_client = AmqpClient(APP_CONFIG)
-amqp_client.declare_exchange()
-amqp_client.close()
 threads = init_amqp_queues()
 logger.info("Analyzer has started")
 

@@ -8,6 +8,7 @@
 - AMQP exchange declaration now performs on every connection, to avoid issues with exchange not being declared on RabbitMQ restarts, by @HardNorth
 - `ES_BOOST_AA` environment variable default value changed to `0.0`, by @HardNorth
 - `ES_TIME_WEIGHT_DECAY` environment variable default value changed to `0.999`, by @HardNorth
+- `flask-cors` dependency updated to `6.0.0` to address vulnerabilities, by @HardNorth
 ### Fixed
 - 18 Sonar issues, by @HardNorth
 

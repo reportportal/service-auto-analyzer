@@ -8,6 +8,7 @@
 ### Changed
 - AMQP client was rewritten to better handle connection issues, by @HardNorth
 - `uWSGI` version updated to `2.0.29`, by @HardNorth
+- Improved the way of URL and path extraction on data preparation stage, by @HardNorth
 ### Fixed
 - 4 Sonar issues, by @HardNorth
 

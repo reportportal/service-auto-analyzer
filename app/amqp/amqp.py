@@ -33,11 +33,12 @@ from app.utils import text_processing
 logger = logging.getLogger("analyzerApp.amqp")
 
 # Maximum back‑off interval when reconnecting (seconds)
-_MAX_SLEEP: Final[int] = 60
+ONE_MINUTE: Final[int] = 60
+_MAX_SLEEP: Final[int] = ONE_MINUTE
 
-GLOBAL_LOCK = Lock()
-CREATED_EXCHANGES: dict[str, set[str]] = defaultdict(set)
-EXCHANGE_CREATION_TIME: dict[str, float] = dict()
+GLOBAL_LOCK: Final[Lock] = Lock()
+CREATED_EXCHANGES: Final[dict[str, set[str]]] = defaultdict(set)
+EXCHANGE_CREATION_TIME: Final[dict[str, float]] = dict()
 
 
 class AmqpClientConnectionException(Exception):
@@ -122,20 +123,26 @@ class AmqpClient:
             self.__connection = self._connect_with_retry()
         return self.__connection
 
-    def _declare_exchange(self) -> None:
+    def _declare_exchange(self, update_interval: int = ONE_MINUTE) -> None:
         """Declare application exchange on AMQP server."""
         exchange_name = self._config.amqpExchangeName
         exchange_key = f"{self._amqp_base_url_no_credentials}:{exchange_name}"
         current_time = time.time()
 
         # Check if exchange was created recently (within 1 minute)
-        if exchange_key in EXCHANGE_CREATION_TIME and current_time - EXCHANGE_CREATION_TIME[exchange_key] < 60:
+        if (
+            exchange_key in EXCHANGE_CREATION_TIME
+            and current_time - EXCHANGE_CREATION_TIME[exchange_key] < update_interval
+        ):
             logger.debug(f"Exchange '{exchange_name}' was recently created, skipping declaration")
             return
 
         with GLOBAL_LOCK:
             # Check if exchange was created recently (within 1 minute) once again after acquiring the lock
-            if exchange_key in EXCHANGE_CREATION_TIME and current_time - EXCHANGE_CREATION_TIME[exchange_key] < 60:
+            if (
+                exchange_key in EXCHANGE_CREATION_TIME
+                and current_time - EXCHANGE_CREATION_TIME[exchange_key] < update_interval
+            ):
                 logger.debug(f"Exchange '{exchange_name}' was recently created, skipping declaration")
                 return
 

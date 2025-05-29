@@ -2,6 +2,16 @@
 ## [Unreleased]
 
 ## [5.14.0]
+### Added
+- `ES_BOOST_MA` environment variable to boost manually analyzed test cases in ES, by @HardNorth
+### Changed
+- AMQP exchange declaration now performs on every connection, to avoid issues with exchange not being declared on RabbitMQ restarts, by @HardNorth
+- `ES_BOOST_AA` environment variable default value changed to `0.0`, by @HardNorth
+- `ES_TIME_WEIGHT_DECAY` environment variable default value changed to `0.999`, by @HardNorth
+### Fixed
+- 18 Sonar issues, by @HardNorth
+
+## [5.14.0]
 ### Added:
 - `AMQP_MAX_RETRY_TIME`, `AMQP_INITIAL_RETRY_INTERVAL`, `AMQP_BACKOFF_FACTOR`, `AMQP_HEARTBEAT_INTERVAL` environment variables to configure AMQP client, by @HardNorth
 - `ANALYZER_ENABLE_MEMORY_DUMP` environment variable to print memory dump on healthcheck calls for debugging purpose, by @HardNorth

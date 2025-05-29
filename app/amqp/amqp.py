@@ -13,7 +13,9 @@
 #  limitations under the License.
 
 import time
+from collections import defaultdict
 from collections.abc import Callable
+from threading import Lock
 from typing import Final, Optional
 
 import pika
@@ -21,7 +23,6 @@ from pika.adapters.blocking_connection import BlockingChannel, BlockingConnectio
 from pika.exceptions import (
     AMQPConnectionError,
     ChannelClosedByBroker,
-    StreamLostError,
 )
 from pika.spec import Basic, BasicProperties
 
@@ -33,6 +34,10 @@ logger = logging.getLogger("analyzerApp.amqp")
 
 # Maximum back‑off interval when reconnecting (seconds)
 _MAX_SLEEP: Final[int] = 60
+
+GLOBAL_LOCK = Lock()
+CREATED_EXCHANGES: dict[str, set[str]] = defaultdict(set)
+EXCHANGE_CREATION_TIME: dict[str, float] = dict()
 
 
 class AmqpClientConnectionException(Exception):
@@ -51,8 +56,10 @@ class AmqpClient:
     """AMQP client wrapper able to recover from transient network failures."""
 
     _config: Final[ApplicationConfig]
+    _amqp_base_url: Final[str]
+    _amqp_base_url_no_credentials: Final[str]
     _amqp_url: Final[str]
-    __connection: Optional[BlockingConnection]
+    __connection: Optional[BlockingConnection] = None
 
     def __init__(self, config: ApplicationConfig) -> None:
         """Initialize the AMQP client with retry mechanism.
@@ -60,8 +67,9 @@ class AmqpClient:
         :param ApplicationConfig config: the application config object
         """
         self._config = config
-        self._amqp_url = config.amqpUrl.rstrip("\\/") + f"?heartbeat={config.amqpHeartbeatInterval}"
-        self.__connection = None
+        self._amqp_base_url = config.amqpUrl.rstrip("\\/")
+        self._amqp_base_url_no_credentials = text_processing.remove_credentials_from_url(self._amqp_base_url)
+        self._amqp_url = self._amqp_base_url + f"?heartbeat={config.amqpHeartbeatInterval}"
 
     def close(self) -> None:
         """Close the connection if it is opened."""
@@ -77,7 +85,7 @@ class AmqpClient:
 
         :return: The AMQP connection
         """
-        logger.info(f"Trying to connect to {text_processing.remove_credentials_from_url(self._amqp_url)}")
+        logger.info(f"Trying to connect to {self._amqp_base_url_no_credentials}")
         parameters = pika.connection.URLParameters(self._amqp_url)
         return pika.BlockingConnection(parameters)
 
@@ -114,26 +122,45 @@ class AmqpClient:
             self.__connection = self._connect_with_retry()
         return self.__connection
 
-    def declare_exchange(self) -> None:
+    def _declare_exchange(self) -> None:
         """Declare application exchange on AMQP server."""
-        with self._connection.channel() as channel:
-            channel.exchange_declare(
-                exchange=self._config.amqpExchangeName,
-                exchange_type="direct",
-                durable=False,
-                auto_delete=True,
-                internal=False,
-                arguments={
-                    "analyzer": self._config.amqpExchangeName,
-                    "analyzer_index": self._config.analyzerIndex,
-                    "analyzer_priority": self._config.analyzerPriority,
-                    "analyzer_log_search": self._config.analyzerLogSearch,
-                    "analyzer_suggest": self._config.analyzerSuggest,
-                    "analyzer_cluster": self._config.analyzerCluster,
-                    "version": self._config.appVersion,
-                },
-            )
-            logger.info(f"Exchange '{self._config.amqpExchangeName}' declared")
+        exchange_name = self._config.amqpExchangeName
+        exchange_key = f"{self._amqp_base_url_no_credentials}:{exchange_name}"
+        current_time = time.time()
+
+        # Check if exchange was created recently (within 1 minute)
+        if exchange_key in EXCHANGE_CREATION_TIME and current_time - EXCHANGE_CREATION_TIME[exchange_key] < 60:
+            logger.debug(f"Exchange '{exchange_name}' was recently created, skipping declaration")
+            return
+
+        with GLOBAL_LOCK:
+            # Check if exchange was created recently (within 1 minute) once again after acquiring the lock
+            if exchange_key in EXCHANGE_CREATION_TIME and current_time - EXCHANGE_CREATION_TIME[exchange_key] < 60:
+                logger.debug(f"Exchange '{exchange_name}' was recently created, skipping declaration")
+                return
+
+            with self._connection.channel() as channel:
+                channel.exchange_declare(
+                    exchange=exchange_name,
+                    exchange_type="direct",
+                    durable=False,
+                    auto_delete=True,
+                    internal=False,
+                    arguments={
+                        "analyzer": exchange_name,
+                        "analyzer_index": self._config.analyzerIndex,
+                        "analyzer_priority": self._config.analyzerPriority,
+                        "analyzer_log_search": self._config.analyzerLogSearch,
+                        "analyzer_suggest": self._config.analyzerSuggest,
+                        "analyzer_cluster": self._config.analyzerCluster,
+                        "version": self._config.appVersion,
+                    },
+                )
+                logger.info(f"Exchange '{exchange_name}' declared")
+
+            # Mark that we're creating this exchange
+            CREATED_EXCHANGES[self._amqp_base_url_no_credentials].add(exchange_name)
+            EXCHANGE_CREATION_TIME[exchange_key] = time.time()
 
     @staticmethod
     def _bind_queue(channel: BlockingChannel, name: str, exchange_name: str) -> None:
@@ -183,12 +210,15 @@ class AmqpClient:
         connection_info = f"Exchange: '{self._config.amqpExchangeName}'. Queue: '{queue}'."
         while True:
             try:
-                channel = self._connection.channel()
-                self._bind_queue(channel, queue, self._config.amqpExchangeName)
-                self._consume_queue(channel, queue, False, False, msg_callback)
-                logger.info(f"Start consuming on queue '{queue}'")
-                channel.start_consuming()
-            except (StreamLostError, AMQPConnectionError, ChannelClosedByBroker) as exc:
+                # Ensure exchange exists before consuming
+                self._declare_exchange()
+
+                with self._connection.channel() as channel:
+                    self._bind_queue(channel, queue, self._config.amqpExchangeName)
+                    self._consume_queue(channel, queue, False, False, msg_callback)
+                    logger.info(f"Start consuming on queue '{queue}'")
+                    channel.start_consuming()
+            except (AMQPConnectionError, ChannelClosedByBroker) as exc:
                 logger.exception(f"Connection/channel lost. Reconnecting. {connection_info}", exc_info=exc)
                 self.close()
             except Exception as exc:  # pylint: disable=broad-except
@@ -206,6 +236,9 @@ class AmqpClient:
         """
         while True:
             try:
+                # Ensure exchange exists before publishing
+                self._declare_exchange()
+
                 with self._connection.channel() as channel:
                     channel.basic_publish(
                         exchange=self._config.amqpExchangeName,
@@ -213,7 +246,7 @@ class AmqpClient:
                         body=data.encode("utf‑8"),
                     )
                 return  # success
-            except (AMQPConnectionError, StreamLostError) as exc:
+            except AMQPConnectionError as exc:
                 logger.warning(f"Publish failed: {exc}. Reconnecting.", exc_info=exc)
                 self.close()
             except AmqpClientConnectionException:

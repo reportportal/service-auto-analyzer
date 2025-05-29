@@ -48,7 +48,8 @@ from app.service import (
 from app.utils import utils
 
 APP_CONFIG = ApplicationConfig(
-    esHost=os.getenv("ES_HOSTS", "http://elasticsearch:9200").strip("/").strip("\\"),
+    # Mute Sonar about hardcoded HTTP URL, since this is a hostname inside a docker-compose file
+    esHost=os.getenv("ES_HOSTS", "http://elasticsearch:9200").strip("/").strip("\\"),  # NOSONAR
     esUser=os.getenv("ES_USER", "").strip(),
     esPassword=os.getenv("ES_PASSWORD", "").strip(),
     logLevel=os.getenv("LOGGING_LEVEL", "DEBUG").strip(),
@@ -91,12 +92,13 @@ APP_CONFIG = ApplicationConfig(
 SEARCH_CONFIG = SearchConfig(
     SearchLogsMinSimilarity=float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.95")),
     MinShouldMatch=os.getenv("ES_MIN_SHOULD_MATCH", "80%"),
-    BoostAA=float(os.getenv("ES_BOOST_AA", "-8.0")),
+    BoostAA=float(os.getenv("ES_BOOST_AA", "0.0")),
+    BoostMA=float(os.getenv("ES_BOOST_MA", "10.0")),
     BoostLaunch=float(os.getenv("ES_BOOST_LAUNCH", "4.0")),
     BoostTestCaseHash=float(os.getenv("ES_BOOST_TEST_CASE_HASH", "8.0")),
     MaxQueryTerms=int(os.getenv("ES_MAX_QUERY_TERMS", "50")),
     MinWordLength=int(os.getenv("ES_MIN_WORD_LENGTH", "2")),
-    TimeWeightDecay=float(os.getenv("ES_TIME_WEIGHT_DECAY", "0.95")),
+    TimeWeightDecay=float(os.getenv("ES_TIME_WEIGHT_DECAY", "0.999")),
     PatternLabelMinPercentToSuggest=float(os.getenv("PATTERN_LABEL_MIN_PERCENT", "0.9")),
     PatternLabelMinCountToSuggest=int(os.getenv("PATTERN_LABEL_MIN_COUNT", "5")),
     PatternMinCountToSuggest=int(os.getenv("PATTERN_MIN_COUNT", "10")),
@@ -586,9 +588,6 @@ def start_http_server():
 signal(SIGINT, handler)
 logger.info("The analyzer has started")
 logger.info("Starting waiting for AMQP connection")
-amqp_client = AmqpClient(APP_CONFIG)
-amqp_client.declare_exchange()
-amqp_client.close()
 threads = init_amqp_queues()
 logger.info("Analyzer has started")
 

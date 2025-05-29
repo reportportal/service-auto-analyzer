@@ -14,16 +14,19 @@
 
 import json
 import unittest
-from http import HTTPStatus
 from unittest.mock import MagicMock
-
-import httpretty
 
 from app.commons.model import launch_objects
 from app.service.clean_index_service import CleanIndexService
 from app.utils import utils
 from test import APP_CONFIG, get_fixture
 from test.mock_service import TestService
+from test.service import (
+    get_bulk_call,
+    get_index_found_call,
+    get_index_not_found_call,
+    get_search_for_logs_call_with_parameters,
+)
 
 
 class TestCleanIndexService(TestService):
@@ -31,254 +34,91 @@ class TestCleanIndexService(TestService):
     @utils.ignore_warnings
     def test_clean_index(self):
         """Test cleaning index logs"""
+        common_index_steps: list[dict] = [
+            get_index_found_call("1"),
+            get_search_for_logs_call_with_parameters(
+                "1", get_fixture(self.search_not_merged_logs_for_delete), get_fixture(self.one_hit_search_rs)
+            ),
+            get_bulk_call(None, get_fixture(self.delete_logs_rs)),
+            get_search_for_logs_call_with_parameters(
+                "1", get_fixture(self.search_merged_logs), get_fixture(self.one_hit_search_rs)
+            ),
+            get_bulk_call(None, get_fixture(self.delete_logs_rs)),
+            get_search_for_logs_call_with_parameters(
+                "1", get_fixture(self.search_not_merged_logs), get_fixture(self.one_hit_search_rs)
+            ),
+            get_bulk_call(get_fixture(self.index_logs_rq), get_fixture(self.index_logs_rs)),
+        ]
+
+        clean_index_test = common_index_steps.copy()
+        clean_index_test.append(get_index_not_found_call("1_suggest"))
+
+        clean_index_once_again_test = common_index_steps.copy()
+        clean_index_once_again_test.extend(
+            [
+                get_index_found_call("1_suggest"),
+                get_search_for_logs_call_with_parameters(
+                    "1_suggest",
+                    get_fixture(self.search_suggest_info_ids_query),
+                    get_fixture(self.one_hit_search_suggest_info_rs),
+                ),
+                get_bulk_call(get_fixture(self.delete_suggest_logs_rq), get_fixture(self.delete_logs_rs)),
+            ]
+        )
         tests = [
             {
                 "test_calls": [
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/2",
-                        "status": HTTPStatus.NOT_FOUND,
-                    },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/2_suggest",
-                        "status": HTTPStatus.NOT_FOUND,
-                    },
+                    get_index_not_found_call("2"),
+                    get_index_not_found_call("2_suggest"),
                 ],
                 "rq": launch_objects.CleanIndex(ids=[1], project=2),
                 "expected_count": 0,
             },
             {
                 "test_calls": [
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/rp_2",
-                        "status": HTTPStatus.NOT_FOUND,
-                    },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/rp_2_suggest",
-                        "status": HTTPStatus.NOT_FOUND,
-                    },
+                    get_index_not_found_call("rp_2"),
+                    get_index_not_found_call("rp_2_suggest"),
                 ],
                 "rq": launch_objects.CleanIndex(ids=[1], project=2),
                 "app_config": APP_CONFIG,
                 "expected_count": 0,
             },
             {
-                "test_calls": [
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/1",
-                        "status": HTTPStatus.OK,
-                    },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/1/_search?scroll=5m&size=1000",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.search_not_merged_logs_for_delete),
-                        "rs": get_fixture(self.one_hit_search_rs),
-                    },
-                    {
-                        "method": httpretty.POST,
-                        "uri": "/_bulk?refresh=true",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rs": get_fixture(self.delete_logs_rs),
-                    },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/1/_search?scroll=5m&size=1000",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.search_merged_logs),
-                        "rs": get_fixture(self.one_hit_search_rs),
-                    },
-                    {
-                        "method": httpretty.POST,
-                        "uri": "/_bulk?refresh=true",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rs": get_fixture(self.delete_logs_rs),
-                    },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/1/_search?scroll=5m&size=1000",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.search_not_merged_logs),
-                        "rs": get_fixture(self.one_hit_search_rs),
-                    },
-                    {
-                        "method": httpretty.POST,
-                        "uri": "/_bulk?refresh=true",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.index_logs_rq),
-                        "rs": get_fixture(self.index_logs_rs),
-                    },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/1_suggest",
-                        "status": HTTPStatus.NOT_FOUND,
-                    },
-                ],
+                "test_calls": clean_index_test,
+                "rq": launch_objects.CleanIndex(ids=[1], project=1),
+                "expected_count": 1,
+            },
+            {
+                "test_calls": clean_index_once_again_test,
                 "rq": launch_objects.CleanIndex(ids=[1], project=1),
                 "expected_count": 1,
             },
             {
                 "test_calls": [
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/1",
-                        "status": HTTPStatus.OK,
-                    },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/1/_search?scroll=5m&size=1000",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.search_not_merged_logs_for_delete),
-                        "rs": get_fixture(self.one_hit_search_rs),
-                    },
-                    {
-                        "method": httpretty.POST,
-                        "uri": "/_bulk?refresh=true",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rs": get_fixture(self.delete_logs_rs),
-                    },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/1/_search?scroll=5m&size=1000",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.search_merged_logs),
-                        "rs": get_fixture(self.one_hit_search_rs),
-                    },
-                    {
-                        "method": httpretty.POST,
-                        "uri": "/_bulk?refresh=true",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rs": get_fixture(self.delete_logs_rs),
-                    },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/1/_search?scroll=5m&size=1000",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.search_not_merged_logs),
-                        "rs": get_fixture(self.one_hit_search_rs),
-                    },
-                    {
-                        "method": httpretty.POST,
-                        "uri": "/_bulk?refresh=true",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.index_logs_rq),
-                        "rs": get_fixture(self.index_logs_rs),
-                    },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/1_suggest",
-                        "status": HTTPStatus.OK,
-                    },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/1_suggest/_search?scroll=5m&size=1000",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.search_suggest_info_ids_query),
-                        "rs": get_fixture(self.one_hit_search_suggest_info_rs),
-                    },
-                    {
-                        "method": httpretty.POST,
-                        "uri": "/_bulk?refresh=true",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.delete_suggest_logs_rq),
-                        "rs": get_fixture(self.delete_logs_rs),
-                    },
-                ],
-                "rq": launch_objects.CleanIndex(ids=[1], project=1),
-                "expected_count": 1,
-            },
-            {
-                "test_calls": [
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/rp_1",
-                        "status": HTTPStatus.OK,
-                    },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/rp_1/_search?scroll=5m&size=1000",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.search_not_merged_logs_for_delete),
-                        "rs": get_fixture(self.one_hit_search_rs),
-                    },
-                    {
-                        "method": httpretty.POST,
-                        "uri": "/_bulk?refresh=true",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rs": get_fixture(self.delete_logs_rs),
-                    },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/rp_1/_search?scroll=5m&size=1000",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.search_merged_logs),
-                        "rs": get_fixture(self.one_hit_search_rs),
-                    },
-                    {
-                        "method": httpretty.POST,
-                        "uri": "/_bulk?refresh=true",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rs": get_fixture(self.delete_logs_rs),
-                    },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/rp_1/_search?scroll=5m&size=1000",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.search_not_merged_logs),
-                        "rs": get_fixture(self.one_hit_search_rs),
-                    },
-                    {
-                        "method": httpretty.POST,
-                        "uri": "/_bulk?refresh=true",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.index_logs_rq),
-                        "rs": get_fixture(self.index_logs_rs),
-                    },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/rp_1_suggest",
-                        "status": HTTPStatus.OK,
-                    },
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/rp_1_suggest/_search?scroll=5m&size=1000",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.search_suggest_info_ids_query),
-                        "rs": get_fixture(self.one_hit_search_suggest_info_rs),
-                    },
-                    {
-                        "method": httpretty.POST,
-                        "uri": "/_bulk?refresh=true",
-                        "status": HTTPStatus.OK,
-                        "content_type": "application/json",
-                        "rq": get_fixture(self.delete_suggest_logs_rq_with_prefix),
-                        "rs": get_fixture(self.delete_logs_rs),
-                    },
+                    get_index_found_call("rp_1"),
+                    get_search_for_logs_call_with_parameters(
+                        "rp_1",
+                        get_fixture(self.search_not_merged_logs_for_delete),
+                        get_fixture(self.one_hit_search_rs),
+                    ),
+                    get_bulk_call(None, get_fixture(self.delete_logs_rs)),
+                    get_search_for_logs_call_with_parameters(
+                        "rp_1", get_fixture(self.search_merged_logs), get_fixture(self.one_hit_search_rs)
+                    ),
+                    get_bulk_call(None, get_fixture(self.delete_logs_rs)),
+                    get_search_for_logs_call_with_parameters(
+                        "rp_1", get_fixture(self.search_not_merged_logs), get_fixture(self.one_hit_search_rs)
+                    ),
+                    get_bulk_call(get_fixture(self.index_logs_rq), get_fixture(self.index_logs_rs)),
+                    get_index_found_call("rp_1_suggest"),
+                    get_search_for_logs_call_with_parameters(
+                        "rp_1_suggest",
+                        get_fixture(self.search_suggest_info_ids_query),
+                        get_fixture(self.one_hit_search_suggest_info_rs),
+                    ),
+                    get_bulk_call(
+                        get_fixture(self.delete_suggest_logs_rq_with_prefix), get_fixture(self.delete_logs_rs)
+                    ),
                 ],
                 "rq": launch_objects.CleanIndex(ids=[1], project=1),
                 "app_config": APP_CONFIG,

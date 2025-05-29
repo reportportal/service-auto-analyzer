@@ -149,7 +149,7 @@ class AnalyzerService:
 
     def build_common_query(self, log: dict[str, Any], size=10, filter_no_defect=True) -> dict[str, Any]:
         issue_type_conditions = self.prepare_restrictions_by_issue_type(filter_no_defect=filter_no_defect)
-        return {
+        common_query = {
             "size": size,
             "sort": [
                 "_score",
@@ -171,18 +171,13 @@ class AnalyzerService:
                                 }
                             }
                         },
-                        {
-                            "term": {
-                                "is_auto_analyzed": {
-                                    "value": str(self.search_cfg.BoostAA > 0).lower(),
-                                    "boost": abs(self.search_cfg.BoostAA),
-                                }
-                            }
-                        },
                     ],
                 }
             },
         }
+
+        utils.append_aa_ma_boosts(common_query, self.search_cfg)
+        return common_query
 
     def add_query_with_start_time_decay(self, main_query: dict, start_time: int) -> dict:
         return {

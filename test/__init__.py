@@ -15,6 +15,7 @@
 import os
 import random
 import string
+from typing import Any
 
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.utils.utils import read_json_file
@@ -61,7 +62,7 @@ DEFAULT_BOOST_LAUNCH = 8.0
 DEFAULT_SEARCH_CONFIG = SearchConfig(BoostLaunch=DEFAULT_BOOST_LAUNCH)
 
 
-def get_fixture(fixture_name, to_json=False):
+def get_fixture(fixture_name: str, to_json: bool = False) -> Any:
     return read_json_file("test_res/fixtures", fixture_name, to_json)
 
 

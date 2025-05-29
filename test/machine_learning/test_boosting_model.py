@@ -154,7 +154,7 @@ class TestBoostingModel(unittest.TestCase):
                 model = DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
                 model.load_model()
                 _boosting_featurizer.set_defect_type_model(model)
-            gathered_data, issue_type_names = _boosting_featurizer.gather_features_info()
+            gathered_data, _ = _boosting_featurizer.gather_features_info()
             predict_label, predict_probability = test["decision_maker"].predict(gathered_data)
             assert gathered_data == boost_model_results[str(idx)][0]
             assert predict_label == boost_model_results[str(idx)][1]
@@ -269,7 +269,7 @@ class TestBoostingModel(unittest.TestCase):
                 model.load_model()
                 _boosting_featurizer.set_defect_type_model(model)
 
-            gathered_data, test_item_ids = _boosting_featurizer.gather_features_info()
+            gathered_data, _ = _boosting_featurizer.gather_features_info()
             predict_label, predict_probability = test["decision_maker"].predict(gathered_data)
             assert gathered_data == boost_model_results[str(idx)][0]
             assert predict_label == boost_model_results[str(idx)][1]

@@ -330,11 +330,9 @@ class ClusterService:
         clusters_found: dict[int, tuple[list[int], list[int]]] = {}
         cluster_message_by_id = {}
         for group in groups:
-            cnt_items = len(groups[group])
             cluster_id = 0
             cluster_message = ""
             if group in additional_results:
-                cnt_items += len(additional_results[group].logIds)
                 cluster_id = additional_results[group].clusterId
                 cluster_message = additional_results[group].clusterMessage
             if not cluster_id or not cluster_message:

@@ -69,7 +69,7 @@ def validate_file(file_path: str) -> bool:
 
 def extract_real_id(elastic_id):
     real_id = str(elastic_id)
-    if real_id[-2:] == "_m":
+    if real_id.endswith("_m"):
         return int(real_id[:-2])
     return int(real_id)
 
@@ -282,7 +282,7 @@ def calculate_threshold(text_size, cur_threshold, min_recalculated_threshold=0.8
         return cur_threshold
     allowed_words_missed = get_allowed_number_of_missed(cur_threshold)
     new_threshold = cur_threshold
-    for words_num in range(allowed_words_missed, 0, -1):
+    for _ in range(allowed_words_missed, 0, -1):
         threshold = (text_size - allowed_words_missed) / text_size
         if threshold >= min_recalculated_threshold:
             new_threshold = round(threshold, 2)
@@ -364,3 +364,36 @@ def compute_if_absent(on: dict[str, Any], key: str, default_value: Any) -> Any:
     if key not in on:
         on[key] = default_value
     return on[key]
+
+
+def append_aa_ma_boosts(query: dict[str, Any], search_cfg: launch_objects.SearchConfig) -> None:
+    """Append boosts for auto-analyzed and manually-analyzed fields to ES/OS query.
+
+    :param query: ES/OS query
+    :param search_cfg: Search configuration
+    """
+    should = create_path(query, ("query", "bool", "should"), [])
+    boost_aa = search_cfg.BoostAA
+    boost_ma = search_cfg.BoostMA
+    if boost_aa > boost_ma:
+        should.append(
+            {
+                "term": {
+                    "is_auto_analyzed": {
+                        "value": True,
+                        "boost": boost_aa - boost_ma,
+                    }
+                }
+            }
+        )
+    else:
+        should.append(
+            {
+                "term": {
+                    "is_auto_analyzed": {
+                        "value": False,
+                        "boost": boost_ma - boost_aa,
+                    }
+                }
+            }
+        )

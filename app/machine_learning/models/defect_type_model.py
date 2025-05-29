@@ -143,7 +143,7 @@ class DefectTypeModel(MlModel):
         assert name in self.models
         LOGGER.debug(f"Validation data label distribution: {Counter(labels)}")
         LOGGER.debug(f"Validation model name: {name}")
-        res, res_prob = self.predict(test_data_x, name)
+        res, _ = self.predict(test_data_x, name)
         f1 = f1_score(y_pred=res, y_true=labels)
         if f1 is None:
             f1 = 0.0

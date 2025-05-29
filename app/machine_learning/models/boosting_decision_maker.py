@@ -125,7 +125,7 @@ class BoostingDecisionMaker(MlModel):
         return self.boost_model.predict(data).tolist(), self.boost_model.predict_proba(data).tolist()
 
     def validate_model(self, valid_test_set: list[list[float]], valid_test_labels: list[int]) -> float:
-        res, res_prob = self.predict(valid_test_set)
+        res, _ = self.predict(valid_test_set)
         f1 = f1_score(y_pred=res, y_true=valid_test_labels)
         if f1 is None:
             f1 = 0.0

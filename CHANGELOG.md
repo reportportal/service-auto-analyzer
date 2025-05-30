@@ -1,7 +1,7 @@
 # Changelog
 ## [Unreleased]
 
-## [5.14.0]
+## [5.14.1]
 ### Added
 - `ES_BOOST_MA` environment variable to boost manually analyzed test cases in ES, by @HardNorth
 ### Changed

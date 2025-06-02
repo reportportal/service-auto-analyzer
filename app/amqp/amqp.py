@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import time
+import uuid
 from collections import defaultdict
 from collections.abc import Callable
 from threading import Lock
@@ -39,6 +40,8 @@ _MAX_SLEEP: Final[int] = ONE_MINUTE
 GLOBAL_LOCK: Final[Lock] = Lock()
 CREATED_EXCHANGES: Final[dict[str, set[str]]] = defaultdict(set)
 EXCHANGE_CREATION_TIME: Final[dict[str, float]] = dict()
+
+_DEFAULT_ROUTING_KEY: Final[str] = str(uuid.uuid4())
 
 
 class AmqpClientConnectionException(Exception):
@@ -123,6 +126,25 @@ class AmqpClient:
             self.__connection = self._connect_with_retry()
         return self.__connection
 
+    def _do_declare_exchange(self, channel: BlockingChannel) -> None:
+        channel.exchange_declare(
+            exchange=self._config.amqpExchangeName,
+            exchange_type=self._config.amqpExchangeType,
+            durable=False,
+            auto_delete=True,
+            internal=False,
+            arguments={
+                "analyzer": self._config.amqpExchangeName,
+                "analyzer_index": self._config.analyzerIndex,
+                "analyzer_priority": self._config.analyzerPriority,
+                "analyzer_log_search": self._config.analyzerLogSearch,
+                "analyzer_suggest": self._config.analyzerSuggest,
+                "analyzer_cluster": self._config.analyzerCluster,
+                "version": self._config.appVersion,
+            },
+        )
+        logger.info(f"Exchange '{self._config.amqpExchangeName}' declared")
+
     def _declare_exchange(self, update_interval: int = ONE_MINUTE) -> None:
         """Declare application exchange on AMQP server."""
         exchange_name = self._config.amqpExchangeName
@@ -147,23 +169,17 @@ class AmqpClient:
                 return
 
             with self._connection.channel() as channel:
-                channel.exchange_declare(
-                    exchange=exchange_name,
-                    exchange_type="direct",
-                    durable=False,
-                    auto_delete=True,
-                    internal=False,
-                    arguments={
-                        "analyzer": exchange_name,
-                        "analyzer_index": self._config.analyzerIndex,
-                        "analyzer_priority": self._config.analyzerPriority,
-                        "analyzer_log_search": self._config.analyzerLogSearch,
-                        "analyzer_suggest": self._config.analyzerSuggest,
-                        "analyzer_cluster": self._config.analyzerCluster,
-                        "version": self._config.appVersion,
-                    },
-                )
-                logger.info(f"Exchange '{exchange_name}' declared")
+                try:
+                    self._do_declare_exchange(channel)
+                except ChannelClosedByBroker as exc:
+                    if (
+                        exc.reply_code == 406
+                        and "PRECONDITION_FAILED - inequivalent arg 'type' for exchange" in exc.reply_text
+                    ):
+                        logger.warning(f"Exchange '{exchange_name}' already exists with a different type.")
+                        with self._connection.channel() as channel2:
+                            channel2.exchange_delete(exchange_name)
+                            self._do_declare_exchange(channel)
 
             # Mark that we're creating this exchange
             CREATED_EXCHANGES[self._amqp_base_url_no_credentials].add(exchange_name)
@@ -180,8 +196,7 @@ class AmqpClient:
         :param str exchange_name: Name of the exchange
         """
         channel.queue_declare(queue=name, durable=True, exclusive=False, auto_delete=False, arguments=None)
-        bind_routing_key = routing_key if routing_key is not None else name
-        channel.queue_bind(exchange=exchange_name, queue=name, routing_key=bind_routing_key)
+        channel.queue_bind(exchange=exchange_name, queue=name, routing_key=routing_key)
 
     @staticmethod
     def _consume_queue(

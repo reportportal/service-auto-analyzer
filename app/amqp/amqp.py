@@ -170,7 +170,9 @@ class AmqpClient:
             EXCHANGE_CREATION_TIME[exchange_key] = time.time()
 
     @staticmethod
-    def _bind_queue(channel: BlockingChannel, name: str, exchange_name: str) -> None:
+    def _bind_queue(
+        channel: BlockingChannel, exchange_name: str, name: str, routing_key: Optional[str] = None
+    ) -> None:
         """Bind to a queue and exchange.
 
         :param BlockingChannel channel: The channel to bind the queue on
@@ -178,7 +180,8 @@ class AmqpClient:
         :param str exchange_name: Name of the exchange
         """
         channel.queue_declare(queue=name, durable=True, exclusive=False, auto_delete=False, arguments=None)
-        channel.queue_bind(exchange=exchange_name, queue=name, routing_key=name)
+        bind_routing_key = routing_key if routing_key is not None else name
+        channel.queue_bind(exchange=exchange_name, queue=name, routing_key=bind_routing_key)
 
     @staticmethod
     def _consume_queue(
@@ -208,11 +211,13 @@ class AmqpClient:
         self,
         queue: str,
         msg_callback: Callable[[BlockingChannel, Basic.Deliver, BasicProperties, bytes], None],
+        routing_key: Optional[str] = None,
     ) -> None:
         """Continuously consume messages, reconnect on failure.
 
         :param str queue: Name of the queue to consume
         :param callable msg_callback: Callback function to handle received messages
+        :param str routing_key: Optional routing key to bind the queue
         """
         connection_info = f"Exchange: '{self._config.amqpExchangeName}'. Queue: '{queue}'."
         while True:
@@ -221,7 +226,7 @@ class AmqpClient:
                 self._declare_exchange()
 
                 with self._connection.channel() as channel:
-                    self._bind_queue(channel, queue, self._config.amqpExchangeName)
+                    self._bind_queue(channel, self._config.amqpExchangeName, queue, routing_key)
                     self._consume_queue(channel, queue, False, False, msg_callback)
                     logger.info(f"Start consuming on queue '{queue}'")
                     channel.start_consuming()

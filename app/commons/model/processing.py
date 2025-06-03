@@ -13,10 +13,12 @@
 #  limitations under the License.
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Optional
 
 
 @dataclass(order=True)
 class ProcessingItem:
     priority: int
-    item: tuple[str, Any] = field(compare=False)
+    routing_key: str
+    reply_to: Optional[str] = field(compare=False)
+    item: Any = field(compare=False)

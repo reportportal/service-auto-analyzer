@@ -129,9 +129,7 @@ def init_amqp_queues():
                 AmqpClient(APP_CONFIG).receive,
                 (
                     "train_models",
-                    lambda current_channel, method, props, body: _amqp_handler.handle_amqp_request(
-                        current_channel, method, props, body
-                    ),
+                    _amqp_handler.handle_amqp_request,
                     "train_models",
                 ),
             )
@@ -168,9 +166,7 @@ def init_amqp_queues():
                     AmqpClient(APP_CONFIG).receive,
                     (
                         routing_key,
-                        lambda current_channel, method, props, body: _amqp_handler.handle_amqp_request(
-                            current_channel, method, props, body
-                        ),
+                        _amqp_handler.handle_amqp_request,
                         routing_key,
                     ),
                 )

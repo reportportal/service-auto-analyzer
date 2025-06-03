@@ -189,11 +189,12 @@ class AmqpRequestHandler:
         # Processing request
         logging.new_correlation_id()
         logger.debug(f"Processing message: --Method: {method} --Properties: {props} --Body: {body}")
-        channel.basic_ack(delivery_tag=method.delivery_tag)
         try:
             message = json.loads(body, strict=False)
+            channel.basic_ack(delivery_tag=method.delivery_tag)
         except Exception as exc:
             logger.exception("Failed to parse message body to JSON", exc_info=exc)
+            channel.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
             return None
         if prepare_data_func:
             try:

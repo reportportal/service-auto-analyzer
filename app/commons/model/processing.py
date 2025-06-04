@@ -15,10 +15,14 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from pika.adapters.blocking_connection import BlockingChannel
+
 
 @dataclass(order=True)
 class ProcessingItem:
     priority: int
     routing_key: str
     reply_to: Optional[str] = field(compare=False)
+    correlation_id: str = field(compare=False)
+    channel: BlockingChannel = field(compare=False)
     item: Any = field(compare=False)

@@ -27,7 +27,7 @@ from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
 
 from app.amqp.amqp import AmqpClient
-from app.amqp.amqp_handler import AmqpRequestHandler
+from app.amqp.amqp_handler import ProcessAmqpRequestHandler
 from app.commons import logging as my_logging
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
@@ -121,56 +121,18 @@ def create_thread(func, args):
 def init_amqp_queues():
     """Initialize rabbitmq queues, exchange and starts threads for queue messages processing"""
     _threads = []
-    _amqp_handler = AmqpRequestHandler(APP_CONFIG, SEARCH_CONFIG)
+    _amqp_handler = ProcessAmqpRequestHandler(APP_CONFIG, SEARCH_CONFIG)
 
-    if APP_CONFIG.instanceTaskType == "train":
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "train_models",
-                    _amqp_handler.handle_amqp_request,
-                    "train_models",
-                ),
-            )
+    _threads.append(
+        create_thread(
+            AmqpClient(APP_CONFIG).receive,
+            (
+                "all",
+                _amqp_handler.handle_amqp_request,
+                None,
+            ),
         )
-    else:
-        # List of all routing keys for standard AMQP requests
-        standard_routing_keys = [
-            "stats_info",
-            "index",
-            "analyze",
-            "delete",
-            "clean",
-            "search",
-            "suggest",
-            "cluster",
-            "namespace_finder",
-            "suggest_patterns",
-            "index_suggest_info",
-            "remove_suggest_info",
-            "update_suggest_info",
-            "remove_models",
-            "get_model_info",
-            "defect_update",
-            "item_remove",
-            "launch_remove",
-            "remove_by_launch_start_time",
-            "remove_by_log_time",
-        ]
-
-        # Create threads for standard AMQP requests
-        for routing_key in standard_routing_keys:
-            _threads.append(
-                create_thread(
-                    AmqpClient(APP_CONFIG).receive,
-                    (
-                        routing_key,
-                        _amqp_handler.handle_amqp_request,
-                        routing_key,
-                    ),
-                )
-            )
+    )
     return _threads
 
 
@@ -261,12 +223,12 @@ def start_http_server():
 
 
 signal(SIGINT, handler)
-logger.info("The analyzer has started")
-logger.info("Starting waiting for AMQP connection")
-threads = init_amqp_queues()
-logger.info("Analyzer has started")
 
 if __name__ == "__main__":
+    logger.info("The analyzer has started")
+    logger.info("Starting waiting for AMQP connection")
+    threads = init_amqp_queues()
+    logger.info("Analyzer has started")
     logger.info("Program started")
 
     start_http_server()

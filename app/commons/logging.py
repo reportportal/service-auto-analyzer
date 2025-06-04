@@ -84,6 +84,10 @@ def get_correlation_id() -> str:
     return corr_id
 
 
+def set_correlation_id(corr_id: str):
+    __INSTANCES.correlation_id = corr_id
+
+
 # Sonar complains about the name of this function, but it must have the same name as in standard library
 # noinspection PyPep8Naming
 def getLogger(logger_name: str) -> Logger:  # NOSONAR

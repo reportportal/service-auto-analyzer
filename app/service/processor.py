@@ -33,7 +33,7 @@ from app.service.suggest_service import SuggestService
 logger = logging.getLogger("analyzerApp.processor")
 
 
-class Processor:
+class ServiceProcessor:
     """Class for processing requests based on routing key and routing configuration"""
 
     def __init__(self, app_config: ApplicationConfig, search_config: SearchConfig):

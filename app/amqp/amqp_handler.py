@@ -16,7 +16,6 @@ import json
 import queue
 import threading
 import time
-from multiprocessing import Pipe, Process
 from typing import Any, Optional
 
 from amqp.amqp import AmqpClient
@@ -26,7 +25,8 @@ from pika.spec import Basic, BasicProperties
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.processing import ProcessingItem
-from app.service.processor import Processor
+from app.commons.processing import Processor
+from app.service.processor import ServiceProcessor
 
 logger = logging.getLogger("analyzerApp.amqpHandler")
 
@@ -92,13 +92,13 @@ class AmqpRequestHandler:
 
     app_config: ApplicationConfig
     search_config: SearchConfig
-    _processor: Processor
+    _processor: ServiceProcessor
 
     def __init__(self, app_config: ApplicationConfig, search_config: SearchConfig):
         """Initialize processor for handling requests"""
         self.app_config = app_config
         self.search_config = search_config
-        self._processor = Processor(app_config, search_config)
+        self._processor = ServiceProcessor(app_config, search_config)
 
     def handle_amqp_request(
         self,
@@ -152,10 +152,8 @@ class ProcessAmqpRequestHandler:
     prefetch_size: int
     counter: AtomicInteger
     queue: queue.PriorityQueue
-    running_tasks: list
-    parent_conn: Any
-    child_conn: Any
-    _processor_process: Optional[Process]
+    running_tasks: list[ProcessingItem]
+    _processor: Processor
     _processing_thread: Optional[threading.Thread]
     _shutdown: bool
 
@@ -171,33 +169,21 @@ class ProcessAmqpRequestHandler:
         self.counter = AtomicInteger(0)
 
         # Initialize queue and running tasks
-        self.queue: queue.PriorityQueue = queue.PriorityQueue(maxsize=queue_size)
-        self.running_tasks: list = []
+        self.queue = queue.PriorityQueue(maxsize=queue_size)
+        self.running_tasks = []
 
         # Setup process communication
-        self.parent_conn, self.child_conn = Pipe()
-        self._processor_process = None
-        self._processing_thread = None
+        self._processor = Processor(app_config, search_config, self._processor_worker)
         self._shutdown = False
-
-        # Start the processor process
-        self._start_processor_process()
 
         # Start the processing thread
         self._processing_thread = threading.Thread(target=self._process_queue, daemon=True)
         self._processing_thread.start()
 
-    def _start_processor_process(self):
-        """Start the processor in a separate process"""
-        self._processor_process = Process(
-            target=self._processor_worker, args=(self.child_conn, self.app_config, self.search_config)
-        )
-        self._processor_process.start()
-
     @staticmethod
-    def _processor_worker(conn, app_config: ApplicationConfig, search_config: SearchConfig):
+    def _processor_worker(conn: Any, app_config: ApplicationConfig, search_config: SearchConfig) -> None:
         """Worker function that runs in separate process"""
-        processor = Processor(app_config, search_config)
+        processor = ServiceProcessor(app_config, search_config)
 
         try:
             while True:
@@ -230,7 +216,7 @@ class ProcessAmqpRequestHandler:
                         processing_item = self.queue.get_nowait()
 
                         # Send to processor
-                        self.parent_conn.send(
+                        self._processor.parent_conn.send(
                             (processing_item.routing_key, processing_item.log_correlation_id, processing_item.item)
                         )
 
@@ -247,8 +233,8 @@ class ProcessAmqpRequestHandler:
                 # Receive results from processor
                 if self.running_tasks:
                     try:
-                        if self.parent_conn.poll(timeout=0.1):
-                            response_body = self.parent_conn.recv()
+                        if self._processor.parent_conn.poll(timeout=0.1):
+                            response_body = self._processor.parent_conn.recv()
 
                             if self.running_tasks:
                                 completed_task = self.running_tasks.pop(0)  # FIFO for completed tasks
@@ -325,21 +311,8 @@ class ProcessAmqpRequestHandler:
         self._shutdown = True
 
         # Stop processor process
-        if self._processor_process and self._processor_process.is_alive():
-            try:
-                self.parent_conn.send((None, None))  # Shutdown signal
-                self._processor_process.join(timeout=5)
-                if self._processor_process.is_alive():
-                    self._processor_process.terminate()
-            except Exception as exc:
-                logger.exception("Error shutting down processor process", exc_info=exc)
+        self._processor.shutdown()
 
         # Wait for processing thread
         if self._processing_thread and self._processing_thread.is_alive():
             self._processing_thread.join(timeout=5)
-
-        # Close connections
-        try:
-            self.parent_conn.close()
-        except Exception:
-            pass

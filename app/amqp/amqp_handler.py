@@ -22,6 +22,7 @@ from typing import Any, Optional
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
 
+from amqp.amqp import AmqpClient
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.processing import ProcessingItem
@@ -63,8 +64,31 @@ def get_priority(props: BasicProperties) -> int:
     return priority
 
 
+class AtomicInteger:
+    def __init__(self, value: int = 0) -> None:
+        self._value = int(value)
+        self._lock = threading.Lock()
+
+    def inc(self, d: int = 1) -> int:
+        with self._lock:
+            self._value += int(d)
+            return self._value
+
+    def dec(self, d: int = 1) -> int:
+        return self.inc(-d)
+
+    @property
+    def value(self) -> int:
+        with self._lock:
+            return self._value
+
+
 class AmqpRequestHandler:
     """Class for handling AMQP requests with service routing based on routing key"""
+
+    app_config: ApplicationConfig
+    search_config: SearchConfig
+    _processor: Processor
 
     def __init__(self, app_config: ApplicationConfig, search_config: SearchConfig):
         """Initialize processor for handling requests"""
@@ -117,14 +141,30 @@ class AmqpRequestHandler:
 class ProcessAmqpRequestHandler:
     """Class for handling AMQP requests with process-based routing and priority queue"""
 
+    app_config: ApplicationConfig
+    search_config: SearchConfig
+    client: AmqpClient
+    queue_size: int
+    prefetch_size: int
+    counter: AtomicInteger
+    queue: queue.PriorityQueue
+    running_tasks: list
+    parent_conn: Any
+    child_conn: Any
+    _processor_process: Optional[Process]
+    _processing_thread: Optional[threading.Thread]
+    _shutdown: bool
+
     def __init__(
         self, app_config: ApplicationConfig, search_config: SearchConfig, queue_size: int = 100, prefetch_size: int = 2
     ):
         """Initialize processor for handling requests with process-based communication"""
         self.app_config = app_config
         self.search_config = search_config
+        self.client = AmqpClient(app_config)
         self.queue_size = queue_size
         self.prefetch_size = prefetch_size
+        self.counter = AtomicInteger(0)
 
         # Initialize queue and running tasks
         self.queue: queue.PriorityQueue = queue.PriorityQueue(maxsize=queue_size)
@@ -187,7 +227,7 @@ class ProcessAmqpRequestHandler:
 
                         # Send to processor
                         self.parent_conn.send(
-                            (processing_item.routing_key, processing_item.correlation_id, processing_item.item)
+                            (processing_item.routing_key, processing_item.log_correlation_id, processing_item.item)
                         )
 
                         # Add to running tasks
@@ -229,15 +269,7 @@ class ProcessAmqpRequestHandler:
 
         try:
             if processing_item.reply_to:
-                processing_item.channel.basic_publish(
-                    exchange="",
-                    routing_key=processing_item.reply_to,
-                    properties=BasicProperties(
-                        correlation_id=processing_item.correlation_id, content_type="application/json"
-                    ),
-                    mandatory=False,
-                    body=bytes(response_body, "utf-8"),
-                )
+                self.client.reply(processing_item.reply_to, processing_item.msg_correlation_id, response_body)
         except Exception as exc:
             logger.exception("Failed to publish result", exc_info=exc)
             return None
@@ -253,6 +285,8 @@ class ProcessAmqpRequestHandler:
         body: bytes,
     ) -> None:
         """Function for handling amqp request: convert to ProcessingItem and add to priority queue."""
+        number: int = self.counter.inc()
+
         log_message(method, props, body)
 
         # Processing request
@@ -265,10 +299,11 @@ class ProcessAmqpRequestHandler:
         # Create ProcessingItem
         processing_item = ProcessingItem(
             priority=priority,
+            number=number,
             routing_key=method.routing_key,
             reply_to=props.reply_to,
-            correlation_id=logging.get_correlation_id(),
-            channel=channel,
+            log_correlation_id=logging.get_correlation_id(),
+            msg_correlation_id=props.correlation_id,
             item=message,
         )
 

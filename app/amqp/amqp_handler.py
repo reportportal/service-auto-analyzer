@@ -162,8 +162,7 @@ class ProcessAmqpRequestHandler:
         while not self._shutdown:
             try:
                 # Send messages to processor (up to prefetch_size)
-                sent_count = 0
-                while sent_count < self.prefetch_size and len(self.running_tasks) < self.prefetch_size:
+                while len(self.running_tasks) < self.prefetch_size:
                     try:
                         processing_item: ProcessingItem = self.queue.get_nowait()
                         logging.set_correlation_id(processing_item.log_correlation_id)
@@ -178,7 +177,6 @@ class ProcessAmqpRequestHandler:
 
                         # Add to running tasks
                         self.running_tasks.append(processing_item)
-                        sent_count += 1
                     except queue.Empty:
                         break
                     except Exception as exc:

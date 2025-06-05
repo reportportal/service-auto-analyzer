@@ -16,7 +16,7 @@ import json
 import queue
 import threading
 import time
-from typing import Any, Optional
+from typing import Any, Optional, Callable
 
 from amqp.amqp import AmqpClient
 from pika.adapters.blocking_connection import BlockingChannel
@@ -150,15 +150,21 @@ class ProcessAmqpRequestHandler:
     client: AmqpClient
     queue_size: int
     prefetch_size: int
+    routing_key_predicate: Optional[Callable[[str], bool]]
     counter: AtomicInteger
-    queue: queue.PriorityQueue
+    queue: queue.PriorityQueue[ProcessingItem]
     running_tasks: list[ProcessingItem]
     _processor: Processor
     _processing_thread: Optional[threading.Thread]
     _shutdown: bool
 
     def __init__(
-        self, app_config: ApplicationConfig, search_config: SearchConfig, queue_size: int = 100, prefetch_size: int = 2
+        self,
+        app_config: ApplicationConfig,
+        search_config: SearchConfig,
+        queue_size: int = 100,
+        prefetch_size: int = 2,
+        routing_key_predicate: Optional[Callable[[str], bool]] = None,
     ):
         """Initialize processor for handling requests with process-based communication"""
         self.app_config = app_config
@@ -166,6 +172,7 @@ class ProcessAmqpRequestHandler:
         self.client = AmqpClient(app_config)
         self.queue_size = queue_size
         self.prefetch_size = prefetch_size
+        self.routing_key_predicate = routing_key_predicate
         self.counter = AtomicInteger(0)
 
         # Initialize queue and running tasks
@@ -213,7 +220,11 @@ class ProcessAmqpRequestHandler:
                 sent_count = 0
                 while sent_count < self.prefetch_size and len(self.running_tasks) < self.prefetch_size:
                     try:
-                        processing_item = self.queue.get_nowait()
+                        processing_item: ProcessingItem = self.queue.get_nowait()
+                        logging.set_correlation_id(processing_item.log_correlation_id)
+                        if self.routing_key_predicate and self.routing_key_predicate(processing_item.routing_key):
+                            logger.debug(f"Skipping item with routing key: {processing_item.routing_key}")
+                            continue
 
                         # Send to processor
                         self._processor.parent_conn.send(
@@ -223,7 +234,6 @@ class ProcessAmqpRequestHandler:
                         # Add to running tasks
                         self.running_tasks.append(processing_item)
                         sent_count += 1
-
                     except queue.Empty:
                         break
                     except Exception as exc:

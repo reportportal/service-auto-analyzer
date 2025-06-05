@@ -192,8 +192,9 @@ class AmqpClient:
         """Bind to a queue and exchange.
 
         :param BlockingChannel channel: The channel to bind the queue on
-        :param str name: Name of the queue
         :param str exchange_name: Name of the exchange
+        :param str name: Name of the queue
+        :param str routing_key: Optional routing key to bind the queue
         """
         channel.queue_declare(queue=name, durable=True, exclusive=False, auto_delete=False, arguments=None)
         channel.queue_bind(exchange=exchange_name, queue=name, routing_key=routing_key)

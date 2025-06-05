@@ -87,61 +87,6 @@ class AtomicInteger:
             return self._value
 
 
-class AmqpRequestHandler:
-    """Class for handling AMQP requests with service routing based on routing key"""
-
-    app_config: ApplicationConfig
-    search_config: SearchConfig
-    _processor: ServiceProcessor
-
-    def __init__(self, app_config: ApplicationConfig, search_config: SearchConfig):
-        """Initialize processor for handling requests"""
-        self.app_config = app_config
-        self.search_config = search_config
-        self._processor = ServiceProcessor(app_config, search_config)
-
-    def handle_amqp_request(
-        self,
-        channel: BlockingChannel,
-        method: Basic.Deliver,
-        props: BasicProperties,
-        body: bytes,
-    ) -> None:
-        """Function for handling amqp request: index, search and analyze using routing key."""
-        log_incoming_message(method, props, body)
-
-        # Processing request
-        message = serialize_message(channel, method.delivery_tag, body)
-        if not message:
-            return None
-
-        # Process using the processor
-        try:
-            response_body = self._processor.process(method.routing_key, message)
-        except Exception as exc:
-            logger.exception("Failed to process message", exc_info=exc)
-            return None
-
-        # Sending response if applicable
-        if response_body is None:
-            return None
-
-        try:
-            if props.reply_to:
-                channel.basic_publish(
-                    exchange="",
-                    routing_key=props.reply_to,
-                    properties=BasicProperties(correlation_id=props.correlation_id, content_type="application/json"),
-                    mandatory=False,
-                    body=bytes(response_body, "utf-8"),
-                )
-        except Exception as exc:
-            logger.exception("Failed to publish result", exc_info=exc)
-            return None
-        logger.debug("Finished processing response")
-        return None
-
-
 class ProcessAmqpRequestHandler:
     """Class for handling AMQP requests with process-based routing and priority queue"""
 

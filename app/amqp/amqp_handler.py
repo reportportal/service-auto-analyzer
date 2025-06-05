@@ -31,9 +31,13 @@ from app.service.processor import Processor
 logger = logging.getLogger("analyzerApp.amqpHandler")
 
 
-def log_message(method, props, body):
+def log_incoming_message(method: Basic.Deliver, props: BasicProperties, body: bytes) -> None:
     logging.new_correlation_id()
     logger.debug(f"Processing message: --Method: {method} --Properties: {props} --Body: {body}")
+
+
+def log_outgoing_message(reply_to: str, correlation_id: str, body: Any) -> None:
+    logger.debug(f"Replying message: --To: {reply_to} --Correlation ID: {correlation_id} --Body: {json.dumps(body)}")
 
 
 def serialize_message(channel: BlockingChannel, delivery_tag: Optional[int], body: bytes) -> Optional[Any]:
@@ -104,7 +108,7 @@ class AmqpRequestHandler:
         body: bytes,
     ) -> None:
         """Function for handling amqp request: index, search and analyze using routing key."""
-        log_message(method, props, body)
+        log_incoming_message(method, props, body)
 
         # Processing request
         message = serialize_message(channel, method.delivery_tag, body)
@@ -262,13 +266,13 @@ class ProcessAmqpRequestHandler:
                 logger.exception("Error in processing thread", exc_info=exc)
                 time.sleep(0.1)
 
-    def _handle_response(self, processing_item: ProcessingItem, response_body):
+    def _handle_response(self, processing_item: ProcessingItem, response_body: Any):
         """Handle the response from processor similar to original AmqpRequestHandler"""
         if response_body is None:
             return None
-
         try:
             if processing_item.reply_to:
+                log_outgoing_message(processing_item.reply_to, processing_item.msg_correlation_id, response_body)
                 self.client.reply(processing_item.reply_to, processing_item.msg_correlation_id, response_body)
         except Exception as exc:
             logger.exception("Failed to publish result", exc_info=exc)
@@ -287,7 +291,7 @@ class ProcessAmqpRequestHandler:
         """Function for handling amqp request: convert to ProcessingItem and add to priority queue."""
         number: int = self.counter.inc()
 
-        log_message(method, props, body)
+        log_incoming_message(method, props, body)
 
         # Processing request
         message = serialize_message(channel, method.delivery_tag, body)

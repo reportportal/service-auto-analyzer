@@ -284,3 +284,33 @@ class AmqpClient:
             except KeyboardInterrupt:
                 logger.info("Consumer interrupted by user. Exiting.")
                 break
+
+    def reply(self, to: str, correlation_id: str, data: str) -> None:
+        """Publish a reply message with automatic reconnection.
+
+        :param str to: The routing key to send the message to
+        :param str correlation_id: The correlation ID for the message
+        :param str data: The data to publish
+        """
+        while True:
+            try:
+                with self._connection.channel() as channel:
+                    channel.basic_publish(
+                        exchange="",
+                        routing_key=to,
+                        properties=BasicProperties(correlation_id=correlation_id, content_type="application/json"),
+                        mandatory=False,
+                        body=bytes(data, "utf-8"),
+                    )
+                return  # success
+            except AMQPConnectionError as exc:
+                logger.warning(f"Publish failed: {exc}. Reconnecting.", exc_info=exc)
+                self.close()
+            except AmqpClientConnectionException:
+                raise
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.exception("Failed to publish message", exc_info=exc)
+                self.close()
+            except KeyboardInterrupt:
+                logger.info("Consumer interrupted by user. Exiting.")
+                break

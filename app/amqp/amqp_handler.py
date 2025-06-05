@@ -270,6 +270,7 @@ class ProcessAmqpRequestHandler:
         """Handle the response from processor similar to original AmqpRequestHandler"""
         if response_body is None:
             return None
+        logging.set_correlation_id(processing_item.log_correlation_id)
         try:
             if processing_item.reply_to:
                 log_outgoing_message(processing_item.reply_to, processing_item.msg_correlation_id, response_body)

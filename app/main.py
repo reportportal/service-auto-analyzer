@@ -118,17 +118,38 @@ def create_thread(func, args):
     return thread
 
 
+def except_train(request: str) -> bool:
+    """Filters out requests that are for training models"""
+    return request != "train_models"
+
+
+def only_train(request: str) -> bool:
+    """Filters out requests that are not related to training models"""
+    return request == "train_models"
+
+
 def init_amqp_queues():
     """Initialize rabbitmq queues, exchange and starts threads for queue messages processing"""
     _threads = []
-    _amqp_handler = ProcessAmqpRequestHandler(APP_CONFIG, SEARCH_CONFIG)
+    _main_amqp_handler = ProcessAmqpRequestHandler(APP_CONFIG, SEARCH_CONFIG, routing_key_predicate=except_train)
+    _train_amqp_handler = ProcessAmqpRequestHandler(APP_CONFIG, SEARCH_CONFIG, routing_key_predicate=only_train)
 
     _threads.append(
         create_thread(
             AmqpClient(APP_CONFIG).receive,
             (
                 "all",
-                _amqp_handler.handle_amqp_request,
+                _main_amqp_handler.handle_amqp_request,
+                None,
+            ),
+        )
+    )
+    _threads.append(
+        create_thread(
+            AmqpClient(APP_CONFIG).receive,
+            (
+                "train",
+                _train_amqp_handler.handle_amqp_request,
                 None,
             ),
         )

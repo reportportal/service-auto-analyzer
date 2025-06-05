@@ -157,45 +157,52 @@ class ProcessAmqpRequestHandler:
         finally:
             conn.close()
 
+    def __send_to_processor(self) -> Optional[ProcessingItem]:
+        try:
+            processing_item: ProcessingItem = self.queue.get_nowait()
+            logging.set_correlation_id(processing_item.log_correlation_id)
+            if self.routing_key_predicate and self.routing_key_predicate(processing_item.routing_key):
+                logger.debug(f"Skipping item with routing key: {processing_item.routing_key}")
+                return processing_item
+
+            # Send to processor
+            self._processor.parent_conn.send(
+                (processing_item.routing_key, processing_item.log_correlation_id, processing_item.item)
+            )
+
+            # Add to running tasks
+            self.running_tasks.append(processing_item)
+            return processing_item
+        except queue.Empty:
+            return None
+        except Exception as exc:
+            logger.exception("Failed to send message to processor", exc_info=exc)
+            return None
+
+    def __receive_results(self) -> None:
+        if self.running_tasks:
+            try:
+                if self._processor.parent_conn.poll(timeout=0.1):
+                    response_body = self._processor.parent_conn.recv()
+
+                    if self.running_tasks:
+                        completed_task = self.running_tasks.pop(0)  # FIFO for completed tasks
+
+                        # Handle response similar to original handler
+                        self._handle_response(completed_task, response_body)
+            except Exception as exc:
+                logger.exception("Failed to receive response from processor", exc_info=exc)
+
     def _process_queue(self):
         """Thread function to process queue and communicate with processor"""
         while not self._shutdown:
             try:
                 # Send messages to processor (up to prefetch_size)
                 while len(self.running_tasks) < self.prefetch_size:
-                    try:
-                        processing_item: ProcessingItem = self.queue.get_nowait()
-                        logging.set_correlation_id(processing_item.log_correlation_id)
-                        if self.routing_key_predicate and self.routing_key_predicate(processing_item.routing_key):
-                            logger.debug(f"Skipping item with routing key: {processing_item.routing_key}")
-                            continue
-
-                        # Send to processor
-                        self._processor.parent_conn.send(
-                            (processing_item.routing_key, processing_item.log_correlation_id, processing_item.item)
-                        )
-
-                        # Add to running tasks
-                        self.running_tasks.append(processing_item)
-                    except queue.Empty:
-                        break
-                    except Exception as exc:
-                        logger.exception("Failed to send message to processor", exc_info=exc)
+                    if not self.__send_to_processor():
                         break
 
-                # Receive results from processor
-                if self.running_tasks:
-                    try:
-                        if self._processor.parent_conn.poll(timeout=0.1):
-                            response_body = self._processor.parent_conn.recv()
-
-                            if self.running_tasks:
-                                completed_task = self.running_tasks.pop(0)  # FIFO for completed tasks
-
-                                # Handle response similar to original handler
-                                self._handle_response(completed_task, response_body)
-                    except Exception as exc:
-                        logger.exception("Failed to receive response from processor", exc_info=exc)
+                self.__receive_results()
 
                 # Small sleep to prevent busy waiting
                 if not self.running_tasks and self.queue.empty():

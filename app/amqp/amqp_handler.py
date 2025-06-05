@@ -16,7 +16,7 @@ import json
 import queue
 import threading
 import time
-from typing import Any, Optional, Callable
+from typing import Any, Callable, Optional
 
 from amqp.amqp import AmqpClient
 from pika.adapters.blocking_connection import BlockingChannel

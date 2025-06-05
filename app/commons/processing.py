@@ -49,3 +49,9 @@ class Processor:
                     self.process.terminate()
             except Exception as exc:
                 logger.exception("Error shutting down processor process", exc_info=exc)
+
+        # Close connections
+        try:
+            self.parent_conn.close()
+        except Exception:
+            pass

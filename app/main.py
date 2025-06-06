@@ -184,14 +184,7 @@ def read_model_settings():
     )
 
 
-log_file_path = "res/logging.conf"
-logging.config.fileConfig(log_file_path, defaults={"logfilename": APP_CONFIG.analyzerPathToLog})
-if APP_CONFIG.logLevel.lower() == "debug":
-    logging.disable(logging.NOTSET)
-elif APP_CONFIG.logLevel.lower() == "info":
-    logging.disable(logging.DEBUG)
-else:
-    logging.disable(logging.INFO)
+my_logging.setup(APP_CONFIG)
 logger = my_logging.getLogger("analyzerApp")
 APP_CONFIG.appVersion = read_version()
 es_client = EsClient(APP_CONFIG)

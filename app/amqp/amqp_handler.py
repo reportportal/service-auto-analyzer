@@ -31,9 +31,11 @@ from app.service.processor import ServiceProcessor
 logger = logging.getLogger("analyzerApp.amqpHandler")
 
 
-def log_incoming_message(method: Basic.Deliver, props: BasicProperties, body: bytes) -> None:
+def log_incoming_message(routing_key: str, correlation_id: str, body: Any) -> None:
     logging.new_correlation_id()
-    logger.debug(f"Processing message: --Method: {method} --Properties: {props} --Body: {body}")
+    logger.debug(
+        f"Processing message: --Routing key: {routing_key} --Correlation ID: {correlation_id} --Body: {json.dumps(body)}"
+    )
 
 
 def log_outgoing_message(reply_to: str, correlation_id: str, body: Any) -> None:
@@ -162,8 +164,9 @@ class ProcessAmqpRequestHandler:
             processing_item: ProcessingItem = self.queue.get_nowait()
             logging.set_correlation_id(processing_item.log_correlation_id)
             if self.routing_key_predicate and self.routing_key_predicate(processing_item.routing_key):
-                logger.debug(f"Skipping item with routing key: {processing_item.routing_key}")
                 return processing_item
+
+            log_incoming_message(processing_item.routing_key, processing_item.msg_correlation_id, processing_item.item)
 
             # Send to processor
             self._processor.parent_conn.send(
@@ -195,6 +198,7 @@ class ProcessAmqpRequestHandler:
 
     def _process_queue(self):
         """Thread function to process queue and communicate with processor"""
+        logging.setup(self.app_config)
         while not self._shutdown:
             try:
                 # Send messages to processor (up to prefetch_size)
@@ -237,8 +241,6 @@ class ProcessAmqpRequestHandler:
     ) -> None:
         """Function for handling amqp request: convert to ProcessingItem and add to priority queue."""
         number: int = self.counter.inc()
-
-        log_incoming_message(method, props, body)
 
         # Processing request
         message = serialize_message(channel, method.delivery_tag, body)

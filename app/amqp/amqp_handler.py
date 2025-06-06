@@ -14,6 +14,7 @@
 
 import json
 import queue
+import logging as default_logging
 import threading
 import time
 from typing import Any, Callable, Optional
@@ -198,7 +199,6 @@ class ProcessAmqpRequestHandler:
 
     def _process_queue(self):
         """Thread function to process queue and communicate with processor"""
-        logging.setup(self.app_config)
         while not self._shutdown:
             try:
                 # Send messages to processor (up to prefetch_size)

@@ -14,15 +14,14 @@
 
 import json
 import queue
-import logging as default_logging
 import threading
 import time
 from typing import Any, Callable, Optional
 
-from app.amqp.amqp import AmqpClient
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
 
+from app.amqp.amqp import AmqpClient
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.processing import ProcessingItem

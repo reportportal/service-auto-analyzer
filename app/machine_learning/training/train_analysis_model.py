@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+import math
 import os
 from datetime import datetime
 from time import time
@@ -84,7 +84,8 @@ def fill_metric_stats(
     baseline_model_metric_result: list[float], new_model_metric_results: list[float], info_dict: dict[str, Any]
 ) -> None:
     _, p_value = stats.f_oneway(baseline_model_metric_result, new_model_metric_results)
-    p_value = p_value if p_value is not None else 1.0
+    if p_value is None or math.isnan(p_value):
+        p_value = 1.0
     info_dict["p_value"] = p_value
     mean_metric = np.mean(new_model_metric_results)
     baseline_mean_metric = np.mean(baseline_model_metric_result)

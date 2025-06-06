@@ -18,6 +18,7 @@ from app.service.clean_index_service import CleanIndexService
 from app.service.cluster_service import ClusterService
 from app.service.delete_index_service import DeleteIndexService
 from app.service.namespace_finder_service import NamespaceFinderService
+from app.service.processor import ServiceProcessor
 from app.service.retraining_service import RetrainingService
 from app.service.search_service import SearchService
 from app.service.suggest_info_service import SuggestInfoService
@@ -31,6 +32,7 @@ __all__ = [
     "ClusterService",
     "DeleteIndexService",
     "NamespaceFinderService",
+    "ServiceProcessor",
     "RetrainingService",
     "SearchService",
     "SuggestInfoService",

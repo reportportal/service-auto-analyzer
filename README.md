@@ -98,28 +98,5 @@ Perform next steps inside source directory of the analyzer.
 ```
 5. Start the uwsgi server, you can change properties, such as the workers quantity for running the analyzer in the several processes
 ```bash
-  /analyzer/bin/uwsgi --ini res/analyzer.ini
-```
-
-#### Analyzer Train
-
-1. Create a virtual environment with any name (in the example **/venv**)
-```bash
-  python -m venv /analyzer-train
-```
-2. Install python libraries
-```bash
-  /analyzer-train/bin/pip install --no-cache-dir -r requirements.txt
-```
-3. Activate the virtual environment
-```bash
-  source /analyzer-train/bin/activate
-```
-4. Install stopwords package from the nltk library
-```bash
-  /analyzer-train/bin/python3 -m nltk.downloader -d /usr/share/nltk_data stopwords
-```
-5. Start the uwsgi server, you can change properties, such as the workers quantity for running the analyzer train in the several processes
-```bash
-  /analyzer-train/bin/uwsgi --ini res/analyzer-train.ini
+  /analyzer/bin/waitress-serve --port=5001 app.main:application
 ```

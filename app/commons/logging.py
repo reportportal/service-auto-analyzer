@@ -15,9 +15,11 @@
 """Logging adapter to add correlation id to each log entry which Analyzer outputs."""
 
 import base64
-import logging
+import logging.config
 import uuid
 from threading import local
+
+from app.commons.model.launch_objects import ApplicationConfig
 
 __INSTANCES = local()
 
@@ -84,7 +86,22 @@ def get_correlation_id() -> str:
     return corr_id
 
 
+def set_correlation_id(corr_id: str):
+    __INSTANCES.correlation_id = corr_id
+
+
 # Sonar complains about the name of this function, but it must have the same name as in standard library
 # noinspection PyPep8Naming
 def getLogger(logger_name: str) -> Logger:  # NOSONAR
     return Logger(logging.getLogger(logger_name))
+
+
+def setup(app_config: ApplicationConfig):
+    log_file_path = "res/logging.conf"
+    logging.config.fileConfig(log_file_path, defaults={"logfilename": app_config.analyzerPathToLog})
+    if app_config.logLevel.lower() == "debug":
+        logging.disable(logging.NOTSET)
+    elif app_config.logLevel.lower() == "info":
+        logging.disable(logging.DEBUG)
+    else:
+        logging.disable(logging.INFO)

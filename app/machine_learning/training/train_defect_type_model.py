@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import math
 import os
 from datetime import datetime
 from time import sleep, time
@@ -399,7 +400,7 @@ class DefectTypeModelTraining:
                 LOGGER.debug(f"Baseline test results {baseline_model_results}")
                 LOGGER.debug(f"New model test results {new_model_results}")
                 _, p_value = stats.f_oneway(baseline_model_results, new_model_results)
-                if p_value is None:
+                if p_value is None or math.isnan(p_value):
                     p_value = 1.0
                 train_log_info[label]["p_value"] = p_value
                 baseline_mean_f1 = np.mean(baseline_model_results)

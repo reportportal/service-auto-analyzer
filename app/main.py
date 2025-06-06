@@ -236,7 +236,7 @@ def get_health_status():
 
 
 # noinspection PyUnusedLocal
-def handler(signal_received, frame):
+def signal_handler(signal_received, frame):
     print("The analyzer has stopped")
     exit(0)
 
@@ -247,7 +247,7 @@ def start_http_server():
     application.run(host="0.0.0.0", port=APP_CONFIG.analyzerHttpPort, use_reloader=False)
 
 
-signal(SIGINT, handler)
+signal(SIGINT, signal_handler)
 
 # Run the application directly
 if __name__ == "__main__":

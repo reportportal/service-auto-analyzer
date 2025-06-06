@@ -33,9 +33,8 @@ logger = logging.getLogger("analyzerApp.amqpHandler")
 
 def log_incoming_message(routing_key: str, correlation_id: str, body: Any) -> None:
     logging.new_correlation_id()
-    logger.debug(
-        f"Processing message: --Routing key: {routing_key} --Correlation ID: {correlation_id} --Body: {json.dumps(body)}"
-    )
+    body = json.dumps(body)
+    logger.debug(f"Processing message: --Routing key: {routing_key} --Correlation ID: {correlation_id} --Body: {body}")
 
 
 def log_outgoing_message(reply_to: str, correlation_id: str, body: Any) -> None:

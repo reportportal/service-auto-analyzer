@@ -12,11 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import gc
 import json
 import logging.config
 import os
-import sys
 import threading
 from signal import SIGINT, signal
 from sys import exit
@@ -72,7 +70,6 @@ APP_CONFIG = ApplicationConfig(
     esProjectIndexPrefix=os.getenv("ES_PROJECT_INDEX_PREFIX", "").strip(),
     analyzerHttpPort=int(os.getenv("ANALYZER_HTTP_PORT", "5001")),
     analyzerPathToLog=os.getenv("ANALYZER_FILE_LOGGING_PATH", "/tmp/config.log"),
-    enableMemoryDump=json.loads(os.getenv("ANALYZER_ENABLE_MEMORY_DUMP", "false").lower()),
 )
 
 SEARCH_CONFIG = SearchConfig(
@@ -201,26 +198,6 @@ def get_health_status():
         logger.error("Analyzer health check status failed: %s", status)
         status["status"] = "Elasticsearch is not healthy"
         status_code = 503
-
-    if APP_CONFIG.enableMemoryDump:
-        gc.collect()
-        xs = []
-        for obj in gc.get_objects():
-            i = id(obj)
-            size = sys.getsizeof(obj, 0)
-            referents = [id(o) for o in gc.get_referents(obj) if hasattr(o, "__class__")]
-            if hasattr(obj, "__class__"):
-                cls = str(obj.__class__)
-                stat = {"id": i, "class": cls, "size": size, "referents": referents}
-                try:
-                    if hasattr(obj, "__name__"):
-                        stat["name"] = obj.__name__
-                except ModuleNotFoundError:
-                    pass
-                xs.append(stat)
-        status["memory"] = {}
-        status["memory"]["all"] = xs
-        status["memory"]["total"] = len(xs)
     return Response(json.dumps(status), status=status_code, mimetype="application/json")
 
 

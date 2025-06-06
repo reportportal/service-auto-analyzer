@@ -37,7 +37,7 @@ class Processor:
         self.app_config = app_config
         self.search_config = search_config
         self.parent_conn, self.child_conn = Pipe()
-        self.process = Process(target=target, args=(self.child_conn, self.app_config, self.search_config))
+        self.process = Process(target=target, args=(self.child_conn, self.app_config, self.search_config), daemon=True)
         self.process.start()
 
     def shutdown(self) -> None:

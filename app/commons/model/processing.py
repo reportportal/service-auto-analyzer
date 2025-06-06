@@ -25,3 +25,4 @@ class ProcessingItem:
     log_correlation_id: str = field(compare=False)
     msg_correlation_id: str = field(compare=False)
     item: Any = field(compare=False)
+    send_time: Optional[float] = field(default=None, compare=False)

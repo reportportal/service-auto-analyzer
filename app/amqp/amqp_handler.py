@@ -100,7 +100,7 @@ class ProcessAmqpRequestHandler:
     counter: AtomicInteger
     queue: queue.PriorityQueue[ProcessingItem]
     running_tasks: list[ProcessingItem]
-    _processor: Processor
+    processor: Processor
     _processing_thread: Optional[threading.Thread]
     _shutdown: bool
 
@@ -126,7 +126,7 @@ class ProcessAmqpRequestHandler:
         self.running_tasks = []
 
         # Setup process communication
-        self._processor = Processor(app_config, search_config, self._processor_worker)
+        self.processor = Processor(app_config, search_config, self._processor_worker)
         self._shutdown = False
 
         # Start the processing thread
@@ -168,9 +168,11 @@ class ProcessAmqpRequestHandler:
             log_incoming_message(processing_item.routing_key, processing_item.msg_correlation_id, processing_item.item)
 
             # Send to processor
-            self._processor.parent_conn.send(
+            self.processor.parent_conn.send(
                 (processing_item.routing_key, processing_item.log_correlation_id, processing_item.item)
             )
+
+            processing_item.send_time = time.time()  # Record send time for tracking
 
             # Add to running tasks
             self.running_tasks.append(processing_item)
@@ -184,8 +186,8 @@ class ProcessAmqpRequestHandler:
     def __receive_results(self) -> None:
         if self.running_tasks:
             try:
-                if self._processor.parent_conn.poll(timeout=0.1):
-                    response_body = self._processor.parent_conn.recv()
+                if self.processor.parent_conn.poll(timeout=0.1):
+                    response_body = self.processor.parent_conn.recv()
 
                     if self.running_tasks:
                         completed_task = self.running_tasks.pop(0)  # FIFO for completed tasks
@@ -271,7 +273,7 @@ class ProcessAmqpRequestHandler:
         self._shutdown = True
 
         # Stop processor process
-        self._processor.shutdown()
+        self.processor.shutdown()
 
         # Wait for processing thread
         if self._processing_thread and self._processing_thread.is_alive():

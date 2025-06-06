@@ -132,23 +132,31 @@ def init_amqp_queues():
     _train_amqp_handler = ProcessAmqpRequestHandler(APP_CONFIG, SEARCH_CONFIG, routing_key_predicate=only_train)
 
     _threads.append(
-        create_thread(
-            AmqpClient(APP_CONFIG).receive,
-            (
-                "all",
-                _main_amqp_handler.handle_amqp_request,
-                None,
+        (
+            "all",
+            create_thread(
+                AmqpClient(APP_CONFIG).receive,
+                (
+                    "all",
+                    _main_amqp_handler.handle_amqp_request,
+                    None,
+                ),
             ),
+            _main_amqp_handler,
         )
     )
     _threads.append(
-        create_thread(
-            AmqpClient(APP_CONFIG).receive,
-            (
-                "train",
-                _train_amqp_handler.handle_amqp_request,
-                None,
+        (
+            "train",
+            create_thread(
+                AmqpClient(APP_CONFIG).receive,
+                (
+                    "train",
+                    _train_amqp_handler.handle_amqp_request,
+                    None,
+                ),
             ),
+            _train_amqp_handler,
         )
     )
     return _threads
@@ -188,6 +196,7 @@ es_client = EsClient(APP_CONFIG)
 read_model_settings()
 
 application = create_application()
+THREADS: list[tuple[str, threading.Thread, ProcessAmqpRequestHandler]] = []
 
 
 @application.route("/", methods=["GET"])
@@ -198,6 +207,31 @@ def get_health_status():
         logger.error("Analyzer health check status failed: %s", status)
         status["status"] = "Elasticsearch is not healthy"
         status_code = 503
+    if THREADS:
+        status["threads"] = []
+        for thread_name, thread, handler in THREADS:
+            if not thread.is_alive():
+                status["threads"].append({"name": thread_name, "status": "not alive"})
+            else:
+                thread_status: dict[str, Any] = {
+                    "name": thread_name,
+                    "status": "alive",
+                    "pid": handler.processor.process.pid,
+                }
+                status["threads"].append(thread_status)
+                tasks = [
+                    {
+                        "routing_key": task.routing_key,
+                        "correlation_id": task.msg_correlation_id,
+                        "send_time": task.send_time,
+                    }
+                    for task in handler.running_tasks
+                ]
+                thread_status["running_tasks"] = {
+                    "number": len(tasks),
+                    "tasks": tasks,
+                }
+
     return Response(json.dumps(status), status=status_code, mimetype="application/json")
 
 
@@ -219,17 +253,10 @@ signal(SIGINT, handler)
 if __name__ == "__main__":
     logger.info("Program started")
     logger.info("Creating AMQP connections")
-    threads = init_amqp_queues()
+    THREADS.extend(init_amqp_queues())
     logger.info("The analyzer has started")
 
     start_http_server()
 
     logger.info("The analyzer has finished")
     exit(0)
-
-# Run the application on waitress
-if __name__ == "app.main":
-    logger.info("Program started")
-    logger.info("Creating AMQP connections")
-    threads = init_amqp_queues()
-    logger.info("The analyzer has started")

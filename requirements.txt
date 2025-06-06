@@ -2,7 +2,6 @@ flask==2.3.2
 flask-cors==6.0.0
 Flask-WTF==1.2.1
 waitress==3.0.2
-uWSGI==2.0.29
 pika==1.2.1
 pydantic==1.10.13
 elasticsearch==7.0.0

@@ -245,14 +245,21 @@ def start_http_server():
 
 signal(SIGINT, handler)
 
+# Run the application directly
 if __name__ == "__main__":
-    logger.info("The analyzer has started")
-    logger.info("Starting waiting for AMQP connection")
-    threads = init_amqp_queues()
-    logger.info("Analyzer has started")
     logger.info("Program started")
+    logger.info("Creating AMQP connections")
+    threads = init_amqp_queues()
+    logger.info("The analyzer has started")
 
     start_http_server()
 
     logger.info("The analyzer has finished")
     exit(0)
+
+# Run the application on waitress
+if __name__ == "app.main":
+    logger.info("Program started")
+    logger.info("Creating AMQP connections")
+    threads = init_amqp_queues()
+    logger.info("The analyzer has started")

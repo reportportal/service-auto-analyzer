@@ -210,7 +210,7 @@ class ProcessAmqpRequestHandler:
                 logger.debug(f"Re-sent task to new processor: {task.routing_key} - {task.msg_correlation_id}")
             except Exception as exc:
                 logger.exception(f"Failed to re-send task {task.routing_key} to new processor", exc_info=exc)
-            logger.info(f"Re-sent {len(self.running_tasks)} tasks to new processor")
+        logger.info(f"Re-sent {len(self.running_tasks)} tasks to new processor")
 
     def __receive_results(self) -> None:
         if self.running_tasks:

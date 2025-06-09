@@ -33,6 +33,11 @@ from app.service.suggest_service import SuggestService
 logger = logging.getLogger("analyzerApp.processor")
 
 
+def same_data(data: Any) -> Any:
+    """Function for returning data without changes"""
+    return data
+
+
 class ServiceProcessor:
     """Class for processing requests based on routing key and routing configuration"""
 
@@ -125,42 +130,42 @@ class ServiceProcessor:
             },
             "update_suggest_info": {
                 "handler": self._suggest_info_service.update_suggest_info,
-                "prepare_data_func": lambda x: x,
+                "prepare_data_func": same_data,
                 "prepare_response_data": prepare_index_response_data,
             },
             "remove_models": {
                 "handler": self._analyzer_service.remove_models,
-                "prepare_data_func": lambda x: x,
+                "prepare_data_func": same_data,
                 "prepare_response_data": output_result,
             },
             "get_model_info": {
                 "handler": self._analyzer_service.get_model_info,
-                "prepare_data_func": lambda x: x,
+                "prepare_data_func": same_data,
                 "prepare_response_data": prepare_search_response_data,
             },
             "defect_update": {
                 "handler": self._es_client.defect_update,
-                "prepare_data_func": lambda x: x,
+                "prepare_data_func": same_data,
                 "prepare_response_data": prepare_search_response_data,
             },
             "item_remove": {
                 "handler": self._clean_index_service.delete_test_items,
-                "prepare_data_func": lambda x: x,
+                "prepare_data_func": same_data,
                 "prepare_response_data": output_result,
             },
             "launch_remove": {
                 "handler": self._clean_index_service.delete_launches,
-                "prepare_data_func": lambda x: x,
+                "prepare_data_func": same_data,
                 "prepare_response_data": output_result,
             },
             "remove_by_launch_start_time": {
                 "handler": self._clean_index_service.remove_by_launch_start_time,
-                "prepare_data_func": lambda x: x,
+                "prepare_data_func": same_data,
                 "prepare_response_data": output_result,
             },
             "remove_by_log_time": {
                 "handler": self._clean_index_service.remove_by_log_time,
-                "prepare_data_func": lambda x: x,
+                "prepare_data_func": same_data,
                 "prepare_response_data": output_result,
             },
         }

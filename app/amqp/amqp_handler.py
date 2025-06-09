@@ -158,30 +158,59 @@ class ProcessAmqpRequestHandler:
         finally:
             conn.close()
 
+    def __send_task(self, processing_item: ProcessingItem) -> None:
+        """Send processing item to processor process"""
+        self.processor.parent_conn.send(
+            (processing_item.routing_key, processing_item.log_correlation_id, processing_item.item)
+        )
+        processing_item.send_time = time.time()  # Record send time for tracking
+        self.running_tasks.append(processing_item)
+
     def __send_to_processor(self) -> Optional[ProcessingItem]:
         try:
             processing_item: ProcessingItem = self.queue.get_nowait()
             logging.set_correlation_id(processing_item.log_correlation_id)
             if self.routing_key_predicate and self.routing_key_predicate(processing_item.routing_key):
                 return processing_item
-
             log_incoming_message(processing_item.routing_key, processing_item.msg_correlation_id, processing_item.item)
-
-            # Send to processor
-            self.processor.parent_conn.send(
-                (processing_item.routing_key, processing_item.log_correlation_id, processing_item.item)
-            )
-
-            processing_item.send_time = time.time()  # Record send time for tracking
-
-            # Add to running tasks
-            self.running_tasks.append(processing_item)
+            self.__send_task(processing_item)
             return processing_item
         except queue.Empty:
             return None
         except Exception as exc:
             logger.exception("Failed to send message to processor", exc_info=exc)
             return None
+
+    def _restart_processor(self) -> None:
+        """Restart the processor process if it has died"""
+        # Store running tasks to re-send them
+        tasks_to_resend = self.running_tasks.copy()
+
+        # Clean up old process and connections
+        if self.processor.process.is_alive():
+            self.processor.shutdown()
+        else:
+            # Process is dead, just close connections
+            try:
+                self.processor.parent_conn.close()
+            except Exception:
+                pass
+
+        # Clear running tasks list before re-sending
+        self.running_tasks.clear()
+
+        # Create new processor instance
+        self.processor = Processor(self.app_config, self.search_config, self._processor_worker)
+        logger.info("Successfully restarted processor process")
+
+        # Re-send all previously running tasks to the new processor
+        for task in tasks_to_resend:
+            try:
+                self.__send_task(task)
+                logger.debug(f"Re-sent task to new processor: {task.routing_key} - {task.msg_correlation_id}")
+            except Exception as exc:
+                logger.exception(f"Failed to re-send task {task.routing_key} to new processor", exc_info=exc)
+            logger.info(f"Re-sent {len(self.running_tasks)} tasks to new processor")
 
     def __receive_results(self) -> None:
         if self.running_tasks:
@@ -201,6 +230,11 @@ class ProcessAmqpRequestHandler:
         """Thread function to process queue and communicate with processor"""
         while not self._shutdown:
             try:
+                # Check if processor process is alive and restart if needed
+                if not self.processor.process.is_alive():
+                    logger.warning("Processor process is not running, restarting...")
+                    self._restart_processor()
+
                 # Send messages to processor (up to prefetch_size)
                 while len(self.running_tasks) < self.prefetch_size:
                     if not self.__send_to_processor():

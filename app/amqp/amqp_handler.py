@@ -103,6 +103,7 @@ class ProcessAmqpRequestHandler:
     processor: Processor
     _processing_thread: Optional[threading.Thread]
     _shutdown: bool
+    _routing_keys: Optional[set[str]]
 
     def __init__(
         self,
@@ -112,6 +113,9 @@ class ProcessAmqpRequestHandler:
         prefetch_size: int = 2,
         routing_key_predicate: Optional[Callable[[str], bool]] = None,
         client: Optional[AmqpClient] = None,  # Optional client for testing
+        routing_keys: Optional[
+            list[str]
+        ] = None,  # Optional list of routing keys to initialize the processor with specific routing keys
     ):
         """Initialize processor for handling requests with process-based communication"""
         self.app_config = app_config
@@ -120,6 +124,10 @@ class ProcessAmqpRequestHandler:
         self.queue_size = queue_size
         self.prefetch_size = prefetch_size
         self.routing_key_predicate = routing_key_predicate
+        if routing_keys:
+            self._routing_keys = set(routing_keys)
+        else:
+            self._routing_keys = None
         self.counter = AtomicInteger(0)
 
         # Initialize queue and running tasks
@@ -127,7 +135,7 @@ class ProcessAmqpRequestHandler:
         self.running_tasks = []
 
         # Setup process communication
-        self.processor = Processor(app_config, search_config, self._processor_worker)
+        self.processor = Processor(app_config, search_config, self._processor_worker, routing_keys=self._routing_keys)
         self._shutdown = False
 
         # Start the processing thread
@@ -135,9 +143,11 @@ class ProcessAmqpRequestHandler:
         self._processing_thread.start()
 
     @staticmethod
-    def _processor_worker(conn: Any, app_config: ApplicationConfig, search_config: SearchConfig) -> None:
+    def _processor_worker(
+        conn: Any, app_config: ApplicationConfig, search_config: SearchConfig, routing_keys: Optional[set[str]] = None
+    ) -> None:
         """Worker function that runs in separate process"""
-        processor = ServiceProcessor(app_config, search_config)
+        processor = ServiceProcessor(app_config, search_config, routing_keys=routing_keys)
 
         try:
             while True:
@@ -201,7 +211,7 @@ class ProcessAmqpRequestHandler:
         self.running_tasks.clear()
 
         # Create new processor instance
-        self.processor = Processor(self.app_config, self.search_config, self._processor_worker)
+        self.processor = Processor(self.app_config, self.search_config, self._processor_worker, self._routing_keys)
         logger.info("Successfully restarted processor process")
 
         # Re-send all previously running tasks to the new processor

@@ -197,6 +197,9 @@ class ProcessAmqpRequestHandler:
         # Store running tasks to re-send them
         tasks_to_resend = self.running_tasks.copy()
 
+        # Increment retries for the first task, since it might be the one that caused the failure
+        tasks_to_resend[0].retries += 1
+
         # Clean up old process and connections
         if self.processor.process.is_alive():
             self.processor.shutdown()
@@ -216,6 +219,9 @@ class ProcessAmqpRequestHandler:
 
         # Re-send all previously running tasks to the new processor
         for task in tasks_to_resend:
+            if task.retries >= self.app_config.amqpHandlerMaxRetries:
+                logger.warning(f"Task {task.routing_key} - {task.msg_correlation_id} exceeded max retries, skipping")
+                continue
             try:
                 self.__send_task(task)
                 logger.debug(f"Re-sent task to new processor: {task.routing_key} - {task.msg_correlation_id}")

@@ -44,6 +44,7 @@ class ApplicationConfig(BaseModel):
     amqpInitialRetryInterval: int = 1
     amqpMaxRetryTime: int = 300
     amqpBackoffFactor: int = 2
+    amqpHandlerMaxRetries: int = 3
 
     analyzerPriority: int = 1
     analyzerIndex: bool = True

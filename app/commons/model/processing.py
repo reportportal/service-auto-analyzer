@@ -26,3 +26,4 @@ class ProcessingItem:
     msg_correlation_id: str = field(compare=False)
     item: Any = field(compare=False)
     send_time: Optional[float] = field(default=None, compare=False)
+    retries: int = field(default=0, compare=False)

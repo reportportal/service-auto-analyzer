@@ -113,6 +113,119 @@ class ServiceProcessor:
     _analyzer_service: Optional[AnalyzerService] = None
     _suggest_info_service: Optional[SuggestInfoService] = None
 
+    __configs: dict[str, dict[str, Any]] = {
+        "train_models": {
+            "handler": lambda s: RetrainingService(s.model_chooser, s.app_config, s.search_config).train_models,
+            "prepare_data_func": prepare_train_info,
+        },
+        "index": {
+            "handler": lambda s: s.es_client.index_logs,
+            "prepare_data_func": prepare_launches,
+            "prepare_response_data": prepare_index_response_data,
+        },
+        "analyze": {
+            "handler": lambda s: AutoAnalyzerService(s.model_chooser, s.app_config, s.search_config).analyze_logs,
+            "prepare_data_func": prepare_launches,
+            "prepare_response_data": prepare_analyze_response_data,
+        },
+        "delete": {
+            "handler": lambda s: DeleteIndexService(s.model_chooser, s.app_config, s.search_config).delete_index,
+            "prepare_data_func": prepare_delete_index,
+            "prepare_response_data": output_result,
+        },
+        "clean": {
+            "handler": lambda s: s.clean_index_service.delete_logs,
+            "prepare_data_func": prepare_clean_index,
+            "prepare_response_data": output_result,
+        },
+        "search": {
+            "handler": lambda s: SearchService(s.app_config, s.search_config).search_logs,
+            "prepare_data_func": prepare_search_logs,
+            "prepare_response_data": prepare_analyze_response_data,
+        },
+        "suggest": {
+            "handler": lambda s: SuggestService(s.model_chooser, s.app_config, s.search_config).suggest_items,
+            "prepare_data_func": prepare_test_item_info,
+            "prepare_response_data": prepare_analyze_response_data,
+        },
+        "cluster": {
+            "handler": lambda s: ClusterService(s.app_config, s.search_config).find_clusters,
+            "prepare_data_func": prepare_launch_info,
+            "prepare_response_data": prepare_index_response_data,
+        },
+        "stats_info": {
+            "handler": lambda s: s.es_client.send_stats_info,
+        },
+        "namespace_finder": {
+            "handler": lambda s: NamespaceFinderService(s.app_config).update_chosen_namespaces,
+            "prepare_data_func": prepare_launches,
+        },
+        "suggest_patterns": {
+            "handler": lambda s: SuggestPatternsService(s.app_config, s.search_config).suggest_patterns,
+            "prepare_data_func": prepare_delete_index,
+            "prepare_response_data": prepare_index_response_data,
+        },
+        "index_suggest_info": {
+            "handler": lambda s: s.suggest_info_service.index_suggest_info,
+            "prepare_data_func": prepare_suggest_info_list,
+            "prepare_response_data": prepare_index_response_data,
+        },
+        "remove_suggest_info": {
+            "handler": lambda s: s.suggest_info_service.remove_suggest_info,
+            "prepare_data_func": prepare_delete_index,
+            "prepare_response_data": output_result,
+        },
+        "update_suggest_info": {
+            "handler": lambda s: s.suggest_info_service.update_suggest_info,
+            "prepare_data_func": same_data,
+            "prepare_response_data": prepare_index_response_data,
+        },
+        "remove_models": {
+            "handler": lambda s: s.analyzer_service.remove_models,
+            "prepare_data_func": same_data,
+            "prepare_response_data": output_result,
+        },
+        "get_model_info": {
+            "handler": lambda s: s.analyzer_service.get_model_info,
+            "prepare_data_func": same_data,
+            "prepare_response_data": prepare_search_response_data,
+        },
+        "defect_update": {
+            "handler": lambda s: s.es_client.defect_update,
+            "prepare_data_func": same_data,
+            "prepare_response_data": prepare_search_response_data,
+        },
+        "item_remove": {
+            "handler": lambda s: s.clean_index_service.delete_test_items,
+            "prepare_data_func": same_data,
+            "prepare_response_data": output_result,
+        },
+        "launch_remove": {
+            "handler": lambda s: s.clean_index_service.delete_launches,
+            "prepare_data_func": same_data,
+            "prepare_response_data": output_result,
+        },
+        "remove_by_launch_start_time": {
+            "handler": lambda s: s.clean_index_service.remove_by_launch_start_time,
+            "prepare_data_func": same_data,
+            "prepare_response_data": output_result,
+        },
+        "remove_by_log_time": {
+            "handler": lambda s: s.clean_index_service.remove_by_log_time,
+            "prepare_data_func": same_data,
+            "prepare_response_data": output_result,
+        },
+        "noop_sleep": {
+            "handler": lambda s: lambda x: time.sleep(x),
+            "prepare_data_func": same_data,
+        },
+        "noop_echo": {
+            "handler": lambda s: lambda x: x,
+            "prepare_data_func": same_data,
+            "prepare_response_data": output_result,
+        },
+    }
+
     def __init__(
         self, app_config: ApplicationConfig, search_config: SearchConfig, routing_keys: Optional[set[str]] = None
     ):
@@ -121,7 +234,7 @@ class ServiceProcessor:
         self.search_config = search_config
 
         # Define routing configuration for different queue types
-        self._routing_config = self._build_routing_config(app_config, search_config, routing_keys)
+        self._routing_config = self._build_routing_config(routing_keys)
 
     @property
     def model_chooser(self) -> model_chooser.ModelChooser:
@@ -153,146 +266,18 @@ class ServiceProcessor:
             self._suggest_info_service = SuggestInfoService(self.app_config)
         return self._suggest_info_service
 
-    def _build_routing_config(
-        self, app_config: ApplicationConfig, search_config: SearchConfig, routing_keys: Optional[set[str]]
-    ) -> dict:
+    def _build_routing_config(self, routing_keys: Optional[set[str]]) -> dict:
         """Build routing configuration for different routing keys"""
 
         config = {}
+        for key, config_builder in self.__configs.items():
+            if routing_keys is None or key in routing_keys:
+                config_def = config_builder.copy()
+                if "handler" in config_def:
+                    handler_func = config_def["handler"]
+                    config_def["handler"] = handler_func(self)
+                config[key] = config_def
 
-        if routing_keys is None or "train_models" in routing_keys:
-            config["train_models"] = {
-                "handler": RetrainingService(self.model_chooser, app_config, search_config).train_models,
-                "prepare_data_func": prepare_train_info,
-            }
-        if routing_keys is None or "index" in routing_keys:
-            config["index"] = {
-                "handler": self.es_client.index_logs,
-                "prepare_data_func": prepare_launches,
-                "prepare_response_data": prepare_index_response_data,
-            }
-        if routing_keys is None or "analyze" in routing_keys:
-            config["analyze"] = {
-                "handler": AutoAnalyzerService(self.model_chooser, app_config, search_config).analyze_logs,
-                "prepare_data_func": prepare_launches,
-                "prepare_response_data": prepare_analyze_response_data,
-            }
-        if routing_keys is None or "delete" in routing_keys:
-            config["delete"] = {
-                "handler": DeleteIndexService(self.model_chooser, app_config, search_config).delete_index,
-                "prepare_data_func": prepare_delete_index,
-                "prepare_response_data": output_result,
-            }
-        if routing_keys is None or "clean" in routing_keys:
-            config["clean"] = {
-                "handler": self.clean_index_service.delete_logs,
-                "prepare_data_func": prepare_clean_index,
-                "prepare_response_data": output_result,
-            }
-        if routing_keys is None or "search" in routing_keys:
-            config["search"] = {
-                "handler": SearchService(app_config, search_config).search_logs,
-                "prepare_data_func": prepare_search_logs,
-                "prepare_response_data": prepare_analyze_response_data,
-            }
-        if routing_keys is None or "suggest" in routing_keys:
-            config["suggest"] = {
-                "handler": SuggestService(self.model_chooser, app_config, search_config).suggest_items,
-                "prepare_data_func": prepare_test_item_info,
-                "prepare_response_data": prepare_analyze_response_data,
-            }
-        if routing_keys is None or "cluster" in routing_keys:
-            config["cluster"] = {
-                "handler": ClusterService(app_config, search_config).find_clusters,
-                "prepare_data_func": prepare_launch_info,
-                "prepare_response_data": prepare_index_response_data,
-            }
-        if routing_keys is None or "stats_info" in routing_keys:
-            config["stats_info"] = {
-                "handler": self.es_client.send_stats_info,
-            }
-        if routing_keys is None or "namespace_finder" in routing_keys:
-            config["namespace_finder"] = {
-                "handler": NamespaceFinderService(app_config).update_chosen_namespaces,
-                "prepare_data_func": prepare_launches,
-            }
-        if routing_keys is None or "suggest_patterns" in routing_keys:
-            config["suggest_patterns"] = {
-                "handler": SuggestPatternsService(app_config, search_config).suggest_patterns,
-                "prepare_data_func": prepare_delete_index,
-                "prepare_response_data": prepare_index_response_data,
-            }
-        if routing_keys is None or "index_suggest_info" in routing_keys:
-            config["index_suggest_info"] = {
-                "handler": self.suggest_info_service.index_suggest_info,
-                "prepare_data_func": prepare_suggest_info_list,
-                "prepare_response_data": prepare_index_response_data,
-            }
-        if routing_keys is None or "remove_suggest_info" in routing_keys:
-            config["remove_suggest_info"] = {
-                "handler": self.suggest_info_service.remove_suggest_info,
-                "prepare_data_func": prepare_delete_index,
-                "prepare_response_data": output_result,
-            }
-        if routing_keys is None or "update_suggest_info" in routing_keys:
-            config["update_suggest_info"] = {
-                "handler": self.suggest_info_service.update_suggest_info,
-                "prepare_data_func": same_data,
-                "prepare_response_data": prepare_index_response_data,
-            }
-        if routing_keys is None or "remove_models" in routing_keys:
-            config["remove_models"] = {
-                "handler": self.analyzer_service.remove_models,
-                "prepare_data_func": same_data,
-                "prepare_response_data": output_result,
-            }
-        if routing_keys is None or "get_model_info" in routing_keys:
-            config["get_model_info"] = {
-                "handler": self.analyzer_service.get_model_info,
-                "prepare_data_func": same_data,
-                "prepare_response_data": prepare_search_response_data,
-            }
-        if routing_keys is None or "defect_update" in routing_keys:
-            config["defect_update"] = {
-                "handler": self.es_client.defect_update,
-                "prepare_data_func": same_data,
-                "prepare_response_data": prepare_search_response_data,
-            }
-        if routing_keys is None or "item_remove" in routing_keys:
-            config["item_remove"] = {
-                "handler": self.clean_index_service.delete_test_items,
-                "prepare_data_func": same_data,
-                "prepare_response_data": output_result,
-            }
-        if routing_keys is None or "launch_remove" in routing_keys:
-            config["launch_remove"] = {
-                "handler": self.clean_index_service.delete_launches,
-                "prepare_data_func": same_data,
-                "prepare_response_data": output_result,
-            }
-        if routing_keys is None or "remove_by_launch_start_time" in routing_keys:
-            config["remove_by_launch_start_time"] = {
-                "handler": self.clean_index_service.remove_by_launch_start_time,
-                "prepare_data_func": same_data,
-                "prepare_response_data": output_result,
-            }
-        if routing_keys is None or "remove_by_log_time" in routing_keys:
-            config["remove_by_log_time"] = {
-                "handler": self.clean_index_service.remove_by_log_time,
-                "prepare_data_func": same_data,
-                "prepare_response_data": output_result,
-            }
-        if routing_keys is None or "noop_sleep" in routing_keys:
-            config["noop_sleep"] = {
-                "handler": lambda x: time.sleep(x),
-                "prepare_data_func": same_data,
-            }
-        if routing_keys is None or "noop_echo" in routing_keys:
-            config["noop_echo"] = {
-                "handler": lambda x: x,
-                "prepare_data_func": same_data,
-                "prepare_response_data": output_result,
-            }
         logger.debug(f"Routing configuration built: {config.keys()}")
         return config
 

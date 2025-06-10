@@ -115,7 +115,7 @@ class TestProcessAmqpRequestHandler:
         """Test Case 1: Processing a task - check it appears in running_tasks and then disappears"""
         # Create a task with short sleep to monitor lifecycle
         channel, method, props, body = create_amqp_request_mock(
-            routing_key="noop_sleep", body=0.2, reply_to="test_reply"  # Sleep for 0.2 seconds
+            routing_key="noop_sleep", body=1, reply_to="test_reply"  # Sleep for 0.2 seconds
         )
 
         # Verify initially no running tasks
@@ -131,11 +131,11 @@ class TestProcessAmqpRequestHandler:
         assert len(handler.running_tasks) == 1, "Task should appear in running_tasks"
         running_task = handler.running_tasks[0]
         assert running_task.routing_key == "noop_sleep"
-        assert running_task.item == 0.2
+        assert running_task.item == 1
         assert running_task.send_time is not None
 
         # Wait for task to complete (noop_sleep sleeps for 0.2s + processing time)
-        time.sleep(10)
+        time.sleep(11)
 
         # Verify task disappears from running_tasks
         assert len(handler.running_tasks) == 0, "Task should be removed from running_tasks after completion"

@@ -111,11 +111,12 @@ class ProcessAmqpRequestHandler:
         queue_size: int = 100,
         prefetch_size: int = 2,
         routing_key_predicate: Optional[Callable[[str], bool]] = None,
+        client: Optional[AmqpClient] = None,  # Optional client for testing
     ):
         """Initialize processor for handling requests with process-based communication"""
         self.app_config = app_config
         self.search_config = search_config
-        self.client = AmqpClient(app_config)
+        self.client = client or AmqpClient(app_config)
         self.queue_size = queue_size
         self.prefetch_size = prefetch_size
         self.routing_key_predicate = routing_key_predicate

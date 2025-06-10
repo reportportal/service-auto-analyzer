@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+import time
 from typing import Any, Optional
 
 from app.commons import logging, model_chooser
@@ -31,6 +31,72 @@ from app.service.suggest_patterns_service import SuggestPatternsService
 from app.service.suggest_service import SuggestService
 
 logger = logging.getLogger("analyzerApp.processor")
+
+
+# Helper functions for data preparation and response formatting
+def prepare_launches(launches: list) -> list[launch_objects.Launch]:
+    """Function for deserializing array of launches"""
+    return [launch_objects.Launch(**launch) for launch in launches]
+
+
+def prepare_suggest_info_list(suggest_info_list: list) -> list[launch_objects.SuggestAnalysisResult]:
+    """Function for deserializing array of suggest info results"""
+    return [launch_objects.SuggestAnalysisResult(**res) for res in suggest_info_list]
+
+
+def prepare_search_logs(search_data: dict) -> launch_objects.SearchLogs:
+    """Function for deserializing search logs object"""
+    return launch_objects.SearchLogs(**search_data)
+
+
+def prepare_launch_info(launch_info: dict) -> launch_objects.LaunchInfoForClustering:
+    """Function for deserializing search logs object"""
+    return launch_objects.LaunchInfoForClustering(**launch_info)
+
+
+def prepare_clean_index(clean_index: dict) -> launch_objects.CleanIndex:
+    """Function for deserializing clean index object"""
+    return launch_objects.CleanIndex(**clean_index)
+
+
+def prepare_delete_index(body: Any) -> int:
+    """Function for deserializing index id object"""
+    return int(body)
+
+
+def prepare_test_item_info(test_item_info: Any) -> launch_objects.TestItemInfo:
+    """Function for deserializing test item info for suggestions"""
+    return launch_objects.TestItemInfo(**test_item_info)
+
+
+def prepare_train_info(train_info: dict) -> ml.TrainInfo:
+    """Function for deserializing train info object"""
+    return ml.TrainInfo(**train_info)
+
+
+def prepare_search_response_data(response: list | dict) -> str:
+    """Function for serializing response from search request"""
+    import json
+
+    return json.dumps(response)
+
+
+def prepare_analyze_response_data(response: list) -> str:
+    """Function for serializing response from analyze request"""
+    import json
+
+    return json.dumps([resp.dict() for resp in response])
+
+
+def prepare_index_response_data(response: Any) -> str:
+    """Function for serializing response from index request
+    and other objects, which are pydantic objects"""
+    return response.json()
+
+
+def output_result(response: Any) -> str:
+    """Function for serializing int object"""
+    return str(response)
 
 
 def same_data(data: Any) -> Any:
@@ -168,6 +234,15 @@ class ServiceProcessor:
                 "prepare_data_func": same_data,
                 "prepare_response_data": output_result,
             },
+            "noop_sleep": {
+                "handler": lambda x: time.sleep(x),
+                "prepare_data_func": same_data,
+            },
+            "noop_echo": {
+                "handler": lambda x: x,
+                "prepare_data_func": same_data,
+                "prepare_response_data": output_result,
+            },
         }
         return config
 
@@ -207,71 +282,3 @@ class ServiceProcessor:
             return None
 
         return response_body
-
-
-# Helper functions for data preparation and response formatting
-
-
-def prepare_launches(launches: list) -> list[launch_objects.Launch]:
-    """Function for deserializing array of launches"""
-    return [launch_objects.Launch(**launch) for launch in launches]
-
-
-def prepare_suggest_info_list(suggest_info_list: list) -> list[launch_objects.SuggestAnalysisResult]:
-    """Function for deserializing array of suggest info results"""
-    return [launch_objects.SuggestAnalysisResult(**res) for res in suggest_info_list]
-
-
-def prepare_search_logs(search_data: dict) -> launch_objects.SearchLogs:
-    """Function for deserializing search logs object"""
-    return launch_objects.SearchLogs(**search_data)
-
-
-def prepare_launch_info(launch_info: dict) -> launch_objects.LaunchInfoForClustering:
-    """Function for deserializing search logs object"""
-    return launch_objects.LaunchInfoForClustering(**launch_info)
-
-
-def prepare_clean_index(clean_index: dict) -> launch_objects.CleanIndex:
-    """Function for deserializing clean index object"""
-    return launch_objects.CleanIndex(**clean_index)
-
-
-def prepare_delete_index(body: Any) -> int:
-    """Function for deserializing index id object"""
-    return int(body)
-
-
-def prepare_test_item_info(test_item_info: Any) -> launch_objects.TestItemInfo:
-    """Function for deserializing test item info for suggestions"""
-    return launch_objects.TestItemInfo(**test_item_info)
-
-
-def prepare_train_info(train_info: dict) -> ml.TrainInfo:
-    """Function for deserializing train info object"""
-    return ml.TrainInfo(**train_info)
-
-
-def prepare_search_response_data(response: list | dict) -> str:
-    """Function for serializing response from search request"""
-    import json
-
-    return json.dumps(response)
-
-
-def prepare_analyze_response_data(response: list) -> str:
-    """Function for serializing response from analyze request"""
-    import json
-
-    return json.dumps([resp.dict() for resp in response])
-
-
-def prepare_index_response_data(response: Any) -> str:
-    """Function for serializing response from index request
-    and other objects, which are pydantic objects"""
-    return response.json()
-
-
-def output_result(response: Any) -> str:
-    """Function for serializing int object"""
-    return str(response)

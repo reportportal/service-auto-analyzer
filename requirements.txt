@@ -6,7 +6,7 @@ uWSGI==2.0.29
 pika==1.2.1
 pydantic==1.10.13
 elasticsearch==7.0.0
-requests==2.32.2
+requests==2.32.4
 bump2version==1.0.1
 nltk==3.9.1
 scipy==1.13.1

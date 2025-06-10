@@ -39,6 +39,7 @@ class ApplicationConfig(BaseModel):
 
     amqpUrl: str = ""
     amqpExchangeName: str = "analyzer"
+    amqpExchangeType: str = "direct"
     amqpHeartbeatInterval: int = 30
     amqpInitialRetryInterval: int = 1
     amqpMaxRetryTime: int = 300

@@ -179,6 +179,7 @@ def init_amqp_queues():
                         _es_client.index_logs,
                         prepare_response_data=amqp_handler.prepare_index_response_data,
                     ),
+                    "index",
                 ),
             )
         )
@@ -195,6 +196,7 @@ def init_amqp_queues():
                         _auto_analyzer_service.analyze_logs,
                         prepare_response_data=amqp_handler.prepare_analyze_response_data,
                     ),
+                    "analyze",
                 ),
             )
         )
@@ -212,6 +214,7 @@ def init_amqp_queues():
                         prepare_data_func=amqp_handler.prepare_delete_index,
                         prepare_response_data=amqp_handler.output_result,
                     ),
+                    "delete",
                 ),
             )
         )
@@ -229,6 +232,7 @@ def init_amqp_queues():
                         prepare_data_func=amqp_handler.prepare_clean_index,
                         prepare_response_data=amqp_handler.output_result,
                     ),
+                    "clean",
                 ),
             )
         )
@@ -246,6 +250,7 @@ def init_amqp_queues():
                         prepare_data_func=amqp_handler.prepare_search_logs,
                         prepare_response_data=amqp_handler.prepare_analyze_response_data,
                     ),
+                    "search",
                 ),
             )
         )
@@ -263,6 +268,7 @@ def init_amqp_queues():
                         prepare_data_func=amqp_handler.prepare_test_item_info,
                         prepare_response_data=amqp_handler.prepare_analyze_response_data,
                     ),
+                    "suggest",
                 ),
             )
         )
@@ -280,6 +286,7 @@ def init_amqp_queues():
                         prepare_data_func=amqp_handler.prepare_launch_info,
                         prepare_response_data=amqp_handler.prepare_index_response_data,
                     ),
+                    "cluster",
                 ),
             )
         )
@@ -291,6 +298,7 @@ def init_amqp_queues():
                     lambda current_channel, method, props, body: amqp_handler.handle_inner_amqp_request(
                         current_channel, method, props, body, _es_client.send_stats_info
                     ),
+                    "stats_info",
                 ),
             )
         )
@@ -307,6 +315,7 @@ def init_amqp_queues():
                         _namespace_finder_service.update_chosen_namespaces,
                         publish_result=False,
                     ),
+                    "namespace_finder",
                 ),
             )
         )
@@ -324,6 +333,7 @@ def init_amqp_queues():
                         prepare_data_func=amqp_handler.prepare_delete_index,
                         prepare_response_data=amqp_handler.prepare_index_response_data,
                     ),
+                    "suggest_patterns",
                 ),
             )
         )
@@ -341,6 +351,7 @@ def init_amqp_queues():
                         prepare_data_func=amqp_handler.prepare_suggest_info_list,
                         prepare_response_data=amqp_handler.prepare_index_response_data,
                     ),
+                    "index_suggest_info",
                 ),
             )
         )
@@ -358,6 +369,7 @@ def init_amqp_queues():
                         prepare_data_func=amqp_handler.prepare_delete_index,
                         prepare_response_data=amqp_handler.output_result,
                     ),
+                    "remove_suggest_info",
                 ),
             )
         )
@@ -374,6 +386,7 @@ def init_amqp_queues():
                         _suggest_info_service.update_suggest_info,
                         prepare_data_func=lambda x: x,
                     ),
+                    "update_suggest_info",
                 ),
             )
         )
@@ -391,6 +404,7 @@ def init_amqp_queues():
                         prepare_data_func=lambda x: x,
                         prepare_response_data=amqp_handler.output_result,
                     ),
+                    "remove_models",
                 ),
             )
         )
@@ -407,6 +421,7 @@ def init_amqp_queues():
                         _analyzer_service.get_model_info,
                         prepare_data_func=lambda x: x,
                     ),
+                    "get_model_info",
                 ),
             )
         )
@@ -424,6 +439,7 @@ def init_amqp_queues():
                         prepare_data_func=lambda x: x,
                         prepare_response_data=amqp_handler.prepare_search_response_data,
                     ),
+                    "defect_update",
                 ),
             )
         )
@@ -441,6 +457,7 @@ def init_amqp_queues():
                         prepare_data_func=lambda x: x,
                         prepare_response_data=amqp_handler.output_result,
                     ),
+                    "item_remove",
                 ),
             )
         )
@@ -458,6 +475,7 @@ def init_amqp_queues():
                         prepare_data_func=lambda x: x,
                         prepare_response_data=amqp_handler.output_result,
                     ),
+                    "launch_remove",
                 ),
             )
         )
@@ -475,6 +493,7 @@ def init_amqp_queues():
                         prepare_data_func=lambda x: x,
                         prepare_response_data=amqp_handler.output_result,
                     ),
+                    "remove_by_launch_start_time",
                 ),
             )
         )
@@ -492,6 +511,7 @@ def init_amqp_queues():
                         prepare_data_func=lambda x: x,
                         prepare_response_data=amqp_handler.output_result,
                     ),
+                    "remove_by_log_time",
                 ),
             )
         )

@@ -363,6 +363,7 @@ class TestProcessAmqpRequestHandler:
         assert restarted_task.routing_key == original_task.routing_key
         assert restarted_task.item == original_task.item
         assert restarted_task.send_time > original_send_time, "Task should have newer send_time after restart"
+        assert restarted_task.retries == 1, "Task should have incremented retries after restart"
 
         # Verify processor was restarted (process should be alive)
         assert handler.processor.process.is_alive(), "Processor should be alive after restart"

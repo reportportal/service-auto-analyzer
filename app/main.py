@@ -130,8 +130,36 @@ def only_train(request: str) -> bool:
 def init_amqp_queues():
     """Initialize rabbitmq queues, exchange and starts threads for queue messages processing"""
     _threads = []
-    _main_amqp_handler = ProcessAmqpRequestHandler(APP_CONFIG, SEARCH_CONFIG, routing_key_predicate=except_train)
-    _train_amqp_handler = ProcessAmqpRequestHandler(APP_CONFIG, SEARCH_CONFIG, routing_key_predicate=only_train)
+    _main_amqp_handler = ProcessAmqpRequestHandler(
+        APP_CONFIG,
+        SEARCH_CONFIG,
+        routing_key_predicate=except_train,
+        init_services=[
+            "index",
+            "analyze",
+            "delete",
+            "clean",
+            "search",
+            "suggest",
+            "cluster",
+            "stats_info",
+            "namespace_finder",
+            "suggest_patterns",
+            "index_suggest_info",
+            "remove_suggest_info",
+            "update_suggest_info",
+            "remove_models",
+            "get_model_info",
+            "defect_update",
+            "item_remove",
+            "launch_remove",
+            "remove_by_launch_start_time",
+            "remove_by_log_time",
+        ],
+    )
+    _train_amqp_handler = ProcessAmqpRequestHandler(
+        APP_CONFIG, SEARCH_CONFIG, routing_key_predicate=only_train, init_services=["train_models"]
+    )
 
     _threads.append(
         (

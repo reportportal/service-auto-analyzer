@@ -227,14 +227,19 @@ class ServiceProcessor:
     }
 
     def __init__(
-        self, app_config: ApplicationConfig, search_config: SearchConfig, routing_keys: Optional[set[str]] = None
+        self, app_config: ApplicationConfig, search_config: SearchConfig, services_to_init: Optional[set[str]] = None
     ):
-        """Initialize all services based on instance task type"""
+        """Initialize all services based on instance task type.
+
+        :param app_config: Application configuration object
+        :param search_config: Search configuration object
+        :param services_to_init: Set of service names to initialize. If None, all services are initialized.
+        """
         self.app_config = app_config
         self.search_config = search_config
 
         # Define routing configuration for different queue types
-        self._routing_config = self._build_routing_config(routing_keys)
+        self._routing_config = self._build_routing_config(services_to_init)
 
     @property
     def model_chooser(self) -> model_chooser.ModelChooser:

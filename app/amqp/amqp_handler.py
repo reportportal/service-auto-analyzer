@@ -32,7 +32,6 @@ logger = logging.getLogger("analyzerApp.amqpHandler")
 
 
 def log_incoming_message(routing_key: str, correlation_id: str, body: Any) -> None:
-    logging.new_correlation_id()
     body = json.dumps(body)
     logger.debug(f"Processing message: --Routing key: {routing_key} --Correlation ID: {correlation_id} --Body: {body}")
 
@@ -96,14 +95,14 @@ class ProcessAmqpRequestHandler:
     client: AmqpClient
     queue_size: int
     prefetch_size: int
-    routing_key_predicate: Optional[Callable[[str], bool]]
+    routing_key_predicate: Callable[[str], bool]
     counter: AtomicInteger
     queue: queue.PriorityQueue[ProcessingItem]
     running_tasks: list[ProcessingItem]
     processor: Processor
     _processing_thread: Optional[threading.Thread]
     _shutdown: bool
-    _routing_keys: Optional[set[str]]
+    _init_services: Optional[set[str]]
 
     def __init__(
         self,
@@ -112,22 +111,30 @@ class ProcessAmqpRequestHandler:
         queue_size: int = 100,
         prefetch_size: int = 2,
         routing_key_predicate: Optional[Callable[[str], bool]] = None,
-        client: Optional[AmqpClient] = None,  # Optional client for testing
-        routing_keys: Optional[
-            list[str]
-        ] = None,  # Optional list of routing keys to initialize the processor with specific routing keys
+        client: Optional[AmqpClient] = None,
+        init_services: Optional[list[str]] = None,
     ):
-        """Initialize processor for handling requests with process-based communication"""
+        """Initialize processor for handling requests with process-based communication.
+
+        :param app_config: Application configuration object
+        :param search_config: Search configuration object
+        :param queue_size: Maximum size of the internal priority queue (buffer)
+        :param prefetch_size: Number of messages to prefetch from the queue for processing
+        :param routing_key_predicate: Optional predicate to filter routing keys for processing. Should return True for
+        keys to process.
+        :param client: Optional AMQP client for sending replies (useful for testing)
+        :param init_services: Optional list of routing keys to initialize the processor with specific routing keys
+        """
         self.app_config = app_config
         self.search_config = search_config
         self.client = client or AmqpClient(app_config)
         self.queue_size = queue_size
         self.prefetch_size = prefetch_size
-        self.routing_key_predicate = routing_key_predicate
-        if routing_keys:
-            self._routing_keys = set(routing_keys)
+        self.routing_key_predicate = routing_key_predicate or (lambda _: True)
+        if init_services:
+            self._init_services = set(init_services)
         else:
-            self._routing_keys = None
+            self._init_services = None
         self.counter = AtomicInteger(0)
 
         # Initialize queue and running tasks
@@ -135,7 +142,9 @@ class ProcessAmqpRequestHandler:
         self.running_tasks = []
 
         # Setup process communication
-        self.processor = Processor(app_config, search_config, self._processor_worker, routing_keys=self._routing_keys)
+        self.processor = Processor(
+            app_config, search_config, self._processor_worker, init_services=self._init_services
+        )
         self._shutdown = False
 
         # Start the processing thread
@@ -144,10 +153,10 @@ class ProcessAmqpRequestHandler:
 
     @staticmethod
     def _processor_worker(
-        conn: Any, app_config: ApplicationConfig, search_config: SearchConfig, routing_keys: Optional[set[str]] = None
+        conn: Any, app_config: ApplicationConfig, search_config: SearchConfig, init_services: Optional[set[str]] = None
     ) -> None:
         """Worker function that runs in separate process"""
-        processor = ServiceProcessor(app_config, search_config, routing_keys=routing_keys)
+        processor = ServiceProcessor(app_config, search_config, services_to_init=init_services)
 
         try:
             while True:
@@ -181,7 +190,7 @@ class ProcessAmqpRequestHandler:
         try:
             processing_item: ProcessingItem = self.queue.get_nowait()
             logging.set_correlation_id(processing_item.log_correlation_id)
-            if self.routing_key_predicate and self.routing_key_predicate(processing_item.routing_key):
+            if not self.routing_key_predicate(processing_item.routing_key):
                 return processing_item
             log_incoming_message(processing_item.routing_key, processing_item.msg_correlation_id, processing_item.item)
             self.__send_task(processing_item)
@@ -214,7 +223,7 @@ class ProcessAmqpRequestHandler:
         self.running_tasks.clear()
 
         # Create new processor instance
-        self.processor = Processor(self.app_config, self.search_config, self._processor_worker, self._routing_keys)
+        self.processor = Processor(self.app_config, self.search_config, self._processor_worker, self._init_services)
         logger.info("Successfully restarted processor process")
 
         # Re-send all previously running tasks to the new processor
@@ -308,6 +317,7 @@ class ProcessAmqpRequestHandler:
     ) -> None:
         """Function for handling amqp request: convert to ProcessingItem and add to priority queue."""
         number: int = self.counter.inc()
+        logging.new_correlation_id()
 
         # Processing request
         message = serialize_message(channel, method.delivery_tag, body)

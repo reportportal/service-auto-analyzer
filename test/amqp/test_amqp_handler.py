@@ -63,7 +63,7 @@ def handler(app_config, search_config, mock_amqp_client):
         queue_size=10,
         prefetch_size=2,
         client=mock_amqp_client,
-        routing_keys=["noop_echo", "noop_sleep"],
+        init_services=["noop_echo", "noop_sleep"],
     )
     yield handler
     # Clean up
@@ -286,7 +286,7 @@ class TestProcessAmqpRequestHandler:
             app_config=app_config,
             search_config=search_config,
             client=mock_amqp_client,
-            routing_keys=["noop_echo", "noop_sleep"],
+            init_services=["noop_echo", "noop_sleep"],
         )
 
         # Verify handler is initialized
@@ -308,14 +308,14 @@ class TestProcessAmqpRequestHandler:
 
         # Create handler with routing key predicate that filters out "filtered_key"
         def routing_key_predicate(key):
-            return key == "filtered_key"
+            return key != "filtered_key"
 
         handler = ProcessAmqpRequestHandler(
             app_config=app_config,
             search_config=search_config,
             client=mock_amqp_client,
             routing_key_predicate=routing_key_predicate,
-            routing_keys=["noop_echo", "noop_sleep"],
+            init_services=["noop_echo", "noop_sleep"],
         )
 
         # Submit task with filtered routing key

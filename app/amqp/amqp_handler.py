@@ -229,6 +229,18 @@ class ProcessAmqpRequestHandler:
                 logger.exception(f"Failed to re-send task {task.routing_key} to new processor", exc_info=exc)
         logger.info(f"Re-sent {len(self.running_tasks)} tasks to new processor")
 
+    def __has_long_running_tasks(self) -> bool:
+        """Check if there are any long-running tasks that need attention"""
+        if not self.running_tasks:
+            return False
+
+        # Check if any task has been running longer than the configured timeout
+        for task in self.running_tasks:
+            if task.send_time and (time.time() - task.send_time) > self.app_config.amqpHandlerTaskTimeout:
+                logger.warning(f"Task {task.routing_key} - {task.msg_correlation_id} is taking too long")
+                return True
+        return False
+
     def __receive_results(self) -> None:
         if self.running_tasks:
             try:
@@ -250,6 +262,10 @@ class ProcessAmqpRequestHandler:
                 # Check if processor process is alive and restart if needed
                 if not self.processor.process.is_alive():
                     logger.warning("Processor process is not running, restarting...")
+                    self._restart_processor()
+
+                if self.__has_long_running_tasks():
+                    logger.warning("Detected long-running tasks, restarting processor...")
                     self._restart_processor()
 
                 # Send messages to processor (up to prefetch_size)

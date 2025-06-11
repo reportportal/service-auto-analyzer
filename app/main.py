@@ -44,6 +44,7 @@ APP_CONFIG = ApplicationConfig(
     amqpHeartbeatInterval=int(os.getenv("AMQP_HEARTBEAT_INTERVAL", "30")),
     amqpBackoffFactor=int(os.getenv("AMQP_BACKOFF_FACTOR", "2")),
     amqpHandlerMaxRetries=int(os.getenv("AMQP_HANDLER_MAX_RETRIES", "3")),
+    amqpHandlerTaskTimeout=int(os.getenv("AMQP_HANDLER_TASK_TIMEOUT", "600")),
     analyzerPriority=int(os.getenv("ANALYZER_PRIORITY", "1")),
     analyzerIndex=json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),
     analyzerLogSearch=json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower()),

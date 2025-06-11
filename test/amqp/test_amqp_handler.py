@@ -34,13 +34,9 @@ def app_config():
         logLevel="DEBUG",
         amqpUrl="amqp://guest:guest@localhost:5672/",
         amqpExchangeName="test_analyzer",
-        analyzerPriority=1,
-        analyzerIndex=True,
-        analyzerLogSearch=True,
-        analyzerSuggest=True,
-        analyzerCluster=True,
         appVersion="test",
         instanceTaskType="test",
+        amqpHandlerTaskTimeout=5,
     )
 
 
@@ -174,7 +170,7 @@ class TestProcessAmqpRequestHandler:
         """Test Case 3: Kill processing process, check restart and task requeue"""
         # Create a longer-running task
         channel, method, props, body = create_amqp_request_mock(
-            routing_key="noop_sleep", body=2.0, reply_to="test_reply"  # Sleep for 2 seconds
+            routing_key="noop_sleep", body=2, reply_to="test_reply"  # Sleep for 2 seconds
         )
 
         # Submit the long-running task
@@ -333,3 +329,40 @@ class TestProcessAmqpRequestHandler:
         # Verify task was filtered out (not processed)
         assert len(handler.running_tasks) == 0
         mock_amqp_client.reply.assert_not_called()
+
+    def test_long_running_task_interruption(self, handler, mock_amqp_client):
+        """Test Case 4: Long running task interruption - verify task restart when timeout is exceeded"""
+
+        # Create a task that will run for 6 seconds (longer than 5-second timeout)
+        channel, method, props, body = create_amqp_request_mock(
+            routing_key="noop_sleep", body=6, reply_to="test_reply"  # Sleep for 6 seconds
+        )
+
+        # Submit the long-running task
+        handler.handle_amqp_request(channel, method, props, body)
+
+        # Wait for task to be picked up and record original start time
+        time.sleep(0.1)
+
+        # Verify task is in running_tasks and record start time
+        assert len(handler.running_tasks) == 1, "Task should appear in running_tasks"
+        original_task = handler.running_tasks[0]
+        original_send_time = original_task.send_time
+        assert original_send_time is not None, "Task should have send_time recorded"
+        assert original_task.routing_key == "noop_sleep"
+        assert original_task.item == 6
+
+        # Wait 10 seconds for timeout detection and restart
+        # This should be enough for the handler to detect the long-running task (after 5 seconds)
+        # and restart the processor
+        time.sleep(10)
+
+        # Verify task is still running but was restarted with newer start time
+        assert len(handler.running_tasks) == 1, "Task should still be in running_tasks after restart"
+        restarted_task = handler.running_tasks[0]
+        assert restarted_task.routing_key == original_task.routing_key
+        assert restarted_task.item == original_task.item
+        assert restarted_task.send_time > original_send_time, "Task should have newer send_time after restart"
+
+        # Verify processor was restarted (process should be alive)
+        assert handler.processor.process.is_alive(), "Processor should be alive after restart"

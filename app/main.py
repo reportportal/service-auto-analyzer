@@ -12,11 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import gc
 import json
 import logging.config
 import os
-import sys
 import threading
 from signal import SIGINT, signal
 from sys import exit
@@ -26,25 +24,11 @@ from flask import Flask, Response
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
 
-from app.amqp import amqp_handler
 from app.amqp.amqp import AmqpClient
+from app.amqp.amqp_handler import ProcessAmqpRequestHandler
 from app.commons import logging as my_logging
-from app.commons import model_chooser
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
-from app.service import (
-    AnalyzerService,
-    AutoAnalyzerService,
-    CleanIndexService,
-    ClusterService,
-    DeleteIndexService,
-    NamespaceFinderService,
-    RetrainingService,
-    SearchService,
-    SuggestInfoService,
-    SuggestPatternsService,
-    SuggestService,
-)
 from app.utils import utils
 
 APP_CONFIG = ApplicationConfig(
@@ -59,6 +43,8 @@ APP_CONFIG = ApplicationConfig(
     amqpMaxRetryTime=int(os.getenv("AMQP_MAX_RETRY_TIME", "300")),
     amqpHeartbeatInterval=int(os.getenv("AMQP_HEARTBEAT_INTERVAL", "30")),
     amqpBackoffFactor=int(os.getenv("AMQP_BACKOFF_FACTOR", "2")),
+    amqpHandlerMaxRetries=int(os.getenv("AMQP_HANDLER_MAX_RETRIES", "3")),
+    amqpHandlerTaskTimeout=int(os.getenv("AMQP_HANDLER_TASK_TIMEOUT", "600")),
     analyzerPriority=int(os.getenv("ANALYZER_PRIORITY", "1")),
     analyzerIndex=json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),
     analyzerLogSearch=json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower()),
@@ -86,7 +72,6 @@ APP_CONFIG = ApplicationConfig(
     esProjectIndexPrefix=os.getenv("ES_PROJECT_INDEX_PREFIX", "").strip(),
     analyzerHttpPort=int(os.getenv("ANALYZER_HTTP_PORT", "5001")),
     analyzerPathToLog=os.getenv("ANALYZER_FILE_LOGGING_PATH", "/tmp/config.log"),
-    enableMemoryDump=json.loads(os.getenv("ANALYZER_ENABLE_MEMORY_DUMP", "false").lower()),
 )
 
 SEARCH_CONFIG = SearchConfig(
@@ -132,390 +117,78 @@ def create_thread(func, args):
     return thread
 
 
-def init_amqp_queues():
-    """Initialize rabbitmq queues, exchange and stars threads for queue messages processing"""
-    _threads = []
-    _model_chooser = model_chooser.ModelChooser(APP_CONFIG, SEARCH_CONFIG)
-    if APP_CONFIG.instanceTaskType == "train":
-        _retraining_service = RetrainingService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "train_models",
-                    lambda current_channel, method, props, body: amqp_handler.handle_inner_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _retraining_service.train_models,
-                        prepare_data_func=amqp_handler.prepare_train_info,
-                    ),
-                ),
-            )
-        )
-    else:
-        _es_client = EsClient(APP_CONFIG)
-        _auto_analyzer_service = AutoAnalyzerService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
-        _delete_index_service = DeleteIndexService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
-        _clean_index_service = CleanIndexService(APP_CONFIG)
-        _analyzer_service = AnalyzerService(_model_chooser, SEARCH_CONFIG)
-        _suggest_service = SuggestService(_model_chooser, APP_CONFIG, SEARCH_CONFIG)
-        _suggest_info_service = SuggestInfoService(APP_CONFIG)
-        _search_service = SearchService(APP_CONFIG, SEARCH_CONFIG)
-        _cluster_service = ClusterService(APP_CONFIG, SEARCH_CONFIG)
-        _namespace_finder_service = NamespaceFinderService(APP_CONFIG)
-        _suggest_patterns_service = SuggestPatternsService(APP_CONFIG, SEARCH_CONFIG)
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "index",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _es_client.index_logs,
-                        prepare_response_data=amqp_handler.prepare_index_response_data,
-                    ),
-                    "index",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "analyze",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _auto_analyzer_service.analyze_logs,
-                        prepare_response_data=amqp_handler.prepare_analyze_response_data,
-                    ),
-                    "analyze",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "delete",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _delete_index_service.delete_index,
-                        prepare_data_func=amqp_handler.prepare_delete_index,
-                        prepare_response_data=amqp_handler.output_result,
-                    ),
-                    "delete",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "clean",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _clean_index_service.delete_logs,
-                        prepare_data_func=amqp_handler.prepare_clean_index,
-                        prepare_response_data=amqp_handler.output_result,
-                    ),
-                    "clean",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "search",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _search_service.search_logs,
-                        prepare_data_func=amqp_handler.prepare_search_logs,
-                        prepare_response_data=amqp_handler.prepare_analyze_response_data,
-                    ),
-                    "search",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "suggest",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _suggest_service.suggest_items,
-                        prepare_data_func=amqp_handler.prepare_test_item_info,
-                        prepare_response_data=amqp_handler.prepare_analyze_response_data,
-                    ),
-                    "suggest",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "cluster",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _cluster_service.find_clusters,
-                        prepare_data_func=amqp_handler.prepare_launch_info,
-                        prepare_response_data=amqp_handler.prepare_index_response_data,
-                    ),
-                    "cluster",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "stats_info",
-                    lambda current_channel, method, props, body: amqp_handler.handle_inner_amqp_request(
-                        current_channel, method, props, body, _es_client.send_stats_info
-                    ),
-                    "stats_info",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "namespace_finder",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _namespace_finder_service.update_chosen_namespaces,
-                        publish_result=False,
-                    ),
-                    "namespace_finder",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "suggest_patterns",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _suggest_patterns_service.suggest_patterns,
-                        prepare_data_func=amqp_handler.prepare_delete_index,
-                        prepare_response_data=amqp_handler.prepare_index_response_data,
-                    ),
-                    "suggest_patterns",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "index_suggest_info",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _suggest_info_service.index_suggest_info,
-                        prepare_data_func=amqp_handler.prepare_suggest_info_list,
-                        prepare_response_data=amqp_handler.prepare_index_response_data,
-                    ),
-                    "index_suggest_info",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "remove_suggest_info",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _suggest_info_service.remove_suggest_info,
-                        prepare_data_func=amqp_handler.prepare_delete_index,
-                        prepare_response_data=amqp_handler.output_result,
-                    ),
-                    "remove_suggest_info",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "update_suggest_info",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _suggest_info_service.update_suggest_info,
-                        prepare_data_func=lambda x: x,
-                    ),
-                    "update_suggest_info",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "remove_models",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _analyzer_service.remove_models,
-                        prepare_data_func=lambda x: x,
-                        prepare_response_data=amqp_handler.output_result,
-                    ),
-                    "remove_models",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "get_model_info",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _analyzer_service.get_model_info,
-                        prepare_data_func=lambda x: x,
-                    ),
-                    "get_model_info",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "defect_update",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _es_client.defect_update,
-                        prepare_data_func=lambda x: x,
-                        prepare_response_data=amqp_handler.prepare_search_response_data,
-                    ),
-                    "defect_update",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "item_remove",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _clean_index_service.delete_test_items,
-                        prepare_data_func=lambda x: x,
-                        prepare_response_data=amqp_handler.output_result,
-                    ),
-                    "item_remove",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "launch_remove",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _clean_index_service.delete_launches,
-                        prepare_data_func=lambda x: x,
-                        prepare_response_data=amqp_handler.output_result,
-                    ),
-                    "launch_remove",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "remove_by_launch_start_time",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _clean_index_service.remove_by_launch_start_time,
-                        prepare_data_func=lambda x: x,
-                        prepare_response_data=amqp_handler.output_result,
-                    ),
-                    "remove_by_launch_start_time",
-                ),
-            )
-        )
-        _threads.append(
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "remove_by_log_time",
-                    lambda current_channel, method, props, body: amqp_handler.handle_amqp_request(
-                        current_channel,
-                        method,
-                        props,
-                        body,
-                        _clean_index_service.remove_by_log_time,
-                        prepare_data_func=lambda x: x,
-                        prepare_response_data=amqp_handler.output_result,
-                    ),
-                    "remove_by_log_time",
-                ),
-            )
-        )
+def except_train(request: str) -> bool:
+    """Filters out requests that are for training models"""
+    return request != "train_models"
 
+
+def only_train(request: str) -> bool:
+    """Filters out requests that are not related to training models"""
+    return request == "train_models"
+
+
+def init_amqp_queues():
+    """Initialize rabbitmq queues, exchange and starts threads for queue messages processing"""
+    _threads = []
+    _main_amqp_handler = ProcessAmqpRequestHandler(
+        APP_CONFIG,
+        SEARCH_CONFIG,
+        routing_key_predicate=except_train,
+        init_services=[
+            "index",
+            "analyze",
+            "delete",
+            "clean",
+            "search",
+            "suggest",
+            "cluster",
+            "stats_info",
+            "namespace_finder",
+            "suggest_patterns",
+            "index_suggest_info",
+            "remove_suggest_info",
+            "update_suggest_info",
+            "remove_models",
+            "get_model_info",
+            "defect_update",
+            "item_remove",
+            "launch_remove",
+            "remove_by_launch_start_time",
+            "remove_by_log_time",
+        ],
+    )
+    _train_amqp_handler = ProcessAmqpRequestHandler(
+        APP_CONFIG, SEARCH_CONFIG, routing_key_predicate=only_train, init_services=["train_models"]
+    )
+
+    _threads.append(
+        (
+            "all",
+            create_thread(
+                AmqpClient(APP_CONFIG).receive,
+                (
+                    "all",
+                    _main_amqp_handler.handle_amqp_request,
+                    None,
+                ),
+            ),
+            _main_amqp_handler,
+        )
+    )
+    _threads.append(
+        (
+            "train",
+            create_thread(
+                AmqpClient(APP_CONFIG).receive,
+                (
+                    "train",
+                    _train_amqp_handler.handle_amqp_request,
+                    None,
+                ),
+            ),
+            _train_amqp_handler,
+        )
+    )
     return _threads
 
 
@@ -546,20 +219,14 @@ def read_model_settings():
     )
 
 
-log_file_path = "res/logging.conf"
-logging.config.fileConfig(log_file_path, defaults={"logfilename": APP_CONFIG.analyzerPathToLog})
-if APP_CONFIG.logLevel.lower() == "debug":
-    logging.disable(logging.NOTSET)
-elif APP_CONFIG.logLevel.lower() == "info":
-    logging.disable(logging.DEBUG)
-else:
-    logging.disable(logging.INFO)
+my_logging.setup(APP_CONFIG)
 logger = my_logging.getLogger("analyzerApp")
 APP_CONFIG.appVersion = read_version()
 es_client = EsClient(APP_CONFIG)
 read_model_settings()
 
 application = create_application()
+THREADS: list[tuple[str, threading.Thread, ProcessAmqpRequestHandler]] = []
 
 
 @application.route("/", methods=["GET"])
@@ -570,31 +237,36 @@ def get_health_status():
         logger.error("Analyzer health check status failed: %s", status)
         status["status"] = "Elasticsearch is not healthy"
         status_code = 503
+    if THREADS:
+        status["threads"] = []
+        for thread_name, thread, handler in THREADS:
+            if not thread.is_alive():
+                status["threads"].append({"name": thread_name, "status": "not alive"})
+            else:
+                thread_status: dict[str, Any] = {
+                    "name": thread_name,
+                    "status": "alive",
+                    "pid": handler.processor.process.pid,
+                }
+                status["threads"].append(thread_status)
+                tasks = [
+                    {
+                        "routing_key": task.routing_key,
+                        "correlation_id": task.msg_correlation_id,
+                        "send_time": task.send_time,
+                    }
+                    for task in handler.running_tasks
+                ]
+                thread_status["running_tasks"] = {
+                    "number": len(tasks),
+                    "tasks": tasks,
+                }
 
-    if APP_CONFIG.enableMemoryDump:
-        gc.collect()
-        xs = []
-        for obj in gc.get_objects():
-            i = id(obj)
-            size = sys.getsizeof(obj, 0)
-            referents = [id(o) for o in gc.get_referents(obj) if hasattr(o, "__class__")]
-            if hasattr(obj, "__class__"):
-                cls = str(obj.__class__)
-                stat = {"id": i, "class": cls, "size": size, "referents": referents}
-                try:
-                    if hasattr(obj, "__name__"):
-                        stat["name"] = obj.__name__
-                except ModuleNotFoundError:
-                    pass
-                xs.append(stat)
-        status["memory"] = {}
-        status["memory"]["all"] = xs
-        status["memory"]["total"] = len(xs)
     return Response(json.dumps(status), status=status_code, mimetype="application/json")
 
 
 # noinspection PyUnusedLocal
-def handler(signal_received, frame):
+def signal_handler(signal_received, frame):
     print("The analyzer has stopped")
     exit(0)
 
@@ -605,14 +277,14 @@ def start_http_server():
     application.run(host="0.0.0.0", port=APP_CONFIG.analyzerHttpPort, use_reloader=False)
 
 
-signal(SIGINT, handler)
-logger.info("The analyzer has started")
-logger.info("Starting waiting for AMQP connection")
-threads = init_amqp_queues()
-logger.info("Analyzer has started")
+signal(SIGINT, signal_handler)
 
+# Run the application directly
 if __name__ == "__main__":
     logger.info("Program started")
+    logger.info("Creating AMQP connections")
+    THREADS.extend(init_amqp_queues())
+    logger.info("The analyzer has started")
 
     start_http_server()
 

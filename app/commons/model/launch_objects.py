@@ -39,11 +39,13 @@ class ApplicationConfig(BaseModel):
 
     amqpUrl: str = ""
     amqpExchangeName: str = "analyzer"
-    amqpExchangeType: str = "direct"
+    amqpExchangeType: str = "fanout"
     amqpHeartbeatInterval: int = 30
     amqpInitialRetryInterval: int = 1
     amqpMaxRetryTime: int = 300
     amqpBackoffFactor: int = 2
+    amqpHandlerMaxRetries: int = 3
+    amqpHandlerTaskTimeout: int = 600
 
     analyzerPriority: int = 1
     analyzerIndex: bool = True
@@ -72,7 +74,6 @@ class ApplicationConfig(BaseModel):
     esProjectIndexPrefix: str = ""
     analyzerHttpPort: int = 5001
     analyzerPathToLog: str = "/tmp/config.log"
-    enableMemoryDump: bool = False
 
 
 class SearchConfig(BaseModel):

@@ -32,12 +32,15 @@ logger = logging.getLogger("analyzerApp.amqpHandler")
 
 
 def log_incoming_message(routing_key: str, correlation_id: str, body: Any) -> None:
-    body = json.dumps(body)
-    logger.debug(f"Processing message: --Routing key: {routing_key} --Correlation ID: {correlation_id} --Body: {body}")
+    body_str = json.dumps(body)
+    logger.debug(
+        f"Processing message: --Routing key: {routing_key} --Correlation ID: {correlation_id} --Body: {body_str}"
+    )
 
 
 def log_outgoing_message(reply_to: str, correlation_id: str, body: Any) -> None:
-    logger.debug(f"Replying message: --To: {reply_to} --Correlation ID: {correlation_id} --Body: {json.dumps(body)}")
+    body_str = json.dumps(body)
+    logger.debug(f"Replying message: --To: {reply_to} --Correlation ID: {correlation_id} --Body: {body_str}")
 
 
 def serialize_message(channel: BlockingChannel, delivery_tag: Optional[int], body: bytes) -> Optional[Any]:

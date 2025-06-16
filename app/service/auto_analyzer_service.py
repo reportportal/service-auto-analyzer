@@ -493,6 +493,7 @@ class AutoAnalyzerService(AnalyzerService):
                         project_id,
                         ModelType.auto_analysis,
                         custom_model_prob=self.search_cfg.ProbabilityForCustomModelAutoAnalysis,
+                        hash_source=launch_id,
                     )
                     if project_id not in defect_type_model_to_use:
                         # noinspection PyTypeChecker

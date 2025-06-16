@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import os
+from typing import Optional, Any
 
 import numpy as np
 
@@ -77,11 +78,27 @@ class ModelChooser:
                 result[model_type] = None
         return result
 
-    def choose_model(self, project_id: int, model_type: ModelType, custom_model_prob: float = 1.0) -> MlModel:
+    def choose_model(
+        self,
+        project_id: int,
+        model_type: ModelType,
+        *,
+        custom_model_prob: float = 1.0,
+        hash_source: Optional[Any] = None,
+    ) -> MlModel:
+        hash_code = hash(hash_source) if hash_source else hash(project_id)
+        test_value = hash_code % 100
         model = self.global_models[model_type]
-        prob_for_model = self.random_generator.uniform(0.0, 1.0)
-        if prob_for_model > custom_model_prob:
+        if test_value > custom_model_prob:  # use hash instead of random to ensure in repeatable results
+            logger.debug(
+                f"Using global model of type '{model_type.name}', for project {project_id}, "
+                f"for hash source {str(hash_source)}."
+            )
             return model
+        logger.debug(
+            f"Using custom model of type '{model_type.name}', for project {project_id}, "
+            f"for hash source {str(hash_source)}."
+        )
         folders = self.object_saver.get_folder_objects(f"{model_type.name}_model/", project_id)
         if len(folders):
             try:

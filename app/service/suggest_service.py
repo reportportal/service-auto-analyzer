@@ -410,6 +410,7 @@ class SuggestService(AnalyzerService):
                 test_item_info.project,
                 ModelType.suggestion,
                 custom_model_prob=self.search_cfg.ProbabilityForCustomModelSuggestions,
+                hash_source=test_item_info.testItemId,
             )
 
             _boosting_data_gatherer = SuggestBoostingFeaturizer(

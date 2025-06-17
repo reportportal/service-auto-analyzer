@@ -16,7 +16,6 @@ import tempfile
 from typing import Generator
 
 import pytest
-from machine_learning.models import CustomDefectTypeModel, MlModel
 
 import app.utils.utils as utils
 from app.commons import object_saving
@@ -24,7 +23,7 @@ from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType
 from app.commons.model_chooser import ModelChooser
 from app.commons.object_saving import ObjectSaver
-from app.machine_learning.models.defect_type_model import DefectTypeModel
+from app.machine_learning.models import CustomDefectTypeModel, DefectTypeModel, MlModel
 
 # Test constants for deterministic project IDs
 # Logic: if test_value > custom_model_prob -> use global model, else use custom model

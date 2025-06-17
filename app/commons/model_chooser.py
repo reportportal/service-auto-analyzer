@@ -58,7 +58,6 @@ class ModelChooser:
         self.search_cfg = search_cfg
         self.object_saver = object_saving.create(self.app_config)
         self.global_models = self.initialize_global_models()
-        self.random_generator = np.random.Generator(bit_generator=np.random.PCG64(DEFAULT_RANDOM_SEED))
 
     def initialize_global_models(self) -> dict[ModelType, MlModel]:
         result = {}

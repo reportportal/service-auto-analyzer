@@ -11,4 +11,3 @@ sure==2.0.1
 freezegun==1.2.2
 jsondiff
 pandas-stubs==1.5.3.230321
-

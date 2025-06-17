@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import hashlib
 import os
 from typing import Any, Optional
 
@@ -85,10 +86,11 @@ class ModelChooser:
         custom_model_prob: float = 1.0,
         hash_source: Optional[Any] = None,
     ) -> MlModel:
-        hash_code = hash(hash_source) if hash_source else hash(project_id)
-        test_value = hash_code % 100
+        use_for_hash = str(hash_source if hash_source is not None else project_id).encode("utf-8")
+        hash_code = hashlib.md5(use_for_hash).digest()
+        test_value = int.from_bytes(hash_code) % 100
         model = self.global_models[model_type]
-        if test_value > custom_model_prob:  # use hash instead of random to ensure in repeatable results
+        if test_value > int(custom_model_prob * 100):  # use hash instead of random to ensure in repeatable results
             logger.debug(
                 f"Using global model of type '{model_type.name}', for project {project_id}, "
                 f"for hash source {str(hash_source)}."

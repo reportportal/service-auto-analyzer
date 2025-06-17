@@ -63,7 +63,7 @@ def deduplicate_data(data: list[list[float]], labels: list[int]) -> tuple[list[l
 def split_data(
     data: list[list[float]], labels: list[int], random_state: int
 ) -> tuple[list[list[float]], list[list[float]], list[int], list[int]]:
-    x_ids: list[int] = [i for i in range(len(data))]
+    x_ids: list[int] = list(range(len(data)))
     x_train_ids, x_test_ids, y_train, y_test = train_test_split(
         x_ids, labels, test_size=0.1, random_state=random_state, stratify=labels
     )

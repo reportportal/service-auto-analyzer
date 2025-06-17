@@ -39,7 +39,7 @@ _MAX_SLEEP: Final[int] = ONE_MINUTE
 
 GLOBAL_LOCK: Final[Lock] = Lock()
 CREATED_EXCHANGES: Final[dict[str, set[str]]] = defaultdict(set)
-EXCHANGE_CREATION_TIME: Final[dict[str, float]] = dict()
+EXCHANGE_CREATION_TIME: Final[dict[str, float]] = {}
 
 _DEFAULT_ROUTING_KEY: Final[str] = str(uuid.uuid4())
 

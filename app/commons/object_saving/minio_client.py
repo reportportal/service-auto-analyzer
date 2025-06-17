@@ -135,7 +135,7 @@ class MinioClient(Storage):
                 prefix = path[0 : -(len(folder))]
                 object_name = object_name[len(prefix) :]
             object_names.add(object_name)
-        return sorted(list(object_names))
+        return sorted(object_names)
 
     def remove_folder_objects(self, bucket: str, folder: str) -> bool:
         bucket_name = self.get_bucket(bucket)

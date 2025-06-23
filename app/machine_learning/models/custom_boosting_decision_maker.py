@@ -24,7 +24,7 @@ class CustomBoostingDecisionMaker(BoostingDecisionMaker):
         self,
         object_saver: ObjectSaver,
         *,
-        features: list[int],
+        features: Optional[list[int]] = None,
         monotonous_features: Optional[list[int]] = None,
         n_estimators: Optional[int] = None,
         max_depth: Optional[int] = None,

@@ -286,7 +286,7 @@ class ServiceProcessor:
     def process(self, routing_key: str, body: Any) -> Optional[str]:
         """Process request based on routing key and body data"""
         config = self._routing_config[routing_key]
-        request_handler = config["handler"]
+        request_processor = config["handler"]
         prepare_data_func = config.get("prepare_data_func", None)
         prepare_response_data = config.get("prepare_response_data", None)
 
@@ -299,13 +299,7 @@ class ServiceProcessor:
                 logger.exception("Failed to prepare message body", exc_info=exc)
                 return None
 
-        # Handle request
-        try:
-            response = request_handler(message)
-        except Exception as exc:
-            logger.exception("Failed to handle message", exc_info=exc)
-            return None
-
+        response = request_processor(message)
         logger.debug("Finished processing request")
 
         # Prepare response if applicable

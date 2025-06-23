@@ -164,16 +164,22 @@ class ProcessAmqpRequestHandler:
         try:
             while True:
                 if conn.poll():
-                    try:
-                        routing_key, correlation_id, message = conn.recv()
-                        if routing_key is None:  # Shutdown signal
+                    routing_key, correlation_id, message = conn.recv()
+                    if routing_key is None:  # Shutdown signal
+                        break
+                    logging.set_correlation_id(correlation_id)
+
+                    retry = 0
+                    result = None
+                    while retry < app_config.amqpHandlerMaxRetries:
+                        retry += 1
+                        try:
+                            result = processor.process(routing_key, message)
                             break
-                        logging.set_correlation_id(correlation_id)
-                        response_body = processor.process(routing_key, message)
-                        conn.send(response_body)
-                    except Exception as exc:
-                        logger.exception("Failed to process message in worker", exc_info=exc)
-                        conn.send(None)
+                        except Exception as exc:
+                            logger.exception(f"Failed to process message in worker on attempt {retry}", exc_info=exc)
+                            time.sleep(0.01)  # Small sleep to prevent busy waiting
+                    conn.send(result)
                 else:
                     time.sleep(0.01)  # Small sleep to prevent busy waiting
         except Exception as exc:

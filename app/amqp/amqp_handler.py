@@ -160,7 +160,6 @@ class ProcessAmqpRequestHandler:
     ) -> None:
         """Worker function that runs in separate process"""
         processor = ServiceProcessor(app_config, search_config, services_to_init=init_services)
-
         try:
             while True:
                 if conn.poll():
@@ -184,8 +183,7 @@ class ProcessAmqpRequestHandler:
                     time.sleep(0.01)  # Small sleep to prevent busy waiting
         except Exception as exc:
             logger.exception("Processor worker encountered error", exc_info=exc)
-        finally:
-            conn.close()
+        conn.close()
 
     def __send_task(self, processing_item: ProcessingItem) -> None:
         """Send processing item to processor process"""

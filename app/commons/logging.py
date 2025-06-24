@@ -18,6 +18,7 @@ import base64
 import logging.config
 import uuid
 from threading import local
+from typing import Optional
 
 from app.commons.model.launch_objects import ApplicationConfig
 
@@ -58,7 +59,7 @@ class Logger:
         kwargs["extra"] = {"correlation_id": get_correlation_id()}
         self.__logger.error(msg, *args, **kwargs)
 
-    def exception(self, msg, *args, exc_info=True, **kwargs):
+    def exception(self, msg, *args, exc_info: Optional[bool | BaseException] = True, **kwargs):
         """
         Delegate an exception call to the underlying logger.
         """

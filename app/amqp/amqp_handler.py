@@ -13,9 +13,9 @@
 #  limitations under the License.
 
 import json
-import queue
 import threading
 import time
+from queue import Empty, PriorityQueue
 from typing import Any, Callable, Optional
 
 from pika.adapters.blocking_connection import BlockingChannel
@@ -100,12 +100,12 @@ class ProcessAmqpRequestHandler:
     prefetch_size: int
     routing_key_predicate: Callable[[str], bool]
     counter: AtomicInteger
-    queue: queue.PriorityQueue[ProcessingItem]
+    queue: PriorityQueue[ProcessingItem]
     running_tasks: list[ProcessingItem]
     processor: Processor
     _processing_thread: Optional[threading.Thread]
     _shutdown: bool
-    _init_services: Optional[set[str]]
+    _init_services: set[str]
 
     def __init__(
         self,
@@ -137,11 +137,11 @@ class ProcessAmqpRequestHandler:
         if init_services:
             self._init_services = set(init_services)
         else:
-            self._init_services = None
+            self._init_services = set()
         self.counter = AtomicInteger(0)
 
         # Initialize queue and running tasks
-        self.queue = queue.PriorityQueue(maxsize=queue_size)
+        self.queue = PriorityQueue(maxsize=queue_size)
         self.running_tasks = []
 
         # Setup process communication
@@ -168,15 +168,17 @@ class ProcessAmqpRequestHandler:
                         break
                     logging.set_correlation_id(correlation_id)
 
-                    retry = 0
                     result = None
-                    while retry < app_config.amqpHandlerMaxRetries:
-                        retry += 1
+                    for i in range(app_config.amqpHandlerMaxRetries):
                         try:
                             result = processor.process(routing_key, message)
                             break
                         except Exception as exc:
-                            logger.exception(f"Failed to process message in worker on attempt {retry}", exc_info=exc)
+                            logger.exception(
+                                f"Failed to process message {routing_key}' in worker on attempt {i + 1} of "
+                                + str(app_config.amqpHandlerMaxRetries),
+                                exc_info=exc,
+                            )
                             time.sleep(0.01)  # Small sleep to prevent busy waiting
                     conn.send(result)
                 else:
@@ -202,7 +204,7 @@ class ProcessAmqpRequestHandler:
             log_incoming_message(processing_item.routing_key, processing_item.msg_correlation_id, processing_item.item)
             self.__send_task(processing_item)
             return processing_item
-        except queue.Empty:
+        except Empty:
             return None
         except Exception as exc:
             logger.exception("Failed to send message to processor", exc_info=exc)
@@ -337,10 +339,10 @@ class ProcessAmqpRequestHandler:
         processing_item = ProcessingItem(
             priority=priority,
             number=number,
-            routing_key=method.routing_key,
+            routing_key=method.routing_key or "",
             reply_to=props.reply_to,
             log_correlation_id=logging.get_correlation_id(),
-            msg_correlation_id=props.correlation_id,
+            msg_correlation_id=props.correlation_id or "",
             item=message,
         )
 

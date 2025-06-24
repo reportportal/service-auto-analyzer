@@ -101,6 +101,11 @@ def same_data(data: Any) -> Any:
     return data
 
 
+def raise_exception(message: str) -> None:
+    """Function to raise an exception with a given message"""
+    raise Exception(message)
+
+
 class ServiceProcessor:
     """Class for processing requests based on routing key and routing configuration"""
 
@@ -220,6 +225,10 @@ class ServiceProcessor:
             "handler": lambda s: lambda x: x,
             "prepare_data_func": same_data,
             "prepare_response_data": to_str,
+        },
+        "noop_fail": {
+            "handler": lambda s: lambda x: raise_exception("Intentional failure for testing purposes: " + str(x)),
+            "prepare_data_func": same_data,
         },
     }
 

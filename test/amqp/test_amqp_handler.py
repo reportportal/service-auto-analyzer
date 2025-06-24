@@ -11,9 +11,10 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+import io
 import json
 import time
+from contextlib import redirect_stderr
 from typing import Any
 from unittest.mock import Mock
 
@@ -63,7 +64,7 @@ def handler(app_config, search_config, mock_amqp_client):
         queue_size=10,
         prefetch_size=2,
         client=mock_amqp_client,
-        init_services=["noop_echo", "noop_sleep"],
+        init_services=["noop_echo", "noop_sleep", "noop_fail"],
     )
     yield handler
     # Clean up
@@ -290,6 +291,7 @@ class TestProcessAmqpRequestHandler:
         )
 
         # Verify handler is initialized
+        assert handler._processing_thread is not None
         assert handler._processing_thread.is_alive()
         assert handler.processor.process.is_alive()
 
@@ -367,3 +369,38 @@ class TestProcessAmqpRequestHandler:
 
         # Verify processor was restarted (process should be alive)
         assert handler.processor.process.is_alive(), "Processor should be alive after restart"
+
+    def test_exception_retry(self, handler, mock_amqp_client):
+        """Test Case 5: Failed tasks should be processed several times before dropping"""
+
+        # Create a task that will fail with noop_fail handler
+        channel, method, props, body = create_amqp_request_mock(
+            routing_key="noop_fail", body="exception_retry", reply_to="test_reply"
+        )
+
+        std_out = io.StringIO()
+        with redirect_stderr(std_out):
+            # Submit the failing task
+            handler.handle_amqp_request(channel, method, props, body)
+
+            # Wait for task to be picked up and record original start time
+            time.sleep(0.1)
+
+            # Verify task is in running_tasks and record start time
+            assert len(handler.running_tasks) == 1, "Task should appear in running_tasks"
+            original_task = handler.running_tasks[0]
+            original_send_time = original_task.send_time
+            assert original_send_time is not None, "Task should have send_time recorded"
+            assert original_task.routing_key == "noop_fail"
+            assert original_task.item == "exception_retry"
+
+            # Wait for all tasks to complete
+            time.sleep(10)
+
+        # Verify task was dropped after retries
+        assert len(handler.running_tasks) == 0, "Task should be dropped after retries"
+        test_exception = "Intentional failure for testing purposes: exception_retry"
+        std_out_str = std_out.getvalue()
+        assert std_out_str.count(test_exception) == 3, "Should log exception message 3 times (for 3 retries)"
+        mock_amqp_client.reply.assert_not_called()
+        assert handler.processor.process.is_alive(), "Processor should be alive after handling failed task"

@@ -207,16 +207,10 @@ def read_model_settings():
     if not model_settings or not isinstance(model_settings, dict):
         raise RuntimeError("Failed to read model settings")
 
-    SEARCH_CONFIG.BoostModelFolder = model_settings["BOOST_MODEL_FOLDER"].strip().rstrip("/").rstrip("\\")
-    SEARCH_CONFIG.SuggestBoostModelFolder = (
-        model_settings["SUGGEST_BOOST_MODEL_FOLDER"].strip().rstrip("/").rstrip("\\")
-    )
-    SEARCH_CONFIG.SimilarityWeightsFolder = (
-        model_settings["SIMILARITY_WEIGHTS_FOLDER"].strip().rstrip("/").rstrip("\\")
-    )
-    SEARCH_CONFIG.GlobalDefectTypeModelFolder = (
-        model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"].strip().rstrip("/").rstrip("\\")
-    )
+    SEARCH_CONFIG.BoostModelFolder = utils.strip_path(model_settings["BOOST_MODEL_FOLDER"])
+    SEARCH_CONFIG.SuggestBoostModelFolder = utils.strip_path(model_settings["SUGGEST_BOOST_MODEL_FOLDER"])
+    SEARCH_CONFIG.SimilarityWeightsFolder = utils.strip_path(model_settings["SIMILARITY_WEIGHTS_FOLDER"])
+    SEARCH_CONFIG.GlobalDefectTypeModelFolder = utils.strip_path(model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"])
 
 
 my_logging.setup(APP_CONFIG)

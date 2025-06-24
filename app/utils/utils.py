@@ -397,3 +397,8 @@ def append_aa_ma_boosts(query: dict[str, Any], search_cfg: launch_objects.Search
                 }
             }
         )
+
+
+def strip_path(path: str) -> str:
+    """Strip trailing slashes from a path."""
+    return path.strip().rstrip("/").rstrip("\\")

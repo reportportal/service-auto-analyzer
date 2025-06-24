@@ -17,13 +17,13 @@ from typing import Generator
 
 import pytest
 
-import app.utils.utils as utils
 from app.commons import object_saving
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType
 from app.commons.model_chooser import ModelChooser
 from app.commons.object_saving import ObjectSaver
 from app.machine_learning.models import CustomDefectTypeModel, DefectTypeModel, MlModel
+from app.utils import utils
 
 # Test constants for deterministic project IDs
 # Logic: if test_value > custom_model_prob -> use global model, else use custom model
@@ -57,12 +57,10 @@ class TestModelChooserChooseModel:
         """Create test SearchConfig with empty global model folders."""
         model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
         return SearchConfig(
-            GlobalDefectTypeModelFolder=model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]
-            .strip()
-            .rstrip("/")
-            .rstrip("\\"),
-            SuggestBoostModelFolder="",
-            BoostModelFolder="",
+            BoostModelFolder=utils.strip_path(model_settings["BOOST_MODEL_FOLDER"]),
+            SuggestBoostModelFolder=utils.strip_path(model_settings["SUGGEST_BOOST_MODEL_FOLDER"]),
+            SimilarityWeightsFolder=utils.strip_path(model_settings["SIMILARITY_WEIGHTS_FOLDER"]),
+            GlobalDefectTypeModelFolder=utils.strip_path(model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]),
         )
 
     @pytest.fixture(scope="session")

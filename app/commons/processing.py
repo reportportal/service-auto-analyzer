@@ -46,7 +46,7 @@ class Processor:
     def shutdown(self) -> None:
         if self.process and self.process.is_alive():
             try:
-                self.parent_conn.send((None, None, None))  # Shutdown signal
+                self.parent_conn.send(None)  # Shutdown signal
                 self.process.join(timeout=5)
                 if self.process.is_alive():
                     self.process.terminate()

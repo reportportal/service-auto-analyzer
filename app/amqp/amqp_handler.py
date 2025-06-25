@@ -18,6 +18,7 @@ import time
 from queue import Empty, PriorityQueue
 from typing import Any, Callable, Optional
 
+from commons.model.processing import ProcessingResult
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
 
@@ -163,15 +164,19 @@ class ProcessAmqpRequestHandler:
         try:
             while True:
                 if conn.poll():
-                    routing_key, correlation_id, message = conn.recv()
-                    if routing_key is None:  # Shutdown signal
+                    processing_item: ProcessingItem = conn.recv()
+                    if not processing_item:  # Shutdown signal
                         break
-                    logging.set_correlation_id(correlation_id)
+                    print(processing_item)
+                    routing_key = processing_item.routing_key
+
+                    logging.set_correlation_id(processing_item.log_correlation_id)
 
                     result = None
                     for i in range(app_config.amqpHandlerMaxRetries):
                         try:
-                            result = processor.process(routing_key, message)
+                            result_value = processor.process(routing_key, processing_item.item)
+                            result = ProcessingResult(processing_item, result_value, success=True, retry_count=i)
                             break
                         except Exception as exc:
                             logger.exception(
@@ -179,6 +184,7 @@ class ProcessAmqpRequestHandler:
                                 + str(app_config.amqpHandlerMaxRetries),
                                 exc_info=exc,
                             )
+                            result = ProcessingResult(processing_item, None, success=False, error=exc, retry_count=i)
                             time.sleep(0.01)  # Small sleep to prevent busy waiting
                     conn.send(result)
                 else:
@@ -189,10 +195,8 @@ class ProcessAmqpRequestHandler:
 
     def __send_task(self, processing_item: ProcessingItem) -> None:
         """Send processing item to processor process"""
-        self.processor.parent_conn.send(
-            (processing_item.routing_key, processing_item.log_correlation_id, processing_item.item)
-        )
         processing_item.send_time = time.time()  # Record send time for tracking
+        self.processor.parent_conn.send(processing_item)
         self.running_tasks.append(processing_item)
 
     def __send_to_processor(self) -> Optional[ProcessingItem]:
@@ -259,17 +263,46 @@ class ProcessAmqpRequestHandler:
                 return True
         return False
 
+    def __handle_response(self, result: ProcessingResult):
+        response_body = result.result
+        if response_body is None:
+            return None
+        logging.set_correlation_id(result.item.log_correlation_id)
+        try:
+            if result.item.reply_to:
+                log_outgoing_message(result.item.reply_to, result.item.msg_correlation_id, response_body)
+                self.client.reply(result.item.reply_to, result.item.msg_correlation_id, response_body)
+        except Exception as exc:
+            logger.exception("Failed to publish result", exc_info=exc)
+            return None
+
+        logger.debug("Finished processing response")
+        return None
+
     def __receive_results(self) -> None:
         if self.running_tasks:
             try:
                 if self.processor.parent_conn.poll(timeout=0.1):
-                    response_body = self.processor.parent_conn.recv()
-
+                    result: ProcessingResult = self.processor.parent_conn.recv()
                     if self.running_tasks:
                         completed_task = self.running_tasks.pop(0)  # FIFO for completed tasks
-
-                        # Handle response similar to original handler
-                        self._handle_response(completed_task, response_body)
+                        if completed_task.msg_correlation_id != result.item.msg_correlation_id:
+                            logger.warning(
+                                f"Received result for task {result.item.msg_correlation_id} but expected "
+                                f"{completed_task.msg_correlation_id}. Possible mismatch."
+                            )
+                    if result.retry_count > 0:
+                        if result.success:
+                            logger.warning(
+                                f"Task {result.item.routing_key} - {result.item.msg_correlation_id} "
+                                f"was retried {result.retry_count} times"
+                            )
+                        else:
+                            logger.error(
+                                f"Task {result.item.routing_key} - {result.item.msg_correlation_id} failed after "
+                                f"{result.retry_count} retries."
+                            )
+                    self.__handle_response(result)
             except Exception as exc:
                 logger.exception("Failed to receive response from processor", exc_info=exc)
 
@@ -300,22 +333,6 @@ class ProcessAmqpRequestHandler:
             except Exception as exc:
                 logger.exception("Error in processing thread", exc_info=exc)
                 time.sleep(0.1)
-
-    def _handle_response(self, processing_item: ProcessingItem, response_body: Any):
-        """Handle the response from processor similar to original AmqpRequestHandler"""
-        if response_body is None:
-            return None
-        logging.set_correlation_id(processing_item.log_correlation_id)
-        try:
-            if processing_item.reply_to:
-                log_outgoing_message(processing_item.reply_to, processing_item.msg_correlation_id, response_body)
-                self.client.reply(processing_item.reply_to, processing_item.msg_correlation_id, response_body)
-        except Exception as exc:
-            logger.exception("Failed to publish result", exc_info=exc)
-            return None
-
-        logger.debug("Finished processing response")
-        return None
 
     def handle_amqp_request(
         self,

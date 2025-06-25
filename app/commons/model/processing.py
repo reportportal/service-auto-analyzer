@@ -27,3 +27,12 @@ class ProcessingItem:
     item: Any = field(compare=False)
     send_time: Optional[float] = field(default=None, compare=False)
     retries: int = field(default=0, compare=False)
+
+
+@dataclass
+class ProcessingResult:
+    item: ProcessingItem
+    result: Any
+    success: bool
+    error: Optional[Exception] = None
+    retry_count: int = 0

@@ -18,14 +18,13 @@ import time
 from queue import Empty, PriorityQueue
 from typing import Any, Callable, Optional
 
-from commons.model.processing import ProcessingResult
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
 
 from app.amqp.amqp import AmqpClient
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
-from app.commons.model.processing import ProcessingItem
+from app.commons.model.processing import ProcessingItem, ProcessingResult
 from app.commons.processing import Processor
 from app.service.processor import ServiceProcessor
 

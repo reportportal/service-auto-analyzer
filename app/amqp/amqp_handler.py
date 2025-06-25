@@ -166,7 +166,6 @@ class ProcessAmqpRequestHandler:
                     processing_item: ProcessingItem = conn.recv()
                     if not processing_item:  # Shutdown signal
                         break
-                    print(processing_item)
                     routing_key = processing_item.routing_key
 
                     logging.set_correlation_id(processing_item.log_correlation_id)

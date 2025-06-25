@@ -398,9 +398,9 @@ class TestProcessAmqpRequestHandler:
         assert len(handler.running_tasks) == 0, "Task should be dropped after retries"
 
         mock_error = mock_logger.error
-        # Verify warning was called for failed retries
+        # Verify error was called for failed retries
         error_calls = [call for call in mock_error.call_args_list if "failed after 2 retries." in str(call)]
-        assert len(error_calls) > 0, "Should log warning message about failed retries"
+        assert len(error_calls) == 1, "Should log error message about failed retries"
 
         mock_amqp_client.reply.assert_not_called()
         assert handler.processor.process.is_alive(), "Processor should be alive after handling failed task"

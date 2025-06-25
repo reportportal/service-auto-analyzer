@@ -381,7 +381,7 @@ class TestProcessAmqpRequestHandler:
         handler.handle_amqp_request(channel, method, props, body)
 
         # Wait for task to be picked up and record original start time
-        time.sleep(0.1)
+        time.sleep(0.01)
 
         # Verify task is in running_tasks and record start time
         assert len(handler.running_tasks) == 1, "Task should appear in running_tasks"

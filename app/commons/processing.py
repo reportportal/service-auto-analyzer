@@ -11,9 +11,11 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+import os
 from multiprocessing import Pipe, Process
-from typing import Any, Callable
+from typing import Any, Callable, Protocol
+
+from commons.model.processing import ProcessingItem
 
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
@@ -21,7 +23,61 @@ from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 logger = logging.getLogger("analyzerApp.amqpHandler")
 
 
-class Processor:
+class Processor(Protocol):
+    @property
+    def pid(self) -> int:
+        """Return the process ID of the processor."""
+        ...
+
+    def is_alive(self) -> bool:
+        """Check if the processor is still running."""
+        return True
+
+    def shutdown(self) -> None:
+        """Shutdown the processor gracefully."""
+        ...
+
+    def send(self, item: ProcessingItem) -> None:
+        """Send an item to the processor for processing."""
+        ...
+
+    def poll(self, timeout: float) -> bool:
+        """Check if the processor has any response available within the timeout."""
+        ...
+
+    def recv(self) -> Any:
+        """Receive a response from the processor."""
+        ...
+
+
+class DummyProcessor:
+
+    _is_alive: bool
+
+    def __init__(self) -> None:
+        _is_alive = True
+
+    @property
+    def pid(self) -> int:
+        return os.getpid()
+
+    def is_alive(self) -> bool:
+        return self._is_alive
+
+    def shutdown(self) -> None:
+        _is_alive = False
+
+    def send(self, item: ProcessingItem) -> None:
+        pass
+
+    def poll(self, timeout: float) -> bool:
+        return False
+
+    def recv(self) -> Any:
+        return object()
+
+
+class RealProcessor:
     app_config: ApplicationConfig
     search_config: SearchConfig
     parent_conn: Any
@@ -43,6 +99,13 @@ class Processor:
         )
         self.process.start()
 
+    @property
+    def pid(self) -> int:
+        return self.process.pid
+
+    def is_alive(self) -> bool:
+        return self.process.is_alive()
+
     def shutdown(self) -> None:
         if self.process and self.process.is_alive():
             try:
@@ -58,3 +121,12 @@ class Processor:
             self.parent_conn.close()
         except Exception:
             pass
+
+    def send(self, item: ProcessingItem) -> None:
+        self.parent_conn.send(item)
+
+    def poll(self, timeout: float) -> bool:
+        return self.parent_conn.poll(timeout=timeout)
+
+    def recv(self) -> Any:
+        return self.parent_conn.recv()

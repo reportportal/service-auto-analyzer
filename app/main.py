@@ -25,7 +25,7 @@ from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
 
 from app.amqp.amqp import AmqpClient
-from app.amqp.amqp_handler import ProcessAmqpRequestHandler
+from app.amqp.amqp_handler import AmqpRequestHandler, DirectAmqpRequestHandler, ProcessAmqpRequestHandler
 from app.commons import logging as my_logging
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
@@ -37,6 +37,7 @@ APP_CONFIG = ApplicationConfig(
     esUser=os.getenv("ES_USER", "").strip(),
     esPassword=os.getenv("ES_PASSWORD", "").strip(),
     logLevel=os.getenv("LOGGING_LEVEL", "DEBUG").strip(),
+    debugMode=json.loads(os.getenv("DEBUG_MODE", "false").lower()),
     amqpUrl=os.getenv("AMQP_URL", "").strip("/").strip("\\") + "/" + os.getenv("AMQP_VIRTUAL_HOST", "analyzer"),
     amqpExchangeName=os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
     amqpInitialRetryInterval=int(os.getenv("AMQP_INITIAL_RETRY_INTERVAL", "1")),
@@ -130,7 +131,13 @@ def only_train(request: str) -> bool:
 def init_amqp_queues():
     """Initialize rabbitmq queues, exchange and starts threads for queue messages processing"""
     _threads = []
-    _main_amqp_handler = ProcessAmqpRequestHandler(
+
+    if APP_CONFIG.debugMode:
+        handler_class = DirectAmqpRequestHandler
+    else:
+        handler_class = ProcessAmqpRequestHandler
+
+    _main_amqp_handler = handler_class(
         APP_CONFIG,
         SEARCH_CONFIG,
         routing_key_predicate=except_train,
@@ -157,7 +164,7 @@ def init_amqp_queues():
             "remove_by_log_time",
         ],
     )
-    _train_amqp_handler = ProcessAmqpRequestHandler(
+    _train_amqp_handler = handler_class(
         APP_CONFIG, SEARCH_CONFIG, routing_key_predicate=only_train, init_services=["train_models"]
     )
 
@@ -220,7 +227,7 @@ es_client = EsClient(APP_CONFIG)
 read_model_settings()
 
 application = create_application()
-THREADS: list[tuple[str, threading.Thread, ProcessAmqpRequestHandler]] = []
+THREADS: list[tuple[str, threading.Thread, AmqpRequestHandler]] = []
 
 
 @application.route("/", methods=["GET"])
@@ -240,7 +247,7 @@ def get_health_status():
                 thread_status: dict[str, Any] = {
                     "name": thread_name,
                     "status": "alive",
-                    "pid": handler.processor.process.pid,
+                    "pid": handler.processor.pid,
                 }
                 status["threads"].append(thread_status)
                 tasks = [
@@ -275,12 +282,15 @@ signal(SIGINT, signal_handler)
 
 # Run the application directly
 if __name__ == "__main__":
-    logger.info("Program started")
-    logger.info("Creating AMQP connections")
+    if APP_CONFIG.debugMode:
+        logger.warning("The application is running in DEBUG mode, processing will run in threads.")
+    else:
+        logger.info("The application is running in PRODUCTION mode, processing will run in processes.")
+    logger.info("Program started. Creating AMQP connections.")
     THREADS.extend(init_amqp_queues())
-    logger.info("The analyzer has started")
+    logger.info("The analyzer has started.")
 
     start_http_server()
 
-    logger.info("The analyzer has finished")
+    logger.info("The analyzer has finished.")
     exit(0)

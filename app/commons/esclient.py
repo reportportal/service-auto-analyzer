@@ -123,8 +123,12 @@ class EsClient:
 
     def is_healthy(self):
         """Check whether elasticsearch is healthy"""
+        if self.app_config.esUseSsl:
+            protocol = "https"
+        else:
+            protocol = "http"
         try:
-            url = text_processing.build_url(self.host, ["_cluster/health"])
+            url = text_processing.build_url(f"{protocol}://{self.host}", ["_cluster/health"])
             res = utils.send_request(url, "GET", self.app_config.esUser, self.app_config.esPassword)
             return res["status"] in ["green", "yellow"]
         except Exception as err:

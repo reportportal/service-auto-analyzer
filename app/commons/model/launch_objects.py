@@ -35,6 +35,8 @@ class ApplicationConfig(BaseModel):
     esHost: str = ""
     esUser: str = ""
     esPassword: str = ""
+
+    debugMode: bool = False
     logLevel: str = "DEBUG"
 
     amqpUrl: str = ""

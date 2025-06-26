@@ -16,7 +16,7 @@ import json
 import threading
 import time
 from queue import Empty, PriorityQueue
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Protocol
 
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
@@ -25,7 +25,7 @@ from app.amqp.amqp import AmqpClient
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.processing import ProcessingItem, ProcessingResult
-from app.commons.processing import Processor
+from app.commons.processing import DummyProcessor, Processor, RealProcessor
 from app.service.processor import ServiceProcessor
 
 logger = logging.getLogger("analyzerApp.amqpHandler")
@@ -90,8 +90,23 @@ class AtomicInteger:
             return self._value
 
 
+class AmqpRequestHandler(Protocol):
+    processor: Processor
+    running_tasks: list[ProcessingItem]
+
+    def handle_amqp_request(
+        self,
+        channel: BlockingChannel,
+        method: Basic.Deliver,
+        props: BasicProperties,
+        body: bytes,
+    ) -> None:
+        """Handle AMQP request."""
+        ...
+
+
 class ProcessAmqpRequestHandler:
-    """Class for handling AMQP requests with process-based routing and priority queue"""
+    """Class for handling AMQP requests with process-based routing and priority queue."""
 
     app_config: ApplicationConfig
     search_config: SearchConfig
@@ -111,13 +126,14 @@ class ProcessAmqpRequestHandler:
         self,
         app_config: ApplicationConfig,
         search_config: SearchConfig,
+        *,
         queue_size: int = 100,
         prefetch_size: int = 2,
         routing_key_predicate: Optional[Callable[[str], bool]] = None,
         client: Optional[AmqpClient] = None,
         init_services: Optional[list[str]] = None,
     ):
-        """Initialize processor for handling requests with process-based communication.
+        """Initialize handler for processing requests with process-based communication.
 
         :param app_config: Application configuration object
         :param search_config: Search configuration object
@@ -145,7 +161,7 @@ class ProcessAmqpRequestHandler:
         self.running_tasks = []
 
         # Setup process communication
-        self.processor = Processor(
+        self.processor = RealProcessor(
             app_config, search_config, self._processor_worker, init_services=self._init_services
         )
         self._shutdown = False
@@ -194,7 +210,7 @@ class ProcessAmqpRequestHandler:
     def __send_task(self, processing_item: ProcessingItem) -> None:
         """Send processing item to processor process"""
         processing_item.send_time = time.time()  # Record send time for tracking
-        self.processor.parent_conn.send(processing_item)
+        self.processor.send(processing_item)
         self.running_tasks.append(processing_item)
 
     def __send_to_processor(self) -> Optional[ProcessingItem]:
@@ -221,20 +237,15 @@ class ProcessAmqpRequestHandler:
         tasks_to_resend[0].retries += 1
 
         # Clean up old process and connections
-        if self.processor.process.is_alive():
-            self.processor.shutdown()
-        else:
-            # Process is dead, just close connections
-            try:
-                self.processor.parent_conn.close()
-            except Exception:
-                pass
+        self.processor.shutdown()
 
         # Clear running tasks list before re-sending
         self.running_tasks.clear()
 
         # Create new processor instance
-        self.processor = Processor(self.app_config, self.search_config, self._processor_worker, self._init_services)
+        self.processor = RealProcessor(
+            self.app_config, self.search_config, self._processor_worker, self._init_services
+        )
         logger.info("Successfully restarted processor process")
 
         # Re-send all previously running tasks to the new processor
@@ -280,8 +291,8 @@ class ProcessAmqpRequestHandler:
     def __receive_results(self) -> None:
         if self.running_tasks:
             try:
-                if self.processor.parent_conn.poll(timeout=0.1):
-                    result: ProcessingResult = self.processor.parent_conn.recv()
+                if self.processor.poll(timeout=0.1):
+                    result: ProcessingResult = self.processor.recv()
                     if self.running_tasks:
                         completed_task = self.running_tasks.pop(0)  # FIFO for completed tasks
                         if completed_task.msg_correlation_id != result.item.msg_correlation_id:
@@ -309,7 +320,7 @@ class ProcessAmqpRequestHandler:
         while not self._shutdown:
             try:
                 # Check if processor process is alive and restart if needed
-                if not self.processor.process.is_alive():
+                if not self.processor.is_alive():
                     logger.warning("Processor process is not running, restarting...")
                     self._restart_processor()
 
@@ -379,3 +390,107 @@ class ProcessAmqpRequestHandler:
         # Wait for processing thread
         if self._processing_thread and self._processing_thread.is_alive():
             self._processing_thread.join(timeout=5)
+
+
+class DirectAmqpRequestHandler:
+    """Class for direct handling AMQP requests. Use for debug purpose."""
+
+    app_config: ApplicationConfig
+    search_config: SearchConfig
+    routing_key_predicate: Callable[[str], bool]
+    running_tasks: list[ProcessingItem]
+    counter: int
+    processor: Processor
+    _init_services: set[str]
+    _processor: ServiceProcessor
+
+    def __init__(
+        self,
+        app_config: ApplicationConfig,
+        search_config: SearchConfig,
+        *,
+        routing_key_predicate: Optional[Callable[[str], bool]] = None,
+        init_services: Optional[list[str]] = None,
+    ):
+        """Initialize handler for processing requests.
+
+        :param app_config: Application configuration object
+        :param search_config: Search configuration object
+        :param routing_key_predicate: Optional predicate to filter routing keys for processing. Should return True for
+        keys to process.
+        :param init_services: Optional list of routing keys to initialize the processor with specific routing keys
+        """
+        self.app_config = app_config
+        self.search_config = search_config
+        self.routing_key_predicate = routing_key_predicate or (lambda _: True)
+        self.running_tasks = []
+        if init_services:
+            self._init_services = set(init_services)
+        else:
+            self._init_services = set()
+        self.counter = 0
+        self.processor = DummyProcessor()
+        self._processor = ServiceProcessor(app_config, search_config, services_to_init=self._init_services)
+
+    def handle_amqp_request(
+        self,
+        channel: BlockingChannel,
+        method: Basic.Deliver,
+        props: BasicProperties,
+        body: bytes,
+    ) -> None:
+        """Function for handling amqp request: index, search and analyze using routing key."""
+        logging.new_correlation_id()
+
+        # Processing request
+        message = serialize_message(channel, method.delivery_tag, body)
+        if not message:
+            return None
+
+        if not self.routing_key_predicate(method.routing_key):
+            return None
+
+        self.counter += 1
+        log_incoming_message(method.routing_key, props.correlation_id, message)
+
+        self.running_tasks.append(
+            ProcessingItem(
+                priority=get_priority(props),
+                number=self.counter,
+                routing_key=method.routing_key or "",
+                reply_to=props.reply_to,
+                log_correlation_id=logging.get_correlation_id(),
+                msg_correlation_id=props.correlation_id or "",
+                item=message,
+            )
+        )
+
+        # Process using the processor
+        try:
+            response_body = self._processor.process(method.routing_key, message)
+        except Exception as exc:
+            logger.exception("Failed to process message", exc_info=exc)
+            self.running_tasks.pop(0)
+            return None
+
+        # Sending response if applicable
+        if response_body is None:
+            self.running_tasks.pop(0)
+            return None
+
+        try:
+            if props.reply_to:
+                channel.basic_publish(
+                    exchange="",
+                    routing_key=props.reply_to,
+                    properties=BasicProperties(correlation_id=props.correlation_id, content_type="application/json"),
+                    mandatory=False,
+                    body=bytes(response_body, "utf-8"),
+                )
+        except Exception as exc:
+            logger.exception("Failed to publish result", exc_info=exc)
+            self.running_tasks.pop(0)
+            return None
+        logger.debug("Finished processing response")
+        self.running_tasks.pop(0)
+        return None

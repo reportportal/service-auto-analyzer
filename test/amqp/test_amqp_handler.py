@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
 import json
 import time
 from typing import Any
@@ -165,6 +166,7 @@ class TestProcessAmqpRequestHandler:
         assert call_args[0][1] == "test_correlation_123", "Correlation ID should match"
         assert call_args[0][2] == test_message, "Response body should match the echoed input"
 
+    # noinspection PyUnresolvedReferences
     def test_killing_processing_process(self, handler, mock_amqp_client):
         """Test Case 3: Kill processing process, check restart and task requeue"""
         # Create a longer-running task
@@ -182,7 +184,7 @@ class TestProcessAmqpRequestHandler:
         assert len(handler.running_tasks) == 1
         original_task = handler.running_tasks[0]
         original_send_time = original_task.send_time
-        original_process_pid = handler.processor.process.pid
+        original_process_pid = handler.processor.pid
 
         # Kill the processor process
         handler.processor.process.terminate()
@@ -192,8 +194,8 @@ class TestProcessAmqpRequestHandler:
         time.sleep(0.5)
 
         # Verify process was restarted (new PID)
-        assert handler.processor.process.is_alive(), "Process should be restarted"
-        new_process_pid = handler.processor.process.pid
+        assert handler.processor.is_alive(), "Process should be restarted"
+        new_process_pid = handler.processor.pid
         assert new_process_pid != original_process_pid, "New process should have different PID"
 
         # Verify task was requeued with new send time
@@ -291,7 +293,7 @@ class TestProcessAmqpRequestHandler:
         # Verify handler is initialized
         assert handler._processing_thread is not None
         assert handler._processing_thread.is_alive()
-        assert handler.processor.process.is_alive()
+        assert handler.processor.is_alive()
 
         # Shutdown
         handler.shutdown()
@@ -301,7 +303,7 @@ class TestProcessAmqpRequestHandler:
 
         # Verify cleanup
         assert handler._shutdown is True
-        assert not handler.processor.process.is_alive()
+        assert not handler.processor.is_alive()
 
     def test_routing_key_predicate_filtering(self, app_config, search_config, mock_amqp_client):
         """Test routing key predicate filtering"""
@@ -366,7 +368,7 @@ class TestProcessAmqpRequestHandler:
         assert restarted_task.retries == 1, "Task should have incremented retries after restart"
 
         # Verify processor was restarted (process should be alive)
-        assert handler.processor.process.is_alive(), "Processor should be alive after restart"
+        assert handler.processor.is_alive(), "Processor should be alive after restart"
 
     @patch("app.amqp.amqp_handler.logger")
     def test_exception_retry(self, mock_logger, handler, mock_amqp_client):
@@ -403,4 +405,4 @@ class TestProcessAmqpRequestHandler:
         assert len(error_calls) == 1, "Should log error message about failed retries"
 
         mock_amqp_client.reply.assert_not_called()
-        assert handler.processor.process.is_alive(), "Processor should be alive after handling failed task"
+        assert handler.processor.is_alive(), "Processor should be alive after handling failed task"

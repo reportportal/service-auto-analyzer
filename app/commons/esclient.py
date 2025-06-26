@@ -16,6 +16,7 @@ import json
 import traceback
 from collections import deque
 from time import time
+from typing import Optional
 
 import elasticsearch
 import elasticsearch.helpers
@@ -133,11 +134,10 @@ class EsClient:
             protocol = "https" if self.app_config.esUseSsl else "http"
             return f"{protocol}://{self.host}"
 
-    def is_healthy(self):
+    def is_healthy(self) -> bool:
         """Check whether elasticsearch is healthy"""
         base_url = self.__get_base_url()
         if not base_url:
-            logger.error("Elasticsearch host is not set")
             return False
 
         try:
@@ -149,10 +149,9 @@ class EsClient:
             logger.error(err)
             return False
 
-    def update_settings_after_read_only(self):
+    def update_settings_after_read_only(self) -> None:
         base_url = self.__get_base_url()
         if not base_url:
-            logger.error("Elasticsearch host is not set")
             return
 
         try:
@@ -178,11 +177,10 @@ class EsClient:
         logger.debug(f"Index '{index_name}' created")
         return Response(**response)
 
-    def list_indices(self):
+    def list_indices(self) -> Optional[list]:
         """Get all indices from elasticsearch"""
         base_url = self.__get_base_url()
         if not base_url:
-            logger.error("Elasticsearch host is not set")
             return None
 
         url = text_processing.build_url(base_url, ["_cat", "indices?format=json"])

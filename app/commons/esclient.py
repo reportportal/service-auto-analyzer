@@ -121,20 +121,27 @@ class EsClient:
             },
         }
 
+    def __get_base_url(self):
+        """Get base URL for Elasticsearch"""
+        if not self.host:
+            logger.error("Elasticsearch host is not set")
+            return None
+
+        if self.host.startswith("http"):
+            return self.host
+        else:
+            protocol = "https" if self.app_config.esUseSsl else "http"
+            return f"{protocol}://{self.host}"
+
     def is_healthy(self):
         """Check whether elasticsearch is healthy"""
-        if not self.host:
+        base_url = self.__get_base_url()
+        if not base_url:
             logger.error("Elasticsearch host is not set")
             return False
 
-        if self.host.startswith("http"):
-            protocol = ""
-        else:
-            protocol = "https" if self.app_config.esUseSsl else "http"
-            protocol = f"{protocol}://"
-
         try:
-            url = text_processing.build_url(f"{protocol}{self.host}", ["_cluster/health"])
+            url = text_processing.build_url(base_url, ["_cluster/health"])
             res = utils.send_request(url, "GET", self.app_config.esUser, self.app_config.esPassword)
             return res["status"] in ["green", "yellow"]
         except Exception as err:
@@ -142,10 +149,15 @@ class EsClient:
             logger.error(err)
             return False
 
-    def update_settings_after_read_only(self, es_host):
+    def update_settings_after_read_only(self):
+        base_url = self.__get_base_url()
+        if not base_url:
+            logger.error("Elasticsearch host is not set")
+            return
+
         try:
             requests.put(
-                "{}/_all/_settings".format(es_host),
+                f"{base_url}/_all/_settings",
                 headers={"Content-Type": "application/json"},
                 data='{"index.blocks.read_only_allow_delete": null}',
             ).raise_for_status()
@@ -168,7 +180,12 @@ class EsClient:
 
     def list_indices(self):
         """Get all indices from elasticsearch"""
-        url = text_processing.build_url(self.host, ["_cat", "indices?format=json"])
+        base_url = self.__get_base_url()
+        if not base_url:
+            logger.error("Elasticsearch host is not set")
+            return None
+
+        url = text_processing.build_url(base_url, ["_cat", "indices?format=json"])
         res = utils.send_request(url, "GET", self.app_config.esUser, self.app_config.esPassword)
         return res
 
@@ -347,7 +364,7 @@ class EsClient:
             except:  # noqa
                 formatted_exception = traceback.format_exc()
                 self._recreate_index_if_needed(bodies, formatted_exception)
-                self.update_settings_after_read_only(self.host)
+                self.update_settings_after_read_only()
                 success_count, errors = elasticsearch.helpers.bulk(
                     self.es_client, bodies, chunk_size=es_chunk_number, request_timeout=30, refresh=refresh
                 )

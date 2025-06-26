@@ -15,10 +15,9 @@ import os
 from multiprocessing import Pipe, Process
 from typing import Any, Callable, Protocol
 
-from commons.model.processing import ProcessingItem
-
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
+from app.commons.model.processing import ProcessingItem
 
 logger = logging.getLogger("analyzerApp.amqpHandler")
 

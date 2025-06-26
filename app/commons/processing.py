@@ -31,7 +31,7 @@ class Processor(Protocol):
 
     def is_alive(self) -> bool:
         """Check if the processor is still running."""
-        return True
+        ...
 
     def shutdown(self) -> None:
         """Shutdown the processor gracefully."""
@@ -55,7 +55,7 @@ class DummyProcessor:
     _is_alive: bool
 
     def __init__(self) -> None:
-        _is_alive = True
+        self._is_alive = True
 
     @property
     def pid(self) -> int:
@@ -65,7 +65,7 @@ class DummyProcessor:
         return self._is_alive
 
     def shutdown(self) -> None:
-        _is_alive = False
+        self._is_alive = False
 
     def send(self, item: ProcessingItem) -> None:
         pass

@@ -28,7 +28,7 @@ import json
 
 import pytest
 
-from app.utils import text_processing, utils, log_preparation
+from app.utils import log_preparation, text_processing, utils
 from test import read_file, read_file_lines
 
 

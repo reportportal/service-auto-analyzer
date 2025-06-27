@@ -277,7 +277,7 @@ def get_potential_status_codes(text: str) -> list[str]:
             result = pattern.search(line)
             for i in range(1, 4):
                 try:
-                    found_code = result.group(i)
+                    found_code = result.group(i) if result else None
                     if found_code and found_code.strip():
                         if found_code not in potential_codes:
                             potential_codes.add(found_code)

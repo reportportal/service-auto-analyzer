@@ -16,6 +16,7 @@ import json
 from datetime import datetime
 from functools import reduce
 from time import time
+from typing import Optional
 
 import elasticsearch.helpers
 
@@ -64,7 +65,7 @@ class SuggestService(AnalyzerService):
         model_chooser: ModelChooser,
         app_config: ApplicationConfig,
         search_cfg: SearchConfig,
-        es_client: EsClient = None,
+        es_client: Optional[EsClient] = None,
     ):
         self.app_config = app_config
         self.search_cfg = search_cfg
@@ -214,7 +215,8 @@ class SuggestService(AnalyzerService):
             ]:
                 queries.append("{}\n{}".format(json.dumps({"index": index_name}), json.dumps(query)))
 
-            partial_res = self.es_client.es_client.msearch("\n".join(queries) + "\n")["responses"]
+            search_results = self.es_client.es_client.msearch("\n".join(queries) + "\n")
+            partial_res = search_results["responses"] if search_results else []
             for ind in range(len(partial_res)):
                 full_results.append((log, partial_res[ind]))
         return full_results
@@ -463,7 +465,7 @@ class SuggestService(AnalyzerService):
                             relevantItem=test_item_id,
                             relevantLogId=relevant_log_id,
                             isMergedLog=is_merged,
-                            matchScore=round(prob, 2) * 100,
+                            matchScore=round(prob, 3) * 100,
                             esScore=round(scores_by_test_items[test_item_id]["mrHit"]["_score"], 2),
                             esPosition=scores_by_test_items[test_item_id]["mrHit"]["es_pos"],
                             modelFeatureNames=feature_names,

@@ -18,13 +18,13 @@ from typing_extensions import override
 from app.utils import text_processing
 from app.utils.log_preparation import (
     basic_prepare,
-    unify_message,
     prepare_exception_message_and_stacktrace,
     prepare_exception_message_no_params,
     prepare_exception_message_no_params_no_numbers,
     prepare_message,
     prepare_message_no_numbers,
     prepare_message_no_params,
+    unify_message,
 )
 
 

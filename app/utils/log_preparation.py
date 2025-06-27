@@ -43,7 +43,6 @@ def clean_message(basic_message: str) -> str:
     cleaned_message = text_processing.remove_access_tokens(cleaned_message)
     cleaned_message = text_processing.clean_html(cleaned_message)
     cleaned_message = text_processing.delete_empty_lines(cleaned_message)
-    cleaned_message = text_processing.leave_only_unique_lines(cleaned_message)
     return cleaned_message
 
 

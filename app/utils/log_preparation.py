@@ -47,6 +47,12 @@ def clean_message(basic_message: str) -> str:
     return cleaned_message
 
 
+def unify_message(basic_message: str) -> str:
+    cleaned_message = clean_message(basic_message)
+    cleaned_message = text_processing.leave_only_unique_lines(cleaned_message)
+    return cleaned_message
+
+
 def prepare_message(message: str, number_of_lines: int, test_and_methods: set[str]) -> str:
     cleaned_message = text_processing.first_lines(message, number_of_lines)
     cleaned_message = text_processing.replace_text_pieces(cleaned_message, test_and_methods)

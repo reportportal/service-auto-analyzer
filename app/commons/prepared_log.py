@@ -18,7 +18,7 @@ from typing_extensions import override
 from app.utils import text_processing
 from app.utils.log_preparation import (
     basic_prepare,
-    clean_message,
+    unify_message,
     prepare_exception_message_and_stacktrace,
     prepare_exception_message_no_params,
     prepare_exception_message_no_params_no_numbers,
@@ -70,7 +70,7 @@ class PreparedLogMessage:
     @property
     def clean_message(self) -> str:
         if not self._clean_message:
-            self._clean_message = clean_message(self.basic_message)
+            self._clean_message = unify_message(self.basic_message)
         return self._clean_message
 
     @property

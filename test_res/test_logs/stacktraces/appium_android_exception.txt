@@ -1,0 +1,53 @@
+org.openqa.selenium.TimeoutException: Expected condition failed: waiting for presence of element located by: AppiumBy.androidUIAutomator: new UiSelector().textContains("Continue") (tried for 10 second(s) with 500 milliseconds interval)
+	at org.openqa.selenium.support.ui.FluentWait.timeoutException(FluentWait.java:265)
+	at org.openqa.selenium.support.ui.FluentWait.until(FluentWait.java:228)
+	at com.example.dynamic.e2eui.test.element.DynamicElement.findElement(DynamicElement.java:150)
+	at com.example.dynamic.e2eui.test.element.DynamicElement.findElement(DynamicElement.java:160)
+	at com.example.dynamic.e2eui.test.element.DynamicElement.tap(DynamicElement.java:617)
+	at com.example.dynamic.e2eui.pageobjects.mobile.changedevice.WelcomeBackPage.tapContinueButton(WelcomeBackPage.java:47)
+	at com.example.dynamic.e2eui.glue.stepdefinitions.mobile.ChangeDeviceSteps.changeDeviceV2(ChangeDeviceSteps.java:344)
+	at com.example.dynamic.e2eui.glue.stepdefinitions.mobile.ChangeDeviceSteps.loginOnNewDeviceWithUsername(ChangeDeviceSteps.java:151)
+	at com.example.dynamic.e2eui.glue.stepdefinitions.mobile.LoginSteps.amLoggedInAsUser(LoginSteps.java:424)
+	at ✽.I am logged in as user "userNewRepaymentHubCancelScheduledPaymentMinimum"(classpath:features/BorrowExperince/ScheduledRepayment.feature:133)
+Caused by: org.openqa.selenium.NoSuchElementException: An element could not be located on the page using the given search parameters.
+For documentation on this error, please visit: https://www.selenium.dev/documentation/webdriver/troubleshooting/errors#no-such-element-exception
+Build info: version: '4.32.0', revision: 'd17c8aa950'
+System info: os.name: 'Linux', os.arch: 'amd64', os.version: '5.10.235-227.919.amzn2.x86_64', java.version: '17.0.13'
+Driver info: io.appium.java_client.android.AndroidDriver
+Command: [eb871d02-1dec-4513-baf6-58975c7bd0fa, findElement {using=-android uiautomator, value=new UiSelector().textContains("Continue")}]
+Capabilities {appium:adbHost: 172.20.0.20, appium:adbPort: 17106, appium:appActivity: com.mobile.MainActivity, appium:appPackage: com.example.international.e2e, appium:appiumData: {appiumVersion: appium2-20250101, automationName: UiAutomator2}, appium:autoGrantPermissions: true, appium:automationName: UiAutomator2, appium:chromedriverChromeMappingFile: /root/.testobject_devices/w..., appium:chromedriverExecutableDir: /root/.testobject_devices/w..., appium:chromedriverPorts: [[3140, 3150]], appium:databaseEnabled: false, appium:desired: {adbHost: 172.20.0.20, adbPort: 17106, appActivity: com.mobile.MainActivity, appPackage: com.example.international.e2e, autoGrantPermissions: true, automationName: UiAutomator2, chromedriverChromeMappingFile: /root/.testobject_devices/w..., chromedriverExecutableDir: /root/.testobject_devices/w..., chromedriverPorts: [[3140, 3150]], deviceName: Google_Pixel_6a_example1, flutterSystemPort: 22606, language: en, locale: GB, newCommandTimeout: 90, platformName: Android, printPageSourceOnFindFailure: true, remoteAdbHost: 172.20.0.20, remoteAppsCacheLimit: 0, sauce:chromeOptions: {androidDevToolsPort: 22306}, sauce:options: {allowTouchIdEnroll: false, appiumVersion: appium2-20250101, build: #1630_release-e2e-protected..., name: App is opened by a credit c..., networkCapture: false, privateDevicesOnly: true, resigningEnabled: false, sauceLabsImageInjectionEnabled: false, setupDeviceLock: false, tags: [2.58.1.1725, android, e2e, release, releaseCandidate, regression, Borrow-Experience, releaseCandidate:Borrow-Exp..., regression:Borrow-Experience, retry]}, suppressKillServer: true, systemPort: 21106, uiautomator2ServerInstallTimeout: 60000}, appium:deviceApiLevel: 33, appium:deviceContextId: d93e394a-3466-4359-9cb0-227..., appium:deviceManufacturer: Google, appium:deviceModel: Pixel 6a, appium:deviceName: 33291JEGR04528, appium:deviceScreenDensity: 420, appium:deviceScreenSize: 1080x2400, appium:deviceUDID: 33291JEGR04528, appium:flutterSystemPort: 22606, appium:javascriptEnabled: true, appium:jobUuid: 9de2ce46e5c54ab98cb71426c2b..., appium:language: en, appium:locale: GB, appium:locationContextEnabled: false, appium:networkConnectionEnabled: true, appium:newCommandTimeout: 90, appium:pixelRatio: 2.625, appium:platformVersion: 13, appium:printPageSourceOnFindFailure: true, appium:remoteAdbHost: 172.20.0.20, appium:remoteAppsCacheLimit: 0, appium:statBarHeight: 118, appium:suppressKillServer: true, appium:systemPort: 21106, appium:takesScreenshot: true, appium:testobject_device: Google_Pixel_6a_example1, appium:testobject_device_name: Google Pixel 6a, appium:testobject_device_session_id: 8f388f80-4bec-4a7e-ad73-806..., appium:testobject_test_report_api_url: https://api.eu-central-1.sa..., appium:testobject_test_report_url: https://app.eu-central-1.sa..., appium:testobject_user_id: NiyiOke, appium:uiautomator2ServerInstallTimeout: 60000, appium:usedCachedDevice: false, appium:viewportRect: {height: 2282, left: 0, top: 118, width: 1080}, appium:warnings: {}, appium:webStorageEnabled: false, platformName: ANDROID, sauce:chromeOptions: {androidDevToolsPort: 22306}, sauce:options: {allowTouchIdEnroll: false, appiumVersion: appium2-20250101, build: #1630_release-e2e-protected..., name: App is opened by a credit c..., networkCapture: false, privateDevicesOnly: true, resigningEnabled: false, sauceLabsImageInjectionEnabled: false, setupDeviceLock: false, tags: [2.58.1.1725, android, e2e, release, releaseCandidate, regression, Borrow-Experience, releaseCandidate:Borrow-Exp..., regression:Borrow-Experience, retry]}}
+Session ID: eb871d02-1dec-4513-baf6-58975c7bd0fa
+	at jdk.internal.reflect.GeneratedConstructorAccessor62.newInstance(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingConstructorAccessorImpl.newInstance(DelegatingConstructorAccessorImpl.java:45)
+	at java.base/java.lang.reflect.Constructor.newInstanceWithCaller(Constructor.java:499)
+	at java.base/java.lang.reflect.Constructor.newInstance(Constructor.java:480)
+	at org.openqa.selenium.remote.ErrorCodec.decode(ErrorCodec.java:167)
+	at org.openqa.selenium.remote.codec.w3c.W3CHttpResponseCodec.decode(W3CHttpResponseCodec.java:138)
+	at org.openqa.selenium.remote.codec.w3c.W3CHttpResponseCodec.decode(W3CHttpResponseCodec.java:50)
+	at org.openqa.selenium.remote.HttpCommandExecutor.execute(HttpCommandExecutor.java:215)
+	at io.appium.java_client.remote.AppiumCommandExecutor.execute(AppiumCommandExecutor.java:237)
+	at org.openqa.selenium.remote.RemoteWebDriver.execute(RemoteWebDriver.java:545)
+	at org.openqa.selenium.remote.ElementLocation$ElementFinder$2.findElement(ElementLocation.java:165)
+	at org.openqa.selenium.remote.ElementLocation.findElement(ElementLocation.java:59)
+	at org.openqa.selenium.remote.RemoteWebDriver.findElement(RemoteWebDriver.java:368)
+	at org.openqa.selenium.remote.RemoteWebDriver.findElement(RemoteWebDriver.java:362)
+	at org.openqa.selenium.support.ui.ExpectedConditions$6.apply(ExpectedConditions.java:171)
+	at org.openqa.selenium.support.ui.ExpectedConditions$6.apply(ExpectedConditions.java:168)
+	at org.openqa.selenium.support.ui.FluentWait.until(FluentWait.java:203)
+	at com.example.dynamic.e2eui.test.element.DynamicElement.findElement(DynamicElement.java:150)
+	at com.example.dynamic.e2eui.test.element.DynamicElement.findElement(DynamicElement.java:160)
+	at com.example.dynamic.e2eui.test.element.DynamicElement.tap(DynamicElement.java:617)
+	at com.example.dynamic.e2eui.pageobjects.mobile.changedevice.WelcomeBackPage.tapContinueButton(WelcomeBackPage.java:47)
+	at com.example.dynamic.e2eui.glue.stepdefinitions.mobile.ChangeDeviceSteps.changeDeviceV2(ChangeDeviceSteps.java:344)
+	at com.example.dynamic.e2eui.glue.stepdefinitions.mobile.ChangeDeviceSteps.loginOnNewDeviceWithUsername(ChangeDeviceSteps.java:151)
+	at com.example.dynamic.e2eui.glue.stepdefinitions.mobile.LoginSteps.amLoggedInAsUser(LoginSteps.java:424)
+...	at io.cucumber.java.Invoker.doInvoke(Invoker.java:66)
+	at io.cucumber.java.Invoker.invoke(Invoker.java:24)
+	at io.cucumber.java.AbstractGlueDefinition.invokeMethod(AbstractGlueDefinition.java:47)
+	at io.cucumber.java.JavaStepDefinition.execute(JavaStepDefinition.java:29)
+	at io.cucumber.core.runner.CoreStepDefinition.execute(CoreStepDefinition.java:66)
+	at io.cucumber.core.runner.PickleStepDefinitionMatch.runStep(PickleStepDefinitionMatch.java:63)
+	at io.cucumber.core.runner.ExecutionMode$1.execute(ExecutionMode.java:10)
+	at io.cucumber.core.runner.TestStep.executeStep(TestStep.java:92)
+	at io.cucumber.core.runner.TestStep.run(TestStep.java:64)
+...

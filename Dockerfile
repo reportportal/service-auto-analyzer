@@ -9,7 +9,7 @@ WORKDIR /build
 COPY ./ ./
 RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
     && LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "${VIRTUAL_ENV}/bin/pip install --no-cache-dir -r requirements.txt" \
-    && "${VIRTUAL_ENV}/bin/python3" -m nltk.downloader -d /usr/share/nltk_data stopwords
+    && "${VIRTUAL_ENV}/bin/python3" -m nltk.downloader -d /usr/share/nltk_data stopwords wordnet omw-1.4
 RUN "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir -r requirements-dev.txt
 RUN make test-all
 
@@ -28,7 +28,7 @@ COPY ./ ./
 RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
     && "${VIRTUAL_ENV}/bin/pip" install --upgrade setuptools \
     && LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "${VIRTUAL_ENV}/bin/pip install --no-cache-dir -r requirements.txt" \
-    && "${VIRTUAL_ENV}/bin/python3" -m nltk.downloader -d /usr/share/nltk_data stopwords
+    && "${VIRTUAL_ENV}/bin/python3" -m nltk.downloader -d /usr/share/nltk_data stopwords wordnet omw-1.4
 ARG APP_VERSION=""
 ARG RELEASE_MODE=false
 ARG GITHUB_TOKEN

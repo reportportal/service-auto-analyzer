@@ -19,6 +19,9 @@ from typing import Iterable
 from urllib.parse import urlparse
 
 import nltk
+from nltk.stem import WordNetLemmatizer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 from app.commons.model.launch_objects import Log
 
@@ -885,3 +888,127 @@ def remove_urls(message: str, urls_list: list[str]) -> str:
         except Exception:
             logger.warning("Failed to encode URL: %s", url)
     return result
+
+
+SPECIAL_CHARACTERS_PATTERN = re.compile(r"[.:/\\{}()\[\]\"',\-+=!@#$%^&*<>?|~`;_]")
+CAMEL_CASE_PATTERN = re.compile(r"([a-z])([A-Z])")
+UPPER_LOWER_CASE_PATTERN = re.compile(r"([A-Z]+)([A-Z][a-z])")
+
+
+def preprocess_text_for_similarity(text: str) -> str:
+    """
+    Preprocess text for similarity calculation following the specified requirements.
+
+    :param text: Input text to preprocess
+    :return: Preprocessed text ready for similarity calculation
+    """
+    if not text:
+        return ""
+
+    result = text
+
+    # 1. Text delimited with dots, slashes, colons, braces, quotes, commas, etc. -> separate words
+    result = SPECIAL_CHARACTERS_PATTERN.sub(" ", result)
+
+    # 2. Handle CamelCase and camelCase - insert space before uppercase letters that follow lowercase
+    result = CAMEL_CASE_PATTERN.sub(r"\1 \2", result)
+
+    # 3. Handle sequences of uppercase letters followed by lowercase (like XMLHttpRequest -> XML Http Request)
+    result = UPPER_LOWER_CASE_PATTERN.sub(r"\1 \2", result)
+
+    # 4. Use remove_numbers function
+    result = remove_numbers(result)
+
+    # 5. Lowercase everything
+    result = result.lower()
+
+    # 6. Replace excessive spaces with one space
+    result = re.sub(r"\s+", " ", result).strip()
+
+    # 7. Use lemmatizer and text normalization
+    lemmatizer = WordNetLemmatizer()
+
+    # 8. Remove English stopwords and lemmatize
+    words = result.split()
+    processed_words = []
+
+    for word in words:
+        if not word or len(word) <= 1 or word in STOPWORDS_ALL:
+            continue
+
+        # Lemmatize the word
+        lemmatized_word = lemmatizer.lemmatize(word)
+        processed_words.append(lemmatized_word)
+
+    return " ".join(processed_words)
+
+
+def calculate_text_similarity(base_text: str, *other_texts: str) -> list[float]:
+    """
+    Calculate similarity between a base text and multiple other texts using TF-IDF vectorization and cosine similarity.
+
+    This function preprocesses all texts according to specified requirements and then
+    computes their similarity using computationally efficient methods.
+
+    :param base_text: Base text to compare against
+    :param other_texts: Variable number of texts to compare with the base text
+    :return: List of similarity scores between 0.0 (not similar at all) and 1.0 (completely equal)
+    """
+    if not other_texts:
+        return []
+
+    # Preprocess the base text
+    processed_base_text = preprocess_text_for_similarity(base_text)
+
+    # Preprocess all other texts
+    processed_other_texts = [preprocess_text_for_similarity(text) for text in other_texts]
+
+    # Handle empty texts and identical texts first
+    similarity_scores = []
+    valid_texts = []
+    valid_indices = []
+
+    for i, processed_other_text in enumerate(processed_other_texts):
+        # If either text is empty after preprocessing, append 0
+        if not processed_base_text.strip() or not processed_other_text.strip():
+            similarity_scores.append(0.0)
+            continue
+
+        # If both texts are identical after preprocessing, append 1
+        if processed_base_text == processed_other_text:
+            similarity_scores.append(1.0)
+            continue
+
+        # Store valid texts for batch processing
+        valid_texts.append(processed_other_text)
+        valid_indices.append(i)
+        similarity_scores.append(0.0)  # Placeholder, will be replaced
+
+    # If we have valid texts to process, use single TF-IDF vectorizer
+    if valid_texts:
+        # Create all texts list: base text + all valid other texts
+        all_texts = [processed_base_text] + valid_texts
+
+        # Use TF-IDF vectorization and cosine similarity for efficient computation
+        vectorizer = TfidfVectorizer(
+            lowercase=False,  # Already lowercased in preprocessing
+            token_pattern=r"\b\w+\b",  # Simple word tokenization
+            min_df=1,  # Include all terms
+            max_df=1.0,  # Include all terms
+            ngram_range=(1, 2),  # Use unigrams and bigrams
+        )
+
+        # Fit and transform all texts at once
+        tfidf_matrix = vectorizer.fit_transform(all_texts)
+
+        # Calculate cosine similarity between base text (index 0) and all other texts
+        base_vector = tfidf_matrix[0:1]  # Base text vector
+        other_vectors = tfidf_matrix[1:]  # All other text vectors
+
+        similarity_matrix = cosine_similarity(base_vector, other_vectors)
+
+        # Update similarity scores for valid texts
+        for i, valid_index in enumerate(valid_indices):
+            similarity_scores[valid_index] = float(similarity_matrix[0][i])
+
+    return similarity_scores

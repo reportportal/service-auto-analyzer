@@ -462,8 +462,6 @@ class AutoAnalyzerService(AnalyzerService):
         t_start = time()
         results = []
         try:
-            del launches
-
             cnt_items_to_process = 0
             results_to_share = {}
             chosen_namespaces = {}

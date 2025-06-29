@@ -63,7 +63,7 @@ class AutoAnalyzerService(AnalyzerService):
         model_chooser: ModelChooser,
         app_config: ApplicationConfig,
         search_cfg: SearchConfig,
-        es_client: EsClient = None,
+        es_client: EsClient,
     ):
         self.app_config = app_config
         self.search_cfg = search_cfg
@@ -307,9 +307,13 @@ class AutoAnalyzerService(AnalyzerService):
                 return [(log_info, {"hits": {"hits": [latest_item]}})]
         return []
 
-    def _send_result_to_queue(self, test_item_dict, batches, batch_logs):
+    def _send_result_to_queue(self, test_item_dict, batches, batch_logs, queue):
         t_start = time()
-        partial_res = self.es_client.es_client.msearch("\n".join(batches) + "\n")["responses"]
+        search_results = self.es_client.es_client.msearch("\n".join(batches) + "\n")
+        partial_res = search_results["responses"] if search_results else []
+        if not partial_res:
+            logger.warning("No search results for batches")
+            return
         avg_time_processed = (time() - t_start) / (len(partial_res) if partial_res else 1)
         for test_item_id in test_item_dict:
             candidates = []
@@ -324,7 +328,7 @@ class AutoAnalyzerService(AnalyzerService):
                     candidates_with_no_defect.append((batch_log_info.log_info, partial_res[idx]))
                 time_processed += avg_time_processed
             if batch_log_info:
-                self.queue.put(
+                queue.put(
                     AnalysisCandidate(
                         analyzerConfig=batch_log_info.analyzerConfig,
                         testItemId=batch_log_info.testItemId,
@@ -338,7 +342,7 @@ class AutoAnalyzerService(AnalyzerService):
                     )
                 )
 
-    def _query_elasticsearch(self, launches: list[Launch], max_batch_size=30):
+    def _query_elasticsearch(self, launches: list[Launch], queue, finished_queue, max_batch_size=30):
         t_start = time()
         batches = []
         batch_logs = []
@@ -408,18 +412,18 @@ class AutoAnalyzerService(AnalyzerService):
                         batch_size = max_batch_size
                     if len(batches) >= batch_size:
                         n_first_blocks -= 1
-                        self._send_result_to_queue(test_item_dict, batches, batch_logs)
+                        self._send_result_to_queue(test_item_dict, batches, batch_logs, queue)
                         batches = []
                         batch_logs = []
                         test_item_dict = {}
                         index_in_batch = 0
                     test_items_number_to_process += 1
             if len(batches) > 0:
-                self._send_result_to_queue(test_item_dict, batches, batch_logs)
+                self._send_result_to_queue(test_item_dict, batches, batch_logs, queue)
 
         except Exception as exc:
             logger.exception("Error in ES query", exc_info=exc)
-        self.finished_queue.put("Finished")
+        finished_queue.put("Finished")
         logger.info("Es queries finished %.2f s.", time() - t_start)
 
     @utils.ignore_warnings
@@ -428,11 +432,9 @@ class AutoAnalyzerService(AnalyzerService):
         cnt_launches = len(launches)
         logger.info("Started analysis for %d launches", cnt_launches)
         logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))
-        self.queue = Queue()
-        self.finished_queue = Queue()
-        # noinspection PyTypeChecker
-        defect_type_model_to_use: dict[int, DefectTypeModel] = {}
-        es_query_thread = Thread(target=self._query_elasticsearch, args=(launches,))
+        queue = Queue()
+        finished_queue = Queue()
+        es_query_thread = Thread(target=self._query_elasticsearch, args=(launches, queue, finished_queue))
         es_query_thread.daemon = True
         es_query_thread.start()
         analyzed_results_for_index = []
@@ -444,17 +446,18 @@ class AutoAnalyzerService(AnalyzerService):
             cnt_items_to_process = 0
             results_to_share = {}
             chosen_namespaces = {}
-            while self.finished_queue.empty() or not self.queue.empty():
+            defect_type_model_to_use: dict[int, DefectTypeModel] = {}
+            while finished_queue.empty() or not queue.empty():
                 if (
                     self.search_cfg.AutoAnalysisTimeout - (time() - t_start)
                 ) <= 5:  # check whether we are running out of time # noqa
                     EARLY_FINISH = True
                     break
-                if self.queue.empty():
+                if queue.empty():
                     sleep(0.1)
                     continue
                 else:
-                    analyzer_candidates = self.queue.get()
+                    analyzer_candidates = queue.get()
                 try:
                     project_id = analyzer_candidates.project
                     launch_id = analyzer_candidates.launchId
@@ -627,8 +630,6 @@ class AutoAnalyzerService(AnalyzerService):
             logger.exception(exc)
         es_query_thread.join()
         EARLY_FINISH = False
-        self.queue = Queue()
-        self.finished_queue = Queue()
         logger.debug("Stats info %s", results_to_share)
         logger.info("Processed %d test items. It took %.2f sec.", cnt_items_to_process, time() - t_start)
         logger.info("Finished analysis for %d launches with %d results.", cnt_launches, len(results))

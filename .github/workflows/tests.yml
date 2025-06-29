@@ -33,7 +33,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r ./requirements.txt
           python -m pip install -r ./requirements-dev.txt
-          python -c "import nltk; nltk.download('stopwords')"
+          python -m nltk.downloader stopwords wordnet omw-1.4
 
       - name: Checkstyle
         run: pre-commit run --all-files --show-diff-on-failure

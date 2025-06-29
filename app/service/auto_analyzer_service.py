@@ -17,12 +17,13 @@ from datetime import datetime
 from queue import Queue
 from threading import Event, Thread
 from time import sleep, time
-from typing import Any
+from typing import Any, Optional
 
 from app.amqp.amqp import AmqpClient
 from app.commons import log_merger, logging, object_saving, request_factory
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import (
+    AnalyzerConf,
     AnalysisCandidate,
     AnalysisResult,
     ApplicationConfig,
@@ -62,8 +63,8 @@ class AutoAnalyzerService(AnalyzerService):
         model_chooser: ModelChooser,
         app_config: ApplicationConfig,
         search_cfg: SearchConfig,
-        es_client: EsClient,
-    ):
+        es_client: Optional[EsClient] = None,
+    ) -> None:
         self.app_config = app_config
         self.search_cfg = search_cfg
         super().__init__(model_chooser, search_cfg=self.search_cfg)
@@ -76,7 +77,7 @@ class AutoAnalyzerService(AnalyzerService):
             self.similarity_model = WeightedSimilarityCalculator(object_saving.create_filesystem(weights_folder))
             self.similarity_model.load_model()
 
-    def get_config_for_boosting(self, analyzer_config):
+    def get_config_for_boosting(self, analyzer_config: AnalyzerConf) -> dict[str, Any]:
         min_should_match = self.find_min_should_match_threshold(analyzer_config) / 100
         return {
             "max_query_terms": self.search_cfg.MaxQueryTerms,
@@ -93,7 +94,7 @@ class AutoAnalyzerService(AnalyzerService):
             "time_weight_decay": self.search_cfg.TimeWeightDecay,
         }
 
-    def choose_fields_to_filter_strict(self, log_lines, min_should_match):
+    def choose_fields_to_filter_strict(self, log_lines: int, min_should_match: float) -> list[str]:
         fields = (
             ["detected_message", "message", "potential_status_codes"]
             if log_lines == -1
@@ -110,7 +111,7 @@ class AutoAnalyzerService(AnalyzerService):
             else self.search_cfg.MinShouldMatch
         )
 
-    def build_analyze_query(self, launch: Launch, log: dict[str, Any], size=10):
+    def build_analyze_query(self, launch: Launch, log: dict[str, Any], size: int = 10) -> dict[str, Any]:
         """Build query to get similar log entries for the given log entry.
 
         This query is used to find similar log entries for the given log entry, the results of this query then will be
@@ -193,7 +194,7 @@ class AutoAnalyzerService(AnalyzerService):
 
         return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
-    def build_query_with_no_defect(self, launch: Launch, log: dict, size=10):
+    def build_query_with_no_defect(self, launch: Launch, log: dict[str, Any], size: int = 10) -> dict[str, Any]:
         min_should_match = self.get_min_should_match_setting(launch)
         query = {
             "size": size,
@@ -240,7 +241,9 @@ class AutoAnalyzerService(AnalyzerService):
         utils.append_potential_status_codes(query, log, max_query_terms=self.search_cfg.MaxQueryTerms)
         return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
-    def leave_only_similar_logs(self, candidates_with_no_defect, boosting_config):
+    def leave_only_similar_logs(
+        self, candidates_with_no_defect: list[tuple[dict[str, Any], dict[str, Any]]], boosting_config: dict[str, Any]
+    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         new_results = []
         for log_info, search_res in candidates_with_no_defect:
             no_defect_candidate_exists = False
@@ -265,7 +268,9 @@ class AutoAnalyzerService(AnalyzerService):
             new_results.append((log_info, {"hits": {"hits": new_search_res}}))
         return new_results
 
-    def filter_by_all_logs_should_be_similar(self, candidates_with_no_defect, boosting_config):
+    def filter_by_all_logs_should_be_similar(
+        self, candidates_with_no_defect: list[tuple[dict[str, Any], dict[str, Any]]], boosting_config: dict[str, Any]
+    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         if boosting_config["filter_by_all_logs_should_be_similar"]:
             test_item_stats = {}
             for log_info, search_res in candidates_with_no_defect:
@@ -284,7 +289,9 @@ class AutoAnalyzerService(AnalyzerService):
             return new_results
         return candidates_with_no_defect
 
-    def find_relevant_with_no_defect(self, candidates_with_no_defect, boosting_config):
+    def find_relevant_with_no_defect(
+        self, candidates_with_no_defect: list[tuple[dict[str, Any], dict[str, Any]]], boosting_config: dict[str, Any]
+    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         candidates_with_no_defect = self.leave_only_similar_logs(candidates_with_no_defect, boosting_config)
         candidates_with_no_defect = self.filter_by_all_logs_should_be_similar(
             candidates_with_no_defect, boosting_config
@@ -306,7 +313,13 @@ class AutoAnalyzerService(AnalyzerService):
                 return [(log_info, {"hits": {"hits": [latest_item]}})]
         return []
 
-    def _send_result_to_queue(self, test_item_dict, batches, batch_logs, queue):
+    def _send_result_to_queue(
+        self,
+        test_item_dict: dict[int, list[int]],
+        batches: list[str],
+        batch_logs: list[BatchLogInfo],
+        queue: Queue[AnalysisCandidate],
+    ) -> None:
         t_start = time()
         search_results = self.es_client.es_client.msearch("\n".join(batches) + "\n")
         partial_res = search_results["responses"] if search_results else []
@@ -342,8 +355,13 @@ class AutoAnalyzerService(AnalyzerService):
                 )
 
     def _query_elasticsearch(
-        self, launches: list[Launch], queue, finished_queue, early_finish_event, max_batch_size=30
-    ):
+        self,
+        launches: list[Launch],
+        queue: Queue[AnalysisCandidate],
+        finished_queue: Queue[str],
+        early_finish_event: Event,
+        max_batch_size: int = 30,
+    ) -> None:
         t_start = time()
         batches = []
         batch_logs = []
@@ -428,8 +446,7 @@ class AutoAnalyzerService(AnalyzerService):
         logger.info("Es queries finished %.2f s.", time() - t_start)
 
     @utils.ignore_warnings
-    def analyze_logs(self, launches: list[Launch]):
-        global EARLY_FINISH
+    def analyze_logs(self, launches: list[Launch]) -> list[AnalysisResult]:
         cnt_launches = len(launches)
         logger.info("Started analysis for %d launches", cnt_launches)
         logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))

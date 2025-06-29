@@ -23,9 +23,9 @@ from app.amqp.amqp import AmqpClient
 from app.commons import log_merger, logging, object_saving, request_factory
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import (
-    AnalyzerConf,
     AnalysisCandidate,
     AnalysisResult,
+    AnalyzerConf,
     ApplicationConfig,
     BatchLogInfo,
     Launch,

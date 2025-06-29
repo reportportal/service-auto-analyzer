@@ -213,7 +213,7 @@ def test_remove_credentials_from_url(url, expected_url):
         (
             "org.openqa.selenium.TimeoutException: ErrorCodec.decode",
             ["org.openqa.selenium.TimeoutException: Different error"],
-            [0.5],  # Should be moderate similarity (approximate)
+            [0.56],  # Should be moderate similarity (approximate)
         ),
         # Test empty strings
         ("", [""], [0.0]),
@@ -227,7 +227,7 @@ def test_remove_credentials_from_url(url, expected_url):
                 "java.lang.NullPointerException",
                 "org.openqa.selenium.WebDriverException",
             ],
-            [1.0, 0.05, 0.5],  # Expected approximate similarities
+            [1.0, 0.05, 0.45],  # Expected approximate similarities
         ),
     ],
 )
@@ -238,13 +238,7 @@ def test_calculate_text_similarity_basic_cases(base_text, other_texts, expected_
     assert len(actual_scores) == len(expected_scores)
 
     for actual, expected in zip(actual_scores, expected_scores):
-        if expected == 0.0:
-            assert actual == 0.0
-        elif expected == 1.0:
-            assert actual == 1.0
-        else:
-            # For non-exact cases, check if similarity is reasonable
-            assert 0.0 <= actual <= 1.0
+        assert abs(actual - expected) < 0.01
 
 
 @pytest.mark.parametrize(

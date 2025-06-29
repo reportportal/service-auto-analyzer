@@ -15,7 +15,7 @@
 import json
 from datetime import datetime
 from queue import Queue
-from threading import Thread
+from threading import Event, Thread
 from time import sleep, time
 from typing import Any
 
@@ -41,7 +41,6 @@ from app.service.analyzer_service import AnalyzerService
 from app.utils import text_processing, utils
 
 logger = logging.getLogger("analyzerApp.autoAnalyzerService")
-EARLY_FINISH = False
 SPECIAL_FIELDS_BOOST_SCORES = [
     ("detected_message_without_params_extended", 2.0),
     ("only_numbers", 2.0),
@@ -342,7 +341,9 @@ class AutoAnalyzerService(AnalyzerService):
                     )
                 )
 
-    def _query_elasticsearch(self, launches: list[Launch], queue, finished_queue, max_batch_size=30):
+    def _query_elasticsearch(
+        self, launches: list[Launch], queue, finished_queue, early_finish_event, max_batch_size=30
+    ):
         t_start = time()
         batches = []
         batch_logs = []
@@ -359,7 +360,7 @@ class AutoAnalyzerService(AnalyzerService):
                 if test_items_number_to_process >= self.search_cfg.MaxAutoAnalysisItemsToProcess:
                     logger.info("Only first %d test items were taken", self.search_cfg.MaxAutoAnalysisItemsToProcess)
                     break
-                if EARLY_FINISH:
+                if early_finish_event.is_set():
                     logger.info("Early finish from analyzer before timeout")
                     break
                 for test_item in launch.testItems:
@@ -368,7 +369,7 @@ class AutoAnalyzerService(AnalyzerService):
                             "Only first %d test items were taken", self.search_cfg.MaxAutoAnalysisItemsToProcess
                         )
                         break
-                    if EARLY_FINISH:
+                    if early_finish_event.is_set():
                         logger.info("Early finish from analyzer before timeout")
                         break
                     unique_logs = text_processing.leave_only_unique_logs(test_item.logs)
@@ -434,7 +435,10 @@ class AutoAnalyzerService(AnalyzerService):
         logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))
         queue = Queue()
         finished_queue = Queue()
-        es_query_thread = Thread(target=self._query_elasticsearch, args=(launches, queue, finished_queue))
+        early_finish_event = Event()
+        es_query_thread = Thread(
+            target=self._query_elasticsearch, args=(launches, queue, finished_queue, early_finish_event)
+        )
         es_query_thread.daemon = True
         es_query_thread.start()
         analyzed_results_for_index = []
@@ -451,7 +455,7 @@ class AutoAnalyzerService(AnalyzerService):
                 if (
                     self.search_cfg.AutoAnalysisTimeout - (time() - t_start)
                 ) <= 5:  # check whether we are running out of time # noqa
-                    EARLY_FINISH = True
+                    early_finish_event.set()
                     break
                 if queue.empty():
                     sleep(0.1)
@@ -629,7 +633,6 @@ class AutoAnalyzerService(AnalyzerService):
         except Exception as exc:
             logger.exception(exc)
         es_query_thread.join()
-        EARLY_FINISH = False
         logger.debug("Stats info %s", results_to_share)
         logger.info("Processed %d test items. It took %.2f sec.", cnt_items_to_process, time() - t_start)
         logger.info("Finished analysis for %d launches with %d results.", cnt_launches, len(results))

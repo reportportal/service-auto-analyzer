@@ -37,7 +37,6 @@ from app.machine_learning.models import BoostingDecisionMaker, WeightedSimilarit
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.service.analyzer_service import AnalyzerService
 from app.utils import text_processing, utils
-from app.utils.log_preparation import unify_message
 
 logger = logging.getLogger("analyzerApp.suggestService")
 SPECIAL_FIELDS_BOOST_SCORES = [
@@ -444,65 +443,44 @@ class SuggestService(AnalyzerService):
                         "Test item id %s with issue type %s has probability %.2f", test_item_id, issue_type, prob
                     )
                 processed_time = time() - t_start
-                selected_results = [
-                    (idx, prob)
-                    for idx, prob, _ in sorted_results[: self.search_cfg.MaxSuggestionsNumber]
-                    if prob >= self.suggest_threshold
-                ]
                 global_idx = 0
-                previous_similarity = 0.0
-                for idx, _ in selected_results:
-                    test_item_id = test_item_ids[idx]
-
-                    # Calculate similarity between relevant and original messages to show in UI
-                    relevant_message = unify_message(
-                        scores_by_test_items[test_item_id]["mrHit"]["_source"]["original_message"] or ""
-                    )
-                    original_message = unify_message(
-                        scores_by_test_items[test_item_id]["compared_log"]["_source"]["original_message"] or ""
-                    )
-                    similarity = (
-                        round(text_processing.calculate_text_similarity(original_message, relevant_message)[0], 3)
-                        * 100
-                    )
-
-                    # Do not confuse users if similarity is bigger than previous one
-                    if similarity > previous_similarity:
-                        similarity = previous_similarity
-                    previous_similarity = similarity
-
-                    issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
-                    relevant_log_id = utils.extract_real_id(scores_by_test_items[test_item_id]["mrHit"]["_id"])
-                    real_log_id = str(scores_by_test_items[test_item_id]["mrHit"]["_id"])
-                    is_merged = real_log_id != str(relevant_log_id)
-                    test_item_log_id = utils.extract_real_id(scores_by_test_items[test_item_id]["compared_log"]["_id"])
-                    analysis_result = SuggestAnalysisResult(
-                        project=test_item_info.project,
-                        testItem=test_item_id_for_suggest,
-                        testItemLogId=test_item_log_id,
-                        launchId=test_item_info.launchId,
-                        launchName=test_item_info.launchName,
-                        launchNumber=test_item_info.launchNumber,
-                        issueType=issue_type,
-                        relevantItem=test_item_id,
-                        relevantLogId=relevant_log_id,
-                        isMergedLog=is_merged,
-                        matchScore=similarity,
-                        esScore=round(scores_by_test_items[test_item_id]["mrHit"]["_score"], 2),
-                        esPosition=scores_by_test_items[test_item_id]["mrHit"]["es_pos"],
-                        modelFeatureNames=feature_names,
-                        modelFeatureValues=";".join([str(feature) for feature in feature_data[idx]]),
-                        modelInfo=";".join(model_info_tags),
-                        resultPosition=global_idx,
-                        usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
-                        minShouldMatch=self.find_min_should_match_threshold(test_item_info.analyzerConfig),
-                        processedTime=processed_time,
-                        clusterId=test_item_info.clusterId,
-                        methodName="suggestion",
-                    )
-                    results.append(analysis_result)
-                    logger.debug(analysis_result)
-                    global_idx += 1
+                for idx, prob, _ in sorted_results[: self.search_cfg.MaxSuggestionsNumber]:
+                    if prob >= self.suggest_threshold:
+                        test_item_id = test_item_ids[idx]
+                        issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
+                        relevant_log_id = utils.extract_real_id(scores_by_test_items[test_item_id]["mrHit"]["_id"])
+                        real_log_id = str(scores_by_test_items[test_item_id]["mrHit"]["_id"])
+                        is_merged = real_log_id != str(relevant_log_id)
+                        test_item_log_id = utils.extract_real_id(
+                            scores_by_test_items[test_item_id]["compared_log"]["_id"]
+                        )
+                        analysis_result = SuggestAnalysisResult(
+                            project=test_item_info.project,
+                            testItem=test_item_id_for_suggest,
+                            testItemLogId=test_item_log_id,
+                            launchId=test_item_info.launchId,
+                            launchName=test_item_info.launchName,
+                            launchNumber=test_item_info.launchNumber,
+                            issueType=issue_type,
+                            relevantItem=test_item_id,
+                            relevantLogId=relevant_log_id,
+                            isMergedLog=is_merged,
+                            matchScore=round(prob, 3) * 100,
+                            esScore=round(scores_by_test_items[test_item_id]["mrHit"]["_score"], 2),
+                            esPosition=scores_by_test_items[test_item_id]["mrHit"]["es_pos"],
+                            modelFeatureNames=feature_names,
+                            modelFeatureValues=";".join([str(feature) for feature in feature_data[idx]]),
+                            modelInfo=";".join(model_info_tags),
+                            resultPosition=global_idx,
+                            usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
+                            minShouldMatch=self.find_min_should_match_threshold(test_item_info.analyzerConfig),
+                            processedTime=processed_time,
+                            clusterId=test_item_info.clusterId,
+                            methodName="suggestion",
+                        )
+                        results.append(analysis_result)
+                        logger.debug(analysis_result)
+                        global_idx += 1
             else:
                 logger.debug("There are no results for test item %s", test_item_info.testItemId)
         except Exception as exc:

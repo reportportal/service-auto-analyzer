@@ -36,8 +36,8 @@ from app.commons.model.ml import ModelType
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.similarity_calculator import SimilarityCalculator
-from app.machine_learning import boosting_featurizer
-from app.machine_learning.models import BoostingDecisionMaker, DefectTypeModel, WeightedSimilarityCalculator
+from app.machine_learning.models import WeightedSimilarityCalculator
+from app.machine_learning.predictor import AutoAnalysisPredictor
 from app.service.analyzer_service import AnalyzerService
 from app.utils import text_processing, utils
 
@@ -465,7 +465,6 @@ class AutoAnalyzerService(AnalyzerService):
             cnt_items_to_process = 0
             results_to_share = {}
             chosen_namespaces = {}
-            defect_type_model_to_use: dict[int, DefectTypeModel] = {}
             while finished_queue.empty() or not queue.empty():
                 if (
                     self.search_cfg.AutoAnalysisTimeout - (time() - t_start)
@@ -510,18 +509,17 @@ class AutoAnalyzerService(AnalyzerService):
                     if project_id not in chosen_namespaces:
                         chosen_namespaces[project_id] = self.namespace_finder.get_chosen_namespaces(project_id)
                     boosting_config["chosen_namespaces"] = chosen_namespaces[project_id]
-                    # noinspection PyTypeChecker
-                    _boosting_decision_maker: BoostingDecisionMaker = self.model_chooser.choose_model(
-                        project_id,
-                        ModelType.auto_analysis,
+
+                    # Create predictor for auto analysis
+                    predictor = AutoAnalysisPredictor(
+                        model_chooser=self.model_chooser,
+                        project_id=project_id,
+                        model_type=ModelType.auto_analysis,
+                        boosting_config=boosting_config,
+                        weighted_log_similarity_calculator=self.similarity_model,
                         custom_model_prob=self.search_cfg.ProbabilityForCustomModelAutoAnalysis,
                         hash_source=launch_id,
                     )
-                    if project_id not in defect_type_model_to_use:
-                        # noinspection PyTypeChecker
-                        defect_type_model_to_use[project_id] = self.model_chooser.choose_model(
-                            project_id, ModelType.defect_type
-                        )
 
                     relevant_with_no_defect_candidate = self.find_relevant_with_no_defect(
                         analyzer_candidates.candidatesWithNoDefect, boosting_config
@@ -535,46 +533,32 @@ class AutoAnalyzerService(AnalyzerService):
                     found_result = False
 
                     for candidates in candidates_to_check:
-                        boosting_data_gatherer = boosting_featurizer.BoostingFeaturizer(
-                            candidates,
-                            boosting_config,
-                            feature_ids=_boosting_decision_maker.feature_ids,
-                            weighted_log_similarity_calculator=self.similarity_model,
-                        )
-                        boosting_data_gatherer.set_defect_type_model(defect_type_model_to_use[project_id])
-                        feature_data, issue_type_names = boosting_data_gatherer.gather_features_info()
-                        model_info_tags = (
-                            boosting_data_gatherer.get_used_model_info() + _boosting_decision_maker.get_model_info()
-                        )
+                        # Use predictor for the complete prediction workflow
+                        prediction_result, model_info_tags = predictor.predict(candidates)
                         results_to_share[launch_id]["model_info"].update(model_info_tags)
 
-                        if len(feature_data) > 0:
-
-                            # noinspection PyUnresolvedReferences
-                            predicted_labels, predicted_labels_probability = _boosting_decision_maker.predict(
-                                feature_data
-                            )
-
-                            scores_by_issue_type = boosting_data_gatherer.find_most_relevant_by_type()
-
-                            for i in range(len(issue_type_names)):
-                                issue_type_name = issue_type_names[i]
-                                log_id = scores_by_issue_type[issue_type_name]["mrHit"]["_id"]
-                                logger.debug(
-                                    f"Most relevant item with issue type '{issue_type_name}' has log id: {log_id}"
-                                )
-                                label = predicted_labels[i]
-                                probability = round(predicted_labels_probability[i][1], 3)
-                                logger.debug(
-                                    f"Issue type '{issue_type_name}' has label '{label}' and probability {probability}"
-                                    f" with calculated feature values: {feature_data[i]}"
-                                )
-
-                            predicted_issue_type, prob, global_idx = utils.choose_issue_type(
-                                predicted_labels, predicted_labels_probability, issue_type_names, scores_by_issue_type
-                            )
+                        if prediction_result is not None:
+                            predicted_issue_type, prob, global_idx = prediction_result
 
                             if predicted_issue_type:
+                                # Get additional data needed for result creation
+                                featurizer = predictor.create_featurizer(
+                                    candidates,
+                                    boosting_config,
+                                    predictor.boosting_decision_maker.feature_ids,
+                                    self.similarity_model,
+                                )
+                                feature_data, issue_type_names = featurizer.gather_features_info()
+                                scores_by_issue_type = featurizer.find_most_relevant_by_type()
+
+                                # Debug logging
+                                for i in range(len(issue_type_names)):
+                                    issue_type_name = issue_type_names[i]
+                                    log_id = scores_by_issue_type[issue_type_name]["mrHit"]["_id"]
+                                    logger.debug(
+                                        f"Most relevant item with issue type '{issue_type_name}' has log id: {log_id}"
+                                    )
+
                                 chosen_type = scores_by_issue_type[predicted_issue_type]
                                 relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
                                 analysis_result = AnalysisResult(
@@ -600,7 +584,7 @@ class AutoAnalyzerService(AnalyzerService):
                                         esScore=round(chosen_type["mrHit"]["_score"], 2),
                                         esPosition=chosen_type["mrHit"]["es_pos"],
                                         modelFeatureNames=";".join(
-                                            [str(i) for i in _boosting_decision_maker.feature_ids]
+                                            [str(i) for i in predictor.boosting_decision_maker.feature_ids]
                                         ),
                                         modelFeatureValues=";".join(
                                             [str(feature) for feature in feature_data[global_idx]]

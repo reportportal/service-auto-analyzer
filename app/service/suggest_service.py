@@ -33,8 +33,8 @@ from app.commons.model.launch_objects import (
 from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
-from app.machine_learning.models import BoostingDecisionMaker, WeightedSimilarityCalculator
-from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
+from app.machine_learning.models import WeightedSimilarityCalculator
+from app.machine_learning.predictor import SuggestionPredictor
 from app.service.analyzer_service import AnalyzerService
 from app.utils import text_processing, utils
 
@@ -407,33 +407,35 @@ class SuggestService(AnalyzerService):
 
             boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
             boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(test_item_info.project)
-            # noinspection PyTypeChecker
-            _suggest_decision_maker_to_use: BoostingDecisionMaker = self.model_chooser.choose_model(
-                test_item_info.project,
-                ModelType.suggestion,
+
+            # Create predictor for suggestions
+            predictor = SuggestionPredictor(
+                model_chooser=self.model_chooser,
+                project_id=test_item_info.project,
+                model_type=ModelType.suggestion,
+                boosting_config=boosting_config,
+                weighted_log_similarity_calculator=self.similarity_model,
                 custom_model_prob=self.search_cfg.ProbabilityForCustomModelSuggestions,
                 hash_source=test_item_info.launchId,
+                suggest_threshold=self.suggest_threshold,
             )
 
-            _boosting_data_gatherer = SuggestBoostingFeaturizer(
-                searched_res,
-                boosting_config,
-                feature_ids=_suggest_decision_maker_to_use.feature_ids,
-                weighted_log_similarity_calculator=self.similarity_model,
-            )
-            # noinspection PyTypeChecker
-            _boosting_data_gatherer.set_defect_type_model(
-                self.model_chooser.choose_model(test_item_info.project, ModelType.defect_type)
-            )
-            feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
-            scores_by_test_items = _boosting_data_gatherer.find_most_relevant_by_type()
-            model_info_tags = (
-                _boosting_data_gatherer.get_used_model_info() + _suggest_decision_maker_to_use.get_model_info()
-            )
-            feature_names = ";".join([str(i) for i in _suggest_decision_maker_to_use.feature_ids])
-            if feature_data:
-                _, predicted_labels_probability = _suggest_decision_maker_to_use.predict(feature_data)
-                sorted_results = self.sort_results(scores_by_test_items, test_item_ids, predicted_labels_probability)
+            # Use predictor for the complete prediction workflow
+            prediction_result, model_info_tags = predictor.predict(searched_res)
+            feature_names = ";".join([str(i) for i in predictor.boosting_decision_maker.feature_ids])
+
+            if prediction_result is not None:
+                sorted_results = prediction_result
+
+                # Get additional data needed for result creation
+                featurizer = predictor.create_featurizer(
+                    searched_res,
+                    boosting_config,
+                    predictor.boosting_decision_maker.feature_ids,
+                    self.similarity_model,
+                )
+                feature_data, test_item_ids = featurizer.gather_features_info()
+                scores_by_test_items = featurizer.find_most_relevant_by_type()
 
                 logger.debug("Found %d results for test items ", len(sorted_results))
                 for idx, prob, _ in sorted_results:

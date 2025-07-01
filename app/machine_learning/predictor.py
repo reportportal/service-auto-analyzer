@@ -30,11 +30,17 @@ class PredictionResult:
     Attributes:
         predicted_labels: List of binary prediction labels from the decision maker
         predicted_labels_probability: List of prediction probabilities from the decision maker
+        scores_by_identity: Dictionary with issue identity as key and value as most relevant log and its metadata
+        identifiers: List of identities for the gathered features
+        feature_data: List of feature vectors for each identity gathered from the featurizer
         model_info_tags: List of model information tags
     """
 
     predicted_labels: list[int]
     predicted_labels_probability: list[list[float]]
+    scores_by_identity: dict[str, dict[str, Any]]
+    identifiers: list[str]
+    feature_data: list[list[float]]
     model_info_tags: list[str]
 
 
@@ -136,7 +142,12 @@ class Predictor(metaclass=ABCMeta):
         # If no feature data, return empty result
         if not feature_data:
             return PredictionResult(
-                predicted_labels=[], predicted_labels_probability=[], model_info_tags=model_info_tags
+                predicted_labels=[],
+                predicted_labels_probability=[],
+                model_info_tags=model_info_tags,
+                identifiers=identifiers,
+                scores_by_identity=featurizer.find_most_relevant_by_type(),
+                feature_data=[],
             )
 
         # Make predictions
@@ -146,6 +157,9 @@ class Predictor(metaclass=ABCMeta):
             predicted_labels=predicted_labels,
             predicted_labels_probability=predicted_labels_probability,
             model_info_tags=model_info_tags,
+            identifiers=identifiers,
+            scores_by_identity=featurizer.find_most_relevant_by_type(),
+            feature_data=feature_data,
         )
 
 

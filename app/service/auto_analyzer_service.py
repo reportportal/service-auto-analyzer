@@ -538,33 +538,22 @@ class AutoAnalyzerService(AnalyzerService):
                         results_to_share[launch_id]["model_info"].update(prediction_result_obj.model_info_tags)
 
                         if prediction_result_obj.predicted_labels_probability:
-                            # Get additional data needed for result creation
-                            featurizer = predictor.create_featurizer(
-                                candidates,
-                                boosting_config,
-                                predictor.boosting_decision_maker.feature_ids,
-                                self.similarity_model,
-                            )
-                            feature_data, issue_type_names = featurizer.gather_features_info()
-                            scores_by_issue_type = featurizer.find_most_relevant_by_type()
-
                             predicted_issue_type, prob, global_idx = utils.choose_issue_type(
                                 prediction_result_obj.predicted_labels,
                                 prediction_result_obj.predicted_labels_probability,
-                                issue_type_names,
-                                scores_by_issue_type,
+                                prediction_result_obj.identifiers,
+                                prediction_result_obj.scores_by_identity,
                             )
 
                             # Debug logging
-                            for i in range(len(issue_type_names)):
-                                issue_type_name = issue_type_names[i]
-                                log_id = scores_by_issue_type[issue_type_name]["mrHit"]["_id"]
+                            for issue_type_name in prediction_result_obj.identifiers:
+                                log_id = prediction_result_obj.scores_by_identity[issue_type_name]["mrHit"]["_id"]
                                 logger.debug(
                                     f"Most relevant item with issue type '{issue_type_name}' has log id: {log_id}"
                                 )
 
                             if predicted_issue_type:
-                                chosen_type = scores_by_issue_type[predicted_issue_type]
+                                chosen_type = prediction_result_obj.scores_by_identity[predicted_issue_type]
                                 relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
                                 analysis_result = AnalysisResult(
                                     testItem=analyzer_candidates.testItemId,
@@ -592,7 +581,10 @@ class AutoAnalyzerService(AnalyzerService):
                                             [str(i) for i in predictor.boosting_decision_maker.feature_ids]
                                         ),
                                         modelFeatureValues=";".join(
-                                            [str(feature) for feature in feature_data[global_idx]]
+                                            [
+                                                str(feature)
+                                                for feature in prediction_result_obj.feature_data[global_idx]
+                                            ]
                                         ),
                                         modelInfo=";".join(prediction_result_obj.model_info_tags),
                                         resultPosition=0,

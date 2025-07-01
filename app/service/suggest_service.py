@@ -426,25 +426,18 @@ class SuggestService(AnalyzerService):
             feature_names = ";".join([str(i) for i in predictor.boosting_decision_maker.feature_ids])
 
             if prediction_result_obj.predicted_labels_probability:
-
-                # Get additional data needed for result creation
-                featurizer = predictor.create_featurizer(
-                    searched_res,
-                    boosting_config,
-                    predictor.boosting_decision_maker.feature_ids,
-                    self.similarity_model,
-                )
-                feature_data, test_item_ids = featurizer.gather_features_info()
-                scores_by_test_items = featurizer.find_most_relevant_by_type()
-
                 sorted_results = self.sort_results(
-                    scores_by_test_items, test_item_ids, prediction_result_obj.predicted_labels_probability
+                    prediction_result_obj.scores_by_identity,
+                    prediction_result_obj.identifiers,
+                    prediction_result_obj.predicted_labels_probability,
                 )
 
                 logger.debug("Found %d results for test items ", len(sorted_results))
                 for idx, prob, _ in sorted_results:
-                    test_item_id = test_item_ids[idx]
-                    issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
+                    test_item_id = prediction_result_obj.identifiers[idx]
+                    issue_type = prediction_result_obj.scores_by_identity[test_item_id]["mrHit"]["_source"][
+                        "issue_type"
+                    ]
                     logger.debug(
                         "Test item id %s with issue type %s has probability %.2f", test_item_id, issue_type, prob
                     )
@@ -452,13 +445,17 @@ class SuggestService(AnalyzerService):
                 global_idx = 0
                 for idx, prob, _ in sorted_results[: self.search_cfg.MaxSuggestionsNumber]:
                     if prob >= self.suggest_threshold:
-                        test_item_id = test_item_ids[idx]
-                        issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
-                        relevant_log_id = utils.extract_real_id(scores_by_test_items[test_item_id]["mrHit"]["_id"])
-                        real_log_id = str(scores_by_test_items[test_item_id]["mrHit"]["_id"])
+                        test_item_id = prediction_result_obj.identifiers[idx]
+                        issue_type = prediction_result_obj.scores_by_identity[test_item_id]["mrHit"]["_source"][
+                            "issue_type"
+                        ]
+                        relevant_log_id = utils.extract_real_id(
+                            prediction_result_obj.scores_by_identity[test_item_id]["mrHit"]["_id"]
+                        )
+                        real_log_id = str(prediction_result_obj.scores_by_identity[test_item_id]["mrHit"]["_id"])
                         is_merged = real_log_id != str(relevant_log_id)
                         test_item_log_id = utils.extract_real_id(
-                            scores_by_test_items[test_item_id]["compared_log"]["_id"]
+                            prediction_result_obj.scores_by_identity[test_item_id]["compared_log"]["_id"]
                         )
                         analysis_result = SuggestAnalysisResult(
                             project=test_item_info.project,
@@ -472,10 +469,14 @@ class SuggestService(AnalyzerService):
                             relevantLogId=relevant_log_id,
                             isMergedLog=is_merged,
                             matchScore=round(prob, 2) * 100,
-                            esScore=round(scores_by_test_items[test_item_id]["mrHit"]["_score"], 2),
-                            esPosition=scores_by_test_items[test_item_id]["mrHit"]["es_pos"],
+                            esScore=round(
+                                prediction_result_obj.scores_by_identity[test_item_id]["mrHit"]["_score"], 2
+                            ),
+                            esPosition=prediction_result_obj.scores_by_identity[test_item_id]["mrHit"]["es_pos"],
                             modelFeatureNames=feature_names,
-                            modelFeatureValues=";".join([str(feature) for feature in feature_data[idx]]),
+                            modelFeatureValues=";".join(
+                                [str(feature) for feature in prediction_result_obj.feature_data[idx]]
+                            ),
                             modelInfo=";".join(model_info_tags),
                             resultPosition=global_idx,
                             usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,

@@ -28,7 +28,7 @@ class NamespaceFinderService:
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
 
     @utils.ignore_warnings
-    def update_chosen_namespaces(self, launches: list[Launch]):
+    def update_chosen_namespaces(self, launches: list[Launch]) -> None:
         project_ids_str = ", ".join({str(launch.project) for launch in launches})
         launch_ids_str = ", ".join({str(launch.launchId) for launch in launches})
         logger.info(f"Started updating chosen namespaces for projects '{project_ids_str}', launches: {launch_ids_str}")

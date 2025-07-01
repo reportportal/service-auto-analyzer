@@ -537,28 +537,33 @@ class AutoAnalyzerService(AnalyzerService):
                         prediction_result_obj = predictor.predict(candidates)
                         results_to_share[launch_id]["model_info"].update(prediction_result_obj.model_info_tags)
 
-                        if prediction_result_obj.prediction_result is not None:
-                            predicted_issue_type, prob, global_idx = prediction_result_obj.prediction_result
+                        if prediction_result_obj.predicted_labels_probability:
+                            # Get additional data needed for result creation
+                            featurizer = predictor.create_featurizer(
+                                candidates,
+                                boosting_config,
+                                predictor.boosting_decision_maker.feature_ids,
+                                self.similarity_model,
+                            )
+                            feature_data, issue_type_names = featurizer.gather_features_info()
+                            scores_by_issue_type = featurizer.find_most_relevant_by_type()
+
+                            predicted_issue_type, prob, global_idx = utils.choose_issue_type(
+                                prediction_result_obj.predicted_labels,
+                                prediction_result_obj.predicted_labels_probability,
+                                issue_type_names,
+                                scores_by_issue_type,
+                            )
+
+                            # Debug logging
+                            for i in range(len(issue_type_names)):
+                                issue_type_name = issue_type_names[i]
+                                log_id = scores_by_issue_type[issue_type_name]["mrHit"]["_id"]
+                                logger.debug(
+                                    f"Most relevant item with issue type '{issue_type_name}' has log id: {log_id}"
+                                )
 
                             if predicted_issue_type:
-                                # Get additional data needed for result creation
-                                featurizer = predictor.create_featurizer(
-                                    candidates,
-                                    boosting_config,
-                                    predictor.boosting_decision_maker.feature_ids,
-                                    self.similarity_model,
-                                )
-                                feature_data, issue_type_names = featurizer.gather_features_info()
-                                scores_by_issue_type = featurizer.find_most_relevant_by_type()
-
-                                # Debug logging
-                                for i in range(len(issue_type_names)):
-                                    issue_type_name = issue_type_names[i]
-                                    log_id = scores_by_issue_type[issue_type_name]["mrHit"]["_id"]
-                                    logger.debug(
-                                        f"Most relevant item with issue type '{issue_type_name}' has log id: {log_id}"
-                                    )
-
                                 chosen_type = scores_by_issue_type[predicted_issue_type]
                                 relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
                                 analysis_result = AnalysisResult(
@@ -608,7 +613,6 @@ class AutoAnalyzerService(AnalyzerService):
                                 logger.debug("Test item %s has no relevant items", analyzer_candidates.testItemId)
                         else:
                             logger.debug("There are no results for test item %s", analyzer_candidates.testItemId)
-
                         if found_result:
                             break
 

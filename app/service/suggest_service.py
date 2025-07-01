@@ -425,8 +425,7 @@ class SuggestService(AnalyzerService):
             model_info_tags = prediction_result_obj.model_info_tags
             feature_names = ";".join([str(i) for i in predictor.boosting_decision_maker.feature_ids])
 
-            if prediction_result_obj.prediction_result is not None:
-                sorted_results = prediction_result_obj.prediction_result
+            if prediction_result_obj.predicted_labels_probability:
 
                 # Get additional data needed for result creation
                 featurizer = predictor.create_featurizer(
@@ -437,6 +436,10 @@ class SuggestService(AnalyzerService):
                 )
                 feature_data, test_item_ids = featurizer.gather_features_info()
                 scores_by_test_items = featurizer.find_most_relevant_by_type()
+
+                sorted_results = self.sort_results(
+                    scores_by_test_items, test_item_ids, prediction_result_obj.predicted_labels_probability
+                )
 
                 logger.debug("Found %d results for test items ", len(sorted_results))
                 for idx, prob, _ in sorted_results:

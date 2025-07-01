@@ -421,11 +421,12 @@ class SuggestService(AnalyzerService):
             )
 
             # Use predictor for the complete prediction workflow
-            prediction_result, model_info_tags = predictor.predict(searched_res)
+            prediction_result_obj = predictor.predict(searched_res)
+            model_info_tags = prediction_result_obj.model_info_tags
             feature_names = ";".join([str(i) for i in predictor.boosting_decision_maker.feature_ids])
 
-            if prediction_result is not None:
-                sorted_results = prediction_result
+            if prediction_result_obj.prediction_result is not None:
+                sorted_results = prediction_result_obj.prediction_result
 
                 # Get additional data needed for result creation
                 featurizer = predictor.create_featurizer(

@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from abc import ABCMeta, abstractmethod
+from dataclasses import dataclass
 from typing import Any, Optional, Union
 
 from app.commons.model.ml import ModelType
@@ -21,6 +22,19 @@ from app.machine_learning.boosting_featurizer import BoostingFeaturizer
 from app.machine_learning.models import BoostingDecisionMaker, DefectTypeModel, WeightedSimilarityCalculator
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import utils
+
+
+@dataclass
+class PredictionResult:
+    """Result container for prediction workflows.
+
+    Attributes:
+        prediction_result: The actual prediction result (varies by implementation)
+        model_info_tags: List of model information tags
+    """
+
+    prediction_result: Any
+    model_info_tags: list[str]
 
 
 class Predictor(metaclass=ABCMeta):
@@ -124,14 +138,14 @@ class Predictor(metaclass=ABCMeta):
     def predict(
         self,
         search_results: list[tuple[dict[str, Any], dict[str, Any]]],
-    ) -> tuple[Any, list[str]]:
+    ) -> PredictionResult:
         """Execute the full prediction workflow.
 
         Args:
             search_results: List of (log_info, search_results) tuples from Elasticsearch
 
         Returns:
-            Tuple of (prediction_result, model_info_tags)
+            PredictionResult containing:
             - prediction_result: Result from post_process_predictions
             - model_info_tags: List of model information tags
         """
@@ -152,7 +166,7 @@ class Predictor(metaclass=ABCMeta):
 
         # If no feature data, return empty result
         if not feature_data:
-            return None, model_info_tags
+            return PredictionResult(prediction_result=None, model_info_tags=model_info_tags)
 
         # Make predictions
         predicted_labels, predicted_labels_probability = self.boosting_decision_maker.predict(feature_data)
@@ -166,7 +180,7 @@ class Predictor(metaclass=ABCMeta):
             scores_by_type,
         )
 
-        return prediction_result, model_info_tags
+        return PredictionResult(prediction_result=prediction_result, model_info_tags=model_info_tags)
 
 
 class AutoAnalysisPredictor(Predictor):

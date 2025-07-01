@@ -534,11 +534,11 @@ class AutoAnalyzerService(AnalyzerService):
 
                     for candidates in candidates_to_check:
                         # Use predictor for the complete prediction workflow
-                        prediction_result, model_info_tags = predictor.predict(candidates)
-                        results_to_share[launch_id]["model_info"].update(model_info_tags)
+                        prediction_result_obj = predictor.predict(candidates)
+                        results_to_share[launch_id]["model_info"].update(prediction_result_obj.model_info_tags)
 
-                        if prediction_result is not None:
-                            predicted_issue_type, prob, global_idx = prediction_result
+                        if prediction_result_obj.prediction_result is not None:
+                            predicted_issue_type, prob, global_idx = prediction_result_obj.prediction_result
 
                             if predicted_issue_type:
                                 # Get additional data needed for result creation
@@ -589,7 +589,7 @@ class AutoAnalyzerService(AnalyzerService):
                                         modelFeatureValues=";".join(
                                             [str(feature) for feature in feature_data[global_idx]]
                                         ),
-                                        modelInfo=";".join(model_info_tags),
+                                        modelInfo=";".join(prediction_result_obj.model_info_tags),
                                         resultPosition=0,
                                         usedLogLines=analyzer_candidates.analyzerConfig.numberOfLogLines,
                                         minShouldMatch=self.find_min_should_match_threshold(

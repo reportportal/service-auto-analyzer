@@ -112,7 +112,6 @@ class ProcessAmqpRequestHandler:
     search_config: SearchConfig
     client: AmqpClient
     queue_size: int
-    prefetch_size: int
     routing_key_predicate: Callable[[str], bool]
     counter: AtomicInteger
     queue: PriorityQueue[ProcessingItem]
@@ -138,7 +137,6 @@ class ProcessAmqpRequestHandler:
         :param app_config: Application configuration object
         :param search_config: Search configuration object
         :param queue_size: Maximum size of the internal priority queue (buffer)
-        :param prefetch_size: Number of messages to prefetch from the queue for processing
         :param routing_key_predicate: Optional predicate to filter routing keys for processing. Should return True for
         keys to process.
         :param client: Optional AMQP client for sending replies (useful for testing)
@@ -148,7 +146,6 @@ class ProcessAmqpRequestHandler:
         self.search_config = search_config
         self.client = client or AmqpClient(app_config)
         self.queue_size = queue_size
-        self.prefetch_size = prefetch_size
         self.routing_key_predicate = routing_key_predicate or (lambda _: True)
         if init_services:
             self._init_services = set(init_services)
@@ -329,7 +326,7 @@ class ProcessAmqpRequestHandler:
                     self._restart_processor()
 
                 # Send messages to processor (up to prefetch_size)
-                while len(self.running_tasks) < self.prefetch_size:
+                while not self.running_tasks:
                     if not self.__send_to_processor():
                         break
 

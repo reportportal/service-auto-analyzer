@@ -61,7 +61,6 @@ def handler(app_config, search_config, mock_amqp_client):
         app_config=app_config,
         search_config=search_config,
         queue_size=10,
-        prefetch_size=2,
         client=mock_amqp_client,
         init_services=["noop_echo", "noop_sleep", "noop_fail"],
     )

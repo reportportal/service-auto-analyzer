@@ -447,17 +447,18 @@ class DirectAmqpRequestHandler:
         if not message:
             return None
 
-        if not self.routing_key_predicate(method.routing_key):
+        routing_key = method.routing_key or ""
+        if not self.routing_key_predicate(routing_key):
             return None
 
         self.counter += 1
-        log_incoming_message(method.routing_key, props.correlation_id, message)
+        log_incoming_message(routing_key, props.correlation_id or "", message)
 
         self.running_tasks.append(
             ProcessingItem(
                 priority=get_priority(props),
                 number=self.counter,
-                routing_key=method.routing_key or "",
+                routing_key=routing_key,
                 reply_to=props.reply_to,
                 log_correlation_id=logging.get_correlation_id(),
                 msg_correlation_id=props.correlation_id or "",
@@ -467,7 +468,7 @@ class DirectAmqpRequestHandler:
 
         # Process using the processor
         try:
-            response_body = self._processor.process(method.routing_key, message)
+            response_body = self._processor.process(method.routing_key or "", message)
         except Exception as exc:
             logger.exception("Failed to process message", exc_info=exc)
             self.running_tasks.pop(0)

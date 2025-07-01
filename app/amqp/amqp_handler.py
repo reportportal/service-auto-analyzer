@@ -132,6 +132,7 @@ class ProcessAmqpRequestHandler:
         routing_key_predicate: Optional[Callable[[str], bool]] = None,
         client: Optional[AmqpClient] = None,
         init_services: Optional[list[str]] = None,
+        name: str = None,
     ):
         """Initialize handler for processing requests with process-based communication.
 
@@ -167,7 +168,7 @@ class ProcessAmqpRequestHandler:
         self._shutdown = False
 
         # Start the processing thread
-        self._processing_thread = threading.Thread(target=self._process_queue, daemon=True)
+        self._processing_thread = threading.Thread(target=self._process_queue, name=name, daemon=True)
         self._processing_thread.start()
 
     @staticmethod

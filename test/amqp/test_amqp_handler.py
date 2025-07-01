@@ -14,7 +14,7 @@
 
 import json
 import time
-from typing import Any
+from typing import Any, Generator
 from unittest.mock import Mock, patch
 
 import pytest
@@ -27,7 +27,7 @@ from app.commons.model.processing import ProcessingItem
 
 
 @pytest.fixture
-def app_config():
+def app_config() -> ApplicationConfig:
     """Create test ApplicationConfig"""
     return ApplicationConfig(
         esHost="localhost:9200",
@@ -36,18 +36,18 @@ def app_config():
         amqpExchangeName="test_analyzer",
         appVersion="test",
         instanceTaskType="test",
-        amqpHandlerTaskTimeout=5,
+        amqpHandlerTaskTimeout=6,
     )
 
 
 @pytest.fixture
-def search_config():
+def search_config() -> SearchConfig:
     """Create test SearchConfig"""
     return SearchConfig()
 
 
 @pytest.fixture
-def mock_amqp_client():
+def mock_amqp_client() -> Mock:
     """Create mocked AmqpClient"""
     client = Mock()
     client.reply = Mock()
@@ -55,7 +55,7 @@ def mock_amqp_client():
 
 
 @pytest.fixture
-def handler(app_config, search_config, mock_amqp_client):
+def handler(app_config, search_config, mock_amqp_client) -> Generator[ProcessAmqpRequestHandler, Any, None]:
     """Create ProcessAmqpRequestHandler instance with mocked client"""
     handler = ProcessAmqpRequestHandler(
         app_config=app_config,
@@ -69,7 +69,9 @@ def handler(app_config, search_config, mock_amqp_client):
     handler.shutdown()
 
 
-def create_test_processing_item(routing_key="noop_echo", item="test_data", reply_to="test_reply", priority=1000):
+def create_test_processing_item(
+    routing_key="noop_echo", item="test_data", reply_to="test_reply", priority=1000
+) -> ProcessingItem:
     """Helper to create ProcessingItem for testing"""
     return ProcessingItem(
         priority=priority,
@@ -110,7 +112,7 @@ class TestProcessAmqpRequestHandler:
         """Test Case 1: Processing a task - check it appears in running_tasks and then disappears"""
         # Create a task with short sleep to monitor lifecycle
         channel, method, props, body = create_amqp_request_mock(
-            routing_key="noop_sleep", body=1, reply_to="test_reply"  # Sleep for 0.2 seconds
+            routing_key="noop_sleep", body=1, reply_to="test_reply"  # Sleep for 1 seconds
         )
 
         # Verify initially no running tasks
@@ -405,3 +407,35 @@ class TestProcessAmqpRequestHandler:
 
         mock_amqp_client.reply.assert_not_called()
         assert handler.processor.is_alive(), "Processor should be alive after handling failed task"
+
+    def test_two_long_tasks_processing(self, handler, mock_amqp_client):
+        """Test Case 6: Check that two long tasks are processed correctly without deadlock"""
+
+        # Create a task that will just wait
+        channel, method, props, body = create_amqp_request_mock(routing_key="noop_sleep", body=2)
+
+        # Submit the long-running task
+        handler.handle_amqp_request(channel, method, props, body)
+
+        # Wait for task to be picked up and record original start time
+        time.sleep(0.02)
+
+        # Create another task
+        channel, method, props, body = create_amqp_request_mock(routing_key="noop_sleep", body=3)
+
+        # Submit the long-running task once again
+        handler.handle_amqp_request(channel, method, props, body)
+
+        # Wait for task to be picked up and record original start time
+        time.sleep(0.02)
+
+        # Verify task is in running_tasks and record start time
+        assert len(handler.running_tasks) == 1, "A task should appear in running_tasks"
+        assert handler.queue.qsize() == 1, "Another task should be queued"
+
+        # Wait for all tasks to complete
+        time.sleep(10)
+
+        # Verify task was dropped after retries
+        assert len(handler.running_tasks) == 0, "Tasks should be processed and removed from running_tasks"
+        assert handler.queue.qsize() == 0, "Queue should be empty after processing all tasks"

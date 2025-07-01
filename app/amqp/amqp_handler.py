@@ -130,7 +130,7 @@ class ProcessAmqpRequestHandler:
         routing_key_predicate: Optional[Callable[[str], bool]] = None,
         client: Optional[AmqpClient] = None,
         init_services: Optional[list[str]] = None,
-        name: str = None,
+        name: Optional[str] = None,
     ):
         """Initialize handler for processing requests with process-based communication.
 

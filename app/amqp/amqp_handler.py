@@ -127,7 +127,6 @@ class ProcessAmqpRequestHandler:
         search_config: SearchConfig,
         *,
         queue_size: int = 100,
-        prefetch_size: int = 2,
         routing_key_predicate: Optional[Callable[[str], bool]] = None,
         client: Optional[AmqpClient] = None,
         init_services: Optional[list[str]] = None,

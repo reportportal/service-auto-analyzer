@@ -67,15 +67,15 @@ class Predictor(metaclass=ABCMeta):
         self.hash_source = hash_source
 
         # Acquire models
-        # noinspection PyTypeChecker
-        self.boosting_decision_maker = self.model_chooser.choose_model(
+        self.boosting_decision_maker = self.model_chooser.choose_model(  # type: ignore[assignment]
             project_id,
             model_type,
             custom_model_prob=custom_model_prob,
             hash_source=hash_source,
         )
-        # noinspection PyTypeChecker
-        self.defect_type_model = self.model_chooser.choose_model(project_id, ModelType.defect_type)
+        self.defect_type_model = self.model_chooser.choose_model(  # type: ignore[assignment]
+            project_id, ModelType.defect_type
+        )
 
     @abstractmethod
     def create_featurizer(

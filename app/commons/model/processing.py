@@ -32,7 +32,7 @@ class ProcessingItem:
 @dataclass
 class ProcessingResult:
     item: ProcessingItem
-    result: Any
+    result: Optional[Any]
     success: bool
     error: Optional[Exception] = None
     retry_count: int = 0

@@ -63,14 +63,13 @@ class Predictor(metaclass=ABCMeta):
     ) -> None:
         """Initialize the predictor with required dependencies.
 
-        Args:
-            model_chooser: Service for choosing appropriate ML models
-            project_id: Project identifier for model selection
-            model_type: Type of model to use (auto_analysis or suggestion)
-            boosting_config: Configuration for the boosting featurizer
-            weighted_log_similarity_calculator: Model for calculating log similarities
-            custom_model_prob: Probability to use custom model instead of global
-            hash_source: Source for hash-based model selection
+        :param ModelChooser model_chooser: Service for choosing appropriate ML models
+        :param int project_id: Project identifier for model selection
+        :param ModelType model_type: Type of model to use (auto_analysis or suggestion)
+        :param dict[str, Any] boosting_config: Configuration for the boosting featurizer
+        :param WeightedSimilarityCalculator weighted_log_similarity_calculator: Model for calculating log similarities
+        :param float custom_model_prob: Probability to use custom model instead of global
+        :param Optional[Union[int, str]] hash_source: Source for hash-based model selection
         """
         self.model_chooser = model_chooser
         self.project_id = project_id
@@ -101,14 +100,11 @@ class Predictor(metaclass=ABCMeta):
     ) -> BoostingFeaturizer:
         """Create the appropriate featurizer for this prediction type.
 
-        Args:
-            search_results: List of (log_info, search_results) tuples
-            boosting_config: Configuration for the featurizer
-            feature_ids: List of feature IDs to use
-            weighted_log_similarity_calculator: Similarity calculator model
-
-        Returns:
-            Configured featurizer instance
+        :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
+        :param dict[str, Any] boosting_config: Configuration for the featurizer
+        :param list[int] feature_ids: List of feature IDs to use
+        :param WeightedSimilarityCalculator weighted_log_similarity_calculator: Similarity calculator model
+        :return: Configured featurizer instance
         """
         pass
 
@@ -123,15 +119,12 @@ class Predictor(metaclass=ABCMeta):
     ) -> Any:
         """Post-process the prediction results.
 
-        Args:
-            predicted_labels: Binary prediction labels from the decision maker
-            predicted_labels_probability: Prediction probabilities from the decision maker
-            feature_data: Feature vectors used for prediction
-            identifiers: Issue type names (auto analysis) or test item IDs (suggestions)
-            scores_by_type: Most relevant items by type from the featurizer
-
-        Returns:
-            Post-processed prediction result (varies by implementation)
+        :param list[int] predicted_labels: Binary prediction labels from the decision maker
+        :param list[list[float]] predicted_labels_probability: Prediction probabilities from the decision maker
+        :param list[list[float]] feature_data: Feature vectors used for prediction
+        :param list[str] identifiers: Issue type names (auto analysis) or test item IDs (suggestions)
+        :param dict[str, dict[str, Any]] scores_by_type: Most relevant items by type from the featurizer
+        :return: Post-processed prediction result (varies by implementation)
         """
         pass
 
@@ -141,13 +134,9 @@ class Predictor(metaclass=ABCMeta):
     ) -> PredictionResult:
         """Execute the full prediction workflow.
 
-        Args:
-            search_results: List of (log_info, search_results) tuples from Elasticsearch
-
-        Returns:
-            PredictionResult containing:
-            - prediction_result: Result from post_process_predictions
-            - model_info_tags: List of model information tags
+        :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
+                                                                           from Elasticsearch
+        :return: PredictionResult containing prediction_result and model_info_tags
         """
         # Create and configure featurizer
         featurizer = self.create_featurizer(
@@ -196,7 +185,14 @@ class AutoAnalysisPredictor(Predictor):
         feature_ids: list[int],
         weighted_log_similarity_calculator: WeightedSimilarityCalculator,
     ) -> BoostingFeaturizer:
-        """Create a BoostingFeaturizer for auto analysis."""
+        """Create a BoostingFeaturizer for auto analysis.
+
+        :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
+        :param dict[str, Any] boosting_config: Configuration for the featurizer
+        :param list[int] feature_ids: List of feature IDs to use
+        :param WeightedSimilarityCalculator weighted_log_similarity_calculator: Similarity calculator model
+        :return: Configured BoostingFeaturizer instance
+        """
         featurizer = BoostingFeaturizer(
             search_results,
             boosting_config,
@@ -216,8 +212,12 @@ class AutoAnalysisPredictor(Predictor):
     ) -> tuple[str, float, int]:
         """Post-process predictions using choose_issue_type logic.
 
-        Returns:
-            Tuple of (predicted_issue_type, probability, global_index)
+        :param list[int] predicted_labels: Binary prediction labels from the decision maker
+        :param list[list[float]] predicted_labels_probability: Prediction probabilities from the decision maker
+        :param list[list[float]] feature_data: Feature vectors used for prediction
+        :param list[str] identifiers: Issue type names
+        :param dict[str, dict[str, Any]] scores_by_type: Most relevant items by type from the featurizer
+        :return: Tuple of (predicted_issue_type, probability, global_index)
         """
         issue_type_names = identifiers
         scores_by_issue_type = scores_by_type
@@ -246,7 +246,17 @@ class SuggestionPredictor(Predictor):
         hash_source: Optional[Union[int, str]] = None,
         suggest_threshold: float = 0.4,
     ) -> None:
-        """Initialize suggestion predictor with additional threshold parameter."""
+        """Initialize suggestion predictor with additional threshold parameter.
+
+        :param ModelChooser model_chooser: Service for choosing appropriate ML models
+        :param int project_id: Project identifier for model selection
+        :param ModelType model_type: Type of model to use (auto_analysis or suggestion)
+        :param dict[str, Any] boosting_config: Configuration for the boosting featurizer
+        :param WeightedSimilarityCalculator weighted_log_similarity_calculator: Model for calculating log similarities
+        :param float custom_model_prob: Probability to use custom model instead of global
+        :param Optional[Union[int, str]] hash_source: Source for hash-based model selection
+        :param float suggest_threshold: Threshold for suggestion probability filtering
+        """
         super().__init__(
             model_chooser,
             project_id,
@@ -265,7 +275,14 @@ class SuggestionPredictor(Predictor):
         feature_ids: list[int],
         weighted_log_similarity_calculator: WeightedSimilarityCalculator,
     ) -> BoostingFeaturizer:
-        """Create a SuggestBoostingFeaturizer for suggestions."""
+        """Create a SuggestBoostingFeaturizer for suggestions.
+
+        :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
+        :param dict[str, Any] boosting_config: Configuration for the featurizer
+        :param list[int] feature_ids: List of feature IDs to use
+        :param WeightedSimilarityCalculator weighted_log_similarity_calculator: Similarity calculator model
+        :return: Configured SuggestBoostingFeaturizer instance
+        """
         featurizer = SuggestBoostingFeaturizer(
             search_results,
             boosting_config,
@@ -285,8 +302,12 @@ class SuggestionPredictor(Predictor):
     ) -> list[tuple[int, float, str]]:
         """Post-process predictions using sort_results logic.
 
-        Returns:
-            List of sorted results as (idx, probability, start_time) tuples
+        :param list[int] predicted_labels: Binary prediction labels from the decision maker
+        :param list[list[float]] predicted_labels_probability: Prediction probabilities from the decision maker
+        :param list[list[float]] feature_data: Feature vectors used for prediction
+        :param list[str] identifiers: Test item IDs
+        :param dict[str, dict[str, Any]] scores_by_type: Most relevant items by type from the featurizer
+        :return: List of sorted results as (idx, probability, start_time) tuples
         """
         test_item_ids = identifiers
         scores_by_test_items = scores_by_type
@@ -310,7 +331,13 @@ class SuggestionPredictor(Predictor):
         scores_by_test_items: dict[str, dict[str, Any]],
         test_item_ids: list[str],
     ) -> list[tuple[int, float, str]]:
-        """Deduplicate results by issue type, keeping the one with highest probability."""
+        """Deduplicate results by issue type, keeping the one with highest probability.
+
+        :param list[tuple[int, float, str]] gathered_results: List of (idx, probability, start_time) tuples
+        :param dict[str, dict[str, Any]] scores_by_test_items: Most relevant items by test item ID
+        :param list[str] test_item_ids: List of test item IDs
+        :return: Deduplicated list of (idx, probability, start_time) tuples
+        """
         issue_type_dict = {}
         for idx, prob, start_time in gathered_results:
             test_item_id = test_item_ids[idx]

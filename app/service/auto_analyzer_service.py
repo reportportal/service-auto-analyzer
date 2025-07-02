@@ -32,7 +32,6 @@ from app.commons.model.launch_objects import (
     SearchConfig,
     SuggestAnalysisResult,
 )
-from app.commons.model.ml import ModelType
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.similarity_calculator import SimilarityCalculator
@@ -514,7 +513,6 @@ class AutoAnalyzerService(AnalyzerService):
                     predictor = AutoAnalysisPredictor(
                         model_chooser=self.model_chooser,
                         project_id=project_id,
-                        model_type=ModelType.auto_analysis,
                         boosting_config=boosting_config,
                         weighted_log_similarity_calculator=self.similarity_model,
                         custom_model_prob=self.search_cfg.ProbabilityForCustomModelAutoAnalysis,

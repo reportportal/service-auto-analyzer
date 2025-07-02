@@ -169,6 +169,34 @@ class AutoAnalysisPredictor(Predictor):
     Uses BoostingFeaturizer for feature extraction and prediction.
     """
 
+    def __init__(
+        self,
+        model_chooser: ModelChooser,
+        project_id: int,
+        boosting_config: dict[str, Any],
+        weighted_log_similarity_calculator: WeightedSimilarityCalculator,
+        custom_model_prob: float = 0.0,
+        hash_source: Optional[Union[int, str]] = None,
+    ) -> None:
+        """Initialize auto analysis predictor.
+
+        :param ModelChooser model_chooser: Service for choosing appropriate ML models
+        :param int project_id: Project identifier for model selection
+        :param dict[str, Any] boosting_config: Configuration for the boosting featurizer
+        :param WeightedSimilarityCalculator weighted_log_similarity_calculator: Model for calculating log similarities
+        :param float custom_model_prob: Probability to use custom model instead of global
+        :param Optional[Union[int, str]] hash_source: Source for hash-based model selection
+        """
+        super().__init__(
+            model_chooser,
+            project_id,
+            ModelType.auto_analysis,
+            boosting_config,
+            weighted_log_similarity_calculator,
+            custom_model_prob,
+            hash_source,
+        )
+
     def create_featurizer(
         self,
         search_results: list[tuple[dict[str, Any], dict[str, Any]]],
@@ -204,34 +232,29 @@ class SuggestionPredictor(Predictor):
         self,
         model_chooser: ModelChooser,
         project_id: int,
-        model_type: ModelType,
         boosting_config: dict[str, Any],
         weighted_log_similarity_calculator: WeightedSimilarityCalculator,
         custom_model_prob: float = 0.0,
         hash_source: Optional[Union[int, str]] = None,
-        suggest_threshold: float = 0.4,
     ) -> None:
-        """Initialize suggestion predictor with additional threshold parameter.
+        """Initialize suggestion predictor.
 
         :param ModelChooser model_chooser: Service for choosing appropriate ML models
         :param int project_id: Project identifier for model selection
-        :param ModelType model_type: Type of model to use (auto_analysis or suggestion)
         :param dict[str, Any] boosting_config: Configuration for the boosting featurizer
         :param WeightedSimilarityCalculator weighted_log_similarity_calculator: Model for calculating log similarities
         :param float custom_model_prob: Probability to use custom model instead of global
         :param Optional[Union[int, str]] hash_source: Source for hash-based model selection
-        :param float suggest_threshold: Threshold for suggestion probability filtering
         """
         super().__init__(
             model_chooser,
             project_id,
-            model_type,
+            ModelType.suggestion,
             boosting_config,
             weighted_log_similarity_calculator,
             custom_model_prob,
             hash_source,
         )
-        self.suggest_threshold = suggest_threshold
 
     def create_featurizer(
         self,

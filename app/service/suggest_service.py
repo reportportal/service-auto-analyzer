@@ -412,12 +412,10 @@ class SuggestService(AnalyzerService):
             predictor = SuggestionPredictor(
                 model_chooser=self.model_chooser,
                 project_id=test_item_info.project,
-                model_type=ModelType.suggestion,
                 boosting_config=boosting_config,
                 weighted_log_similarity_calculator=self.similarity_model,
                 custom_model_prob=self.search_cfg.ProbabilityForCustomModelSuggestions,
                 hash_source=test_item_info.launchId,
-                suggest_threshold=self.suggest_threshold,
             )
 
             # Use predictor for the complete prediction workflow

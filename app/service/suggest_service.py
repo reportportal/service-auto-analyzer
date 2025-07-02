@@ -34,7 +34,7 @@ from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.machine_learning.models import WeightedSimilarityCalculator
-from app.machine_learning.predictor import SuggestionPredictor
+from app.machine_learning.predictor import PREDICTION_CLASSES
 from app.service.analyzer_service import AnalyzerService
 from app.utils import text_processing, utils
 
@@ -408,8 +408,9 @@ class SuggestService(AnalyzerService):
             boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
             boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(test_item_info.project)
 
+            predictor_class = PREDICTION_CLASSES[self.search_cfg.MlModelForSuggestions]
             # Create predictor for suggestions
-            predictor = SuggestionPredictor(
+            predictor = predictor_class(
                 model_chooser=self.model_chooser,
                 project_id=test_item_info.project,
                 boosting_config=boosting_config,
@@ -432,29 +433,28 @@ class SuggestService(AnalyzerService):
 
                 logger.debug("Found %d results for test items ", len(sorted_results))
                 for idx, prob, _ in sorted_results:
-                    test_item_id = prediction_result_obj.identifiers[idx]
-                    issue_type = prediction_result_obj.scores_by_identity[test_item_id]["mrHit"]["_source"][
-                        "issue_type"
-                    ]
-                    logger.debug(
-                        "Test item id %s with issue type %s has probability %.2f", test_item_id, issue_type, prob
-                    )
+                    identity = prediction_result_obj.identifiers[idx]
+                    issue_type = prediction_result_obj.scores_by_identity[identity]["mrHit"]["_source"]["issue_type"]
+                    logger.debug(f"Test item '{identity}' with issue type '{issue_type}' has probability {prob:.2f}")
                 processed_time = time() - t_start
                 global_idx = 0
                 for idx, prob, _ in sorted_results[: self.search_cfg.MaxSuggestionsNumber]:
                     if prob >= self.suggest_threshold:
-                        test_item_id = prediction_result_obj.identifiers[idx]
-                        issue_type = prediction_result_obj.scores_by_identity[test_item_id]["mrHit"]["_source"][
+                        identity = prediction_result_obj.identifiers[idx]
+                        issue_type = prediction_result_obj.scores_by_identity[identity]["mrHit"]["_source"][
                             "issue_type"
                         ]
                         relevant_log_id = utils.extract_real_id(
-                            prediction_result_obj.scores_by_identity[test_item_id]["mrHit"]["_id"]
+                            prediction_result_obj.scores_by_identity[identity]["mrHit"]["_id"]
                         )
-                        real_log_id = str(prediction_result_obj.scores_by_identity[test_item_id]["mrHit"]["_id"])
+                        real_log_id = str(prediction_result_obj.scores_by_identity[identity]["mrHit"]["_id"])
                         is_merged = real_log_id != str(relevant_log_id)
                         test_item_log_id = utils.extract_real_id(
-                            prediction_result_obj.scores_by_identity[test_item_id]["compared_log"]["_id"]
+                            prediction_result_obj.scores_by_identity[identity]["compared_log"]["_id"]
                         )
+                        test_item_id = prediction_result_obj.scores_by_identity[identity]["mrHit"]["_source"][
+                            "test_item"
+                        ]
                         analysis_result = SuggestAnalysisResult(
                             project=test_item_info.project,
                             testItem=test_item_id_for_suggest,
@@ -467,10 +467,8 @@ class SuggestService(AnalyzerService):
                             relevantLogId=relevant_log_id,
                             isMergedLog=is_merged,
                             matchScore=round(prob, 2) * 100,
-                            esScore=round(
-                                prediction_result_obj.scores_by_identity[test_item_id]["mrHit"]["_score"], 2
-                            ),
-                            esPosition=prediction_result_obj.scores_by_identity[test_item_id]["mrHit"]["es_pos"],
+                            esScore=round(prediction_result_obj.scores_by_identity[identity]["mrHit"]["_score"], 2),
+                            esPosition=prediction_result_obj.scores_by_identity[identity]["mrHit"]["es_pos"],
                             modelFeatureNames=feature_names,
                             modelFeatureValues=";".join(
                                 [str(feature) for feature in prediction_result_obj.feature_data[idx]]

@@ -62,7 +62,6 @@ class Predictor(metaclass=ABCMeta):
         self,
         model_chooser: ModelChooser,
         project_id: int,
-        model_type: ModelType,
         boosting_config: dict[str, Any],
         weighted_log_similarity_calculator: WeightedSimilarityCalculator,
         custom_model_prob: float = 0.0,
@@ -72,7 +71,6 @@ class Predictor(metaclass=ABCMeta):
 
         :param ModelChooser model_chooser: Service for choosing appropriate ML models
         :param int project_id: Project identifier for model selection
-        :param ModelType model_type: Type of model to use (auto_analysis or suggestion)
         :param dict[str, Any] boosting_config: Configuration for the boosting featurizer
         :param WeightedSimilarityCalculator weighted_log_similarity_calculator: Model for calculating log similarities
         :param float custom_model_prob: Probability to use custom model instead of global
@@ -80,7 +78,6 @@ class Predictor(metaclass=ABCMeta):
         """
         self.model_chooser = model_chooser
         self.project_id = project_id
-        self.model_type = model_type
         self.boosting_config = boosting_config
         self.weighted_log_similarity_calculator = weighted_log_similarity_calculator
         self.custom_model_prob = custom_model_prob
@@ -89,13 +86,19 @@ class Predictor(metaclass=ABCMeta):
         # Acquire models
         self.boosting_decision_maker = self.model_chooser.choose_model(  # type: ignore[assignment]
             project_id,
-            model_type,
+            self.model_type,
             custom_model_prob=custom_model_prob,
             hash_source=hash_source,
         )
         self.defect_type_model = self.model_chooser.choose_model(  # type: ignore[assignment]
             project_id, ModelType.defect_type
         )
+
+    @property
+    @abstractmethod
+    def model_type(self):
+        """Return the type of model used by this predictor."""
+        ...
 
     @abstractmethod
     def create_featurizer(
@@ -113,7 +116,7 @@ class Predictor(metaclass=ABCMeta):
         :param WeightedSimilarityCalculator weighted_log_similarity_calculator: Similarity calculator model
         :return: Configured featurizer instance
         """
-        pass
+        ...
 
     def predict(
         self,
@@ -190,12 +193,16 @@ class AutoAnalysisPredictor(Predictor):
         super().__init__(
             model_chooser,
             project_id,
-            ModelType.auto_analysis,
             boosting_config,
             weighted_log_similarity_calculator,
             custom_model_prob,
             hash_source,
         )
+
+    @property
+    def model_type(self) -> ModelType:
+        """Return the type of model used by this predictor."""
+        return ModelType.auto_analysis
 
     def create_featurizer(
         self,
@@ -249,12 +256,16 @@ class SuggestionPredictor(Predictor):
         super().__init__(
             model_chooser,
             project_id,
-            ModelType.suggestion,
             boosting_config,
             weighted_log_similarity_calculator,
             custom_model_prob,
             hash_source,
         )
+
+    @property
+    def model_type(self) -> ModelType:
+        """Return the type of model used by this predictor."""
+        return ModelType.suggestion
 
     def create_featurizer(
         self,
@@ -279,3 +290,9 @@ class SuggestionPredictor(Predictor):
         )
         featurizer.set_defect_type_model(self.defect_type_model)
         return featurizer
+
+
+PREDICTION_CLASSES: dict[ModelType, type[Predictor]] = {
+    ModelType.auto_analysis: AutoAnalysisPredictor,
+    ModelType.suggestion: SuggestionPredictor,
+}

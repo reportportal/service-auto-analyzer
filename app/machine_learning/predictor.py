@@ -126,7 +126,8 @@ class Predictor(metaclass=ABCMeta):
 
         :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
                                                                            from Elasticsearch
-        :return: PredictionResult containing predicted_labels, predicted_labels_probability and model_info_tags
+        :return: PredictionResult containing predicted_labels, predicted_labels_probability, scores_by_identity,
+                 identifiers, feature_data, and model_info_tags
         """
         # Create and configure featurizer
         featurizer = self.create_featurizer(

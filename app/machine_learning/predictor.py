@@ -293,7 +293,7 @@ class SuggestionPredictor(Predictor):
         return featurizer
 
 
-PREDICTION_CLASSES: dict[ModelType, type[Predictor]] = {
-    ModelType.auto_analysis: AutoAnalysisPredictor,
-    ModelType.suggestion: SuggestionPredictor,
+PREDICTION_CLASSES: dict[str, type[Predictor]] = {
+    ModelType.auto_analysis.name: AutoAnalysisPredictor,
+    ModelType.suggestion.name: SuggestionPredictor,
 }

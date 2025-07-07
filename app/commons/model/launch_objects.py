@@ -114,7 +114,7 @@ class SearchConfig(BaseModel):
     SuggestBoostModelMaxDepth: int = 5
     AutoBoostModelNumEstimators: int = 50
     AutoBoostModelMaxDepth: int = 5
-    MlModelForSuggestions: ModelType = ModelType.suggestion
+    MlModelForSuggestions: str = ModelType.suggestion.name
 
 
 class SearchLogInfo(BaseModel):

@@ -20,6 +20,7 @@ from signal import SIGINT, signal
 from sys import exit
 from typing import Any
 
+from commons.model.ml import ModelType
 from flask import Flask, Response
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
@@ -100,6 +101,7 @@ SEARCH_CONFIG = SearchConfig(
     MaxAutoAnalysisItemsToProcess=int(
         os.getenv("ANALYZER_MAX_ITEMS_TO_PROCESS", os.getenv("MAX_AUTO_ANALYSIS_ITEMS_TO_PROCESS", "4000"))
     ),
+    MlModelForSuggestions=ModelType[os.getenv("ML_MODEL_FOR_SUGGESTIONS", "suggestion").strip().lower()].value,
 )
 
 
@@ -111,9 +113,9 @@ def create_application():
     return _application
 
 
-def create_thread(func, args):
+def create_thread(func, args, name: str):
     """Creates a thread with specified function and arguments"""
-    thread = threading.Thread(target=func, args=args, daemon=True)
+    thread = threading.Thread(target=func, args=args, name=name, daemon=True)
     thread.start()
     return thread
 
@@ -141,6 +143,7 @@ def init_amqp_queues():
         APP_CONFIG,
         SEARCH_CONFIG,
         routing_key_predicate=except_train,
+        name="main_handler",
         init_services=[
             "index",
             "analyze",
@@ -165,7 +168,11 @@ def init_amqp_queues():
         ],
     )
     _train_amqp_handler = handler_class(
-        APP_CONFIG, SEARCH_CONFIG, routing_key_predicate=only_train, init_services=["train_models"]
+        APP_CONFIG,
+        SEARCH_CONFIG,
+        routing_key_predicate=only_train,
+        name="train_handler",
+        init_services=["train_models"],
     )
 
     _threads.append(
@@ -178,6 +185,7 @@ def init_amqp_queues():
                     _main_amqp_handler.handle_amqp_request,
                     None,
                 ),
+                "all",
             ),
             _main_amqp_handler,
         )
@@ -192,6 +200,7 @@ def init_amqp_queues():
                     _train_amqp_handler.handle_amqp_request,
                     None,
                 ),
+                "train",
             ),
             _train_amqp_handler,
         )

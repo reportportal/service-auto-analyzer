@@ -33,8 +33,8 @@ from app.commons.model.launch_objects import (
 from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
-from app.machine_learning.models import BoostingDecisionMaker, WeightedSimilarityCalculator
-from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
+from app.machine_learning.models import WeightedSimilarityCalculator
+from app.machine_learning.predictor import PREDICTION_CLASSES
 from app.service.analyzer_service import AnalyzerService
 from app.utils import text_processing, utils
 
@@ -407,53 +407,54 @@ class SuggestService(AnalyzerService):
 
             boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
             boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(test_item_info.project)
-            # noinspection PyTypeChecker
-            _suggest_decision_maker_to_use: BoostingDecisionMaker = self.model_chooser.choose_model(
-                test_item_info.project,
-                ModelType.suggestion,
+
+            predictor_class = PREDICTION_CLASSES[self.search_cfg.MlModelForSuggestions]
+            # Create predictor for suggestions
+            predictor = predictor_class(
+                model_chooser=self.model_chooser,
+                project_id=test_item_info.project,
+                boosting_config=boosting_config,
+                weighted_log_similarity_calculator=self.similarity_model,
                 custom_model_prob=self.search_cfg.ProbabilityForCustomModelSuggestions,
                 hash_source=test_item_info.launchId,
             )
 
-            _boosting_data_gatherer = SuggestBoostingFeaturizer(
-                searched_res,
-                boosting_config,
-                feature_ids=_suggest_decision_maker_to_use.feature_ids,
-                weighted_log_similarity_calculator=self.similarity_model,
-            )
-            # noinspection PyTypeChecker
-            _boosting_data_gatherer.set_defect_type_model(
-                self.model_chooser.choose_model(test_item_info.project, ModelType.defect_type)
-            )
-            feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
-            scores_by_test_items = _boosting_data_gatherer.find_most_relevant_by_type()
-            model_info_tags = (
-                _boosting_data_gatherer.get_used_model_info() + _suggest_decision_maker_to_use.get_model_info()
-            )
-            feature_names = ";".join([str(i) for i in _suggest_decision_maker_to_use.feature_ids])
-            if feature_data:
-                _, predicted_labels_probability = _suggest_decision_maker_to_use.predict(feature_data)
-                sorted_results = self.sort_results(scores_by_test_items, test_item_ids, predicted_labels_probability)
+            # Use predictor for the complete prediction workflow
+            prediction_result_obj = predictor.predict(searched_res)
+            model_info_tags = prediction_result_obj.model_info_tags
+            feature_names = ";".join([str(i) for i in predictor.boosting_decision_maker.feature_ids])
+
+            if prediction_result_obj.predicted_labels_probability:
+                sorted_results = self.sort_results(
+                    prediction_result_obj.scores_by_identity,
+                    prediction_result_obj.identifiers,
+                    prediction_result_obj.predicted_labels_probability,
+                )
 
                 logger.debug("Found %d results for test items ", len(sorted_results))
                 for idx, prob, _ in sorted_results:
-                    test_item_id = test_item_ids[idx]
-                    issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
-                    logger.debug(
-                        "Test item id %s with issue type %s has probability %.2f", test_item_id, issue_type, prob
-                    )
+                    identity = prediction_result_obj.identifiers[idx]
+                    issue_type = prediction_result_obj.scores_by_identity[identity]["mrHit"]["_source"]["issue_type"]
+                    logger.debug(f"Test item '{identity}' with issue type '{issue_type}' has probability {prob:.2f}")
                 processed_time = time() - t_start
                 global_idx = 0
                 for idx, prob, _ in sorted_results[: self.search_cfg.MaxSuggestionsNumber]:
                     if prob >= self.suggest_threshold:
-                        test_item_id = test_item_ids[idx]
-                        issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
-                        relevant_log_id = utils.extract_real_id(scores_by_test_items[test_item_id]["mrHit"]["_id"])
-                        real_log_id = str(scores_by_test_items[test_item_id]["mrHit"]["_id"])
+                        identity = prediction_result_obj.identifiers[idx]
+                        issue_type = prediction_result_obj.scores_by_identity[identity]["mrHit"]["_source"][
+                            "issue_type"
+                        ]
+                        relevant_log_id = utils.extract_real_id(
+                            prediction_result_obj.scores_by_identity[identity]["mrHit"]["_id"]
+                        )
+                        real_log_id = str(prediction_result_obj.scores_by_identity[identity]["mrHit"]["_id"])
                         is_merged = real_log_id != str(relevant_log_id)
                         test_item_log_id = utils.extract_real_id(
-                            scores_by_test_items[test_item_id]["compared_log"]["_id"]
+                            prediction_result_obj.scores_by_identity[identity]["compared_log"]["_id"]
                         )
+                        test_item_id = prediction_result_obj.scores_by_identity[identity]["mrHit"]["_source"][
+                            "test_item"
+                        ]
                         analysis_result = SuggestAnalysisResult(
                             project=test_item_info.project,
                             testItem=test_item_id_for_suggest,
@@ -465,11 +466,13 @@ class SuggestService(AnalyzerService):
                             relevantItem=test_item_id,
                             relevantLogId=relevant_log_id,
                             isMergedLog=is_merged,
-                            matchScore=round(prob, 3) * 100,
-                            esScore=round(scores_by_test_items[test_item_id]["mrHit"]["_score"], 2),
-                            esPosition=scores_by_test_items[test_item_id]["mrHit"]["es_pos"],
+                            matchScore=round(prob, 2) * 100,
+                            esScore=round(prediction_result_obj.scores_by_identity[identity]["mrHit"]["_score"], 2),
+                            esPosition=prediction_result_obj.scores_by_identity[identity]["mrHit"]["es_pos"],
                             modelFeatureNames=feature_names,
-                            modelFeatureValues=";".join([str(feature) for feature in feature_data[idx]]),
+                            modelFeatureValues=";".join(
+                                [str(feature) for feature in prediction_result_obj.feature_data[idx]]
+                            ),
                             modelInfo=";".join(model_info_tags),
                             resultPosition=global_idx,
                             usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,

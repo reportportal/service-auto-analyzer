@@ -17,6 +17,8 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from app.commons.model.ml import ModelType
+
 
 class AnalyzerConf(BaseModel):
     """Analyzer config object"""
@@ -112,6 +114,7 @@ class SearchConfig(BaseModel):
     SuggestBoostModelMaxDepth: int = 5
     AutoBoostModelNumEstimators: int = 50
     AutoBoostModelMaxDepth: int = 5
+    MlModelForSuggestions: ModelType = ModelType.suggestion
 
 
 class SearchLogInfo(BaseModel):

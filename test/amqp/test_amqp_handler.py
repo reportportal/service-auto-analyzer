@@ -287,6 +287,7 @@ class TestProcessAmqpRequestHandler:
         # Verify no reply was sent for malformed message
         mock_amqp_client.reply.assert_not_called()
 
+    # noinspection PyUnreachableCode,PyTestUnpassedFixture
     def test_shutdown_cleanup(self, app_config, search_config, mock_amqp_client):
         """Test proper cleanup during shutdown"""
         handler = ProcessAmqpRequestHandler(

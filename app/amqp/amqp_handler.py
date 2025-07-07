@@ -18,6 +18,7 @@ import time
 from queue import Empty, PriorityQueue
 from typing import Any, Callable, Optional, Protocol
 
+from elasticsearch import ConflictError
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
 
@@ -71,21 +72,142 @@ def get_priority(props: BasicProperties) -> int:
     return priority
 
 
+def retry(item: ProcessingItem, exc: Exception) -> bool:
+    """Default retry predicate for handling exceptions."""
+    # You can customize this logic based on your requirements
+    if isinstance(exc, ConflictError) and item.routing_key == "item_remove":
+        return "but no document was found" not in exc.error
+    return True
+
+
+class Worker:
+    """Worker class for processing AMQP messages in a separate process.
+
+    Handles initialization of services and provides retry logic for failed processing attempts.
+    Contains the main worker function that runs in a separate process and processes messages.
+    """
+
+    _init_services: set[str]
+    _retry_predicate: Optional[Callable[[ProcessingItem, Exception], bool]]
+
+    def __init__(
+        self,
+        init_services: set[str],
+        retry_predicate: Optional[Callable[[ProcessingItem, Exception], bool]] = None,
+    ):
+        """Initialize worker with services to initialize and optional retry predicate.
+
+        :param set[str] init_services: Set of service names to initialize in the worker process
+        :param Optional[Callable[[ProcessingItem, Exception], bool]] retry_predicate: Optional function to determine
+        if a failed processing attempt should be retried
+        """
+        self._init_services = init_services
+        self._retry_predicate = retry_predicate
+
+    def __process(
+        self, processing_item: ProcessingItem, processor: ServiceProcessor, max_retries: int
+    ) -> Optional[ProcessingResult]:
+        result = None
+        routing_key = processing_item.routing_key
+        for i in range(max_retries):
+            try:
+                result_value = processor.process(routing_key, processing_item.item)
+                result = ProcessingResult(processing_item, result_value, success=True, retry_count=i)
+                break
+            except Exception as exc:
+                logger.exception(
+                    f"Failed to process message '{routing_key}' in worker on attempt {i + 1} of {max_retries}",
+                    exc_info=exc,
+                )
+                result = ProcessingResult(processing_item, None, success=False, error=exc, retry_count=i)
+                if self._retry_predicate is not None:
+                    if not self._retry_predicate(processing_item, exc):
+                        logger.info(
+                            f"Retry predicate failed for message {routing_key} - "
+                            f"{processing_item.msg_correlation_id}, not retrying"
+                        )
+                        break
+                time.sleep(0.01)  # Small sleep to prevent busy waiting
+        return result
+
+    def work(
+        self,
+        conn: Any,
+        app_config: ApplicationConfig,
+        search_config: SearchConfig,
+    ) -> None:
+        """Worker function that runs in separate process.
+
+        Continuously polls for processing items from the connection, processes them using ServiceProcessor,
+        handles retries based on the retry predicate, and sends results back through the connection.
+
+        :param Any conn: Process connection object for communication with parent process
+        :param ApplicationConfig app_config: Application configuration containing retry settings
+        :param SearchConfig search_config: Search configuration for the processor
+        """
+        processor = ServiceProcessor(app_config, search_config, services_to_init=self._init_services)
+        try:
+            while True:
+                if not conn.poll():
+                    # If no message is available, wait for a short time before checking again
+                    time.sleep(0.01)  # Small sleep to prevent busy waiting
+                    continue
+
+                processing_item: ProcessingItem = conn.recv()
+                if not processing_item:  # Shutdown signal
+                    break
+
+                logging.set_correlation_id(processing_item.log_correlation_id)
+
+                result = self.__process(processing_item, processor, app_config.amqpHandlerMaxRetries)
+                conn.send(result)
+        except Exception as exc:
+            logger.exception("Processor worker encountered error", exc_info=exc)
+        conn.close()
+
+
 class AtomicInteger:
+    """Thread-safe integer counter with atomic increment and decrement operations.
+
+    Provides thread-safe operations for incrementing, decrementing, and reading integer values
+    using a threading lock to ensure atomicity across multiple threads.
+    """
+
     def __init__(self, value: int = 0) -> None:
+        """Initialize the atomic integer with an optional starting value.
+
+        :param int value: Initial value for the counter (default: 0)
+        """
         self._value = int(value)
         self._lock = threading.Lock()
 
     def inc(self, d: int = 1) -> int:
+        """Atomically increment the value and return the new value.
+
+        :param int d: Amount to increment by (default: 1)
+        :return: The new value after incrementing
+        :rtype: int
+        """
         with self._lock:
             self._value += int(d)
             return self._value
 
     def dec(self, d: int = 1) -> int:
+        """Atomically decrement the value and return the new value.
+
+        :param int d: Amount to decrement by (default: 1)
+        :return: The new value after decrementing
+        :rtype: int
+        """
         return self.inc(-d)
 
     @property
     def value(self) -> int:
+        """Get the current value in a thread-safe manner.
+
+        :return: Current integer value
+        :rtype: int
+        """
         with self._lock:
             return self._value
 
@@ -120,6 +242,7 @@ class ProcessAmqpRequestHandler:
     _processing_thread: Optional[threading.Thread]
     _shutdown: bool
     _init_services: set[str]
+    _retry_predicate: Optional[Callable[[ProcessingItem, Exception], bool]]
 
     def __init__(
         self,
@@ -130,17 +253,22 @@ class ProcessAmqpRequestHandler:
         routing_key_predicate: Optional[Callable[[str], bool]] = None,
         client: Optional[AmqpClient] = None,
         init_services: Optional[list[str]] = None,
+        retry_predicate: Optional[Callable[[ProcessingItem, Exception], bool]] = retry,
         name: Optional[str] = None,
     ):
         """Initialize handler for processing requests with process-based communication.
 
-        :param app_config: Application configuration object
-        :param search_config: Search configuration object
-        :param queue_size: Maximum size of the internal priority queue (buffer)
-        :param routing_key_predicate: Optional predicate to filter routing keys for processing. Should return True for
-        keys to process.
-        :param client: Optional AMQP client for sending replies (useful for testing)
-        :param init_services: Optional list of routing keys to initialize the processor with specific routing keys
+        :param ApplicationConfig app_config: Application configuration object
+        :param SearchConfig search_config: Search configuration object
+        :param int queue_size: Maximum size of the internal priority queue (buffer)
+        :param Optional[Callable[[str], bool]] routing_key_predicate: Optional predicate to filter routing keys for
+        processing. Should return True for keys to process.
+        :param Optional[AmqpClient] client: Optional AMQP client for sending replies (useful for testing)
+        :param Optional[list[str]] init_services: Optional list of routing keys to initialize the processor with
+        specific routing keys
+        :param Optional[Callable[[ProcessingItem, Exception], bool]] retry_predicate: Optional function to determine
+        if a failed processing attempt should be retried
+        :param Optional[str] name: Optional name for the processing thread
         """
         self.app_config = app_config
         self.search_config = search_config
@@ -151,6 +279,7 @@ class ProcessAmqpRequestHandler:
             self._init_services = set(init_services)
         else:
             self._init_services = set()
+        self._retry_predicate = retry_predicate
         self.counter = AtomicInteger(0)
 
         # Initialize queue and running tasks
@@ -159,50 +288,15 @@ class ProcessAmqpRequestHandler:
 
         # Setup process communication
         self.processor = RealProcessor(
-            app_config, search_config, self._processor_worker, init_services=self._init_services
+            app_config,
+            search_config,
+            Worker(self._init_services, self._retry_predicate).work,
         )
         self._shutdown = False
 
         # Start the processing thread
         self._processing_thread = threading.Thread(target=self._process_queue, name=name, daemon=True)
         self._processing_thread.start()
-
-    @staticmethod
-    def _processor_worker(
-        conn: Any, app_config: ApplicationConfig, search_config: SearchConfig, init_services: Optional[set[str]] = None
-    ) -> None:
-        """Worker function that runs in separate process"""
-        processor = ServiceProcessor(app_config, search_config, services_to_init=init_services)
-        try:
-            while True:
-                if conn.poll():
-                    processing_item: ProcessingItem = conn.recv()
-                    if not processing_item:  # Shutdown signal
-                        break
-                    routing_key = processing_item.routing_key
-
-                    logging.set_correlation_id(processing_item.log_correlation_id)
-
-                    result = None
-                    for i in range(app_config.amqpHandlerMaxRetries):
-                        try:
-                            result_value = processor.process(routing_key, processing_item.item)
-                            result = ProcessingResult(processing_item, result_value, success=True, retry_count=i)
-                            break
-                        except Exception as exc:
-                            logger.exception(
-                                f"Failed to process message {routing_key}' in worker on attempt {i + 1} of "
-                                + str(app_config.amqpHandlerMaxRetries),
-                                exc_info=exc,
-                            )
-                            result = ProcessingResult(processing_item, None, success=False, error=exc, retry_count=i)
-                            time.sleep(0.01)  # Small sleep to prevent busy waiting
-                    conn.send(result)
-                else:
-                    time.sleep(0.01)  # Small sleep to prevent busy waiting
-        except Exception as exc:
-            logger.exception("Processor worker encountered error", exc_info=exc)
-        conn.close()
 
     def __send_task(self, processing_item: ProcessingItem) -> None:
         """Send processing item to processor process"""
@@ -241,7 +335,9 @@ class ProcessAmqpRequestHandler:
 
         # Create new processor instance
         self.processor = RealProcessor(
-            self.app_config, self.search_config, self._processor_worker, self._init_services
+            self.app_config,
+            self.search_config,
+            Worker(self._init_services, self._retry_predicate).work,
         )
         logger.info("Successfully restarted processor process")
 
@@ -297,17 +393,16 @@ class ProcessAmqpRequestHandler:
                                 f"Received result for task {result.item.msg_correlation_id} but expected "
                                 f"{completed_task.msg_correlation_id}. Possible mismatch."
                             )
-                    if result.retry_count > 0:
-                        if result.success:
-                            logger.warning(
-                                f"Task {result.item.routing_key} - {result.item.msg_correlation_id} "
-                                f"was retried {result.retry_count} times"
-                            )
-                        else:
-                            logger.error(
-                                f"Task {result.item.routing_key} - {result.item.msg_correlation_id} failed after "
-                                f"{result.retry_count} retries."
-                            )
+                    if result.success and result.retry_count > 0:
+                        logger.warning(
+                            f"Task {result.item.routing_key} - {result.item.msg_correlation_id} "
+                            f"was retried {result.retry_count} times"
+                        )
+                    elif not result.success:
+                        logger.error(
+                            f"Task {result.item.routing_key} - {result.item.msg_correlation_id} failed after "
+                            f"{result.retry_count} retries."
+                        )
                     self.__handle_response(result)
             except Exception as exc:
                 logger.exception("Failed to receive response from processor", exc_info=exc)

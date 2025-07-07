@@ -105,6 +105,11 @@ def create_amqp_request_mock(
     return channel, method, props, body_bytes
 
 
+def custom_retry_predicate(item, exc):
+    """Custom retry predicate that only retries tasks with 'should_retry' in the item data"""
+    return "should_retry" in str(item.item)
+
+
 class TestProcessAmqpRequestHandler:
     """Test suite for ProcessAmqpRequestHandler"""
 
@@ -288,16 +293,17 @@ class TestProcessAmqpRequestHandler:
             app_config=app_config,
             search_config=search_config,
             client=mock_amqp_client,
-            init_services=["noop_echo", "noop_sleep"],
+            init_services=["noop_echo"],
         )
 
-        # Verify handler is initialized
-        assert handler._processing_thread is not None
-        assert handler._processing_thread.is_alive()
-        assert handler.processor.is_alive()
-
-        # Shutdown
-        handler.shutdown()
+        try:
+            # Verify handler is initialized
+            assert handler._processing_thread is not None
+            assert handler._processing_thread.is_alive()
+            assert handler.processor.is_alive()
+        finally:
+            # Ensure shutdown is called even if test fails
+            handler.shutdown()
 
         # Wait for cleanup
         time.sleep(0.2)
@@ -318,20 +324,23 @@ class TestProcessAmqpRequestHandler:
             search_config=search_config,
             client=mock_amqp_client,
             routing_key_predicate=routing_key_predicate,
-            init_services=["noop_echo", "noop_sleep"],
+            init_services=["noop_echo"],
         )
 
-        # Submit task with filtered routing key
-        channel, method, props, body = create_amqp_request_mock(routing_key="filtered_key", body="test_data")
+        try:
+            # Submit task with filtered routing key
+            channel, method, props, body = create_amqp_request_mock(routing_key="filtered_key", body="test_data")
 
-        handler.handle_amqp_request(channel, method, props, body)
+            handler.handle_amqp_request(channel, method, props, body)
 
-        # Wait a bit
-        time.sleep(0.2)
+            # Wait a bit
+            time.sleep(0.2)
 
-        # Verify task was filtered out (not processed)
-        assert len(handler.running_tasks) == 0
-        mock_amqp_client.reply.assert_not_called()
+            # Verify task was filtered out (not processed)
+            assert len(handler.running_tasks) == 0
+            mock_amqp_client.reply.assert_not_called()
+        finally:
+            handler.shutdown()
 
     def test_long_running_task_interruption(self, handler, mock_amqp_client):
         """Test Case 4: Long running task interruption - verify task restart when timeout is exceeded"""
@@ -408,6 +417,73 @@ class TestProcessAmqpRequestHandler:
 
         mock_amqp_client.reply.assert_not_called()
         assert handler.processor.is_alive(), "Processor should be alive after handling failed task"
+
+    @patch("app.amqp.amqp_handler.logger")
+    def test_custom_retry_predicate(self, mock_logger, app_config, search_config, mock_amqp_client):
+        """Test Case 7: Custom retry predicate - verify that custom retry logic is respected"""
+
+        # Create handler with custom retry predicate
+        handler = ProcessAmqpRequestHandler(
+            app_config=app_config,
+            search_config=search_config,
+            client=mock_amqp_client,
+            retry_predicate=custom_retry_predicate,
+            init_services=["noop_fail"],
+        )
+
+        try:
+            # Test Case 7a: Task that should be retried according to custom predicate
+            channel_retry, method_retry, props_retry, body_retry = create_amqp_request_mock(
+                routing_key="noop_fail",
+                body="should_retry_task",
+                reply_to="test_reply_retry",
+                correlation_id="correlation_retry",
+            )
+
+            # Submit the failing task that should be retried
+            handler.handle_amqp_request(channel_retry, method_retry, props_retry, body_retry)
+
+            # Wait for retries to complete
+            time.sleep(15)
+
+            # Verify task was dropped after retries (custom predicate allowed retries)
+            assert len(handler.running_tasks) == 0, "Retry task should be dropped after retries"
+
+            # Verify retry attempts were made (should see error about failed retries)
+            mock_error = mock_logger.error
+            retry_error_calls = [call for call in mock_error.call_args_list if "failed after" in str(call)]
+            assert len(retry_error_calls) == 1, "Should log error message about failed retries for retry task"
+            assert "2 retries" in str(retry_error_calls[0])
+
+            # Test Case 7b: Task that should NOT be retried according to custom predicate
+            channel_no_retry, method_no_retry, props_no_retry, body_no_retry = create_amqp_request_mock(
+                routing_key="noop_fail",
+                body="no_retry_task",
+                reply_to="test_reply_no_retry",
+                correlation_id="correlation_no_retry",
+            )
+
+            # Submit the failing task that should NOT be retried
+            handler.handle_amqp_request(channel_no_retry, method_no_retry, props_no_retry, body_no_retry)
+
+            # Wait for processing to complete (should fail quickly without retries)
+            time.sleep(0.1)
+
+            # Verify task was dropped quickly (custom predicate prevented retries)
+            assert len(handler.running_tasks) == 0, "No-retry task should be dropped quickly"
+
+            # Verify that the custom predicate prevented retries by checking for the specific log message
+            mock_error = mock_logger.error
+            no_retry_error_calls = [
+                call for call in mock_error.call_args_list if "failed after 0 retries." in str(call)
+            ]
+            assert len(no_retry_error_calls) == 1, "Should log info message about retry predicate failure"
+
+            # Verify no replies were sent for either failed task
+            mock_amqp_client.reply.assert_not_called()
+        finally:
+            # Clean up
+            handler.shutdown()
 
     def test_two_long_tasks_processing(self, handler, mock_amqp_client):
         """Test Case 6: Check that two long tasks are processed correctly without deadlock"""

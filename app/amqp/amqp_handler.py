@@ -393,17 +393,16 @@ class ProcessAmqpRequestHandler:
                                 f"Received result for task {result.item.msg_correlation_id} but expected "
                                 f"{completed_task.msg_correlation_id}. Possible mismatch."
                             )
-                    if result.retry_count > 0:
-                        if result.success:
-                            logger.warning(
-                                f"Task {result.item.routing_key} - {result.item.msg_correlation_id} "
-                                f"was retried {result.retry_count} times"
-                            )
-                        else:
-                            logger.error(
-                                f"Task {result.item.routing_key} - {result.item.msg_correlation_id} failed after "
-                                f"{result.retry_count} retries."
-                            )
+                    if result.success and result.retry_count > 0:
+                        logger.warning(
+                            f"Task {result.item.routing_key} - {result.item.msg_correlation_id} "
+                            f"was retried {result.retry_count} times"
+                        )
+                    elif not result.success:
+                        logger.error(
+                            f"Task {result.item.routing_key} - {result.item.msg_correlation_id} failed after "
+                            f"{result.retry_count} retries."
+                        )
                     self.__handle_response(result)
             except Exception as exc:
                 logger.exception("Failed to receive response from processor", exc_info=exc)

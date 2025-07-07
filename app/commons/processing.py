@@ -88,14 +88,11 @@ class RealProcessor:
         app_config: ApplicationConfig,
         search_config: SearchConfig,
         target: Callable[[Any, ApplicationConfig, SearchConfig], None],
-        init_services: set[str] = None,
     ) -> None:
         self.app_config = app_config
         self.search_config = search_config
         self.parent_conn, self.child_conn = Pipe()
-        self.process = Process(
-            target=target, args=(self.child_conn, self.app_config, self.search_config, init_services), daemon=True
-        )
+        self.process = Process(target=target, args=(self.child_conn, self.app_config, self.search_config), daemon=True)
         self.process.start()
 
     @property

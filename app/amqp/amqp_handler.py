@@ -104,7 +104,33 @@ class Worker:
         self._init_services = init_services
         self._retry_predicate = retry_predicate
 
-    def processor_worker(
+    def __process(
+        self, processing_item: ProcessingItem, processor: ServiceProcessor, max_retries: int
+    ) -> Optional[ProcessingResult]:
+        result = None
+        routing_key = processing_item.routing_key
+        for i in range(max_retries):
+            try:
+                result_value = processor.process(routing_key, processing_item.item)
+                result = ProcessingResult(processing_item, result_value, success=True, retry_count=i)
+                break
+            except Exception as exc:
+                logger.exception(
+                    f"Failed to process message '{routing_key}' in worker on attempt {i + 1} of {max_retries}",
+                    exc_info=exc,
+                )
+                result = ProcessingResult(processing_item, None, success=False, error=exc, retry_count=i)
+                if self._retry_predicate is not None:
+                    if not self._retry_predicate(processing_item, exc):
+                        logger.info(
+                            f"Retry predicate failed for message {routing_key} - "
+                            f"{processing_item.msg_correlation_id}, not retrying"
+                        )
+                        break
+                time.sleep(0.01)  # Small sleep to prevent busy waiting
+        return result
+
+    def work(
         self,
         conn: Any,
         app_config: ApplicationConfig,
@@ -122,38 +148,19 @@ class Worker:
         processor = ServiceProcessor(app_config, search_config, services_to_init=self._init_services)
         try:
             while True:
-                if conn.poll():
-                    processing_item: ProcessingItem = conn.recv()
-                    if not processing_item:  # Shutdown signal
-                        break
-                    routing_key = processing_item.routing_key
-
-                    logging.set_correlation_id(processing_item.log_correlation_id)
-
-                    result = None
-                    for i in range(app_config.amqpHandlerMaxRetries):
-                        try:
-                            result_value = processor.process(routing_key, processing_item.item)
-                            result = ProcessingResult(processing_item, result_value, success=True, retry_count=i)
-                            break
-                        except Exception as exc:
-                            logger.exception(
-                                f"Failed to process message {routing_key}' in worker on attempt {i + 1} of "
-                                + str(app_config.amqpHandlerMaxRetries),
-                                exc_info=exc,
-                            )
-                            result = ProcessingResult(processing_item, None, success=False, error=exc, retry_count=i)
-                            if self._retry_predicate is not None:
-                                if not self._retry_predicate(processing_item, exc):
-                                    logger.info(
-                                        f"Retry predicate failed for message {routing_key} - "
-                                        f"{processing_item.msg_correlation_id}, not retrying"
-                                    )
-                                    break
-                            time.sleep(0.01)  # Small sleep to prevent busy waiting
-                    conn.send(result)
-                else:
+                if not conn.poll():
+                    # If no message is available, wait for a short time before checking again
                     time.sleep(0.01)  # Small sleep to prevent busy waiting
+                    continue
+
+                processing_item: ProcessingItem = conn.recv()
+                if not processing_item:  # Shutdown signal
+                    break
+
+                logging.set_correlation_id(processing_item.log_correlation_id)
+
+                result = self.__process(processing_item, processor, app_config.amqpHandlerMaxRetries)
+                conn.send(result)
         except Exception as exc:
             logger.exception("Processor worker encountered error", exc_info=exc)
         conn.close()
@@ -283,7 +290,7 @@ class ProcessAmqpRequestHandler:
         self.processor = RealProcessor(
             app_config,
             search_config,
-            Worker(self._init_services, self._retry_predicate).processor_worker,
+            Worker(self._init_services, self._retry_predicate).work,
         )
         self._shutdown = False
 
@@ -330,7 +337,7 @@ class ProcessAmqpRequestHandler:
         self.processor = RealProcessor(
             self.app_config,
             self.search_config,
-            Worker(self._init_services, self._retry_predicate).processor_worker,
+            Worker(self._init_services, self._retry_predicate).work,
         )
         logger.info("Successfully restarted processor process")
 

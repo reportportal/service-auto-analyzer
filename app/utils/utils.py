@@ -19,7 +19,7 @@ import traceback
 import warnings
 from collections import Counter
 from functools import wraps
-from typing import Any, TYPE_CHECKING
+from typing import Any
 
 import numpy as np
 import requests
@@ -27,9 +27,6 @@ import requests
 from app.commons import logging
 from app.commons.model import launch_objects
 from app.utils.text_processing import remove_credentials_from_url, split_words
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger("analyzerApp.utils")
 ERROR_LOGGING_LEVEL = 40000

@@ -16,7 +16,7 @@ import json
 from datetime import datetime
 from functools import reduce
 from time import time
-from typing import Optional
+from typing import Optional, Any, List, Tuple, Dict
 
 import elasticsearch.helpers
 
@@ -221,7 +221,12 @@ class SuggestService(AnalyzerService):
                 full_results.append((log, partial_res[ind]))
         return full_results
 
-    def deduplicate_results(self, gathered_results, scores_by_test_items, test_item_ids):
+    def deduplicate_results(
+        self,
+        gathered_results: list[tuple[int, float, Any]],
+        scores_by_test_items: dict[str, dict[str, Any]],
+        test_item_ids: list[str],
+    ) -> list[tuple[int, float, Any]]:
         _similarity_calculator = similarity_calculator.SimilarityCalculator(
             {
                 "max_query_terms": self.search_cfg.MaxQueryTerms,
@@ -273,7 +278,12 @@ class SuggestService(AnalyzerService):
             filtered_results.append(gathered_results[i])
         return filtered_results
 
-    def sort_results(self, scores_by_test_items, test_item_ids, predicted_labels_probability):
+    def sort_results(
+        self,
+        scores_by_test_items: dict[str, dict[str, Any]],
+        test_item_ids: list[str],
+        predicted_labels_probability: list[list[float]],
+    ) -> list[tuple[int, float, Any]]:
         gathered_results = []
         for idx, prob in enumerate(predicted_labels_probability):
             test_item_id = test_item_ids[idx]

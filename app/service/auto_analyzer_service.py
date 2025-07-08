@@ -518,6 +518,7 @@ class AutoAnalyzerService(AnalyzerService):
                         custom_model_prob=self.search_cfg.ProbabilityForCustomModelAutoAnalysis,
                         hash_source=launch_id,
                     )
+                    feature_names = ";".join([str(i) for i in predictor.boosting_decision_maker.feature_ids])
 
                     relevant_with_no_defect_candidate = self.find_relevant_with_no_defect(
                         analyzer_candidates.candidatesWithNoDefect, boosting_config
@@ -533,7 +534,8 @@ class AutoAnalyzerService(AnalyzerService):
                     for candidates in candidates_to_check:
                         # Use predictor for the complete prediction workflow
                         prediction_result_obj = predictor.predict(candidates)
-                        results_to_share[launch_id]["model_info"].update(prediction_result_obj.model_info_tags)
+                        model_info_tags = prediction_result_obj.model_info_tags
+                        results_to_share[launch_id]["model_info"].update(model_info_tags)
 
                         if prediction_result_obj.predicted_labels_probability:
                             predicted_issue_type, prob, global_idx = utils.choose_issue_type(
@@ -541,6 +543,9 @@ class AutoAnalyzerService(AnalyzerService):
                                 prediction_result_obj.predicted_labels_probability,
                                 prediction_result_obj.identifiers,
                                 prediction_result_obj.scores_by_identity,
+                            )
+                            feature_values = ";".join(
+                                [str(feature) for feature in prediction_result_obj.feature_data[global_idx]]
                             )
 
                             # Debug logging
@@ -575,16 +580,9 @@ class AutoAnalyzerService(AnalyzerService):
                                         matchScore=round(prob * 100, 2),
                                         esScore=round(chosen_type["mrHit"]["_score"], 2),
                                         esPosition=chosen_type["mrHit"]["es_pos"],
-                                        modelFeatureNames=";".join(
-                                            [str(i) for i in predictor.boosting_decision_maker.feature_ids]
-                                        ),
-                                        modelFeatureValues=";".join(
-                                            [
-                                                str(feature)
-                                                for feature in prediction_result_obj.feature_data[global_idx]
-                                            ]
-                                        ),
-                                        modelInfo=";".join(prediction_result_obj.model_info_tags),
+                                        modelFeatureNames=feature_names,
+                                        modelFeatureValues=feature_values,
+                                        modelInfo=";".join(model_info_tags),
                                         resultPosition=0,
                                         usedLogLines=analyzer_candidates.analyzerConfig.numberOfLogLines,
                                         minShouldMatch=self.find_min_should_match_threshold(

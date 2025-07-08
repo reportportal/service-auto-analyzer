@@ -358,7 +358,7 @@ class SuggestService(AnalyzerService):
         test_item_id = None
         test_items = self.es_client.es_client.search(
             index_name, body=self.get_query_for_test_item_in_cluster(test_item_info)
-        )
+        ) or {"hits": {"hits": []}}
         for res in test_items["hits"]["hits"]:
             test_item_id = int(res["_source"]["test_item"])
             break
@@ -428,11 +428,11 @@ class SuggestService(AnalyzerService):
                 custom_model_prob=self.search_cfg.ProbabilityForCustomModelSuggestions,
                 hash_source=test_item_info.launchId,
             )
+            feature_names = ";".join([str(i) for i in predictor.boosting_decision_maker.feature_ids])
 
             # Use predictor for the complete prediction workflow
             prediction_result_obj = predictor.predict(searched_res)
             model_info_tags = prediction_result_obj.model_info_tags
-            feature_names = ";".join([str(i) for i in predictor.boosting_decision_maker.feature_ids])
 
             if prediction_result_obj.predicted_labels_probability:
                 sorted_results = self.sort_results(
@@ -450,6 +450,9 @@ class SuggestService(AnalyzerService):
                 global_idx = 0
                 for idx, prob, _ in sorted_results[: self.search_cfg.MaxSuggestionsNumber]:
                     if prob >= self.suggest_threshold:
+                        feature_values = ";".join(
+                            [str(feature) for feature in prediction_result_obj.feature_data[idx]]
+                        )
                         identity = prediction_result_obj.identifiers[idx]
                         issue_type = prediction_result_obj.scores_by_identity[identity]["mrHit"]["_source"][
                             "issue_type"
@@ -480,9 +483,7 @@ class SuggestService(AnalyzerService):
                             esScore=round(prediction_result_obj.scores_by_identity[identity]["mrHit"]["_score"], 2),
                             esPosition=prediction_result_obj.scores_by_identity[identity]["mrHit"]["es_pos"],
                             modelFeatureNames=feature_names,
-                            modelFeatureValues=";".join(
-                                [str(feature) for feature in prediction_result_obj.feature_data[idx]]
-                            ),
+                            modelFeatureValues=feature_values,
                             modelInfo=";".join(model_info_tags),
                             resultPosition=global_idx,
                             usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,

@@ -19,7 +19,7 @@ import traceback
 import warnings
 from collections import Counter
 from functools import wraps
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import numpy as np
 import requests
@@ -27,6 +27,9 @@ import requests
 from app.commons import logging
 from app.commons.model import launch_objects
 from app.utils.text_processing import remove_credentials_from_url, split_words
+
+if TYPE_CHECKING:
+    pass
 
 logger = logging.getLogger("analyzerApp.utils")
 ERROR_LOGGING_LEVEL = 40000
@@ -76,33 +79,6 @@ def extract_real_id(elastic_id):
 
 def jaccard_similarity(s1, s2):
     return len(s1.intersection(s2)) / len(s1.union(s2)) if len(s1.union(s2)) > 0 else 0
-
-
-def choose_issue_type(
-    predicted_labels: list[int],
-    predicted_labels_probability: list[list[float]],
-    issue_type_names: list[str],
-    scores_by_issue_type: dict[str, dict[str, Any]],
-) -> tuple[str, float, int]:
-    predicted_issue_type = ""
-    max_prob = 0.0
-    max_val_start_time = None
-    global_idx = 0
-    for i in range(len(predicted_labels)):
-        if predicted_labels[i] == 1:
-            issue_type = issue_type_names[i]
-            chosen_type = scores_by_issue_type[issue_type]
-            start_time = chosen_type["mrHit"]["_source"]["start_time"]
-            predicted_prob = round(predicted_labels_probability[i][1], 4)
-            if (predicted_prob > max_prob) or (
-                (predicted_prob == max_prob)  # noqa
-                and (max_val_start_time is None or start_time > max_val_start_time)
-            ):
-                max_prob = predicted_prob
-                predicted_issue_type = issue_type
-                global_idx = i
-                max_val_start_time = start_time
-    return predicted_issue_type, max_prob, global_idx
 
 
 def send_request(url, method, username, password):

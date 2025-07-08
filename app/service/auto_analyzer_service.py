@@ -36,7 +36,7 @@ from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.similarity_calculator import SimilarityCalculator
 from app.machine_learning.models import WeightedSimilarityCalculator
-from app.machine_learning.predictor import AutoAnalysisPredictor
+from app.machine_learning.predictor import AutoAnalysisPredictor, PredictionResult
 from app.service.analyzer_service import AnalyzerService
 from app.utils import text_processing, utils
 
@@ -48,6 +48,34 @@ SPECIAL_FIELDS_BOOST_SCORES = [
     ("found_tests_and_methods", 2),
     ("test_item_name", 2.0),
 ]
+
+
+def _choose_issue_type(prediction_results: list[PredictionResult]) -> Optional[PredictionResult]:
+    """Choose the best issue type from a list of prediction results.
+
+    :param list[PredictionResult] prediction_results: List of PredictionResult objects to choose from
+    :return: The PredictionResult with the highest probability, or None if no positive predictions
+    """
+    if not prediction_results:
+        return None
+
+    best_result = None
+    max_prob = 0.0
+    max_val_start_time = None
+
+    for result in prediction_results:
+        if result.label == 1:
+            start_time = result.scores["mrHit"]["_source"]["start_time"]
+            predicted_prob = round(result.probability[1], 4)
+
+            if (predicted_prob > max_prob) or (
+                (predicted_prob == max_prob)  # noqa
+                and (max_val_start_time is None or start_time > max_val_start_time)
+            ):
+                max_prob = predicted_prob
+                best_result = result
+                max_val_start_time = start_time
+    return best_result
 
 
 class AutoAnalyzerService(AnalyzerService):
@@ -536,33 +564,26 @@ class AutoAnalyzerService(AnalyzerService):
                         prediction_results = predictor.predict(candidates)
 
                         if prediction_results:
-                            # Extract data from list of PredictionResult objects
-                            predicted_labels = [result.label for result in prediction_results]
-                            predicted_labels_probability = [result.probability for result in prediction_results]
-                            identifiers = [result.identity for result in prediction_results]
-                            scores_by_identity = {result.identity: result.scores for result in prediction_results}
-                            feature_data = [result.feature_data for result in prediction_results]
-                            model_info_tags = prediction_results[0].model_info_tags  # Same for all results
+                            # Use the new choose_issue_type function
+                            best_prediction = _choose_issue_type(prediction_results)
 
+                            # Get model info tags from the first result (same for all results)
+                            model_info_tags = prediction_results[0].model_info_tags
                             results_to_share[launch_id]["model_info"].update(model_info_tags)
 
-                            predicted_issue_type, prob, global_idx = utils.choose_issue_type(
-                                predicted_labels,
-                                predicted_labels_probability,
-                                identifiers,
-                                scores_by_identity,
-                            )
-                            feature_values = ";".join([str(feature) for feature in feature_data[global_idx]])
-
                             # Debug logging
-                            for issue_type_name in identifiers:
-                                log_id = scores_by_identity[issue_type_name]["mrHit"]["_id"]
+                            for result in prediction_results:
+                                log_id = result.scores["mrHit"]["_id"]
                                 logger.debug(
-                                    f"Most relevant item with issue type '{issue_type_name}' has log id: {log_id}"
+                                    f"Most relevant item with issue type '{result.identity}' has log id: {log_id}"
                                 )
 
-                            if predicted_issue_type:
-                                chosen_type = scores_by_identity[predicted_issue_type]
+                            if best_prediction:
+                                predicted_issue_type = best_prediction.identity
+                                prob = round(best_prediction.probability[1], 4)
+                                chosen_type = best_prediction.scores
+                                feature_values = ";".join([str(feature) for feature in best_prediction.feature_data])
+
                                 relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
                                 analysis_result = AnalysisResult(
                                     testItem=analyzer_candidates.testItemId,

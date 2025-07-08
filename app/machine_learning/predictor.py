@@ -49,7 +49,7 @@ class PredictionResult:
     Attributes:
         label: Binary prediction label from the decision maker
         probability: Prediction probability from the decision maker
-        scores: Most relevant log and its metadata for the identity
+        scores: Most relevant log and its metadata for the result
         identity: Identity for the gathered features
         feature_data: Feature vector for the identity gathered from the featurizer
         model_info_tags: List of model information tags

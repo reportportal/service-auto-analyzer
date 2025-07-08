@@ -53,7 +53,6 @@ class PredictionResult:
         identifiers: List of identities for the gathered features
         feature_data: List of feature vectors for each identity gathered from the featurizer
         model_info_tags: List of model information tags
-        metadata: PredictionMetadata containing additional information about the prediction
     """
 
     predicted_labels: list[int]

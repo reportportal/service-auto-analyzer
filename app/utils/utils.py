@@ -248,12 +248,12 @@ def extract_exception(err: Exception) -> str:
     return err_message
 
 
-def get_allowed_number_of_missed(cur_threshold):
-    if cur_threshold >= 0.95 and cur_threshold <= 0.99:
+def get_allowed_number_of_missed(cur_threshold: float) -> int:
+    if 0.95 <= cur_threshold <= 0.99:
         return 1
-    if cur_threshold >= 0.9 and cur_threshold < 0.95:
+    if 0.9 <= cur_threshold < 0.95:
         return 2
-    if cur_threshold >= 0.8 and cur_threshold < 0.9:
+    if 0.8 <= cur_threshold < 0.9:
         return 3
     return 0
 

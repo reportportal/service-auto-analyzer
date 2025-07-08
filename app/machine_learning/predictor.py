@@ -47,19 +47,19 @@ class PredictionResult:
     """Result container for prediction workflows.
 
     Attributes:
-        predicted_labels: List of binary prediction labels from the decision maker
-        predicted_labels_probability: List of prediction probabilities from the decision maker
-        scores_by_identity: Dictionary with issue identity as key and value as most relevant log and its metadata
-        identifiers: List of identities for the gathered features
-        feature_data: List of feature vectors for each identity gathered from the featurizer
+        label: Binary prediction label from the decision maker
+        probability: Prediction probability from the decision maker
+        scores: Most relevant log and its metadata for the identity
+        identity: Identity for the gathered features
+        feature_data: Feature vector for the identity gathered from the featurizer
         model_info_tags: List of model information tags
     """
 
-    predicted_labels: list[int]
-    predicted_labels_probability: list[list[float]]
-    scores_by_identity: dict[str, dict[str, Any]]
-    identifiers: list[str]
-    feature_data: list[list[float]]
+    label: int
+    probability: list[float]
+    scores: dict[str, Any]
+    identity: str
+    feature_data: list[float]
     model_info_tags: list[str]
 
 
@@ -140,13 +140,12 @@ class Predictor(metaclass=ABCMeta):
     def predict(
         self,
         search_results: list[tuple[dict[str, Any], dict[str, Any]]],
-    ) -> PredictionResult:
+    ) -> list[PredictionResult]:
         """Execute the full prediction workflow.
 
         :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
                                                                            from Elasticsearch
-        :return: PredictionResult containing predicted_labels, predicted_labels_probability, scores_by_identity,
-                 identifiers, feature_data, and model_info_tags
+        :return: List of PredictionResult objects, one for each prediction
         """
         # Create and configure featurizer
         featurizer = self.create_featurizer(
@@ -164,26 +163,28 @@ class Predictor(metaclass=ABCMeta):
 
         # If no feature data, return empty result
         if not feature_data:
-            return PredictionResult(
-                predicted_labels=[],
-                predicted_labels_probability=[],
-                model_info_tags=model_info_tags,
-                identifiers=identifiers,
-                scores_by_identity=featurizer.find_most_relevant_by_type(),
-                feature_data=[],
-            )
+            return []
 
         # Make predictions
         predicted_labels, predicted_labels_probability = self.boosting_decision_maker.predict(feature_data)
 
-        return PredictionResult(
-            predicted_labels=predicted_labels,
-            predicted_labels_probability=predicted_labels_probability,
-            model_info_tags=model_info_tags,
-            identifiers=identifiers,
-            scores_by_identity=featurizer.find_most_relevant_by_type(),
-            feature_data=feature_data,
-        )
+        # Get scores by identity
+        scores_by_identity = featurizer.find_most_relevant_by_type()
+
+        # Create list of PredictionResult objects, one for each prediction
+        results = []
+        for idx, identity in enumerate(identifiers):
+            result = PredictionResult(
+                label=predicted_labels[idx],
+                probability=predicted_labels_probability[idx],
+                scores=scores_by_identity[identity],
+                identity=identity,
+                feature_data=feature_data[idx],
+                model_info_tags=model_info_tags,
+            )
+            results.append(result)
+
+        return results
 
 
 class AutoAnalysisPredictor(Predictor):

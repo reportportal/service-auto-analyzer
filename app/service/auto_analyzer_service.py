@@ -533,30 +533,36 @@ class AutoAnalyzerService(AnalyzerService):
 
                     for candidates in candidates_to_check:
                         # Use predictor for the complete prediction workflow
-                        prediction_result_obj = predictor.predict(candidates)
-                        model_info_tags = prediction_result_obj.model_info_tags
-                        results_to_share[launch_id]["model_info"].update(model_info_tags)
+                        prediction_results = predictor.predict(candidates)
 
-                        if prediction_result_obj.predicted_labels_probability:
+                        if prediction_results:
+                            # Extract data from list of PredictionResult objects
+                            predicted_labels = [result.label for result in prediction_results]
+                            predicted_labels_probability = [result.probability for result in prediction_results]
+                            identifiers = [result.identity for result in prediction_results]
+                            scores_by_identity = {result.identity: result.scores for result in prediction_results}
+                            feature_data = [result.feature_data for result in prediction_results]
+                            model_info_tags = prediction_results[0].model_info_tags  # Same for all results
+
+                            results_to_share[launch_id]["model_info"].update(model_info_tags)
+
                             predicted_issue_type, prob, global_idx = utils.choose_issue_type(
-                                prediction_result_obj.predicted_labels,
-                                prediction_result_obj.predicted_labels_probability,
-                                prediction_result_obj.identifiers,
-                                prediction_result_obj.scores_by_identity,
+                                predicted_labels,
+                                predicted_labels_probability,
+                                identifiers,
+                                scores_by_identity,
                             )
-                            feature_values = ";".join(
-                                [str(feature) for feature in prediction_result_obj.feature_data[global_idx]]
-                            )
+                            feature_values = ";".join([str(feature) for feature in feature_data[global_idx]])
 
                             # Debug logging
-                            for issue_type_name in prediction_result_obj.identifiers:
-                                log_id = prediction_result_obj.scores_by_identity[issue_type_name]["mrHit"]["_id"]
+                            for issue_type_name in identifiers:
+                                log_id = scores_by_identity[issue_type_name]["mrHit"]["_id"]
                                 logger.debug(
                                     f"Most relevant item with issue type '{issue_type_name}' has log id: {log_id}"
                                 )
 
                             if predicted_issue_type:
-                                chosen_type = prediction_result_obj.scores_by_identity[predicted_issue_type]
+                                chosen_type = scores_by_identity[predicted_issue_type]
                                 relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
                                 analysis_result = AnalysisResult(
                                     testItem=analyzer_candidates.testItemId,

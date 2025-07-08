@@ -78,7 +78,12 @@ def jaccard_similarity(s1, s2):
     return len(s1.intersection(s2)) / len(s1.union(s2)) if len(s1.union(s2)) > 0 else 0
 
 
-def choose_issue_type(predicted_labels, predicted_labels_probability, issue_type_names, scores_by_issue_type):
+def choose_issue_type(
+    predicted_labels: list[int],
+    predicted_labels_probability: list[list[float]],
+    issue_type_names: list[str],
+    scores_by_issue_type: dict[str, dict[str, Any]],
+) -> tuple[str, float, int]:
     predicted_issue_type = ""
     max_prob = 0.0
     max_val_start_time = None

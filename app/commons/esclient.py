@@ -437,13 +437,11 @@ class EsClient:
                 formatted_exception = traceback.format_exc()
                 self._recreate_index_if_needed([{"_index": index_name}], formatted_exception)
 
-    @utils.ignore_warnings
-    def send_stats_info(self, stats_info):
+    def send_stats_info(self, stats_info: dict) -> None:
         logger.info("Started sending stats about analysis")
 
         stat_info_array = []
-        for launch_id in stats_info:
-            obj_info = stats_info[launch_id]
+        for obj_info in stats_info.values():
             rp_aa_stats_index = "rp_aa_stats"
             if "method" in obj_info and obj_info["method"] == "training":
                 rp_aa_stats_index = "rp_model_train_stats"

@@ -16,7 +16,7 @@ import json
 from datetime import datetime
 from functools import reduce
 from time import time
-from typing import Optional, Any, List, Tuple, Dict
+from typing import Any, Optional
 
 import elasticsearch.helpers
 

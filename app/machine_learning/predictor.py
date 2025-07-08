@@ -115,7 +115,7 @@ class Predictor(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def model_type(self):
+    def model_type(self) -> ModelType:
         """Return the type of model used by this predictor."""
         ...
 

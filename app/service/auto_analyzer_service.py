@@ -65,7 +65,7 @@ def _choose_issue_type(prediction_results: list[PredictionResult]) -> Optional[P
 
     for result in prediction_results:
         if result.label == 1:
-            start_time = result.scores["mrHit"]["_source"]["start_time"]
+            start_time = result.data["mrHit"]["_source"]["start_time"]
             predicted_prob = round(result.probability[1], 4)
 
             if (predicted_prob > max_prob) or (
@@ -573,7 +573,7 @@ class AutoAnalyzerService(AnalyzerService):
 
                             # Debug logging
                             for result in prediction_results:
-                                log_id = result.scores["mrHit"]["_id"]
+                                log_id = result.data["mrHit"]["_id"]
                                 logger.debug(
                                     f"Most relevant item with issue type '{result.identity}' has log id: {log_id}"
                                 )
@@ -581,7 +581,7 @@ class AutoAnalyzerService(AnalyzerService):
                             if best_prediction:
                                 predicted_issue_type = best_prediction.identity
                                 prob = round(best_prediction.probability[1], 4)
-                                chosen_type = best_prediction.scores
+                                chosen_type = best_prediction.data
                                 feature_values = ";".join([str(feature) for feature in best_prediction.feature_data])
 
                                 relevant_item = chosen_type["mrHit"]["_source"]["test_item"]

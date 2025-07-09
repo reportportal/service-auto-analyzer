@@ -49,7 +49,7 @@ class PredictionResult:
     Attributes:
         label: Binary prediction label from the decision maker
         probability: Prediction probability from the decision maker
-        scores: Most relevant log and its metadata for the result
+        data: Most relevant log and its metadata for the result
         identity: Identity for the gathered features
         feature_data: Feature vector for the identity gathered from the featurizer
         model_info_tags: List of model information tags
@@ -57,7 +57,7 @@ class PredictionResult:
 
     label: int
     probability: list[float]
-    scores: dict[str, Any]
+    data: dict[str, Any]
     identity: str
     feature_data: list[float]
     model_info_tags: list[str]
@@ -177,7 +177,7 @@ class Predictor(metaclass=ABCMeta):
             result = PredictionResult(
                 label=predicted_labels[idx],
                 probability=predicted_labels_probability[idx],
-                scores=scores_by_identity[identity],
+                data=scores_by_identity[identity],
                 identity=identity,
                 feature_data=feature_data[idx],
                 model_info_tags=model_info_tags,

@@ -388,10 +388,9 @@ class SuggestService(AnalyzerService):
     def suggest_items(self, test_item_info: TestItemInfo):
         logger.info(f"Started suggesting for test item with id: {test_item_info.testItemId}")
         logger.debug(f"Started suggesting items by request: {test_item_info.json()}")
-        logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))
         index_name = text_processing.unite_project_name(test_item_info.project, self.app_config.esProjectIndexPrefix)
         if not self.es_client.index_exists(index_name):
-            logger.info("Project %s doesn't exist", index_name)
+            logger.info(f"Project {index_name} doesn't exist.")
             logger.info("Finished suggesting for test item with 0 results.")
             return []
 
@@ -432,7 +431,7 @@ class SuggestService(AnalyzerService):
                 model_info_tags = prediction_results[0].model_info_tags
                 sorted_results = self.sort_results(prediction_results)
 
-                logger.debug("Found %d results for test items ", len(sorted_results))
+                logger.debug(f"Found {len(sorted_results)} results for test items.")
                 for result in sorted_results:
                     prob = result.probability[1]
                     identity = result.identity
@@ -483,7 +482,7 @@ class SuggestService(AnalyzerService):
                         logger.debug(analysis_result)
                         global_idx += 1
             else:
-                logger.debug("There are no results for test item %s", test_item_info.testItemId)
+                logger.debug(f"There are no results for test item {test_item_info.testItemId}")
         except Exception as exc:
             logger.exception(exc)
             errors_found.append(utils.extract_exception(exc))
@@ -532,7 +531,7 @@ class SuggestService(AnalyzerService):
                         ).json(),
                     )
             amqp_client.close()
-        logger.debug("Stats info %s", results_to_share)
-        logger.info("Processed the test item. It took %.2f sec.", time() - t_start)
-        logger.info("Finished suggesting for test item with %d results.", len(results))
+        logger.debug(f"Stats info {json.dumps(results_to_share)}")
+        logger.info(f"Processed the test item. It took {time() - t_start:.2f} sec.")
+        logger.info(f"Finished suggesting for test item with {len(results)} results.")
         return results

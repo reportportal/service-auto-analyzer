@@ -563,7 +563,7 @@ class AutoAnalyzerService(AnalyzerService):
                         prediction_results = predictor.predict(candidates)
 
                         if not prediction_results:
-                            logger.debug("There are no results for test item %s", analyzer_candidates.testItemId)
+                            logger.debug(f"There are no results for test item {analyzer_candidates.testItemId}")
                             continue
 
                         # Get model info tags from the first result (same for all results)

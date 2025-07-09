@@ -546,7 +546,6 @@ class AutoAnalyzerService(AnalyzerService):
                         custom_model_prob=self.search_cfg.ProbabilityForCustomModelAutoAnalysis,
                         hash_source=launch_id,
                     )
-                    feature_names = ";".join([str(i) for i in predictor.boosting_decision_maker.feature_ids])
 
                     relevant_with_no_defect_candidate = self.find_relevant_with_no_defect(
                         analyzer_candidates.candidatesWithNoDefect, boosting_config
@@ -565,7 +564,7 @@ class AutoAnalyzerService(AnalyzerService):
 
                         if prediction_results:
                             # Use the new choose_issue_type function
-                            best_prediction = _choose_issue_type(prediction_results)
+                            best = _choose_issue_type(prediction_results)
 
                             # Get model info tags from the first result (same for all results)
                             model_info_tags = prediction_results[0].model_info_tags
@@ -578,11 +577,15 @@ class AutoAnalyzerService(AnalyzerService):
                                     f"Most relevant item with issue type '{result.identity}' has log id: {log_id}"
                                 )
 
-                            if best_prediction:
-                                predicted_issue_type = best_prediction.identity
-                                prob = round(best_prediction.probability[1], 4)
-                                chosen_type = best_prediction.data
-                                feature_values = ";".join([str(feature) for feature in best_prediction.feature_data])
+                            if best:
+                                predicted_issue_type = best.identity
+                                prob = round(best.probability[1], 4)
+                                chosen_type = best.data
+                                feature_names = None
+                                feature_values = None
+                                if best.feature_info:
+                                    feature_names = ";".join([str(f_id) for f_id in best.feature_info.feature_ids])
+                                    feature_values = ";".join([str(f) for f in best.feature_info.feature_data])
 
                                 relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
                                 analysis_result = AnalysisResult(

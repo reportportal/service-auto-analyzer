@@ -423,7 +423,6 @@ class SuggestService(AnalyzerService):
                 custom_model_prob=self.search_cfg.ProbabilityForCustomModelSuggestions,
                 hash_source=test_item_info.launchId,
             )
-            feature_names = ";".join([str(i) for i in predictor.boosting_decision_maker.feature_ids])
 
             # Use predictor for the complete prediction workflow
             prediction_results = predictor.predict(searched_res)
@@ -444,7 +443,12 @@ class SuggestService(AnalyzerService):
                 for result in sorted_results[: self.search_cfg.MaxSuggestionsNumber]:
                     prob = result.probability[1]
                     if prob >= self.suggest_threshold:
-                        feature_values = ";".join([str(feature) for feature in result.feature_data])
+                        feature_names = None
+                        feature_values = None
+                        if result.feature_info:
+                            feature_names = ";".join([str(f_id) for f_id in result.feature_info.feature_ids])
+                            feature_values = ";".join([str(f) for f in result.feature_info.feature_data])
+
                         issue_type = result.data["mrHit"]["_source"]["issue_type"]
                         relevant_log_id = utils.extract_real_id(result.data["mrHit"]["_id"])
                         real_log_id = str(result.data["mrHit"]["_id"])

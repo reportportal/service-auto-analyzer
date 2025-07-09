@@ -24,6 +24,19 @@ from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeat
 
 
 @dataclass
+class FeatureInfo:
+    """Container for data about features.
+
+    Attributes:
+        feature_ids: List of feature IDs used in the featurizer
+        feature_data: Feature vector for the identity gathered from the featurizer
+    """
+
+    feature_ids: list[int]
+    feature_data: list[float]
+
+
+@dataclass
 class PredictionResult:
     """Result container for prediction workflows.
 
@@ -32,7 +45,7 @@ class PredictionResult:
         probability: Prediction probability from the decision maker
         data: Most relevant log and its metadata for the result
         identity: Identity for the gathered features
-        feature_data: Feature vector for the identity gathered from the featurizer
+        feature_info: Data about features if any
         model_info_tags: List of model information tags
     """
 
@@ -40,7 +53,7 @@ class PredictionResult:
     probability: list[float]
     data: dict[str, Any]
     identity: str
-    feature_data: list[float]
+    feature_info: Optional[FeatureInfo]
     model_info_tags: list[str]
 
 
@@ -160,7 +173,9 @@ class Predictor(metaclass=ABCMeta):
                 probability=predicted_labels_probability[idx],
                 data=scores_by_identity[identity],
                 identity=identity,
-                feature_data=feature_data[idx],
+                feature_info=FeatureInfo(
+                    feature_ids=self.boosting_decision_maker.feature_ids, feature_data=feature_data[idx]
+                ),
                 model_info_tags=model_info_tags,
             )
             results.append(result)

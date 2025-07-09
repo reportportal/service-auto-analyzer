@@ -16,6 +16,8 @@ from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Optional, Union
 
+from typing_extensions import override
+
 from app.commons.model.ml import ModelType
 from app.commons.model_chooser import ModelChooser
 from app.machine_learning.boosting_featurizer import BoostingFeaturizer
@@ -58,6 +60,27 @@ class PredictionResult:
 
 
 class Predictor(metaclass=ABCMeta):
+    """Abstract base class for prediction workflows"""
+
+    def __init__(self, *_, **__) -> None:
+        """Initialize the predictor."""
+        pass
+
+    @abstractmethod
+    def predict(
+        self,
+        search_results: list[tuple[dict[str, Any], dict[str, Any]]],
+    ) -> list[PredictionResult]:
+        """Execute the full prediction workflow.
+
+        :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
+                                                                           from Elasticsearch
+        :return: List of PredictionResult objects, one for each prediction
+        """
+        ...
+
+
+class MlPredictor(Predictor, metaclass=ABCMeta):
     """Abstract base class for prediction workflows using BoostingDecisionMaker and BoostingFeaturizer.
 
     This class encapsulates the common pattern used in both auto analysis and suggestion prediction:
@@ -89,6 +112,7 @@ class Predictor(metaclass=ABCMeta):
         :param float custom_model_prob: Probability to use custom model instead of global
         :param Optional[Union[int, str]] hash_source: Source for hash-based model selection
         """
+        super().__init__()
         self.model_chooser = model_chooser
         self.project_id = project_id
         self.boosting_config = boosting_config
@@ -131,6 +155,7 @@ class Predictor(metaclass=ABCMeta):
         """
         ...
 
+    @override
     def predict(
         self,
         search_results: list[tuple[dict[str, Any], dict[str, Any]]],
@@ -183,7 +208,7 @@ class Predictor(metaclass=ABCMeta):
         return results
 
 
-class AutoAnalysisPredictor(Predictor):
+class AutoAnalysisPredictor(MlPredictor):
     """Concrete predictor implementation for auto analysis workflow.
 
     Uses BoostingFeaturizer for feature extraction and prediction.
@@ -216,11 +241,13 @@ class AutoAnalysisPredictor(Predictor):
             hash_source,
         )
 
+    @override
     @property
     def model_type(self) -> ModelType:
         """Return the type of model used by this predictor."""
         return ModelType.auto_analysis
 
+    @override
     def create_featurizer(
         self,
         search_results: list[tuple[dict[str, Any], dict[str, Any]]],
@@ -246,7 +273,7 @@ class AutoAnalysisPredictor(Predictor):
         return featurizer
 
 
-class SuggestionPredictor(Predictor):
+class SuggestionPredictor(MlPredictor):
     """Concrete predictor implementation for suggestion workflow.
 
     Uses SuggestBoostingFeaturizer for feature extraction and prediction.
@@ -279,11 +306,13 @@ class SuggestionPredictor(Predictor):
             hash_source,
         )
 
+    @override
     @property
     def model_type(self) -> ModelType:
         """Return the type of model used by this predictor."""
         return ModelType.suggestion
 
+    @override
     def create_featurizer(
         self,
         search_results: list[tuple[dict[str, Any], dict[str, Any]]],

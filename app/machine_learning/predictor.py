@@ -241,8 +241,8 @@ class AutoAnalysisPredictor(MlPredictor):
             hash_source,
         )
 
-    @override
     @property
+    @override
     def model_type(self) -> ModelType:
         """Return the type of model used by this predictor."""
         return ModelType.auto_analysis
@@ -306,8 +306,8 @@ class SuggestionPredictor(MlPredictor):
             hash_source,
         )
 
-    @override
     @property
+    @override
     def model_type(self) -> ModelType:
         """Return the type of model used by this predictor."""
         return ModelType.suggestion

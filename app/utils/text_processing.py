@@ -892,7 +892,7 @@ def remove_urls(message: str, urls_list: list[str]) -> str:
 
 SPECIAL_CHARACTERS_PATTERN = re.compile(r"[.:/\\{}()\[\]\"',\-+=!@#$%^&*<>?|~`;_]")
 CAMEL_CASE_PATTERN = re.compile(r"([a-z])([A-Z])")
-UPPER_LOWER_CASE_PATTERN = re.compile(r"([A-Z]+)([A-Z][a-z])")
+UPPER_LOWER_CASE_PATTERN = re.compile(r"([A-Z])([A-Z][a-z])")
 
 
 def preprocess_text_for_similarity(text: str) -> str:

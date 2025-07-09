@@ -289,7 +289,9 @@ class SuggestService(AnalyzerService):
             filtered_results.append(prediction_results[i])
         return filtered_results
 
-    def prepare_not_found_object_info(self, test_item_info, processed_time, model_feature_names: str, model_info):
+    def prepare_not_found_object_info(
+        self, test_item_info, processed_time, model_feature_names: Optional[str], model_info: Optional[list[str]]
+    ):
         return {  # reciprocalRank is not filled for not found results not to count in the metrics dashboard
             "project": test_item_info.project,
             "testItem": test_item_info.testItemId,
@@ -399,7 +401,7 @@ class SuggestService(AnalyzerService):
         errors_found = []
         errors_count = 0
         model_info_tags = []
-        feature_names = ""
+        feature_names = None
         try:
             logs, test_item_id_for_suggest = self.prepare_logs_for_suggestions(test_item_info, index_name)
             logger.info(f"Number of prepared log search requests for suggestions: {len(logs)}")
@@ -441,7 +443,6 @@ class SuggestService(AnalyzerService):
                 for pos_idx, result in enumerate(sorted_results[: self.search_cfg.MaxSuggestionsNumber]):
                     prob = result.probability[1]
                     if prob >= self.suggest_threshold:
-                        feature_names = None
                         feature_values = None
                         if result.feature_info:
                             feature_names = ";".join([str(f_id) for f_id in result.feature_info.feature_ids])

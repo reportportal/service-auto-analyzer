@@ -24,25 +24,6 @@ from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeat
 
 
 @dataclass
-class PredictionMetadata:
-    """Metadata container for prediction results.
-
-    Attributes:
-        esScore: Optional[float] - Elasticsearch score for the prediction
-        esPosition: Optional[int] - Position in Elasticsearch results
-        modelFeatureNames: Optional[str] - Names of features used in the model
-        modelFeatureValues: Optional[str] - Values of features used in the model
-        modelInfo: Optional[str] - Additional information about the model used
-    """
-
-    esScore: Optional[float]
-    esPosition: Optional[int]
-    modelFeatureNames: Optional[str]
-    modelFeatureValues: Optional[str]
-    modelInfo: Optional[str]
-
-
-@dataclass
 class PredictionResult:
     """Result container for prediction workflows.
 

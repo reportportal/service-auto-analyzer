@@ -438,8 +438,7 @@ class SuggestService(AnalyzerService):
                     issue_type = result.data["mrHit"]["_source"]["issue_type"]
                     logger.debug(f"Test item '{identity}' with issue type '{issue_type}' has probability {prob:.2f}")
                 processed_time = time() - t_start
-                global_idx = 0
-                for result in sorted_results[: self.search_cfg.MaxSuggestionsNumber]:
+                for pos_idx, result in enumerate(sorted_results[: self.search_cfg.MaxSuggestionsNumber]):
                     prob = result.probability[1]
                     if prob >= self.suggest_threshold:
                         feature_names = None
@@ -471,7 +470,7 @@ class SuggestService(AnalyzerService):
                             modelFeatureNames=feature_names,
                             modelFeatureValues=feature_values,
                             modelInfo=";".join(model_info_tags),
-                            resultPosition=global_idx,
+                            resultPosition=pos_idx,
                             usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
                             minShouldMatch=self.find_min_should_match_threshold(test_item_info.analyzerConfig),
                             processedTime=processed_time,
@@ -480,7 +479,6 @@ class SuggestService(AnalyzerService):
                         )
                         results.append(analysis_result)
                         logger.debug(analysis_result)
-                        global_idx += 1
             else:
                 logger.debug(f"There are no results for test item {test_item_info.testItemId}")
         except Exception as exc:

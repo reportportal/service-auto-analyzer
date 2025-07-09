@@ -567,7 +567,9 @@ class AutoAnalyzerService(AnalyzerService):
 
                         # Get model info tags from the first result (same for all results)
                         model_info_tags = prediction_results[0].model_info_tags
-                        results_to_share[launch_id]["model_info"].update(model_info_tags)
+                        new_model_info_tags = set(results_to_share[launch_id]["model_info"])
+                        new_model_info_tags.update(model_info_tags)
+                        results_to_share[launch_id]["model_info"] = list(new_model_info_tags)
 
                         # Debug logging
                         for result in prediction_results:

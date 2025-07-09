@@ -475,8 +475,7 @@ class AutoAnalyzerService(AnalyzerService):
     @utils.ignore_warnings
     def analyze_logs(self, launches: list[Launch]) -> list[AnalysisResult]:
         cnt_launches = len(launches)
-        logger.info("Started analysis for %d launches", cnt_launches)
-        logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))
+        logger.info(f"Started analysis for {cnt_launches} launches")
         queue = Queue()
         finished_queue = Queue()
         early_finish_event = Event()
@@ -488,9 +487,9 @@ class AutoAnalyzerService(AnalyzerService):
         analyzed_results_for_index = []
         t_start = time()
         results = []
+        results_to_share = {}
+        cnt_items_to_process = 0
         try:
-            cnt_items_to_process = 0
-            results_to_share = {}
             chosen_namespaces = {}
             while finished_queue.empty() or not queue.empty():
                 if (
@@ -655,7 +654,7 @@ class AutoAnalyzerService(AnalyzerService):
         except Exception as exc:
             logger.exception(exc)
         es_query_thread.join()
-        logger.debug("Stats info %s", results_to_share)
-        logger.info("Processed %d test items. It took %.2f sec.", cnt_items_to_process, time() - t_start)
-        logger.info("Finished analysis for %d launches with %d results.", cnt_launches, len(results))
+        logger.debug(f"Stats info: {json.dumps(results_to_share)}")
+        logger.info(f"Processed {cnt_items_to_process} test items. It took {time() - t_start:.2f} sec.")
+        logger.info(f"Finished analysis for {cnt_launches} launches with {len(results)} results.")
         return results

@@ -529,7 +529,7 @@ class SuggestService(AnalyzerService):
                         ).json(),
                     )
             amqp_client.close()
-        logger.debug(f"Stats info {json.dumps(results_to_share)}")
+        logger.debug(f"Stats info: {json.dumps(results_to_share)}")
         logger.info(f"Processed the test item. It took {time() - t_start:.2f} sec.")
         logger.info(f"Finished suggesting for test item with {len(results)} results.")
         return results

@@ -520,7 +520,7 @@ class AutoAnalyzerService(AnalyzerService):
                             "min_should_match": self.find_min_should_match_threshold(
                                 analyzer_candidates.analyzerConfig
                             ),
-                            "model_info": set(),
+                            "model_info": [],
                             "module_version": [self.app_config.appVersion],
                             "errors": [],
                             "errors_count": 0,

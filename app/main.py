@@ -265,7 +265,7 @@ def get_health_status():
                         "correlation_id": task.msg_correlation_id,
                         "send_time": task.send_time,
                     }
-                    for task in handler.running_tasks
+                    for task in list(handler.running_tasks.queue)
                 ]
                 thread_status["running_tasks"] = {
                     "number": len(tasks),

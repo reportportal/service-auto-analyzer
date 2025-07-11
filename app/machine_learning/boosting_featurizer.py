@@ -610,14 +610,16 @@ class BoostingFeaturizer:
         max_score = 0
         self.total_normalized_score = 0.0
         for query_log, es_results in all_elastic_results:
+            my_hits = []
             for hit in es_results["hits"]["hits"]:
-                max_score = max(max_score, hit["_score"])
-        for query_log, es_results in all_elastic_results:
-            for hit in es_results["hits"]["hits"]:
-                # TODO: Get rid of this trash, we must not modify data from ES/OS
+                my_hit = hit.copy()
+                max_score = max(max_score, my_hit["_score"])
+                my_hits.append(my_hit)
+            all_results.append((query_log, my_hits))
+        for query_log, es_results in all_results:
+            for hit in es_results:
                 hit["normalized_score"] = hit["_score"] / max_score
                 self.total_normalized_score += hit["normalized_score"]
-            all_results.append((query_log, es_results["hits"]["hits"]))
         return all_results
 
     def _calculate_similarity_percent(self, field_name="message") -> dict[str, float]:

@@ -335,6 +335,10 @@ class ProcessAmqpRequestHandler:
 
     def _restart_processor(self) -> None:
         """Restart the processor process if it has died"""
+        if self._shutdown:
+            # If shutdown is initiated, do not restart the processor
+            return
+
         # Store running tasks to re-send them, clearing the queue
         with self.running_tasks.mutex:
             tasks_to_resend = list(self.running_tasks.queue)

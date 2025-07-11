@@ -59,7 +59,7 @@ class PredictionResult:
     identity: str
     feature_info: Optional[FeatureInfo]
     model_info_tags: list[str]
-    original_position: int = None
+    original_position: int
 
 
 class Predictor(metaclass=ABCMeta):

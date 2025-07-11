@@ -42,7 +42,7 @@ class BoostingFeaturizer:
         results: list[tuple[dict[str, Any], dict[str, Any]]],
         config: dict[str, Any],
         feature_ids: str | list[int],
-        weighted_log_similarity_calculator: Optional[WeightedSimilarityCalculator] = None,
+        weighted_log_similarity_calculator: WeightedSimilarityCalculator,
     ) -> None:
         self.config = config
         self.previously_gathered_features = {}
@@ -150,7 +150,7 @@ class BoostingFeaturizer:
         if self.scores_by_type is not None:
             return self.scores_by_type
 
-        scores_by_issue_type = defaultdict(lambda: {"mrHit": {"_score": -1}, "score": 0})
+        scores_by_issue_type: dict[str, dict[str, Any]] = defaultdict(lambda: {"mrHit": {"_score": -1}, "score": 0.0})
         for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
@@ -186,7 +186,7 @@ class BoostingFeaturizer:
         :param list[tuple[dict[str, Any], dict[str, Any]]] all_results: list of logs queried and their search results
         :return: dict with test item id as key and value as the relation between the number of logs found and queried
         """
-        test_item_log_stats = defaultdict(lambda: 0)
+        test_item_log_stats = defaultdict(lambda: 0.0)
         for _, res in all_results:
             for hit in res["hits"]["hits"]:
                 test_item = hit["_source"]["test_item"]
@@ -588,12 +588,12 @@ class BoostingFeaturizer:
         :param str return_val_name: name of return value, can be 'mean_score' or 'cnt_items_percent'
         :return: dict with issue type as key and value as mean score or percent of items
         """
-        cnt_items_by_issue_type: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
+        cnt_items_by_issue_type: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(lambda: 0.0))
         cnt_items_glob = 0
-        for log, es_results in self.all_results:
+        for _, es_results in self.all_results:
             cnt_items_glob += len(es_results)
 
-            for idx, hit in enumerate(es_results):
+            for hit in es_results:
                 issue_type = hit["_source"]["issue_type"]
                 cnt_items_by_issue_type[issue_type]["cnt_items_percent"] += 1
                 cnt_items_by_issue_type[issue_type]["mean_score"] += hit["normalized_score"]

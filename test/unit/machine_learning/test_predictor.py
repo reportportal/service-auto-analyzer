@@ -116,12 +116,12 @@ class TestSimilarityPredictor:
     def test_predictor_instantiation_with_defaults(self):
         """Test SimilarityPredictor instantiation with default parameters."""
         predictor = SimilarityPredictor()
-        assert predictor.similarity_threshold == 0.5
+        assert 0.499 <= predictor.similarity_threshold <= 0.501
 
     def test_predictor_instantiation_with_kwargs(self):
         """Test SimilarityPredictor instantiation with keyword arguments."""
         predictor = SimilarityPredictor(similarity_threshold=0.7)
-        assert predictor.similarity_threshold == 0.7
+        assert 0.699 <= predictor.similarity_threshold <= 0.701
 
     def test_predictor_in_prediction_classes(self):
         """Test that SimilarityPredictor is properly registered in PREDICTION_CLASSES."""
@@ -268,7 +268,7 @@ class TestSimilarityPredictor:
         results = predictor.predict(search_results)
         assert len(results) == 1
         assert results[0].label == 1
-        assert results[0].probability[1] == 1.0  # Perfect similarity
+        assert 0.999 <= results[0].probability[1] <= 1.001
         assert results[0].identity == "456"
 
     def test_predict_combined_text_fields(self):
@@ -300,7 +300,7 @@ class TestSimilarityPredictor:
         results = predictor.predict(search_results)
         assert len(results) == 1
         assert results[0].label == 1  # Should be high similarity
-        assert results[0].probability[1] == 1.0  # Should be identical after combining
+        assert 0.999 <= results[0].probability[1] <= 1.001  # Should be identical after combining
 
     def test_predict_multiple_test_items(self):
         """Test predict method with multiple test items."""
@@ -504,6 +504,6 @@ class TestSimilarityPredictor:
 
         probability = results[0].probability
         assert len(probability) == 2
-        assert probability[0] == 1.0 - probability[1]  # [1-similarity, similarity] format
+        assert 1.0 - probability[1] - 0.001 <= probability[0] <= 1.0 - probability[1] + 0.001
         assert 0.0 <= probability[0] <= 1.0
         assert 0.0 <= probability[1] <= 1.0

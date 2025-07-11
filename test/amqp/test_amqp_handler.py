@@ -514,12 +514,21 @@ class TestProcessAmqpRequestHandler:
         # Wait for task to be picked up and record original start time
         time.sleep(0.02)
 
+        # Create the last task
+        channel, method, props, body = create_amqp_request_mock(routing_key="noop_sleep", body=3)
+
+        # Submit it
+        handler.handle_amqp_request(channel, method, props, body)
+
+        # Wait for task to be picked up and record original start time
+        time.sleep(0.02)
+
         # Verify task is in running_tasks and record start time
-        assert handler.running_tasks.qsize() == 1, "A task should appear in running_tasks"
-        assert handler.queue.qsize() == 1, "Another task should be queued"
+        assert handler.running_tasks.qsize() == 2, "A task should appear in running_tasks"
+        assert handler.queue.qsize() == 1, "The last task should be queued"
 
         # Wait for all tasks to complete
-        time.sleep(10)
+        time.sleep(15)
 
         # Verify task was dropped after retries
         assert handler.running_tasks.qsize() == 0, "Tasks should be processed and removed from running_tasks"

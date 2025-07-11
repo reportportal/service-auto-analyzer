@@ -467,7 +467,7 @@ class SuggestService(AnalyzerService):
                             isMergedLog=is_merged,
                             matchScore=round(prob, 2) * 100,
                             esScore=round(result.data["mrHit"]["_score"], 2),
-                            esPosition=result.data["mrHit"]["es_pos"],
+                            esPosition=result.original_position,
                             modelFeatureNames=feature_names,
                             modelFeatureValues=feature_values,
                             modelInfo=";".join(model_info_tags),

@@ -50,6 +50,7 @@ class PredictionResult:
         identity: Identity for the gathered features
         feature_info: Data about features if any
         model_info_tags: List of model information tags
+        original_position: Original position of the log in the search results
     """
 
     label: int
@@ -58,6 +59,7 @@ class PredictionResult:
     identity: str
     feature_info: Optional[FeatureInfo]
     model_info_tags: list[str]
+    original_position: int = None
 
 
 class Predictor(metaclass=ABCMeta):
@@ -188,6 +190,7 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
                     feature_ids=self.boosting_decision_maker.feature_ids, feature_data=feature_data[idx]
                 ),
                 model_info_tags=model_info_tags,
+                original_position=scores_by_identity[identity].get("original_position", idx),
             )
             results.append(result)
 
@@ -374,10 +377,6 @@ class SimilarityPredictor(Predictor):
                 if not hit_text.strip():
                     continue
 
-                # Add position info to hit
-                # TODO: Get rid of this trash, and also hit["normalized_score"], we must not modify data from ES/OS
-                hit["es_pos"] = idx
-
                 valid_hits.append(hit)
                 hit_texts.append(hit_text)
 
@@ -390,7 +389,7 @@ class SimilarityPredictor(Predictor):
             # Group results by test_item to find most relevant for each
             results_by_test_item = {}
 
-            for hit, similarity in zip(valid_hits, similarity_scores):
+            for idx, (hit, similarity) in enumerate(zip(valid_hits, similarity_scores)):
                 # Get test_item identifier
                 test_item = str(hit.get("_source", {}).get("test_item", "unknown"))
 
@@ -400,6 +399,7 @@ class SimilarityPredictor(Predictor):
                         "similarity": similarity,
                         "mrHit": hit,
                         "compared_log": search_request,
+                        "original_position": idx,  # Add position info to hit
                     }
 
             # Create PredictionResult objects for each test_item
@@ -423,6 +423,7 @@ class SimilarityPredictor(Predictor):
                     identity=test_item,
                     feature_info=FeatureInfo(feature_ids=[0], feature_data=[similarity]),
                     model_info_tags=["similarity_predictor"],
+                    original_position=result_data["original_position"],
                 )
 
                 results.append(prediction_result)

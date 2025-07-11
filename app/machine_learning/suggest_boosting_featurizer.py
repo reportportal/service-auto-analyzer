@@ -50,13 +50,12 @@ class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
         for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
                 test_item = str(hit["_source"]["test_item"])
-                hit["es_pos"] = idx
 
                 issue_type_item = scores_by_type[test_item]
                 if hit["_score"] > issue_type_item["mrHit"]["_score"]:
                     issue_type_item["mrHit"] = hit
                     issue_type_item["compared_log"] = log
-
+                    issue_type_item["original_position"] = idx
                 issue_type_item["score"] = max(issue_type_item["score"], hit["normalized_score"])
         self.scores_by_type = dict(scores_by_type)
         return self.scores_by_type

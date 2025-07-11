@@ -614,7 +614,7 @@ class AutoAnalyzerService(AnalyzerService):
                                 isMergedLog=chosen_type["compared_log"]["_source"]["is_merged"],
                                 matchScore=round(prob * 100, 2),
                                 esScore=round(chosen_type["mrHit"]["_score"], 2),
-                                esPosition=chosen_type["mrHit"]["es_pos"],
+                                esPosition=best.original_position,
                                 modelFeatureNames=feature_names,
                                 modelFeatureValues=feature_values,
                                 modelInfo=";".join(model_info_tags),

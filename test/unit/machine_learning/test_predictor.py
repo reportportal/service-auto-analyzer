@@ -382,9 +382,7 @@ class TestSimilarityPredictor:
         assert result.feature_info.feature_ids == [0]
         assert result.feature_info.feature_data == [result.probability[1]]
         assert result.model_info_tags == ["similarity_predictor"]
-
-        # Check that es_pos is added to hit
-        assert result.data["mrHit"]["es_pos"] == 0
+        assert result.original_position == 0
 
     def test_predict_multiple_search_requests(self):
         """Test predict method with multiple search requests."""

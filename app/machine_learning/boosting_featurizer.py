@@ -154,12 +154,12 @@ class BoostingFeaturizer:
         for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
-                hit["es_pos"] = idx
 
                 issue_type_item = scores_by_issue_type[issue_type]
                 if hit["_score"] > issue_type_item["mrHit"]["_score"]:
                     issue_type_item["mrHit"] = hit
                     issue_type_item["compared_log"] = log
+                    issue_type_item["original_position"] = idx
                 issue_type_item["score"] += hit["normalized_score"] / self.total_normalized_score
         self.scores_by_type = dict(scores_by_issue_type)
         return self.scores_by_type
@@ -614,6 +614,7 @@ class BoostingFeaturizer:
                 max_score = max(max_score, hit["_score"])
         for query_log, es_results in all_elastic_results:
             for hit in es_results["hits"]["hits"]:
+                # TODO: Get rid of this trash, we must not modify data from ES/OS
                 hit["normalized_score"] = hit["_score"] / max_score
                 self.total_normalized_score += hit["normalized_score"]
             all_results.append((query_log, es_results["hits"]["hits"]))

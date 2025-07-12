@@ -16,7 +16,7 @@ import json
 from datetime import datetime
 from functools import reduce
 from time import time
-from typing import Optional
+from typing import Optional, Any
 
 import elasticsearch.helpers
 
@@ -221,10 +221,9 @@ class SuggestService(AnalyzerService):
                 full_results.append((log, partial_res[ind]))
         return full_results
 
-    def deduplicate_results(
-        self,
-        prediction_results: list[PredictionResult],
-    ) -> list[PredictionResult]:
+    def __create_similarity_dict(
+        self, prediction_results: list[PredictionResult]
+    ) -> dict[str, dict[tuple[str, str], dict[str, Any]]]:
         _similarity_calculator = similarity_calculator.SimilarityCalculator(
             {
                 "max_query_terms": self.search_cfg.MaxQueryTerms,
@@ -244,11 +243,14 @@ class SuggestService(AnalyzerService):
                     continue
                 items_to_compare = {"hits": {"hits": [result_first.data["mrHit"]]}}
                 all_pairs_to_check.append((result_second.data["mrHit"], items_to_compare))
-
         sim_dict = _similarity_calculator.find_similarity(
             all_pairs_to_check, ["detected_message_with_numbers", "stacktrace", "merged_small_logs"]
         )
+        return sim_dict
 
+    def __filter_by_similarity(
+        self, prediction_results: list[PredictionResult], sim_dict: dict[str, dict[tuple[str, str], dict[str, Any]]]
+    ) -> list[PredictionResult]:
         filtered_results = []
         deleted_indices = set()
         for i in range(len(prediction_results)):
@@ -274,6 +276,14 @@ class SuggestService(AnalyzerService):
                 ):
                     deleted_indices.add(j)
             filtered_results.append(prediction_results[i])
+        return filtered_results
+
+    def deduplicate_results(
+        self,
+        prediction_results: list[PredictionResult],
+    ) -> list[PredictionResult]:
+        sim_dict = self.__create_similarity_dict(prediction_results)
+        filtered_results = self.__filter_by_similarity(prediction_results, sim_dict)
         return filtered_results
 
     def sort_results(

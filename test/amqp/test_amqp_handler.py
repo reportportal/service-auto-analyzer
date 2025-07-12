@@ -188,8 +188,9 @@ class TestProcessAmqpRequestHandler:
         time.sleep(0.1)
 
         # Verify task is in running_tasks
-        assert len(handler.running_tasks) == 1
-        original_task = list(handler.__running_tasks.queue)[0]
+        running_tasks = handler.running_tasks
+        assert len(running_tasks) == 1
+        original_task = running_tasks[0]
         original_send_time = original_task.send_time
         original_process_pid = handler.processor.pid
 
@@ -206,8 +207,9 @@ class TestProcessAmqpRequestHandler:
         assert new_process_pid != original_process_pid, "New process should have different PID"
 
         # Verify task was requeued with new send time
-        assert len(handler.running_tasks) == 1, "Task should still be in running_tasks"
-        requeued_task = list(handler.__running_tasks.queue)[0]
+        running_tasks = handler.running_tasks
+        assert len(running_tasks) == 1, "Task should still be in running_tasks"
+        requeued_task = running_tasks[0]
         assert requeued_task.routing_key == original_task.routing_key
         assert requeued_task.item == original_task.item
         assert requeued_task.send_time > original_send_time, "Task should have new send_time after restart"

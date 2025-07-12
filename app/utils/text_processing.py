@@ -282,10 +282,9 @@ def get_potential_status_codes(text: str) -> list[str]:
                 continue
             for i in range(1, 4):
                 found_code = (result.group(i) or "").strip()
-                if found_code:
-                    if found_code not in potential_codes:
-                        potential_codes.add(found_code)
-                        potential_codes_list.append(found_code)
+                if found_code and found_code not in potential_codes:
+                    potential_codes.add(found_code)
+                    potential_codes_list.append(found_code)
     return potential_codes_list
 
 

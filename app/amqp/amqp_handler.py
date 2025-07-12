@@ -340,11 +340,11 @@ class ProcessAmqpRequestHandler:
             return
 
         # Store running tasks to re-send them, clearing the queue
-        if self.__running_tasks.empty():
+        if not self.__running_tasks.queue:
             tasks_to_resend = []
         else:
             with self.__running_tasks.mutex:
-                if self.__running_tasks.empty():
+                if not self.__running_tasks.queue:
                     tasks_to_resend = []
                 else:
                     tasks_to_resend = list(self.__running_tasks.queue)
@@ -379,12 +379,12 @@ class ProcessAmqpRequestHandler:
 
     def __has_long_running_tasks(self) -> bool:
         """Check if there are any long-running tasks that need attention"""
-        if self.__running_tasks.empty():
+        if not self.__running_tasks.queue:
             return False
 
         # Check if any task has been running longer than the configured timeout
         with self.__running_tasks.mutex:
-            if self.__running_tasks.empty():
+            if not self.__running_tasks.queue:
                 return False
             for task in self.__running_tasks.queue:
                 if task.send_time and (time.time() - task.send_time) > self.app_config.amqpHandlerTaskTimeout:
@@ -410,12 +410,15 @@ class ProcessAmqpRequestHandler:
 
     def __process_result(self, result: ProcessingResult) -> None:
         if not self.__running_tasks.empty():
-            completed_task = self.__running_tasks.get()  # FIFO for completed tasks
-            if completed_task.msg_correlation_id != result.item.msg_correlation_id:
-                logger.warning(
-                    f"Received result for task {result.item.msg_correlation_id} but expected "
-                    f"{completed_task.msg_correlation_id}. Possible mismatch."
-                )
+            try:
+                completed_task = self.__running_tasks.get()  # FIFO for completed tasks
+                if completed_task.msg_correlation_id != result.item.msg_correlation_id:
+                    logger.warning(
+                        f"Received result for task {result.item.msg_correlation_id} but expected "
+                        f"{completed_task.msg_correlation_id}. Possible mismatch."
+                    )
+            except Empty:
+                logger.warning("Received result but no tasks in running queue, possible bug")
         if result.success and result.retry_count > 0:
             logger.warning(
                 f"Task {result.item.routing_key} - {result.item.msg_correlation_id} "
@@ -429,14 +432,13 @@ class ProcessAmqpRequestHandler:
         self.__handle_response(result)
 
     def __receive_results(self) -> None:
-        if not self.__running_tasks.empty():
-            try:
-                if not self.processor.poll(timeout=0.1):
-                    return
-                result: ProcessingResult = self.processor.recv()
-                self.__process_result(result)
-            except Exception as exc:
-                logger.exception("Failed to receive response from processor", exc_info=exc)
+        try:
+            if not self.processor.poll(timeout=0.1):
+                return
+            result: ProcessingResult = self.processor.recv()
+            self.__process_result(result)
+        except Exception as exc:
+            logger.exception("Failed to receive response from processor", exc_info=exc)
 
     def _monitor_processor(self):
         """Thread 1: Monitor processor and task states"""
@@ -529,10 +531,10 @@ class ProcessAmqpRequestHandler:
     @property
     def running_tasks(self) -> list[ProcessingItem]:
         """Get the queue of currently running tasks."""
-        if self.__running_tasks.empty():
+        if not self.__running_tasks.queue:
             return []
         with self.__running_tasks.mutex:
-            if self.__running_tasks.empty():
+            if not self.__running_tasks.queue:
                 return []
             return list(self.__running_tasks.queue)
 
@@ -656,9 +658,9 @@ class DirectAmqpRequestHandler:
     @property
     def running_tasks(self) -> list[ProcessingItem]:
         """Get the queue of currently running tasks."""
-        if self.__running_tasks.empty():
+        if not self.__running_tasks.queue:
             return []
         with self.__running_tasks.mutex:
-            if self.__running_tasks.empty():
+            if not self.__running_tasks.queue:
                 return []
             return list(self.__running_tasks.queue)

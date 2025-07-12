@@ -221,22 +221,10 @@ class SuggestService(AnalyzerService):
                 full_results.append((log, partial_res[ind]))
         return full_results
 
-    def sort_results(
+    def deduplicate_results(
         self,
         prediction_results: list[PredictionResult],
     ) -> list[PredictionResult]:
-        # Sort by probability (index 1) and start_time, both descending
-        sorted_results = sorted(
-            prediction_results,
-            key=lambda x: (round(x.probability[1], 4), x.data["mrHit"]["_source"]["start_time"]),
-            reverse=True,
-        )
-        return self.deduplicate_results(sorted_results)
-
-    def deduplicate_results(
-        self,
-        prediction_results: list,
-    ) -> list:
         _similarity_calculator = similarity_calculator.SimilarityCalculator(
             {
                 "max_query_terms": self.search_cfg.MaxQueryTerms,
@@ -247,9 +235,8 @@ class SuggestService(AnalyzerService):
             similarity_model=self.similarity_model,
         )
         all_pairs_to_check = []
-        for i in range(len(prediction_results)):
+        for i, result_first in enumerate(prediction_results):
             for j in range(i + 1, len(prediction_results)):
-                result_first = prediction_results[i]
                 result_second = prediction_results[j]
                 issue_type1 = result_first.data["mrHit"]["_source"]["issue_type"]
                 issue_type2 = result_second.data["mrHit"]["_source"]["issue_type"]
@@ -288,6 +275,18 @@ class SuggestService(AnalyzerService):
                     deleted_indices.add(j)
             filtered_results.append(prediction_results[i])
         return filtered_results
+
+    def sort_results(
+        self,
+        prediction_results: list[PredictionResult],
+    ) -> list[PredictionResult]:
+        # Sort by probability (index 1) and start_time, both descending
+        sorted_results = sorted(
+            prediction_results,
+            key=lambda x: (round(x.probability[1], 4), x.data["mrHit"]["_source"]["start_time"]),
+            reverse=True,
+        )
+        return self.deduplicate_results(sorted_results)
 
     def prepare_not_found_object_info(
         self, test_item_info, processed_time, model_feature_names: Optional[str], model_info: Optional[list[str]]

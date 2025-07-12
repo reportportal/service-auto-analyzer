@@ -224,6 +224,7 @@ class SuggestService(AnalyzerService):
     def __create_similarity_dict(
         self, prediction_results: list[PredictionResult]
     ) -> dict[str, dict[tuple[str, str], dict[str, Any]]]:
+        """Create a similarity dictionary for comparing prediction results."""
         _similarity_calculator = similarity_calculator.SimilarityCalculator(
             {
                 "max_query_terms": self.search_cfg.MaxQueryTerms,
@@ -251,6 +252,7 @@ class SuggestService(AnalyzerService):
     def __filter_by_similarity(
         self, prediction_results: list[PredictionResult], sim_dict: dict[str, dict[tuple[str, str], dict[str, Any]]]
     ) -> list[PredictionResult]:
+        """Filter prediction results by removing highly similar duplicates."""
         filtered_results = []
         deleted_indices = set()
         for i in range(len(prediction_results)):
@@ -282,6 +284,7 @@ class SuggestService(AnalyzerService):
         self,
         prediction_results: list[PredictionResult],
     ) -> list[PredictionResult]:
+        """Deduplicate prediction results by removing highly similar items."""
         sim_dict = self.__create_similarity_dict(prediction_results)
         filtered_results = self.__filter_by_similarity(prediction_results, sim_dict)
         return filtered_results
@@ -290,13 +293,14 @@ class SuggestService(AnalyzerService):
         self,
         prediction_results: list[PredictionResult],
     ) -> list[PredictionResult]:
+        """Sort prediction results by probability and timestamp in descending order."""
         # Sort by probability (index 1) and start_time, both descending
         sorted_results = sorted(
             prediction_results,
             key=lambda x: (round(x.probability[1], 4), x.data["mrHit"]["_source"]["start_time"]),
             reverse=True,
         )
-        return self.deduplicate_results(sorted_results)
+        return sorted_results
 
     def prepare_not_found_object_info(
         self, test_item_info, processed_time, model_feature_names: Optional[str], model_info: Optional[list[str]]
@@ -441,15 +445,16 @@ class SuggestService(AnalyzerService):
                 # Extract model info tags (same for all results)
                 model_info_tags = prediction_results[0].model_info_tags
                 sorted_results = self.sort_results(prediction_results)
+                unique_results = self.deduplicate_results(sorted_results)
 
-                logger.debug(f"Found {len(sorted_results)} results for test items.")
-                for result in sorted_results:
+                logger.debug(f"Found {len(unique_results)} results for test items.")
+                for result in unique_results:
                     prob = result.probability[1]
                     identity = result.identity
                     issue_type = result.data["mrHit"]["_source"]["issue_type"]
                     logger.debug(f"Test item '{identity}' with issue type '{issue_type}' has probability {prob:.2f}")
                 processed_time = time() - t_start
-                for pos_idx, result in enumerate(sorted_results[: self.search_cfg.MaxSuggestionsNumber]):
+                for pos_idx, result in enumerate(unique_results[: self.search_cfg.MaxSuggestionsNumber]):
                     prob = result.probability[1]
                     if prob >= self.suggest_threshold:
                         feature_values = None

@@ -16,11 +16,27 @@ from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Optional, Union
 
+from typing_extensions import override
+
 from app.commons.model.ml import ModelType
 from app.commons.model_chooser import ModelChooser
 from app.machine_learning.boosting_featurizer import BoostingFeaturizer
 from app.machine_learning.models import BoostingDecisionMaker, DefectTypeModel, WeightedSimilarityCalculator
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
+from app.utils.text_processing import calculate_text_similarity
+
+
+@dataclass
+class FeatureInfo:
+    """Container for data about features.
+
+    Attributes:
+        feature_ids: List of feature IDs used in the featurizer
+        feature_data: Feature vector for the identity gathered from the featurizer
+    """
+
+    feature_ids: list[int]
+    feature_data: list[float]
 
 
 @dataclass
@@ -28,23 +44,46 @@ class PredictionResult:
     """Result container for prediction workflows.
 
     Attributes:
-        predicted_labels: List of binary prediction labels from the decision maker
-        predicted_labels_probability: List of prediction probabilities from the decision maker
-        scores_by_identity: Dictionary with issue identity as key and value as most relevant log and its metadata
-        identifiers: List of identities for the gathered features
-        feature_data: List of feature vectors for each identity gathered from the featurizer
+        label: Binary prediction label from the decision maker
+        probability: Prediction probability from the decision maker
+        data: Most relevant log and its metadata for the result
+        identity: Identity for the gathered features
+        feature_info: Data about features if any
         model_info_tags: List of model information tags
+        original_position: Original position of the log in the search results
     """
 
-    predicted_labels: list[int]
-    predicted_labels_probability: list[list[float]]
-    scores_by_identity: dict[str, dict[str, Any]]
-    identifiers: list[str]
-    feature_data: list[list[float]]
+    label: int
+    probability: list[float]
+    data: dict[str, Any]
+    identity: str
+    feature_info: Optional[FeatureInfo]
     model_info_tags: list[str]
+    original_position: int
 
 
 class Predictor(metaclass=ABCMeta):
+    """Abstract base class for prediction workflows"""
+
+    def __init__(self, **_) -> None:
+        """Initialize the predictor."""
+        pass
+
+    @abstractmethod
+    def predict(
+        self,
+        search_results: list[tuple[dict[str, Any], dict[str, Any]]],
+    ) -> list[PredictionResult]:
+        """Execute the full prediction workflow.
+
+        :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
+                                                                           from Elasticsearch
+        :return: List of PredictionResult objects, one for each prediction
+        """
+        ...
+
+
+class MlPredictor(Predictor, metaclass=ABCMeta):
     """Abstract base class for prediction workflows using BoostingDecisionMaker and BoostingFeaturizer.
 
     This class encapsulates the common pattern used in both auto analysis and suggestion prediction:
@@ -55,11 +94,14 @@ class Predictor(metaclass=ABCMeta):
     5. Return prediction results
     """
 
+    boosting_config: dict[str, Any]
     boosting_decision_maker: BoostingDecisionMaker
     defect_type_model: DefectTypeModel
+    weighted_log_similarity_calculator: WeightedSimilarityCalculator
 
     def __init__(
         self,
+        *,
         model_chooser: ModelChooser,
         project_id: int,
         boosting_config: dict[str, Any],
@@ -76,66 +118,49 @@ class Predictor(metaclass=ABCMeta):
         :param float custom_model_prob: Probability to use custom model instead of global
         :param Optional[Union[int, str]] hash_source: Source for hash-based model selection
         """
-        self.model_chooser = model_chooser
-        self.project_id = project_id
+        super().__init__()
         self.boosting_config = boosting_config
         self.weighted_log_similarity_calculator = weighted_log_similarity_calculator
-        self.custom_model_prob = custom_model_prob
-        self.hash_source = hash_source
 
         # Acquire models
-        self.boosting_decision_maker = self.model_chooser.choose_model(  # type: ignore[assignment]
+        self.boosting_decision_maker = model_chooser.choose_model(  # type: ignore[assignment]
             project_id,
             self.model_type,
             custom_model_prob=custom_model_prob,
             hash_source=hash_source,
         )
-        self.defect_type_model = self.model_chooser.choose_model(  # type: ignore[assignment]
+        self.defect_type_model = model_chooser.choose_model(  # type: ignore[assignment]
             project_id, ModelType.defect_type
         )
 
     @property
     @abstractmethod
-    def model_type(self):
+    def model_type(self) -> ModelType:
         """Return the type of model used by this predictor."""
         ...
 
     @abstractmethod
-    def create_featurizer(
-        self,
-        search_results: list[tuple[dict[str, Any], dict[str, Any]]],
-        boosting_config: dict[str, Any],
-        feature_ids: list[int],
-        weighted_log_similarity_calculator: WeightedSimilarityCalculator,
-    ) -> BoostingFeaturizer:
+    def create_featurizer(self, search_results: list[tuple[dict[str, Any], dict[str, Any]]]) -> BoostingFeaturizer:
         """Create the appropriate featurizer for this prediction type.
 
         :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
-        :param dict[str, Any] boosting_config: Configuration for the featurizer
-        :param list[int] feature_ids: List of feature IDs to use
-        :param WeightedSimilarityCalculator weighted_log_similarity_calculator: Similarity calculator model
         :return: Configured featurizer instance
         """
         ...
 
+    @override
     def predict(
         self,
         search_results: list[tuple[dict[str, Any], dict[str, Any]]],
-    ) -> PredictionResult:
+    ) -> list[PredictionResult]:
         """Execute the full prediction workflow.
 
         :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
                                                                            from Elasticsearch
-        :return: PredictionResult containing predicted_labels, predicted_labels_probability, scores_by_identity,
-                 identifiers, feature_data, and model_info_tags
+        :return: List of PredictionResult objects, one for each prediction
         """
         # Create and configure featurizer
-        featurizer = self.create_featurizer(
-            search_results,
-            self.boosting_config,
-            self.boosting_decision_maker.feature_ids,
-            self.weighted_log_similarity_calculator,
-        )
+        featurizer = self.create_featurizer(search_results)
 
         # Extract features and find most relevant items
         feature_data, identifiers = featurizer.gather_features_info()
@@ -145,29 +170,34 @@ class Predictor(metaclass=ABCMeta):
 
         # If no feature data, return empty result
         if not feature_data:
-            return PredictionResult(
-                predicted_labels=[],
-                predicted_labels_probability=[],
-                model_info_tags=model_info_tags,
-                identifiers=identifiers,
-                scores_by_identity=featurizer.find_most_relevant_by_type(),
-                feature_data=[],
-            )
+            return []
 
         # Make predictions
         predicted_labels, predicted_labels_probability = self.boosting_decision_maker.predict(feature_data)
 
-        return PredictionResult(
-            predicted_labels=predicted_labels,
-            predicted_labels_probability=predicted_labels_probability,
-            model_info_tags=model_info_tags,
-            identifiers=identifiers,
-            scores_by_identity=featurizer.find_most_relevant_by_type(),
-            feature_data=feature_data,
-        )
+        # Get scores by identity
+        scores_by_identity = featurizer.find_most_relevant_by_type()
+
+        # Create list of PredictionResult objects, one for each prediction
+        results = []
+        for idx, identity in enumerate(identifiers):
+            result = PredictionResult(
+                label=predicted_labels[idx],
+                probability=predicted_labels_probability[idx],
+                data=scores_by_identity[identity],
+                identity=identity,
+                feature_info=FeatureInfo(
+                    feature_ids=self.boosting_decision_maker.feature_ids, feature_data=feature_data[idx]
+                ),
+                model_info_tags=model_info_tags,
+                original_position=scores_by_identity[identity].get("original_position", idx),
+            )
+            results.append(result)
+
+        return results
 
 
-class AutoAnalysisPredictor(Predictor):
+class AutoAnalysisPredictor(MlPredictor):
     """Concrete predictor implementation for auto analysis workflow.
 
     Uses BoostingFeaturizer for feature extraction and prediction.
@@ -192,45 +222,38 @@ class AutoAnalysisPredictor(Predictor):
         :param Optional[Union[int, str]] hash_source: Source for hash-based model selection
         """
         super().__init__(
-            model_chooser,
-            project_id,
-            boosting_config,
-            weighted_log_similarity_calculator,
-            custom_model_prob,
-            hash_source,
+            model_chooser=model_chooser,
+            project_id=project_id,
+            boosting_config=boosting_config,
+            weighted_log_similarity_calculator=weighted_log_similarity_calculator,
+            custom_model_prob=custom_model_prob,
+            hash_source=hash_source,
         )
 
     @property
+    @override
     def model_type(self) -> ModelType:
         """Return the type of model used by this predictor."""
         return ModelType.auto_analysis
 
-    def create_featurizer(
-        self,
-        search_results: list[tuple[dict[str, Any], dict[str, Any]]],
-        boosting_config: dict[str, Any],
-        feature_ids: list[int],
-        weighted_log_similarity_calculator: WeightedSimilarityCalculator,
-    ) -> BoostingFeaturizer:
+    @override
+    def create_featurizer(self, search_results: list[tuple[dict[str, Any], dict[str, Any]]]) -> BoostingFeaturizer:
         """Create a BoostingFeaturizer for auto analysis.
 
         :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
-        :param dict[str, Any] boosting_config: Configuration for the featurizer
-        :param list[int] feature_ids: List of feature IDs to use
-        :param WeightedSimilarityCalculator weighted_log_similarity_calculator: Similarity calculator model
         :return: Configured BoostingFeaturizer instance
         """
         featurizer = BoostingFeaturizer(
             search_results,
-            boosting_config,
-            feature_ids=feature_ids,
-            weighted_log_similarity_calculator=weighted_log_similarity_calculator,
+            self.boosting_config,
+            feature_ids=self.boosting_decision_maker.feature_ids,
+            weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
         )
         featurizer.set_defect_type_model(self.defect_type_model)
         return featurizer
 
 
-class SuggestionPredictor(Predictor):
+class SuggestionPredictor(MlPredictor):
     """Concrete predictor implementation for suggestion workflow.
 
     Uses SuggestBoostingFeaturizer for feature extraction and prediction.
@@ -255,45 +278,167 @@ class SuggestionPredictor(Predictor):
         :param Optional[Union[int, str]] hash_source: Source for hash-based model selection
         """
         super().__init__(
-            model_chooser,
-            project_id,
-            boosting_config,
-            weighted_log_similarity_calculator,
-            custom_model_prob,
-            hash_source,
+            model_chooser=model_chooser,
+            project_id=project_id,
+            boosting_config=boosting_config,
+            weighted_log_similarity_calculator=weighted_log_similarity_calculator,
+            custom_model_prob=custom_model_prob,
+            hash_source=hash_source,
         )
 
     @property
+    @override
     def model_type(self) -> ModelType:
         """Return the type of model used by this predictor."""
         return ModelType.suggestion
 
-    def create_featurizer(
-        self,
-        search_results: list[tuple[dict[str, Any], dict[str, Any]]],
-        boosting_config: dict[str, Any],
-        feature_ids: list[int],
-        weighted_log_similarity_calculator: WeightedSimilarityCalculator,
-    ) -> BoostingFeaturizer:
+    @override
+    def create_featurizer(self, search_results: list[tuple[dict[str, Any], dict[str, Any]]]) -> BoostingFeaturizer:
         """Create a SuggestBoostingFeaturizer for suggestions.
 
         :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
-        :param dict[str, Any] boosting_config: Configuration for the featurizer
-        :param list[int] feature_ids: List of feature IDs to use
-        :param WeightedSimilarityCalculator weighted_log_similarity_calculator: Similarity calculator model
         :return: Configured SuggestBoostingFeaturizer instance
         """
         featurizer = SuggestBoostingFeaturizer(
             search_results,
-            boosting_config,
-            feature_ids=feature_ids,
-            weighted_log_similarity_calculator=weighted_log_similarity_calculator,
+            self.boosting_config,
+            feature_ids=self.boosting_decision_maker.feature_ids,
+            weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
         )
         featurizer.set_defect_type_model(self.defect_type_model)
         return featurizer
 
 
+def extract_text_fields_for_comparison(search_request: dict[str, Any]) -> str:
+    query_message = search_request.get("_source", {}).get("message", "") or ""
+    query_merged_logs = search_request.get("_source", {}).get("merged_small_logs", "") or ""
+    # Combine query text fields
+    query_text = " ".join([text.strip() for text in [query_message, query_merged_logs] if text.strip()])
+    return query_text
+
+
+class SimilarityPredictor(Predictor):
+    """Predictor implementation using text similarity calculation.
+
+    Uses calculate_text_similarity function to compute similarity scores
+    between the current test item logs and candidate logs from search results.
+    """
+
+    similarity_threshold: float
+
+    def __init__(self, **kwargs) -> None:
+        """Initialize similarity predictor.
+
+        :param similarity_threshold: Threshold for binary classification (default 0.5)
+        Other parameters are accepted for compatibility but not used.
+        """
+        super().__init__()
+        self.similarity_threshold = kwargs.get("similarity_threshold", 0.5)
+
+    def __do_prediction_for_request(
+        self, query_text: str, search_request: dict[str, Any], valid_hits: list[Any], hit_texts: list[str]
+    ) -> list[PredictionResult]:
+        # Calculate similarities for all hits at once
+        similarity_scores = calculate_text_similarity(query_text, *hit_texts)
+
+        # Group results by test_item to find most relevant for each
+        results_by_test_item = {}
+
+        for idx, (hit, similarity) in enumerate(zip(valid_hits, similarity_scores)):
+            # Get test_item identifier
+            test_item = str(hit.get("_source", {}).get("test_item", "unknown"))
+
+            # Track the best hit for each test_item
+            if test_item not in results_by_test_item or similarity > results_by_test_item[test_item]["similarity"]:
+                results_by_test_item[test_item] = {
+                    "similarity": similarity,
+                    "mrHit": hit,
+                    "compared_log": search_request,
+                    "original_position": idx,  # Add position info to hit
+                }
+
+        results = []
+        # Create PredictionResult objects for each test_item
+        for test_item, result_data in results_by_test_item.items():
+            similarity = result_data["similarity"]
+
+            # Binary classification based on threshold
+            label = 1 if similarity >= self.similarity_threshold else 0
+
+            # Probability format: [1-similarity, similarity] to match other predictors
+            probability = [1.0 - similarity, similarity]
+
+            # Create data structure matching expected format
+            data = {"mrHit": result_data["mrHit"], "compared_log": result_data["compared_log"]}
+
+            # Create PredictionResult
+            prediction_result = PredictionResult(
+                label=label,
+                probability=probability,
+                data=data,
+                identity=test_item,
+                feature_info=FeatureInfo(feature_ids=[0], feature_data=[similarity]),
+                model_info_tags=["similarity_predictor"],
+                original_position=result_data["original_position"],
+            )
+            results.append(prediction_result)
+        return results
+
+    @override
+    def predict(
+        self,
+        search_results: list[tuple[dict[str, Any], dict[str, Any]]],
+    ) -> list[PredictionResult]:
+        """Execute similarity-based prediction workflow.
+
+        :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (search_request, search_results)
+                                                                           tuples
+        :return: List of PredictionResult objects, one for each prediction
+        """
+        if not search_results:
+            return []
+
+        results = []
+
+        for search_request, search_result in search_results:
+            # Get all candidate logs from search hits
+            hits = search_result.get("hits", {}).get("hits", [])
+
+            if not hits:
+                continue
+
+            # Extract and combine message and merged_small_logs from query log
+            query_text = extract_text_fields_for_comparison(search_request)
+
+            # If query text is empty, skip this search request
+            if not query_text.strip():
+                continue
+
+            # Collect valid hits and their texts for batch processing
+            valid_hits = []
+            hit_texts = []
+
+            for idx, hit in enumerate(hits):
+                # Extract and combine message and merged_small_logs from hit
+                hit_text = extract_text_fields_for_comparison(hit)
+
+                # If hit text is empty, skip this hit
+                if not hit_text.strip():
+                    continue
+
+                valid_hits.append(hit)
+                hit_texts.append(hit_text)
+
+            if not valid_hits:
+                continue
+
+            results.extend(self.__do_prediction_for_request(query_text, search_request, valid_hits, hit_texts))
+
+        return results
+
+
 PREDICTION_CLASSES: dict[str, type[Predictor]] = {
     ModelType.auto_analysis.name: AutoAnalysisPredictor,
     ModelType.suggestion.name: SuggestionPredictor,
+    "similarity": SimilarityPredictor,
 }

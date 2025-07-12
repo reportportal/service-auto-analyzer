@@ -59,7 +59,7 @@ def replace_patterns(text: str, patterns: Iterable[tuple[re.Pattern, str]]) -> s
 
 def remove_patterns(text: str, patterns: Iterable[re.Pattern]) -> str:
     """Removes starting patterns from the text."""
-    return replace_patterns(text, map(lambda p: (p, ""), patterns))
+    return replace_patterns(text, [(p, "") for p in patterns])
 
 
 EU_DATE: str = r"\d+-\d+-\d+"
@@ -278,15 +278,13 @@ def get_potential_status_codes(text: str) -> list[str]:
         line = clean_from_brackets(line)
         for pattern in STATUS_CODES_PATTERNS:
             result = pattern.search(line)
+            if not result:
+                continue
             for i in range(1, 4):
-                try:
-                    found_code = result.group(i) if result else None
-                    if found_code and found_code.strip():
-                        if found_code not in potential_codes:
-                            potential_codes.add(found_code)
-                            potential_codes_list.append(found_code)
-                except:  # noqa
-                    pass
+                found_code = (result.group(i) or "").strip()
+                if found_code and found_code not in potential_codes:
+                    potential_codes.add(found_code)
+                    potential_codes_list.append(found_code)
     return potential_codes_list
 
 
@@ -892,7 +890,7 @@ def remove_urls(message: str, urls_list: list[str]) -> str:
 
 SPECIAL_CHARACTERS_PATTERN = re.compile(r"[.:/\\{}()\[\]\"',\-+=!@#$%^&*<>?|~`;_]")
 CAMEL_CASE_PATTERN = re.compile(r"([a-z])([A-Z])")
-UPPER_LOWER_CASE_PATTERN = re.compile(r"([A-Z]+)([A-Z][a-z])")
+UPPER_LOWER_CASE_PATTERN = re.compile(r"([A-Z])([A-Z][a-z])")
 
 
 def preprocess_text_for_similarity(text: str) -> str:

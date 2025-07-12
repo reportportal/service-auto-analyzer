@@ -105,7 +105,7 @@ def create_amqp_request_mock(
     return channel, method, props, body_bytes
 
 
-def custom_retry_predicate(item, exc):
+def custom_retry_predicate(item, _):
     """Custom retry predicate that only retries tasks with 'should_retry' in the item data"""
     return "should_retry" in str(item.item)
 
@@ -130,8 +130,9 @@ class TestProcessAmqpRequestHandler:
         time.sleep(0.1)
 
         # Verify task appears in running_tasks
-        assert len(handler.running_tasks) == 1, "Task should appear in running_tasks"
-        running_task = handler.running_tasks[0]
+        running_tasks = handler.running_tasks
+        assert len(running_tasks) == 1, "Task should appear in running_tasks"
+        running_task = running_tasks[0]
         assert running_task.routing_key == "noop_sleep"
         assert running_task.item == 1
         assert running_task.send_time is not None
@@ -187,8 +188,9 @@ class TestProcessAmqpRequestHandler:
         time.sleep(0.1)
 
         # Verify task is in running_tasks
-        assert len(handler.running_tasks) == 1
-        original_task = handler.running_tasks[0]
+        running_tasks = handler.running_tasks
+        assert len(running_tasks) == 1
+        original_task = running_tasks[0]
         original_send_time = original_task.send_time
         original_process_pid = handler.processor.pid
 
@@ -205,8 +207,9 @@ class TestProcessAmqpRequestHandler:
         assert new_process_pid != original_process_pid, "New process should have different PID"
 
         # Verify task was requeued with new send time
-        assert len(handler.running_tasks) == 1, "Task should still be in running_tasks"
-        requeued_task = handler.running_tasks[0]
+        running_tasks = handler.running_tasks
+        assert len(running_tasks) == 1, "Task should still be in running_tasks"
+        requeued_task = running_tasks[0]
         assert requeued_task.routing_key == original_task.routing_key
         assert requeued_task.item == original_task.item
         assert requeued_task.send_time > original_send_time, "Task should have new send_time after restart"
@@ -299,8 +302,12 @@ class TestProcessAmqpRequestHandler:
 
         try:
             # Verify handler is initialized
-            assert handler._processing_thread is not None
-            assert handler._processing_thread.is_alive()
+            assert handler._monitor_thread is not None
+            assert handler._monitor_thread.is_alive()
+            assert handler._receiver_thread is not None
+            assert handler._receiver_thread.is_alive()
+            assert handler._sender_thread is not None
+            assert handler._sender_thread.is_alive()
             assert handler.processor.is_alive()
         finally:
             # Ensure shutdown is called even if test fails
@@ -312,6 +319,9 @@ class TestProcessAmqpRequestHandler:
         # Verify cleanup
         assert handler._shutdown is True
         assert not handler.processor.is_alive()
+        assert not handler._monitor_thread.is_alive()
+        assert not handler._receiver_thread.is_alive()
+        assert not handler._sender_thread.is_alive()
 
     def test_routing_key_predicate_filtering(self, app_config, search_config, mock_amqp_client):
         """Test routing key predicate filtering"""
@@ -359,8 +369,9 @@ class TestProcessAmqpRequestHandler:
         time.sleep(0.1)
 
         # Verify task is in running_tasks and record start time
-        assert len(handler.running_tasks) == 1, "Task should appear in running_tasks"
-        original_task = handler.running_tasks[0]
+        running_tasks = handler.running_tasks
+        assert len(running_tasks) == 1, "Task should appear in running_tasks"
+        original_task = running_tasks[0]
         original_send_time = original_task.send_time
         assert original_send_time is not None, "Task should have send_time recorded"
         assert original_task.routing_key == "noop_sleep"
@@ -372,8 +383,9 @@ class TestProcessAmqpRequestHandler:
         time.sleep(12)
 
         # Verify task is still running but was restarted with newer start time
-        assert len(handler.running_tasks) == 1, "Task should still be in running_tasks after restart"
-        restarted_task = handler.running_tasks[0]
+        running_tasks = handler.running_tasks
+        assert len(running_tasks) == 1, "Task should still be in running_tasks after restart"
+        restarted_task = running_tasks[0]
         assert restarted_task.routing_key == original_task.routing_key
         assert restarted_task.item == original_task.item
         assert restarted_task.send_time > original_send_time, "Task should have newer send_time after restart"
@@ -398,8 +410,9 @@ class TestProcessAmqpRequestHandler:
         time.sleep(0.01)
 
         # Verify task is in running_tasks and record start time
-        assert len(handler.running_tasks) == 1, "Task should appear in running_tasks"
-        original_task = handler.running_tasks[0]
+        running_tasks = handler.running_tasks
+        assert len(running_tasks) == 1, "Task should appear in running_tasks"
+        original_task = running_tasks[0]
         original_send_time = original_task.send_time
         assert original_send_time is not None, "Task should have send_time recorded"
         assert original_task.routing_key == "noop_fail"
@@ -507,12 +520,21 @@ class TestProcessAmqpRequestHandler:
         # Wait for task to be picked up and record original start time
         time.sleep(0.02)
 
+        # Create the last task
+        channel, method, props, body = create_amqp_request_mock(routing_key="noop_sleep", body=3)
+
+        # Submit it
+        handler.handle_amqp_request(channel, method, props, body)
+
+        # Wait for task to be picked up and record original start time
+        time.sleep(0.02)
+
         # Verify task is in running_tasks and record start time
-        assert len(handler.running_tasks) == 1, "A task should appear in running_tasks"
-        assert handler.queue.qsize() == 1, "Another task should be queued"
+        assert len(handler.running_tasks) == 2, "A task should appear in running_tasks"
+        assert handler.queue.qsize() == 1, "The last task should be queued"
 
         # Wait for all tasks to complete
-        time.sleep(10)
+        time.sleep(15)
 
         # Verify task was dropped after retries
         assert len(handler.running_tasks) == 0, "Tasks should be processed and removed from running_tasks"

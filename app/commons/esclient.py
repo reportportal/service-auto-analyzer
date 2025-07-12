@@ -247,9 +247,9 @@ class EsClient:
 
     def index_logs(self, launches: list[Launch]):
         """Index launches to the index with project name"""
-        launch_ids = set(map(lambda launch_obj: str(launch_obj.launchId), launches))
+        launch_ids = {str(launch_obj.launchId) for launch_obj in launches}
         launch_ids_str = ", ".join(launch_ids)
-        project = next(map(lambda launch_obj: launch_obj.project, launches))
+        project = launches[0].project if launches else None
         logger.info(f"Indexing {len(launch_ids)} launches of project '{project}': {launch_ids_str}")
         t_start = time()
         test_item_queue = self._to_launch_test_item_list(launches)
@@ -381,7 +381,7 @@ class EsClient:
     def delete_logs(self, clean_index):
         """Delete logs from elasticsearch"""
         index_name = text_processing.unite_project_name(clean_index.project, self.app_config.esProjectIndexPrefix)
-        log_ids = ", ".join(map(lambda log_id: str(log_id), clean_index.ids))
+        log_ids = ", ".join([str(log_id) for log_id in clean_index.ids])
         logger.info(f"Delete project '{index_name}' logs: {log_ids}")
         t_start = time()
         if not self.index_exists(index_name):
@@ -437,13 +437,11 @@ class EsClient:
                 formatted_exception = traceback.format_exc()
                 self._recreate_index_if_needed([{"_index": index_name}], formatted_exception)
 
-    @utils.ignore_warnings
-    def send_stats_info(self, stats_info):
+    def send_stats_info(self, stats_info: dict) -> None:
         logger.info("Started sending stats about analysis")
 
         stat_info_array = []
-        for launch_id in stats_info:
-            obj_info = stats_info[launch_id]
+        for obj_info in stats_info.values():
             rp_aa_stats_index = "rp_aa_stats"
             if "method" in obj_info and obj_info["method"] == "training":
                 rp_aa_stats_index = "rp_model_train_stats"

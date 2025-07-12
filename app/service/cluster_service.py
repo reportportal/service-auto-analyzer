@@ -395,7 +395,7 @@ class ClusterService:
             log_messages, log_dict, log_ids_for_merged_logs = log_merger.merge_logs(
                 prepared_logs, launch_info.numberOfLogLines, launch_info.cleanNumbers
             )
-            log_ids = set([str(log["_id"]) for log in log_dict.values()])
+            log_ids = {str(log["_id"]) for log in log_dict.values()}
             groups = self.cluster_messages_with_grouping_by_error(
                 log_messages, log_dict, unique_errors_min_should_match
             )

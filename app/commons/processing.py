@@ -67,9 +67,10 @@ class DummyProcessor:
         self._is_alive = False
 
     def send(self, item: ProcessingItem) -> None:
+        """Dummy send method that does nothing."""
         pass
 
-    def poll(self, timeout: float) -> bool:
+    def poll(self, _: float) -> bool:
         return False
 
     def recv(self) -> Any:

@@ -103,7 +103,7 @@ def same_data(data: Any) -> Any:
 
 def raise_exception(message: str) -> None:
     """Function to raise an exception with a given message"""
-    raise Exception(message)
+    raise RuntimeError(message)
 
 
 class ServiceProcessor:

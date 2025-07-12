@@ -59,7 +59,7 @@ def replace_patterns(text: str, patterns: Iterable[tuple[re.Pattern, str]]) -> s
 
 def remove_patterns(text: str, patterns: Iterable[re.Pattern]) -> str:
     """Removes starting patterns from the text."""
-    return replace_patterns(text, map(lambda p: (p, ""), patterns))
+    return replace_patterns(text, [(p, "") for p in patterns])
 
 
 EU_DATE: str = r"\d+-\d+-\d+"

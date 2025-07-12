@@ -408,29 +408,33 @@ class ProcessAmqpRequestHandler:
         logger.debug("Finished processing response")
         return None
 
+    def __process_result(self, result: ProcessingResult) -> None:
+        if not self.__running_tasks.empty():
+            completed_task = self.__running_tasks.get()  # FIFO for completed tasks
+            if completed_task.msg_correlation_id != result.item.msg_correlation_id:
+                logger.warning(
+                    f"Received result for task {result.item.msg_correlation_id} but expected "
+                    f"{completed_task.msg_correlation_id}. Possible mismatch."
+                )
+        if result.success and result.retry_count > 0:
+            logger.warning(
+                f"Task {result.item.routing_key} - {result.item.msg_correlation_id} "
+                f"was retried {result.retry_count} times"
+            )
+        elif not result.success:
+            logger.error(
+                f"Task {result.item.routing_key} - {result.item.msg_correlation_id} failed after "
+                f"{result.retry_count} retries."
+            )
+        self.__handle_response(result)
+
     def __receive_results(self) -> None:
         if not self.__running_tasks.empty():
             try:
-                if self.processor.poll(timeout=0.1):
-                    result: ProcessingResult = self.processor.recv()
-                    if not self.__running_tasks.empty():
-                        completed_task = self.__running_tasks.get()  # FIFO for completed tasks
-                        if completed_task.msg_correlation_id != result.item.msg_correlation_id:
-                            logger.warning(
-                                f"Received result for task {result.item.msg_correlation_id} but expected "
-                                f"{completed_task.msg_correlation_id}. Possible mismatch."
-                            )
-                    if result.success and result.retry_count > 0:
-                        logger.warning(
-                            f"Task {result.item.routing_key} - {result.item.msg_correlation_id} "
-                            f"was retried {result.retry_count} times"
-                        )
-                    elif not result.success:
-                        logger.error(
-                            f"Task {result.item.routing_key} - {result.item.msg_correlation_id} failed after "
-                            f"{result.retry_count} retries."
-                        )
-                    self.__handle_response(result)
+                if not self.processor.poll(timeout=0.1):
+                    return
+                result: ProcessingResult = self.processor.recv()
+                self.__process_result(result)
             except Exception as exc:
                 logger.exception("Failed to receive response from processor", exc_info=exc)
 

@@ -223,7 +223,7 @@ def fill_previously_gathered_features(
 
 def gather_feature_list(gathered_data_dict: dict[int, list[list[float]]], feature_ids: list[int]) -> list[list[float]]:
     features_array: np.array = None
-    axis_x_size = max(map(lambda x: len(x), gathered_data_dict.values()))
+    axis_x_size = max([len(x) for x in gathered_data_dict.values()])
     if axis_x_size <= 0:
         return []
     for idx, feature in enumerate(feature_ids):

@@ -278,15 +278,14 @@ def get_potential_status_codes(text: str) -> list[str]:
         line = clean_from_brackets(line)
         for pattern in STATUS_CODES_PATTERNS:
             result = pattern.search(line)
+            if not result:
+                continue
             for i in range(1, 4):
-                try:
-                    found_code = result.group(i) if result else None
-                    if found_code and found_code.strip():
-                        if found_code not in potential_codes:
-                            potential_codes.add(found_code)
-                            potential_codes_list.append(found_code)
-                except:  # noqa
-                    pass
+                found_code = (result.group(i) or "").strip()
+                if found_code:
+                    if found_code not in potential_codes:
+                        potential_codes.add(found_code)
+                        potential_codes_list.append(found_code)
     return potential_codes_list
 
 

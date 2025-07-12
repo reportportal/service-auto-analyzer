@@ -335,6 +335,55 @@ class SimilarityPredictor(Predictor):
         super().__init__()
         self.similarity_threshold = kwargs.get("similarity_threshold", 0.5)
 
+    def __do_prediction_for_request(
+        self, query_text: str, search_request: dict[str, Any], valid_hits: list[Any], hit_texts: list[str]
+    ) -> list[PredictionResult]:
+        # Calculate similarities for all hits at once
+        similarity_scores = calculate_text_similarity(query_text, *hit_texts)
+
+        # Group results by test_item to find most relevant for each
+        results_by_test_item = {}
+
+        for idx, (hit, similarity) in enumerate(zip(valid_hits, similarity_scores)):
+            # Get test_item identifier
+            test_item = str(hit.get("_source", {}).get("test_item", "unknown"))
+
+            # Track the best hit for each test_item
+            if test_item not in results_by_test_item or similarity > results_by_test_item[test_item]["similarity"]:
+                results_by_test_item[test_item] = {
+                    "similarity": similarity,
+                    "mrHit": hit,
+                    "compared_log": search_request,
+                    "original_position": idx,  # Add position info to hit
+                }
+
+        results = []
+        # Create PredictionResult objects for each test_item
+        for test_item, result_data in results_by_test_item.items():
+            similarity = result_data["similarity"]
+
+            # Binary classification based on threshold
+            label = 1 if similarity >= self.similarity_threshold else 0
+
+            # Probability format: [1-similarity, similarity] to match other predictors
+            probability = [1.0 - similarity, similarity]
+
+            # Create data structure matching expected format
+            data = {"mrHit": result_data["mrHit"], "compared_log": result_data["compared_log"]}
+
+            # Create PredictionResult
+            prediction_result = PredictionResult(
+                label=label,
+                probability=probability,
+                data=data,
+                identity=test_item,
+                feature_info=FeatureInfo(feature_ids=[0], feature_data=[similarity]),
+                model_info_tags=["similarity_predictor"],
+                original_position=result_data["original_position"],
+            )
+            results.append(prediction_result)
+        return results
+
     @override
     def predict(
         self,
@@ -383,50 +432,7 @@ class SimilarityPredictor(Predictor):
             if not valid_hits:
                 continue
 
-            # Calculate similarities for all hits at once
-            similarity_scores = calculate_text_similarity(query_text, *hit_texts)
-
-            # Group results by test_item to find most relevant for each
-            results_by_test_item = {}
-
-            for idx, (hit, similarity) in enumerate(zip(valid_hits, similarity_scores)):
-                # Get test_item identifier
-                test_item = str(hit.get("_source", {}).get("test_item", "unknown"))
-
-                # Track the best hit for each test_item
-                if test_item not in results_by_test_item or similarity > results_by_test_item[test_item]["similarity"]:
-                    results_by_test_item[test_item] = {
-                        "similarity": similarity,
-                        "mrHit": hit,
-                        "compared_log": search_request,
-                        "original_position": idx,  # Add position info to hit
-                    }
-
-            # Create PredictionResult objects for each test_item
-            for test_item, result_data in results_by_test_item.items():
-                similarity = result_data["similarity"]
-
-                # Binary classification based on threshold
-                label = 1 if similarity >= self.similarity_threshold else 0
-
-                # Probability format: [1-similarity, similarity] to match other predictors
-                probability = [1.0 - similarity, similarity]
-
-                # Create data structure matching expected format
-                data = {"mrHit": result_data["mrHit"], "compared_log": result_data["compared_log"]}
-
-                # Create PredictionResult
-                prediction_result = PredictionResult(
-                    label=label,
-                    probability=probability,
-                    data=data,
-                    identity=test_item,
-                    feature_info=FeatureInfo(feature_ids=[0], feature_data=[similarity]),
-                    model_info_tags=["similarity_predictor"],
-                    original_position=result_data["original_position"],
-                )
-
-                results.append(prediction_result)
+            results.extend(self.__do_prediction_for_request(query_text, search_request, valid_hits, hit_texts))
 
         return results
 

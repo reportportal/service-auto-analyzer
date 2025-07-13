@@ -21,6 +21,12 @@ import httpretty
 from app.commons.model import launch_objects
 from test import get_fixture
 
+SUGGESTIONS_INFO_METRICS = "/rp_suggestions_info_metrics"
+APPLICATION_JSON = "application/json"
+ERROR_COMMON_ERROR = "assertionError commonError"
+HELLO_WORLD = "hello world"
+HELLO_WORLD_SDF = f"{HELLO_WORLD} 'sdf'"
+
 
 def get_index_call(index_name: str, status: int) -> dict:
     """
@@ -57,7 +63,7 @@ def get_search_for_logs_call(index_name: str, query_parameters: str, rq: Any, rs
         "method": httpretty.GET,
         "uri": uri,
         "status": HTTPStatus.OK,
-        "content_type": "application/json",
+        "content_type": APPLICATION_JSON,
         "rq": rq,
         "rs": rs,
     }
@@ -76,7 +82,7 @@ def get_bulk_call(rq: Any, rs: Any) -> dict:
         "method": httpretty.POST,
         "uri": "/_bulk?refresh=true",
         "status": HTTPStatus.OK,
-        "content_type": "application/json",
+        "content_type": APPLICATION_JSON,
         "rs": rs,
     }
     if rq is not None:
@@ -89,7 +95,7 @@ def get_metrics_info_call() -> dict:
     """Returns a dictionary representing the GET metrics info call."""
     return {
         "method": httpretty.GET,
-        "uri": "/rp_suggestions_info_metrics",
+        "uri": SUGGESTIONS_INFO_METRICS,
         "status": HTTPStatus.OK,
     }
 
@@ -221,11 +227,11 @@ def get_common_query_data() -> list[tuple[str, str]]:
     return [
         ("assertionError notFoundError", "ab001"),
         ("assertionError ifElseError", "pb001"),
-        ("assertionError commonError", "ab001"),
-        ("assertionError commonError", "ab001"),
+        (ERROR_COMMON_ERROR, "ab001"),
+        (ERROR_COMMON_ERROR, "ab001"),
         ("assertionError", "ab001"),
-        ("assertionError commonError", "ab001"),
-        ("assertionError commonError", "ti001"),
+        (ERROR_COMMON_ERROR, "ab001"),
+        (ERROR_COMMON_ERROR, "ti001"),
     ]
 
 
@@ -328,11 +334,11 @@ def get_base_log_dict(
     test_case_hash: int = 1,
     test_item: str = "123",
     test_item_name: str = "test item Common Query",
-    message: str = "hello world",
+    message: str = HELLO_WORLD,
     merged_small_logs: str = "",
-    detected_message: str = "hello world",
+    detected_message: str = HELLO_WORLD,
     detected_message_with_numbers: str = "hello world 1",
-    detected_message_without_params_extended: str = "hello world",
+    detected_message_without_params_extended: str = HELLO_WORLD,
     stacktrace: str = "",
     only_numbers: str = "1",
     found_exceptions: str = "AssertionError",
@@ -364,21 +370,17 @@ def get_base_log_dict(
 
 
 def get_extended_log_dict(
-    message: str = "hello world 'sdf'",
+    message: str = HELLO_WORLD_SDF,
     merged_small_logs: str = "",
-    detected_message: str = "hello world 'sdf'",
+    detected_message: str = HELLO_WORLD_SDF,
     detected_message_with_numbers: str = "hello world 1 'sdf'",
     stacktrace: str = "",
     found_exceptions: str = "AssertionError",
-    found_exceptions_extended: str = "AssertionError",
     message_params: str = "sdf",
-    urls: str = "",
-    paths: str = "",
-    message_without_params_extended: str = "hello world",
-    detected_message_without_params_extended: str = "hello world",
+    message_without_params_extended: str = HELLO_WORLD,
     stacktrace_extended: str = "",
-    message_extended: str = "hello world 'sdf'",
-    detected_message_extended: str = "hello world 'sdf'",
+    message_extended: str = HELLO_WORLD_SDF,
+    detected_message_extended: str = HELLO_WORLD_SDF,
     potential_status_codes: str = "",
     found_tests_and_methods: str = "",
 ) -> dict:
@@ -397,12 +399,12 @@ def get_extended_log_dict(
     # Add extended fields
     base_log["_source"].update(
         {
-            "found_exceptions_extended": found_exceptions_extended,
+            "found_exceptions_extended": "AssertionError",
             "message_params": message_params,
-            "urls": urls,
-            "paths": paths,
+            "urls": "",
+            "paths": "",
             "message_without_params_extended": message_without_params_extended,
-            "detected_message_without_params_extended": detected_message_without_params_extended,
+            "detected_message_without_params_extended": HELLO_WORLD,
             "stacktrace_extended": stacktrace_extended,
             "message_extended": message_extended,
             "detected_message_extended": detected_message_extended,
@@ -419,7 +421,7 @@ def get_suggest_index_call(index_name: str, status: int) -> dict:
         "method": httpretty.GET,
         "uri": f"/{index_name}_suggest",
         "status": status,
-        "content_type": "application/json",
+        "content_type": APPLICATION_JSON,
     }
 
 
@@ -439,7 +441,7 @@ def get_delete_suggest_index_call(index_name: str, status: int, fixture_rs: str)
         "method": httpretty.DELETE,
         "uri": f"/{index_name}_suggest",
         "status": status,
-        "content_type": "application/json",
+        "content_type": APPLICATION_JSON,
         "rs": get_fixture(fixture_rs),
     }
 
@@ -450,7 +452,7 @@ def get_delete_by_query_call(index_name: str, fixture_rq: str, response_data: di
         "method": httpretty.POST,
         "uri": f"/{index_name}_suggest/_delete_by_query",
         "status": HTTPStatus.OK,
-        "content_type": "application/json",
+        "content_type": APPLICATION_JSON,
         "rq": get_fixture(fixture_rq),
         "rs": json.dumps(response_data),
     }
@@ -527,14 +529,14 @@ def get_suggest_index_creation_calls(
     if metrics_status == HTTPStatus.NOT_FOUND:
         calls.extend(
             [
-                {"method": httpretty.GET, "uri": "/rp_suggestions_info_metrics", "status": HTTPStatus.NOT_FOUND},
+                {"method": httpretty.GET, "uri": SUGGESTIONS_INFO_METRICS, "status": HTTPStatus.NOT_FOUND},
                 get_put_index_call("rp_suggestions_info_metrics", metrics_fixture),
             ]
         )
     else:
         calls.extend(
             [
-                {"method": httpretty.GET, "uri": "/rp_suggestions_info_metrics", "status": HTTPStatus.OK},
+                {"method": httpretty.GET, "uri": SUGGESTIONS_INFO_METRICS, "status": HTTPStatus.OK},
                 get_put_mapping_call("rp_suggestions_info_metrics", metrics_fixture),
             ]
         )
@@ -569,7 +571,7 @@ def get_cluster_search_call(index_name: str, fixture_rq: str, fixture_rs: str) -
         "method": httpretty.GET,
         "uri": f"/{index_name}/_search",
         "status": HTTPStatus.OK,
-        "content_type": "application/json",
+        "content_type": APPLICATION_JSON,
         "rq": get_fixture(fixture_rq),
         "rs": get_fixture(fixture_rs),
     }
@@ -581,7 +583,7 @@ def get_cluster_bulk_call(fixture_rq: str, fixture_rs: str) -> dict:
         "method": httpretty.POST,
         "uri": "/_bulk?refresh=false",
         "status": HTTPStatus.OK,
-        "content_type": "application/json",
+        "content_type": APPLICATION_JSON,
         "rq": get_fixture(fixture_rq),
         "rs": get_fixture(fixture_rs),
     }

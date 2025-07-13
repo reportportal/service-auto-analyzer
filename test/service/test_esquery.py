@@ -314,7 +314,6 @@ class TestEsQuery(unittest.TestCase):
             detected_message_with_numbers="",
             message_params="",
             message_without_params_extended="",
-            detected_message_without_params_extended="hello world",
             message_extended="",
             detected_message_extended="",
             potential_status_codes="200 400",

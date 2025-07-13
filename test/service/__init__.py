@@ -413,7 +413,7 @@ def get_extended_log_dict(
 
 
 # Helper functions for SuggestInfoService tests
-def get_suggest_index_call(index_name: str, status: HTTPStatus) -> dict:
+def get_suggest_index_call(index_name: str, status: int) -> dict:
     """Returns a dictionary representing an HTTP call to a suggest index."""
     return {
         "method": httpretty.GET,
@@ -512,8 +512,8 @@ def get_suggest_info_cleanup_calls(
 
 
 def get_suggest_index_creation_calls(
-    metrics_status: HTTPStatus,
-    suggest_index_status: HTTPStatus,
+    metrics_status: int,
+    suggest_index_status: int,
     metrics_fixture: str,
     suggest_fixture: str,
     index_name: str,

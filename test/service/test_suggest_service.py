@@ -258,7 +258,6 @@ class TestSuggestService(TestService):
                 "test_item_info": test_item_info_w_logs,
                 "expected_result": [
                     get_suggest_analysis_result(
-                        issue_type="AB001",
                         relevant_item=3,
                         relevant_log_id=3,
                         es_score=15.0,

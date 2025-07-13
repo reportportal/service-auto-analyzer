@@ -201,7 +201,6 @@ class TestEsQuery(unittest.TestCase):
             merged_small_logs="hello world",
             detected_message="",
             detected_message_with_numbers="",
-            detected_message_without_params_extended="hello world",
             only_numbers="",
         )
 

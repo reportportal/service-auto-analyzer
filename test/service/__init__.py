@@ -22,7 +22,7 @@ from app.commons.model import launch_objects
 from test import get_fixture
 
 
-def get_index_call(index_name: str, status: HTTPStatus) -> dict:
+def get_index_call(index_name: str, status: int) -> dict:
     """
     Returns a dictionary representing an HTTP call that simulates getting index.
     """
@@ -433,7 +433,7 @@ def get_suggest_index_found_call(index_name: str) -> dict:
     return get_suggest_index_call(index_name, HTTPStatus.OK)
 
 
-def get_delete_suggest_index_call(index_name: str, status: HTTPStatus, fixture_rs: str) -> dict:
+def get_delete_suggest_index_call(index_name: str, status: int, fixture_rs: str) -> dict:
     """Returns a dictionary representing a DELETE call to a suggest index."""
     return {
         "method": httpretty.DELETE,

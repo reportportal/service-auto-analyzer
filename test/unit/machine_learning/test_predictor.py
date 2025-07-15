@@ -12,17 +12,18 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import pytest
 from unittest.mock import Mock
+
+import pytest
 
 from app.commons.model.ml import ModelType
 from app.machine_learning.predictor import (
     PREDICTION_CLASSES,
+    AutoAnalysisPredictor,
+    FeatureInfo,
     PredictionResult,
     SimilarityPredictor,
-    AutoAnalysisPredictor,
     SuggestionPredictor,
-    FeatureInfo,
     extract_text_fields_for_comparison,
 )
 

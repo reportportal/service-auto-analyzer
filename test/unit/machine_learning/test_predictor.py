@@ -738,8 +738,6 @@ class TestAutoAnalysisPredictor:
         probability = results[0].probability
         assert len(probability) == 2
         assert probability == [0.2, 0.8]  # From our mock
-        assert 0.0 <= probability[0] <= 1.0
-        assert 0.0 <= probability[1] <= 1.0
 
     def test_predict_multiple_predictions(self):
         """Test predict method with multiple predictions."""
@@ -968,8 +966,6 @@ class TestSuggestionPredictor:
         probability = results[0].probability
         assert len(probability) == 2
         assert probability == [0.3, 0.7]  # From our mock
-        assert 0.0 <= probability[0] <= 1.0
-        assert 0.0 <= probability[1] <= 1.0
 
     def test_predict_multiple_predictions(self):
         """Test predict method with multiple predictions."""

@@ -18,7 +18,7 @@ import time
 from queue import Empty, PriorityQueue, Queue
 from typing import Any, Callable, Optional, Protocol
 
-from elasticsearch import ConflictError
+from elasticsearch import ConflictError, NotFoundError
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
 
@@ -77,6 +77,8 @@ def retry(item: ProcessingItem, exc: Exception) -> bool:
     # You can customize this logic based on your requirements
     if isinstance(exc, ConflictError) and item.routing_key == "item_remove":
         return "but no document was found" not in exc.error
+    if isinstance(exc, NotFoundError) and item.routing_key == "remove_by_launch_start_time":
+        return "no such index" not in exc.error
     return True
 
 

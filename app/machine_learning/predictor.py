@@ -129,7 +129,7 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
             custom_model_prob=custom_model_prob,
             hash_source=hash_source,
         )
-        use_custom_defect_model = float(int(self.boosting_decision_maker.is_custom))
+        use_custom_defect_model = 1.0 if self.boosting_decision_maker.is_custom else 0.0
         self.defect_type_model = model_chooser.choose_model(  # type: ignore[assignment]
             project_id, ModelType.defect_type, custom_model_prob=use_custom_defect_model
         )

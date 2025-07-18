@@ -22,6 +22,7 @@ from scipy.sparse import csr_matrix
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import classification_report, confusion_matrix, f1_score
+from typing_extensions import override
 
 from app.commons import logging
 from app.commons.object_saving.object_saver import ObjectSaver
@@ -99,6 +100,11 @@ class DefectTypeModel(MlModel):
     @property
     def loaded(self) -> bool:
         return self._loaded
+
+    @property
+    @override
+    def is_custom(self) -> bool:
+        return False
 
     def load_model(self) -> None:
         if self.loaded:

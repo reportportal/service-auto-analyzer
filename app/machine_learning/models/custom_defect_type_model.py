@@ -14,6 +14,8 @@
 
 from typing import Optional
 
+from typing_extensions import override
+
 from app.commons.object_saving.object_saver import ObjectSaver
 from app.machine_learning.models.defect_type_model import DefectTypeModel
 
@@ -24,3 +26,8 @@ class CustomDefectTypeModel(DefectTypeModel):
 
     def __init__(self, object_saver: ObjectSaver, n_estimators: Optional[int] = None):
         super().__init__(object_saver, MODEL_TAG, n_estimators=n_estimators)
+
+    @property
+    @override
+    def is_custom(self) -> bool:
+        return True

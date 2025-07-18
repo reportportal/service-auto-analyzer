@@ -15,6 +15,7 @@ import json
 from typing import Any, Optional
 
 from sklearn.metrics import classification_report, confusion_matrix, f1_score
+from typing_extensions import override
 from xgboost import XGBClassifier
 
 from app.commons import logging
@@ -64,6 +65,12 @@ class BoostingDecisionMaker(MlModel):
     @property
     def loaded(self) -> bool:
         return self._loaded
+
+    @property
+    @override
+    def is_custom(self) -> bool:
+        """Indicates whether the model is custom or not."""
+        return False
 
     @property
     def feature_importances(self) -> Optional[dict[int, float]]:

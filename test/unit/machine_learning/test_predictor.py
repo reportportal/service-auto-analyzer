@@ -576,6 +576,7 @@ class TestAutoAnalysisPredictor:
         mock_boosting_decision_maker.feature_ids = [0, 1, 3]
         mock_boosting_decision_maker.predict.return_value = ([1], [[0.2, 0.8]])
         mock_boosting_decision_maker.get_model_info.return_value = ["auto_analysis_model"]
+        mock_boosting_decision_maker.is_custom = False
 
         return {
             "model_chooser": mock_model_chooser,
@@ -602,7 +603,7 @@ class TestAutoAnalysisPredictor:
         deps["model_chooser"].choose_model.assert_any_call(
             123, ModelType.auto_analysis, custom_model_prob=0.0, hash_source=None
         )
-        deps["model_chooser"].choose_model.assert_any_call(123, ModelType.defect_type)
+        deps["model_chooser"].choose_model.assert_any_call(123, ModelType.defect_type, custom_model_prob=0.0)
 
     def test_predictor_instantiation_with_kwargs(self):
         """Test AutoAnalysisPredictor instantiation with keyword arguments."""
@@ -802,6 +803,7 @@ class TestSuggestionPredictor:
         mock_boosting_decision_maker.feature_ids = [0, 1, 3]
         mock_boosting_decision_maker.predict.return_value = ([1], [[0.3, 0.7]])
         mock_boosting_decision_maker.get_model_info.return_value = ["suggestion_model"]
+        mock_boosting_decision_maker.is_custom = False
 
         return {
             "model_chooser": mock_model_chooser,
@@ -828,7 +830,7 @@ class TestSuggestionPredictor:
         deps["model_chooser"].choose_model.assert_any_call(
             123, ModelType.suggestion, custom_model_prob=0.0, hash_source=None
         )
-        deps["model_chooser"].choose_model.assert_any_call(123, ModelType.defect_type)
+        deps["model_chooser"].choose_model.assert_any_call(123, ModelType.defect_type, custom_model_prob=0.0)
 
     def test_predictor_instantiation_with_kwargs(self):
         """Test SuggestionPredictor instantiation with keyword arguments."""

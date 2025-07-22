@@ -572,6 +572,7 @@ class DirectAmqpRequestHandler:
         *,
         routing_key_predicate: Optional[Callable[[str], bool]] = None,
         init_services: Optional[list[str]] = None,
+        **_: Any,
     ):
         """Initialize handler for processing requests.
 

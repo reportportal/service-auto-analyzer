@@ -20,7 +20,6 @@ from signal import SIGINT, signal
 from sys import exit
 from typing import Any
 
-from commons.model.ml import ModelType
 from flask import Flask, Response
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
@@ -30,6 +29,7 @@ from app.amqp.amqp_handler import AmqpRequestHandler, DirectAmqpRequestHandler, 
 from app.commons import logging as my_logging
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
+from app.commons.model.ml import ModelType
 from app.utils import utils
 
 APP_CONFIG = ApplicationConfig(

@@ -60,7 +60,7 @@ def get_search_for_logs_call(index_name: str, query_parameters: str, rq: Any, rs
     if query_parameters:
         uri += f"?{query_parameters}"
     return {
-        "method": httpretty.GET,
+        "method": httpretty.POST,
         "uri": uri,
         "status": HTTPStatus.OK,
         "content_type": APPLICATION_JSON,
@@ -551,7 +551,7 @@ def get_suggest_index_creation_calls(
 def get_cluster_search_call(index_name: str, fixture_rq: str, fixture_rs: str) -> dict:
     """Returns a dictionary representing a GET search call for clustering."""
     return {
-        "method": httpretty.GET,
+        "method": httpretty.POST,
         "uri": f"/{index_name}/_search",
         "status": HTTPStatus.OK,
         "content_type": APPLICATION_JSON,

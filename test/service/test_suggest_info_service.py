@@ -329,7 +329,7 @@ class TestSuggestInfoService(TestService):
                 "test_calls": [
                     get_suggest_index_found_call("1"),
                     {
-                        "method": httpretty.GET,
+                        "method": httpretty.POST,
                         "uri": "/1_suggest/_search?scroll=5m&size=1000",
                         "status": HTTPStatus.OK,
                         "content_type": "application/json",
@@ -353,7 +353,7 @@ class TestSuggestInfoService(TestService):
                 "test_calls": [
                     get_suggest_index_found_call("1"),
                     {
-                        "method": httpretty.GET,
+                        "method": httpretty.POST,
                         "uri": "/1_suggest/_search?scroll=5m&size=1000",
                         "status": HTTPStatus.OK,
                         "content_type": "application/json",
@@ -375,22 +375,20 @@ class TestSuggestInfoService(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            try:
-                self._start_server(test["test_calls"])
-                app_config = self.app_config
-                if "app_config" in test:
-                    app_config = test["app_config"]
-                suggest_info_service = SuggestInfoService(app_config=app_config)
-                suggest_info_service.es_client.es_client.scroll = MagicMock(
-                    return_value=json.loads(get_fixture(self.no_hits_search_rs))
-                )
-                response = suggest_info_service.update_suggest_info(test["defect_update_info"])
+            print(f"Running test case idx: {idx}")
+            self._start_server(test["test_calls"])
+            app_config = self.app_config
+            if "app_config" in test:
+                app_config = test["app_config"]
+            suggest_info_service = SuggestInfoService(app_config=app_config)
+            suggest_info_service.es_client.es_client.scroll = MagicMock(
+                return_value=json.loads(get_fixture(self.no_hits_search_rs))
+            )
+            response = suggest_info_service.update_suggest_info(test["defect_update_info"])
 
-                assert test["result"] == response
+            assert test["result"] == response
 
-                TestSuggestInfoService.shutdown_server(test["test_calls"])
-            except AssertionError as err:
-                raise AssertionError(f"Error in the test case number: {idx}").with_traceback(err.__traceback__)
+            TestSuggestInfoService.shutdown_server(test["test_calls"])
 
 
 if __name__ == "__main__":

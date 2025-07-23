@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import json
+import traceback
 from datetime import datetime
 from functools import reduce
 from time import time
@@ -367,7 +368,7 @@ class SuggestService(AnalyzerService):
     def query_logs_for_cluster(self, test_item_info: TestItemInfo, index_name: str) -> tuple[list[dict], int]:
         test_item_id = None
         test_items = self.es_client.es_client.search(
-            index_name, body=self.get_query_for_test_item_in_cluster(test_item_info)
+            index=index_name, body=self.get_query_for_test_item_in_cluster(test_item_info)
         ) or {"hits": {"hits": []}}
         for res in test_items["hits"]["hits"]:
             test_item_id = int(res["_source"]["test_item"])
@@ -497,6 +498,7 @@ class SuggestService(AnalyzerService):
             else:
                 logger.debug(f"There are no results for test item {test_item_info.testItemId}")
         except Exception as exc:
+            traceback.print_exc()
             logger.exception(exc)
             errors_found.append(utils.extract_exception(exc))
             errors_count += 1

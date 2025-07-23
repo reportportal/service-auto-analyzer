@@ -318,8 +318,8 @@ class ProcessAmqpRequestHandler:
     def __send_task(self, processing_item: ProcessingItem) -> None:
         """Send processing item to processor process"""
         self.processor.send(processing_item)
-        processing_item.send_time = time.time()  # Record send time for tracking
         self.__running_tasks.put(processing_item)
+        processing_item.send_time = time.time()  # Record send time for tracking
 
     def __send_to_processor(self) -> Optional[ProcessingItem]:
         try:
@@ -342,21 +342,6 @@ class ProcessAmqpRequestHandler:
             # If shutdown is initiated, do not restart the processor
             return
 
-        # Store running tasks to re-send them, clearing the queue
-        if not self.__running_tasks.queue:
-            tasks_to_resend = []
-        else:
-            with self.__running_tasks.mutex:
-                if not self.__running_tasks.queue:
-                    tasks_to_resend = []
-                else:
-                    tasks_to_resend = list(self.__running_tasks.queue)
-                    self.__running_tasks.queue.clear()
-
-        if tasks_to_resend:
-            # Increment retries for the first task, since it might be the one that caused the failure
-            tasks_to_resend[0].retries += 1
-
         # Clean up old process and connections
         self.processor.shutdown()
 
@@ -368,17 +353,39 @@ class ProcessAmqpRequestHandler:
         )
         LOGGER.info("Successfully restarted processor process")
 
-        # Re-send all previously running tasks to the new processor
-        for task in tasks_to_resend:
-            if task.retries >= self.app_config.amqpHandlerMaxRetries:
-                LOGGER.warning(f"Task {task.routing_key} - {task.msg_correlation_id} exceeded max retries, skipping")
-                continue
-            try:
-                self.__send_task(task)
-                LOGGER.debug(f"Re-sent task to new processor: {task.routing_key} - {task.msg_correlation_id}")
-            except Exception as exc:
-                LOGGER.exception(f"Failed to re-send task {task.routing_key} to new processor", exc_info=exc)
-        LOGGER.info(f"Re-sent {self.__running_tasks.qsize()} tasks to new processor")
+        if self.__running_tasks.qsize() <= 0:
+            LOGGER.info("No running tasks to re-send to new processor")
+            return
+
+        # Store running tasks to re-send them, clearing the queue
+        with self.__running_tasks.mutex:
+            # Double-check under mutex if the queue is empty
+            if not self.__running_tasks.queue:
+                return
+
+            tasks_to_resend = list(self.__running_tasks.queue)
+            self.__running_tasks.queue.clear()
+            if not tasks_to_resend:
+                return
+
+            # Increment retries for the first task, since it might be the one that caused the failure
+            tasks_to_resend[0].retries += 1
+
+            # Re-send all previously running tasks to the new processor
+            resent = 0
+            for task in tasks_to_resend:
+                if task.retries >= self.app_config.amqpHandlerMaxRetries:
+                    LOGGER.warning(
+                        f"Task {task.routing_key} - {task.msg_correlation_id} exceeded max retries, skipping"
+                    )
+                    continue
+                try:
+                    self.__send_task(task)
+                    resent += 1
+                    LOGGER.debug(f"Re-sent task to new processor: {task.routing_key} - {task.msg_correlation_id}")
+                except Exception as exc:
+                    LOGGER.exception(f"Failed to re-send task {task.routing_key} to new processor", exc_info=exc)
+            LOGGER.info(f"Re-sent {resent} tasks to new processor")
 
     def __has_long_running_tasks(self) -> bool:
         """Check if there are any long-running tasks that need attention"""

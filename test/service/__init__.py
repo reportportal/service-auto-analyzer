@@ -60,7 +60,7 @@ def get_search_for_logs_call(index_name: str, query_parameters: str, rq: Any, rs
     if query_parameters:
         uri += f"?{query_parameters}"
     return {
-        "method": httpretty.GET,
+        "method": httpretty.POST,
         "uri": uri,
         "status": HTTPStatus.OK,
         "content_type": APPLICATION_JSON,

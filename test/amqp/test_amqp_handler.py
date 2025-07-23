@@ -394,7 +394,7 @@ class TestProcessAmqpRequestHandler:
         # Verify processor was restarted (process should be alive)
         assert handler.processor.is_alive(), "Processor should be alive after restart"
 
-    @patch("app.amqp.amqp_handler.logger")
+    @patch("app.amqp.amqp_handler.LOGGER")
     def test_exception_retry(self, mock_logger, handler, mock_amqp_client):
         """Test Case 5: Failed tasks should be processed several times before dropping"""
 
@@ -432,7 +432,7 @@ class TestProcessAmqpRequestHandler:
         mock_amqp_client.reply.assert_not_called()
         assert handler.processor.is_alive(), "Processor should be alive after handling failed task"
 
-    @patch("app.amqp.amqp_handler.logger")
+    @patch("app.amqp.amqp_handler.LOGGER")
     def test_custom_retry_predicate(self, mock_logger, app_config, search_config, mock_amqp_client):
         """Test Case 7: Custom retry predicate - verify that custom retry logic is respected"""
 

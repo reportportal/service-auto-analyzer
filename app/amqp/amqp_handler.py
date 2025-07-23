@@ -315,7 +315,7 @@ class ProcessAmqpRequestHandler:
         self._sender_thread.start()
         self._receiver_thread.start()
 
-    def __send_task(self, processing_item: ProcessingItem) -> None:
+    def __send_task_lock(self, processing_item: ProcessingItem) -> None:
         """Send processing item to processor process"""
         self.processor.send(processing_item)
         self.__running_tasks.put(processing_item)
@@ -328,13 +328,19 @@ class ProcessAmqpRequestHandler:
             if not self.routing_key_predicate(processing_item.routing_key):
                 return processing_item
             log_incoming_message(processing_item.routing_key, processing_item.msg_correlation_id, processing_item.item)
-            self.__send_task(processing_item)
+            self.__send_task_lock(processing_item)
             return processing_item
         except Empty:
             return None
         except Exception as exc:
             LOGGER.exception("Failed to send message to processor", exc_info=exc)
             return None
+
+    def __send_task_no_lock(self, processing_item: ProcessingItem) -> None:
+        """Send processing item to processor process without acquiring a lock."""
+        self.processor.send(processing_item)
+        self.__running_tasks.queue.append(processing_item)
+        processing_item.send_time = time.time()  # Record send time for tracking
 
     def _restart_processor(self) -> None:
         """Restart the processor process if it has died"""
@@ -380,7 +386,7 @@ class ProcessAmqpRequestHandler:
                     )
                     continue
                 try:
-                    self.__send_task(task)
+                    self.__send_task_no_lock(task)
                     resent += 1
                     LOGGER.debug(f"Re-sent task to new processor: {task.routing_key} - {task.msg_correlation_id}")
                 except Exception as exc:

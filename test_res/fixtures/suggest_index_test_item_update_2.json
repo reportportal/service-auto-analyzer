@@ -1,4 +1,4 @@
-{"update":{"_index":"1_suggest","_id":"1"}}
+{"update":{"_id":"1","_index":"1_suggest"}}
 {"doc":{"userChoice":0}}
-{"update":{"_index":"1_suggest","_id":"3"}}
+{"update":{"_id":"3","_index":"1_suggest"}}
 {"doc":{"userChoice":0}}

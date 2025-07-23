@@ -356,8 +356,8 @@ class TestProcessAmqpRequestHandler:
     def test_long_running_task_interruption(self, handler, mock_amqp_client):
         """Test Case 4: Long running task interruption - verify task restart when timeout is exceeded"""
 
-        task_timeout = 7
-        # Create a task that will run for 7 seconds (longer than 6-second timeout)
+        task_timeout = 12
+        # Create a task that will run longer than the timeout and shutdown waiting for the processor
         channel, method, props, body = create_amqp_request_mock(
             routing_key="noop_sleep", body=task_timeout, reply_to="test_reply"  # Sleep for 6 seconds
         )
@@ -380,7 +380,7 @@ class TestProcessAmqpRequestHandler:
         # Wait 10 seconds for timeout detection and restart
         # This should be enough for the handler to detect the long-running task (after 5 seconds)
         # and restart the processor
-        time.sleep(12)
+        time.sleep(task_timeout)
 
         # Verify task is still running but was restarted with newer start time
         running_tasks = handler.running_tasks

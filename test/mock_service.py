@@ -242,8 +242,8 @@ class TestService(unittest.TestCase):
         assert len(actual_calls) == len(test_calls)
         for i, calls in enumerate(zip(test_calls, actual_calls)):
             expected_test_call, test_call = calls
-            assert expected_test_call["method"] == test_call.method
-            assert expected_test_call["uri"] == test_call.path
+            assert expected_test_call["method"] == test_call.method, f"Method mismatch in request {i}"
+            assert expected_test_call["uri"] == test_call.path, f"URI mismatch in request {i}"
             if "rq" in expected_test_call:
                 expected_body = expected_test_call["rq"]
                 real_body = test_call.parse_request_body(test_call.body)

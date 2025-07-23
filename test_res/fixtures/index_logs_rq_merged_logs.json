@@ -1,4 +1,4 @@
-{"update":{"_index":"idx3","_id":"1"}}
+{"update":{"_id":"1","_index":"idx3"}}
 {"doc":{"merged_small_logs":""}}
-{"update":{"_index":"idx3","_id":"2"}}
+{"update":{"_id":"2","_index":"idx3"}}
 {"doc":{"merged_small_logs":""}}

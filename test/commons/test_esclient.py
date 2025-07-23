@@ -228,7 +228,7 @@ class TestEsClient(TestService):
                         "status": HTTPStatus.OK,
                     },
                     {
-                        "method": httpretty.GET,
+                        "method": httpretty.POST,
                         "uri": "/1/_search?scroll=5m&size=1000",
                         "status": HTTPStatus.OK,
                         "content_type": "application/json",
@@ -243,7 +243,7 @@ class TestEsClient(TestService):
                         "rs": get_fixture(self.delete_logs_rs),
                     },
                     {
-                        "method": httpretty.GET,
+                        "method": httpretty.POST,
                         "uri": "/1/_search?scroll=5m&size=1000",
                         "status": HTTPStatus.OK,
                         "content_type": "application/json",
@@ -258,7 +258,7 @@ class TestEsClient(TestService):
                         "rs": get_fixture(self.delete_logs_rs),
                     },
                     {
-                        "method": httpretty.GET,
+                        "method": httpretty.POST,
                         "uri": "/1/_search?scroll=5m&size=1000",
                         "status": HTTPStatus.OK,
                         "content_type": "application/json",
@@ -295,7 +295,7 @@ class TestEsClient(TestService):
                         "status": HTTPStatus.OK,
                     },
                     {
-                        "method": httpretty.GET,
+                        "method": httpretty.POST,
                         "uri": "/rp_1/_search?scroll=5m&size=1000",
                         "status": HTTPStatus.OK,
                         "content_type": "application/json",
@@ -310,7 +310,7 @@ class TestEsClient(TestService):
                         "rs": get_fixture(self.delete_logs_rs),
                     },
                     {
-                        "method": httpretty.GET,
+                        "method": httpretty.POST,
                         "uri": "/rp_1/_search?scroll=5m&size=1000",
                         "status": HTTPStatus.OK,
                         "content_type": "application/json",
@@ -325,7 +325,7 @@ class TestEsClient(TestService):
                         "rs": get_fixture(self.delete_logs_rs),
                     },
                     {
-                        "method": httpretty.GET,
+                        "method": httpretty.POST,
                         "uri": "/rp_1/_search?scroll=5m&size=1000",
                         "status": HTTPStatus.OK,
                         "content_type": "application/json",
@@ -443,7 +443,7 @@ class TestEsClient(TestService):
                         "rs": get_fixture(self.index_logs_rs),
                     },
                     {
-                        "method": httpretty.GET,
+                        "method": httpretty.POST,
                         "uri": "/2/_search?scroll=5m&size=1000",
                         "status": HTTPStatus.OK,
                         "content_type": "application/json",
@@ -458,7 +458,7 @@ class TestEsClient(TestService):
                         "rs": get_fixture(self.delete_logs_rs),
                     },
                     {
-                        "method": httpretty.GET,
+                        "method": httpretty.POST,
                         "uri": "/2/_search?scroll=5m&size=1000",
                         "status": HTTPStatus.OK,
                         "content_type": "application/json",
@@ -505,7 +505,7 @@ class TestEsClient(TestService):
                         "rs": get_fixture(self.index_logs_rs_different_log_level),
                     },
                     {
-                        "method": httpretty.GET,
+                        "method": httpretty.POST,
                         "uri": "/2/_search?scroll=5m&size=1000",
                         "status": HTTPStatus.OK,
                         "content_type": "application/json",
@@ -520,7 +520,7 @@ class TestEsClient(TestService):
                         "rs": get_fixture(self.delete_logs_rs),
                     },
                     {
-                        "method": httpretty.GET,
+                        "method": httpretty.POST,
                         "uri": "/2/_search?scroll=5m&size=1000",
                         "status": HTTPStatus.OK,
                         "content_type": "application/json",
@@ -564,7 +564,7 @@ class TestEsClient(TestService):
                         "rs": get_fixture(self.index_logs_rs_different_log_level),
                     },
                     {
-                        "method": httpretty.GET,
+                        "method": httpretty.POST,
                         "uri": "/rp_2/_search?scroll=5m&size=1000",
                         "status": HTTPStatus.OK,
                         "content_type": "application/json",
@@ -579,7 +579,7 @@ class TestEsClient(TestService):
                         "rs": get_fixture(self.delete_logs_rs),
                     },
                     {
-                        "method": httpretty.GET,
+                        "method": httpretty.POST,
                         "uri": "/rp_2/_search?scroll=5m&size=1000",
                         "status": HTTPStatus.OK,
                         "content_type": "application/json",
@@ -624,7 +624,7 @@ class TestEsClient(TestService):
                         "rs": get_fixture(self.index_logs_rs),
                     },
                     {
-                        "method": httpretty.GET,
+                        "method": httpretty.POST,
                         "uri": "/2/_search?scroll=5m&size=1000",
                         "status": HTTPStatus.OK,
                         "content_type": "application/json",
@@ -639,7 +639,7 @@ class TestEsClient(TestService):
                         "rs": get_fixture(self.delete_logs_rs),
                     },
                     {
-                        "method": httpretty.GET,
+                        "method": httpretty.POST,
                         "uri": "/2/_search?scroll=5m&size=1000",
                         "status": HTTPStatus.OK,
                         "content_type": "application/json",
@@ -705,7 +705,7 @@ class TestEsClient(TestService):
                         "content_type": "application/json",
                     },
                     {
-                        "method": httpretty.GET,
+                        "method": httpretty.POST,
                         "uri": "/1/_search?scroll=5m&size=1000",
                         "status": HTTPStatus.OK,
                         "content_type": "application/json",
@@ -733,7 +733,7 @@ class TestEsClient(TestService):
                         "content_type": "application/json",
                     },
                     {
-                        "method": httpretty.GET,
+                        "method": httpretty.POST,
                         "uri": "/1/_search?scroll=5m&size=1000",
                         "status": HTTPStatus.OK,
                         "content_type": "application/json",
@@ -755,20 +755,18 @@ class TestEsClient(TestService):
         ]
 
         for idx, test in enumerate(tests):
-            try:
-                self._start_server(test["test_calls"])
-                app_config = self.app_config
-                if "app_config" in test:
-                    app_config = test["app_config"]
-                es_client = esclient.EsClient(app_config=app_config)
-                es_client.es_client.scroll = MagicMock(return_value=json.loads(get_fixture(self.no_hits_search_rs)))
-                response = es_client.defect_update(test["defect_update_info"])
+            print(f"Test case number: {idx}")
+            self._start_server(test["test_calls"])
+            app_config = self.app_config
+            if "app_config" in test:
+                app_config = test["app_config"]
+            es_client = esclient.EsClient(app_config=app_config)
+            es_client.es_client.scroll = MagicMock(return_value=json.loads(get_fixture(self.no_hits_search_rs)))
+            response = es_client.defect_update(test["defect_update_info"])
 
-                assert test["result"] == response
+            assert test["result"] == response
 
-                TestEsClient.shutdown_server(test["test_calls"])
-            except AssertionError as err:
-                raise AssertionError(f"Error in the test case number: {idx}").with_traceback(err.__traceback__)
+            TestEsClient.shutdown_server(test["test_calls"])
 
     def test_remove_test_items(self):
         tests = [

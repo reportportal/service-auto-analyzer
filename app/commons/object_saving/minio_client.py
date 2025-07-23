@@ -44,7 +44,7 @@ class MinioClient(Storage):
             secure=app_config.minioUseTls,
             region=self.region,
         )
-        LOGGER.info(f"Minio initialized {minio_host}")
+        LOGGER.debug(f"Minio initialized {minio_host}")
 
     def get_bucket(self, bucket_id: str | None) -> str:
         path = self._get_project_name(bucket_id)

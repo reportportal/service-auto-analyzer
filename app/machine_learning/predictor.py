@@ -176,6 +176,9 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
         # Make predictions
         predicted_labels, predicted_labels_probability = self.boosting_decision_maker.predict(feature_data)
 
+        if not predicted_labels or not predicted_labels_probability:
+            return []
+
         # Get scores by identity
         scores_by_identity = featurizer.find_most_relevant_by_type()
 

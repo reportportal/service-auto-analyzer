@@ -374,7 +374,7 @@ class ClusterService:
         return results_to_return, len(results_to_return), merged_logs_to_update
 
     @utils.ignore_warnings
-    def find_clusters(self, launch_info: LaunchInfoForClustering):
+    def find_clusters(self, launch_info: LaunchInfoForClustering) -> ClusterResult:
         logger.info("Started clusterizing logs")
         index_name = text_processing.unite_project_name(launch_info.project, self.app_config.esProjectIndexPrefix)
         if not self.es_client.index_exists(index_name):

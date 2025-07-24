@@ -29,19 +29,20 @@ from app.commons.model.processing import ProcessingItem, ProcessingResult
 from app.commons.processing import DummyProcessor, Processor, RealProcessor
 from app.service.processor import ServiceProcessor
 
-logger = logging.getLogger("analyzerApp.amqpHandler")
+LOGGER = logging.getLogger("analyzerApp.amqpHandler")
+NUMBER_OF_TASKS_TO_SEND = 2
 
 
 def log_incoming_message(routing_key: str, correlation_id: str, body: Any) -> None:
     body_str = json.dumps(body)
-    logger.debug(
+    LOGGER.debug(
         f"Processing message: --Routing key: {routing_key} --Correlation ID: {correlation_id} --Body: {body_str}"
     )
 
 
 def log_outgoing_message(reply_to: str, correlation_id: str, body: Any) -> None:
     body_str = json.dumps(body)
-    logger.debug(f"Replying message: --To: {reply_to} --Correlation ID: {correlation_id} --Body: {body_str}")
+    LOGGER.debug(f"Replying message: --To: {reply_to} --Correlation ID: {correlation_id} --Body: {body_str}")
 
 
 def serialize_message(channel: BlockingChannel, delivery_tag: Optional[int], body: bytes) -> Optional[Any]:
@@ -51,7 +52,7 @@ def serialize_message(channel: BlockingChannel, delivery_tag: Optional[int], bod
             channel.basic_ack(delivery_tag=delivery_tag)
         return message
     except Exception as exc:
-        logger.exception("Failed to parse message body to JSON", exc_info=exc)
+        LOGGER.exception("Failed to parse message body to JSON", exc_info=exc)
         if delivery_tag is not None:
             channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
         return None
@@ -68,7 +69,7 @@ def get_priority(props: BasicProperties) -> int:
                 timestamp_str = timestamp_str[:-1]
             priority = int(timestamp_str)
         except (ValueError, TypeError) as exc:
-            logger.warning(f"Failed to parse timestamp_in_ms header: {props.headers['timestamp_in_ms']}", exc_info=exc)
+            LOGGER.warning(f"Failed to parse timestamp_in_ms header: {props.headers['timestamp_in_ms']}", exc_info=exc)
     return priority
 
 
@@ -117,14 +118,14 @@ class Worker:
                 result = ProcessingResult(processing_item, result_value, success=True, retry_count=i)
                 break
             except Exception as exc:
-                logger.exception(
+                LOGGER.exception(
                     f"Failed to process message '{routing_key}' in worker on attempt {i + 1} of {max_retries}",
                     exc_info=exc,
                 )
                 result = ProcessingResult(processing_item, None, success=False, error=exc, retry_count=i)
                 if self._retry_predicate is not None:
                     if not self._retry_predicate(processing_item, exc):
-                        logger.info(
+                        LOGGER.info(
                             f"Retry predicate failed for message {routing_key} - "
                             f"{processing_item.msg_correlation_id}, not retrying"
                         )
@@ -164,7 +165,7 @@ class Worker:
                 result = self.__process(processing_item, processor, app_config.amqpHandlerMaxRetries)
                 conn.send(result)
         except Exception as exc:
-            logger.exception("Processor worker encountered error", exc_info=exc)
+            LOGGER.exception("Processor worker encountered error", exc_info=exc)
         conn.close()
 
 
@@ -314,11 +315,11 @@ class ProcessAmqpRequestHandler:
         self._sender_thread.start()
         self._receiver_thread.start()
 
-    def __send_task(self, processing_item: ProcessingItem) -> None:
+    def __send_task_lock(self, processing_item: ProcessingItem) -> None:
         """Send processing item to processor process"""
-        processing_item.send_time = time.time()  # Record send time for tracking
         self.processor.send(processing_item)
         self.__running_tasks.put(processing_item)
+        processing_item.send_time = time.time()  # Record send time for tracking
 
     def __send_to_processor(self) -> Optional[ProcessingItem]:
         try:
@@ -327,34 +328,25 @@ class ProcessAmqpRequestHandler:
             if not self.routing_key_predicate(processing_item.routing_key):
                 return processing_item
             log_incoming_message(processing_item.routing_key, processing_item.msg_correlation_id, processing_item.item)
-            self.__send_task(processing_item)
+            self.__send_task_lock(processing_item)
             return processing_item
         except Empty:
             return None
         except Exception as exc:
-            logger.exception("Failed to send message to processor", exc_info=exc)
+            LOGGER.exception("Failed to send message to processor", exc_info=exc)
             return None
+
+    def __send_task_no_lock(self, processing_item: ProcessingItem) -> None:
+        """Send processing item to processor process without acquiring a lock."""
+        self.processor.send(processing_item)
+        self.__running_tasks.queue.append(processing_item)
+        processing_item.send_time = time.time()  # Record send time for tracking
 
     def _restart_processor(self) -> None:
         """Restart the processor process if it has died"""
         if self._shutdown:
             # If shutdown is initiated, do not restart the processor
             return
-
-        # Store running tasks to re-send them, clearing the queue
-        if not self.__running_tasks.queue:
-            tasks_to_resend = []
-        else:
-            with self.__running_tasks.mutex:
-                if not self.__running_tasks.queue:
-                    tasks_to_resend = []
-                else:
-                    tasks_to_resend = list(self.__running_tasks.queue)
-                    self.__running_tasks.queue.clear()
-
-        if tasks_to_resend:
-            # Increment retries for the first task, since it might be the one that caused the failure
-            tasks_to_resend[0].retries += 1
 
         # Clean up old process and connections
         self.processor.shutdown()
@@ -365,19 +357,41 @@ class ProcessAmqpRequestHandler:
             self.search_config,
             Worker(self._init_services, self._retry_predicate).work,
         )
-        logger.info("Successfully restarted processor process")
+        LOGGER.info("Successfully restarted processor process")
 
-        # Re-send all previously running tasks to the new processor
-        for task in tasks_to_resend:
-            if task.retries >= self.app_config.amqpHandlerMaxRetries:
-                logger.warning(f"Task {task.routing_key} - {task.msg_correlation_id} exceeded max retries, skipping")
-                continue
-            try:
-                self.__send_task(task)
-                logger.debug(f"Re-sent task to new processor: {task.routing_key} - {task.msg_correlation_id}")
-            except Exception as exc:
-                logger.exception(f"Failed to re-send task {task.routing_key} to new processor", exc_info=exc)
-        logger.info(f"Re-sent {self.__running_tasks.qsize()} tasks to new processor")
+        if self.__running_tasks.qsize() <= 0:
+            LOGGER.info("No running tasks to re-send to new processor")
+            return
+
+        # Store running tasks to re-send them, clearing the queue
+        with self.__running_tasks.mutex:
+            # Double-check under mutex if the queue is empty
+            if not self.__running_tasks.queue:
+                return
+
+            tasks_to_resend = list(self.__running_tasks.queue)
+            self.__running_tasks.queue.clear()
+            if not tasks_to_resend:
+                return
+
+            # Increment retries for the first task, since it might be the one that caused the failure
+            tasks_to_resend[0].retries += 1
+
+            # Re-send all previously running tasks to the new processor
+            resent = 0
+            for task in tasks_to_resend:
+                if task.retries >= self.app_config.amqpHandlerMaxRetries:
+                    LOGGER.warning(
+                        f"Task {task.routing_key} - {task.msg_correlation_id} exceeded max retries, skipping"
+                    )
+                    continue
+                try:
+                    self.__send_task_no_lock(task)
+                    resent += 1
+                    LOGGER.debug(f"Re-sent task to new processor: {task.routing_key} - {task.msg_correlation_id}")
+                except Exception as exc:
+                    LOGGER.exception(f"Failed to re-send task {task.routing_key} to new processor", exc_info=exc)
+            LOGGER.info(f"Re-sent {resent} tasks to new processor")
 
     def __has_long_running_tasks(self) -> bool:
         """Check if there are any long-running tasks that need attention"""
@@ -390,7 +404,7 @@ class ProcessAmqpRequestHandler:
                 return False
             for task in self.__running_tasks.queue:
                 if task.send_time and (time.time() - task.send_time) > self.app_config.amqpHandlerTaskTimeout:
-                    logger.warning(f"Task {task.routing_key} - {task.msg_correlation_id} is taking too long")
+                    LOGGER.warning(f"Task {task.routing_key} - {task.msg_correlation_id} is taking too long")
                     return True
         return False
 
@@ -404,10 +418,10 @@ class ProcessAmqpRequestHandler:
                 log_outgoing_message(result.item.reply_to, result.item.msg_correlation_id, response_body)
                 self.client.reply(result.item.reply_to, result.item.msg_correlation_id, response_body)
         except Exception as exc:
-            logger.exception("Failed to publish result", exc_info=exc)
+            LOGGER.exception("Failed to publish result", exc_info=exc)
             return None
 
-        logger.debug("Finished processing response")
+        LOGGER.debug("Finished processing response")
         return None
 
     def __process_result(self, result: ProcessingResult) -> None:
@@ -415,19 +429,19 @@ class ProcessAmqpRequestHandler:
             try:
                 completed_task = self.__running_tasks.get()  # FIFO for completed tasks
                 if completed_task.msg_correlation_id != result.item.msg_correlation_id:
-                    logger.warning(
+                    LOGGER.warning(
                         f"Received result for task {result.item.msg_correlation_id} but expected "
                         f"{completed_task.msg_correlation_id}. Possible mismatch."
                     )
             except Empty:
-                logger.warning("Received result but no tasks in running queue, possible bug")
+                LOGGER.warning("Received result but no tasks in running queue, possible bug")
         if result.success and result.retry_count > 0:
-            logger.warning(
+            LOGGER.warning(
                 f"Task {result.item.routing_key} - {result.item.msg_correlation_id} "
                 f"was retried {result.retry_count} times"
             )
         elif not result.success:
-            logger.error(
+            LOGGER.error(
                 f"Task {result.item.routing_key} - {result.item.msg_correlation_id} failed after "
                 f"{result.retry_count} retries."
             )
@@ -440,7 +454,7 @@ class ProcessAmqpRequestHandler:
             result: ProcessingResult = self.processor.recv()
             self.__process_result(result)
         except Exception as exc:
-            logger.exception("Failed to receive response from processor", exc_info=exc)
+            LOGGER.exception("Failed to receive response from processor", exc_info=exc)
 
     def _monitor_processor(self):
         """Thread 1: Monitor processor and task states"""
@@ -448,26 +462,26 @@ class ProcessAmqpRequestHandler:
             try:
                 # Check if processor process is alive and restart if needed
                 if not self.processor.is_alive():
-                    logger.warning("Processor process is not running, restarting...")
+                    LOGGER.warning("Processor process is not running, restarting...")
                     self._restart_processor()
 
                 if self.__has_long_running_tasks():
-                    logger.warning("Detected long-running tasks, restarting processor...")
+                    LOGGER.warning("Detected long-running tasks, restarting processor...")
                     self._restart_processor()
 
                 # Monitor interval
                 time.sleep(0.1)
 
             except Exception as exc:
-                logger.exception("Error in monitor thread", exc_info=exc)
+                LOGGER.exception("Error in monitor thread", exc_info=exc)
                 time.sleep(0.1)
 
     def _send_tasks(self):
-        """Thread 2: Send tasks to processor if running tasks < 2"""
+        """Thread 2: Send tasks to processor if running tasks < NUMBER_OF_TASKS_TO_SEND"""
         while not self._shutdown:
             try:
                 # Send messages to processor if we have less than 2 running tasks
-                while self.__running_tasks.qsize() < 2:
+                while self.__running_tasks.qsize() < NUMBER_OF_TASKS_TO_SEND:
                     if not self.__send_to_processor():
                         break
 
@@ -476,7 +490,7 @@ class ProcessAmqpRequestHandler:
                     time.sleep(0.01)
 
             except Exception as exc:
-                logger.exception("Error in sender thread", exc_info=exc)
+                LOGGER.exception("Error in sender thread", exc_info=exc)
                 time.sleep(0.1)
 
     def _receive_results(self):
@@ -490,7 +504,7 @@ class ProcessAmqpRequestHandler:
                     time.sleep(0.01)
 
             except Exception as exc:
-                logger.exception("Error in receiver thread", exc_info=exc)
+                LOGGER.exception("Error in receiver thread", exc_info=exc)
                 time.sleep(0.1)
 
     def handle_amqp_request(
@@ -526,7 +540,7 @@ class ProcessAmqpRequestHandler:
         try:
             self.queue.put(processing_item, block=True)
         except Exception as exc:
-            logger.exception("Failed to add item to processing queue", exc_info=exc)
+            LOGGER.exception("Failed to add item to processing queue", exc_info=exc)
             return None
         return None
 
@@ -632,7 +646,7 @@ class DirectAmqpRequestHandler:
         try:
             response_body = self._processor.process(method.routing_key or "", message)
         except Exception as exc:
-            logger.exception("Failed to process message", exc_info=exc)
+            LOGGER.exception("Failed to process message", exc_info=exc)
             self.__running_tasks.get()
             return None
 
@@ -651,10 +665,10 @@ class DirectAmqpRequestHandler:
                     body=bytes(response_body, "utf-8"),
                 )
         except Exception as exc:
-            logger.exception("Failed to publish result", exc_info=exc)
+            LOGGER.exception("Failed to publish result", exc_info=exc)
             self.__running_tasks.get()
             return None
-        logger.debug("Finished processing response")
+        LOGGER.debug("Finished processing response")
         self.__running_tasks.get()
         return None
 

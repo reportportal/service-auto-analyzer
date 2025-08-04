@@ -375,7 +375,9 @@ class ClusterService:
 
     @utils.ignore_warnings
     def find_clusters(self, launch_info: LaunchInfoForClustering) -> ClusterResult:
-        logger.info("Started clusterizing logs")
+        logger.info(
+            f"Started clusterizing logs for launch {launch_info.launch.launchId} in project {launch_info.project}"
+        )
         index_name = text_processing.unite_project_name(launch_info.project, self.app_config.esProjectIndexPrefix)
         if not self.es_client.index_exists(index_name):
             logger.info("Project %s doesn't exist", index_name)

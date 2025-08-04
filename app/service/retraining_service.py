@@ -40,7 +40,7 @@ class RetrainingService:
     @utils.ignore_warnings
     def train_models(self, train_info: TrainInfo) -> None:
         assert self.trigger_manager.does_trigger_exist(train_info.model_type)
-        logger.info("Started training")
+        logger.info(f"Started training model for {train_info.model_type} in project {train_info.project}")
         t_start = time()
         _retraining_triggering, _retraining = self.trigger_manager.get_trigger_info(train_info.model_type)
         if _retraining_triggering.should_model_training_be_triggered(train_info):

@@ -349,6 +349,7 @@ class AnalysisModelTraining:
         for project_id in projects:
             namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
             gathered_suggested_data, log_id_dict = self.query_es_for_suggest_info(project_id)
+            defect_type_model = self.model_chooser.choose_model(project_id, ModelType.defect_type)
 
             for _suggest_res in gathered_suggested_data:
                 searched_res = []
@@ -380,9 +381,7 @@ class AnalysisModelTraining:
                         )
 
                     # noinspection PyTypeChecker
-                    _boosting_data_gatherer.set_defect_type_model(
-                        self.model_chooser.choose_model(project_id, ModelType.defect_type)
-                    )
+                    _boosting_data_gatherer.set_defect_type_model(defect_type_model)
                     _boosting_data_gatherer.fill_previously_gathered_features(
                         [utils.to_float_list(_suggest_res["_source"]["modelFeatureValues"])],
                         [int(_id) for _id in _suggest_res["_source"]["modelFeatureNames"].split(";")],

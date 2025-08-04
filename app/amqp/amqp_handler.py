@@ -382,7 +382,8 @@ class ProcessAmqpRequestHandler:
             for task in tasks_to_resend:
                 if task.retries >= self.app_config.amqpHandlerMaxRetries:
                     LOGGER.warning(
-                        f"Task {task.routing_key} - {task.msg_correlation_id} exceeded max retries, skipping"
+                        f"Task {task.routing_key} - {task.msg_correlation_id} exceeded max retries, skipping",
+                        correlation_id=task.log_correlation_id,
                     )
                     continue
                 try:

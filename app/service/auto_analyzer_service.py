@@ -20,7 +20,7 @@ from time import sleep, time
 from typing import Any, Optional
 
 from app.amqp.amqp import AmqpClient
-from app.commons import log_merger, logging, object_saving, request_factory
+from app.commons import log_merger, logging, request_factory
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import (
     AnalysisCandidate,
@@ -35,7 +35,6 @@ from app.commons.model.launch_objects import (
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.similarity_calculator import SimilarityCalculator
-from app.machine_learning.models import WeightedSimilarityCalculator
 from app.machine_learning.predictor import AutoAnalysisPredictor, PredictionResult
 from app.service.analyzer_service import AnalyzerService
 from app.utils import text_processing, utils
@@ -83,7 +82,6 @@ class AutoAnalyzerService(AnalyzerService):
     search_cfg: SearchConfig
     es_client: EsClient
     namespace_finder: NamespaceFinder
-    similarity_model: WeightedSimilarityCalculator
 
     def __init__(
         self,
@@ -97,12 +95,6 @@ class AutoAnalyzerService(AnalyzerService):
         super().__init__(model_chooser, search_cfg=self.search_cfg)
         self.es_client = es_client or EsClient(app_config=self.app_config)
         self.namespace_finder = NamespaceFinder(app_config)
-        weights_folder = self.search_cfg.SimilarityWeightsFolder
-        if not weights_folder:
-            raise ValueError("SimilarityWeightsFolder is not set")
-        if weights_folder:
-            self.similarity_model = WeightedSimilarityCalculator(object_saving.create_filesystem(weights_folder))
-            self.similarity_model.load_model()
 
     def get_config_for_boosting(self, analyzer_config: AnalyzerConf) -> dict[str, Any]:
         min_should_match = self.find_min_should_match_threshold(analyzer_config) / 100
@@ -278,7 +270,7 @@ class AutoAnalyzerService(AnalyzerService):
                 if log["_source"]["issue_type"][:2].lower() in ["nd", "ti"]:
                     no_defect_candidate_exists = True
             new_search_res = []
-            _similarity_calculator = SimilarityCalculator(boosting_config, similarity_model=self.similarity_model)
+            _similarity_calculator = SimilarityCalculator()
             if no_defect_candidate_exists:
                 sim_dict = _similarity_calculator.find_similarity(
                     [(log_info, search_res)], ["message", "merged_small_logs"]
@@ -541,7 +533,6 @@ class AutoAnalyzerService(AnalyzerService):
                         model_chooser=self.model_chooser,
                         project_id=project_id,
                         boosting_config=boosting_config,
-                        weighted_log_similarity_calculator=self.similarity_model,
                         custom_model_prob=self.search_cfg.ProbabilityForCustomModelAutoAnalysis,
                         hash_source=launch_id,
                     )

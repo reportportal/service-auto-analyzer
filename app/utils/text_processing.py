@@ -15,7 +15,7 @@
 import re
 import string
 import urllib.parse
-from typing import Iterable
+from typing import Iterable, Any
 from urllib.parse import urlparse
 
 import nltk
@@ -716,12 +716,12 @@ def remove_credentials_from_url(url: str) -> str:
     return url.replace(parsed_url.netloc, new_netloc)
 
 
-def does_stacktrace_need_words_reweighting(log):
+def does_stacktrace_need_words_reweighting(log: str) -> bool:
     found_file_extensions = []
     all_extensions_to_find = "|".join(["py", "java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "scala"])
     for m in re.findall(r"\.(%s)(?!\.)\b" % all_extensions_to_find, log):
         found_file_extensions.append(m)
-    if len(found_file_extensions) == 1 and found_file_extensions[0] in ["js", "c", "h", "rb", "cpp"]:
+    if len(found_file_extensions) == 1 and found_file_extensions[0] in {"js", "c", "h", "rb", "cpp"}:
         return True
     return False
 
@@ -941,7 +941,7 @@ def preprocess_text_for_similarity(text: str) -> str:
     return " ".join(processed_words)
 
 
-def calculate_text_similarity(base_text: str, *other_texts: str) -> list[float]:
+def calculate_text_similarity(base_text: str, *other_texts: str) -> list[tuple[float, bool]]:
     """
     Calculate similarity between a base text and multiple other texts using TF-IDF vectorization and cosine similarity.
 
@@ -962,25 +962,29 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[float]:
     processed_other_texts = [preprocess_text_for_similarity(text) for text in other_texts]
 
     # Handle empty texts and identical texts first
-    similarity_scores = []
+    similarity_scores: list[tuple[float, bool]] = []
     valid_texts = []
     valid_indices = []
 
     for i, processed_other_text in enumerate(processed_other_texts):
         # If either text is empty after preprocessing, append 0
+        if not processed_base_text.strip() and not processed_other_text.strip():
+            similarity_scores.append((0.0, True))
+            continue
+
         if not processed_base_text.strip() or not processed_other_text.strip():
-            similarity_scores.append(0.0)
+            similarity_scores.append((0.0, False))
             continue
 
         # If both texts are identical after preprocessing, append 1
         if processed_base_text == processed_other_text:
-            similarity_scores.append(1.0)
+            similarity_scores.append((1.0, False))
             continue
 
         # Store valid texts for batch processing
         valid_texts.append(processed_other_text)
         valid_indices.append(i)
-        similarity_scores.append(0.0)  # Placeholder, will be replaced
+        similarity_scores.append((0.0, False))  # Placeholder, will be replaced
 
     # If we have valid texts to process, use single TF-IDF vectorizer
     if valid_texts:
@@ -1007,6 +1011,6 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[float]:
 
         # Update similarity scores for valid texts
         for i, valid_index in enumerate(valid_indices):
-            similarity_scores[valid_index] = float(similarity_matrix[0][i])
+            similarity_scores[valid_index] = float(similarity_matrix[0][i]), False
 
     return similarity_scores

@@ -19,7 +19,6 @@ from typing import Any, Callable, Optional
 import numpy as np
 
 from app.commons import logging, similarity_calculator
-from app.machine_learning.models import WeightedSimilarityCalculator
 from app.machine_learning.models.defect_type_model import DATA_FIELD, DefectTypeModel
 from app.utils import text_processing, utils
 
@@ -42,13 +41,10 @@ class BoostingFeaturizer:
         results: list[tuple[dict[str, Any], dict[str, Any]]],
         config: dict[str, Any],
         feature_ids: str | list[int],
-        weighted_log_similarity_calculator: WeightedSimilarityCalculator,
     ) -> None:
         self.config = config
         self.previously_gathered_features = {}
-        self.similarity_calculator = similarity_calculator.SimilarityCalculator(
-            self.config, similarity_model=weighted_log_similarity_calculator
-        )
+        self.similarity_calculator = similarity_calculator.SimilarityCalculator()
         if type(feature_ids) is str:
             self.feature_ids = text_processing.transform_string_feature_range_into_list(feature_ids)
         else:

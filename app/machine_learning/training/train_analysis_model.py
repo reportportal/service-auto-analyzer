@@ -112,9 +112,9 @@ def train_several_times(
         bad_data = True
 
     if not bad_data:
-        data, labels = deduplicate_data(data, labels)
+        dedupe_data, labels = deduplicate_data(data, labels)
         for random_state in my_random_states:
-            x_train, x_test, y_train, y_test = split_data(data, labels, random_state)
+            x_train, x_test, y_train, y_test = split_data(dedupe_data, labels, random_state)
             proportion_binary_labels = utils.calculate_proportions_for_labels(y_train)
             if proportion_binary_labels < SMOTE_PROPORTION:
                 oversample = BorderlineSMOTE(sampling_strategy=SMOTE_PROPORTION, random_state=random_state)

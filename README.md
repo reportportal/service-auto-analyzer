@@ -93,11 +93,11 @@ Perform next steps inside source directory of the analyzer.
 ```bash
   /analyzer/bin/activate
 ```
-4. Install stopwords package from the nltk library
+4. Install stopwords, wordnet and omw-1.4 package from the nltk library
 ```bash
-  /analyzer/bin/python3 -m nltk.downloader -d /usr/share/nltk_data stopwords
+  /analyzer/bin/python3 -m nltk.downloader -d /usr/share/nltk_data stopwords wordnet omw-1.4
 ```
-5. Start the uwsgi server, you can change properties, such as the workers quantity for running the analyzer in the several processes
+5. Start the Flask server
 ```bash
-  /analyzer/bin/waitress-serve --port=5001 app.main:application
+  /analyzer/bin/python3 app/main.py
 ```

@@ -374,8 +374,10 @@ class ClusterService:
         return results_to_return, len(results_to_return), merged_logs_to_update
 
     @utils.ignore_warnings
-    def find_clusters(self, launch_info: LaunchInfoForClustering):
-        logger.info("Started clusterizing logs")
+    def find_clusters(self, launch_info: LaunchInfoForClustering) -> ClusterResult:
+        logger.info(
+            f"Started clusterizing logs for launch {launch_info.launch.launchId} in project {launch_info.project}"
+        )
         index_name = text_processing.unite_project_name(launch_info.project, self.app_config.esProjectIndexPrefix)
         if not self.es_client.index_exists(index_name):
             logger.info("Project %s doesn't exist", index_name)
@@ -395,7 +397,7 @@ class ClusterService:
             log_messages, log_dict, log_ids_for_merged_logs = log_merger.merge_logs(
                 prepared_logs, launch_info.numberOfLogLines, launch_info.cleanNumbers
             )
-            log_ids = set([str(log["_id"]) for log in log_dict.values()])
+            log_ids = {str(log["_id"]) for log in log_dict.values()}
             groups = self.cluster_messages_with_grouping_by_error(
                 log_messages, log_dict, unique_errors_min_should_match
             )

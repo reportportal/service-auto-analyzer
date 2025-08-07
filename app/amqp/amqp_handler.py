@@ -13,148 +13,649 @@
 #  limitations under the License.
 
 import json
-import uuid
-from typing import Any, Callable, Optional
+import threading
+import time
+from queue import Empty, PriorityQueue, Queue
+from typing import Any, Callable, Optional, Protocol
 
+from elasticsearch import ConflictError, NotFoundError
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
 
+from app.amqp.amqp import AmqpClient
 from app.commons import logging
-from app.commons.model import launch_objects, ml
+from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
+from app.commons.model.processing import ProcessingItem, ProcessingResult
+from app.commons.processing import DummyProcessor, Processor, RealProcessor
+from app.service.processor import ServiceProcessor
 
-logger = logging.getLogger("analyzerApp.amqpHandler")
-
-
-def prepare_launches(launches: list) -> list[launch_objects.Launch]:
-    """Function for deserializing array of launches"""
-    return [launch_objects.Launch(**launch) for launch in launches]
-
-
-def prepare_suggest_info_list(suggest_info_list: list) -> list[launch_objects.SuggestAnalysisResult]:
-    """Function for deserializing array of suggest info results"""
-    return [launch_objects.SuggestAnalysisResult(**res) for res in suggest_info_list]
+LOGGER = logging.getLogger("analyzerApp.amqpHandler")
+NUMBER_OF_TASKS_TO_SEND = 2
 
 
-def prepare_search_logs(search_data: dict) -> launch_objects.SearchLogs:
-    """Function for deserializing search logs object"""
-    return launch_objects.SearchLogs(**search_data)
+def log_incoming_message(routing_key: str, correlation_id: str, body: Any) -> None:
+    body_str = json.dumps(body)
+    LOGGER.debug(
+        f"Processing message: --Routing key: {routing_key} --Correlation ID: {correlation_id} --Body: {body_str}"
+    )
 
 
-def prepare_launch_info(launch_info: dict) -> launch_objects.LaunchInfoForClustering:
-    """Function for deserializing search logs object"""
-    return launch_objects.LaunchInfoForClustering(**launch_info)
+def log_outgoing_message(reply_to: str, correlation_id: str, body: Any) -> None:
+    body_str = json.dumps(body)
+    LOGGER.debug(f"Replying message: --To: {reply_to} --Correlation ID: {correlation_id} --Body: {body_str}")
 
 
-def prepare_clean_index(clean_index: dict) -> launch_objects.CleanIndex:
-    """Function for deserializing clean index object"""
-    return launch_objects.CleanIndex(**clean_index)
-
-
-def prepare_delete_index(body: Any) -> int:
-    """Function for deserializing index id object"""
-    return int(body)
-
-
-def prepare_test_item_info(test_item_info: Any) -> launch_objects.TestItemInfo:
-    """Function for deserializing test item info for suggestions"""
-    return launch_objects.TestItemInfo(**test_item_info)
-
-
-def prepare_train_info(train_info: dict) -> ml.TrainInfo:
-    """Function for deserializing train info object"""
-    return ml.TrainInfo(**train_info)
-
-
-def prepare_search_response_data(response: list | dict) -> str:
-    """Function for serializing response from search request"""
-    return json.dumps(response)
-
-
-def prepare_analyze_response_data(response: list) -> str:
-    """Function for serializing response from analyze request"""
-    return json.dumps([resp.dict() for resp in response])
-
-
-def prepare_index_response_data(response: Any) -> str:
-    """Function for serializing response from index request
-    and other objects, which are pydantic objects"""
-    return response.json()
-
-
-def output_result(response: Any) -> str:
-    """Function for serializing int object"""
-    return str(response)
-
-
-def __get_correlation_id() -> str:
-    return str(uuid.uuid4())
-
-
-def handle_request(
-    channel: BlockingChannel,
-    method: Basic.Deliver,
-    props: BasicProperties,
-    body: bytes,
-    request_handler: Callable[[Any], Any],
-    prepare_data_func: Optional[Callable[[Any], Any]] = None,
-) -> Optional[Any]:
-    """Function for handling amqp requests."""
-    logging.new_correlation_id()
-    logger.debug(f"Processing message: --Method: {method} --Properties: {props} --Body: {body}")
-    channel.basic_ack(delivery_tag=method.delivery_tag)
+def serialize_message(channel: BlockingChannel, delivery_tag: Optional[int], body: bytes) -> Optional[Any]:
     try:
         message = json.loads(body, strict=False)
+        if delivery_tag is not None:
+            channel.basic_ack(delivery_tag=delivery_tag)
+        return message
     except Exception as exc:
-        logger.exception("Failed to parse message body to JSON", exc_info=exc)
+        LOGGER.exception("Failed to parse message body to JSON", exc_info=exc)
+        if delivery_tag is not None:
+            channel.basic_nack(delivery_tag=delivery_tag, requeue=False)
         return None
-    if prepare_data_func:
+
+
+def get_priority(props: BasicProperties) -> int:
+    """Determine priority from timestamp_in_ms header or use current time."""
+    priority = int(time.time() * 1000)  # Default to current time in milliseconds
+    if props.headers and "timestamp_in_ms" in props.headers:
         try:
-            message = prepare_data_func(message)
+            timestamp_str = str(props.headers["timestamp_in_ms"])
+            # Remove 'L' suffix if present (e.g., 1749029201296L)
+            if timestamp_str.endswith("L"):
+                timestamp_str = timestamp_str[:-1]
+            priority = int(timestamp_str)
+        except (ValueError, TypeError) as exc:
+            LOGGER.warning(f"Failed to parse timestamp_in_ms header: {props.headers['timestamp_in_ms']}", exc_info=exc)
+    return priority
+
+
+def retry(item: ProcessingItem, exc: Exception) -> bool:
+    """Default retry predicate for handling exceptions."""
+    # You can customize this logic based on your requirements
+    if isinstance(exc, ConflictError) and item.routing_key == "item_remove":
+        return "but no document was found" not in exc.error
+    if isinstance(exc, NotFoundError) and item.routing_key == "remove_by_launch_start_time":
+        return "no such index" not in exc.error
+    return True
+
+
+class Worker:
+    """Worker class for processing AMQP messages in a separate process.
+
+    Handles initialization of services and provides retry logic for failed processing attempts.
+    Contains the main worker function that runs in a separate process and processes messages.
+    """
+
+    _init_services: set[str]
+    _retry_predicate: Optional[Callable[[ProcessingItem, Exception], bool]]
+
+    def __init__(
+        self,
+        init_services: set[str],
+        retry_predicate: Optional[Callable[[ProcessingItem, Exception], bool]] = None,
+    ):
+        """Initialize worker with services to initialize and optional retry predicate.
+
+        :param set[str] init_services: Set of service names to initialize in the worker process
+        :param Optional[Callable[[ProcessingItem, Exception], bool]] retry_predicate: Optional function to determine
+        if a failed processing attempt should be retried
+        """
+        self._init_services = init_services
+        self._retry_predicate = retry_predicate
+
+    def __process(
+        self, processing_item: ProcessingItem, processor: ServiceProcessor, max_retries: int
+    ) -> Optional[ProcessingResult]:
+        result = None
+        routing_key = processing_item.routing_key
+        for i in range(max_retries):
+            try:
+                result_value = processor.process(routing_key, processing_item.item)
+                result = ProcessingResult(processing_item, result_value, success=True, retry_count=i)
+                break
+            except Exception as exc:
+                LOGGER.exception(
+                    f"Failed to process message '{routing_key}' in worker on attempt {i + 1} of {max_retries}",
+                    exc_info=exc,
+                )
+                result = ProcessingResult(processing_item, None, success=False, error=exc, retry_count=i)
+                if self._retry_predicate is not None:
+                    if not self._retry_predicate(processing_item, exc):
+                        LOGGER.info(
+                            f"Retry predicate failed for message {routing_key} - "
+                            f"{processing_item.msg_correlation_id}, not retrying"
+                        )
+                        break
+                time.sleep(0.01)  # Small sleep to prevent busy waiting
+        return result
+
+    def work(
+        self,
+        conn: Any,
+        app_config: ApplicationConfig,
+        search_config: SearchConfig,
+    ) -> None:
+        """Worker function that runs in separate process.
+
+        Continuously polls for processing items from the connection, processes them using ServiceProcessor,
+        handles retries based on the retry predicate, and sends results back through the connection.
+
+        :param Any conn: Process connection object for communication with parent process
+        :param ApplicationConfig app_config: Application configuration containing retry settings
+        :param SearchConfig search_config: Search configuration for the processor
+        """
+        processor = ServiceProcessor(app_config, search_config, services_to_init=self._init_services)
+        try:
+            while True:
+                if not conn.poll():
+                    # If no message is available, wait for a short time before checking again
+                    time.sleep(0.01)  # Small sleep to prevent busy waiting
+                    continue
+
+                processing_item: ProcessingItem = conn.recv()
+                if not processing_item:  # Shutdown signal
+                    break
+
+                logging.set_correlation_id(processing_item.log_correlation_id)
+
+                result = self.__process(processing_item, processor, app_config.amqpHandlerMaxRetries)
+                conn.send(result)
         except Exception as exc:
-            logger.exception("Failed to prepare message body", exc_info=exc)
+            LOGGER.exception("Processor worker encountered error", exc_info=exc)
+        conn.close()
+
+
+class AtomicInteger:
+    """Thread-safe integer counter with atomic increment and decrement operations.
+
+    Provides thread-safe operations for incrementing, decrementing, and reading integer values
+    using a threading lock to ensure atomicity across multiple threads.
+    """
+
+    def __init__(self, value: int = 0) -> None:
+        """Initialize the atomic integer with an optional starting value.
+
+        :param int value: Initial value for the counter (default: 0)
+        """
+        self._value = int(value)
+        self._lock = threading.Lock()
+
+    def inc(self, d: int = 1) -> int:
+        """Atomically increment the value and return the new value.
+
+        :param int d: Amount to increment by (default: 1)
+        :return: The new value after incrementing
+        :rtype: int
+        """
+        with self._lock:
+            self._value += int(d)
+            return self._value
+
+    def dec(self, d: int = 1) -> int:
+        """Atomically decrement the value and return the new value.
+
+        :param int d: Amount to decrement by (default: 1)
+        :return: The new value after decrementing
+        :rtype: int
+        """
+        return self.inc(-d)
+
+    @property
+    def value(self) -> int:
+        """Get the current value in a thread-safe manner.
+
+        :return: Current integer value
+        :rtype: int
+        """
+        with self._lock:
+            return self._value
+
+
+class AmqpRequestHandler(Protocol):
+    processor: Processor
+    running_tasks: list[ProcessingItem]
+
+    def handle_amqp_request(
+        self,
+        channel: BlockingChannel,
+        method: Basic.Deliver,
+        props: BasicProperties,
+        body: bytes,
+    ) -> None:
+        """Handle AMQP request."""
+        ...
+
+
+class ProcessAmqpRequestHandler:
+    """Class for handling AMQP requests with process-based routing and priority queue."""
+
+    app_config: ApplicationConfig
+    search_config: SearchConfig
+    client: AmqpClient
+    queue_size: int
+    routing_key_predicate: Callable[[str], bool]
+    counter: AtomicInteger
+    queue: PriorityQueue[ProcessingItem]
+    __running_tasks: Queue[ProcessingItem]
+    processor: Processor
+    _monitor_thread: Optional[threading.Thread]
+    _sender_thread: Optional[threading.Thread]
+    _receiver_thread: Optional[threading.Thread]
+    _shutdown: bool
+    _init_services: set[str]
+    _retry_predicate: Optional[Callable[[ProcessingItem, Exception], bool]]
+
+    def __init__(
+        self,
+        app_config: ApplicationConfig,
+        search_config: SearchConfig,
+        *,
+        queue_size: int = 100,
+        routing_key_predicate: Optional[Callable[[str], bool]] = None,
+        client: Optional[AmqpClient] = None,
+        init_services: Optional[list[str]] = None,
+        retry_predicate: Optional[Callable[[ProcessingItem, Exception], bool]] = retry,
+        name: Optional[str] = None,
+    ):
+        """Initialize handler for processing requests with process-based communication.
+
+        :param ApplicationConfig app_config: Application configuration object
+        :param SearchConfig search_config: Search configuration object
+        :param int queue_size: Maximum size of the internal priority queue (buffer)
+        :param Optional[Callable[[str], bool]] routing_key_predicate: Optional predicate to filter routing keys for
+        processing. Should return True for keys to process.
+        :param Optional[AmqpClient] client: Optional AMQP client for sending replies (useful for testing)
+        :param Optional[list[str]] init_services: Optional list of routing keys to initialize the processor with
+        specific routing keys
+        :param Optional[Callable[[ProcessingItem, Exception], bool]] retry_predicate: Optional function to determine
+        if a failed processing attempt should be retried
+        :param Optional[str] name: Optional name for the processing thread
+        """
+        self.app_config = app_config
+        self.search_config = search_config
+        self.client = client or AmqpClient(app_config)
+        self.queue_size = queue_size
+        self.routing_key_predicate = routing_key_predicate or (lambda _: True)
+        if init_services:
+            self._init_services = set(init_services)
+        else:
+            self._init_services = set()
+        self._retry_predicate = retry_predicate
+        self.counter = AtomicInteger(0)
+
+        # Initialize queue and running tasks
+        self.queue = PriorityQueue(maxsize=queue_size)
+        self.__running_tasks = Queue()
+
+        # Setup process communication
+        self.processor = RealProcessor(
+            app_config,
+            search_config,
+            Worker(self._init_services, self._retry_predicate).work,
+        )
+        self._shutdown = False
+
+        # Start the three processing threads
+        thread_name_prefix = name or "ProcessHandler"
+        self._monitor_thread = threading.Thread(
+            target=self._monitor_processor, name=f"{thread_name_prefix}-Monitor", daemon=True
+        )
+        self._sender_thread = threading.Thread(
+            target=self._send_tasks, name=f"{thread_name_prefix}-Sender", daemon=True
+        )
+        self._receiver_thread = threading.Thread(
+            target=self._receive_results, name=f"{thread_name_prefix}-Receiver", daemon=True
+        )
+
+        self._monitor_thread.start()
+        self._sender_thread.start()
+        self._receiver_thread.start()
+
+    def __send_task_lock(self, processing_item: ProcessingItem) -> None:
+        """Send processing item to processor process"""
+        self.processor.send(processing_item)
+        self.__running_tasks.put(processing_item)
+        processing_item.send_time = time.time()  # Record send time for tracking
+
+    def __send_to_processor(self) -> Optional[ProcessingItem]:
+        try:
+            processing_item: ProcessingItem = self.queue.get_nowait()
+            logging.set_correlation_id(processing_item.log_correlation_id)
+            if not self.routing_key_predicate(processing_item.routing_key):
+                return processing_item
+            log_incoming_message(processing_item.routing_key, processing_item.msg_correlation_id, processing_item.item)
+            self.__send_task_lock(processing_item)
+            return processing_item
+        except Empty:
             return None
-    try:
-        result = request_handler(message)
-    except Exception as exc:
-        logger.exception("Failed to handle message", exc_info=exc)
+        except Exception as exc:
+            LOGGER.exception("Failed to send message to processor", exc_info=exc)
+            return None
+
+    def __send_task_no_lock(self, processing_item: ProcessingItem) -> None:
+        """Send processing item to processor process without acquiring a lock."""
+        self.processor.send(processing_item)
+        self.__running_tasks.queue.append(processing_item)
+        processing_item.send_time = time.time()  # Record send time for tracking
+
+    def _restart_processor(self) -> None:
+        """Restart the processor process if it has died"""
+        if self._shutdown:
+            # If shutdown is initiated, do not restart the processor
+            return
+
+        # Clean up old process and connections
+        self.processor.shutdown()
+
+        # Create new processor instance
+        self.processor = RealProcessor(
+            self.app_config,
+            self.search_config,
+            Worker(self._init_services, self._retry_predicate).work,
+        )
+        LOGGER.info("Successfully restarted processor process")
+
+        if self.__running_tasks.qsize() <= 0:
+            LOGGER.info("No running tasks to re-send to new processor")
+            return
+
+        # Store running tasks to re-send them, clearing the queue
+        with self.__running_tasks.mutex:
+            # Double-check under mutex if the queue is empty
+            if not self.__running_tasks.queue:
+                return
+
+            tasks_to_resend = list(self.__running_tasks.queue)
+            self.__running_tasks.queue.clear()
+            if not tasks_to_resend:
+                return
+
+            # Increment retries for the first task, since it might be the one that caused the failure
+            tasks_to_resend[0].retries += 1
+
+            # Re-send all previously running tasks to the new processor
+            resent = 0
+            for task in tasks_to_resend:
+                if task.retries >= self.app_config.amqpHandlerMaxRetries:
+                    LOGGER.warning(
+                        f"Task {task.routing_key} - {task.msg_correlation_id} exceeded max retries, skipping",
+                        correlation_id=task.log_correlation_id,
+                    )
+                    continue
+                try:
+                    self.__send_task_no_lock(task)
+                    resent += 1
+                    LOGGER.debug(f"Re-sent task to new processor: {task.routing_key} - {task.msg_correlation_id}")
+                except Exception as exc:
+                    LOGGER.exception(f"Failed to re-send task {task.routing_key} to new processor", exc_info=exc)
+            LOGGER.info(f"Re-sent {resent} tasks to new processor")
+
+    def __has_long_running_tasks(self) -> bool:
+        """Check if there are any long-running tasks that need attention"""
+        if not self.__running_tasks.queue:
+            return False
+
+        # Check if any task has been running longer than the configured timeout
+        with self.__running_tasks.mutex:
+            if not self.__running_tasks.queue:
+                return False
+            for task in self.__running_tasks.queue:
+                if task.send_time and (time.time() - task.send_time) > self.app_config.amqpHandlerTaskTimeout:
+                    LOGGER.warning(f"Task {task.routing_key} - {task.msg_correlation_id} is taking too long")
+                    return True
+        return False
+
+    def __handle_response(self, result: ProcessingResult):
+        response_body = result.result
+        if response_body is None:
+            return None
+        logging.set_correlation_id(result.item.log_correlation_id)
+        try:
+            if result.item.reply_to:
+                log_outgoing_message(result.item.reply_to, result.item.msg_correlation_id, response_body)
+                self.client.reply(result.item.reply_to, result.item.msg_correlation_id, response_body)
+        except Exception as exc:
+            LOGGER.exception("Failed to publish result", exc_info=exc)
+            return None
+
+        LOGGER.debug("Finished processing response")
         return None
-    logger.debug("Finished processing request")
-    return result
+
+    def __process_result(self, result: ProcessingResult) -> None:
+        if not self.__running_tasks.empty():
+            try:
+                completed_task = self.__running_tasks.get()  # FIFO for completed tasks
+                if completed_task.msg_correlation_id != result.item.msg_correlation_id:
+                    LOGGER.warning(
+                        f"Received result for task {result.item.msg_correlation_id} but expected "
+                        f"{completed_task.msg_correlation_id}. Possible mismatch."
+                    )
+            except Empty:
+                LOGGER.warning("Received result but no tasks in running queue, possible bug")
+        if result.success and result.retry_count > 0:
+            LOGGER.warning(
+                f"Task {result.item.routing_key} - {result.item.msg_correlation_id} "
+                f"was retried {result.retry_count} times"
+            )
+        elif not result.success:
+            LOGGER.error(
+                f"Task {result.item.routing_key} - {result.item.msg_correlation_id} failed after "
+                f"{result.retry_count} retries."
+            )
+        self.__handle_response(result)
+
+    def __receive_results(self) -> None:
+        try:
+            if not self.processor.poll(timeout=0.1):
+                return
+            result: ProcessingResult = self.processor.recv()
+            self.__process_result(result)
+        except Exception as exc:
+            LOGGER.exception("Failed to receive response from processor", exc_info=exc)
+
+    def _monitor_processor(self):
+        """Thread 1: Monitor processor and task states"""
+        while not self._shutdown:
+            try:
+                # Check if processor process is alive and restart if needed
+                if not self.processor.is_alive():
+                    LOGGER.warning("Processor process is not running, restarting...")
+                    self._restart_processor()
+
+                if self.__has_long_running_tasks():
+                    LOGGER.warning("Detected long-running tasks, restarting processor...")
+                    self._restart_processor()
+
+                # Monitor interval
+                time.sleep(0.1)
+
+            except Exception as exc:
+                LOGGER.exception("Error in monitor thread", exc_info=exc)
+                time.sleep(0.1)
+
+    def _send_tasks(self):
+        """Thread 2: Send tasks to processor if running tasks < NUMBER_OF_TASKS_TO_SEND"""
+        while not self._shutdown:
+            try:
+                # Send messages to processor if we have less than 2 running tasks
+                while self.__running_tasks.qsize() < NUMBER_OF_TASKS_TO_SEND:
+                    if not self.__send_to_processor():
+                        break
+
+                # Small sleep to prevent busy waiting
+                if self.queue.empty():
+                    time.sleep(0.01)
+
+            except Exception as exc:
+                LOGGER.exception("Error in sender thread", exc_info=exc)
+                time.sleep(0.1)
+
+    def _receive_results(self):
+        """Thread 3: Receive results from processor if there are running tasks"""
+        while not self._shutdown:
+            try:
+                if not self.__running_tasks.empty():
+                    self.__receive_results()
+                else:
+                    # Small sleep when no running tasks
+                    time.sleep(0.01)
+
+            except Exception as exc:
+                LOGGER.exception("Error in receiver thread", exc_info=exc)
+                time.sleep(0.1)
+
+    def handle_amqp_request(
+        self,
+        channel: BlockingChannel,
+        method: Basic.Deliver,
+        props: BasicProperties,
+        body: bytes,
+    ) -> None:
+        """Function for handling amqp request: convert to ProcessingItem and add to priority queue."""
+        number: int = self.counter.inc()
+        logging.new_correlation_id()
+
+        # Processing request
+        message = serialize_message(channel, method.delivery_tag, body)
+        if not message:
+            return None
+
+        priority = get_priority(props)
+
+        # Create ProcessingItem
+        processing_item = ProcessingItem(
+            priority=priority,
+            number=number,
+            routing_key=method.routing_key or "",
+            reply_to=props.reply_to,
+            log_correlation_id=logging.get_correlation_id(),
+            msg_correlation_id=props.correlation_id or "",
+            item=message,
+        )
+
+        # Add to priority queue (blocking on overflow)
+        try:
+            self.queue.put(processing_item, block=True)
+        except Exception as exc:
+            LOGGER.exception("Failed to add item to processing queue", exc_info=exc)
+            return None
+        return None
+
+    @property
+    def running_tasks(self) -> list[ProcessingItem]:
+        """Get the queue of currently running tasks."""
+        if not self.__running_tasks.queue:
+            return []
+        with self.__running_tasks.mutex:
+            if not self.__running_tasks.queue:
+                return []
+            return list(self.__running_tasks.queue)
+
+    def shutdown(self):
+        """Gracefully shutdown the handler"""
+        self._shutdown = True
+
+        # Stop processor process
+        self.processor.shutdown()
+
+        # Wait for all processing threads
+        for thread in [self._monitor_thread, self._sender_thread, self._receiver_thread]:
+            if thread and thread.is_alive():
+                thread.join(timeout=5)
 
 
-def handle_inner_amqp_request(
-    channel: BlockingChannel,
-    method: Basic.Deliver,
-    props: BasicProperties,
-    body: bytes,
-    request_handler: Callable[[Any], Any],
-    prepare_data_func: Optional[Callable[[Any], Any]] = None,
-):
-    """Function for handling inner amqp requests."""
-    handle_request(channel, method, props, body, request_handler, prepare_data_func)
+class DirectAmqpRequestHandler:
+    """Class for direct handling AMQP requests. Use for debug purpose."""
 
+    app_config: ApplicationConfig
+    search_config: SearchConfig
+    routing_key_predicate: Callable[[str], bool]
+    __running_tasks: Queue[ProcessingItem]
+    counter: int
+    processor: Processor
+    _init_services: set[str]
+    _processor: ServiceProcessor
 
-def handle_amqp_request(
-    channel: BlockingChannel,
-    method: Basic.Deliver,
-    props: BasicProperties,
-    body: bytes,
-    request_handler: Callable[[Any], Any],
-    prepare_data_func: Callable[[Any], Any] = prepare_launches,
-    prepare_response_data: Callable[[Any], str] = prepare_search_response_data,
-    publish_result: bool = True,
-) -> None:
-    """Function for handling amqp request: index, search and analyze."""
-    response = handle_request(channel, method, props, body, request_handler, prepare_data_func)
-    if response is None:
-        return
+    def __init__(
+        self,
+        app_config: ApplicationConfig,
+        search_config: SearchConfig,
+        *,
+        routing_key_predicate: Optional[Callable[[str], bool]] = None,
+        init_services: Optional[list[str]] = None,
+        **_: Any,
+    ):
+        """Initialize handler for processing requests.
 
-    try:
-        response_body = prepare_response_data(response)
-    except Exception as exc:
-        logger.exception("Failed to prepare response body", exc_info=exc)
-        return
-    if publish_result:
+        :param app_config: Application configuration object
+        :param search_config: Search configuration object
+        :param routing_key_predicate: Optional predicate to filter routing keys for processing. Should return True for
+        keys to process.
+        :param init_services: Optional list of routing keys to initialize the processor with specific routing keys
+        """
+        self.app_config = app_config
+        self.search_config = search_config
+        self.routing_key_predicate = routing_key_predicate or (lambda _: True)
+        self.__running_tasks = Queue()
+        if init_services:
+            self._init_services = set(init_services)
+        else:
+            self._init_services = set()
+        self.counter = 0
+        self.processor = DummyProcessor()
+        self._processor = ServiceProcessor(app_config, search_config, services_to_init=self._init_services)
+
+    def handle_amqp_request(
+        self,
+        channel: BlockingChannel,
+        method: Basic.Deliver,
+        props: BasicProperties,
+        body: bytes,
+    ) -> None:
+        """Function for handling amqp request: index, search and analyze using routing key."""
+        logging.new_correlation_id()
+
+        # Processing request
+        message = serialize_message(channel, method.delivery_tag, body)
+        if not message:
+            return None
+
+        routing_key = method.routing_key or ""
+        if not self.routing_key_predicate(routing_key):
+            return None
+
+        self.counter += 1
+        log_incoming_message(routing_key, props.correlation_id or "", message)
+
+        self.__running_tasks.put(
+            ProcessingItem(
+                priority=get_priority(props),
+                number=self.counter,
+                routing_key=routing_key,
+                reply_to=props.reply_to,
+                log_correlation_id=logging.get_correlation_id(),
+                msg_correlation_id=props.correlation_id or "",
+                item=message,
+            )
+        )
+
+        # Process using the processor
+        try:
+            response_body = self._processor.process(method.routing_key or "", message)
+        except Exception as exc:
+            LOGGER.exception("Failed to process message", exc_info=exc)
+            self.__running_tasks.get()
+            return None
+
+        # Sending response if applicable
+        if response_body is None:
+            self.__running_tasks.get()
+            return None
+
         try:
             if props.reply_to:
                 channel.basic_publish(
@@ -165,6 +666,19 @@ def handle_amqp_request(
                     body=bytes(response_body, "utf-8"),
                 )
         except Exception as exc:
-            logger.exception("Failed to publish result", exc_info=exc)
-            return
-    logger.debug("Finished processing response")
+            LOGGER.exception("Failed to publish result", exc_info=exc)
+            self.__running_tasks.get()
+            return None
+        LOGGER.debug("Finished processing response")
+        self.__running_tasks.get()
+        return None
+
+    @property
+    def running_tasks(self) -> list[ProcessingItem]:
+        """Get the queue of currently running tasks."""
+        if not self.__running_tasks.queue:
+            return []
+        with self.__running_tasks.mutex:
+            if not self.__running_tasks.queue:
+                return []
+            return list(self.__running_tasks.queue)

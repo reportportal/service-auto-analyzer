@@ -12,7 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import hashlib
 import os
+from typing import Any, Optional
 
 import numpy as np
 
@@ -57,7 +59,6 @@ class ModelChooser:
         self.search_cfg = search_cfg
         self.object_saver = object_saving.create(self.app_config)
         self.global_models = self.initialize_global_models()
-        self.random_generator = np.random.Generator(bit_generator=np.random.PCG64(DEFAULT_RANDOM_SEED))
 
     def initialize_global_models(self) -> dict[ModelType, MlModel]:
         result = {}
@@ -77,19 +78,37 @@ class ModelChooser:
                 result[model_type] = None
         return result
 
-    def choose_model(self, project_id: int, model_type: ModelType, custom_model_prob: float = 1.0) -> MlModel:
-        model = self.global_models[model_type]
-        prob_for_model = self.random_generator.uniform(0.0, 1.0)
-        if prob_for_model > custom_model_prob:
-            return model
-        folders = self.object_saver.get_folder_objects(f"{model_type.name}_model/", project_id)
-        if len(folders):
-            try:
-                model = CUSTOM_MODEL_MAPPING[model_type](object_saving.create(self.app_config, project_id, folders[0]))
-                model.load_model()
-            except Exception as err:
-                logger.exception(err)
-        return model
+    def choose_model(
+        self,
+        project_id: int,
+        model_type: ModelType,
+        *,
+        custom_model_prob: float = 1.0,
+        hash_source: Optional[Any] = None,
+    ) -> MlModel:
+        use_for_hash = str(hash_source if hash_source is not None else project_id).encode("utf-8")
+        hash_code = hashlib.md5(use_for_hash).digest()
+        test_value = int.from_bytes(hash_code) % 100
+        if test_value <= int(custom_model_prob * 100):
+            folders = self.object_saver.get_folder_objects(f"{model_type.name}_model/", project_id)
+            if len(folders):
+                try:
+                    model = CUSTOM_MODEL_MAPPING[model_type](
+                        object_saving.create(self.app_config, project_id, folders[0])
+                    )
+                    model.load_model()
+                    logger.debug(
+                        f"Using custom model of type '{model_type.name}', for project '{project_id}', "
+                        f"for hash source '{str(hash_source)}'."
+                    )
+                    return model
+                except Exception as err:
+                    logger.exception(f"Unable to load model of type: {model_type.name}", exc_info=err)
+        logger.debug(
+            f"Using global model of type '{model_type.name}', for project '{project_id}', "
+            f"for hash source '{str(hash_source)}'."
+        )
+        return self.global_models[model_type]
 
     def delete_old_model(self, model_type: ModelType, project_id: str | int | None = None):
         all_folders = self.object_saver.get_folder_objects(f"{model_type.name}_model/", project_id)

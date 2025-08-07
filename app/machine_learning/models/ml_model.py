@@ -60,3 +60,9 @@ class MlModel(metaclass=ABCMeta):
     @abstractmethod
     def loaded(self) -> bool:
         raise NotImplementedError('"loaded" property is not implemented!')
+
+    @property
+    @abstractmethod
+    def is_custom(self) -> bool:
+        """Indicates whether the model is custom or not."""
+        raise NotImplementedError('"is_custom" property is not implemented!')

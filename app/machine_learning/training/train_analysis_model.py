@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+import math
 import os
 from datetime import datetime
 from time import time
@@ -63,7 +63,7 @@ def deduplicate_data(data: list[list[float]], labels: list[int]) -> tuple[list[l
 def split_data(
     data: list[list[float]], labels: list[int], random_state: int
 ) -> tuple[list[list[float]], list[list[float]], list[int], list[int]]:
-    x_ids: list[int] = [i for i in range(len(data))]
+    x_ids: list[int] = list(range(len(data)))
     x_train_ids, x_test_ids, y_train, y_test = train_test_split(
         x_ids, labels, test_size=0.1, random_state=random_state, stratify=labels
     )
@@ -84,7 +84,8 @@ def fill_metric_stats(
     baseline_model_metric_result: list[float], new_model_metric_results: list[float], info_dict: dict[str, Any]
 ) -> None:
     _, p_value = stats.f_oneway(baseline_model_metric_result, new_model_metric_results)
-    p_value = p_value if p_value is not None else 1.0
+    if p_value is None or math.isnan(p_value):
+        p_value = 1.0
     info_dict["p_value"] = p_value
     mean_metric = np.mean(new_model_metric_results)
     baseline_mean_metric = np.mean(baseline_model_metric_result)
@@ -111,9 +112,9 @@ def train_several_times(
         bad_data = True
 
     if not bad_data:
-        data, labels = deduplicate_data(data, labels)
+        dedupe_data, labels = deduplicate_data(data, labels)
         for random_state in my_random_states:
-            x_train, x_test, y_train, y_test = split_data(data, labels, random_state)
+            x_train, x_test, y_train, y_test = split_data(dedupe_data, labels, random_state)
             proportion_binary_labels = utils.calculate_proportions_for_labels(y_train)
             if proportion_binary_labels < SMOTE_PROPORTION:
                 oversample = BorderlineSMOTE(sampling_strategy=SMOTE_PROPORTION, random_state=random_state)
@@ -348,6 +349,7 @@ class AnalysisModelTraining:
         for project_id in projects:
             namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
             gathered_suggested_data, log_id_dict = self.query_es_for_suggest_info(project_id)
+            defect_type_model = self.model_chooser.choose_model(project_id, ModelType.defect_type)
 
             for _suggest_res in gathered_suggested_data:
                 searched_res = []
@@ -379,9 +381,7 @@ class AnalysisModelTraining:
                         )
 
                     # noinspection PyTypeChecker
-                    _boosting_data_gatherer.set_defect_type_model(
-                        self.model_chooser.choose_model(project_id, ModelType.defect_type)
-                    )
+                    _boosting_data_gatherer.set_defect_type_model(defect_type_model)
                     _boosting_data_gatherer.fill_previously_gathered_features(
                         [utils.to_float_list(_suggest_res["_source"]["modelFeatureValues"])],
                         [int(_id) for _id in _suggest_res["_source"]["modelFeatureNames"].split(";")],

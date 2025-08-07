@@ -16,6 +16,7 @@ import json
 import traceback
 from collections import deque
 from time import time
+from typing import Optional
 
 import elasticsearch
 import elasticsearch.helpers
@@ -121,10 +122,26 @@ class EsClient:
             },
         }
 
-    def is_healthy(self):
+    def __get_base_url(self):
+        """Get base URL for Elasticsearch"""
+        if not self.host:
+            logger.error("Elasticsearch host is not set")
+            return None
+
+        if self.host.startswith("http"):
+            return self.host
+        else:
+            protocol = "https" if self.app_config.esUseSsl else "http"
+            return f"{protocol}://{self.host}"
+
+    def is_healthy(self) -> bool:
         """Check whether elasticsearch is healthy"""
+        base_url = self.__get_base_url()
+        if not base_url:
+            return False
+
         try:
-            url = text_processing.build_url(self.host, ["_cluster/health"])
+            url = text_processing.build_url(base_url, ["_cluster/health"])
             res = utils.send_request(url, "GET", self.app_config.esUser, self.app_config.esPassword)
             return res["status"] in ["green", "yellow"]
         except Exception as err:
@@ -132,10 +149,14 @@ class EsClient:
             logger.error(err)
             return False
 
-    def update_settings_after_read_only(self, es_host):
+    def update_settings_after_read_only(self) -> None:
+        base_url = self.__get_base_url()
+        if not base_url:
+            return
+
         try:
             requests.put(
-                "{}/_all/_settings".format(es_host),
+                f"{base_url}/_all/_settings",
                 headers={"Content-Type": "application/json"},
                 data='{"index.blocks.read_only_allow_delete": null}',
             ).raise_for_status()
@@ -156,9 +177,13 @@ class EsClient:
         logger.debug(f"Index '{index_name}' created")
         return Response(**response)
 
-    def list_indices(self):
+    def list_indices(self) -> Optional[list]:
         """Get all indices from elasticsearch"""
-        url = text_processing.build_url(self.host, ["_cat", "indices?format=json"])
+        base_url = self.__get_base_url()
+        if not base_url:
+            return None
+
+        url = text_processing.build_url(base_url, ["_cat", "indices?format=json"])
         res = utils.send_request(url, "GET", self.app_config.esUser, self.app_config.esPassword)
         return res
 
@@ -222,9 +247,9 @@ class EsClient:
 
     def index_logs(self, launches: list[Launch]):
         """Index launches to the index with project name"""
-        launch_ids = set(map(lambda launch_obj: str(launch_obj.launchId), launches))
+        launch_ids = {str(launch_obj.launchId) for launch_obj in launches}
         launch_ids_str = ", ".join(launch_ids)
-        project = next(map(lambda launch_obj: launch_obj.project, launches))
+        project = launches[0].project if launches else None
         logger.info(f"Indexing {len(launch_ids)} launches of project '{project}': {launch_ids_str}")
         t_start = time()
         test_item_queue = self._to_launch_test_item_list(launches)
@@ -337,7 +362,7 @@ class EsClient:
             except:  # noqa
                 formatted_exception = traceback.format_exc()
                 self._recreate_index_if_needed(bodies, formatted_exception)
-                self.update_settings_after_read_only(self.host)
+                self.update_settings_after_read_only()
                 success_count, errors = elasticsearch.helpers.bulk(
                     self.es_client, bodies, chunk_size=es_chunk_number, request_timeout=30, refresh=refresh
                 )
@@ -356,7 +381,7 @@ class EsClient:
     def delete_logs(self, clean_index):
         """Delete logs from elasticsearch"""
         index_name = text_processing.unite_project_name(clean_index.project, self.app_config.esProjectIndexPrefix)
-        log_ids = ", ".join(map(lambda log_id: str(log_id), clean_index.ids))
+        log_ids = ", ".join([str(log_id) for log_id in clean_index.ids])
         logger.info(f"Delete project '{index_name}' logs: {log_ids}")
         t_start = time()
         if not self.index_exists(index_name):
@@ -412,13 +437,11 @@ class EsClient:
                 formatted_exception = traceback.format_exc()
                 self._recreate_index_if_needed([{"_index": index_name}], formatted_exception)
 
-    @utils.ignore_warnings
-    def send_stats_info(self, stats_info):
+    def send_stats_info(self, stats_info: dict) -> None:
         logger.info("Started sending stats about analysis")
 
         stat_info_array = []
-        for launch_id in stats_info:
-            obj_info = stats_info[launch_id]
+        for obj_info in stats_info.values():
             rp_aa_stats_index = "rp_aa_stats"
             if "method" in obj_info and obj_info["method"] == "training":
                 rp_aa_stats_index = "rp_model_train_stats"

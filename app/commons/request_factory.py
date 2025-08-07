@@ -20,7 +20,7 @@ from typing import Any
 from app.commons.model.launch_objects import Launch, Log, TestItem, TestItemInfo
 from app.commons.prepared_log import PreparedLogMessage, PreparedLogMessageClustering
 from app.utils import text_processing, utils
-from app.utils.log_preparation import clean_message
+from app.utils.log_preparation import unify_message
 from app.utils.utils import compute_if_absent
 
 
@@ -196,7 +196,7 @@ def prepare_log_words(launches: list[Launch]) -> tuple[dict[str, int], int]:
             for log in test_item.logs:
                 if log.logLevel < utils.ERROR_LOGGING_LEVEL or not log.message.strip():
                     continue
-                cleaned_message = clean_message(log.message)
+                cleaned_message = unify_message(log.message)
                 _, stacktrace = text_processing.detect_log_description_and_stacktrace(cleaned_message)
                 log_words.update(get_words_in_stacktrace(stacktrace))
     return log_words, project

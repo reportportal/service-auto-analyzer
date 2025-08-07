@@ -78,28 +78,6 @@ def jaccard_similarity(s1, s2):
     return len(s1.intersection(s2)) / len(s1.union(s2)) if len(s1.union(s2)) > 0 else 0
 
 
-def choose_issue_type(predicted_labels, predicted_labels_probability, issue_type_names, scores_by_issue_type):
-    predicted_issue_type = ""
-    max_prob = 0.0
-    max_val_start_time = None
-    global_idx = 0
-    for i in range(len(predicted_labels)):
-        if predicted_labels[i] == 1:
-            issue_type = issue_type_names[i]
-            chosen_type = scores_by_issue_type[issue_type]
-            start_time = chosen_type["mrHit"]["_source"]["start_time"]
-            predicted_prob = round(predicted_labels_probability[i][1], 4)
-            if (predicted_prob > max_prob) or (
-                (predicted_prob == max_prob)  # noqa
-                and (max_val_start_time is None or start_time > max_val_start_time)
-            ):
-                max_prob = predicted_prob
-                predicted_issue_type = issue_type
-                global_idx = i
-                max_val_start_time = start_time
-    return predicted_issue_type, max_prob, global_idx
-
-
 def send_request(url, method, username, password):
     """Send request with specified url and http method"""
     try:
@@ -245,7 +223,7 @@ def fill_previously_gathered_features(
 
 def gather_feature_list(gathered_data_dict: dict[int, list[list[float]]], feature_ids: list[int]) -> list[list[float]]:
     features_array: np.array = None
-    axis_x_size = max(map(lambda x: len(x), gathered_data_dict.values()))
+    axis_x_size = max([len(x) for x in gathered_data_dict.values()])
     if axis_x_size <= 0:
         return []
     for idx, feature in enumerate(feature_ids):
@@ -267,12 +245,12 @@ def extract_exception(err: Exception) -> str:
     return err_message
 
 
-def get_allowed_number_of_missed(cur_threshold):
-    if cur_threshold >= 0.95 and cur_threshold <= 0.99:
+def get_allowed_number_of_missed(cur_threshold: float) -> int:
+    if 0.95 <= cur_threshold <= 0.99:
         return 1
-    if cur_threshold >= 0.9 and cur_threshold < 0.95:
+    if 0.9 <= cur_threshold < 0.95:
         return 2
-    if cur_threshold >= 0.8 and cur_threshold < 0.9:
+    if 0.8 <= cur_threshold < 0.9:
         return 3
     return 0
 
@@ -397,3 +375,8 @@ def append_aa_ma_boosts(query: dict[str, Any], search_cfg: launch_objects.Search
                 }
             }
         )
+
+
+def strip_path(path: str) -> str:
+    """Strip trailing slashes from a path."""
+    return path.strip().rstrip("/").rstrip("\\")

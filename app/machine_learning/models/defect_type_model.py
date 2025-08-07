@@ -22,6 +22,7 @@ from scipy.sparse import csr_matrix
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import classification_report, confusion_matrix, f1_score
+from typing_extensions import override
 
 from app.commons import logging
 from app.commons.object_saving.object_saver import ObjectSaver
@@ -100,6 +101,11 @@ class DefectTypeModel(MlModel):
     def loaded(self) -> bool:
         return self._loaded
 
+    @property
+    @override
+    def is_custom(self) -> bool:
+        return False
+
     def load_model(self) -> None:
         if self.loaded:
             return
@@ -152,7 +158,7 @@ class DefectTypeModel(MlModel):
         LOGGER.debug(f"\n{classification_report(y_pred=res, y_true=labels)}")
         return f1
 
-    def predict(self, data: list, model_name: str) -> tuple[list, list]:
+    def predict(self, data: list, model_name: str) -> tuple[list[int], list[list[float]]]:
         if len(data) == 0:
             return [], []
         transformed_values = self.count_vectorizer_models[model_name].transform(data)
@@ -161,4 +167,4 @@ class DefectTypeModel(MlModel):
         )
         predicted_labels = self.models[model_name].predict(x_test_values)
         predicted_probs = self.models[model_name].predict_proba(x_test_values)
-        return predicted_labels, predicted_probs
+        return predicted_labels.tolist(), predicted_probs.tolist()

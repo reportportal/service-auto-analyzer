@@ -17,6 +17,8 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from app.commons.model.ml import ModelType
+
 
 class AnalyzerConf(BaseModel):
     """Analyzer config object"""
@@ -35,14 +37,19 @@ class ApplicationConfig(BaseModel):
     esHost: str = ""
     esUser: str = ""
     esPassword: str = ""
+
+    debugMode: bool = False
     logLevel: str = "DEBUG"
 
     amqpUrl: str = ""
     amqpExchangeName: str = "analyzer"
+    amqpExchangeType: str = "fanout"
     amqpHeartbeatInterval: int = 30
     amqpInitialRetryInterval: int = 1
     amqpMaxRetryTime: int = 300
     amqpBackoffFactor: int = 2
+    amqpHandlerMaxRetries: int = 3
+    amqpHandlerTaskTimeout: int = 600
 
     analyzerPriority: int = 1
     analyzerIndex: bool = True
@@ -71,7 +78,6 @@ class ApplicationConfig(BaseModel):
     esProjectIndexPrefix: str = ""
     analyzerHttpPort: int = 5001
     analyzerPathToLog: str = "/tmp/config.log"
-    enableMemoryDump: bool = False
 
 
 class SearchConfig(BaseModel):
@@ -108,6 +114,7 @@ class SearchConfig(BaseModel):
     SuggestBoostModelMaxDepth: int = 5
     AutoBoostModelNumEstimators: int = 50
     AutoBoostModelMaxDepth: int = 5
+    MlModelForSuggestions: str = ModelType.suggestion.name
 
 
 class SearchLogInfo(BaseModel):
@@ -225,11 +232,11 @@ class SuggestAnalysisResult(BaseModel):
     isMergedLog: bool = False
     matchScore: float
     resultPosition: int
-    esScore: float
-    esPosition: int
-    modelFeatureNames: str
-    modelFeatureValues: str
-    modelInfo: str
+    esScore: Optional[float]
+    esPosition: Optional[int]
+    modelFeatureNames: Optional[str]
+    modelFeatureValues: Optional[str]
+    modelInfo: Optional[str]
     usedLogLines: int
     minShouldMatch: int
     processedTime: float

@@ -5,7 +5,7 @@
 * you may not use this file except in compliance with the License.
 * You may obtain a copy of the License at
 *
-* http://www.apache.org/licenses/LICENSE-2.0
+* https://www.apache.org/licenses/LICENSE-2.0
 *
 * Unless required by applicable law or agreed to in writing, software
 * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,16 +15,19 @@
 """
 
 import unittest
-from http import HTTPStatus
 from unittest.mock import MagicMock
 
-import httpretty
-
-from app.commons.model import launch_objects
 from app.service import SuggestPatternsService
 from app.utils import utils
 from test import APP_CONFIG
 from test.mock_service import TestService
+from test.service import (
+    get_common_expected_patterns_with_labels,
+    get_common_expected_patterns_without_labels,
+    get_common_query_data,
+    get_index_found_call,
+    get_index_not_found_call,
+)
 
 
 class TestSearchService(TestService):
@@ -32,117 +35,54 @@ class TestSearchService(TestService):
     @utils.ignore_warnings
     def test_suggest_patterns(self):
         """Test suggest patterns"""
+
+        # Common test data
+        common_query_data = get_common_query_data()
+        common_expected_with_labels = get_common_expected_patterns_with_labels()
+        common_expected_without_labels = get_common_expected_patterns_without_labels()
+
         tests = [
+            # Test case 0: Index not found
             {
-                "test_calls": [
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/1",
-                        "status": HTTPStatus.NOT_FOUND,
-                    },
-                ],
+                "test_calls": [get_index_not_found_call("1")],
                 "rq": 1,
                 "query_data": [],
                 "expected_count_with_labels": [],
                 "expected_count_without_labels": [],
             },
+            # Test case 1: Index found but no query data
             {
-                "test_calls": [
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/1",
-                        "status": HTTPStatus.OK,
-                    },
-                ],
+                "test_calls": [get_index_found_call("1")],
                 "rq": 1,
                 "query_data": [],
                 "expected_count_with_labels": [],
                 "expected_count_without_labels": [],
             },
+            # Test case 2: Index found with app config but no query data
             {
-                "test_calls": [
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/rp_1",
-                        "status": HTTPStatus.OK,
-                    },
-                ],
+                "test_calls": [get_index_found_call("rp_1")],
                 "app_config": APP_CONFIG,
                 "rq": 1,
                 "query_data": [],
                 "expected_count_with_labels": [],
                 "expected_count_without_labels": [],
             },
+            # Test case 3: Index found with query data
             {
-                "test_calls": [
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/1",
-                        "status": HTTPStatus.OK,
-                    },
-                ],
+                "test_calls": [get_index_found_call("1")],
                 "rq": 1,
-                "query_data": [
-                    ("assertionError notFoundError", "ab001"),
-                    ("assertionError ifElseError", "pb001"),
-                    ("assertionError commonError", "ab001"),
-                    ("assertionError commonError", "ab001"),
-                    ("assertionError", "ab001"),
-                    ("assertionError commonError", "ab001"),
-                    ("assertionError commonError", "ti001"),
-                ],
-                "expected_count_with_labels": [
-                    launch_objects.SuggestPatternLabel(
-                        pattern="assertionError", totalCount=24, percentTestItemsWithLabel=0.83, label="ab001"
-                    ),
-                    launch_objects.SuggestPatternLabel(
-                        pattern="commonError", totalCount=12, percentTestItemsWithLabel=1.0, label="ab001"
-                    ),
-                ],
-                "expected_count_without_labels": [
-                    launch_objects.SuggestPatternLabel(
-                        pattern="assertionError", totalCount=28, percentTestItemsWithLabel=0.0, label=""
-                    ),
-                    launch_objects.SuggestPatternLabel(
-                        pattern="commonError", totalCount=16, percentTestItemsWithLabel=0.0, label=""
-                    ),
-                ],
+                "query_data": common_query_data,
+                "expected_count_with_labels": common_expected_with_labels,
+                "expected_count_without_labels": common_expected_without_labels,
             },
+            # Test case 4: Index found with app config and query data
             {
-                "test_calls": [
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/rp_1",
-                        "status": HTTPStatus.OK,
-                    },
-                ],
+                "test_calls": [get_index_found_call("rp_1")],
                 "app_config": APP_CONFIG,
                 "rq": 1,
-                "query_data": [
-                    ("assertionError notFoundError", "ab001"),
-                    ("assertionError ifElseError", "pb001"),
-                    ("assertionError commonError", "ab001"),
-                    ("assertionError commonError", "ab001"),
-                    ("assertionError", "ab001"),
-                    ("assertionError commonError", "ab001"),
-                    ("assertionError commonError", "ti001"),
-                ],
-                "expected_count_with_labels": [
-                    launch_objects.SuggestPatternLabel(
-                        pattern="assertionError", totalCount=24, percentTestItemsWithLabel=0.83, label="ab001"
-                    ),
-                    launch_objects.SuggestPatternLabel(
-                        pattern="commonError", totalCount=12, percentTestItemsWithLabel=1.0, label="ab001"
-                    ),
-                ],
-                "expected_count_without_labels": [
-                    launch_objects.SuggestPatternLabel(
-                        pattern="assertionError", totalCount=28, percentTestItemsWithLabel=0.0, label=""
-                    ),
-                    launch_objects.SuggestPatternLabel(
-                        pattern="commonError", totalCount=16, percentTestItemsWithLabel=0.0, label=""
-                    ),
-                ],
+                "query_data": common_query_data,
+                "expected_count_with_labels": common_expected_with_labels,
+                "expected_count_without_labels": common_expected_without_labels,
             },
         ]
 

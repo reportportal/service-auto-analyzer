@@ -66,6 +66,7 @@ class TestCleanIndexService(TestService):
             ]
         )
         tests = [
+            # Test case 0: Index not found
             {
                 "test_calls": [
                     get_index_not_found_call("2"),
@@ -74,6 +75,7 @@ class TestCleanIndexService(TestService):
                 "rq": launch_objects.CleanIndex(ids=[1], project=2),
                 "expected_count": 0,
             },
+            # Test case 1: Index not found with index prefix
             {
                 "test_calls": [
                     get_index_not_found_call("rp_2"),
@@ -83,6 +85,7 @@ class TestCleanIndexService(TestService):
                 "app_config": APP_CONFIG,
                 "expected_count": 0,
             },
+            # Test case 2: Clean index
             {
                 "test_calls": clean_index_test,
                 "rq": launch_objects.CleanIndex(ids=[1], project=1),

@@ -14,6 +14,8 @@
 
 from typing import Optional
 
+from typing_extensions import override
+
 from app.commons.object_saving.object_saver import ObjectSaver
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 
@@ -24,7 +26,7 @@ class CustomBoostingDecisionMaker(BoostingDecisionMaker):
         self,
         object_saver: ObjectSaver,
         *,
-        features: list[int],
+        features: Optional[list[int]] = None,
         monotonous_features: Optional[list[int]] = None,
         n_estimators: Optional[int] = None,
         max_depth: Optional[int] = None,
@@ -39,3 +41,9 @@ class CustomBoostingDecisionMaker(BoostingDecisionMaker):
             max_depth=max_depth,
             random_state=random_state,
         )
+
+    @property
+    @override
+    def is_custom(self) -> bool:
+        """Indicates whether the model is custom or not."""
+        return True

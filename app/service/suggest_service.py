@@ -13,9 +13,11 @@
 #  limitations under the License.
 
 import json
+import traceback
 from datetime import datetime
 from functools import reduce
 from time import time
+from typing import Any, Optional
 
 import elasticsearch.helpers
 
@@ -32,8 +34,8 @@ from app.commons.model.launch_objects import (
 from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
-from app.machine_learning.models import BoostingDecisionMaker, WeightedSimilarityCalculator
-from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
+from app.machine_learning.models import WeightedSimilarityCalculator
+from app.machine_learning.predictor import PREDICTION_CLASSES, PredictionResult
 from app.service.analyzer_service import AnalyzerService
 from app.utils import text_processing, utils
 
@@ -64,7 +66,7 @@ class SuggestService(AnalyzerService):
         model_chooser: ModelChooser,
         app_config: ApplicationConfig,
         search_cfg: SearchConfig,
-        es_client: EsClient = None,
+        es_client: Optional[EsClient] = None,
     ):
         self.app_config = app_config
         self.search_cfg = search_cfg
@@ -214,12 +216,16 @@ class SuggestService(AnalyzerService):
             ]:
                 queries.append("{}\n{}".format(json.dumps({"index": index_name}), json.dumps(query)))
 
-            partial_res = self.es_client.es_client.msearch("\n".join(queries) + "\n")["responses"]
+            search_results = self.es_client.es_client.msearch("\n".join(queries) + "\n")
+            partial_res = search_results["responses"] if search_results else []
             for ind in range(len(partial_res)):
                 full_results.append((log, partial_res[ind]))
         return full_results
 
-    def deduplicate_results(self, gathered_results, scores_by_test_items, test_item_ids):
+    def __create_similarity_dict(
+        self, prediction_results: list[PredictionResult]
+    ) -> dict[str, dict[tuple[str, str], dict[str, Any]]]:
+        """Create a similarity dictionary for comparing prediction results."""
         _similarity_calculator = similarity_calculator.SimilarityCalculator(
             {
                 "max_query_terms": self.search_cfg.MaxQueryTerms,
@@ -230,31 +236,35 @@ class SuggestService(AnalyzerService):
             similarity_model=self.similarity_model,
         )
         all_pairs_to_check = []
-        for i in range(len(gathered_results)):
-            for j in range(i + 1, len(gathered_results)):
-                test_item_id_first = test_item_ids[gathered_results[i][0]]
-                test_item_id_second = test_item_ids[gathered_results[j][0]]
-                issue_type1 = scores_by_test_items[test_item_id_first]["mrHit"]["_source"]["issue_type"]
-                issue_type2 = scores_by_test_items[test_item_id_second]["mrHit"]["_source"]["issue_type"]
+        for i, result_first in enumerate(prediction_results):
+            for j in range(i + 1, len(prediction_results)):
+                result_second = prediction_results[j]
+                issue_type1 = result_first.data["mrHit"]["_source"]["issue_type"]
+                issue_type2 = result_second.data["mrHit"]["_source"]["issue_type"]
                 if issue_type1 != issue_type2:
                     continue
-                items_to_compare = {"hits": {"hits": [scores_by_test_items[test_item_id_first]["mrHit"]]}}
-                all_pairs_to_check.append((scores_by_test_items[test_item_id_second]["mrHit"], items_to_compare))
+                items_to_compare = {"hits": {"hits": [result_first.data["mrHit"]]}}
+                all_pairs_to_check.append((result_second.data["mrHit"], items_to_compare))
         sim_dict = _similarity_calculator.find_similarity(
             all_pairs_to_check, ["detected_message_with_numbers", "stacktrace", "merged_small_logs"]
         )
+        return sim_dict
 
+    def __filter_by_similarity(
+        self, prediction_results: list[PredictionResult], sim_dict: dict[str, dict[tuple[str, str], dict[str, Any]]]
+    ) -> list[PredictionResult]:
+        """Filter prediction results by removing highly similar duplicates."""
         filtered_results = []
         deleted_indices = set()
-        for i in range(len(gathered_results)):
+        for i in range(len(prediction_results)):
             if i in deleted_indices:
                 continue
-            for j in range(i + 1, len(gathered_results)):
-                test_item_id_first = test_item_ids[gathered_results[i][0]]
-                test_item_id_second = test_item_ids[gathered_results[j][0]]
+            for j in range(i + 1, len(prediction_results)):
+                result_first = prediction_results[i]
+                result_second = prediction_results[j]
                 group_id = (
-                    str(scores_by_test_items[test_item_id_first]["mrHit"]["_id"]),
-                    str(scores_by_test_items[test_item_id_second]["mrHit"]["_id"]),
+                    str(result_first.data["mrHit"]["_id"]),
+                    str(result_second.data["mrHit"]["_id"]),
                 )
                 if group_id not in sim_dict["detected_message_with_numbers"]:
                     continue
@@ -268,21 +278,34 @@ class SuggestService(AnalyzerService):
                     and merged_logs_sim["similarity"] >= 0.98
                 ):
                     deleted_indices.add(j)
-            filtered_results.append(gathered_results[i])
+            filtered_results.append(prediction_results[i])
         return filtered_results
 
-    def sort_results(self, scores_by_test_items, test_item_ids, predicted_labels_probability):
-        gathered_results = []
-        for idx, prob in enumerate(predicted_labels_probability):
-            test_item_id = test_item_ids[idx]
-            gathered_results.append(
-                (idx, round(prob[1], 4), scores_by_test_items[test_item_id]["mrHit"]["_source"]["start_time"])
-            )
+    def deduplicate_results(
+        self,
+        prediction_results: list[PredictionResult],
+    ) -> list[PredictionResult]:
+        """Deduplicate prediction results by removing highly similar items."""
+        sim_dict = self.__create_similarity_dict(prediction_results)
+        filtered_results = self.__filter_by_similarity(prediction_results, sim_dict)
+        return filtered_results
 
-        gathered_results = sorted(gathered_results, key=lambda x: (x[1], x[2]), reverse=True)
-        return self.deduplicate_results(gathered_results, scores_by_test_items, test_item_ids)
+    def sort_results(
+        self,
+        prediction_results: list[PredictionResult],
+    ) -> list[PredictionResult]:
+        """Sort prediction results by probability and timestamp in descending order."""
+        # Sort by probability (index 1) and start_time, both descending
+        sorted_results = sorted(
+            prediction_results,
+            key=lambda x: (round(x.probability[1], 4), x.data["mrHit"]["_source"]["start_time"]),
+            reverse=True,
+        )
+        return sorted_results
 
-    def prepare_not_found_object_info(self, test_item_info, processed_time, model_feature_names: str, model_info):
+    def prepare_not_found_object_info(
+        self, test_item_info, processed_time, model_feature_names: Optional[str], model_info: Optional[list[str]]
+    ):
         return {  # reciprocalRank is not filled for not found results not to count in the metrics dashboard
             "project": test_item_info.project,
             "testItem": test_item_info.testItemId,
@@ -345,8 +368,8 @@ class SuggestService(AnalyzerService):
     def query_logs_for_cluster(self, test_item_info: TestItemInfo, index_name: str) -> tuple[list[dict], int]:
         test_item_id = None
         test_items = self.es_client.es_client.search(
-            index_name, body=self.get_query_for_test_item_in_cluster(test_item_info)
-        )
+            index=index_name, body=self.get_query_for_test_item_in_cluster(test_item_info)
+        ) or {"hits": {"hits": []}}
         for res in test_items["hits"]["hits"]:
             test_item_id = int(res["_source"]["test_item"])
             break
@@ -381,10 +404,9 @@ class SuggestService(AnalyzerService):
     def suggest_items(self, test_item_info: TestItemInfo):
         logger.info(f"Started suggesting for test item with id: {test_item_info.testItemId}")
         logger.debug(f"Started suggesting items by request: {test_item_info.json()}")
-        logger.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))
         index_name = text_processing.unite_project_name(test_item_info.project, self.app_config.esProjectIndexPrefix)
         if not self.es_client.index_exists(index_name):
-            logger.info("Project %s doesn't exist", index_name)
+            logger.info(f"Project {index_name} doesn't exist.")
             logger.info("Finished suggesting for test item with 0 results.")
             return []
 
@@ -393,7 +415,7 @@ class SuggestService(AnalyzerService):
         errors_found = []
         errors_count = 0
         model_info_tags = []
-        feature_names = ""
+        feature_names = None
         try:
             logs, test_item_id_for_suggest = self.prepare_logs_for_suggestions(test_item_info, index_name)
             logger.info(f"Number of prepared log search requests for suggestions: {len(logs)}")
@@ -405,52 +427,48 @@ class SuggestService(AnalyzerService):
 
             boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
             boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(test_item_info.project)
-            # noinspection PyTypeChecker
-            _suggest_decision_maker_to_use: BoostingDecisionMaker = self.model_chooser.choose_model(
-                test_item_info.project,
-                ModelType.suggestion,
-                custom_model_prob=self.search_cfg.ProbabilityForCustomModelSuggestions,
-            )
 
-            _boosting_data_gatherer = SuggestBoostingFeaturizer(
-                searched_res,
-                boosting_config,
-                feature_ids=_suggest_decision_maker_to_use.feature_ids,
+            predictor_class = PREDICTION_CLASSES[self.search_cfg.MlModelForSuggestions]
+            # Create predictor for suggestions
+            predictor = predictor_class(
+                model_chooser=self.model_chooser,
+                project_id=test_item_info.project,
+                boosting_config=boosting_config,
                 weighted_log_similarity_calculator=self.similarity_model,
+                custom_model_prob=self.search_cfg.ProbabilityForCustomModelSuggestions,
+                hash_source=test_item_info.launchId,
             )
-            # noinspection PyTypeChecker
-            _boosting_data_gatherer.set_defect_type_model(
-                self.model_chooser.choose_model(test_item_info.project, ModelType.defect_type)
-            )
-            feature_data, test_item_ids = _boosting_data_gatherer.gather_features_info()
-            scores_by_test_items = _boosting_data_gatherer.find_most_relevant_by_type()
-            model_info_tags = (
-                _boosting_data_gatherer.get_used_model_info() + _suggest_decision_maker_to_use.get_model_info()
-            )
-            feature_names = ";".join([str(i) for i in _suggest_decision_maker_to_use.feature_ids])
-            if feature_data:
-                _, predicted_labels_probability = _suggest_decision_maker_to_use.predict(feature_data)
-                sorted_results = self.sort_results(scores_by_test_items, test_item_ids, predicted_labels_probability)
 
-                logger.debug("Found %d results for test items ", len(sorted_results))
-                for idx, prob, _ in sorted_results:
-                    test_item_id = test_item_ids[idx]
-                    issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
-                    logger.debug(
-                        "Test item id %s with issue type %s has probability %.2f", test_item_id, issue_type, prob
-                    )
+            # Use predictor for the complete prediction workflow
+            prediction_results = predictor.predict(searched_res)
+
+            if prediction_results:
+                # Extract model info tags (same for all results)
+                model_info_tags = prediction_results[0].model_info_tags
+                sorted_results = self.sort_results(prediction_results)
+                unique_results = self.deduplicate_results(sorted_results)
+
+                logger.debug(f"Found {len(unique_results)} results for test items.")
+                for result in unique_results:
+                    prob = result.probability[1]
+                    identity = result.identity
+                    issue_type = result.data["mrHit"]["_source"]["issue_type"]
+                    logger.debug(f"Test item '{identity}' with issue type '{issue_type}' has probability {prob:.2f}")
                 processed_time = time() - t_start
-                global_idx = 0
-                for idx, prob, _ in sorted_results[: self.search_cfg.MaxSuggestionsNumber]:
+                for pos_idx, result in enumerate(unique_results[: self.search_cfg.MaxSuggestionsNumber]):
+                    prob = result.probability[1]
                     if prob >= self.suggest_threshold:
-                        test_item_id = test_item_ids[idx]
-                        issue_type = scores_by_test_items[test_item_id]["mrHit"]["_source"]["issue_type"]
-                        relevant_log_id = utils.extract_real_id(scores_by_test_items[test_item_id]["mrHit"]["_id"])
-                        real_log_id = str(scores_by_test_items[test_item_id]["mrHit"]["_id"])
+                        feature_values = None
+                        if result.feature_info:
+                            feature_names = ";".join([str(f_id) for f_id in result.feature_info.feature_ids])
+                            feature_values = ";".join([str(f) for f in result.feature_info.feature_data])
+
+                        issue_type = result.data["mrHit"]["_source"]["issue_type"]
+                        relevant_log_id = utils.extract_real_id(result.data["mrHit"]["_id"])
+                        real_log_id = str(result.data["mrHit"]["_id"])
                         is_merged = real_log_id != str(relevant_log_id)
-                        test_item_log_id = utils.extract_real_id(
-                            scores_by_test_items[test_item_id]["compared_log"]["_id"]
-                        )
+                        test_item_log_id = utils.extract_real_id(result.data["compared_log"]["_id"])
+                        test_item_id = result.data["mrHit"]["_source"]["test_item"]
                         analysis_result = SuggestAnalysisResult(
                             project=test_item_info.project,
                             testItem=test_item_id_for_suggest,
@@ -463,12 +481,12 @@ class SuggestService(AnalyzerService):
                             relevantLogId=relevant_log_id,
                             isMergedLog=is_merged,
                             matchScore=round(prob, 2) * 100,
-                            esScore=round(scores_by_test_items[test_item_id]["mrHit"]["_score"], 2),
-                            esPosition=scores_by_test_items[test_item_id]["mrHit"]["es_pos"],
+                            esScore=round(result.data["mrHit"]["_score"], 2),
+                            esPosition=result.original_position,
                             modelFeatureNames=feature_names,
-                            modelFeatureValues=";".join([str(feature) for feature in feature_data[idx]]),
+                            modelFeatureValues=feature_values,
                             modelInfo=";".join(model_info_tags),
-                            resultPosition=global_idx,
+                            resultPosition=pos_idx,
                             usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
                             minShouldMatch=self.find_min_should_match_threshold(test_item_info.analyzerConfig),
                             processedTime=processed_time,
@@ -477,10 +495,10 @@ class SuggestService(AnalyzerService):
                         )
                         results.append(analysis_result)
                         logger.debug(analysis_result)
-                        global_idx += 1
             else:
-                logger.debug("There are no results for test item %s", test_item_info.testItemId)
+                logger.debug(f"There are no results for test item {test_item_info.testItemId}")
         except Exception as exc:
+            traceback.print_exc()
             logger.exception(exc)
             errors_found.append(utils.extract_exception(exc))
             errors_count += 1
@@ -528,7 +546,7 @@ class SuggestService(AnalyzerService):
                         ).json(),
                     )
             amqp_client.close()
-        logger.debug("Stats info %s", results_to_share)
-        logger.info("Processed the test item. It took %.2f sec.", time() - t_start)
-        logger.info("Finished suggesting for test item with %d results.", len(results))
+        logger.debug(f"Stats info: {json.dumps(results_to_share)}")
+        logger.info(f"Processed the test item. It took {time() - t_start:.2f} sec.")
+        logger.info(f"Finished suggesting for test item with {len(results)} results.")
         return results

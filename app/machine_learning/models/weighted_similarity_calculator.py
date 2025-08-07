@@ -15,6 +15,7 @@
 import math
 
 import numpy as np
+from typing_extensions import override
 
 from app.commons.object_saving import ObjectSaver
 from app.machine_learning.models import MlModel
@@ -41,6 +42,12 @@ class WeightedSimilarityCalculator(MlModel):
     @property
     def loaded(self) -> bool:
         return self._loaded
+
+    @property
+    @override
+    def is_custom(self) -> bool:
+        """Indicates whether the model is custom or not."""
+        return False
 
     def load_model(self) -> None:
         if self.loaded:

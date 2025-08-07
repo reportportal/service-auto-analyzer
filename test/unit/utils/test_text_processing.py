@@ -28,7 +28,7 @@ import json
 
 import pytest
 
-from app.utils import text_processing, utils
+from app.utils import log_preparation, text_processing, utils
 from test import read_file, read_file_lines
 
 
@@ -192,3 +192,175 @@ def test_find_test_methods_in_text():
 )
 def test_remove_credentials_from_url(url, expected_url):
     assert text_processing.remove_credentials_from_url(url) == expected_url
+
+
+@pytest.mark.parametrize(
+    "base_text, other_texts, expected_scores",
+    [
+        # Test identical texts
+        (
+            "org.openqa.selenium.TimeoutException: ErrorCodec.decode",
+            ["org.openqa.selenium.TimeoutException: ErrorCodec.decode"],
+            [1.0],
+        ),
+        # Test completely different exceptions
+        (
+            "org.openqa.selenium.TimeoutException",
+            ["java.lang.NullPointerException"],
+            [0.05],  # Should be low similarity
+        ),
+        # Test same exception type, different details
+        (
+            "org.openqa.selenium.TimeoutException: ErrorCodec.decode",
+            ["org.openqa.selenium.TimeoutException: Different error"],
+            [0.56],  # Should be moderate similarity (approximate)
+        ),
+        # Test empty strings
+        ("", [""], [0.0]),
+        # Test one empty string
+        ("some text", [""], [0.0]),
+        # Test multiple texts at once
+        (
+            "org.openqa.selenium.TimeoutException",
+            [
+                "org.openqa.selenium.TimeoutException",
+                "java.lang.NullPointerException",
+                "org.openqa.selenium.WebDriverException",
+            ],
+            [1.0, 0.05, 0.45],  # Expected approximate similarities
+        ),
+    ],
+)
+def test_calculate_text_similarity_basic_cases(base_text, other_texts, expected_scores):
+    """Test basic text similarity calculation cases"""
+    actual_scores = text_processing.calculate_text_similarity(base_text, *other_texts)
+
+    assert len(actual_scores) == len(expected_scores)
+
+    for actual, expected in zip(actual_scores, expected_scores):
+        assert abs(actual - expected) < 0.01
+
+
+@pytest.mark.parametrize(
+    "text, expected_preprocessing_contains",
+    [
+        (
+            "org.openqa.selenium.TimeoutException: ErrorCodec.decode(ErrorCodec.java:167)",
+            ["timeout", "exception", "error", "codec", "decode"],
+        ),
+        (
+            'AppiumBy.iOSNsPredicate: label CONTAINS[c] "Continue"',
+            ["appium", "predicate", "label", "contain", "continue"],
+        ),
+        (
+            "CamelCaseExample_with_snake_case",
+            ["camel", "case", "example", "snake"],
+        ),
+        (
+            "XMLHttpRequest.send()",
+            ["xml", "http", "request", "send"],
+        ),
+        (
+            "build_info: version: '4.33.0', revision: '2c6aaad03a'",
+            ["build", "info", "version", "revision", "specialnumber"],
+        ),
+    ],
+)
+def test_preprocess_text_for_similarity(text, expected_preprocessing_contains):
+    """Test text preprocessing for similarity calculation"""
+    processed = text_processing.preprocess_text_for_similarity(text)
+
+    # Check that expected words are present in the processed text
+    for expected_word in expected_preprocessing_contains:
+        assert expected_word in processed.lower()
+
+    # Check that the processed text is lowercase
+    assert processed == processed.lower()
+
+    # Check that no punctuation remains (except spaces)
+    assert not any(char in processed for char in ".,;:!?()[]{}\"'")
+
+
+@pytest.mark.parametrize(
+    "base_text, other_texts",
+    [
+        # Test with numbers that should be normalized
+        (
+            "Error code 404: File not found at line 123",
+            ["Error code 500: File not found at line 456"],
+        ),
+        # Test with URLs that should be normalized
+        (
+            "Failed to connect to https://api.example.com/v1/users",
+            ["Failed to connect to https://api.example.com/v2/products"],
+        ),
+        # Test with file paths that should be normalized
+        (
+            "File not found: /path/to/file.java:150",
+            ["File not found: /different/path/file.java:200"],
+        ),
+        # Test with special characters and mixed case
+        (
+            "MyClass.methodName() threw NullPointerException",
+            ["MyClass.methodName() threw IllegalArgumentException"],
+        ),
+    ],
+)
+def test_calculate_text_similarity_edge_cases(base_text, other_texts):
+    """Test text similarity calculation with edge cases"""
+    actual_scores = text_processing.calculate_text_similarity(base_text, *other_texts)
+
+    # Basic validation
+    assert len(actual_scores) == len(other_texts)
+
+    for score in actual_scores:
+        assert 0.0 <= score <= 1.0
+        # For these edge cases, similarity should be moderate to high
+        # since they have similar structure but different details
+        assert score > 0.3  # Should have some similarity due to common words
+
+
+def test_calculate_text_similarity_no_other_texts():
+    """Test calculate_text_similarity with no other texts provided"""
+    result = text_processing.calculate_text_similarity("base text")
+    assert result == []
+
+
+def test_calculate_text_similarity_appium_exceptions():
+    """Test text similarity with appium exception files if available"""
+    ios_exception = log_preparation.clean_message(
+        utils.read_file("test_res/test_logs/stacktraces", "appium_ios_exception.txt")
+    )
+    android_exception = log_preparation.clean_message(
+        utils.read_file("test_res/test_logs/stacktraces", "appium_android_exception.txt")
+    )
+
+    # Test overall similarity
+    similarity_scores = text_processing.calculate_text_similarity(ios_exception, android_exception)
+    assert len(similarity_scores) == 1
+    assert 0.0 <= similarity_scores[0] <= 1.0
+
+    # Test first line similarity
+    ios_first_line = ios_exception.split("\n")[0]
+    android_first_line = android_exception.split("\n")[0]
+    first_line_scores = text_processing.calculate_text_similarity(ios_first_line, android_first_line)
+    assert len(first_line_scores) == 1
+    assert 0.0 <= first_line_scores[0] <= 1.0
+
+
+@pytest.mark.parametrize(
+    "base_text, other_texts, expected_length",
+    [
+        ("base", ["base text1"], 1),
+        ("base", ["base text1", "base text2"], 2),
+        ("base", ["base text1", "base text2", "base text3", "base text4 text5"], 4),
+        ("base", [], 0),
+    ],
+)
+def test_calculate_text_similarity_multiple_texts(base_text, other_texts, expected_length):
+    """Test that calculate_text_similarity handles multiple texts correctly"""
+    scores = text_processing.calculate_text_similarity(base_text, *other_texts)
+    assert len(scores) == expected_length
+
+    for score in scores:
+        assert 0.0 <= score <= 1.0

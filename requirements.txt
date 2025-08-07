@@ -1,12 +1,10 @@
 flask==2.3.2
 flask-cors==6.0.0
 Flask-WTF==1.2.1
-waitress==3.0.2
-uWSGI==2.0.29
 pika==1.2.1
 pydantic==1.10.13
-elasticsearch==7.0.0
-requests==2.32.2
+elasticsearch==7.10.1
+requests==2.32.4
 bump2version==1.0.1
 nltk==3.9.1
 scipy==1.13.1
@@ -18,6 +16,6 @@ python-dateutil==2.8.2
 minio==7.2.11
 gensim==4.3.3
 pandas==1.5.3
-urllib3==1.26.19
+urllib3==1.26.20
 werkzeug==3.0.6 # not directly required, pinned by Snyk to avoid a vulnerability
 certifi>=2025.1.31

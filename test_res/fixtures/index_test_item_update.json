@@ -1,6 +1,6 @@
-{"update":{"_index":"1","_id":"1"}}
+{"update":{"_id":"1","_index":"1"}}
 {"doc":{"issue_type":"pb001","is_auto_analyzed":false}}
-{"update":{"_index":"1","_id":"2"}}
+{"update":{"_id":"2","_index":"1"}}
 {"doc":{"issue_type":"pb001","is_auto_analyzed":false}}
-{"update":{"_index":"1","_id":"3"}}
+{"update":{"_id":"3","_index":"1"}}
 {"doc":{"issue_type":"ab001","is_auto_analyzed":false}}

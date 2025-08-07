@@ -41,7 +41,6 @@ class TestService(unittest.TestCase):
     model_settings: dict
     app_config: ApplicationConfig
 
-    @utils.ignore_warnings
     def setUp(self):
         self.two_indices_rs = "two_indices_rs.json"
         self.index_created_rs = "index_created_rs.json"
@@ -195,11 +194,9 @@ class TestService(unittest.TestCase):
         self.model_chooser = model_chooser.ModelChooser(self.app_config, self.get_default_search_config())
         logging.disable(logging.CRITICAL)
 
-    @utils.ignore_warnings
     def tearDown(self):
         logging.disable(logging.DEBUG)
 
-    @utils.ignore_warnings
     def get_default_search_config(self) -> SearchConfig:
         """Get default search config"""
         return SearchConfig(
@@ -225,7 +222,6 @@ class TestService(unittest.TestCase):
             MaxAutoAnalysisItemsToProcess=4000,
         )
 
-    @utils.ignore_warnings
     def _start_server(self, test_calls):
         httpretty.reset()
         httpretty.enable(allow_net_connect=False)
@@ -240,15 +236,14 @@ class TestService(unittest.TestCase):
             )
 
     @staticmethod
-    @utils.ignore_warnings
     def shutdown_server(test_calls):
         """Shutdown server and test request calls"""
         actual_calls = httpretty.latest_requests()
         assert len(actual_calls) == len(test_calls)
         for i, calls in enumerate(zip(test_calls, actual_calls)):
             expected_test_call, test_call = calls
-            assert expected_test_call["method"] == test_call.method
-            assert expected_test_call["uri"] == test_call.path
+            assert expected_test_call["method"] == test_call.method, f"Method mismatch in request {i}"
+            assert expected_test_call["uri"] == test_call.path, f"URI mismatch in request {i}"
             if "rq" in expected_test_call:
                 expected_body = expected_test_call["rq"]
                 real_body = test_call.parse_request_body(test_call.body)

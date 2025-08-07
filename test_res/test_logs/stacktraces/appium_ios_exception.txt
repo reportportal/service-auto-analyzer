@@ -1,0 +1,53 @@
+org.openqa.selenium.TimeoutException: Expected condition failed: waiting for presence of element located by: AppiumBy.iOSNsPredicate: label CONTAINS[c] "Continue" (tried for 10 second(s) with 500 milliseconds interval)
+	at org.openqa.selenium.support.ui.FluentWait.timeoutException(FluentWait.java:265)
+	at org.openqa.selenium.support.ui.FluentWait.until(FluentWait.java:228)
+	at com.example.dynamic.e2eui.test.element.DynamicElement.findElement(DynamicElement.java:150)
+	at com.example.dynamic.e2eui.test.element.DynamicElement.findElement(DynamicElement.java:160)
+	at com.example.dynamic.e2eui.test.element.DynamicElement.tap(DynamicElement.java:617)
+	at com.example.dynamic.e2eui.pageobjects.mobile.changedevice.WelcomeBackPage.tapContinueButton(WelcomeBackPage.java:47)
+	at com.example.dynamic.e2eui.glue.stepdefinitions.mobile.ChangeDeviceSteps.changeDeviceV2(ChangeDeviceSteps.java:344)
+	at com.example.dynamic.e2eui.glue.stepdefinitions.mobile.ChangeDeviceSteps.loginOnNewDeviceWithUsername(ChangeDeviceSteps.java:151)
+	at com.example.dynamic.e2eui.glue.stepdefinitions.mobile.LoginSteps.amLoggedInAsUser(LoginSteps.java:424)
+	at ✽.I am logged in as user "deepLinkCreditCardRepaymentHub"(classpath:features/BorrowExperince/DeepLinks.feature:20)
+Caused by: org.openqa.selenium.NoSuchElementException: An element could not be located on the page using the given search parameters.
+For documentation on this error, please visit: https://www.selenium.dev/documentation/webdriver/troubleshooting/errors#no-such-element-exception
+Build info: version: '4.33.0', revision: '2c6aaad03a'
+System info: os.name: 'Linux', os.arch: 'amd64', os.version: '5.10.236-228.935.amzn2.x86_64', java.version: '17.0.13'
+Driver info: io.appium.java_client.ios.IOSDriver
+Command: [c299344b-230a-4a83-bc73-bcbae19b5050, findElement {using=-ios predicate string, value=label CONTAINS[c] "Continue"}]
+Capabilities {appium:appiumData: {appiumVersion: appium2-20250101, automationName: XCUITest}, appium:autoAcceptAlerts: true, appium:automationName: XCUITest, appium:bundleId: com.example.international.e2e, appium:commandTimeouts: {default: 60000}, appium:databaseEnabled: false, appium:deviceContextId: 2e5e5269-4548-4e95-8f43-b7e..., appium:deviceName: 00008130-000004123A61001C, appium:flutterSystemPort: 6300, appium:javascriptEnabled: true, appium:jobUuid: d3dccf32f85c4c9094d47f33e5f..., appium:language: en, appium:locale: en_GB, appium:locationContextEnabled: false, appium:locationServicesAuthorized: false, appium:locationServicesEnabled: false, appium:networkConnectionEnabled: false, appium:newCommandTimeout: 90, appium:noReset: true, appium:orientation: PORTRAIT, appium:platformVersion: 17.5.1, appium:printPageSourceOnFindFailure: true, appium:takesScreenshot: true, appium:testobject_device: iPhone_15_Pro_Max_17_example3, appium:testobject_device_name: iPhone 15 Pro Max, appium:testobject_device_session_id: 49045701-a005-4b44-ac70-b10..., appium:testobject_test_report_api_url: https://api.eu-central-1.sa..., appium:testobject_test_report_url: https://app.eu-central-1.sa..., appium:testobject_user_id: NiyiOke, appium:udid: 00008130-000004123A61001C, appium:usedCachedDevice: false, appium:webDriverAgentUrl: http://127.0.0.1:5700, appium:webStorageEnabled: false, platformName: IOS, sauce:options: {allowTouchIdEnroll: false, appLaunchStateTimeoutSec: 50, appiumVersion: appium2-20250101, build: #1653_release-e2e-protected..., name: App is opened by a credit c..., networkCapture: false, privateDeviceOnly: true, realDevice: true, resigningEnabled: false, sauceLabsImageInjectionEnabled: false, tags: [2.61.0.1663, iOS, e2e, release, releaseCandidate, regression, Borrow-Experience, releaseCandidate:Borrow-Exp..., regression:Borrow-Experience, retry]}}
+Session ID: c299344b-230a-4a83-bc73-bcbae19b5050
+	at jdk.internal.reflect.GeneratedConstructorAccessor63.newInstance(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingConstructorAccessorImpl.newInstance(DelegatingConstructorAccessorImpl.java:45)
+	at java.base/java.lang.reflect.Constructor.newInstanceWithCaller(Constructor.java:499)
+	at java.base/java.lang.reflect.Constructor.newInstance(Constructor.java:480)
+	at org.openqa.selenium.remote.ErrorCodec.decode(ErrorCodec.java:167)
+	at org.openqa.selenium.remote.codec.w3c.W3CHttpResponseCodec.decode(W3CHttpResponseCodec.java:138)
+	at org.openqa.selenium.remote.codec.w3c.W3CHttpResponseCodec.decode(W3CHttpResponseCodec.java:50)
+	at org.openqa.selenium.remote.HttpCommandExecutor.execute(HttpCommandExecutor.java:215)
+	at io.appium.java_client.remote.AppiumCommandExecutor.execute(AppiumCommandExecutor.java:237)
+	at org.openqa.selenium.remote.RemoteWebDriver.execute(RemoteWebDriver.java:544)
+	at org.openqa.selenium.remote.ElementLocation$ElementFinder$2.findElement(ElementLocation.java:165)
+	at org.openqa.selenium.remote.ElementLocation.findElement(ElementLocation.java:59)
+	at org.openqa.selenium.remote.RemoteWebDriver.findElement(RemoteWebDriver.java:367)
+	at org.openqa.selenium.remote.RemoteWebDriver.findElement(RemoteWebDriver.java:361)
+	at org.openqa.selenium.support.ui.ExpectedConditions$6.apply(ExpectedConditions.java:171)
+	at org.openqa.selenium.support.ui.ExpectedConditions$6.apply(ExpectedConditions.java:168)
+	at org.openqa.selenium.support.ui.FluentWait.until(FluentWait.java:203)
+	at com.example.dynamic.e2eui.test.element.DynamicElement.findElement(DynamicElement.java:150)
+	at com.example.dynamic.e2eui.test.element.DynamicElement.findElement(DynamicElement.java:160)
+	at com.example.dynamic.e2eui.test.element.DynamicElement.tap(DynamicElement.java:617)
+	at com.example.dynamic.e2eui.pageobjects.mobile.changedevice.WelcomeBackPage.tapContinueButton(WelcomeBackPage.java:47)
+	at com.example.dynamic.e2eui.glue.stepdefinitions.mobile.ChangeDeviceSteps.changeDeviceV2(ChangeDeviceSteps.java:344)
+	at com.example.dynamic.e2eui.glue.stepdefinitions.mobile.ChangeDeviceSteps.loginOnNewDeviceWithUsername(ChangeDeviceSteps.java:151)
+	at com.example.dynamic.e2eui.glue.stepdefinitions.mobile.LoginSteps.amLoggedInAsUser(LoginSteps.java:424)
+...	at io.cucumber.java.Invoker.doInvoke(Invoker.java:66)
+	at io.cucumber.java.Invoker.invoke(Invoker.java:24)
+	at io.cucumber.java.AbstractGlueDefinition.invokeMethod(AbstractGlueDefinition.java:47)
+	at io.cucumber.java.JavaStepDefinition.execute(JavaStepDefinition.java:29)
+	at io.cucumber.core.runner.CoreStepDefinition.execute(CoreStepDefinition.java:66)
+	at io.cucumber.core.runner.PickleStepDefinitionMatch.runStep(PickleStepDefinitionMatch.java:63)
+	at io.cucumber.core.runner.ExecutionMode$1.execute(ExecutionMode.java:10)
+	at io.cucumber.core.runner.TestStep.executeStep(TestStep.java:92)
+	at io.cucumber.core.runner.TestStep.run(TestStep.java:64)
+...

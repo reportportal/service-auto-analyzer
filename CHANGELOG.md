@@ -1,6 +1,22 @@
 # Changelog
 ## [Unreleased]
 
+## [5.14.2]
+### Added
+- Ability to use different ML models for Suggestions, by @HardNorth
+- Ability to switch ML model for Suggestions with `ML_MODEL_FOR_SUGGESTIONS` environment variable, by @HardNorth
+### Changed
+- Handling of AMQP messages now moved to separate processes: "train" (only for model training) and "main" (for all other messages), by @HardNorth
+- Handling of AMQP messages now performed in two separate queues: `train` and `all`, by @HardNorth
+- Handling of AMQP messages now performed in in strict order, by @HardNorth
+- Analyzer exchange type is changed to `fanout`, by @HardNorth
+- Many logging messages were refactored and improved, by @HardNorth
+- Choosing custom/global ML model now performed by Launch ID hash only, by @HardNorth
+### Fixed
+- 11 Sonar issues, by @HardNorth
+### Removed
+- `analyzer-train` service, as it is no longer needed, by @HardNorth
+
 ## [5.14.1]
 ### Added
 - `ES_BOOST_MA` environment variable to boost manually analyzed test cases in ES, by @HardNorth

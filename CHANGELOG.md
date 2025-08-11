@@ -1,6 +1,10 @@
 # Changelog
 ## [Unreleased]
 
+## [5.14.3]
+### Fixed
+* Base URL generation with credentials for ES/OS healthcheck and indices endpoints, by @HardNorth in https://github.com/reportportal/service-auto-analyzer/pull/216
+
 ## [5.14.2]
 ### Added
 - Ability to use different ML models for Suggestions, by @HardNorth

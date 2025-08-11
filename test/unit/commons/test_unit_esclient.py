@@ -126,19 +126,19 @@ def test_to_index_bodies(launch, expected_length):
         ("http://username:password@elastic_host", True, "", "", "http://username:password@elastic_host"),  # NOSONAR
         # 5. Protocol and credentials are present in host parameter, but also HTTP credentials are in app_config
         (
-            "http://username:password@elastic_host",
+            "http://username:password@elastic_host",  # NOSONAR
             False,
             "user2",
             "pass2",
-            "http://username:password@elastic_host",
-        ),  # NOSONAR
+            "http://username:password@elastic_host",  # NOSONAR
+        ),
         (
-            "http://username:password@elastic_host",
+            "http://username:password@elastic_host",  # NOSONAR
             True,
             "user2",
             "pass2",
-            "http://username:password@elastic_host",
-        ),  # NOSONAR
+            "http://username:password@elastic_host",  # NOSONAR
+        ),
         # 6. No protocol, no credentials in host, but HTTP credentials are specified in app_config
         ("elastic_host", False, "username", "password", "http://username:password@elastic_host"),  # NOSONAR
         ("elastic_host", True, "username", "password", "https://username:password@elastic_host"),  # NOSONAR

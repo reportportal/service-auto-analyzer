@@ -153,8 +153,7 @@ class EsClient:
             res = utils.send_request(url, "GET", self.app_config.esUser, self.app_config.esPassword)
             return res["status"] in ["green", "yellow"]
         except Exception as err:
-            logger.error("Elasticsearch is not healthy")
-            logger.error(err)
+            logger.exception("Elasticsearch is not healthy", exc_info=err)
             return False
 
     def update_settings_after_read_only(self) -> None:
@@ -169,8 +168,7 @@ class EsClient:
                 data='{"index.blocks.read_only_allow_delete": null}',
             ).raise_for_status()
         except Exception as err:
-            logger.error(err)
-            logger.error("Can't reset read only mode for elastic indices")
+            logger.exception("Can't reset read only mode for elastic indices", exc_info=err)
 
     def create_index(self, index_name: str) -> Response:
         """Create index in elasticsearch"""

@@ -113,17 +113,17 @@ def test_to_index_bodies(launch, expected_length):
     "host, use_ssl, es_user, es_password, expected",
     [
         # 1. No protocol specified in the host param
-        ("elastic_host", False, "", "", "http://elastic_host"),
-        ("elastic_host", True, "", "", "https://elastic_host"),
+        ("elastic_host", False, "", "", "http://elastic_host"),  # NOSONAR
+        ("elastic_host", True, "", "", "https://elastic_host"),  # NOSONAR
         # 2. http protocol specified in the host parameter
-        ("http://elastic_host", False, "", "", "http://elastic_host"),
-        ("http://elastic_host", True, "", "", "http://elastic_host"),
+        ("http://elastic_host", False, "", "", "http://elastic_host"),  # NOSONAR
+        ("http://elastic_host", True, "", "", "http://elastic_host"),  # NOSONAR
         # 3. No protocol, but basic HTTP credentials are present in host parameter
-        ("username:password@elastic_host", False, "", "", "http://username:password@elastic_host"),
-        ("username:password@elastic_host", True, "", "", "https://username:password@elastic_host"),
+        ("username:password@elastic_host", False, "", "", "http://username:password@elastic_host"),  # NOSONAR
+        ("username:password@elastic_host", True, "", "", "https://username:password@elastic_host"),  # NOSONAR
         # 4. Protocol and credentials are present in host parameter -> same URL, no changes
-        ("http://username:password@elastic_host", False, "", "", "http://username:password@elastic_host"),
-        ("http://username:password@elastic_host", True, "", "", "http://username:password@elastic_host"),
+        ("http://username:password@elastic_host", False, "", "", "http://username:password@elastic_host"),  # NOSONAR
+        ("http://username:password@elastic_host", True, "", "", "http://username:password@elastic_host"),  # NOSONAR
         # 5. Protocol and credentials are present in host parameter, but also HTTP credentials are in app_config
         (
             "http://username:password@elastic_host",
@@ -131,17 +131,17 @@ def test_to_index_bodies(launch, expected_length):
             "user2",
             "pass2",
             "http://username:password@elastic_host",
-        ),
+        ),  # NOSONAR
         (
             "http://username:password@elastic_host",
             True,
             "user2",
             "pass2",
             "http://username:password@elastic_host",
-        ),
+        ),  # NOSONAR
         # 6. No protocol, no credentials in host, but HTTP credentials are specified in app_config
-        ("elastic_host", False, "username", "password", "http://username:password@elastic_host"),
-        ("elastic_host", True, "username", "password", "https://username:password@elastic_host"),
+        ("elastic_host", False, "username", "password", "http://username:password@elastic_host"),  # NOSONAR
+        ("elastic_host", True, "username", "password", "https://username:password@elastic_host"),  # NOSONAR
     ],
 )
 def test_get_base_url_variations(host, use_ssl, es_user, es_password, expected):

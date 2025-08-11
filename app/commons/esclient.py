@@ -17,6 +17,7 @@ import traceback
 from collections import deque
 from time import time
 from typing import Optional
+from urllib.parse import urlparse
 
 import elasticsearch
 import elasticsearch.helpers
@@ -122,17 +123,24 @@ class EsClient:
             },
         }
 
-    def __get_base_url(self):
+    def __get_base_url(self) -> Optional[str]:
         """Get base URL for Elasticsearch"""
         if not self.host:
             logger.error("Elasticsearch host is not set")
             return None
-
-        if self.host.startswith("http"):
-            return self.host
-        else:
+        url = self.host
+        if not self.host.startswith("http"):
             protocol = "https" if self.app_config.esUseSsl else "http"
-            return f"{protocol}://{self.host}"
+            url = f"{protocol}://{self.host}"
+        if not self.app_config.esUser:
+            # No credentials provided, return the URL as is
+            return url
+        if url != text_processing.remove_credentials_from_url(url):
+            # Credentials are present in the URL, return it as is
+            return url
+        parsed_url = urlparse(url)
+        new_netloc = f"{self.app_config.esUser}:{self.app_config.esPassword}@{parsed_url.netloc}"
+        return f"{parsed_url.scheme}://{new_netloc}"
 
     def is_healthy(self) -> bool:
         """Check whether elasticsearch is healthy"""

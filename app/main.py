@@ -44,10 +44,10 @@ APP_CONFIG = ApplicationConfig(
     esCAcert=os.getenv("ES_CA_CERT", ""),
     esClientCert=os.getenv("ES_CLIENT_CERT", ""),
     esClientKey=os.getenv("ES_CLIENT_KEY", ""),
+    turnOffSslVerification=json.loads(os.getenv("ES_TURN_OFF_SSL_VERIFICATION", "false").lower()),
     esChunkNumber=int(os.getenv("ES_CHUNK_NUMBER", "1000")),
     esChunkNumberUpdateClusters=int(os.getenv("ES_CHUNK_NUMBER_UPDATE_CLUSTERS", "500")),
     esProjectIndexPrefix=os.getenv("ES_PROJECT_INDEX_PREFIX", "").strip(),
-    turnOffSslVerification=json.loads(os.getenv("ES_TURN_OFF_SSL_VERIFICATION", "false").lower()),
     # Debug settings
     logLevel=os.getenv("LOGGING_LEVEL", "DEBUG").strip(),
     debugMode=json.loads(os.getenv("DEBUG_MODE", "false").lower()),

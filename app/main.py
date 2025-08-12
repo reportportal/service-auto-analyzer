@@ -33,12 +33,25 @@ from app.commons.model.ml import ModelType
 from app.utils import utils
 
 APP_CONFIG = ApplicationConfig(
+    # ES/OS settings
     # Mute Sonar about hardcoded HTTP URL, since this is a hostname inside a docker-compose file
     esHost=os.getenv("ES_HOSTS", "http://elasticsearch:9200").strip("/").strip("\\"),  # NOSONAR
     esUser=os.getenv("ES_USER", "").strip(),
     esPassword=os.getenv("ES_PASSWORD", "").strip(),
+    esUseSsl=json.loads(os.getenv("ES_USE_SSL", "false").lower()),
+    esVerifyCerts=json.loads(os.getenv("ES_VERIFY_CERTS", "false").lower()),
+    esSslShowWarn=json.loads(os.getenv("ES_SSL_SHOW_WARN", "false").lower()),
+    esCAcert=os.getenv("ES_CA_CERT", ""),
+    esClientCert=os.getenv("ES_CLIENT_CERT", ""),
+    esClientKey=os.getenv("ES_CLIENT_KEY", ""),
+    esChunkNumber=int(os.getenv("ES_CHUNK_NUMBER", "1000")),
+    esChunkNumberUpdateClusters=int(os.getenv("ES_CHUNK_NUMBER_UPDATE_CLUSTERS", "500")),
+    esProjectIndexPrefix=os.getenv("ES_PROJECT_INDEX_PREFIX", "").strip(),
+    turnOffSslVerification=json.loads(os.getenv("ES_TURN_OFF_SSL_VERIFICATION", "false").lower()),
+    # Debug settings
     logLevel=os.getenv("LOGGING_LEVEL", "DEBUG").strip(),
     debugMode=json.loads(os.getenv("DEBUG_MODE", "false").lower()),
+    # AMQP settings
     amqpUrl=os.getenv("AMQP_URL", "").strip("/").strip("\\") + "/" + os.getenv("AMQP_VIRTUAL_HOST", "analyzer"),
     amqpExchangeName=os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
     amqpInitialRetryInterval=int(os.getenv("AMQP_INITIAL_RETRY_INTERVAL", "1")),
@@ -52,13 +65,6 @@ APP_CONFIG = ApplicationConfig(
     analyzerLogSearch=json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower()),
     analyzerSuggest=json.loads(os.getenv("ANALYZER_SUGGEST", "true").lower()),
     analyzerCluster=json.loads(os.getenv("ANALYZER_CLUSTER", "true").lower()),
-    turnOffSslVerification=json.loads(os.getenv("ES_TURN_OFF_SSL_VERIFICATION", "false").lower()),
-    esVerifyCerts=json.loads(os.getenv("ES_VERIFY_CERTS", "false").lower()),
-    esUseSsl=json.loads(os.getenv("ES_USE_SSL", "false").lower()),
-    esSslShowWarn=json.loads(os.getenv("ES_SSL_SHOW_WARN", "false").lower()),
-    esCAcert=os.getenv("ES_CA_CERT", ""),
-    esClientCert=os.getenv("ES_CLIENT_CERT", ""),
-    esClientKey=os.getenv("ES_CLIENT_KEY", ""),
     minioHost=os.getenv("MINIO_SHORT_HOST", "minio:9000"),
     minioAccessKey=os.getenv("MINIO_ACCESS_KEY", "minio"),
     minioSecretKey=os.getenv("MINIO_SECRET_KEY", "minio123"),
@@ -69,9 +75,6 @@ APP_CONFIG = ApplicationConfig(
     minioRegion=os.getenv("ANALYZER_BINSTORE_MINIO_REGION", os.getenv("ANALYZER_BINARYSTORE_MINIO_REGION", None)),
     instanceTaskType=os.getenv("INSTANCE_TASK_TYPE", "").strip(),
     filesystemDefaultPath=os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
-    esChunkNumber=int(os.getenv("ES_CHUNK_NUMBER", "1000")),
-    esChunkNumberUpdateClusters=int(os.getenv("ES_CHUNK_NUMBER_UPDATE_CLUSTERS", "500")),
-    esProjectIndexPrefix=os.getenv("ES_PROJECT_INDEX_PREFIX", "").strip(),
     analyzerHttpPort=int(os.getenv("ANALYZER_HTTP_PORT", "5001")),
     analyzerPathToLog=os.getenv("ANALYZER_FILE_LOGGING_PATH", "/tmp/config.log"),
 )

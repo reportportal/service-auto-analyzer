@@ -1,5 +1,7 @@
 # Changelog
 ## [Unreleased]
+### Fixed
+- Text similarity calculation for cases when a text contains only stop words, by @HardNorth
 ### Changed
 - Refactor request calling in `esclient` class, by @HardNorth
 

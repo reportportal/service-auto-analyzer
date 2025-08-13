@@ -116,6 +116,7 @@ def train_several_times(
                 + str(len(x_test))
             )
             proportion_binary_labels = utils.calculate_proportions_for_labels(y_train)
+            LOGGER.debug(f"Train data proportion: {proportion_binary_labels:.2f}")
             if proportion_binary_labels < SMOTE_PROPORTION:
                 oversample = BorderlineSMOTE(sampling_strategy=SMOTE_PROPORTION, random_state=random_state)
                 x_train, y_train = oversample.fit_resample(x_train, y_train)

@@ -102,8 +102,16 @@ class SimilarityCalculator:
                         if needs_reweighting_wc:
                             query_vector *= 2
                             log_vector *= 2
-                    similarity = round(1 - spatial.distance.cosine(query_vector, log_vector), 2)
-                    all_results_similarity[group_id] = {"similarity": similarity, "both_empty": False}
+                    cosine_distance = spatial.distance.cosine(query_vector, log_vector)
+                    if np.isnan(cosine_distance):
+                        # If cosine distance is NaN, it means either or both vectors are empty or contain only zeros.
+                        # This might happen if all words in the text are stop words
+                        similarity = 1.0 if obj["_source"].get(field, "") == log["_source"].get(field, "") else 0.0
+                        all_results_similarity[group_id] = {"similarity": similarity, "both_empty": False}
+                    else:
+                        distance = float(cosine_distance)
+                        similarity = round(1 - distance, 2)
+                        all_results_similarity[group_id] = {"similarity": similarity, "both_empty": False}
                 else:
                     all_results_similarity[group_id] = {"similarity": 0.0, "both_empty": False}
         return all_results_similarity

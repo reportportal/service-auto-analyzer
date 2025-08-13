@@ -1,5 +1,7 @@
 # Changelog
 ## [Unreleased]
+### Changed
+- Refactor request calling in `esclient` class, by @HardNorth
 
 ## [5.14.3]
 ### Fixed

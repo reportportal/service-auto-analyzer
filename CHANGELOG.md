@@ -4,6 +4,7 @@
 - Text similarity calculation for cases when a text contains only stop words, by @HardNorth
 ### Changed
 - Refactor request calling in `esclient` class, by @HardNorth
+- Text similarity calculation logic replaced with less sophisticated one, by @HardNorth
 
 ## [5.14.3]
 ### Fixed

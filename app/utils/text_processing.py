@@ -974,7 +974,7 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[tuple[f
                 similarity_scores.append((1.0 if base_text == other_texts[i] else 0.0, False))
             elif not base_text.strip() and not other_texts[i].strip():
                 # Both texts are empty
-                similarity_scores.append((1.0, True))
+                similarity_scores.append((0.0, True))
             else:
                 similarity_scores.append((0.0, False))
             continue

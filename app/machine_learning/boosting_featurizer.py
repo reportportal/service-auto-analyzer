@@ -82,7 +82,7 @@ class BoostingFeaturizer:
             28: (self._calculate_percent_count_items_and_mean, {"return_val_name": "mean_score"}, []),
             29: (self._calculate_similarity_percent, {"field_name": "message_params"}, []),
             34: (self._calculate_similarity_percent, {"field_name": "found_exceptions"}, []),
-            35: (self._is_all_log_lines, {}, []),
+            35: (self._is_analyzed_manually, {}, []),
             36: (self._calculate_similarity_percent, {"field_name": "detected_message_extended"}, []),
             37: (self._calculate_similarity_percent, {"field_name": "detected_message_without_params_extended"}, []),
             38: (self._calculate_similarity_percent, {"field_name": "stacktrace_extended"}, []),
@@ -419,16 +419,16 @@ class BoostingFeaturizer:
         scores_by_issue_type = self.find_most_relevant_by_type()
         return {item: search_rs["score"] for item, search_rs in scores_by_issue_type.items()}
 
-    def _is_all_log_lines(self) -> dict[str, int]:
-        """Return if all log lines were used to find the most relevant log.
+    def _is_analyzed_manually(self) -> dict[str, int]:
+        """Return if the search results were analyzed manually.
 
-        :return: dict with issue type as key and value as 1 if all log lines were used, 0 otherwise
+        :return: dict with issue type as key and value as 1 if analyzed manually, 0 otherwise
         """
-        scores_by_issue_type = self._calculate_score()
-        num_of_logs_issue_type = {}
-        for issue_type in scores_by_issue_type:
-            num_of_logs_issue_type[issue_type] = int(self.config["number_of_log_lines"] == -1)
-        return num_of_logs_issue_type
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        is_analyzed_manually = {}
+        for issue_type, search_rs in scores_by_issue_type.items():
+            is_analyzed_manually[issue_type] = int(not (search_rs["mrHit"]["_source"].get("is_auto_analyzed", True)))
+        return is_analyzed_manually
 
     def is_only_merged_small_logs(self) -> dict[str, int]:
         """Check if the query log and search results contain only merged small logs.

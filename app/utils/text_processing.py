@@ -15,7 +15,7 @@
 import re
 import string
 import urllib.parse
-from typing import Iterable, Any
+from typing import Iterable
 from urllib.parse import urlparse
 
 import nltk
@@ -969,7 +969,14 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[tuple[f
     for i, processed_other_text in enumerate(processed_other_texts):
         # If either text is empty after preprocessing, append 0
         if not processed_base_text.strip() and not processed_other_text.strip():
-            similarity_scores.append((0.0, True))
+            if base_text.strip() and other_texts[i].strip():
+                # Both texts contain only stopwords
+                similarity_scores.append((1.0 if base_text == other_texts[i] else 0.0, False))
+            elif not base_text.strip() and not other_texts[i].strip():
+                # Both texts are empty
+                similarity_scores.append((0.0, True))
+            else:
+                similarity_scores.append((0.0, False))
             continue
 
         if not processed_base_text.strip() or not processed_other_text.strip():

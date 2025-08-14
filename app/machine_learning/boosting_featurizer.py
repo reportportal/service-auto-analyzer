@@ -41,6 +41,7 @@ class BoostingFeaturizer:
         results: list[tuple[dict[str, Any], dict[str, Any]]],
         config: dict[str, Any],
         feature_ids: str | list[int],
+        **_: Any,
     ) -> None:
         self.config = config
         self.previously_gathered_features = {}

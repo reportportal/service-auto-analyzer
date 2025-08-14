@@ -21,7 +21,7 @@ from app.machine_learning import boosting_featurizer
 class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
 
     def __init__(
-        self, results: list[tuple[dict[str, Any], dict[str, Any]]], config, feature_ids: str | list[int]
+        self, results: list[tuple[dict[str, Any], dict[str, Any]]], config, feature_ids: str | list[int], **_: Any
     ) -> None:
         super().__init__(results, config, feature_ids)
 

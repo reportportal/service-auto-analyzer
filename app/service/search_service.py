@@ -229,7 +229,7 @@ class SearchService:
 
             _similarity_calculator = similarity_calculator.SimilarityCalculator()
             sim_dict = _similarity_calculator.find_similarity(
-                [(queried_log, search_results)], ["message", "potential_status_codes", "merged_small_logs"]
+                [(queried_log, search_results)], ["message", "merged_small_logs"]
             )
 
             for group_id, similarity_obj in sim_dict["message"].items():
@@ -244,12 +244,6 @@ class SearchService:
                     similarity_percent,
                     message_to_use,
                 )
-                potential_status_codes_match = 0.0
-                _similarity_dict = sim_dict["potential_status_codes"]
-                if group_id in _similarity_dict:
-                    potential_status_codes_match = _similarity_dict[group_id]["similarity"]
-                if potential_status_codes_match < 0.99:
-                    continue
                 if similarity_percent >= search_min_should_match:
                     log_id_extracted = utils.extract_real_id(log_id)
                     is_merged = log_id != str(log_id_extracted)

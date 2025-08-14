@@ -7,6 +7,9 @@
 ### Changed
 - Refactor request calling in `esclient` class, by @HardNorth
 - Text similarity calculation logic replaced with less sophisticated one, by @HardNorth
+### Removed
+- `potential_status_codes` field from minimal threshold validation as it unreliable, by @HardNorth
+- Similarity weights model, by @HardNorth
 
 ## [5.14.3]
 ### Fixed

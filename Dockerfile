@@ -54,6 +54,6 @@ RUN dnf -y upgrade && dnf -y install python3.11 ca-certificates pcre-devel \
     && mkdir -p -m 0744 /backend/storage \
     && source "${VIRTUAL_ENV}/bin/activate"
 
-# Start Waitress server
+# Start server
 CMD ["python", "app/main.py"]
 HEALTHCHECK --interval=1m --timeout=5s --retries=2 CMD ["curl", "-s", "-f", "--show-error", "http://localhost:5001/"]

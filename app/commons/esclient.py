@@ -16,11 +16,10 @@ import json
 import traceback
 from collections import deque
 from time import time
-from typing import Optional
+from typing import Any, Optional
 
 import elasticsearch
 import elasticsearch.helpers
-import requests
 import urllib3
 from elasticsearch import RequestsHttpConnection
 from urllib3.exceptions import InsecureRequestWarning
@@ -57,7 +56,7 @@ class EsClient:
     def create_es_client(self, app_config: ApplicationConfig) -> elasticsearch.Elasticsearch:
         if not app_config.esVerifyCerts:
             urllib3.disable_warnings(InsecureRequestWarning)
-        kwargs = {
+        kwargs: dict[str, Any] = {
             "timeout": 30,
             "max_retries": 5,
             "retry_on_timeout": True,
@@ -122,17 +121,16 @@ class EsClient:
             },
         }
 
-    def __get_base_url(self):
+    def __get_base_url(self) -> Optional[str]:
         """Get base URL for Elasticsearch"""
         if not self.host:
             logger.error("Elasticsearch host is not set")
             return None
-
-        if self.host.startswith("http"):
-            return self.host
-        else:
+        url = self.host
+        if not self.host.startswith("http"):
             protocol = "https" if self.app_config.esUseSsl else "http"
-            return f"{protocol}://{self.host}"
+            url = f"{protocol}://{self.host}"
+        return url
 
     def is_healthy(self) -> bool:
         """Check whether elasticsearch is healthy"""
@@ -140,29 +138,22 @@ class EsClient:
         if not base_url:
             return False
 
-        try:
-            url = text_processing.build_url(base_url, ["_cluster/health"])
-            res = utils.send_request(url, "GET", self.app_config.esUser, self.app_config.esPassword)
-            return res["status"] in ["green", "yellow"]
-        except Exception as err:
-            logger.error("Elasticsearch is not healthy")
-            logger.error(err)
-            return False
+        url = text_processing.build_url(base_url, ["_cluster/health"])
+        res = utils.send_request(url, "GET", self.app_config.esUser, self.app_config.esPassword)
+        return res.get("status", "") in {"green", "yellow"} if res else False
 
     def update_settings_after_read_only(self) -> None:
         base_url = self.__get_base_url()
         if not base_url:
             return
 
-        try:
-            requests.put(
-                f"{base_url}/_all/_settings",
-                headers={"Content-Type": "application/json"},
-                data='{"index.blocks.read_only_allow_delete": null}',
-            ).raise_for_status()
-        except Exception as err:
-            logger.error(err)
-            logger.error("Can't reset read only mode for elastic indices")
+        utils.send_request(
+            f"{base_url}/_all/_settings",
+            "PUT",
+            self.app_config.esUser,
+            self.app_config.esPassword,
+            data='{"index.blocks.read_only_allow_delete": null}',
+        )
 
     def create_index(self, index_name: str) -> Response:
         """Create index in elasticsearch"""
@@ -176,16 +167,6 @@ class EsClient:
         )
         logger.debug(f"Index '{index_name}' created")
         return Response(**response)
-
-    def list_indices(self) -> Optional[list]:
-        """Get all indices from elasticsearch"""
-        base_url = self.__get_base_url()
-        if not base_url:
-            return None
-
-        url = text_processing.build_url(base_url, ["_cat", "indices?format=json"])
-        res = utils.send_request(url, "GET", self.app_config.esUser, self.app_config.esPassword)
-        return res
 
     def index_exists(self, index_name: str, print_error: bool = True):
         """Checks whether index exists"""

@@ -1,5 +1,29 @@
 # Changelog
 ## [Unreleased]
+### Fixed
+- Text similarity calculation for cases when a text contains only stop words, by @HardNorth
+### Changed
+- Refactor request calling in `esclient` class, by @HardNorth
+
+## [5.14.3]
+### Fixed
+* Base URL generation with credentials for ES/OS healthcheck and indices endpoints, by @HardNorth in https://github.com/reportportal/service-auto-analyzer/pull/216
+
+## [5.14.2]
+### Added
+- Ability to use different ML models for Suggestions, by @HardNorth
+- Ability to switch ML model for Suggestions with `ML_MODEL_FOR_SUGGESTIONS` environment variable, by @HardNorth
+### Changed
+- Handling of AMQP messages now moved to separate processes: "train" (only for model training) and "main" (for all other messages), by @HardNorth
+- Handling of AMQP messages now performed in two separate queues: `train` and `all`, by @HardNorth
+- Handling of AMQP messages now performed in in strict order, by @HardNorth
+- Analyzer exchange type is changed to `fanout`, by @HardNorth
+- Many logging messages were refactored and improved, by @HardNorth
+- Choosing custom/global ML model now performed by Launch ID hash only, by @HardNorth
+### Fixed
+- 11 Sonar issues, by @HardNorth
+### Removed
+- `analyzer-train` service, as it is no longer needed, by @HardNorth
 
 ## [5.14.1]
 ### Added

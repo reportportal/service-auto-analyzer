@@ -29,56 +29,6 @@ from test.mock_service import TestService
 
 class TestEsClient(TestService):
 
-    @utils.ignore_warnings
-    def test_list_indices(self):
-        """Test checking getting indices from elasticsearch"""
-        tests = [
-            {
-                "test_calls": [
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/_cat/indices?format=json",
-                        "status": HTTPStatus.OK,
-                        "rs": "[]",
-                    },
-                ],
-                "expected_count": 0,
-            },
-            {
-                "test_calls": [
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/_cat/indices?format=json",
-                        "status": HTTPStatus.OK,
-                        "rs": get_fixture(self.two_indices_rs),
-                    },
-                ],
-                "expected_count": 2,
-            },
-            {
-                "test_calls": [
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/_cat/indices?format=json",
-                        "status": HTTPStatus.INTERNAL_SERVER_ERROR,
-                    },
-                ],
-                "expected_count": 0,
-            },
-        ]
-        for idx, test in enumerate(tests):
-            try:
-                self._start_server(test["test_calls"])
-
-                es_client = esclient.EsClient(app_config=self.app_config)
-
-                response = es_client.list_indices()
-                assert test["expected_count"] == len(response)
-
-                TestEsClient.shutdown_server(test["test_calls"])
-            except AssertionError as err:
-                raise AssertionError(f"Error in the test case number: {idx}").with_traceback(err.__traceback__)
-
     def test_create_index(self):
         """Test creating index"""
         test = {

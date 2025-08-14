@@ -2,6 +2,7 @@
 ## [Unreleased]
 ### Added
 - `_is_analyzed_manually` feature in `BoostingFeaturizer` class, by @HardNorth
+- Newly trained models, by @HardNorth
 ### Fixed
 - Text similarity calculation for cases when a text contains only stop words, by @HardNorth
 ### Changed

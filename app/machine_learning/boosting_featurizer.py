@@ -76,7 +76,7 @@ class BoostingFeaturizer:
             18: (self._calculate_similarity_percent, {"field_name": "detected_message"}, []),
             19: (self._calculate_similarity_percent, {"field_name": "detected_message_with_numbers"}, []),
             23: (self._calculate_similarity_percent, {"field_name": "stacktrace"}, []),
-            25: (self._calculate_similarity_percent, {"field_name": "only_numbers"}, []),
+            25: (self._calculate_similarity_by_values, {"field_name": "only_numbers"}, []),
             26: (self._calculate_max_score_and_pos, {"return_val_name": "max_score"}, []),
             27: (self._calculate_min_score_and_pos, {"return_val_name": "min_score"}, []),
             28: (self._calculate_percent_count_items_and_mean, {"return_val_name": "mean_score"}, []),
@@ -100,7 +100,7 @@ class BoostingFeaturizer:
                 {"field_name": "detected_message_without_params_and_brackets"},
                 [],
             ),
-            55: (self._calculate_similarity_percent, {"field_name": "potential_status_codes"}, []),
+            55: (self._calculate_similarity_by_values, {"field_name": "potential_status_codes"}, []),
             56: (self.is_the_same_launch, {}, []),
             57: (self.is_the_same_launch_id, {}, []),
             59: (self._calculate_similarity_percent, {"field_name": "found_tests_and_methods"}, []),
@@ -618,6 +618,49 @@ class BoostingFeaturizer:
                 hit["normalized_score"] = hit["_score"] / max_score
                 self.total_normalized_score += hit["normalized_score"]
         return all_results
+
+    def _calculate_similarity_by_values(self, field_name: str) -> dict[str, float]:
+        """Calculate similarity percent by specified field giving into account separate values in this field.
+
+        :param str field_name: name of field to calculate similarity
+        :return: dict with issue type as key and float value as similarity percent
+        """
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        similarity_percent_by_field = {}
+        for issue_type, search_rs in scores_by_issue_type.items():
+            rq_field = search_rs["compared_log"]["_source"].get(field_name, "")
+            rs_field = search_rs["mrHit"]["_source"].get(field_name, "")
+            rq_values = [f for f in rq_field.split(" ") if f.strip()]
+            rs_values = [f for f in rs_field.split(" ") if f.strip()]
+            if not rq_values and not rs_values:
+                similarity_percent_by_field[issue_type] = 1.0
+                continue
+            if not rq_values or not rs_values:
+                similarity_percent_by_field[issue_type] = 0.0
+                continue
+            max_value_number = max(len(rq_values), len(rs_values))
+            if len(rq_values) > len(rs_values):
+                base_values = rq_values
+                compared_values = rs_values
+            else:
+                base_values = rs_values
+                compared_values = rq_values
+            common_value_number = 0
+            different_value_number = 0
+            for base_value in base_values:
+                found = False
+                for i, compare_value in enumerate(compared_values):
+                    if base_value.strip().lower() == compare_value.strip().lower():
+                        common_value_number += 1
+                        del compared_values[i]
+                        found = True
+                        break
+                if not found:
+                    different_value_number += 1
+            similarity_percent_by_field[issue_type] = (common_value_number / max_value_number) * (
+                1 - (different_value_number / max_value_number)
+            )
+        return similarity_percent_by_field
 
     def _calculate_similarity_percent(self, field_name="message") -> dict[str, float]:
         """Calculate similarity percent by specified filed for every unique Issue Type from OpenSearch query result.

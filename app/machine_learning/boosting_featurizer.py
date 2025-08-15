@@ -632,9 +632,6 @@ class BoostingFeaturizer:
             rs_field = search_rs["mrHit"]["_source"].get(field_name, "")
             rq_values = [f for f in rq_field.split(" ") if f.strip()]
             rs_values = [f for f in rs_field.split(" ") if f.strip()]
-            if not rq_values and not rs_values:
-                similarity_percent_by_field[issue_type] = 1.0
-                continue
             if not rq_values or not rs_values:
                 similarity_percent_by_field[issue_type] = 0.0
                 continue

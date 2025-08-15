@@ -480,12 +480,12 @@ class AutoAnalyzerService(AnalyzerService):
         try:
             # Generate all analysis candidates using batch processing
             all_candidates = self._generate_analysis_candidates(launches)
-            all_candidates_by_launch: dict[tuple[int, int], list[AnalysisCandidate]] = defaultdict(list)
+            all_candidates_by_launch_and_project: dict[tuple[int, int], list[AnalysisCandidate]] = defaultdict(list)
             for candidate in all_candidates:
-                all_candidates_by_launch[candidate.project, candidate.launchId].append(candidate)
+                all_candidates_by_launch_and_project[candidate.project, candidate.launchId].append(candidate)
 
             # Process each candidate sequentially
-            for (project_id, launch_id), analyzer_candidates in all_candidates_by_launch.items():
+            for (project_id, launch_id), analyzer_candidates in all_candidates_by_launch_and_project.items():
                 if not analyzer_candidates:
                     logger.info(f"No candidates found for project {project_id}, launch {launch_id}")
                     continue

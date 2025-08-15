@@ -914,19 +914,16 @@ def preprocess_text_for_similarity(text: str) -> str:
     # 3. Handle sequences of uppercase letters followed by lowercase (like XMLHttpRequest -> XML Http Request)
     result = UPPER_LOWER_CASE_PATTERN.sub(r"\1 \2", result)
 
-    # 4. Use remove_numbers function
-    result = remove_numbers(result)
-
-    # 5. Lowercase everything
+    # 4. Lowercase everything
     result = result.lower()
 
-    # 6. Replace excessive spaces with one space
+    # 5. Replace excessive spaces with one space
     result = re.sub(r"\s+", " ", result).strip()
 
-    # 7. Use lemmatizer and text normalization
+    # 6. Use lemmatizer and text normalization
     lemmatizer = WordNetLemmatizer()
 
-    # 8. Remove English stopwords and lemmatize
+    # 7. Remove English stopwords and lemmatize
     words = result.split()
     processed_words = []
 

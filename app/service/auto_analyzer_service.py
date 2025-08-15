@@ -566,7 +566,7 @@ class AutoAnalyzerService(AnalyzerService):
                                 logger.debug(
                                     f"Most relevant ID for item '{test_item_id}' is '{relevant_test_item_id}', it has "
                                     f"issue type '{result.identity}', log ID '{log_id}' and probability: "
-                                    + str(result.probability)
+                                    + str(round(result.probability[1], 2))
                                 )
 
                             best = _choose_issue_type(prediction_results)

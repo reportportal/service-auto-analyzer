@@ -14,6 +14,7 @@
 
 import json
 from datetime import datetime
+from functools import reduce
 from queue import Queue
 from threading import Event, Thread
 from time import sleep, time
@@ -341,6 +342,10 @@ class AutoAnalyzerService(AnalyzerService):
         if not partial_res:
             logger.warning("No search results for batches")
             return
+        res_num = reduce(lambda a, b: a + b, [len(res["hits"]["hits"]) for res in partial_res], 0)
+        logger.info(f"Found {res_num} items by FTS (KNN)")
+        logger.debug(f"Items for analysis by FTS (KNN): {json.dumps(search_results)}")
+
         avg_time_processed = (time() - t_start) / (len(partial_res) if partial_res else 1)
         for test_item_id in test_item_dict:
             candidates = []

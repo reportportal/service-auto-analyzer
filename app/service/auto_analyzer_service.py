@@ -560,9 +560,12 @@ class AutoAnalyzerService(AnalyzerService):
 
                             # Debug logging
                             for result in prediction_results:
+                                test_item_id = result.data["compared_log"]["_source"]["test_item"]
+                                relevant_test_item_id = result.data["mrHit"]["_source"]["test_item"]
                                 log_id = result.data["mrHit"]["_id"]
                                 logger.debug(
-                                    f"Most relevant item with issue type '{result.identity}' has log id: {log_id}"
+                                    f"Most relevant ID for item {test_item_id} is {relevant_test_item_id}, it has "
+                                    f"issue type '{result.identity}' and log ID: {log_id}"
                                 )
 
                             best = _choose_issue_type(prediction_results)

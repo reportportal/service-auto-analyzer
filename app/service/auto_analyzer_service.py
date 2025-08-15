@@ -15,9 +15,7 @@
 import json
 from datetime import datetime
 from functools import reduce
-from queue import Queue
-from threading import Event, Thread
-from time import sleep, time
+from time import time
 from typing import Any, Optional
 
 from app.amqp.amqp import AmqpClient
@@ -329,24 +327,24 @@ class AutoAnalyzerService(AnalyzerService):
                 return [(log_info, {"hits": {"hits": [latest_item]}})]
         return []
 
-    def _send_result_to_queue(
+    def _process_batch(
         self,
         test_item_dict: dict[int, list[int]],
         batches: list[str],
         batch_logs: list[BatchLogInfo],
-        queue: Queue[AnalysisCandidate],
-    ) -> None:
+    ) -> list[AnalysisCandidate]:
         t_start = time()
         search_results = self.es_client.es_client.msearch("\n".join(batches) + "\n")
         partial_res = search_results["responses"] if search_results else []
         if not partial_res:
             logger.warning("No search results for batches")
-            return
+            return []
         res_num = reduce(lambda a, b: a + b, [len(res["hits"]["hits"]) for res in partial_res], 0)
         logger.info(f"Found {res_num} items by FTS (KNN)")
         logger.debug(f"Items for analysis by FTS (KNN): {json.dumps(search_results)}")
 
         avg_time_processed = (time() - t_start) / (len(partial_res) if partial_res else 1)
+        analysis_candidates = []
         for test_item_id in test_item_dict:
             candidates = []
             candidates_with_no_defect = []
@@ -360,7 +358,7 @@ class AutoAnalyzerService(AnalyzerService):
                     candidates_with_no_defect.append((batch_log_info.log_info, partial_res[idx]))
                 time_processed += avg_time_processed
             if batch_log_info:
-                queue.put(
+                analysis_candidates.append(
                     AnalysisCandidate(
                         analyzerConfig=batch_log_info.analyzerConfig,
                         testItemId=batch_log_info.testItemId,
@@ -373,16 +371,15 @@ class AutoAnalyzerService(AnalyzerService):
                         candidatesWithNoDefect=candidates_with_no_defect,
                     )
                 )
+        return analysis_candidates
 
-    def _query_elasticsearch(
+    def _generate_analysis_candidates(
         self,
         launches: list[Launch],
-        queue: Queue[AnalysisCandidate],
-        finished_queue: Queue[str],
-        early_finish_event: Event,
         max_batch_size: int = 30,
-    ) -> None:
+    ) -> list[AnalysisCandidate]:
         t_start = time()
+        all_candidates = []
         batches = []
         batch_logs = []
         index_in_batch = 0
@@ -390,6 +387,7 @@ class AutoAnalyzerService(AnalyzerService):
         batch_size = 5
         n_first_blocks = 3
         test_items_number_to_process = 0
+
         try:
             for launch in launches:
                 index_name = text_processing.unite_project_name(launch.project, self.app_config.esProjectIndexPrefix)
@@ -398,18 +396,14 @@ class AutoAnalyzerService(AnalyzerService):
                 if test_items_number_to_process >= self.search_cfg.MaxAutoAnalysisItemsToProcess:
                     logger.info("Only first %d test items were taken", self.search_cfg.MaxAutoAnalysisItemsToProcess)
                     break
-                if early_finish_event.is_set():
-                    logger.info("Early finish from analyzer before timeout")
-                    break
+
                 for test_item in launch.testItems:
                     if test_items_number_to_process >= self.search_cfg.MaxAutoAnalysisItemsToProcess:
                         logger.info(
                             "Only first %d test items were taken", self.search_cfg.MaxAutoAnalysisItemsToProcess
                         )
                         break
-                    if early_finish_event.is_set():
-                        logger.info("Early finish from analyzer before timeout")
-                        break
+
                     unique_logs = text_processing.leave_only_unique_logs(test_item.logs)
                     prepared_logs = [
                         request_factory.prepare_log(launch, test_item, log, index_name)
@@ -451,53 +445,47 @@ class AutoAnalyzerService(AnalyzerService):
                         batch_size = max_batch_size
                     if len(batches) >= batch_size:
                         n_first_blocks -= 1
-                        self._send_result_to_queue(test_item_dict, batches, batch_logs, queue)
+                        batch_candidates = self._process_batch(test_item_dict, batches, batch_logs)
+                        all_candidates.extend(batch_candidates)
                         batches = []
                         batch_logs = []
                         test_item_dict = {}
                         index_in_batch = 0
                     test_items_number_to_process += 1
+
+            # Process remaining batches
             if len(batches) > 0:
-                self._send_result_to_queue(test_item_dict, batches, batch_logs, queue)
+                batch_candidates = self._process_batch(test_item_dict, batches, batch_logs)
+                all_candidates.extend(batch_candidates)
 
         except Exception as exc:
             logger.exception("Error in ES query", exc_info=exc)
-        finished_queue.put("Finished")
+
         logger.info("Es queries finished %.2f s.", time() - t_start)
+        return all_candidates
 
     @utils.ignore_warnings
     def analyze_logs(self, launches: list[Launch]) -> list[AnalysisResult]:
         cnt_launches = len(launches)
         logger.info(f"Started analysis for {cnt_launches} launches")
-        queue = Queue()
-        finished_queue = Queue()
-        early_finish_event = Event()
-        es_query_thread = Thread(
-            target=self._query_elasticsearch, args=(launches, queue, finished_queue, early_finish_event)
-        )
-        es_query_thread.daemon = True
-        es_query_thread.start()
+
         analyzed_results_for_index = []
         t_start = time()
         results = []
         results_to_share = {}
         cnt_items_to_process = 0
+        chosen_namespaces = {}
+
         try:
-            chosen_namespaces = {}
-            while finished_queue.empty() or not queue.empty():
-                if (
-                    self.search_cfg.AutoAnalysisTimeout - (time() - t_start)
-                ) <= 5:  # check whether we are running out of time # noqa
-                    early_finish_event.set()
-                    break
-                if queue.empty():
-                    sleep(0.1)
-                    continue
-                else:
-                    analyzer_candidates = queue.get()
+            # Generate all analysis candidates using batch processing
+            all_candidates = self._generate_analysis_candidates(launches)
+
+            # Process each candidate sequentially
+            for analyzer_candidates in all_candidates:
                 try:
                     project_id = analyzer_candidates.project
                     launch_id = analyzer_candidates.launchId
+
                     if launch_id not in results_to_share:
                         results_to_share[launch_id] = {
                             "not_found": 0,
@@ -631,11 +619,14 @@ class AutoAnalyzerService(AnalyzerService):
                     if not found_result:
                         results_to_share[launch_id]["not_found"] += 1
                     results_to_share[launch_id]["processed_time"] += time() - t_start_item
+
                 except Exception as exc:
                     logger.exception(exc)
                     if launch_id in results_to_share:
                         results_to_share[launch_id]["errors"].append(utils.extract_exception(exc))
                         results_to_share[launch_id]["errors_count"] += 1
+
+            # Send results to AMQP if configured
             if self.app_config.amqpUrl and analyzed_results_for_index:
                 amqp_client = AmqpClient(self.app_config)
                 amqp_client.send_to_inner_queue(
@@ -645,9 +636,10 @@ class AutoAnalyzerService(AnalyzerService):
                     results_to_share[launch_id]["model_info"] = list(results_to_share[launch_id]["model_info"])
                 amqp_client.send_to_inner_queue("stats_info", json.dumps(results_to_share))
                 amqp_client.close()
+
         except Exception as exc:
             logger.exception(exc)
-        es_query_thread.join()
+
         logger.debug(f"Stats info: {json.dumps(results_to_share)}")
         logger.info(f"Processed {cnt_items_to_process} test items. It took {time() - t_start:.2f} sec.")
         logger.info(f"Finished analysis for {cnt_launches} launches with {len(results)} results.")

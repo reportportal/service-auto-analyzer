@@ -29,7 +29,7 @@ MODEL_FILES: list[str] = ["boost_model.pickle", "data_features_config.pickle"]
 DEFAULT_RANDOM_STATE = 43
 DEFAULT_N_ESTIMATORS = 75
 DEFAULT_MAX_DEPTH = 5
-DEFAULT_LEARNING_RATE = 0.4
+DEFAULT_LEARNING_RATE = 0.2
 
 
 class BoostingDecisionMaker(MlModel):

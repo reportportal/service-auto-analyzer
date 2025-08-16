@@ -94,7 +94,7 @@ class BoostingFeaturizer:
             49: (self.is_text_of_particular_defect_type, {"label_type": "pb"}, []),
             50: (self.is_text_of_particular_defect_type, {"label_type": "si"}, []),
             51: (self.predict_particular_defect_type, {}, []),
-            52: (self._calculate_similarity_percent, {"field_name": "namespaces_stacktrace"}, []),
+            52: (self.fields_equal, {"field_name": "urls"}, []),
             53: (
                 self._calculate_similarity_percent,
                 {"field_name": "detected_message_without_params_and_brackets"},

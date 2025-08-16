@@ -286,18 +286,26 @@ def get_potential_status_codes(text: str) -> list[str]:
     return potential_codes_list
 
 
-def get_unique_potential_status_codes(text: str) -> list[str]:
-    """Get unique potential status codes from the text."""
-    potential_codes = get_potential_status_codes(text)
-    if not potential_codes:
+def get_unique_strings(strings: list[str]) -> list[str]:
+    """Get unique strings from the list.
+
+    :param strings: List of strings to filter.
+    :return: List of unique strings.
+    """
+    if not strings:
         return []
-    unique_codes = set()
+    unique_strings = set()
     result = []
-    for code in potential_codes:
-        if code not in unique_codes:
-            unique_codes.add(code)
+    for code in strings:
+        if code not in unique_strings:
+            unique_strings.add(code)
             result.append(code)
     return result
+
+
+def get_unique_potential_status_codes(text: str) -> list[str]:
+    """Get unique potential status codes from the text."""
+    return get_unique_strings(get_potential_status_codes(text))
 
 
 NUMBER_PATTERN = re.compile(r"\b\d+\b")
@@ -664,13 +672,15 @@ URL_PATTERN = re.compile(r"\b[\w+]+:/\S+\b", re.IGNORECASE)
 
 
 def extract_urls(text: str) -> list[str]:
-    all_unique = set()
+    """Extracts URLs from the given text.
+
+    :param text: The input text from which to extract URLs.
+    :return: A list of extracted URLs.
+    """
     all_urls = []
     for param in URL_PATTERN.findall(text):
         url = param.strip()
-        if url not in all_unique:
-            all_unique.add(url)
-            all_urls.append(url)
+        all_urls.append(url)
     return all_urls
 
 

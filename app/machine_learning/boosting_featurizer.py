@@ -100,7 +100,7 @@ class BoostingFeaturizer:
                 {"field_name": "detected_message_without_params_and_brackets"},
                 [],
             ),
-            55: (self._calculate_similarity_by_values, {"field_name": "potential_status_codes"}, []),
+            55: (self.fields_equal, {"field_name": "potential_status_codes"}, []),
             56: (self.is_the_same_launch, {}, []),
             57: (self.is_the_same_launch_id, {}, []),
             59: (self._calculate_similarity_percent, {"field_name": "found_tests_and_methods"}, []),
@@ -123,10 +123,12 @@ class BoostingFeaturizer:
                 processed_results, fields=filter_min_should_match_any
             )
         self.test_item_log_stats = self._calculate_stats_by_test_item_ids(processed_results)
-        filter_by_all_logs_should_be_similar = self.config.get("filter_by_all_logs_should_be_similar", None)
+        filter_by_all_logs_should_be_similar: Optional[bool] = self.config.get(
+            "filter_by_all_logs_should_be_similar", None
+        )
         if filter_by_all_logs_should_be_similar:
             processed_results = self.filter_by_all_logs_should_be_similar(processed_results)
-        filter_by_test_case_hash = self.config.get("filter_by_test_case_hash", None)
+        filter_by_test_case_hash: Optional[bool] = self.config.get("filter_by_test_case_hash", None)
         if filter_by_test_case_hash:
             processed_results = self.filter_by_test_case_hash(processed_results)
         if "calculate_similarities" not in self.config or self.config["calculate_similarities"]:
@@ -332,54 +334,55 @@ class BoostingFeaturizer:
             new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
 
-    def is_the_same_field(self, field_name: str) -> dict[str, int]:
+    def fields_equal(self, field_name: str, lowercase: bool = False) -> dict[str, int]:
         """Check if the query log and search results contain field and its values are equal.
 
         :param str field_name: field name to compare
+        :param bool lowercase: if True, compare values in lowercase
         :return: dict with issue type as key and value as 1 if fields are equal, 0 otherwise
         """
         scores_by_issue_type = self.find_most_relevant_by_type()
-        num_of_logs_issue_type = {}
+        result = {}
         for issue_type, search_rs in scores_by_issue_type.items():
             rel_item_value = search_rs["mrHit"]["_source"][field_name]
             queried_item_value = search_rs["compared_log"]["_source"][field_name]
 
             if rel_item_value is None and queried_item_value is None:
-                num_of_logs_issue_type[issue_type] = 0
+                result[issue_type] = 0
                 continue
-
-            if type(queried_item_value) is str:
-                queried_item_value = queried_item_value.strip().lower()
-            if type(rel_item_value) is str:
-                rel_item_value = rel_item_value.strip().lower()
 
             if rel_item_value == "" and queried_item_value == "":
-                num_of_logs_issue_type[issue_type] = 0
+                result[issue_type] = 0
                 continue
 
-            num_of_logs_issue_type[issue_type] = int(rel_item_value == queried_item_value)
-        return num_of_logs_issue_type
+            if lowercase and type(queried_item_value) is str:
+                queried_item_value = queried_item_value.strip().lower()
+            if lowercase and type(rel_item_value) is str:
+                rel_item_value = rel_item_value.strip().lower()
+
+            result[issue_type] = int(rel_item_value == queried_item_value)
+        return result
 
     def is_the_same_test_case(self) -> dict[str, int]:
         """Check if the query log and search results contain the same Test Case Hash.
 
         :return: dict with issue type as key and value as 1 if Test Case Hashes are equal, 0 otherwise
         """
-        return self.is_the_same_field("test_case_hash")
+        return self.fields_equal("test_case_hash", lowercase=True)
 
     def is_the_same_launch(self) -> dict[str, int]:
         """Check if the query log and search results contain the same Launch Name.
 
         :return: dict with issue type as key and value as 1 if Launch Names are equal, 0 otherwise
         """
-        return self.is_the_same_field("launch_name")
+        return self.fields_equal("launch_name", lowercase=True)
 
     def is_the_same_launch_id(self) -> dict[str, int]:
         """Check if the query log and search results contain the same Launch ID.
 
         :return: dict with issue type as key and value as 1 if Launch IDs are equal, 0 otherwise
         """
-        return self.is_the_same_field("launch_id")
+        return self.fields_equal("launch_id")
 
     def has_the_same_test_case_in_all_results(self) -> dict[str, int]:
         """Check if the query log and search results contain the same Test Case Hash in any of all results.

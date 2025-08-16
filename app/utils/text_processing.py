@@ -272,7 +272,6 @@ STATUS_CODES_PATTERNS = [
 
 
 def get_potential_status_codes(text: str) -> list[str]:
-    potential_codes = set()
     potential_codes_list = []
     for line in text.split("\n"):
         line = clean_from_brackets(line)
@@ -282,10 +281,23 @@ def get_potential_status_codes(text: str) -> list[str]:
                 continue
             for i in range(1, 4):
                 found_code = (result.group(i) or "").strip()
-                if found_code and found_code not in potential_codes:
-                    potential_codes.add(found_code)
+                if found_code:
                     potential_codes_list.append(found_code)
     return potential_codes_list
+
+
+def get_unique_potential_status_codes(text: str) -> list[str]:
+    """Get unique potential status codes from the text."""
+    potential_codes = get_potential_status_codes(text)
+    if not potential_codes:
+        return []
+    unique_codes = set()
+    result = []
+    for code in potential_codes:
+        if code not in unique_codes:
+            unique_codes.add(code)
+            result.append(code)
+    return result
 
 
 NUMBER_PATTERN = re.compile(r"\b\d+\b")
@@ -308,7 +320,7 @@ def first_lines(log_str: str, n_lines: int) -> str:
 def prepare_message_for_clustering(
     message: str, number_of_log_lines: int, clean_numbers: bool, leave_log_structure: bool = False
 ) -> str:
-    potential_status_codes = get_potential_status_codes(message)
+    potential_status_codes = get_unique_potential_status_codes(message)
     message = remove_starting_datetime(message)
     if clean_numbers:
         status_codes_replaced = {}
@@ -409,7 +421,7 @@ def normalize_message(message: str) -> str:
 def find_only_numbers(detected_message_with_numbers: str) -> str:
     """Removes all non digit symbols and concatenates unique numbers"""
     detected_message_only_numbers = re.sub(r"[^\d ._]", "", detected_message_with_numbers)
-    return " ".join(split_words(detected_message_only_numbers))
+    return " ".join(split_words(detected_message_only_numbers, only_unique=False))
 
 
 def enrich_text_with_method_and_classes(text: str) -> str:

@@ -29,6 +29,7 @@ MODEL_FILES: list[str] = ["boost_model.pickle", "data_features_config.pickle"]
 DEFAULT_RANDOM_STATE = 43
 DEFAULT_N_ESTIMATORS = 75
 DEFAULT_MAX_DEPTH = 5
+DEFAULT_LEARNING_RATE = 0.2
 
 
 class BoostingDecisionMaker(MlModel):
@@ -36,6 +37,7 @@ class BoostingDecisionMaker(MlModel):
     n_estimators: int
     max_depth: int
     random_state: int
+    learning_rate: float
     feature_ids: list[int]
     monotonous_features: set[int]
     boost_model: Any
@@ -50,11 +52,13 @@ class BoostingDecisionMaker(MlModel):
         n_estimators: Optional[int] = None,
         max_depth: Optional[int] = None,
         random_state: Optional[int] = None,
+        learning_rate: Optional[float] = DEFAULT_LEARNING_RATE,
     ) -> None:
         super().__init__(object_saver, tags)
         self.n_estimators = n_estimators if n_estimators is not None else DEFAULT_N_ESTIMATORS
         self.max_depth = max_depth if max_depth is not None else DEFAULT_MAX_DEPTH
         self.random_state = random_state if random_state is not None else DEFAULT_RANDOM_STATE
+        self.learning_rate = learning_rate
         self.boost_model = XGBClassifier(
             n_estimators=n_estimators, max_depth=max_depth, random_state=self.random_state
         )
@@ -112,6 +116,7 @@ class BoostingDecisionMaker(MlModel):
             max_depth=self.max_depth,
             random_state=self.random_state,
             monotone_constraints=mon_features_prepared,
+            learning_rate=self.learning_rate,
         )
         self.boost_model.fit(train_data, labels)
         self._loaded = True

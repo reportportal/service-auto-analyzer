@@ -119,7 +119,7 @@ class PreparedLogMessage:
     def exception_message_no_urls(self) -> str:
         if not self._exception_message_no_urls:
             self._exception_message_no_urls = text_processing.remove_urls(
-                self.exception_message, self.exception_message_urls_list
+                self.exception_message, text_processing.get_unique_strings(self.exception_message_urls_list)
             )
         return self._exception_message_no_urls
 

@@ -70,7 +70,6 @@ class TestModelChooserChooseModel:
         return SearchConfig(
             BoostModelFolder=utils.strip_path(model_settings["BOOST_MODEL_FOLDER"]),
             SuggestBoostModelFolder=utils.strip_path(model_settings["SUGGEST_BOOST_MODEL_FOLDER"]),
-            SimilarityWeightsFolder=utils.strip_path(model_settings["SIMILARITY_WEIGHTS_FOLDER"]),
             GlobalDefectTypeModelFolder=utils.strip_path(model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]),
         )
 

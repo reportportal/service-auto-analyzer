@@ -100,7 +100,6 @@ class SearchConfig(BaseModel):
     ProbabilityForCustomModelAutoAnalysis: float = 0.5
     BoostModelFolder: str = ""
     SuggestBoostModelFolder: str = ""
-    SimilarityWeightsFolder: str = ""
     GlobalDefectTypeModelFolder: str = ""
     SuggestBoostModelFeatures: str = ""
     AutoBoostModelFeatures: str = ""

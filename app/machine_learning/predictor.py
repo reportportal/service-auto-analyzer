@@ -21,7 +21,7 @@ from typing_extensions import override
 from app.commons.model.ml import ModelType
 from app.commons.model_chooser import ModelChooser
 from app.machine_learning.boosting_featurizer import BoostingFeaturizer
-from app.machine_learning.models import BoostingDecisionMaker, DefectTypeModel, WeightedSimilarityCalculator
+from app.machine_learning.models import BoostingDecisionMaker, DefectTypeModel
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils.text_processing import calculate_text_similarity
 
@@ -97,7 +97,6 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
     boosting_config: dict[str, Any]
     boosting_decision_maker: BoostingDecisionMaker
     defect_type_model: DefectTypeModel
-    weighted_log_similarity_calculator: WeightedSimilarityCalculator
 
     def __init__(
         self,
@@ -105,7 +104,6 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
         model_chooser: ModelChooser,
         project_id: int,
         boosting_config: dict[str, Any],
-        weighted_log_similarity_calculator: WeightedSimilarityCalculator,
         custom_model_prob: float = 0.0,
         hash_source: Optional[Union[int, str]] = None,
     ) -> None:
@@ -114,13 +112,11 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
         :param ModelChooser model_chooser: Service for choosing appropriate ML models
         :param int project_id: Project identifier for model selection
         :param dict[str, Any] boosting_config: Configuration for the boosting featurizer
-        :param WeightedSimilarityCalculator weighted_log_similarity_calculator: Model for calculating log similarities
         :param float custom_model_prob: Probability to use custom model instead of global
         :param Optional[Union[int, str]] hash_source: Source for hash-based model selection
         """
         super().__init__()
         self.boosting_config = boosting_config
-        self.weighted_log_similarity_calculator = weighted_log_similarity_calculator
 
         # Acquire models
         self.boosting_decision_maker = model_chooser.choose_model(  # type: ignore[assignment]
@@ -212,7 +208,6 @@ class AutoAnalysisPredictor(MlPredictor):
         model_chooser: ModelChooser,
         project_id: int,
         boosting_config: dict[str, Any],
-        weighted_log_similarity_calculator: WeightedSimilarityCalculator,
         custom_model_prob: float = 0.0,
         hash_source: Optional[Union[int, str]] = None,
     ) -> None:
@@ -221,7 +216,6 @@ class AutoAnalysisPredictor(MlPredictor):
         :param ModelChooser model_chooser: Service for choosing appropriate ML models
         :param int project_id: Project identifier for model selection
         :param dict[str, Any] boosting_config: Configuration for the boosting featurizer
-        :param WeightedSimilarityCalculator weighted_log_similarity_calculator: Model for calculating log similarities
         :param float custom_model_prob: Probability to use custom model instead of global
         :param Optional[Union[int, str]] hash_source: Source for hash-based model selection
         """
@@ -229,7 +223,6 @@ class AutoAnalysisPredictor(MlPredictor):
             model_chooser=model_chooser,
             project_id=project_id,
             boosting_config=boosting_config,
-            weighted_log_similarity_calculator=weighted_log_similarity_calculator,
             custom_model_prob=custom_model_prob,
             hash_source=hash_source,
         )
@@ -248,10 +241,7 @@ class AutoAnalysisPredictor(MlPredictor):
         :return: Configured BoostingFeaturizer instance
         """
         featurizer = BoostingFeaturizer(
-            search_results,
-            self.boosting_config,
-            feature_ids=self.boosting_decision_maker.feature_ids,
-            weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
+            search_results, self.boosting_config, feature_ids=self.boosting_decision_maker.feature_ids
         )
         featurizer.set_defect_type_model(self.defect_type_model)
         return featurizer
@@ -268,7 +258,6 @@ class SuggestionPredictor(MlPredictor):
         model_chooser: ModelChooser,
         project_id: int,
         boosting_config: dict[str, Any],
-        weighted_log_similarity_calculator: WeightedSimilarityCalculator,
         custom_model_prob: float = 0.0,
         hash_source: Optional[Union[int, str]] = None,
     ) -> None:
@@ -277,7 +266,6 @@ class SuggestionPredictor(MlPredictor):
         :param ModelChooser model_chooser: Service for choosing appropriate ML models
         :param int project_id: Project identifier for model selection
         :param dict[str, Any] boosting_config: Configuration for the boosting featurizer
-        :param WeightedSimilarityCalculator weighted_log_similarity_calculator: Model for calculating log similarities
         :param float custom_model_prob: Probability to use custom model instead of global
         :param Optional[Union[int, str]] hash_source: Source for hash-based model selection
         """
@@ -285,7 +273,6 @@ class SuggestionPredictor(MlPredictor):
             model_chooser=model_chooser,
             project_id=project_id,
             boosting_config=boosting_config,
-            weighted_log_similarity_calculator=weighted_log_similarity_calculator,
             custom_model_prob=custom_model_prob,
             hash_source=hash_source,
         )
@@ -307,7 +294,6 @@ class SuggestionPredictor(MlPredictor):
             search_results,
             self.boosting_config,
             feature_ids=self.boosting_decision_maker.feature_ids,
-            weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
         )
         featurizer.set_defect_type_model(self.defect_type_model)
         return featurizer
@@ -348,7 +334,7 @@ class SimilarityPredictor(Predictor):
         # Group results by test_item to find most relevant for each
         results_by_test_item = {}
 
-        for idx, (hit, similarity) in enumerate(zip(valid_hits, similarity_scores)):
+        for idx, (hit, (similarity, _)) in enumerate(zip(valid_hits, similarity_scores)):
             # Get test_item identifier
             test_item = str(hit.get("_source", {}).get("test_item", "unknown"))
 

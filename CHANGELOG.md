@@ -1,9 +1,17 @@
 # Changelog
 ## [Unreleased]
+### Added
+- `_is_analyzed_manually` feature in `BoostingFeaturizer` class, by @HardNorth
+- Newly trained models, by @HardNorth
 ### Fixed
 - Text similarity calculation for cases when a text contains only stop words, by @HardNorth
 ### Changed
 - Refactor request calling in `esclient` class, by @HardNorth
+- Text similarity calculation logic replaced with less sophisticated one, by @HardNorth
+- Comparison logic of `potential_status_codes` and `only_numbers` fields, by @HardNorth
+### Removed
+- `potential_status_codes` field from minimal threshold validation as it unreliable, by @HardNorth
+- Similarity weights model, by @HardNorth
 
 ## [5.14.3]
 ### Fixed

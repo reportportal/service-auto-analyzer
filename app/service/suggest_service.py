@@ -257,9 +257,9 @@ class SuggestService(AnalyzerService):
                 stacktrace_sim = sim_dict["stacktrace"][group_id]
                 merged_logs_sim = sim_dict["merged_small_logs"][group_id]
                 if (
-                    detected_message_sim["similarity"] >= 0.98
-                    and stacktrace_sim["similarity"] >= 0.98
-                    and merged_logs_sim["similarity"] >= 0.98
+                    (detected_message_sim["both_empty"] or detected_message_sim["similarity"] >= 0.98)
+                    and (stacktrace_sim["both_empty"] or stacktrace_sim["similarity"] >= 0.98)
+                    and (merged_logs_sim["both_empty"] or merged_logs_sim["similarity"] >= 0.98)
                 ):
                     deleted_indices.add(j)
             filtered_results.append(prediction_results[i])

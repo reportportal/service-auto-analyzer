@@ -19,7 +19,7 @@ import numpy as np
 
 from app.commons.object_saving import create_filesystem
 from app.machine_learning.boosting_featurizer import BoostingFeaturizer
-from app.machine_learning.models import DefectTypeModel, WeightedSimilarityCalculator
+from app.machine_learning.models import DefectTypeModel
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import utils
@@ -143,13 +143,7 @@ class TestBoostingModel(unittest.TestCase):
         for idx, test in enumerate(tests):
             print(f"Running test {idx}")
             feature_ids = test["decision_maker"].feature_ids
-            weight_log_sim = None
-            if self.weights_folder.strip():
-                weight_log_sim = WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
-                weight_log_sim.load_model()
-            _boosting_featurizer = BoostingFeaturizer(
-                test["elastic_results"], test["config"], feature_ids, weighted_log_similarity_calculator=weight_log_sim
-            )
+            _boosting_featurizer = BoostingFeaturizer(test["elastic_results"], test["config"], feature_ids)
             if self.global_defect_type_model_folder.strip():
                 model = DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
                 model.load_model()
@@ -257,13 +251,7 @@ class TestBoostingModel(unittest.TestCase):
         for idx, test in enumerate(tests):
             print(f"Running test {idx}")
             feature_ids = test["decision_maker"].feature_ids
-            weight_log_sim = None
-            if self.weights_folder.strip():
-                weight_log_sim = WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
-                weight_log_sim.load_model()
-            _boosting_featurizer = SuggestBoostingFeaturizer(
-                test["elastic_results"], test["config"], feature_ids, weighted_log_similarity_calculator=weight_log_sim
-            )
+            _boosting_featurizer = SuggestBoostingFeaturizer(test["elastic_results"], test["config"], feature_ids)
             if self.global_defect_type_model_folder.strip():
                 model = DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
                 model.load_model()

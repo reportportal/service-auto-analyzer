@@ -13,14 +13,14 @@
 #  limitations under the License.
 
 import json
+from collections import defaultdict
 from datetime import datetime
-from queue import Queue
-from threading import Event, Thread
-from time import sleep, time
+from functools import reduce
+from time import time
 from typing import Any, Optional
 
 from app.amqp.amqp import AmqpClient
-from app.commons import log_merger, logging, object_saving, request_factory
+from app.commons import log_merger, logging, request_factory
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import (
     AnalysisCandidate,
@@ -35,7 +35,6 @@ from app.commons.model.launch_objects import (
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.similarity_calculator import SimilarityCalculator
-from app.machine_learning.models import WeightedSimilarityCalculator
 from app.machine_learning.predictor import AutoAnalysisPredictor, PredictionResult
 from app.service.analyzer_service import AnalyzerService
 from app.utils import text_processing, utils
@@ -83,7 +82,6 @@ class AutoAnalyzerService(AnalyzerService):
     search_cfg: SearchConfig
     es_client: EsClient
     namespace_finder: NamespaceFinder
-    similarity_model: WeightedSimilarityCalculator
 
     def __init__(
         self,
@@ -97,12 +95,6 @@ class AutoAnalyzerService(AnalyzerService):
         super().__init__(model_chooser, search_cfg=self.search_cfg)
         self.es_client = es_client or EsClient(app_config=self.app_config)
         self.namespace_finder = NamespaceFinder(app_config)
-        weights_folder = self.search_cfg.SimilarityWeightsFolder
-        if not weights_folder:
-            raise ValueError("SimilarityWeightsFolder is not set")
-        if weights_folder:
-            self.similarity_model = WeightedSimilarityCalculator(object_saving.create_filesystem(weights_folder))
-            self.similarity_model.load_model()
 
     def get_config_for_boosting(self, analyzer_config: AnalyzerConf) -> dict[str, Any]:
         min_should_match = self.find_min_should_match_threshold(analyzer_config) / 100
@@ -122,11 +114,7 @@ class AutoAnalyzerService(AnalyzerService):
         }
 
     def choose_fields_to_filter_strict(self, log_lines: int, min_should_match: float) -> list[str]:
-        fields = (
-            ["detected_message", "message", "potential_status_codes"]
-            if log_lines == -1
-            else ["message", "potential_status_codes"]
-        )
+        fields = ["detected_message", "message"] if log_lines == -1 else ["message"]
         if min_should_match > 0.99:
             fields.append("found_tests_and_methods")
         return fields
@@ -278,7 +266,7 @@ class AutoAnalyzerService(AnalyzerService):
                 if log["_source"]["issue_type"][:2].lower() in ["nd", "ti"]:
                     no_defect_candidate_exists = True
             new_search_res = []
-            _similarity_calculator = SimilarityCalculator(boosting_config, similarity_model=self.similarity_model)
+            _similarity_calculator = SimilarityCalculator()
             if no_defect_candidate_exists:
                 sim_dict = _similarity_calculator.find_similarity(
                     [(log_info, search_res)], ["message", "merged_small_logs"]
@@ -340,20 +328,24 @@ class AutoAnalyzerService(AnalyzerService):
                 return [(log_info, {"hits": {"hits": [latest_item]}})]
         return []
 
-    def _send_result_to_queue(
+    def _process_batch(
         self,
         test_item_dict: dict[int, list[int]],
         batches: list[str],
         batch_logs: list[BatchLogInfo],
-        queue: Queue[AnalysisCandidate],
-    ) -> None:
+    ) -> list[AnalysisCandidate]:
         t_start = time()
         search_results = self.es_client.es_client.msearch("\n".join(batches) + "\n")
         partial_res = search_results["responses"] if search_results else []
         if not partial_res:
             logger.warning("No search results for batches")
-            return
+            return []
+        res_num = reduce(lambda a, b: a + b, [len(res["hits"]["hits"]) for res in partial_res], 0)
+        logger.info(f"Found {res_num} items by FTS (KNN)")
+        logger.debug(f"Items for analysis by FTS (KNN): {json.dumps(search_results)}")
+
         avg_time_processed = (time() - t_start) / (len(partial_res) if partial_res else 1)
+        analysis_candidates = []
         for test_item_id in test_item_dict:
             candidates = []
             candidates_with_no_defect = []
@@ -367,7 +359,7 @@ class AutoAnalyzerService(AnalyzerService):
                     candidates_with_no_defect.append((batch_log_info.log_info, partial_res[idx]))
                 time_processed += avg_time_processed
             if batch_log_info:
-                queue.put(
+                analysis_candidates.append(
                     AnalysisCandidate(
                         analyzerConfig=batch_log_info.analyzerConfig,
                         testItemId=batch_log_info.testItemId,
@@ -380,16 +372,15 @@ class AutoAnalyzerService(AnalyzerService):
                         candidatesWithNoDefect=candidates_with_no_defect,
                     )
                 )
+        return analysis_candidates
 
-    def _query_elasticsearch(
+    def _generate_analysis_candidates(
         self,
         launches: list[Launch],
-        queue: Queue[AnalysisCandidate],
-        finished_queue: Queue[str],
-        early_finish_event: Event,
         max_batch_size: int = 30,
-    ) -> None:
+    ) -> list[AnalysisCandidate]:
         t_start = time()
+        all_candidates = []
         batches = []
         batch_logs = []
         index_in_batch = 0
@@ -397,6 +388,7 @@ class AutoAnalyzerService(AnalyzerService):
         batch_size = 5
         n_first_blocks = 3
         test_items_number_to_process = 0
+
         try:
             for launch in launches:
                 index_name = text_processing.unite_project_name(launch.project, self.app_config.esProjectIndexPrefix)
@@ -405,18 +397,14 @@ class AutoAnalyzerService(AnalyzerService):
                 if test_items_number_to_process >= self.search_cfg.MaxAutoAnalysisItemsToProcess:
                     logger.info("Only first %d test items were taken", self.search_cfg.MaxAutoAnalysisItemsToProcess)
                     break
-                if early_finish_event.is_set():
-                    logger.info("Early finish from analyzer before timeout")
-                    break
+
                 for test_item in launch.testItems:
                     if test_items_number_to_process >= self.search_cfg.MaxAutoAnalysisItemsToProcess:
                         logger.info(
                             "Only first %d test items were taken", self.search_cfg.MaxAutoAnalysisItemsToProcess
                         )
                         break
-                    if early_finish_event.is_set():
-                        logger.info("Early finish from analyzer before timeout")
-                        break
+
                     unique_logs = text_processing.leave_only_unique_logs(test_item.logs)
                     prepared_logs = [
                         request_factory.prepare_log(launch, test_item, log, index_name)
@@ -458,192 +446,200 @@ class AutoAnalyzerService(AnalyzerService):
                         batch_size = max_batch_size
                     if len(batches) >= batch_size:
                         n_first_blocks -= 1
-                        self._send_result_to_queue(test_item_dict, batches, batch_logs, queue)
+                        batch_candidates = self._process_batch(test_item_dict, batches, batch_logs)
+                        all_candidates.extend(batch_candidates)
                         batches = []
                         batch_logs = []
                         test_item_dict = {}
                         index_in_batch = 0
                     test_items_number_to_process += 1
+
+            # Process remaining batches
             if len(batches) > 0:
-                self._send_result_to_queue(test_item_dict, batches, batch_logs, queue)
+                batch_candidates = self._process_batch(test_item_dict, batches, batch_logs)
+                all_candidates.extend(batch_candidates)
 
         except Exception as exc:
             logger.exception("Error in ES query", exc_info=exc)
-        finished_queue.put("Finished")
+
         logger.info("Es queries finished %.2f s.", time() - t_start)
+        return all_candidates
 
     @utils.ignore_warnings
     def analyze_logs(self, launches: list[Launch]) -> list[AnalysisResult]:
         cnt_launches = len(launches)
         logger.info(f"Started analysis for {cnt_launches} launches")
-        queue = Queue()
-        finished_queue = Queue()
-        early_finish_event = Event()
-        es_query_thread = Thread(
-            target=self._query_elasticsearch, args=(launches, queue, finished_queue, early_finish_event)
-        )
-        es_query_thread.daemon = True
-        es_query_thread.start()
+
         analyzed_results_for_index = []
         t_start = time()
         results = []
         results_to_share = {}
         cnt_items_to_process = 0
+        chosen_namespaces = {}
+
         try:
-            chosen_namespaces = {}
-            while finished_queue.empty() or not queue.empty():
-                if (
-                    self.search_cfg.AutoAnalysisTimeout - (time() - t_start)
-                ) <= 5:  # check whether we are running out of time # noqa
-                    early_finish_event.set()
-                    break
-                if queue.empty():
-                    sleep(0.1)
+            # Generate all analysis candidates using batch processing
+            all_candidates = self._generate_analysis_candidates(launches)
+
+            # Group by Project ID and Launch ID
+            all_candidates_by_launch_and_project: dict[tuple[int, int], list[AnalysisCandidate]] = defaultdict(list)
+            for candidate in all_candidates:
+                all_candidates_by_launch_and_project[candidate.project, candidate.launchId].append(candidate)
+
+            # Process candidates sequentially
+            for (project_id, launch_id), analyzer_candidates in all_candidates_by_launch_and_project.items():
+                if not analyzer_candidates:
+                    logger.info(f"No candidates found for project {project_id}, launch {launch_id}")
                     continue
-                else:
-                    analyzer_candidates = queue.get()
-                try:
-                    project_id = analyzer_candidates.project
-                    launch_id = analyzer_candidates.launchId
-                    if launch_id not in results_to_share:
-                        results_to_share[launch_id] = {
-                            "not_found": 0,
-                            "items_to_process": 0,
-                            "processed_time": 0,
-                            "launch_id": launch_id,
-                            "launch_name": analyzer_candidates.launchName,
-                            "project_id": project_id,
-                            "method": "auto_analysis",
-                            "gather_date": datetime.now().strftime("%Y-%m-%d"),
-                            "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            "number_of_log_lines": analyzer_candidates.analyzerConfig.numberOfLogLines,
-                            "min_should_match": self.find_min_should_match_threshold(
-                                analyzer_candidates.analyzerConfig
-                            ),
-                            "model_info": [],
-                            "module_version": [self.app_config.appVersion],
-                            "errors": [],
-                            "errors_count": 0,
-                        }
 
-                    t_start_item = time()
-                    cnt_items_to_process += 1
-                    results_to_share[launch_id]["items_to_process"] += 1
-                    results_to_share[launch_id]["processed_time"] += analyzer_candidates.timeProcessed
-                    boosting_config = self.get_config_for_boosting(analyzer_candidates.analyzerConfig)
+                # Create predictor for auto analysis
+                analyzer_config = analyzer_candidates[0].analyzerConfig  # Same for all candidates in the launch
+                boosting_config = self.get_config_for_boosting(analyzer_config)
+                predictor = AutoAnalysisPredictor(
+                    model_chooser=self.model_chooser,
+                    project_id=project_id,
+                    boosting_config=boosting_config,
+                    custom_model_prob=self.search_cfg.ProbabilityForCustomModelAutoAnalysis,
+                    hash_source=launch_id,
+                )
 
-                    if project_id not in chosen_namespaces:
-                        chosen_namespaces[project_id] = self.namespace_finder.get_chosen_namespaces(project_id)
-                    boosting_config["chosen_namespaces"] = chosen_namespaces[project_id]
+                for analyzer_candidate in analyzer_candidates:
+                    try:
+                        if launch_id not in results_to_share:
+                            results_to_share[launch_id] = {
+                                "not_found": 0,
+                                "items_to_process": 0,
+                                "processed_time": 0,
+                                "launch_id": launch_id,
+                                "launch_name": analyzer_candidate.launchName,
+                                "project_id": project_id,
+                                "method": "auto_analysis",
+                                "gather_date": datetime.now().strftime("%Y-%m-%d"),
+                                "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                "number_of_log_lines": analyzer_candidate.analyzerConfig.numberOfLogLines,
+                                "min_should_match": self.find_min_should_match_threshold(
+                                    analyzer_candidate.analyzerConfig
+                                ),
+                                "model_info": [],
+                                "module_version": [self.app_config.appVersion],
+                                "errors": [],
+                                "errors_count": 0,
+                            }
 
-                    # Create predictor for auto analysis
-                    predictor = AutoAnalysisPredictor(
-                        model_chooser=self.model_chooser,
-                        project_id=project_id,
-                        boosting_config=boosting_config,
-                        weighted_log_similarity_calculator=self.similarity_model,
-                        custom_model_prob=self.search_cfg.ProbabilityForCustomModelAutoAnalysis,
-                        hash_source=launch_id,
-                    )
+                        t_start_item = time()
+                        cnt_items_to_process += 1
+                        results_to_share[launch_id]["items_to_process"] += 1
+                        results_to_share[launch_id]["processed_time"] += analyzer_candidate.timeProcessed
 
-                    relevant_with_no_defect_candidate = self.find_relevant_with_no_defect(
-                        analyzer_candidates.candidatesWithNoDefect, boosting_config
-                    )
+                        if project_id not in chosen_namespaces:
+                            chosen_namespaces[project_id] = self.namespace_finder.get_chosen_namespaces(project_id)
+                        boosting_config["chosen_namespaces"] = chosen_namespaces[project_id]
 
-                    candidates_to_check = []
-                    if relevant_with_no_defect_candidate:
-                        candidates_to_check.append(relevant_with_no_defect_candidate)
-                    candidates_to_check.append(analyzer_candidates.candidates)
-
-                    found_result = False
-
-                    for candidates in candidates_to_check:
-                        # Use predictor for the complete prediction workflow
-                        prediction_results = predictor.predict(candidates)
-
-                        if not prediction_results:
-                            logger.debug(f"There are no results for test item {analyzer_candidates.testItemId}")
-                            continue
-
-                        # Get model info tags from the first result (same for all results)
-                        model_info_tags = prediction_results[0].model_info_tags
-                        new_model_info_tags = set(results_to_share[launch_id]["model_info"])
-                        new_model_info_tags.update(model_info_tags)
-                        results_to_share[launch_id]["model_info"] = list(new_model_info_tags)
-
-                        # Debug logging
-                        for result in prediction_results:
-                            log_id = result.data["mrHit"]["_id"]
-                            logger.debug(
-                                f"Most relevant item with issue type '{result.identity}' has log id: {log_id}"
-                            )
-
-                        best = _choose_issue_type(prediction_results)
-                        if not best:
-                            logger.debug(f"Test item {analyzer_candidates.testItemId} has no relevant items")
-                            continue
-
-                        predicted_issue_type = best.identity
-                        prob = round(best.probability[1], 4)
-                        chosen_type = best.data
-                        feature_names = None
-                        feature_values = None
-                        if best.feature_info:
-                            feature_names = ";".join([str(f_id) for f_id in best.feature_info.feature_ids])
-                            feature_values = ";".join([str(f) for f in best.feature_info.feature_data])
-
-                        relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
-                        analysis_result = AnalysisResult(
-                            testItem=analyzer_candidates.testItemId,
-                            issueType=predicted_issue_type,
-                            relevantItem=relevant_item,
+                        relevant_with_no_defect_candidate = self.find_relevant_with_no_defect(
+                            analyzer_candidate.candidatesWithNoDefect, boosting_config
                         )
-                        relevant_log_id = utils.extract_real_id(chosen_type["mrHit"]["_id"])
-                        test_item_log_id = utils.extract_real_id(chosen_type["compared_log"]["_id"])
-                        analyzed_results_for_index.append(
-                            SuggestAnalysisResult(
-                                project=analyzer_candidates.project,
-                                testItem=analyzer_candidates.testItemId,
-                                testItemLogId=test_item_log_id,
-                                launchId=analyzer_candidates.launchId,
-                                launchName=analyzer_candidates.launchName,
-                                launchNumber=analyzer_candidates.launchNumber,
+
+                        candidates_to_check = []
+                        if relevant_with_no_defect_candidate:
+                            candidates_to_check.append(relevant_with_no_defect_candidate)
+                        candidates_to_check.append(analyzer_candidate.candidates)
+
+                        found_result = False
+
+                        for candidates in candidates_to_check:
+                            # Use predictor for the complete prediction workflow
+                            prediction_results = predictor.predict(candidates)
+
+                            if not prediction_results:
+                                logger.debug(f"There are no results for test item {analyzer_candidate.testItemId}")
+                                continue
+
+                            # Get model info tags from the first result (same for all results)
+                            model_info_tags = prediction_results[0].model_info_tags
+                            new_model_info_tags = set(results_to_share[launch_id]["model_info"])
+                            new_model_info_tags.update(model_info_tags)
+                            results_to_share[launch_id]["model_info"] = list(new_model_info_tags)
+
+                            # Debug logging
+                            for result in prediction_results:
+                                test_item_id = analyzer_candidate.testItemId
+                                relevant_test_item_id = result.data["mrHit"]["_source"]["test_item"]
+                                log_id = result.data["mrHit"]["_id"]
+                                logger.debug(
+                                    f"Most relevant ID for item '{test_item_id}' is '{relevant_test_item_id}', it has "
+                                    f"issue type '{result.identity}', log ID '{log_id}' and probability: "
+                                    + str(round(result.probability[1], 4))
+                                )
+
+                            best = _choose_issue_type(prediction_results)
+                            if not best:
+                                logger.debug(f"Test item {analyzer_candidate.testItemId} has no relevant items")
+                                continue
+
+                            predicted_issue_type = best.identity
+                            prob = round(best.probability[1], 4)
+                            chosen_type = best.data
+                            feature_names = None
+                            feature_values = None
+                            if best.feature_info:
+                                feature_names = ";".join([str(f_id) for f_id in best.feature_info.feature_ids])
+                                feature_values = ";".join([str(f) for f in best.feature_info.feature_data])
+
+                            relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
+                            analysis_result = AnalysisResult(
+                                testItem=analyzer_candidate.testItemId,
                                 issueType=predicted_issue_type,
                                 relevantItem=relevant_item,
-                                relevantLogId=relevant_log_id,
-                                isMergedLog=chosen_type["compared_log"]["_source"]["is_merged"],
-                                matchScore=round(prob * 100, 2),
-                                esScore=round(chosen_type["mrHit"]["_score"], 2),
-                                esPosition=best.original_position,
-                                modelFeatureNames=feature_names,
-                                modelFeatureValues=feature_values,
-                                modelInfo=";".join(model_info_tags),
-                                resultPosition=0,
-                                usedLogLines=analyzer_candidates.analyzerConfig.numberOfLogLines,
-                                minShouldMatch=self.find_min_should_match_threshold(
-                                    analyzer_candidates.analyzerConfig
-                                ),
-                                processedTime=time() - t_start_item,
-                                methodName="auto_analysis",
-                                userChoice=1,
                             )
-                        )  # default choice in AA, user will change via defect change
+                            relevant_log_id = utils.extract_real_id(chosen_type["mrHit"]["_id"])
+                            test_item_log_id = utils.extract_real_id(chosen_type["compared_log"]["_id"])
+                            analyzed_results_for_index.append(
+                                SuggestAnalysisResult(
+                                    project=analyzer_candidate.project,
+                                    testItem=analyzer_candidate.testItemId,
+                                    testItemLogId=test_item_log_id,
+                                    launchId=analyzer_candidate.launchId,
+                                    launchName=analyzer_candidate.launchName,
+                                    launchNumber=analyzer_candidate.launchNumber,
+                                    issueType=predicted_issue_type,
+                                    relevantItem=relevant_item,
+                                    relevantLogId=relevant_log_id,
+                                    isMergedLog=chosen_type["compared_log"]["_source"]["is_merged"],
+                                    matchScore=round(prob * 100, 2),
+                                    esScore=round(chosen_type["mrHit"]["_score"], 2),
+                                    esPosition=best.original_position,
+                                    modelFeatureNames=feature_names,
+                                    modelFeatureValues=feature_values,
+                                    modelInfo=";".join(model_info_tags),
+                                    resultPosition=0,
+                                    usedLogLines=analyzer_candidate.analyzerConfig.numberOfLogLines,
+                                    minShouldMatch=self.find_min_should_match_threshold(
+                                        analyzer_candidate.analyzerConfig
+                                    ),
+                                    processedTime=time() - t_start_item,
+                                    methodName="auto_analysis",
+                                    userChoice=1,
+                                )
+                            )  # default choice in AA, user will change via defect change
 
-                        results.append(analysis_result)
-                        found_result = True
-                        logger.debug(analysis_result)
+                            results.append(analysis_result)
+                            found_result = True
+                            logger.debug(analysis_result)
 
-                        if found_result:
-                            break
+                            if found_result:
+                                break
 
-                    if not found_result:
-                        results_to_share[launch_id]["not_found"] += 1
-                    results_to_share[launch_id]["processed_time"] += time() - t_start_item
-                except Exception as exc:
-                    logger.exception(exc)
-                    if launch_id in results_to_share:
-                        results_to_share[launch_id]["errors"].append(utils.extract_exception(exc))
-                        results_to_share[launch_id]["errors_count"] += 1
+                        if not found_result:
+                            results_to_share[launch_id]["not_found"] += 1
+                        results_to_share[launch_id]["processed_time"] += time() - t_start_item
+
+                    except Exception as exc:
+                        logger.exception(exc)
+                        if launch_id in results_to_share:
+                            results_to_share[launch_id]["errors"].append(utils.extract_exception(exc))
+                            results_to_share[launch_id]["errors_count"] += 1
+
+            # Send results to AMQP if configured
             if self.app_config.amqpUrl and analyzed_results_for_index:
                 amqp_client = AmqpClient(self.app_config)
                 amqp_client.send_to_inner_queue(
@@ -653,9 +649,10 @@ class AutoAnalyzerService(AnalyzerService):
                     results_to_share[launch_id]["model_info"] = list(results_to_share[launch_id]["model_info"])
                 amqp_client.send_to_inner_queue("stats_info", json.dumps(results_to_share))
                 amqp_client.close()
+
         except Exception as exc:
             logger.exception(exc)
-        es_query_thread.join()
+
         logger.debug(f"Stats info: {json.dumps(results_to_share)}")
         logger.info(f"Processed {cnt_items_to_process} test items. It took {time() - t_start:.2f} sec.")
         logger.info(f"Finished analysis for {cnt_launches} launches with {len(results)} results.")

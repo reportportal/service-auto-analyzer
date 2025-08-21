@@ -19,7 +19,6 @@ from typing import Any, Callable, Optional
 import numpy as np
 
 from app.commons import logging, similarity_calculator
-from app.machine_learning.models import WeightedSimilarityCalculator
 from app.machine_learning.models.defect_type_model import DATA_FIELD, DefectTypeModel
 from app.utils import text_processing, utils
 
@@ -42,13 +41,11 @@ class BoostingFeaturizer:
         results: list[tuple[dict[str, Any], dict[str, Any]]],
         config: dict[str, Any],
         feature_ids: str | list[int],
-        weighted_log_similarity_calculator: WeightedSimilarityCalculator,
+        **_: Any,
     ) -> None:
         self.config = config
         self.previously_gathered_features = {}
-        self.similarity_calculator = similarity_calculator.SimilarityCalculator(
-            self.config, similarity_model=weighted_log_similarity_calculator
-        )
+        self.similarity_calculator = similarity_calculator.SimilarityCalculator()
         if type(feature_ids) is str:
             self.feature_ids = text_processing.transform_string_feature_range_into_list(feature_ids)
         else:
@@ -79,13 +76,13 @@ class BoostingFeaturizer:
             18: (self._calculate_similarity_percent, {"field_name": "detected_message"}, []),
             19: (self._calculate_similarity_percent, {"field_name": "detected_message_with_numbers"}, []),
             23: (self._calculate_similarity_percent, {"field_name": "stacktrace"}, []),
-            25: (self._calculate_similarity_percent, {"field_name": "only_numbers"}, []),
+            25: (self._calculate_similarity_by_values, {"field_name": "only_numbers"}, []),
             26: (self._calculate_max_score_and_pos, {"return_val_name": "max_score"}, []),
             27: (self._calculate_min_score_and_pos, {"return_val_name": "min_score"}, []),
             28: (self._calculate_percent_count_items_and_mean, {"return_val_name": "mean_score"}, []),
             29: (self._calculate_similarity_percent, {"field_name": "message_params"}, []),
             34: (self._calculate_similarity_percent, {"field_name": "found_exceptions"}, []),
-            35: (self._is_all_log_lines, {}, []),
+            35: (self._is_analyzed_manually, {}, []),
             36: (self._calculate_similarity_percent, {"field_name": "detected_message_extended"}, []),
             37: (self._calculate_similarity_percent, {"field_name": "detected_message_without_params_extended"}, []),
             38: (self._calculate_similarity_percent, {"field_name": "stacktrace_extended"}, []),
@@ -97,13 +94,13 @@ class BoostingFeaturizer:
             49: (self.is_text_of_particular_defect_type, {"label_type": "pb"}, []),
             50: (self.is_text_of_particular_defect_type, {"label_type": "si"}, []),
             51: (self.predict_particular_defect_type, {}, []),
-            52: (self._calculate_similarity_percent, {"field_name": "namespaces_stacktrace"}, []),
+            52: (self.fields_equal, {"field_name": "urls"}, []),
             53: (
                 self._calculate_similarity_percent,
                 {"field_name": "detected_message_without_params_and_brackets"},
                 [],
             ),
-            55: (self._calculate_similarity_percent, {"field_name": "potential_status_codes"}, []),
+            55: (self.fields_equal, {"field_name": "potential_status_codes"}, []),
             56: (self.is_the_same_launch, {}, []),
             57: (self.is_the_same_launch_id, {}, []),
             59: (self._calculate_similarity_percent, {"field_name": "found_tests_and_methods"}, []),
@@ -126,10 +123,12 @@ class BoostingFeaturizer:
                 processed_results, fields=filter_min_should_match_any
             )
         self.test_item_log_stats = self._calculate_stats_by_test_item_ids(processed_results)
-        filter_by_all_logs_should_be_similar = self.config.get("filter_by_all_logs_should_be_similar", None)
+        filter_by_all_logs_should_be_similar: Optional[bool] = self.config.get(
+            "filter_by_all_logs_should_be_similar", None
+        )
         if filter_by_all_logs_should_be_similar:
             processed_results = self.filter_by_all_logs_should_be_similar(processed_results)
-        filter_by_test_case_hash = self.config.get("filter_by_test_case_hash", None)
+        filter_by_test_case_hash: Optional[bool] = self.config.get("filter_by_test_case_hash", None)
         if filter_by_test_case_hash:
             processed_results = self.filter_by_test_case_hash(processed_results)
         if "calculate_similarities" not in self.config or self.config["calculate_similarities"]:
@@ -335,54 +334,55 @@ class BoostingFeaturizer:
             new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
 
-    def is_the_same_field(self, field_name: str) -> dict[str, int]:
+    def fields_equal(self, field_name: str, lowercase: bool = False) -> dict[str, int]:
         """Check if the query log and search results contain field and its values are equal.
 
         :param str field_name: field name to compare
+        :param bool lowercase: if True, compare values in lowercase
         :return: dict with issue type as key and value as 1 if fields are equal, 0 otherwise
         """
         scores_by_issue_type = self.find_most_relevant_by_type()
-        num_of_logs_issue_type = {}
+        result = {}
         for issue_type, search_rs in scores_by_issue_type.items():
             rel_item_value = search_rs["mrHit"]["_source"][field_name]
             queried_item_value = search_rs["compared_log"]["_source"][field_name]
 
             if rel_item_value is None and queried_item_value is None:
-                num_of_logs_issue_type[issue_type] = 0
+                result[issue_type] = 0
                 continue
-
-            if type(queried_item_value) is str:
-                queried_item_value = queried_item_value.strip().lower()
-            if type(rel_item_value) is str:
-                rel_item_value = rel_item_value.strip().lower()
 
             if rel_item_value == "" and queried_item_value == "":
-                num_of_logs_issue_type[issue_type] = 0
+                result[issue_type] = 0
                 continue
 
-            num_of_logs_issue_type[issue_type] = int(rel_item_value == queried_item_value)
-        return num_of_logs_issue_type
+            if lowercase and type(queried_item_value) is str:
+                queried_item_value = queried_item_value.strip().lower()
+            if lowercase and type(rel_item_value) is str:
+                rel_item_value = rel_item_value.strip().lower()
+
+            result[issue_type] = int(rel_item_value == queried_item_value)
+        return result
 
     def is_the_same_test_case(self) -> dict[str, int]:
         """Check if the query log and search results contain the same Test Case Hash.
 
         :return: dict with issue type as key and value as 1 if Test Case Hashes are equal, 0 otherwise
         """
-        return self.is_the_same_field("test_case_hash")
+        return self.fields_equal("test_case_hash", lowercase=True)
 
     def is_the_same_launch(self) -> dict[str, int]:
         """Check if the query log and search results contain the same Launch Name.
 
         :return: dict with issue type as key and value as 1 if Launch Names are equal, 0 otherwise
         """
-        return self.is_the_same_field("launch_name")
+        return self.fields_equal("launch_name", lowercase=True)
 
     def is_the_same_launch_id(self) -> dict[str, int]:
         """Check if the query log and search results contain the same Launch ID.
 
         :return: dict with issue type as key and value as 1 if Launch IDs are equal, 0 otherwise
         """
-        return self.is_the_same_field("launch_id")
+        return self.fields_equal("launch_id")
 
     def has_the_same_test_case_in_all_results(self) -> dict[str, int]:
         """Check if the query log and search results contain the same Test Case Hash in any of all results.
@@ -422,16 +422,16 @@ class BoostingFeaturizer:
         scores_by_issue_type = self.find_most_relevant_by_type()
         return {item: search_rs["score"] for item, search_rs in scores_by_issue_type.items()}
 
-    def _is_all_log_lines(self) -> dict[str, int]:
-        """Return if all log lines were used to find the most relevant log.
+    def _is_analyzed_manually(self) -> dict[str, int]:
+        """Return if the search results were analyzed manually.
 
-        :return: dict with issue type as key and value as 1 if all log lines were used, 0 otherwise
+        :return: dict with issue type as key and value as 1 if analyzed manually, 0 otherwise
         """
-        scores_by_issue_type = self._calculate_score()
-        num_of_logs_issue_type = {}
-        for issue_type in scores_by_issue_type:
-            num_of_logs_issue_type[issue_type] = int(self.config["number_of_log_lines"] == -1)
-        return num_of_logs_issue_type
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        is_analyzed_manually = {}
+        for issue_type, search_rs in scores_by_issue_type.items():
+            is_analyzed_manually[issue_type] = int(not (search_rs["mrHit"]["_source"].get("is_auto_analyzed", True)))
+        return is_analyzed_manually
 
     def is_only_merged_small_logs(self) -> dict[str, int]:
         """Check if the query log and search results contain only merged small logs.
@@ -621,6 +621,46 @@ class BoostingFeaturizer:
                 hit["normalized_score"] = hit["_score"] / max_score
                 self.total_normalized_score += hit["normalized_score"]
         return all_results
+
+    def _calculate_similarity_by_values(self, field_name: str) -> dict[str, float]:
+        """Calculate similarity percent by specified field giving into account separate values in this field.
+
+        :param str field_name: name of field to calculate similarity
+        :return: dict with issue type as key and float value as similarity percent
+        """
+        scores_by_issue_type = self.find_most_relevant_by_type()
+        similarity_percent_by_field = {}
+        for issue_type, search_rs in scores_by_issue_type.items():
+            rq_field = search_rs["compared_log"]["_source"].get(field_name, "")
+            rs_field = search_rs["mrHit"]["_source"].get(field_name, "")
+            rq_values = [f for f in rq_field.split(" ") if f.strip()]
+            rs_values = [f for f in rs_field.split(" ") if f.strip()]
+            if not rq_values or not rs_values:
+                similarity_percent_by_field[issue_type] = 0.0
+                continue
+            max_value_number = max(len(rq_values), len(rs_values))
+            if len(rq_values) > len(rs_values):
+                base_values = rq_values
+                compared_values = rs_values
+            else:
+                base_values = rs_values
+                compared_values = rq_values
+            common_value_number = 0
+            different_value_number = 0
+            for base_value in base_values:
+                found = False
+                for i, compare_value in enumerate(compared_values):
+                    if base_value.strip().lower() == compare_value.strip().lower():
+                        common_value_number += 1
+                        del compared_values[i]
+                        found = True
+                        break
+                if not found:
+                    different_value_number += 1
+            similarity_percent_by_field[issue_type] = (common_value_number / max_value_number) * (
+                1 - (different_value_number / max_value_number)
+            )
+        return similarity_percent_by_field
 
     def _calculate_similarity_percent(self, field_name="message") -> dict[str, float]:
         """Calculate similarity percent by specified filed for every unique Issue Type from OpenSearch query result.

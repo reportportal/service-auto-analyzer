@@ -19,10 +19,11 @@ import traceback
 import warnings
 from collections import Counter
 from functools import wraps
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 import requests
+from requests import RequestException
 
 from app.commons import logging
 from app.commons.model import launch_objects
@@ -78,20 +79,27 @@ def jaccard_similarity(s1, s2):
     return len(s1.intersection(s2)) / len(s1.union(s2)) if len(s1.union(s2)) > 0 else 0
 
 
-def send_request(url, method, username, password):
+def send_request(
+    url: str, method: str, username: Optional[str], password: Optional[str], data: Optional[str] = None
+) -> Optional[Any]:
     """Send request with specified url and http method"""
+
+    kwargs = {}
+    if username:
+        kwargs["auth"] = (username, password)
+
+    if data:
+        kwargs["data"] = data
+        kwargs["headers"] = {"Content-Type": "application/json"}
+
     try:
-        if username.strip() and password.strip():
-            response = requests.get(url, auth=(username, password)) if method == "GET" else {}
-        else:
-            response = requests.get(url) if method == "GET" else {}
-        data = response._content.decode("utf-8")
-        content = json.loads(data, strict=False)
-        return content
-    except Exception as err:
-        logger.error("Error with loading url: %s", remove_credentials_from_url(url))
-        logger.error(err)
-    return []
+        response = requests.request(method.lower(), url, **kwargs)
+        response.raise_for_status()
+        if response.content:
+            return json.loads(response.text, strict=False)
+    except RequestException as err:
+        logger.exception(f"Error sending {method} request to URL: {remove_credentials_from_url(url)}", exc_info=err)
+    return None
 
 
 def extract_all_exceptions(bodies):

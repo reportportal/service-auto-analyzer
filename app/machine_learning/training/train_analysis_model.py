@@ -30,11 +30,7 @@ from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model_chooser import ModelChooser
 from app.machine_learning.boosting_featurizer import BoostingFeaturizer
-from app.machine_learning.models import (
-    BoostingDecisionMaker,
-    CustomBoostingDecisionMaker,
-    WeightedSimilarityCalculator,
-)
+from app.machine_learning.models import BoostingDecisionMaker, CustomBoostingDecisionMaker
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import text_processing, utils
 from app.utils.defaultdict import DefaultDict
@@ -115,6 +111,10 @@ def train_several_times(
         dedupe_data, labels = deduplicate_data(data, labels)
         for random_state in my_random_states:
             x_train, x_test, y_train, y_test = split_data(dedupe_data, labels, random_state)
+            LOGGER.debug(
+                f"Train data split with random state {random_state}: train size {len(x_train)}, test size "
+                + str(len(x_test))
+            )
             proportion_binary_labels = utils.calculate_proportions_for_labels(y_train)
             if proportion_binary_labels < SMOTE_PROPORTION:
                 oversample = BorderlineSMOTE(sampling_strategy=SMOTE_PROPORTION, random_state=random_state)
@@ -196,12 +196,6 @@ class AnalysisModelTraining:
         if not self.features:
             raise ValueError('No feature config found, please either correct values in "search_cfg" parameter')
 
-        self.weighted_log_similarity_calculator = None
-        if self.search_cfg.SimilarityWeightsFolder.strip():
-            self.weighted_log_similarity_calculator = WeightedSimilarityCalculator(
-                object_saving.create_filesystem(self.search_cfg.SimilarityWeightsFolder)
-            )
-            self.weighted_log_similarity_calculator.load_model()
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.model_chooser = model_chooser
 
@@ -370,14 +364,12 @@ class AnalysisModelTraining:
                             searched_res,
                             self.get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
                             feature_ids=features,
-                            weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
                         )
                     else:
                         _boosting_data_gatherer = BoostingFeaturizer(
                             searched_res,
                             self.get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
                             feature_ids=features,
-                            weighted_log_similarity_calculator=self.weighted_log_similarity_calculator,
                         )
 
                     # noinspection PyTypeChecker

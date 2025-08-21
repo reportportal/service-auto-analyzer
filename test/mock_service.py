@@ -212,7 +212,6 @@ class TestService(unittest.TestCase):
             PatternLabelMinCountToSuggest=5,
             PatternMinCountToSuggest=10,
             BoostModelFolder=self.model_settings["BOOST_MODEL_FOLDER"],
-            SimilarityWeightsFolder=self.model_settings["SIMILARITY_WEIGHTS_FOLDER"],
             SuggestBoostModelFolder=self.model_settings["SUGGEST_BOOST_MODEL_FOLDER"],
             GlobalDefectTypeModelFolder=self.model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"],
             ProbabilityForCustomModelSuggestions=0.9,

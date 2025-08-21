@@ -14,9 +14,7 @@
 
 import unittest
 
-from app.commons.object_saving import create_filesystem
 from app.machine_learning.boosting_featurizer import BoostingFeaturizer
-from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import utils
 from test import get_fixture
@@ -107,13 +105,9 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 ],
             },
         ]
-        weight_log_sim = WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
-        weight_log_sim.load_model()
         for idx, test in enumerate(tests):
             print(f"Test index: {idx}")
-            _boosting_featurizer = BoostingFeaturizer(
-                test["elastic_results"], test["config"], [], weighted_log_similarity_calculator=weight_log_sim
-            )
+            _boosting_featurizer = BoostingFeaturizer(test["elastic_results"], test["config"], [])
             assert len(_boosting_featurizer.all_results) == len(test["result"])
             for i in range(len(test["result"])):
                 for j in range(len(test["result"][i])):
@@ -205,13 +199,9 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 },
             },
         ]
-        weight_log_sim = WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
-        weight_log_sim.load_model()
         for idx, test in enumerate(tests):
             print(f"Test index: {idx}")
-            _boosting_featurizer = BoostingFeaturizer(
-                test["elastic_results"], test["config"], [], weighted_log_similarity_calculator=weight_log_sim
-            )
+            _boosting_featurizer = BoostingFeaturizer(test["elastic_results"], test["config"], [])
             self.assert_scores_by_issue_type(_boosting_featurizer, test)
 
     def assert_elastic_results(self, results, test):
@@ -336,13 +326,9 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 ],
             },
         ]
-        weight_log_sim = WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
-        weight_log_sim.load_model()
         for idx, test in enumerate(tests):
             try:
-                _boosting_featurizer = BoostingFeaturizer(
-                    test["elastic_results"], test["config"], [], weighted_log_similarity_calculator=weight_log_sim
-                )
+                _boosting_featurizer = BoostingFeaturizer(test["elastic_results"], test["config"], [])
                 all_results = test["elastic_results"]
                 for field in test["config"]["filter_min_should_match"]:
                     all_results = _boosting_featurizer.filter_by_min_should_match(all_results, field=field)
@@ -421,13 +407,9 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 },
             },
         ]
-        weight_log_sim = WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
-        weight_log_sim.load_model()
         for idx, test in enumerate(tests):
             print(f"Test index: {idx}")
-            _boosting_featurizer = SuggestBoostingFeaturizer(
-                test["elastic_results"], test["config"], [], weighted_log_similarity_calculator=weight_log_sim
-            )
+            _boosting_featurizer = SuggestBoostingFeaturizer(test["elastic_results"], test["config"], [])
             self.assert_scores_by_issue_type(_boosting_featurizer, test)
 
     @utils.ignore_warnings
@@ -543,13 +525,9 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 ],
             },
         ]
-        weight_log_sim = WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
-        weight_log_sim.load_model()
         for idx, test in enumerate(tests):
             print(f"Test index: {idx}")
-            _boosting_featurizer = SuggestBoostingFeaturizer(
-                test["elastic_results"], test["config"], [], weighted_log_similarity_calculator=weight_log_sim
-            )
+            _boosting_featurizer = SuggestBoostingFeaturizer(test["elastic_results"], test["config"], [])
             all_results = test["elastic_results"]
             all_results = _boosting_featurizer.filter_by_min_should_match_any(
                 all_results, fields=test["config"]["filter_min_should_match_any"]

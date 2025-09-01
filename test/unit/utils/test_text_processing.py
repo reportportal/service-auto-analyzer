@@ -263,7 +263,7 @@ def test_calculate_text_similarity_basic_cases(base_text, other_texts, expected_
         ),
         (
             "build_info: version: '4.33.0', revision: '2c6aaad03a'",
-            ["build", "info", "version", "revision", "specialnumber"],
+            ["build", "info", "version", "revision", "4", "33", "0"],
         ),
     ],
 )
@@ -271,12 +271,12 @@ def test_preprocess_text_for_similarity(text, expected_preprocessing_contains):
     """Test text preprocessing for similarity calculation"""
     processed = text_processing.preprocess_text_for_similarity(text)
 
-    # Check that expected words are present in the processed text
-    for expected_word in expected_preprocessing_contains:
-        assert expected_word in processed.lower()
-
     # Check that the processed text is lowercase
     assert processed == processed.lower()
+
+    # Check that expected words are present in the processed text
+    for expected_word in expected_preprocessing_contains:
+        assert expected_word in processed
 
     # Check that no punctuation remains (except spaces)
     assert not any(char in processed for char in ".,;:!?()[]{}\"'")

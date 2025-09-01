@@ -950,7 +950,7 @@ def preprocess_text_for_similarity(text: str) -> str:
     processed_words = []
 
     for word in words:
-        if not word or len(word) <= 1 or word in STOPWORDS_ALL:
+        if not word or word in STOPWORDS_ALL:
             continue
 
         # Lemmatize the word

@@ -8,7 +8,7 @@
     "project": 1,
     "logs": [{
     			"logId": 178,
-                "message": "Message  1\n Message  2\n Message 3",
+                "message": "Message  1\n Message  2\n Message 3 java.lang lang.NoClassDefFoundError",
                 "logLevel": 40000
             }]
 }

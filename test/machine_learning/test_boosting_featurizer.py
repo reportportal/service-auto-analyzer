@@ -37,7 +37,6 @@ class TestBoostingFeaturizer(unittest.TestCase):
         self.one_hit_search_rs_explained_wo_params = "one_hit_search_rs_explained_wo_params.json"
         self.epsilon = 0.0001
         model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
-        self.weights_folder = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
 
     @staticmethod
     @utils.ignore_warnings

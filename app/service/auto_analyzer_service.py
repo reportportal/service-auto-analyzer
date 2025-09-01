@@ -275,10 +275,10 @@ class AutoAnalyzerService(AnalyzerService):
                     group_id = (str(obj["_id"]), str(log_info["_id"]))
                     if group_id in sim_dict["message"]:
                         sim_val = sim_dict["message"][group_id]
-                        if sim_val["both_empty"]:
+                        if sim_val.both_empty:
                             sim_val = sim_dict["merged_small_logs"][group_id]
                         threshold = boosting_config["min_should_match"]
-                        if not sim_val["both_empty"] and sim_val["similarity"] >= threshold:
+                        if not sim_val.both_empty and sim_val.similarity >= threshold:
                             new_search_res.append(obj)
             new_results.append((log_info, {"hits": {"hits": new_search_res}}))
         return new_results

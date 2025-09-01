@@ -234,10 +234,10 @@ class SearchService:
 
             for group_id, similarity_obj in sim_dict["message"].items():
                 log_id, _ = group_id
-                similarity_percent = similarity_obj["similarity"]
-                if similarity_obj["both_empty"]:
+                similarity_percent = similarity_obj.similarity
+                if similarity_obj.both_empty:
                     similarity_obj = sim_dict["merged_small_logs"][group_id]
-                    similarity_percent = similarity_obj["similarity"]
+                    similarity_percent = similarity_obj.similarity
                 logger.debug(
                     "Log with id %s has %.3f similarity with the queried log '%s'",
                     log_id,
@@ -248,8 +248,8 @@ class SearchService:
                 both_empty = False
                 _similarity_dict = sim_dict["potential_status_codes"]
                 if group_id in _similarity_dict:
-                    potential_status_codes_match = _similarity_dict[group_id]["similarity"]
-                    both_empty = _similarity_dict[group_id]["both_empty"]
+                    potential_status_codes_match = _similarity_dict[group_id].similarity
+                    both_empty = _similarity_dict[group_id].both_empty
                 if not both_empty and potential_status_codes_match < 0.99:
                     continue
                 if similarity_percent >= search_min_should_match:

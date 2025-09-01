@@ -17,7 +17,7 @@ import traceback
 from datetime import datetime
 from functools import reduce
 from time import time
-from typing import Any, Optional
+from typing import Optional
 
 import elasticsearch.helpers
 
@@ -28,6 +28,7 @@ from app.commons.model.launch_objects import (
     AnalyzerConf,
     ApplicationConfig,
     SearchConfig,
+    SimilarityResult,
     SuggestAnalysisResult,
     TestItemInfo,
 )
@@ -216,7 +217,7 @@ class SuggestService(AnalyzerService):
 
     def __create_similarity_dict(
         self, prediction_results: list[PredictionResult]
-    ) -> dict[str, dict[tuple[str, str], dict[str, Any]]]:
+    ) -> dict[str, dict[tuple[str, str], SimilarityResult]]:
         """Create a similarity dictionary for comparing prediction results."""
         _similarity_calculator = similarity_calculator.SimilarityCalculator()
         all_pairs_to_check = []
@@ -235,7 +236,9 @@ class SuggestService(AnalyzerService):
         return sim_dict
 
     def __filter_by_similarity(
-        self, prediction_results: list[PredictionResult], sim_dict: dict[str, dict[tuple[str, str], dict[str, Any]]]
+        self,
+        prediction_results: list[PredictionResult],
+        sim_dict: dict[str, dict[tuple[str, str], SimilarityResult]],
     ) -> list[PredictionResult]:
         """Filter prediction results by removing highly similar duplicates."""
         filtered_results = []
@@ -257,9 +260,9 @@ class SuggestService(AnalyzerService):
                 stacktrace_sim = sim_dict["stacktrace"][group_id]
                 merged_logs_sim = sim_dict["merged_small_logs"][group_id]
                 if (
-                    (detected_message_sim["both_empty"] or detected_message_sim["similarity"] >= 0.98)
-                    and (stacktrace_sim["both_empty"] or stacktrace_sim["similarity"] >= 0.98)
-                    and (merged_logs_sim["both_empty"] or merged_logs_sim["similarity"] >= 0.98)
+                    (detected_message_sim.both_empty or detected_message_sim.similarity >= 0.98)
+                    and (stacktrace_sim.both_empty or stacktrace_sim.similarity >= 0.98)
+                    and (merged_logs_sim.both_empty or merged_logs_sim.similarity >= 0.98)
                 ):
                     deleted_indices.add(j)
             filtered_results.append(prediction_results[i])

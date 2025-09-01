@@ -14,11 +14,12 @@
 
 from typing import Any
 
+from app.commons.model.launch_objects import SimilarityResult
 from app.utils import text_processing
 
 
 class SimilarityCalculator:
-    __similarity_dict: dict[str, dict]
+    __similarity_dict: dict[str, dict[tuple[str, str], SimilarityResult]]
 
     def __init__(self):
         self.__similarity_dict = {}
@@ -26,20 +27,20 @@ class SimilarityCalculator:
     @staticmethod
     def _find_similarity_for_field(
         all_results: list[tuple[dict[str, Any], dict[str, Any]]], field: str
-    ) -> dict[tuple[str, str], dict[str, float | bool]]:
-        all_results_similarity = {}
+    ) -> dict[tuple[str, str], SimilarityResult]:
+        all_results_similarity: dict[tuple[str, str], SimilarityResult] = {}
         for request, result in all_results:
             group_ids = [(str(obj["_id"]), str(request["_id"])) for obj in result["hits"]["hits"]]
             request_field = request["_source"].get(field, "")
             result_fields = [obj["_source"].get(field, "") for obj in result["hits"]["hits"]]
             similarity_results = text_processing.calculate_text_similarity(request_field, *result_fields)
             for group_id, (similarity, both_empty) in zip(group_ids, similarity_results):
-                all_results_similarity[group_id] = {"similarity": similarity, "both_empty": both_empty}
+                all_results_similarity[group_id] = SimilarityResult(similarity=similarity, both_empty=both_empty)
         return all_results_similarity
 
     def find_similarity(
         self, all_results: list[tuple[dict[str, Any], dict[str, Any]]], fields: list[str]
-    ) -> dict[str, dict[tuple[str, str], dict[str, float | bool]]]:
+    ) -> dict[str, dict[tuple[str, str], SimilarityResult]]:
         for field in fields:
             if field in self.__similarity_dict:
                 continue

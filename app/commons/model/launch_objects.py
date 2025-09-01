@@ -124,6 +124,13 @@ class SearchLogInfo(BaseModel):
     matchScore: float
 
 
+class SimilarityResult(BaseModel):
+    """Text similarity result object"""
+
+    similarity: float
+    both_empty: bool
+
+
 class Log(BaseModel):
     """Log object"""
 

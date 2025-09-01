@@ -43,7 +43,6 @@ class TestBoostingModel(unittest.TestCase):
         model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
         self.boost_model_folder = model_settings["BOOST_MODEL_FOLDER"]
         self.suggest_boost_model_folder = model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
-        self.weights_folder = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
         self.global_defect_type_model_folder = model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]
         logging.disable(logging.CRITICAL)
 
@@ -73,7 +72,6 @@ class TestBoostingModel(unittest.TestCase):
 
     @utils.ignore_warnings
     def test_random_run(self):
-        print("Weights model folder: ", self.weights_folder)
         for folder in [self.boost_model_folder, self.suggest_boost_model_folder]:
             print("Boost model folder ", folder)
             decision_maker = BoostingDecisionMaker(create_filesystem(folder))
@@ -91,7 +89,6 @@ class TestBoostingModel(unittest.TestCase):
     @utils.ignore_warnings
     def test_full_data_check(self):
         print("Boost model folder : ", self.boost_model_folder)
-        print("Weights model folder : ", self.weights_folder)
         print("Global defect type model folder : ", self.global_defect_type_model_folder)
         decision_maker = BoostingDecisionMaker(create_filesystem(self.boost_model_folder))
         decision_maker.load_model()
@@ -157,7 +154,6 @@ class TestBoostingModel(unittest.TestCase):
     @utils.ignore_warnings
     def test_full_data_check_suggests(self):
         print("Boost model folder suggests: ", self.suggest_boost_model_folder)
-        print("Weights model folder suggests: ", self.weights_folder)
         print("Global defect type model folder : ", self.global_defect_type_model_folder)
         decision_maker = BoostingDecisionMaker(create_filesystem(self.suggest_boost_model_folder))
         decision_maker.load_model()

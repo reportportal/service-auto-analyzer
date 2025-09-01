@@ -510,7 +510,7 @@ def preprocess_found_test_methods(text: str) -> str:
 
 def compress(text):
     """compress sentence to consist of only unique words"""
-    return " ".join(split_words(text))
+    return " ".join(split_words(text, to_lower=False))
 
 
 def preprocess_words(text):

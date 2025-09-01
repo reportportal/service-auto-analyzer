@@ -19,6 +19,7 @@ from app.machine_learning.models.boosting_decision_maker import BoostingDecision
 from app.machine_learning.models.custom_boosting_decision_maker import CustomBoostingDecisionMaker
 from app.machine_learning.models.custom_defect_type_model import CustomDefectTypeModel
 from app.machine_learning.models.defect_type_model import DefectTypeModel
+from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
 
 __all__ = [
     "MlModel",
@@ -26,4 +27,5 @@ __all__ = [
     "CustomDefectTypeModel",
     "BoostingDecisionMaker",
     "CustomBoostingDecisionMaker",
+    "WeightedSimilarityCalculator",
 ]

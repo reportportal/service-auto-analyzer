@@ -788,7 +788,6 @@ class TestSuggestionPredictor:
         mock_model_chooser = Mock()
         mock_boosting_decision_maker = Mock()
         mock_defect_type_model = Mock()
-        mock_weighted_similarity_calculator = Mock()
 
         # Configure model chooser to return our mocks
         mock_model_chooser.choose_model.side_effect = lambda project_id, model_type, **kwargs: (

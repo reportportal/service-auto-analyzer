@@ -25,6 +25,59 @@ from app.utils import text_processing, utils
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
 
+def calculate_similarity_by_values(first_field: str, second_field: str) -> float:
+    """Calculate overlap-based similarity for two space-separated value strings.
+
+    The function splits both input strings on whitespace, normalizes tokens by trimming and
+    lowercasing, and performs one-to-one greedy matching between tokens from the longer list
+    (base) and the shorter list (compared). Each token in the compared list can be matched at most
+    once. The similarity is defined as:
+
+        similarity = (common / M) * (1 - different / M)
+
+    where M is max(len(first_tokens), len(second_tokens)); ``common`` is the number of matched
+    tokens, and ``different`` is the number of base tokens that had no match. If either input has no
+    non-empty tokens, the function returns 0.0. The result is in the range [0.0, 1.0].
+
+    :param str first_field: Space-separated values from the first input string.
+    :param str second_field: Space-separated values from the second input string.
+    :return: Overlap similarity penalized by unmatched tokens, in [0.0, 1.0].
+    :rtype: float
+
+    Examples:
+    - "1 2 3" vs "2 3 4" -> common = 2, different = 1, M = 3 -> (2/3) * (1 - 1/3) = 4/9 ≈ 0.444.
+    - "" vs "a" -> 0.0.
+
+    Notes:
+    - Comparison is case-insensitive and ignores empty tokens.
+    - Duplicate tokens are matched greedily at most once (multiset-like behavior).
+    """
+    rq_values = [f for f in first_field.split(" ") if f.strip()]
+    rs_values = [f for f in second_field.split(" ") if f.strip()]
+    if not rq_values or not rs_values:
+        return 0.0
+    max_value_number = max(len(rq_values), len(rs_values))
+    if len(rq_values) > len(rs_values):
+        base_values = rq_values
+        compared_values = rs_values
+    else:
+        base_values = rs_values
+        compared_values = rq_values
+    common_value_number = 0
+    different_value_number = 0
+    for base_value in base_values:
+        found = False
+        for i, compare_value in enumerate(compared_values):
+            if base_value.strip().lower() == compare_value.strip().lower():
+                common_value_number += 1
+                del compared_values[i]
+                found = True
+                break
+        if not found:
+            different_value_number += 1
+    return (common_value_number / max_value_number) * (1 - (different_value_number / max_value_number))
+
+
 class BoostingFeaturizer:
     config: dict[str, Any]
     defect_type_predict_model: Optional[DefectTypeModel]
@@ -633,33 +686,7 @@ class BoostingFeaturizer:
         for issue_type, search_rs in scores_by_issue_type.items():
             rq_field = search_rs["compared_log"]["_source"].get(field_name, "")
             rs_field = search_rs["mrHit"]["_source"].get(field_name, "")
-            rq_values = [f for f in rq_field.split(" ") if f.strip()]
-            rs_values = [f for f in rs_field.split(" ") if f.strip()]
-            if not rq_values or not rs_values:
-                similarity_percent_by_field[issue_type] = 0.0
-                continue
-            max_value_number = max(len(rq_values), len(rs_values))
-            if len(rq_values) > len(rs_values):
-                base_values = rq_values
-                compared_values = rs_values
-            else:
-                base_values = rs_values
-                compared_values = rq_values
-            common_value_number = 0
-            different_value_number = 0
-            for base_value in base_values:
-                found = False
-                for i, compare_value in enumerate(compared_values):
-                    if base_value.strip().lower() == compare_value.strip().lower():
-                        common_value_number += 1
-                        del compared_values[i]
-                        found = True
-                        break
-                if not found:
-                    different_value_number += 1
-            similarity_percent_by_field[issue_type] = (common_value_number / max_value_number) * (
-                1 - (different_value_number / max_value_number)
-            )
+            similarity_percent_by_field[issue_type] = calculate_similarity_by_values(rq_field, rs_field)
         return similarity_percent_by_field
 
     def _calculate_similarity_percent(self, field_name="message") -> dict[str, float]:

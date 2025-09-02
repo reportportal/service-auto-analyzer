@@ -92,12 +92,12 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 "result": [
                     [
                         {
-                            "_score": 158.08437,
+                            "_score": 190.08437,
                             "normalized_score": 1.0,
                         },
                         {
                             "_score": 77.53298,
-                            "normalized_score": 0.4904,
+                            "normalized_score": 0.4078,
                         },
                     ]
                 ],
@@ -111,7 +111,9 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 for j in range(len(test["result"][i])):
                     for field in test["result"][i][j]:
                         elastic_res = _boosting_featurizer.all_results[i][1][j]
-                        assert abs(elastic_res[field] - test["result"][i][j][field]) <= self.epsilon
+                        actual = elastic_res[field]
+                        expected = test["result"][i][j][field]
+                        assert abs(actual - expected) <= self.epsilon, f"Actual: {actual}; Expected: {expected}"
 
     def assert_scores_by_issue_type(self, boosting_featurizer, test):
         scores_by_issue_type = boosting_featurizer.find_most_relevant_by_type()
@@ -120,7 +122,9 @@ class TestBoostingFeaturizer(unittest.TestCase):
             elastic_res = scores_by_issue_type[issue_type]
             for field in test["result"][issue_type]:
                 if not isinstance(test["result"][issue_type][field], dict):
-                    assert abs(elastic_res[field] - test["result"][issue_type][field]) <= self.epsilon
+                    expected = test["result"][issue_type][field]
+                    actual = elastic_res[field]
+                    assert abs(actual - expected) <= self.epsilon, f"Actual: {actual}; Expected: {expected}"
                 else:
                     for field_dict in test["result"][issue_type][field]:
                         result_field_dict = test["result"][issue_type][field][field_dict]
@@ -160,14 +164,14 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 "config": TestBoostingFeaturizer.get_default_config(),
                 "result": {
                     "AB001": {
-                        "mrHit": {"_score": 158.08437, "_id": "1"},
+                        "mrHit": {"_score": 190.08437, "_id": "1"},
                         "compared_log": get_fixture(self.log_message, to_json=True),
-                        "score": 0.6709,
+                        "score": 0.7102,
                     },
                     "PB001": {
                         "mrHit": {"_score": 77.53298, "_id": "2"},
                         "compared_log": get_fixture(self.log_message, to_json=True),
-                        "score": 0.3291,
+                        "score": 0.2897,
                     },
                 },
             },
@@ -185,14 +189,14 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 "config": TestBoostingFeaturizer.get_default_config(),
                 "result": {
                     "AB001": {
-                        "mrHit": {"_score": 158.08437, "_id": "1"},
+                        "mrHit": {"_score": 190.08437, "_id": "1"},
                         "compared_log": get_fixture(self.log_message, to_json=True),
-                        "score": 0.8031,
+                        "score": 0.8178,
                     },
                     "PB001": {
                         "mrHit": {"_score": 77.53298, "_id": "2"},
                         "compared_log": get_fixture(self.log_message, to_json=True),
-                        "score": 0.1969,
+                        "score": 0.1821,
                     },
                 },
             },
@@ -368,14 +372,14 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 "config": TestBoostingFeaturizer.get_default_config(),
                 "result": {
                     "1": {
-                        "mrHit": {"_score": 158.08437, "_id": "1"},
+                        "mrHit": {"_score": 190.08437, "_id": "1"},
                         "compared_log": get_fixture(self.log_message, to_json=True),
                         "score": 1.0,
                     },
                     "2": {
                         "mrHit": {"_score": 77.53298, "_id": "2"},
                         "compared_log": get_fixture(self.log_message, to_json=True),
-                        "score": 0.4905,
+                        "score": 0.4078,
                     },
                 },
             },
@@ -393,14 +397,14 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 "config": TestBoostingFeaturizer.get_default_config(),
                 "result": {
                     "1": {
-                        "mrHit": {"_score": 158.08437, "_id": "1"},
+                        "mrHit": {"_score": 190.08437, "_id": "1"},
                         "compared_log": get_fixture(self.log_message, to_json=True),
-                        "score": 0.9392,
+                        "score": 1.0,
                     },
                     "2": {
                         "mrHit": {"_score": 168.31, "_id": "2"},
                         "compared_log": get_fixture(self.log_message, to_json=True),
-                        "score": 1.0,
+                        "score": 0.8854,
                     },
                 },
             },

@@ -990,16 +990,12 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[Similar
         both_empty = not processed_base_text.strip() and not processed_other_text.strip()
         if both_empty:
             base_both_empty = not base_text.strip() and not other_texts[i].strip()
-            if base_both_empty:
-                # Both texts originally empty
-                similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=base_both_empty))
-            else:
-                # Both texts originally contain only stopwords
-                similarity_scores.append(
-                    SimilarityResult(
-                        similarity=1.0 if base_text == other_texts[i] else 0.0, both_empty=base_both_empty
-                    )
+            similarity_scores.append(
+                SimilarityResult(
+                    similarity=0.0 if base_both_empty else float(base_text == other_texts[i]),
+                    both_empty=base_both_empty,
                 )
+            )
         elif not processed_base_text.strip() or not processed_other_text.strip():
             # If one of the texts is empty after preprocessing, append 0
             similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=both_empty))

@@ -238,8 +238,8 @@ def test_calculate_text_similarity_basic_cases(base_text, other_texts, expected_
     assert len(actual_scores) == len(expected_scores)
 
     for actual, expected in zip(actual_scores, expected_scores):
-        assert abs(actual[0] - expected[0]) < 0.01
-        assert actual[1] == expected[1]
+        assert abs(actual.similarity - expected[0]) < 0.01
+        assert actual.both_empty == expected[1]
 
 
 @pytest.mark.parametrize(
@@ -314,11 +314,11 @@ def test_calculate_text_similarity_edge_cases(base_text, other_texts):
     # Basic validation
     assert len(actual_scores) == len(other_texts)
 
-    for score, _ in actual_scores:
-        assert 0.0 <= score <= 1.0
+    for score in actual_scores:
+        assert 0.0 <= score.similarity <= 1.0
         # For these edge cases, similarity should be moderate to high
         # since they have similar structure but different details
-        assert score > 0.3  # Should have some similarity due to common words
+        assert score.similarity > 0.3  # Should have some similarity due to common words
 
 
 def test_calculate_text_similarity_no_other_texts():
@@ -339,14 +339,14 @@ def test_calculate_text_similarity_appium_exceptions():
     # Test overall similarity
     similarity_scores = text_processing.calculate_text_similarity(ios_exception, android_exception)
     assert len(similarity_scores) == 1
-    assert 0.0 <= similarity_scores[0][0] <= 1.0
+    assert 0.0 <= similarity_scores[0].similarity <= 1.0
 
     # Test first line similarity
     ios_first_line = ios_exception.split("\n")[0]
     android_first_line = android_exception.split("\n")[0]
     first_line_scores = text_processing.calculate_text_similarity(ios_first_line, android_first_line)
     assert len(first_line_scores) == 1
-    assert 0.0 <= first_line_scores[0][0] <= 1.0
+    assert 0.0 <= first_line_scores[0].similarity <= 1.0
 
 
 @pytest.mark.parametrize(
@@ -364,4 +364,4 @@ def test_calculate_text_similarity_multiple_texts(base_text, other_texts, expect
     assert len(scores) == expected_length
 
     for score in scores:
-        assert 0.0 <= score[0] <= 1.0
+        assert 0.0 <= score.similarity <= 1.0

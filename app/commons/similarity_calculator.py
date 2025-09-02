@@ -34,8 +34,8 @@ class SimilarityCalculator:
             request_field = request["_source"].get(field, "")
             result_fields = [obj["_source"].get(field, "") for obj in result["hits"]["hits"]]
             similarity_results = text_processing.calculate_text_similarity(request_field, *result_fields)
-            for group_id, (similarity, both_empty) in zip(group_ids, similarity_results):
-                all_results_similarity[group_id] = SimilarityResult(similarity=similarity, both_empty=both_empty)
+            for group_id, sim_result in zip(group_ids, similarity_results):
+                all_results_similarity[group_id] = sim_result
         return all_results_similarity
 
     def find_similarity(

@@ -23,7 +23,7 @@ from nltk.stem import WordNetLemmatizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from app.commons.model.launch_objects import Log
+from app.commons.model.launch_objects import Log, SimilarityResult
 
 try:
     from app.commons import logging
@@ -960,7 +960,7 @@ def preprocess_text_for_similarity(text: str) -> str:
     return " ".join(processed_words)
 
 
-def calculate_text_similarity(base_text: str, *other_texts: str) -> list[tuple[float, bool]]:
+def calculate_text_similarity(base_text: str, *other_texts: str) -> list[SimilarityResult]:
     """
     Calculate similarity between a base text and multiple other texts using TF-IDF vectorization and cosine similarity.
 
@@ -969,7 +969,8 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[tuple[f
 
     :param base_text: Base text to compare against
     :param other_texts: Variable number of texts to compare with the base text
-    :return: List of similarity scores between 0.0 (not similar at all) and 1.0 (completely equal)
+    :return: List of SimilarityResult objects where `similarity` is in [0.0, 1.0]
+             and `both_empty` indicates both texts were empty
     """
     if not other_texts:
         return []
@@ -981,7 +982,7 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[tuple[f
     processed_other_texts = [preprocess_text_for_similarity(text) for text in other_texts]
 
     # Handle empty texts and identical texts first
-    similarity_scores: list[tuple[float, bool]] = []
+    similarity_scores: list[SimilarityResult] = []
     valid_texts = []
     valid_indices = []
 
@@ -990,27 +991,29 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[tuple[f
         if not processed_base_text.strip() and not processed_other_text.strip():
             if base_text.strip() and other_texts[i].strip():
                 # Both texts contain only stopwords
-                similarity_scores.append((1.0 if base_text == other_texts[i] else 0.0, False))
+                similarity_scores.append(
+                    SimilarityResult(similarity=1.0 if base_text == other_texts[i] else 0.0, both_empty=False)
+                )
             elif not base_text.strip() and not other_texts[i].strip():
                 # Both texts are empty
-                similarity_scores.append((0.0, True))
+                similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=True))
             else:
-                similarity_scores.append((0.0, False))
+                similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=False))
             continue
 
         if not processed_base_text.strip() or not processed_other_text.strip():
-            similarity_scores.append((0.0, False))
+            similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=False))
             continue
 
         # If both texts are identical after preprocessing, append 1
         if processed_base_text == processed_other_text:
-            similarity_scores.append((1.0, False))
+            similarity_scores.append(SimilarityResult(similarity=1.0, both_empty=False))
             continue
 
         # Store valid texts for batch processing
         valid_texts.append(processed_other_text)
         valid_indices.append(i)
-        similarity_scores.append((0.0, False))  # Placeholder, will be replaced
+        similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=False))  # Placeholder, will be replaced
 
     # If we have valid texts to process, use single TF-IDF vectorizer
     if valid_texts:
@@ -1037,6 +1040,9 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[tuple[f
 
         # Update similarity scores for valid texts
         for i, valid_index in enumerate(valid_indices):
-            similarity_scores[valid_index] = float(similarity_matrix[0][i]), False
+            similarity_scores[valid_index] = SimilarityResult(
+                similarity=float(similarity_matrix[0][i]),
+                both_empty=False,
+            )
 
     return similarity_scores

@@ -334,14 +334,17 @@ class SimilarityPredictor(Predictor):
         # Group results by test_item to find most relevant for each
         results_by_test_item = {}
 
-        for idx, (hit, (similarity, _)) in enumerate(zip(valid_hits, similarity_scores)):
+        for idx, (hit, sim_result) in enumerate(zip(valid_hits, similarity_scores)):
             # Get test_item identifier
             test_item = str(hit.get("_source", {}).get("test_item", "unknown"))
 
             # Track the best hit for each test_item
-            if test_item not in results_by_test_item or similarity > results_by_test_item[test_item]["similarity"]:
+            if (
+                test_item not in results_by_test_item
+                or sim_result.similarity > results_by_test_item[test_item]["similarity"]
+            ):
                 results_by_test_item[test_item] = {
-                    "similarity": similarity,
+                    "similarity": sim_result.similarity,
                     "mrHit": hit,
                     "compared_log": search_request,
                     "original_position": idx,  # Add position info to hit

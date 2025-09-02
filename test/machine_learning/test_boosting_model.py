@@ -94,9 +94,9 @@ class TestBoostingModel(unittest.TestCase):
         decision_maker.load_model()
         boost_model_results = get_fixture(self.boost_model_results, to_json=True)
         tests = []
-        for log_lines, filter_fields, _decision_maker in [
-            (-1, ["detected_message", "stacktrace"], decision_maker),
-            (2, ["message"], decision_maker),
+        for log_lines, filter_fields in [
+            (-1, ["detected_message", "stacktrace"]),
+            (2, ["message"]),
         ]:
             tests.extend(
                 [
@@ -108,7 +108,6 @@ class TestBoostingModel(unittest.TestCase):
                             )
                         ],
                         "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
-                        "decision_maker": _decision_maker,
                     },
                     {
                         "elastic_results": [
@@ -118,7 +117,6 @@ class TestBoostingModel(unittest.TestCase):
                             )
                         ],
                         "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
-                        "decision_maker": _decision_maker,
                     },
                     {
                         "elastic_results": [
@@ -132,21 +130,20 @@ class TestBoostingModel(unittest.TestCase):
                             ),
                         ],
                         "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
-                        "decision_maker": _decision_maker,
                     },
                 ]
             )
 
         for idx, test in enumerate(tests):
             print(f"Running test {idx}")
-            feature_ids = test["decision_maker"].feature_ids
+            feature_ids = decision_maker.feature_ids
             _boosting_featurizer = BoostingFeaturizer(test["elastic_results"], test["config"], feature_ids)
             if self.global_defect_type_model_folder.strip():
                 model = DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
                 model.load_model()
                 _boosting_featurizer.set_defect_type_model(model)
             gathered_data, _ = _boosting_featurizer.gather_features_info()
-            predict_label, predict_probability = test["decision_maker"].predict(gathered_data)
+            predict_label, predict_probability = decision_maker.predict(gathered_data)
             assert gathered_data == boost_model_results[str(idx)][0]
             assert predict_label == boost_model_results[str(idx)][1]
             assert predict_probability == boost_model_results[str(idx)][2]
@@ -167,15 +164,13 @@ class TestBoostingModel(unittest.TestCase):
                     "detected_message_without_params_extended",
                     "detected_message_without_params_and_brackets",
                 ],
-                decision_maker,
             ),
             (
                 2,
                 ["message_extended", "message_without_params_extended", "message_without_params_and_brackets"],
-                decision_maker,
             ),
         ]
-        for log_lines, filter_fields_any, _decision_maker in all_configs:
+        for log_lines, filter_fields_any in all_configs:
             tests.extend(
                 [
                     {
@@ -191,7 +186,6 @@ class TestBoostingModel(unittest.TestCase):
                             filter_fields_any=filter_fields_any,
                             min_should_match=0.4,
                         ),
-                        "decision_maker": _decision_maker,
                     },
                     {
                         "elastic_results": [
@@ -206,7 +200,6 @@ class TestBoostingModel(unittest.TestCase):
                             filter_fields_any=filter_fields_any,
                             min_should_match=0.4,
                         ),
-                        "decision_maker": _decision_maker,
                     },
                     {
                         "elastic_results": [
@@ -225,7 +218,6 @@ class TestBoostingModel(unittest.TestCase):
                             filter_fields_any=filter_fields_any,
                             min_should_match=0.4,
                         ),
-                        "decision_maker": _decision_maker,
                     },
                     {
                         "elastic_results": [
@@ -240,13 +232,12 @@ class TestBoostingModel(unittest.TestCase):
                             filter_fields_any=filter_fields_any,
                             min_should_match=0.0,
                         ),
-                        "decision_maker": _decision_maker,
                     },
                 ]
             )
         for idx, test in enumerate(tests):
             print(f"Running test {idx}")
-            feature_ids = test["decision_maker"].feature_ids
+            feature_ids = decision_maker.feature_ids
             _boosting_featurizer = SuggestBoostingFeaturizer(test["elastic_results"], test["config"], feature_ids)
             if self.global_defect_type_model_folder.strip():
                 model = DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
@@ -254,7 +245,7 @@ class TestBoostingModel(unittest.TestCase):
                 _boosting_featurizer.set_defect_type_model(model)
 
             gathered_data, _ = _boosting_featurizer.gather_features_info()
-            predict_label, predict_probability = test["decision_maker"].predict(gathered_data)
+            predict_label, predict_probability = decision_maker.predict(gathered_data)
             assert gathered_data == boost_model_results[str(idx)][0]
             assert predict_label == boost_model_results[str(idx)][1]
             assert predict_probability == boost_model_results[str(idx)][2]

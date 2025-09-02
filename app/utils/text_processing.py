@@ -987,33 +987,31 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[Similar
     valid_indices = []
 
     for i, processed_other_text in enumerate(processed_other_texts):
-        # If either text is empty after preprocessing, append 0
-        if not processed_base_text.strip() and not processed_other_text.strip():
-            if base_text.strip() and other_texts[i].strip():
-                # Both texts contain only stopwords
-                similarity_scores.append(
-                    SimilarityResult(similarity=1.0 if base_text == other_texts[i] else 0.0, both_empty=False)
-                )
-            elif not base_text.strip() and not other_texts[i].strip():
-                # Both texts are empty
-                similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=True))
+        both_empty = not processed_base_text.strip() and not processed_other_text.strip()
+        if both_empty:
+            base_both_empty = not base_text.strip() and not other_texts[i].strip()
+            if base_both_empty:
+                # Both texts originally empty
+                similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=base_both_empty))
             else:
-                similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=False))
-            continue
-
-        if not processed_base_text.strip() or not processed_other_text.strip():
-            similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=False))
-            continue
-
-        # If both texts are identical after preprocessing, append 1
-        if processed_base_text == processed_other_text:
-            similarity_scores.append(SimilarityResult(similarity=1.0, both_empty=False))
-            continue
-
-        # Store valid texts for batch processing
-        valid_texts.append(processed_other_text)
-        valid_indices.append(i)
-        similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=False))  # Placeholder, will be replaced
+                # Both texts originally contain only stopwords
+                similarity_scores.append(
+                    SimilarityResult(
+                        similarity=1.0 if base_text == other_texts[i] else 0.0, both_empty=base_both_empty
+                    )
+                )
+        elif not processed_base_text.strip() or not processed_other_text.strip():
+            # If one of the texts is empty after preprocessing, append 0
+            similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=both_empty))
+        elif processed_base_text == processed_other_text:
+            # If both texts are identical after preprocessing, append 1
+            similarity_scores.append(SimilarityResult(similarity=1.0, both_empty=both_empty))
+        else:
+            # Store valid texts for batch processing
+            valid_texts.append(processed_other_text)
+            valid_indices.append(i)
+            # Placeholder, will be replaced
+            similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=both_empty))
 
     # If we have valid texts to process, use single TF-IDF vectorizer
     if valid_texts:

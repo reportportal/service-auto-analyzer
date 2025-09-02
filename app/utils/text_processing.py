@@ -1009,35 +1009,38 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[Similar
             # Placeholder, will be replaced
             similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=both_empty))
 
+    if not valid_texts:
+        return similarity_scores
+
     # If we have valid texts to process, use single TF-IDF vectorizer
-    if valid_texts:
-        # Create all texts list: base text + all valid other texts
-        all_texts = [processed_base_text] + valid_texts
 
-        # Use TF-IDF vectorization and cosine similarity for efficient computation
-        vectorizer = TfidfVectorizer(
-            lowercase=False,  # Already lowercased in preprocessing
-            token_pattern=r"\b\w+\b",  # Simple word tokenization
-            min_df=1,  # Include all terms
-            max_df=1.0,  # Include all terms
-            ngram_range=(1, 2),  # Use unigrams and bigrams
+    # Create all texts list: base text + all valid other texts
+    all_texts = [processed_base_text] + valid_texts
+
+    # Use TF-IDF vectorization and cosine similarity for efficient computation
+    vectorizer = TfidfVectorizer(
+        lowercase=False,  # Already lowercased in preprocessing
+        token_pattern=r"\b\w+\b",  # Simple word tokenization
+        min_df=1,  # Include all terms
+        max_df=1.0,  # Include all terms
+        ngram_range=(1, 2),  # Use unigrams and bigrams
+    )
+
+    # Fit and transform all texts at once
+    tfidf_matrix = vectorizer.fit_transform(all_texts)
+
+    # Calculate cosine similarity between base text (index 0) and all other texts
+    base_vector = tfidf_matrix[0:1]  # Base text vector
+    other_vectors = tfidf_matrix[1:]  # All other text vectors
+
+    similarity_matrix = cosine_similarity(base_vector, other_vectors)
+
+    # Update similarity scores for valid texts
+    for i, valid_index in enumerate(valid_indices):
+        similarity_scores[valid_index] = SimilarityResult(
+            similarity=float(similarity_matrix[0][i]),
+            both_empty=False,
         )
-
-        # Fit and transform all texts at once
-        tfidf_matrix = vectorizer.fit_transform(all_texts)
-
-        # Calculate cosine similarity between base text (index 0) and all other texts
-        base_vector = tfidf_matrix[0:1]  # Base text vector
-        other_vectors = tfidf_matrix[1:]  # All other text vectors
-
-        similarity_matrix = cosine_similarity(base_vector, other_vectors)
-
-        # Update similarity scores for valid texts
-        for i, valid_index in enumerate(valid_indices):
-            similarity_scores[valid_index] = SimilarityResult(
-                similarity=float(similarity_matrix[0][i]),
-                both_empty=False,
-            )
 
     return similarity_scores
 

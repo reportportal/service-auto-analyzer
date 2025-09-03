@@ -689,8 +689,7 @@ class BoostingFeaturizer:
     def _calculate_similarity_percent(self, field_name="message") -> dict[str, float]:
         """Calculate similarity percent by specified filed for every unique Issue Type from OpenSearch query result.
 
-        This method calculates cosine similarity by specified filed by vectors from CountVectorizer of sklearn library
-        under the hood.
+        This method calculates cosine similarity by specified field using TF-IDF vectorization under the hood.
 
         :param str field_name: name of field to calculate similarity
         :return: dict with issue type as key and float value as similarity percent

@@ -459,7 +459,7 @@ class AutoAnalyzerService(AnalyzerService):
 
             # Process remaining batches
             if len(batches) > 0:
-                batch_candidates = self._process_batch(test_item_dict, batches, batch_logs)
+                batch_candidates = self._process_batch(dict(test_item_dict), batches, batch_logs)
                 all_candidates.extend(batch_candidates)
 
         except Exception as exc:

@@ -116,21 +116,46 @@ class BoostingFeaturizer:
         filter_min_should_match: Optional[list[str]] = self.config.get("filter_min_should_match", None)
         if filter_min_should_match:
             for field in filter_min_should_match:
-                processed_results = self.filter_by_min_should_match(processed_results, field=field)
+                filtered_processed_results = self.filter_by_min_should_match(processed_results, field=field)
+                removed = len(processed_results) - len(filtered_processed_results)
+                if removed > 0:
+                    logger.debug(
+                        f"Filtering by 'min_should_match' config for field '{field}' removed {removed} results",
+                    )
+                    processed_results = filtered_processed_results
         filter_min_should_match_any: Optional[list[str]] = self.config.get("filter_min_should_match_any", None)
         if filter_min_should_match_any:
-            processed_results = self.filter_by_min_should_match_any(
+            filtered_processed_results = self.filter_by_min_should_match_any(
                 processed_results, fields=filter_min_should_match_any
             )
+            removed = len(processed_results) - len(filtered_processed_results)
+            if removed > 0:
+                logger.debug(
+                    f"Filtering by 'min_should_match_any' config for fields '{', '.join(filter_min_should_match_any)}'"
+                    f" removed {removed} results",
+                )
+            processed_results = filtered_processed_results
         self.test_item_log_stats = self._calculate_stats_by_test_item_ids(processed_results)
         filter_by_all_logs_should_be_similar: Optional[bool] = self.config.get(
             "filter_by_all_logs_should_be_similar", None
         )
         if filter_by_all_logs_should_be_similar:
-            processed_results = self.filter_by_all_logs_should_be_similar(processed_results)
+            filtered_processed_results = self.filter_by_all_logs_should_be_similar(processed_results)
+            removed = len(processed_results) - len(filtered_processed_results)
+            if removed > 0:
+                logger.debug(
+                    f"Filtering by 'all_logs_should_be_similar' config removed {removed} results",
+                )
+                processed_results = filtered_processed_results
         filter_by_test_case_hash: Optional[bool] = self.config.get("filter_by_test_case_hash", None)
         if filter_by_test_case_hash:
-            processed_results = self.filter_by_test_case_hash(processed_results)
+            filtered_processed_results = self.filter_by_test_case_hash(processed_results)
+            removed = len(processed_results) - len(filtered_processed_results)
+            if removed > 0:
+                logger.debug(
+                    f"Filtering by 'test_case_hash' config removed {removed} results",
+                )
+                processed_results = filtered_processed_results
         if "calculate_similarities" not in self.config or self.config["calculate_similarities"]:
             self.similarity_calculator.find_similarity(processed_results, fields_to_calc_similarity)
         self.raw_results = processed_results

@@ -18,12 +18,16 @@ from typing import Any, Optional, Union
 
 from typing_extensions import override
 
+from app.commons import logging
 from app.commons.model.ml import ModelType
 from app.commons.model_chooser import ModelChooser
 from app.machine_learning.boosting_featurizer import BoostingFeaturizer
 from app.machine_learning.models import BoostingDecisionMaker, DefectTypeModel
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils.text_processing import calculate_text_similarity
+
+
+LOGGER = logging.getLogger("analyzerApp.esclient")
 
 
 @dataclass
@@ -167,12 +171,14 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
 
         # If no feature data, return empty result
         if not feature_data:
+            LOGGER.debug("No feature data extracted, skipping prediction.")
             return []
 
         # Make predictions
         predicted_labels, predicted_labels_probability = self.boosting_decision_maker.predict(feature_data)
 
         if not predicted_labels or not predicted_labels_probability:
+            LOGGER.debug("No predictions made, skipping result generation.")
             return []
 
         # Get scores by identity

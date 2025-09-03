@@ -642,7 +642,7 @@ class BoostingFeaturizer:
         """Calculate similarity percent by specified filed for every unique Issue Type from OpenSearch query result.
 
         This method calculates cosine similarity by specified filed by vectors from CountVectorizer of sklearn library
-        under the hood. Text lines are reweighed by the WeightedSimilarityCalculator model.
+        under the hood.
 
         :param str field_name: name of field to calculate similarity
         :return: dict with issue type as key and float value as similarity percent

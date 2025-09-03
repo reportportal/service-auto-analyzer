@@ -638,7 +638,9 @@ class AutoAnalyzerService(AnalyzerService):
                         results_to_share[launch_id]["processed_time"] += time() - t_start_item
 
                     except Exception as exc:
-                        logger.exception(exc)
+                        logger.exception(
+                            f"Unable to process candidate for analysis {analyzer_candidate.testItemId}", exc_info=exc
+                        )
                         if launch_id in results_to_share:
                             results_to_share[launch_id]["errors"].append(utils.extract_exception(exc))
                             results_to_share[launch_id]["errors_count"] += 1
@@ -655,7 +657,7 @@ class AutoAnalyzerService(AnalyzerService):
                 amqp_client.close()
 
         except Exception as exc:
-            logger.exception(exc)
+            logger.exception("Unable to process analysis candidates", exc_info=exc)
 
         logger.debug(f"Stats info: {json.dumps(results_to_share)}")
         logger.info(f"Processed {cnt_items_to_process} test items. It took {time() - t_start:.2f} sec.")

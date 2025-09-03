@@ -26,7 +26,6 @@ from app.machine_learning.models import BoostingDecisionMaker, DefectTypeModel
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils.text_processing import calculate_text_similarity
 
-
 LOGGER = logging.getLogger("analyzerApp.esclient")
 
 

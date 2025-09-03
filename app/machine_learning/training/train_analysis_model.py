@@ -211,7 +211,6 @@ class AnalysisModelTraining:
             "filter_by_test_case_hash": False,
             "boosting_model": self.baseline_folder,
             "chosen_namespaces": namespaces,
-            "calculate_similarities": False,
             "time_weight_decay": self.search_cfg.TimeWeightDecay,
         }
 

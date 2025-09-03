@@ -110,7 +110,6 @@ class BoostingFeaturizer:
             66: (self._count_test_item_logs, {}, []),
         }
 
-        fields_to_calc_similarity = self.find_columns_to_find_similarities_for()
         processed_results = self._perform_additional_text_processing(results)
 
         filter_min_should_match: Optional[list[str]] = self.config.get("filter_min_should_match", None)
@@ -156,8 +155,6 @@ class BoostingFeaturizer:
                     f"Filtering by 'test_case_hash' config removed {removed} results",
                 )
                 processed_results = filtered_processed_results
-        if "calculate_similarities" not in self.config or self.config["calculate_similarities"]:
-            self.similarity_calculator.find_similarity(processed_results, fields_to_calc_similarity)
         self.raw_results = processed_results
         self.total_normalized_score = 0.0
         self.all_results = self.normalize_results(processed_results)

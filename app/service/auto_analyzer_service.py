@@ -31,6 +31,7 @@ from app.commons.model.launch_objects import (
     Launch,
     SearchConfig,
     SuggestAnalysisResult,
+    TestItem,
 )
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
@@ -335,7 +336,7 @@ class AutoAnalyzerService(AnalyzerService):
         batch_logs: list[BatchLogInfo],
     ) -> list[AnalysisCandidate]:
         t_start = time()
-        search_results = self.es_client.es_client.msearch("\n".join(batches) + "\n")
+        search_results = self.es_client.es_client.msearch(body="\n".join(batches) + "\n")
         partial_res = search_results["responses"] if search_results else []
         if not partial_res:
             logger.warning("No search results for batches")
@@ -374,7 +375,18 @@ class AutoAnalyzerService(AnalyzerService):
                 )
         return analysis_candidates
 
-    def _generate_analysis_candidates(
+    @staticmethod
+    def _prepare_logs(launch: Launch, test_item: TestItem, index_name: str) -> list[dict[str, Any]]:
+        unique_logs = text_processing.leave_only_unique_logs(test_item.logs)
+        prepared_logs = [
+            request_factory.prepare_log(launch, test_item, log, index_name)
+            for log in unique_logs
+            if log.logLevel >= utils.ERROR_LOGGING_LEVEL
+        ]
+        results, _ = log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+        return results
+
+    def _get_analysis_candidates(
         self,
         launches: list[Launch],
         max_batch_size: int = 30,
@@ -384,7 +396,7 @@ class AutoAnalyzerService(AnalyzerService):
         batches = []
         batch_logs = []
         index_in_batch = 0
-        test_item_dict = {}
+        test_item_dict = defaultdict(list)
         batch_size = 5
         n_first_blocks = 3
         test_items_number_to_process = 0
@@ -405,15 +417,8 @@ class AutoAnalyzerService(AnalyzerService):
                         )
                         break
 
-                    unique_logs = text_processing.leave_only_unique_logs(test_item.logs)
-                    prepared_logs = [
-                        request_factory.prepare_log(launch, test_item, log, index_name)
-                        for log in unique_logs
-                        if log.logLevel >= utils.ERROR_LOGGING_LEVEL
-                    ]
-                    results, _ = log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
-
-                    for log in results:
+                    logs = AutoAnalyzerService._prepare_logs(launch, test_item, index_name)
+                    for log in logs:
                         message = log["_source"]["message"].strip()
                         merged_logs = log["_source"]["merged_small_logs"].strip()
                         if log["_source"]["log_level"] < utils.ERROR_LOGGING_LEVEL or (
@@ -438,19 +443,17 @@ class AutoAnalyzerService(AnalyzerService):
                                     launchNumber=launch.launchNumber,
                                 )
                             )
-                            if test_item.testItemId not in test_item_dict:
-                                test_item_dict[test_item.testItemId] = []
                             test_item_dict[test_item.testItemId].append(index_in_batch)
                             index_in_batch += 1
                     if n_first_blocks <= 0:
                         batch_size = max_batch_size
                     if len(batches) >= batch_size:
                         n_first_blocks -= 1
-                        batch_candidates = self._process_batch(test_item_dict, batches, batch_logs)
+                        batch_candidates = self._process_batch(dict(test_item_dict), batches, batch_logs)
                         all_candidates.extend(batch_candidates)
                         batches = []
                         batch_logs = []
-                        test_item_dict = {}
+                        test_item_dict.clear()
                         index_in_batch = 0
                     test_items_number_to_process += 1
 
@@ -479,7 +482,7 @@ class AutoAnalyzerService(AnalyzerService):
 
         try:
             # Generate all analysis candidates using batch processing
-            all_candidates = self._generate_analysis_candidates(launches)
+            all_candidates = self._get_analysis_candidates(launches)
 
             # Group by Project ID and Launch ID
             all_candidates_by_launch_and_project: dict[tuple[int, int], list[AnalysisCandidate]] = defaultdict(list)

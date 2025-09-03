@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
@@ -335,7 +335,7 @@ class AnalysisCandidate(BaseModel):
     testItemId: int
     timeProcessed: float
     candidates: list[tuple]
-    candidatesWithNoDefect: list[tuple]
+    candidatesWithNoDefect: list[tuple[dict[str, Any], dict[str, Any]]]
     project: int
     launchId: int
     launchName: str

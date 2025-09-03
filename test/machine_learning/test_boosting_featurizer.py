@@ -113,7 +113,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
                         elastic_res = _boosting_featurizer.all_results[i][1][j]
                         actual = elastic_res[field]
                         expected = test["result"][i][j][field]
-                        assert abs(actual - expected) <= self.epsilon, f"Actual: {actual}; Expected: {expected}"
+                        self.assertAlmostEqual(actual, expected, delta=self.epsilon)
 
     def assert_scores_by_issue_type(self, boosting_featurizer, test):
         scores_by_issue_type = boosting_featurizer.find_most_relevant_by_type()
@@ -124,7 +124,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 if not isinstance(test["result"][issue_type][field], dict):
                     expected = test["result"][issue_type][field]
                     actual = elastic_res[field]
-                    assert abs(actual - expected) <= self.epsilon, f"Actual: {actual}; Expected: {expected}"
+                    self.assertAlmostEqual(actual, expected, delta=self.epsilon)
                 else:
                     for field_dict in test["result"][issue_type][field]:
                         result_field_dict = test["result"][issue_type][field][field_dict]

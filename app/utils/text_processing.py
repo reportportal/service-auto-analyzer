@@ -1025,6 +1025,7 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[Similar
         min_df=1,  # Include all terms
         max_df=1.0,  # Include all terms
         ngram_range=(1, 2),  # Use unigrams and bigrams
+        use_idf=False,
     )
 
     # Fit and transform all texts at once

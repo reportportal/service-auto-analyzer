@@ -207,13 +207,13 @@ def test_remove_credentials_from_url(url, expected_url):
         (
             "org.openqa.selenium.TimeoutException",
             ["java.lang.NullPointerException"],
-            [(0.05, False)],  # Should be low similarity
+            [(0.11, False)],  # Should be low similarity
         ),
         # Test same exception type, different details
         (
             "org.openqa.selenium.TimeoutException: ErrorCodec.decode",
             ["org.openqa.selenium.TimeoutException: Different error"],
-            [(0.56, False)],  # Should be moderate similarity (approximate)
+            [(0.71, False)],  # Should be moderate similarity (approximate)
         ),
         # Test empty strings
         ("", [""], [(0.0, True)]),
@@ -227,7 +227,7 @@ def test_remove_credentials_from_url(url, expected_url):
                 "java.lang.NullPointerException",
                 "org.openqa.selenium.WebDriverException",
             ],
-            [(1.0, False), (0.05, False), (0.45, False)],  # Expected approximate similarities
+            [(1.0, False), (0.11, False), (0.60, False)],  # Expected approximate similarities
         ),
     ],
 )
@@ -365,3 +365,44 @@ def test_calculate_text_similarity_multiple_texts(base_text, other_texts, expect
 
     for score in scores:
         assert 0.0 <= score.similarity <= 1.0
+
+
+REQUEST_TEXT = (
+    "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
+    "createExternalSystemUnableInteractWithExternalSystem has been broken with exception org.testng.TestException :\n"
+    "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'."
+)
+
+HISTORY_TEXTS = [
+    "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
+    "createExternalSystemUnableInteractWithExternalSystem has been fail with exception org.testng.TestException : \n"
+    "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'.,"
+    "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
+    "createExternalSystemUnableInteractWithExternalSystem has been failed with exception org.testng.TestException : \n"
+    "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'.",
+    "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
+    "createExternalSystemUnableInteractWithExternalSystem has been failure with exception org.testng.TestException : \n"
+    "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'.",
+    "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
+    "createExternalSystemUnableInteractWithExternalSystem has been deviated with exception org.testng.TestException : \n"
+    "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'.",
+    "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
+    "createExternalSystemUnableInteractWithExternalSystem has been break with exception org.testng.TestException : \n"
+    "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'.",
+    "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
+    "createExternalSystemUnableInteractWithExternalSystem has been ended with exception org.testng.TestException : \n"
+    "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'.",
+]
+
+
+def test_calculate_text_similarity_script_scenarios():
+    previous_similarities = []
+    for n in range(1, len(HISTORY_TEXTS) + 1):
+        result = text_processing.calculate_text_similarity(REQUEST_TEXT, *HISTORY_TEXTS[:n])
+        assert len(result) == n
+        if previous_similarities:
+            for i, r in enumerate(previous_similarities):
+                assert (
+                    abs(r.similarity - result[i].similarity) < 0.0001
+                ), f"Actual: {result[i].similarity}, previous: {r.similarity}"
+        previous_similarities = result

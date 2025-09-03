@@ -989,7 +989,7 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[Similar
     for i, processed_other_text in enumerate(processed_other_texts):
         both_empty = not processed_base_text.strip() and not processed_other_text.strip()
         if both_empty:
-            # The next is False if base texts contain only stop words
+            # The next variable will be False if base texts contain only stop words
             base_both_empty = not base_text.strip() and not other_texts[i].strip()
             similarity_scores.append(
                 SimilarityResult(

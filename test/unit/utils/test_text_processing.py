@@ -375,22 +375,19 @@ REQUEST_TEXT = (
 
 HISTORY_TEXTS = [
     "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
-    "createExternalSystemUnableInteractWithExternalSystem has been fail with exception org.testng.TestException : \n"
+    "createExternalSystemUnableInteractWithExternalSystem has been fail with exception org.testng.TestException :\n"
     "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'.,"
     "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
-    "createExternalSystemUnableInteractWithExternalSystem has been failed with exception org.testng.TestException : \n"
+    "createExternalSystemUnableInteractWithExternalSystem has been failed with exception org.testng.TestException :\n"
     "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'.",
     "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
-    "createExternalSystemUnableInteractWithExternalSystem has been failure with exception org.testng.TestException : \n"
+    "createExternalSystemUnableInteractWithExternalSystem has been failure with exception org.testng.TestException :\n"
     "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'.",
     "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
-    "createExternalSystemUnableInteractWithExternalSystem has been deviated with exception org.testng.TestException : \n"
+    "createExternalSystemUnableInteractWithExternalSystem has been break with exception org.testng.TestException :\n"
     "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'.",
     "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
-    "createExternalSystemUnableInteractWithExternalSystem has been break with exception org.testng.TestException : \n"
-    "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'.",
-    "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
-    "createExternalSystemUnableInteractWithExternalSystem has been ended with exception org.testng.TestException : \n"
+    "createExternalSystemUnableInteractWithExternalSystem has been ended with exception org.testng.TestException :\n"
     "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'.",
 ]
 

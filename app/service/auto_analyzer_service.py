@@ -78,6 +78,17 @@ def _choose_issue_type(prediction_results: list[PredictionResult]) -> Optional[P
     return best_result
 
 
+def _prepare_logs(launch: Launch, test_item: TestItem, index_name: str) -> list[dict[str, Any]]:
+    unique_logs = text_processing.leave_only_unique_logs(test_item.logs)
+    prepared_logs = [
+        request_factory.prepare_log(launch, test_item, log, index_name)
+        for log in unique_logs
+        if log.logLevel >= utils.ERROR_LOGGING_LEVEL
+    ]
+    results, _ = log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+    return results
+
+
 class AutoAnalyzerService(AnalyzerService):
     app_config: ApplicationConfig
     search_cfg: SearchConfig
@@ -375,16 +386,12 @@ class AutoAnalyzerService(AnalyzerService):
                 )
         return analysis_candidates
 
-    @staticmethod
-    def _prepare_logs(launch: Launch, test_item: TestItem, index_name: str) -> list[dict[str, Any]]:
-        unique_logs = text_processing.leave_only_unique_logs(test_item.logs)
-        prepared_logs = [
-            request_factory.prepare_log(launch, test_item, log, index_name)
-            for log in unique_logs
-            if log.logLevel >= utils.ERROR_LOGGING_LEVEL
-        ]
-        results, _ = log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
-        return results
+    def _should_stop_processing(self, test_items_processed: int) -> bool:
+        """Check if we've reached the maximum number of test items to process."""
+        if test_items_processed >= self.search_cfg.MaxAutoAnalysisItemsToProcess:
+            logger.info("Only first %d test items were taken", self.search_cfg.MaxAutoAnalysisItemsToProcess)
+            return True
+        return False
 
     def _get_analysis_candidates(
         self,
@@ -406,18 +413,12 @@ class AutoAnalyzerService(AnalyzerService):
                 index_name = text_processing.unite_project_name(launch.project, self.app_config.esProjectIndexPrefix)
                 if not self.es_client.index_exists(index_name):
                     continue
-                if test_items_number_to_process >= self.search_cfg.MaxAutoAnalysisItemsToProcess:
-                    logger.info("Only first %d test items were taken", self.search_cfg.MaxAutoAnalysisItemsToProcess)
-                    break
 
                 for test_item in launch.testItems:
-                    if test_items_number_to_process >= self.search_cfg.MaxAutoAnalysisItemsToProcess:
-                        logger.info(
-                            "Only first %d test items were taken", self.search_cfg.MaxAutoAnalysisItemsToProcess
-                        )
+                    if self._should_stop_processing(test_items_number_to_process):
                         break
 
-                    logs = AutoAnalyzerService._prepare_logs(launch, test_item, index_name)
+                    logs = _prepare_logs(launch, test_item, index_name)
                     for log in logs:
                         message = log["_source"]["message"].strip()
                         merged_logs = log["_source"]["merged_small_logs"].strip()

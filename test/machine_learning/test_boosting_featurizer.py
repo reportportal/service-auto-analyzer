@@ -333,7 +333,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 _boosting_featurizer = BoostingFeaturizer(test["elastic_results"], test["config"], [])
                 all_results = test["elastic_results"]
                 for field in test["config"]["filter_min_should_match"]:
-                    all_results = _boosting_featurizer.filter_by_min_should_match(all_results, field=field)
+                    all_results = _boosting_featurizer._filter_by_min_should_match(all_results, field=field)
                 self.assert_elastic_results(all_results, test)
             except AssertionError as err:
                 raise AssertionError(f"Error in the test case number: {idx}").with_traceback(err.__traceback__)
@@ -531,7 +531,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
             print(f"Test index: {idx}")
             _boosting_featurizer = SuggestBoostingFeaturizer(test["elastic_results"], test["config"], [])
             all_results = test["elastic_results"]
-            all_results = _boosting_featurizer.filter_by_min_should_match_any(
+            all_results = _boosting_featurizer._filter_by_min_should_match_any(
                 all_results, fields=test["config"]["filter_min_should_match_any"]
             )
             self.assert_elastic_results(all_results, test)

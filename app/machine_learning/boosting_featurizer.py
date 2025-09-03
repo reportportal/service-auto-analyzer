@@ -25,6 +25,10 @@ from app.utils import text_processing, utils
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
 
+def count_hits(results: list[tuple[dict[str, Any], dict[str, Any]]]) -> int:
+    return sum(len(res["hits"]["hits"]) for _, res in results)
+
+
 class BoostingFeaturizer:
     config: dict[str, Any]
     defect_type_predict_model: Optional[DefectTypeModel]
@@ -111,50 +115,12 @@ class BoostingFeaturizer:
         }
 
         processed_results = self._perform_additional_text_processing(results)
-
-        filter_min_should_match: Optional[list[str]] = self.config.get("filter_min_should_match", None)
-        if filter_min_should_match:
-            for field in filter_min_should_match:
-                filtered_processed_results = self.filter_by_min_should_match(processed_results, field=field)
-                removed = len(processed_results) - len(filtered_processed_results)
-                if removed > 0:
-                    logger.debug(
-                        f"Filtering by 'min_should_match' config for field '{field}' removed {removed} results",
-                    )
-                    processed_results = filtered_processed_results
-        filter_min_should_match_any: Optional[list[str]] = self.config.get("filter_min_should_match_any", None)
-        if filter_min_should_match_any:
-            filtered_processed_results = self.filter_by_min_should_match_any(
-                processed_results, fields=filter_min_should_match_any
-            )
-            removed = len(processed_results) - len(filtered_processed_results)
-            if removed > 0:
-                logger.debug(
-                    f"Filtering by 'min_should_match_any' config for fields '{', '.join(filter_min_should_match_any)}'"
-                    f" removed {removed} results",
-                )
-            processed_results = filtered_processed_results
+        processed_results = self.filter_min_should_match(processed_results)
+        processed_results = self.filter_min_should_match_any(processed_results)
         self.test_item_log_stats = self._calculate_stats_by_test_item_ids(processed_results)
-        filter_by_all_logs_should_be_similar: Optional[bool] = self.config.get(
-            "filter_by_all_logs_should_be_similar", None
-        )
-        if filter_by_all_logs_should_be_similar:
-            filtered_processed_results = self.filter_by_all_logs_should_be_similar(processed_results)
-            removed = len(processed_results) - len(filtered_processed_results)
-            if removed > 0:
-                logger.debug(
-                    f"Filtering by 'all_logs_should_be_similar' config removed {removed} results",
-                )
-                processed_results = filtered_processed_results
-        filter_by_test_case_hash: Optional[bool] = self.config.get("filter_by_test_case_hash", None)
-        if filter_by_test_case_hash:
-            filtered_processed_results = self.filter_by_test_case_hash(processed_results)
-            removed = len(processed_results) - len(filtered_processed_results)
-            if removed > 0:
-                logger.debug(
-                    f"Filtering by 'test_case_hash' config removed {removed} results",
-                )
-                processed_results = filtered_processed_results
+        processed_results = self.filter_by_all_logs_should_be_similar(processed_results)
+        processed_results = self.filter_by_test_case_hash(processed_results)
+
         self.raw_results = processed_results
         self.total_normalized_score = 0.0
         self.all_results = self.normalize_results(processed_results)
@@ -162,6 +128,66 @@ class BoostingFeaturizer:
         self.defect_type_predict_model = None
         self.used_model_info = set()
         self.features_to_recalculate_always = set([51, 58] + list(range(67, 74)))
+
+    def filter_min_should_match(self, processed_results: list[tuple[dict[str, Any], dict[str, Any]]]) -> list[Any]:
+        filter_min_should_match: Optional[list[str]] = self.config.get("filter_min_should_match", None)
+        if filter_min_should_match:
+            for field in filter_min_should_match:
+                filtered_processed_results = self._filter_by_min_should_match(processed_results, field=field)
+                removed = count_hits(processed_results) - count_hits(filtered_processed_results)
+                if removed > 0:
+                    logger.debug(
+                        f"Filtering by 'min_should_match' config for field '{field}' removed {removed} results",
+                    )
+                    return filtered_processed_results
+        return processed_results
+
+    def filter_min_should_match_any(
+        self, processed_results: list[tuple[dict[str, Any], dict[str, Any]]]
+    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+        filter_min_should_match_any: Optional[list[str]] = self.config.get("filter_min_should_match_any", None)
+        if filter_min_should_match_any:
+            filtered_processed_results = self._filter_by_min_should_match_any(
+                processed_results, fields=filter_min_should_match_any
+            )
+            removed = count_hits(processed_results) - count_hits(filtered_processed_results)
+            if removed > 0:
+                logger.debug(
+                    f"Filtering by 'min_should_match_any' config for fields '{', '.join(filter_min_should_match_any)}'"
+                    f" removed {removed} results",
+                )
+            return filtered_processed_results
+        return processed_results
+
+    def filter_by_all_logs_should_be_similar(
+        self, processed_results: list[tuple[dict[str, Any], dict[str, Any]]]
+    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+        filter_by_all_logs_should_be_similar: Optional[bool] = self.config.get(
+            "filter_by_all_logs_should_be_similar", None
+        )
+        if filter_by_all_logs_should_be_similar:
+            filtered_processed_results = self._filter_by_all_logs_should_be_similar(processed_results)
+            removed = count_hits(processed_results) - count_hits(filtered_processed_results)
+            if removed > 0:
+                logger.debug(
+                    f"Filtering by 'all_logs_should_be_similar' config removed {removed} results",
+                )
+                return filtered_processed_results
+        return processed_results
+
+    def filter_by_test_case_hash(
+        self, processed_results: list[tuple[dict[str, Any], dict[str, Any]]]
+    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+        filter_by_test_case_hash: Optional[bool] = self.config.get("filter_by_test_case_hash", None)
+        if filter_by_test_case_hash:
+            filtered_processed_results = self._filter_by_test_case_hash(processed_results)
+            removed = count_hits(processed_results) - count_hits(filtered_processed_results)
+            if removed > 0:
+                logger.debug(
+                    f"Filtering by 'test_case_hash' config removed {removed} results",
+                )
+                return filtered_processed_results
+        return processed_results
 
     def find_most_relevant_by_type(self) -> dict[str, dict[str, Any]]:
         """Find most relevant log by issue type from OpenSearch query result.
@@ -312,7 +338,7 @@ class BoostingFeaturizer:
             issue_type_stats[issue_type] = int(rel_item_issue_type.lower().startswith(label_type))
         return issue_type_stats
 
-    def filter_by_all_logs_should_be_similar(
+    def _filter_by_all_logs_should_be_similar(
         self, all_results: list[tuple[dict[str, Any], dict[str, Any]]]
     ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         new_results = []
@@ -326,7 +352,7 @@ class BoostingFeaturizer:
         return new_results
 
     @staticmethod
-    def filter_by_test_case_hash(
+    def _filter_by_test_case_hash(
         all_results: list[tuple[dict[str, Any], dict[str, Any]]],
     ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         new_results = []
@@ -468,7 +494,7 @@ class BoostingFeaturizer:
             similarity_percent_by_type[issue_type] = int(sim_obj.both_empty)
         return similarity_percent_by_type
 
-    def filter_by_min_should_match(self, all_results: list[tuple[dict[str, Any], dict[str, Any]]], field="message"):
+    def _filter_by_min_should_match(self, all_results: list[tuple[dict[str, Any], dict[str, Any]]], field="message"):
         new_results = []
         for log, res in all_results:
             new_elastic_res = []
@@ -487,7 +513,7 @@ class BoostingFeaturizer:
             new_results.append((log, {"hits": {"hits": new_elastic_res}}))
         return new_results
 
-    def filter_by_min_should_match_any(
+    def _filter_by_min_should_match_any(
         self, all_results: list[tuple[dict[str, Any], dict[str, Any]]], fields: list[str]
     ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         if not fields:

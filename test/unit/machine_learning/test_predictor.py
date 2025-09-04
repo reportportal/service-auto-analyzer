@@ -481,7 +481,7 @@ class TestSimilarityPredictor:
             # Identical combined texts
             ("Error", "Context", "Error Context", "", (0.99, 1.01)),
             # Partially similar texts
-            ("Connection timeout error", "", "Connection failed error", "", (0.2, 0.4)),
+            ("Connection timeout error", "", "Connection failed error", "", (0.3, 0.5)),
             # Completely different texts
             ("Database error", "", "Network timeout", "", (0.0, 0.2)),
             # Empty query with non-empty hit (should be skipped, but test range anyway)

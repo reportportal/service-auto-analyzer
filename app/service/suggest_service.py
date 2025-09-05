@@ -17,24 +17,24 @@ import traceback
 from datetime import datetime
 from functools import reduce
 from time import time
-from typing import Any, Optional
+from typing import Optional
 
 import elasticsearch.helpers
 
 from app.amqp.amqp import AmqpClient
-from app.commons import log_merger, logging, object_saving, request_factory, similarity_calculator
+from app.commons import log_merger, logging, request_factory, similarity_calculator
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import (
     AnalyzerConf,
     ApplicationConfig,
     SearchConfig,
+    SimilarityResult,
     SuggestAnalysisResult,
     TestItemInfo,
 )
 from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
-from app.machine_learning.models import WeightedSimilarityCalculator
 from app.machine_learning.predictor import PREDICTION_CLASSES, PredictionResult
 from app.service.analyzer_service import AnalyzerService
 from app.utils import text_processing, utils
@@ -59,7 +59,6 @@ class SuggestService(AnalyzerService):
     search_cfg: SearchConfig
     es_client: EsClient
     namespace_finder: NamespaceFinder
-    similarity_model: WeightedSimilarityCalculator
 
     def __init__(
         self,
@@ -76,12 +75,6 @@ class SuggestService(AnalyzerService):
         self.rp_suggest_index_template = "rp_suggestions_info"
         self.rp_suggest_metrics_index_template = "rp_suggestions_info_metrics"
         self.namespace_finder = NamespaceFinder(app_config)
-        weights_folder = self.search_cfg.SimilarityWeightsFolder
-        if not weights_folder:
-            raise ValueError("SimilarityWeightsFolder is not set")
-        if weights_folder:
-            self.similarity_model = WeightedSimilarityCalculator(object_saving.create_filesystem(weights_folder))
-            self.similarity_model.load_model()
 
     def get_config_for_boosting_suggests(self, analyzer_config: AnalyzerConf) -> dict:
         return {
@@ -224,17 +217,9 @@ class SuggestService(AnalyzerService):
 
     def __create_similarity_dict(
         self, prediction_results: list[PredictionResult]
-    ) -> dict[str, dict[tuple[str, str], dict[str, Any]]]:
+    ) -> dict[str, dict[tuple[str, str], SimilarityResult]]:
         """Create a similarity dictionary for comparing prediction results."""
-        _similarity_calculator = similarity_calculator.SimilarityCalculator(
-            {
-                "max_query_terms": self.search_cfg.MaxQueryTerms,
-                "min_word_length": self.search_cfg.MinWordLength,
-                "min_should_match": "98%",
-                "number_of_log_lines": -1,
-            },
-            similarity_model=self.similarity_model,
-        )
+        _similarity_calculator = similarity_calculator.SimilarityCalculator()
         all_pairs_to_check = []
         for i, result_first in enumerate(prediction_results):
             for j in range(i + 1, len(prediction_results)):
@@ -251,7 +236,9 @@ class SuggestService(AnalyzerService):
         return sim_dict
 
     def __filter_by_similarity(
-        self, prediction_results: list[PredictionResult], sim_dict: dict[str, dict[tuple[str, str], dict[str, Any]]]
+        self,
+        prediction_results: list[PredictionResult],
+        sim_dict: dict[str, dict[tuple[str, str], SimilarityResult]],
     ) -> list[PredictionResult]:
         """Filter prediction results by removing highly similar duplicates."""
         filtered_results = []
@@ -273,9 +260,9 @@ class SuggestService(AnalyzerService):
                 stacktrace_sim = sim_dict["stacktrace"][group_id]
                 merged_logs_sim = sim_dict["merged_small_logs"][group_id]
                 if (
-                    detected_message_sim["similarity"] >= 0.98
-                    and stacktrace_sim["similarity"] >= 0.98
-                    and merged_logs_sim["similarity"] >= 0.98
+                    (detected_message_sim.both_empty or detected_message_sim.similarity >= 0.98)
+                    and (stacktrace_sim.both_empty or stacktrace_sim.similarity >= 0.98)
+                    and (merged_logs_sim.both_empty or merged_logs_sim.similarity >= 0.98)
                 ):
                     deleted_indices.add(j)
             filtered_results.append(prediction_results[i])
@@ -434,7 +421,6 @@ class SuggestService(AnalyzerService):
                 model_chooser=self.model_chooser,
                 project_id=test_item_info.project,
                 boosting_config=boosting_config,
-                weighted_log_similarity_calculator=self.similarity_model,
                 custom_model_prob=self.search_cfg.ProbabilityForCustomModelSuggestions,
                 hash_source=test_item_info.launchId,
             )

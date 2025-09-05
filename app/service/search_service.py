@@ -17,10 +17,9 @@ from time import time
 import elasticsearch
 import elasticsearch.helpers
 
-from app.commons import log_merger, logging, object_saving, request_factory, similarity_calculator
+from app.commons import log_merger, logging, request_factory, similarity_calculator
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, Log, SearchConfig, SearchLogInfo
-from app.machine_learning.models.weighted_similarity_calculator import WeightedSimilarityCalculator
 from app.utils import text_processing, utils
 
 logger = logging.getLogger("analyzerApp.searchService")
@@ -30,18 +29,11 @@ class SearchService:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
     es_client: EsClient
-    similarity_model: WeightedSimilarityCalculator
 
     def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.es_client = EsClient(app_config=self.app_config)
-        if not self.search_cfg.SimilarityWeightsFolder:
-            raise ValueError("SimilarityWeightsFolder is not set")
-        self.similarity_model = WeightedSimilarityCalculator(
-            object_saving.create_filesystem(self.search_cfg.SimilarityWeightsFolder)
-        )
-        self.similarity_model.load_model()
 
     def build_search_query(self, search_req, queried_log, search_min_should_match="95%"):
         """Build search query"""
@@ -235,24 +227,17 @@ class SearchService:
                 search_req, queried_log, search_min_should_match, test_item_info, index_name
             )
 
-            _similarity_calculator = similarity_calculator.SimilarityCalculator(
-                {
-                    "max_query_terms": self.search_cfg.MaxQueryTerms,
-                    "min_word_length": self.search_cfg.MinWordLength,
-                    "number_of_log_lines": search_req.logLines,
-                },
-                similarity_model=self.similarity_model,
-            )
+            _similarity_calculator = similarity_calculator.SimilarityCalculator()
             sim_dict = _similarity_calculator.find_similarity(
                 [(queried_log, search_results)], ["message", "potential_status_codes", "merged_small_logs"]
             )
 
             for group_id, similarity_obj in sim_dict["message"].items():
                 log_id, _ = group_id
-                similarity_percent = similarity_obj["similarity"]
-                if similarity_obj["both_empty"]:
+                similarity_percent = similarity_obj.similarity
+                if similarity_obj.both_empty:
                     similarity_obj = sim_dict["merged_small_logs"][group_id]
-                    similarity_percent = similarity_obj["similarity"]
+                    similarity_percent = similarity_obj.similarity
                 logger.debug(
                     "Log with id %s has %.3f similarity with the queried log '%s'",
                     log_id,
@@ -260,10 +245,12 @@ class SearchService:
                     message_to_use,
                 )
                 potential_status_codes_match = 0.0
+                both_empty = False
                 _similarity_dict = sim_dict["potential_status_codes"]
                 if group_id in _similarity_dict:
-                    potential_status_codes_match = _similarity_dict[group_id]["similarity"]
-                if potential_status_codes_match < 0.99:
+                    potential_status_codes_match = _similarity_dict[group_id].similarity
+                    both_empty = _similarity_dict[group_id].both_empty
+                if not both_empty and potential_status_codes_match < 0.99:
                     continue
                 if similarity_percent >= search_min_should_match:
                     log_id_extracted = utils.extract_real_id(log_id)

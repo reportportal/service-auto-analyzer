@@ -481,7 +481,7 @@ class TestSimilarityPredictor:
             # Identical combined texts
             ("Error", "Context", "Error Context", "", (0.99, 1.01)),
             # Partially similar texts
-            ("Connection timeout error", "", "Connection failed error", "", (0.2, 0.4)),
+            ("Connection timeout error", "", "Connection failed error", "", (0.3, 0.5)),
             # Completely different texts
             ("Database error", "", "Network timeout", "", (0.0, 0.2)),
             # Empty query with non-empty hit (should be skipped, but test range anyway)
@@ -565,7 +565,6 @@ class TestAutoAnalysisPredictor:
         mock_model_chooser = Mock()
         mock_boosting_decision_maker = Mock()
         mock_defect_type_model = Mock()
-        mock_weighted_similarity_calculator = Mock()
 
         # Configure model chooser to return our mocks
         mock_model_chooser.choose_model.side_effect = lambda project_id, model_type, **kwargs: (
@@ -582,7 +581,6 @@ class TestAutoAnalysisPredictor:
             "model_chooser": mock_model_chooser,
             "project_id": 123,
             "boosting_config": {"test": "config"},
-            "weighted_log_similarity_calculator": mock_weighted_similarity_calculator,
             "custom_model_prob": 0.1,
             "hash_source": "test_hash",
         }
@@ -597,7 +595,6 @@ class TestAutoAnalysisPredictor:
         predictor = AutoAnalysisPredictor(**deps)
 
         assert predictor.boosting_config == {"test": "config"}
-        assert predictor.weighted_log_similarity_calculator == deps["weighted_log_similarity_calculator"]
 
         # Verify model chooser was called correctly with defaults
         deps["model_chooser"].choose_model.assert_any_call(
@@ -611,7 +608,6 @@ class TestAutoAnalysisPredictor:
         predictor = AutoAnalysisPredictor(**deps)
 
         assert predictor.boosting_config == {"test": "config"}
-        assert predictor.weighted_log_similarity_calculator == deps["weighted_log_similarity_calculator"]
 
         # Verify model chooser was called with custom parameters
         deps["model_chooser"].choose_model.assert_any_call(
@@ -792,7 +788,6 @@ class TestSuggestionPredictor:
         mock_model_chooser = Mock()
         mock_boosting_decision_maker = Mock()
         mock_defect_type_model = Mock()
-        mock_weighted_similarity_calculator = Mock()
 
         # Configure model chooser to return our mocks
         mock_model_chooser.choose_model.side_effect = lambda project_id, model_type, **kwargs: (
@@ -809,7 +804,6 @@ class TestSuggestionPredictor:
             "model_chooser": mock_model_chooser,
             "project_id": 123,
             "boosting_config": {"suggestion": "config"},
-            "weighted_log_similarity_calculator": mock_weighted_similarity_calculator,
             "custom_model_prob": 0.2,
             "hash_source": "suggestion_hash",
         }
@@ -824,7 +818,6 @@ class TestSuggestionPredictor:
         predictor = SuggestionPredictor(**deps)
 
         assert predictor.boosting_config == {"suggestion": "config"}
-        assert predictor.weighted_log_similarity_calculator == deps["weighted_log_similarity_calculator"]
 
         # Verify model chooser was called correctly with defaults
         deps["model_chooser"].choose_model.assert_any_call(
@@ -838,7 +831,6 @@ class TestSuggestionPredictor:
         predictor = SuggestionPredictor(**deps)
 
         assert predictor.boosting_config == {"suggestion": "config"}
-        assert predictor.weighted_log_similarity_calculator == deps["weighted_log_similarity_calculator"]
 
         # Verify model chooser was called with custom parameters
         deps["model_chooser"].choose_model.assert_any_call(

@@ -44,17 +44,17 @@ def defect_type_model(object_saver: object_saving.ObjectSaver) -> DefectTypeMode
     [
         ("nd001", 0.0),
         ("pb001", 0.0),
-        ("ab001", 0.0),
-        ("si001", 1.0),
+        ("ab001", 1.0),
+        ("si001", 0.0),
         ("pd001", 0.0),
-        ("ab_abracadabra", 0.0),
+        ("ab_abracadabra", 1.0),
         ("pb_abracadabra", 0.0),
-        ("si_abracadabra", 1.0),
+        ("si_abracadabra", 0.0),
     ],
 )
 def test_different_defect_type_predict(defect_type_model: DefectTypeModel, defect_type: str, expected: float) -> None:
     result = defect_type_model.predict([WEB_DRIVER_ERROR], defect_type)
-    assert result[0][0] == expected
+    assert result[0][0] == expected, f"Invalid result for defect type: {defect_type}"
 
 
 @pytest.mark.parametrize("defect_type", ["ndabc", "asdfcas", "pb00a", "nd_abc abc", "\n_asdcas", " _aab"])

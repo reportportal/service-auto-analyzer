@@ -19,7 +19,7 @@ import numpy as np
 
 from app.commons.object_saving import create_filesystem
 from app.machine_learning.boosting_featurizer import BoostingFeaturizer
-from app.machine_learning.models import DefectTypeModel, WeightedSimilarityCalculator
+from app.machine_learning.models import DefectTypeModel
 from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import utils
@@ -43,7 +43,6 @@ class TestBoostingModel(unittest.TestCase):
         model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
         self.boost_model_folder = model_settings["BOOST_MODEL_FOLDER"]
         self.suggest_boost_model_folder = model_settings["SUGGEST_BOOST_MODEL_FOLDER"]
-        self.weights_folder = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
         self.global_defect_type_model_folder = model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]
         logging.disable(logging.CRITICAL)
 
@@ -73,7 +72,6 @@ class TestBoostingModel(unittest.TestCase):
 
     @utils.ignore_warnings
     def test_random_run(self):
-        print("Weights model folder: ", self.weights_folder)
         for folder in [self.boost_model_folder, self.suggest_boost_model_folder]:
             print("Boost model folder ", folder)
             decision_maker = BoostingDecisionMaker(create_filesystem(folder))
@@ -91,15 +89,14 @@ class TestBoostingModel(unittest.TestCase):
     @utils.ignore_warnings
     def test_full_data_check(self):
         print("Boost model folder : ", self.boost_model_folder)
-        print("Weights model folder : ", self.weights_folder)
         print("Global defect type model folder : ", self.global_defect_type_model_folder)
         decision_maker = BoostingDecisionMaker(create_filesystem(self.boost_model_folder))
         decision_maker.load_model()
         boost_model_results = get_fixture(self.boost_model_results, to_json=True)
         tests = []
-        for log_lines, filter_fields, _decision_maker in [
-            (-1, ["detected_message", "stacktrace"], decision_maker),
-            (2, ["message"], decision_maker),
+        for log_lines, filter_fields in [
+            (-1, ["detected_message", "stacktrace"]),
+            (2, ["message"]),
         ]:
             tests.extend(
                 [
@@ -111,7 +108,6 @@ class TestBoostingModel(unittest.TestCase):
                             )
                         ],
                         "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
-                        "decision_maker": _decision_maker,
                     },
                     {
                         "elastic_results": [
@@ -121,7 +117,6 @@ class TestBoostingModel(unittest.TestCase):
                             )
                         ],
                         "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
-                        "decision_maker": _decision_maker,
                     },
                     {
                         "elastic_results": [
@@ -135,27 +130,20 @@ class TestBoostingModel(unittest.TestCase):
                             ),
                         ],
                         "config": self.get_default_config(number_of_log_lines=log_lines, filter_fields=filter_fields),
-                        "decision_maker": _decision_maker,
                     },
                 ]
             )
 
         for idx, test in enumerate(tests):
             print(f"Running test {idx}")
-            feature_ids = test["decision_maker"].feature_ids
-            weight_log_sim = None
-            if self.weights_folder.strip():
-                weight_log_sim = WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
-                weight_log_sim.load_model()
-            _boosting_featurizer = BoostingFeaturizer(
-                test["elastic_results"], test["config"], feature_ids, weighted_log_similarity_calculator=weight_log_sim
-            )
+            feature_ids = decision_maker.feature_ids
+            _boosting_featurizer = BoostingFeaturizer(test["elastic_results"], test["config"], feature_ids)
             if self.global_defect_type_model_folder.strip():
                 model = DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
                 model.load_model()
                 _boosting_featurizer.set_defect_type_model(model)
             gathered_data, _ = _boosting_featurizer.gather_features_info()
-            predict_label, predict_probability = test["decision_maker"].predict(gathered_data)
+            predict_label, predict_probability = decision_maker.predict(gathered_data)
             assert gathered_data == boost_model_results[str(idx)][0]
             assert predict_label == boost_model_results[str(idx)][1]
             assert predict_probability == boost_model_results[str(idx)][2]
@@ -163,7 +151,6 @@ class TestBoostingModel(unittest.TestCase):
     @utils.ignore_warnings
     def test_full_data_check_suggests(self):
         print("Boost model folder suggests: ", self.suggest_boost_model_folder)
-        print("Weights model folder suggests: ", self.weights_folder)
         print("Global defect type model folder : ", self.global_defect_type_model_folder)
         decision_maker = BoostingDecisionMaker(create_filesystem(self.suggest_boost_model_folder))
         decision_maker.load_model()
@@ -177,15 +164,13 @@ class TestBoostingModel(unittest.TestCase):
                     "detected_message_without_params_extended",
                     "detected_message_without_params_and_brackets",
                 ],
-                decision_maker,
             ),
             (
                 2,
                 ["message_extended", "message_without_params_extended", "message_without_params_and_brackets"],
-                decision_maker,
             ),
         ]
-        for log_lines, filter_fields_any, _decision_maker in all_configs:
+        for log_lines, filter_fields_any in all_configs:
             tests.extend(
                 [
                     {
@@ -201,7 +186,6 @@ class TestBoostingModel(unittest.TestCase):
                             filter_fields_any=filter_fields_any,
                             min_should_match=0.4,
                         ),
-                        "decision_maker": _decision_maker,
                     },
                     {
                         "elastic_results": [
@@ -216,7 +200,6 @@ class TestBoostingModel(unittest.TestCase):
                             filter_fields_any=filter_fields_any,
                             min_should_match=0.4,
                         ),
-                        "decision_maker": _decision_maker,
                     },
                     {
                         "elastic_results": [
@@ -235,7 +218,6 @@ class TestBoostingModel(unittest.TestCase):
                             filter_fields_any=filter_fields_any,
                             min_should_match=0.4,
                         ),
-                        "decision_maker": _decision_maker,
                     },
                     {
                         "elastic_results": [
@@ -250,27 +232,20 @@ class TestBoostingModel(unittest.TestCase):
                             filter_fields_any=filter_fields_any,
                             min_should_match=0.0,
                         ),
-                        "decision_maker": _decision_maker,
                     },
                 ]
             )
         for idx, test in enumerate(tests):
             print(f"Running test {idx}")
-            feature_ids = test["decision_maker"].feature_ids
-            weight_log_sim = None
-            if self.weights_folder.strip():
-                weight_log_sim = WeightedSimilarityCalculator(create_filesystem(self.weights_folder))
-                weight_log_sim.load_model()
-            _boosting_featurizer = SuggestBoostingFeaturizer(
-                test["elastic_results"], test["config"], feature_ids, weighted_log_similarity_calculator=weight_log_sim
-            )
+            feature_ids = decision_maker.feature_ids
+            _boosting_featurizer = SuggestBoostingFeaturizer(test["elastic_results"], test["config"], feature_ids)
             if self.global_defect_type_model_folder.strip():
                 model = DefectTypeModel(create_filesystem(self.global_defect_type_model_folder))
                 model.load_model()
                 _boosting_featurizer.set_defect_type_model(model)
 
             gathered_data, _ = _boosting_featurizer.gather_features_info()
-            predict_label, predict_probability = test["decision_maker"].predict(gathered_data)
+            predict_label, predict_probability = decision_maker.predict(gathered_data)
             assert gathered_data == boost_model_results[str(idx)][0]
             assert predict_label == boost_model_results[str(idx)][1]
             assert predict_probability == boost_model_results[str(idx)][2]

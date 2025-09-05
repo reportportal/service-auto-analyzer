@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
@@ -100,14 +100,12 @@ class SearchConfig(BaseModel):
     ProbabilityForCustomModelAutoAnalysis: float = 0.5
     BoostModelFolder: str = ""
     SuggestBoostModelFolder: str = ""
-    SimilarityWeightsFolder: str = ""
     GlobalDefectTypeModelFolder: str = ""
     SuggestBoostModelFeatures: str = ""
     AutoBoostModelFeatures: str = ""
     SuggestBoostModelMonotonousFeatures: str = ""
     AutoBoostModelMonotonousFeatures: str = ""
     MaxSuggestionsNumber: int = 3
-    AutoAnalysisTimeout: int = 300
     MaxAutoAnalysisItemsToProcess: int = 4000
     DefectTypeModelNumEstimators: int = 5
     SuggestBoostModelNumEstimators: int = 50
@@ -123,6 +121,13 @@ class SearchLogInfo(BaseModel):
     logId: int
     testItemId: int
     matchScore: float
+
+
+class SimilarityResult(BaseModel):
+    """Text similarity result object"""
+
+    similarity: float
+    both_empty: bool
 
 
 class Log(BaseModel):
@@ -329,7 +334,7 @@ class AnalysisCandidate(BaseModel):
     testItemId: int
     timeProcessed: float
     candidates: list[tuple]
-    candidatesWithNoDefect: list[tuple]
+    candidatesWithNoDefect: list[tuple[dict[str, Any], dict[str, Any]]]
     project: int
     launchId: int
     launchName: str

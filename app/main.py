@@ -97,10 +97,8 @@ SEARCH_CONFIG = SearchConfig(
     ProbabilityForCustomModelAutoAnalysis=min(1.0, float(os.getenv("PROB_CUSTOM_MODEL_AUTO_ANALYSIS", "0.5"))),
     BoostModelFolder="",
     SuggestBoostModelFolder="",
-    SimilarityWeightsFolder="",
     GlobalDefectTypeModelFolder="",
     MaxSuggestionsNumber=int(os.getenv("MAX_SUGGESTIONS_NUMBER", "3")),
-    AutoAnalysisTimeout=int(os.getenv("AUTO_ANALYSIS_TIMEOUT", "300")),
     MaxAutoAnalysisItemsToProcess=int(
         os.getenv("ANALYZER_MAX_ITEMS_TO_PROCESS", os.getenv("MAX_AUTO_ANALYSIS_ITEMS_TO_PROCESS", "4000"))
     ),
@@ -228,7 +226,6 @@ def read_model_settings():
 
     SEARCH_CONFIG.BoostModelFolder = utils.strip_path(model_settings["BOOST_MODEL_FOLDER"])
     SEARCH_CONFIG.SuggestBoostModelFolder = utils.strip_path(model_settings["SUGGEST_BOOST_MODEL_FOLDER"])
-    SEARCH_CONFIG.SimilarityWeightsFolder = utils.strip_path(model_settings["SIMILARITY_WEIGHTS_FOLDER"])
     SEARCH_CONFIG.GlobalDefectTypeModelFolder = utils.strip_path(model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"])
 
 

@@ -36,8 +36,6 @@ class TestBoostingFeaturizer(unittest.TestCase):
         self.three_hits_search_rs_explained = "three_hits_search_rs_explained.json"
         self.one_hit_search_rs_explained_wo_params = "one_hit_search_rs_explained_wo_params.json"
         self.epsilon = 0.0001
-        model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
-        self.weights_folder = model_settings["SIMILARITY_WEIGHTS_FOLDER"]
 
     @staticmethod
     @utils.ignore_warnings
@@ -94,12 +92,12 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 "result": [
                     [
                         {
-                            "_score": 158.08437,
+                            "_score": 190.08437,
                             "normalized_score": 1.0,
                         },
                         {
                             "_score": 77.53298,
-                            "normalized_score": 0.4904,
+                            "normalized_score": 0.4078,
                         },
                     ]
                 ],
@@ -113,7 +111,9 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 for j in range(len(test["result"][i])):
                     for field in test["result"][i][j]:
                         elastic_res = _boosting_featurizer.all_results[i][1][j]
-                        assert abs(elastic_res[field] - test["result"][i][j][field]) <= self.epsilon
+                        actual = elastic_res[field]
+                        expected = test["result"][i][j][field]
+                        self.assertAlmostEqual(actual, expected, delta=self.epsilon)
 
     def assert_scores_by_issue_type(self, boosting_featurizer, test):
         scores_by_issue_type = boosting_featurizer.find_most_relevant_by_type()
@@ -122,7 +122,9 @@ class TestBoostingFeaturizer(unittest.TestCase):
             elastic_res = scores_by_issue_type[issue_type]
             for field in test["result"][issue_type]:
                 if not isinstance(test["result"][issue_type][field], dict):
-                    assert abs(elastic_res[field] - test["result"][issue_type][field]) <= self.epsilon
+                    expected = test["result"][issue_type][field]
+                    actual = elastic_res[field]
+                    self.assertAlmostEqual(actual, expected, delta=self.epsilon)
                 else:
                     for field_dict in test["result"][issue_type][field]:
                         result_field_dict = test["result"][issue_type][field][field_dict]
@@ -162,14 +164,14 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 "config": TestBoostingFeaturizer.get_default_config(),
                 "result": {
                     "AB001": {
-                        "mrHit": {"_score": 158.08437, "_id": "1"},
+                        "mrHit": {"_score": 190.08437, "_id": "1"},
                         "compared_log": get_fixture(self.log_message, to_json=True),
-                        "score": 0.6709,
+                        "score": 0.7102,
                     },
                     "PB001": {
                         "mrHit": {"_score": 77.53298, "_id": "2"},
                         "compared_log": get_fixture(self.log_message, to_json=True),
-                        "score": 0.3291,
+                        "score": 0.2897,
                     },
                 },
             },
@@ -187,14 +189,14 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 "config": TestBoostingFeaturizer.get_default_config(),
                 "result": {
                     "AB001": {
-                        "mrHit": {"_score": 158.08437, "_id": "1"},
+                        "mrHit": {"_score": 190.08437, "_id": "1"},
                         "compared_log": get_fixture(self.log_message, to_json=True),
-                        "score": 0.8031,
+                        "score": 0.8178,
                     },
                     "PB001": {
                         "mrHit": {"_score": 77.53298, "_id": "2"},
                         "compared_log": get_fixture(self.log_message, to_json=True),
-                        "score": 0.1969,
+                        "score": 0.1821,
                     },
                 },
             },
@@ -331,7 +333,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 _boosting_featurizer = BoostingFeaturizer(test["elastic_results"], test["config"], [])
                 all_results = test["elastic_results"]
                 for field in test["config"]["filter_min_should_match"]:
-                    all_results = _boosting_featurizer.filter_by_min_should_match(all_results, field=field)
+                    all_results = _boosting_featurizer._filter_by_min_should_match(all_results, field=field)
                 self.assert_elastic_results(all_results, test)
             except AssertionError as err:
                 raise AssertionError(f"Error in the test case number: {idx}").with_traceback(err.__traceback__)
@@ -370,14 +372,14 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 "config": TestBoostingFeaturizer.get_default_config(),
                 "result": {
                     "1": {
-                        "mrHit": {"_score": 158.08437, "_id": "1"},
+                        "mrHit": {"_score": 190.08437, "_id": "1"},
                         "compared_log": get_fixture(self.log_message, to_json=True),
                         "score": 1.0,
                     },
                     "2": {
                         "mrHit": {"_score": 77.53298, "_id": "2"},
                         "compared_log": get_fixture(self.log_message, to_json=True),
-                        "score": 0.4905,
+                        "score": 0.4078,
                     },
                 },
             },
@@ -395,14 +397,14 @@ class TestBoostingFeaturizer(unittest.TestCase):
                 "config": TestBoostingFeaturizer.get_default_config(),
                 "result": {
                     "1": {
-                        "mrHit": {"_score": 158.08437, "_id": "1"},
+                        "mrHit": {"_score": 190.08437, "_id": "1"},
                         "compared_log": get_fixture(self.log_message, to_json=True),
-                        "score": 0.9392,
+                        "score": 1.0,
                     },
                     "2": {
                         "mrHit": {"_score": 168.31, "_id": "2"},
                         "compared_log": get_fixture(self.log_message, to_json=True),
-                        "score": 1.0,
+                        "score": 0.8854,
                     },
                 },
             },
@@ -529,7 +531,7 @@ class TestBoostingFeaturizer(unittest.TestCase):
             print(f"Test index: {idx}")
             _boosting_featurizer = SuggestBoostingFeaturizer(test["elastic_results"], test["config"], [])
             all_results = test["elastic_results"]
-            all_results = _boosting_featurizer.filter_by_min_should_match_any(
+            all_results = _boosting_featurizer._filter_by_min_should_match_any(
                 all_results, fields=test["config"]["filter_min_should_match_any"]
             )
             self.assert_elastic_results(all_results, test)

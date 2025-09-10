@@ -217,7 +217,6 @@ class TestService(unittest.TestCase):
             ProbabilityForCustomModelSuggestions=0.9,
             ProbabilityForCustomModelAutoAnalysis=0.1,
             MaxSuggestionsNumber=3,
-            AutoAnalysisTimeout=300,
             MaxAutoAnalysisItemsToProcess=4000,
         )
 

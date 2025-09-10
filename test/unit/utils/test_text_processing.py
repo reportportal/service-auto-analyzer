@@ -207,13 +207,13 @@ def test_remove_credentials_from_url(url, expected_url):
         (
             "org.openqa.selenium.TimeoutException",
             ["java.lang.NullPointerException"],
-            [(0.05, False)],  # Should be low similarity
+            [(0.11, False)],  # Should be low similarity
         ),
         # Test same exception type, different details
         (
             "org.openqa.selenium.TimeoutException: ErrorCodec.decode",
             ["org.openqa.selenium.TimeoutException: Different error"],
-            [(0.56, False)],  # Should be moderate similarity (approximate)
+            [(0.71, False)],  # Should be moderate similarity (approximate)
         ),
         # Test empty strings
         ("", [""], [(0.0, True)]),
@@ -227,7 +227,7 @@ def test_remove_credentials_from_url(url, expected_url):
                 "java.lang.NullPointerException",
                 "org.openqa.selenium.WebDriverException",
             ],
-            [(1.0, False), (0.05, False), (0.45, False)],  # Expected approximate similarities
+            [(1.0, False), (0.11, False), (0.60, False)],  # Expected approximate similarities
         ),
     ],
 )
@@ -238,8 +238,8 @@ def test_calculate_text_similarity_basic_cases(base_text, other_texts, expected_
     assert len(actual_scores) == len(expected_scores)
 
     for actual, expected in zip(actual_scores, expected_scores):
-        assert abs(actual[0] - expected[0]) < 0.01
-        assert actual[1] == expected[1]
+        assert actual.similarity == pytest.approx(expected[0], abs=0.01)
+        assert actual.both_empty == expected[1]
 
 
 @pytest.mark.parametrize(
@@ -251,7 +251,7 @@ def test_calculate_text_similarity_basic_cases(base_text, other_texts, expected_
         ),
         (
             'AppiumBy.iOSNsPredicate: label CONTAINS[c] "Continue"',
-            ["appium", "predicate", "label", "contain", "continue"],
+            ["appium", "predicate", "label", "contains", "continue"],
         ),
         (
             "CamelCaseExample_with_snake_case",
@@ -263,7 +263,7 @@ def test_calculate_text_similarity_basic_cases(base_text, other_texts, expected_
         ),
         (
             "build_info: version: '4.33.0', revision: '2c6aaad03a'",
-            ["build", "info", "version", "revision", "specialnumber"],
+            ["build", "info", "version", "revision", "4", "33", "0"],
         ),
     ],
 )
@@ -271,12 +271,13 @@ def test_preprocess_text_for_similarity(text, expected_preprocessing_contains):
     """Test text preprocessing for similarity calculation"""
     processed = text_processing.preprocess_text_for_similarity(text)
 
-    # Check that expected words are present in the processed text
-    for expected_word in expected_preprocessing_contains:
-        assert expected_word in processed.lower()
-
     # Check that the processed text is lowercase
     assert processed == processed.lower()
+
+    # Check that expected words are present in the processed text
+    tokens = set(processed.split())
+    for expected_word in expected_preprocessing_contains:
+        assert expected_word in tokens
 
     # Check that no punctuation remains (except spaces)
     assert not any(char in processed for char in ".,;:!?()[]{}\"'")
@@ -314,11 +315,11 @@ def test_calculate_text_similarity_edge_cases(base_text, other_texts):
     # Basic validation
     assert len(actual_scores) == len(other_texts)
 
-    for score, _ in actual_scores:
-        assert 0.0 <= score <= 1.0
+    for score in actual_scores:
+        assert 0.0 <= score.similarity <= 1.0
         # For these edge cases, similarity should be moderate to high
         # since they have similar structure but different details
-        assert score > 0.3  # Should have some similarity due to common words
+        assert score.similarity > 0.3  # Should have some similarity due to common words
 
 
 def test_calculate_text_similarity_no_other_texts():
@@ -339,14 +340,14 @@ def test_calculate_text_similarity_appium_exceptions():
     # Test overall similarity
     similarity_scores = text_processing.calculate_text_similarity(ios_exception, android_exception)
     assert len(similarity_scores) == 1
-    assert 0.0 <= similarity_scores[0][0] <= 1.0
+    assert 0.0 <= similarity_scores[0].similarity <= 1.0
 
     # Test first line similarity
     ios_first_line = ios_exception.split("\n")[0]
     android_first_line = android_exception.split("\n")[0]
     first_line_scores = text_processing.calculate_text_similarity(ios_first_line, android_first_line)
     assert len(first_line_scores) == 1
-    assert 0.0 <= first_line_scores[0][0] <= 1.0
+    assert 0.0 <= first_line_scores[0].similarity <= 1.0
 
 
 @pytest.mark.parametrize(
@@ -364,4 +365,40 @@ def test_calculate_text_similarity_multiple_texts(base_text, other_texts, expect
     assert len(scores) == expected_length
 
     for score in scores:
-        assert 0.0 <= score[0] <= 1.0
+        assert 0.0 <= score.similarity <= 1.0
+
+
+REQUEST_TEXT = (
+    "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
+    "createExternalSystemUnableInteractWithExternalSystem has been broken with exception org.testng.TestException :\n"
+    "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'."
+)
+
+HISTORY_TEXTS = [
+    "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
+    "createExternalSystemUnableInteractWithExternalSystem has been fail with exception org.testng.TestException :\n"
+    "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'.,"
+    "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
+    "createExternalSystemUnableInteractWithExternalSystem has been failed with exception org.testng.TestException :\n"
+    "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'.",
+    "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
+    "createExternalSystemUnableInteractWithExternalSystem has been failure with exception org.testng.TestException :\n"
+    "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'.",
+    "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
+    "createExternalSystemUnableInteractWithExternalSystem has been break with exception org.testng.TestException :\n"
+    "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'.",
+    "new-string [TestNG-tests-SPECIALNUMBER] ERROR c.e.t.r.q.w.c.FailureLoggingListener - Test "
+    "createExternalSystemUnableInteractWithExternalSystem has been ended with exception org.testng.TestException :\n"
+    "Incorrect Error Type. Expected :  UNABLE_INTERACT_WITH_EXTERNAL_SYSTEM, but was 'PROJECT_NOT_FOUND'.",
+]
+
+
+def test_calculate_text_similarity_script_scenarios():
+    previous_similarities = []
+    for n in range(1, len(HISTORY_TEXTS) + 1):
+        result = text_processing.calculate_text_similarity(REQUEST_TEXT, *HISTORY_TEXTS[:n])
+        assert len(result) == n
+        if previous_similarities:
+            for i, r in enumerate(previous_similarities):
+                assert result[i].similarity == pytest.approx(r.similarity, abs=0.01)
+        previous_similarities = result

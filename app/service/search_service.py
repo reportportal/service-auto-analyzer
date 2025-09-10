@@ -229,21 +229,29 @@ class SearchService:
 
             _similarity_calculator = similarity_calculator.SimilarityCalculator()
             sim_dict = _similarity_calculator.find_similarity(
-                [(queried_log, search_results)], ["message", "merged_small_logs"]
+                [(queried_log, search_results)], ["message", "potential_status_codes", "merged_small_logs"]
             )
 
             for group_id, similarity_obj in sim_dict["message"].items():
                 log_id, _ = group_id
-                similarity_percent = similarity_obj["similarity"]
-                if similarity_obj["both_empty"]:
+                similarity_percent = similarity_obj.similarity
+                if similarity_obj.both_empty:
                     similarity_obj = sim_dict["merged_small_logs"][group_id]
-                    similarity_percent = similarity_obj["similarity"]
+                    similarity_percent = similarity_obj.similarity
                 logger.debug(
                     "Log with id %s has %.3f similarity with the queried log '%s'",
                     log_id,
                     similarity_percent,
                     message_to_use,
                 )
+                potential_status_codes_match = 0.0
+                both_empty = False
+                _similarity_dict = sim_dict["potential_status_codes"]
+                if group_id in _similarity_dict:
+                    potential_status_codes_match = _similarity_dict[group_id].similarity
+                    both_empty = _similarity_dict[group_id].both_empty
+                if not both_empty and potential_status_codes_match < 0.99:
+                    continue
                 if similarity_percent >= search_min_should_match:
                     log_id_extracted = utils.extract_real_id(log_id)
                     is_merged = log_id != str(log_id_extracted)

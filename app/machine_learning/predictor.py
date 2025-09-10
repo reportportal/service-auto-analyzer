@@ -18,12 +18,15 @@ from typing import Any, Optional, Union
 
 from typing_extensions import override
 
+from app.commons import logging
 from app.commons.model.ml import ModelType
 from app.commons.model_chooser import ModelChooser
 from app.machine_learning.boosting_featurizer import BoostingFeaturizer
 from app.machine_learning.models import BoostingDecisionMaker, DefectTypeModel
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils.text_processing import calculate_text_similarity
+
+LOGGER = logging.getLogger("analyzerApp.predictor")
 
 
 @dataclass
@@ -167,12 +170,14 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
 
         # If no feature data, return empty result
         if not feature_data:
+            LOGGER.debug("No feature data extracted, skipping prediction.")
             return []
 
         # Make predictions
         predicted_labels, predicted_labels_probability = self.boosting_decision_maker.predict(feature_data)
 
         if not predicted_labels or not predicted_labels_probability:
+            LOGGER.debug("No predictions made, skipping result generation.")
             return []
 
         # Get scores by identity
@@ -334,14 +339,17 @@ class SimilarityPredictor(Predictor):
         # Group results by test_item to find most relevant for each
         results_by_test_item = {}
 
-        for idx, (hit, (similarity, _)) in enumerate(zip(valid_hits, similarity_scores)):
+        for idx, (hit, sim_result) in enumerate(zip(valid_hits, similarity_scores)):
             # Get test_item identifier
             test_item = str(hit.get("_source", {}).get("test_item", "unknown"))
 
             # Track the best hit for each test_item
-            if test_item not in results_by_test_item or similarity > results_by_test_item[test_item]["similarity"]:
+            if (
+                test_item not in results_by_test_item
+                or sim_result.similarity > results_by_test_item[test_item]["similarity"]
+            ):
                 results_by_test_item[test_item] = {
-                    "similarity": similarity,
+                    "similarity": sim_result.similarity,
                     "mrHit": hit,
                     "compared_log": search_request,
                     "original_position": idx,  # Add position info to hit

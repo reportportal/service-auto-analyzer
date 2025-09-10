@@ -1,5 +1,9 @@
 # Changelog
 ## [Unreleased]
+### Fixed
+- Text similarity calculation doesn't use IDF now, to be less confusing for users, by @HardNorth
+
+## [5.14.4]
 ### Added
 - `_is_analyzed_manually` feature in `BoostingFeaturizer` class, by @HardNorth
 - Newly trained models, by @HardNorth

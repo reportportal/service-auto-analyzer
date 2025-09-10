@@ -2,6 +2,8 @@
 ## [Unreleased]
 
 ## [5.14.5]
+### Added
+- Newly trained suggestion model, by @HardNorth
 ### Fixed
 - Text similarity calculation doesn't use IDF now, to be less confusing for users, by @HardNorth
 

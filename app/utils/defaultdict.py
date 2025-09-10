@@ -19,7 +19,7 @@ _KT = TypeVar("_KT")
 _RT = TypeVar("_RT")
 
 
-class DefaultDict(_defaultdict):
+class DefaultDict(_defaultdict[_KT, _RT]):
     _checked_keys: set[_KT]
     _default_factory: Optional[Callable[["DefaultDict", _KT], _RT]]
 

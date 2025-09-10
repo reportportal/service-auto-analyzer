@@ -1,5 +1,7 @@
 # Changelog
 ## [Unreleased]
+
+## [5.14.5]
 ### Fixed
 - Text similarity calculation doesn't use IDF now, to be less confusing for users, by @HardNorth
 

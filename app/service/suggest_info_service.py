@@ -22,7 +22,7 @@ import elasticsearch.helpers
 from app.amqp.amqp import AmqpClient
 from app.commons import logging
 from app.commons.esclient import EsClient
-from app.commons.model.launch_objects import ApplicationConfig
+from app.commons.model.launch_objects import ApplicationConfig, BulkResponse
 from app.commons.model.ml import ModelType, TrainInfo
 from app.utils import text_processing, utils
 
@@ -218,6 +218,16 @@ class SuggestInfoService:
             },
         }
 
+    def update_train_data(self, project_id: int, result: BulkResponse) -> None:
+        if self.app_config.amqpUrl:
+            amqp_client = AmqpClient(self.app_config)
+            for model_type in [ModelType.suggestion, ModelType.auto_analysis]:
+                amqp_client.send_to_inner_queue(
+                    "train_models",
+                    TrainInfo(model_type=model_type, project=project_id, gathered_metric_total=result.took).json(),
+                )
+            amqp_client.close()
+
     def update_suggest_info(self, defect_update_info):
         logger.info("Started updating suggest info")
         t_start = time()
@@ -251,16 +261,6 @@ class SuggestInfoService:
                         {"_op_type": "update", "_id": res["_id"], "_index": index_name, "doc": {"userChoice": 0}}
                     )
         result = self.es_client._bulk_index(log_update_queries)
-        if self.app_config.amqpUrl:
-            amqp_client = AmqpClient(self.app_config)
-            for model_type in [ModelType.suggestion, ModelType.auto_analysis]:
-                amqp_client.send_to_inner_queue(
-                    "train_models",
-                    TrainInfo(
-                        model_type=model_type, project=defect_update_info["project"], gathered_metric_total=result.took
-                    ).json(),
-                )
-            amqp_client.close()
-
+        self.update_train_data(defect_update_info["project"], result)
         logger.info("Finished updating suggest info for %.2f sec.", time() - t_start)
         return result.took

@@ -59,13 +59,13 @@ def return_similar_objects_into_sample(
     for idx, ind in enumerate(x_train_ind):
         x_train.append(data[ind][0])
         label_to_use = y_train[idx]
-        if ind in additional_logs and label_to_use != 1:
-            for idx_ in additional_logs[ind]:
-                _, label_res, _ = data[idx_]
-                if label_res == label:
-                    label_to_use = 1
-                    break
         if ind in additional_logs:
+            if label_to_use != 1:
+                for idx_ in additional_logs[ind]:
+                    _, label_res, _ = data[idx_]
+                    if label_res == label:
+                        label_to_use = 1
+                        break
             for idx_ in additional_logs[ind]:
                 x_train_add.append(data[idx_][0])
                 y_train_add.append(label_to_use)

@@ -394,22 +394,10 @@ def clean_html(message):
     return delete_empty_lines("\n".join(all_lines))
 
 
-def split_words(
-    text: str, min_word_length: int = 0, only_unique: bool = True, split_urls: bool = True, to_lower: bool = True
-) -> list[str]:
-    if not text:
-        return []
+def split_text_on_words(text: str, min_word_length: int, only_unique: bool) -> list[str]:
     all_unique_words = set()
     all_words = []
-
-    if split_urls:
-        result = text.translate(text.maketrans(PUNCTUATION_MAP_SPLIT_URLS))
-    else:
-        result = text.translate(text.maketrans(PUNCTUATION_MAP_NO_SPLIT_URLS))
-    result = result.strip().strip(".").strip()
-    if to_lower:
-        result = result.lower()
-    for w in result.split():
+    for w in text.split():
         w = w.strip().strip(".")
         if w != "" and len(w) >= min_word_length:
             if w in STOPWORDS_ALL:
@@ -420,6 +408,23 @@ def split_words(
                 all_unique_words.add(w)
             all_words.append(w)
     return all_words
+
+
+def split_words(
+    text: str, min_word_length: int = 0, only_unique: bool = True, split_urls: bool = True, to_lower: bool = True
+) -> list[str]:
+    if not text:
+        return []
+
+    if split_urls:
+        result = text.translate(text.maketrans(PUNCTUATION_MAP_SPLIT_URLS))
+    else:
+        result = text.translate(text.maketrans(PUNCTUATION_MAP_NO_SPLIT_URLS))
+    result = result.strip().strip(".").strip()
+    if to_lower:
+        result = result.lower()
+
+    return split_text_on_words(result, min_word_length, only_unique)
 
 
 def normalize_message(message: str) -> str:

@@ -44,8 +44,10 @@ jobs:
 
       - name: Create variables
         id: vars
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          echo "tag=$(echo '${{ github.event.pull_request.title }}' | sed -nE 's/.*([0-9]+\.[0-9]+\.[0-9]+\S*).*/\1/p')" >> $GITHUB_OUTPUT
+          echo "tag=$(echo "${PR_TITLE}" | sed -nE 's/.*([0-9]+\.[0-9]+\.[0-9]+\S*).*/\1/p')" >> $GITHUB_OUTPUT
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2

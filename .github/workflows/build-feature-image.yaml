@@ -17,8 +17,10 @@ jobs:
 
       - name: Create variables
         id: vars
+        env:
+          GITHUB_REF: ${{ github.head_ref }}
         run: |
-          echo "tag=$(echo ${{ github.head_ref }}-${{ github.run_number }} | tr '/' '-')" >> $GITHUB_OUTPUT
+          echo "tag=$(echo ${GITHUB_REF}-${{ github.run_number }} | tr '/' '-')" >> $GITHUB_OUTPUT
           echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
     outputs:
       tag: ${{ steps.vars.outputs.tag }}

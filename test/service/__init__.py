@@ -782,6 +782,7 @@ def get_analyzer_index_call(index_name: str) -> dict:
         "method": httpretty.GET,
         "uri": f"/{index_name}",
         "status": HTTPStatus.OK,
+        "content_type": "application/json",
     }
 
 

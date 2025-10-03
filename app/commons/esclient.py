@@ -20,8 +20,7 @@ from typing import Any, Optional
 
 import opensearchpy.helpers
 import urllib3
-from opensearchpy import OpenSearch
-from opensearchpy import RequestsHttpConnection
+from opensearchpy import OpenSearch, RequestsHttpConnection
 from urllib3.exceptions import InsecureRequestWarning
 
 from app.amqp.amqp import AmqpClient

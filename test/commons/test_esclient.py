@@ -24,6 +24,7 @@ from app.commons import esclient
 from app.commons.model import launch_objects
 from app.utils import utils
 from test import APP_CONFIG, get_fixture
+from test.service import get_analyzer_index_call
 from test.mock_service import TestService
 
 
@@ -172,11 +173,7 @@ class TestEsClient(TestService):
         tests = [
             {
                 "test_calls": [
-                    {
-                        "method": httpretty.GET,
-                        "uri": "/1",
-                        "status": HTTPStatus.OK,
-                    },
+                    get_analyzer_index_call("1"),
                     {
                         "method": httpretty.POST,
                         "uri": "/1/_search?scroll=5m&size=1000",

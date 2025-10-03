@@ -222,7 +222,7 @@ class TestService(unittest.TestCase):
 
     def _start_server(self, test_calls):
         httpretty.reset()
-        httpretty.enable(allow_net_connect=True)
+        httpretty.enable(allow_net_connect=False)
         for test_info in test_calls:
             content_type = test_info.get("content_type", "")
             httpretty.register_uri(

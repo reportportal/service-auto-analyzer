@@ -35,7 +35,7 @@ from app.utils import utils
 APP_CONFIG = ApplicationConfig(
     # ES/OS settings
     # Mute Sonar about hardcoded HTTP URL, since this is a hostname inside a docker-compose file
-    esHost=os.getenv("ES_HOSTS", "http://elasticsearch:9200").strip("/").strip("\\"),  # NOSONAR
+    esHost=os.getenv("ES_HOSTS", "http://opensearch:9200").strip("/").strip("\\"),  # NOSONAR
     esUser=os.getenv("ES_USER", "").strip(),
     esPassword=os.getenv("ES_PASSWORD", "").strip(),
     esUseSsl=json.loads(os.getenv("ES_USE_SSL", "false").lower()),
@@ -245,7 +245,7 @@ def get_health_status():
     status_code = 200
     if not es_client.is_healthy():
         logger.error("Analyzer health check status failed: %s", status)
-        status["status"] = "Elasticsearch is not healthy"
+        status["status"] = "OpenSearch is not healthy"
         status_code = 503
     if THREADS:
         status["threads"] = []

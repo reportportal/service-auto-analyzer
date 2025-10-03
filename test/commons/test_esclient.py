@@ -18,7 +18,7 @@ from http import HTTPStatus
 from unittest.mock import MagicMock
 
 import httpretty
-from elasticsearch import RequestError
+from opensearchpy import RequestError
 
 from app.commons import esclient
 from app.commons.model import launch_objects

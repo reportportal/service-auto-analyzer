@@ -17,9 +17,8 @@ from datetime import datetime
 from time import time
 from typing import Any, Optional, Type
 
-import elasticsearch
-import elasticsearch.helpers
 import numpy as np
+import opensearchpy.helpers
 import scipy.stats as stats
 from imblearn.over_sampling import BorderlineSMOTE
 from sklearn.model_selection import train_test_split
@@ -250,7 +249,7 @@ class AnalysisModelTraining:
                 "size": self.app_config.esChunkNumber,
                 "query": {"bool": {"filter": [{"terms": {"_id": log_ids}}]}},
             }
-            for r in elasticsearch.helpers.scan(
+            for r in opensearchpy.helpers.scan(
                 self.es_client.es_client, query=ids_query, index=project_index_name, scroll="5m"
             ):
                 log_id_dict[str(r["_id"])] = r
@@ -301,9 +300,7 @@ class AnalysisModelTraining:
         ]:
             if cur_number_of_logs >= max_number_of_logs:
                 break
-            for res in elasticsearch.helpers.scan(
-                self.es_client.es_client, query=query, index=index_name, scroll="5m"
-            ):
+            for res in opensearchpy.helpers.scan(self.es_client.es_client, query=query, index=index_name, scroll="5m"):
                 if cur_number_of_logs >= max_number_of_logs:
                     break
                 saved_model_features = f'{res["_source"]["modelFeatureNames"]}|{res["_source"]["modelFeatureValues"]}'

@@ -80,7 +80,7 @@ class Predictor(metaclass=ABCMeta):
         """Execute the full prediction workflow.
 
         :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
-                                                                           from Elasticsearch
+                                                                           from OpenSearch
         :return: List of PredictionResult objects, one for each prediction
         """
         ...
@@ -156,7 +156,7 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
         """Execute the full prediction workflow.
 
         :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
-                                                                           from Elasticsearch
+                                                                           from OpenSearch
         :return: List of PredictionResult objects, one for each prediction
         """
         # Create and configure featurizer

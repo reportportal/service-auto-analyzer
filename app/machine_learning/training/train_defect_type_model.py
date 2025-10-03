@@ -18,8 +18,8 @@ from datetime import datetime
 from time import sleep, time
 from typing import Any, Optional, Type
 
-import elasticsearch.helpers
 import numpy as np
+import opensearchpy.helpers
 import scipy.stats as stats
 from pydantic import BaseModel
 from sklearn.model_selection import train_test_split
@@ -249,7 +249,7 @@ class DefectTypeModelTraining:
         query_result = []
         while error_count <= RETRY_COUNT:
             try:
-                query_result = elasticsearch.helpers.scan(
+                query_result = opensearchpy.helpers.scan(
                     self.es_client.es_client,
                     query=self.get_messages_by_issue_type(query),
                     index=project_index_name,

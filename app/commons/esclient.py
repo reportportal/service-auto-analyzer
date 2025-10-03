@@ -18,10 +18,10 @@ from collections import deque
 from time import time
 from typing import Any, Optional
 
-import elasticsearch
-import elasticsearch.helpers
+import opensearchpy.helpers
 import urllib3
-from elasticsearch import RequestsHttpConnection
+from opensearchpy import OpenSearch
+from opensearchpy import RequestsHttpConnection
 from urllib3.exceptions import InsecureRequestWarning
 
 from app.amqp.amqp import AmqpClient
@@ -30,20 +30,20 @@ from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, La
 from app.commons.model.ml import ModelType, TrainInfo
 from app.utils import text_processing, utils
 
-ES_URL_MESSAGE = "ES Url %s"
+ES_URL_MESSAGE = "OpenSearch Url %s"
 
 logger = logging.getLogger("analyzerApp.esclient")
 
 
 class EsClient:
-    """Elasticsearch client implementation"""
+    """OpenSearch client implementation"""
 
     app_config: ApplicationConfig
-    es_client: elasticsearch.Elasticsearch
+    es_client: OpenSearch
     host: str
     tables_to_recreate: list[str]
 
-    def __init__(self, app_config: ApplicationConfig, es_client: elasticsearch.Elasticsearch = None):
+    def __init__(self, app_config: ApplicationConfig, es_client: OpenSearch = None):
         self.app_config = app_config
         self.host = app_config.esHost
         if es_client:
@@ -53,7 +53,7 @@ class EsClient:
         self.es_client = es_client or self.create_es_client(app_config)
         self.tables_to_recreate = ["rp_aa_stats", "rp_model_train_stats", "rp_suggestions_info_metrics"]
 
-    def create_es_client(self, app_config: ApplicationConfig) -> elasticsearch.Elasticsearch:
+    def create_es_client(self, app_config: ApplicationConfig) -> OpenSearch:
         if not app_config.esVerifyCerts:
             urllib3.disable_warnings(InsecureRequestWarning)
         kwargs: dict[str, Any] = {
@@ -74,7 +74,7 @@ class EsClient:
         if app_config.turnOffSslVerification:
             kwargs["connection_class"] = RequestsHttpConnection
 
-        return elasticsearch.Elasticsearch([self.host], **kwargs)
+        return OpenSearch([self.host], **kwargs)
 
     def get_test_item_query(self, test_item_ids, is_merged, full_log):
         """Build test item query"""
@@ -122,9 +122,9 @@ class EsClient:
         }
 
     def __get_base_url(self) -> Optional[str]:
-        """Get base URL for Elasticsearch"""
+        """Get base URL for OpenSearch"""
         if not self.host:
-            logger.error("Elasticsearch host is not set")
+            logger.error("OpenSearch host is not set")
             return None
         url = self.host
         if not self.host.startswith("http"):
@@ -133,7 +133,7 @@ class EsClient:
         return url
 
     def is_healthy(self) -> bool:
-        """Check whether elasticsearch is healthy"""
+        """Check whether OpenSearch is healthy"""
         base_url = self.__get_base_url()
         if not base_url:
             return False
@@ -156,7 +156,7 @@ class EsClient:
         )
 
     def create_index(self, index_name: str) -> Response:
-        """Create index in elasticsearch"""
+        """Create index in OpenSearch"""
         logger.info(f"Creating index: {index_name}")
         response = self.es_client.indices.create(
             index=index_name,
@@ -273,7 +273,7 @@ class EsClient:
             if not test_items:
                 continue
             test_items_dict = {}
-            for r in elasticsearch.helpers.scan(
+            for r in opensearchpy.helpers.scan(
                 self.es_client, query=self.get_test_item_query(test_items, False, True), index=project
             ):
                 test_item_id = r["_source"]["test_item"]
@@ -307,7 +307,7 @@ class EsClient:
             test_item_ids = test_items_to_delete[i * batch_size : (i + 1) * batch_size]
             if not test_item_ids:
                 continue
-            for log in elasticsearch.helpers.scan(
+            for log in opensearchpy.helpers.scan(
                 self.es_client, query=self.get_test_item_query(test_item_ids, True, False), index=project
             ):
                 bodies.append({"_op_type": "delete", "_id": log["_id"], "_index": project})
@@ -337,14 +337,14 @@ class EsClient:
             es_chunk_number = chunk_size
         try:
             try:
-                success_count, errors = elasticsearch.helpers.bulk(
+                success_count, errors = opensearchpy.helpers.bulk(
                     self.es_client, bodies, chunk_size=es_chunk_number, request_timeout=30, refresh=refresh
                 )
             except:  # noqa
                 formatted_exception = traceback.format_exc()
                 self._recreate_index_if_needed(bodies, formatted_exception)
                 self.update_settings_after_read_only()
-                success_count, errors = elasticsearch.helpers.bulk(
+                success_count, errors = opensearchpy.helpers.bulk(
                     self.es_client, bodies, chunk_size=es_chunk_number, request_timeout=30, refresh=refresh
                 )
             error_str = ""
@@ -360,7 +360,7 @@ class EsClient:
             return BulkResponse(took=0, errors=True)
 
     def delete_logs(self, clean_index):
-        """Delete logs from elasticsearch"""
+        """Delete logs from OpenSearch"""
         index_name = text_processing.unite_project_name(clean_index.project, self.app_config.esProjectIndexPrefix)
         log_ids = ", ".join([str(log_id) for log_id in clean_index.ids])
         logger.info(f"Delete project '{index_name}' logs: {log_ids}")
@@ -370,7 +370,7 @@ class EsClient:
         test_item_ids = set()
         try:
             search_query = self.build_search_test_item_ids_query(clean_index.ids)
-            for res in elasticsearch.helpers.scan(self.es_client, query=search_query, index=index_name, scroll="5m"):
+            for res in opensearchpy.helpers.scan(self.es_client, query=search_query, index=index_name, scroll="5m"):
                 test_item_ids.add(res["_source"]["test_item"])
         except Exception as err:
             logger.exception("Couldn't find test items for logs", exc_info=err)
@@ -458,7 +458,7 @@ class EsClient:
             sub_test_item_ids = test_item_ids[i * batch_size : (i + 1) * batch_size]
             if not sub_test_item_ids:
                 continue
-            for log in elasticsearch.helpers.scan(
+            for log in opensearchpy.helpers.scan(
                 self.es_client, query=self.get_test_items_by_ids_query(sub_test_item_ids), index=index_name
             ):
                 issue_type = ""
@@ -555,7 +555,7 @@ class EsClient:
         index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
         query = self.__time_range_query("launch_start_time", start_date, end_date, for_scan=True)
         launch_ids = set()
-        for log in elasticsearch.helpers.scan(self.es_client, query=query, index=index_name):
+        for log in opensearchpy.helpers.scan(self.es_client, query=query, index=index_name):
             launch_ids.add(log["_source"]["launch_id"])
         return list(launch_ids)
 
@@ -571,7 +571,7 @@ class EsClient:
         index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
         query = self.__time_range_query("log_time", start_date, end_date, for_scan=True)
         log_ids = set()
-        for log in elasticsearch.helpers.scan(self.es_client, query=query, index=index_name):
+        for log in opensearchpy.helpers.scan(self.es_client, query=query, index=index_name):
             log_ids.add(log["_id"])
         return list(log_ids)
 

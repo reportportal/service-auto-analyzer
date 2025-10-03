@@ -14,8 +14,7 @@
 
 from time import time
 
-import elasticsearch
-import elasticsearch.helpers
+import opensearchpy.helpers
 
 from app.commons import logging
 from app.commons.esclient import EsClient
@@ -58,7 +57,7 @@ class SuggestPatternsService:
             },
         }
         utils.append_aa_ma_boosts(query, self.search_cfg)
-        for d in elasticsearch.helpers.scan(self.es_client.es_client, index=project, query=query):
+        for d in opensearchpy.helpers.scan(self.es_client.es_client, index=project, query=query):
             data.append((d["_source"]["detected_message"], d["_source"]["issue_type"]))
         return data
 

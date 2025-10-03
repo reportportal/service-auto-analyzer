@@ -14,8 +14,7 @@
 
 from time import time
 
-import elasticsearch
-import elasticsearch.helpers
+import opensearchpy.helpers
 
 from app.commons import log_merger, logging, request_factory, similarity_calculator
 from app.commons.esclient import EsClient
@@ -118,7 +117,7 @@ class SearchService:
             test_items = test_item_ids[i * batch_size : (i + 1) * batch_size]
             if not test_items:
                 continue
-            for r in elasticsearch.helpers.scan(
+            for r in opensearchpy.helpers.scan(
                 self.es_client.es_client,
                 query=self.es_client.get_test_item_query(test_items, False, False),
                 index=index_name,
@@ -193,7 +192,7 @@ class SearchService:
             search_min_should_match=text_processing.prepare_es_min_should_match(search_min_should_match),
         )
         res = []
-        for r in elasticsearch.helpers.scan(self.es_client.es_client, query=query, index=index_name):
+        for r in opensearchpy.helpers.scan(self.es_client.es_client, query=query, index=index_name):
             test_item_info[r["_id"]] = r["_source"]["test_item"]
             res.append(r)
             if len(res) >= 10000:

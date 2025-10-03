@@ -16,8 +16,7 @@ import json
 from datetime import datetime
 from time import time
 
-import elasticsearch
-import elasticsearch.helpers
+import opensearchpy.helpers
 
 from app.amqp.amqp import AmqpClient
 from app.commons import logging
@@ -131,7 +130,7 @@ class SuggestInfoService:
         return {"query": {"bool": {"filter": [{"terms": {"launchId": launch_ids}}]}}}
 
     def clean_suggest_info_logs(self, clean_index):
-        """Delete logs from elasticsearch"""
+        """Delete logs from OpenSearch"""
         index_name = self.build_index_name(clean_index.project)
         index_name = text_processing.unite_project_name(index_name, self.app_config.esProjectIndexPrefix)
         logger.info("Delete logs %s for the index %s", clean_index.ids, index_name)
@@ -142,7 +141,7 @@ class SuggestInfoService:
         suggest_log_ids = set()
         try:
             search_query = self.build_suggest_info_ids_query(clean_index.ids)
-            for res in elasticsearch.helpers.scan(
+            for res in opensearchpy.helpers.scan(
                 self.es_client.es_client, query=search_query, index=index_name, scroll="5m"
             ):
                 suggest_log_ids.add(res["_id"])
@@ -167,7 +166,7 @@ class SuggestInfoService:
         return result.took
 
     def clean_suggest_info_logs_by_test_item(self, remove_items_info):
-        """Delete logs from elasticsearch"""
+        """Delete logs from OpenSearch"""
         index_name = self.build_index_name(remove_items_info["project"])
         index_name = text_processing.unite_project_name(index_name, self.app_config.esProjectIndexPrefix)
         logger.info("Delete test items %s for the index %s", remove_items_info["itemsToDelete"], index_name)
@@ -184,7 +183,7 @@ class SuggestInfoService:
         return deleted_logs
 
     def clean_suggest_info_logs_by_launch_id(self, launch_remove_info):
-        """Delete logs with specified launch ids from elasticsearch"""
+        """Delete logs with specified launch ids from OpenSearch"""
         project = launch_remove_info["project"]
         launch_ids = launch_remove_info["launch_ids"]
         index_name = self.build_index_name(project)
@@ -245,7 +244,7 @@ class SuggestInfoService:
             sub_test_item_ids = test_item_ids[i * batch_size : (i + 1) * batch_size]
             if not sub_test_item_ids:
                 continue
-            for res in elasticsearch.helpers.scan(
+            for res in opensearchpy.helpers.scan(
                 self.es_client.es_client,
                 query=self.build_query_for_getting_suggest_info(sub_test_item_ids),
                 index=index_name,

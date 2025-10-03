@@ -18,7 +18,7 @@ import time
 from queue import Empty, PriorityQueue, Queue
 from typing import Any, Callable, Optional, Protocol
 
-from elasticsearch import ConflictError, NotFoundError
+from opensearchpy import ConflictError, NotFoundError
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
 

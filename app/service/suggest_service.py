@@ -19,7 +19,7 @@ from functools import reduce
 from time import time
 from typing import Optional
 
-import elasticsearch.helpers
+import opensearchpy.helpers
 
 from app.amqp.amqp import AmqpClient
 from app.commons import log_merger, logging, request_factory, similarity_calculator
@@ -209,7 +209,7 @@ class SuggestService(AnalyzerService):
             ]:
                 queries.append("{}\n{}".format(json.dumps({"index": index_name}), json.dumps(query)))
 
-            search_results = self.es_client.es_client.msearch("\n".join(queries) + "\n")
+            search_results = self.es_client.es_client.msearch(body="\n".join(queries) + "\n")
             partial_res = search_results["responses"] if search_results else []
             for ind in range(len(partial_res)):
                 full_results.append((log, partial_res[ind]))
@@ -363,7 +363,7 @@ class SuggestService(AnalyzerService):
         if test_item_id is None:
             return [], 0
         logs = []
-        for log in elasticsearch.helpers.scan(
+        for log in opensearchpy.helpers.scan(
             self.es_client.es_client, query=self.get_query_for_logs_by_test_item(test_item_id), index=index_name
         ):
             # clean test item info not to boost by it

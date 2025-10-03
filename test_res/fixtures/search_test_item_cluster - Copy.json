@@ -1,1 +1,0 @@
-{"query": {"bool": {"filter": [{"range": {"log_level": {"gte": 40000}}}, {"exists": {"field": "issue_type"}}, {"term": {"is_merged": false}}, {"term": {"test_item": 1}}]}}, "sort": "_doc"}

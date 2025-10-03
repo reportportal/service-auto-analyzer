@@ -1,1 +1,0 @@
-{"_source": ["test_item"], "query": {"bool": {"filter": [{"range": {"log_level": {"gte": 40000}}}, {"exists": {"field": "issue_type"}}, {"term": {"is_merged": false}}], "must": [{"term": {"launch_id": 145}}, {"term": {"cluster_id": 5349085043832165}}], "should": []}}}

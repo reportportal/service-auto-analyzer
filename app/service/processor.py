@@ -16,7 +16,6 @@ import time
 from typing import Any, Optional
 
 from app.commons import logging, model_chooser
-from app.commons.esclient import EsClient
 from app.commons.model import launch_objects, ml
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.service.analyzer_service import AnalyzerService
@@ -24,6 +23,7 @@ from app.service.auto_analyzer_service import AutoAnalyzerService
 from app.service.clean_index_service import CleanIndexService
 from app.service.cluster_service import ClusterService
 from app.service.delete_index_service import DeleteIndexService
+from app.service.index_service import IndexService
 from app.service.namespace_finder_service import NamespaceFinderService
 from app.service.retraining_service import RetrainingService
 from app.service.search_service import SearchService
@@ -110,7 +110,7 @@ class ServiceProcessor:
     """Class for processing requests based on routing key and routing configuration"""
 
     _model_chooser: Optional[model_chooser.ModelChooser] = None
-    _es_client: Optional[EsClient] = None
+    _index_service: Optional[IndexService] = None
     _clean_index_service: Optional[CleanIndexService] = None
     _analyzer_service: Optional[AnalyzerService] = None
     _suggest_info_service: Optional[SuggestInfoService] = None
@@ -121,7 +121,7 @@ class ServiceProcessor:
             "prepare_data_func": prepare_train_info,
         },
         "index": {
-            "handler": lambda s: s.es_client.index_logs,
+            "handler": lambda s: s.index_service.index_logs,
             "prepare_data_func": prepare_launches,
             "prepare_response_data": prepare_index_response_data,
         },
@@ -156,7 +156,7 @@ class ServiceProcessor:
             "prepare_response_data": prepare_index_response_data,
         },
         "stats_info": {
-            "handler": lambda s: s.es_client.send_stats_info,
+            "handler": lambda s: s.index_service.send_stats_info,
         },
         "namespace_finder": {
             "handler": lambda s: NamespaceFinderService(s.app_config).update_chosen_namespaces,
@@ -193,7 +193,7 @@ class ServiceProcessor:
             "prepare_response_data": to_json,
         },
         "defect_update": {
-            "handler": lambda s: s.es_client.defect_update,
+            "handler": lambda s: s.index_service.defect_update,
             "prepare_data_func": same_data,
             "prepare_response_data": to_json,
         },
@@ -260,10 +260,10 @@ class ServiceProcessor:
         return self._clean_index_service
 
     @property
-    def es_client(self) -> EsClient:
-        if not self._es_client:
-            self._es_client = EsClient(self.app_config)
-        return self._es_client
+    def index_service(self) -> IndexService:
+        if not self._index_service:
+            self._index_service = IndexService(self.app_config)
+        return self._index_service
 
     @property
     def analyzer_service(self) -> AnalyzerService:

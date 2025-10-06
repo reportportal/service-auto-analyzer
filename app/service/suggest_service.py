@@ -510,7 +510,7 @@ class SuggestService(AnalyzerService):
         }
         if not results:
             self.es_client.create_index_for_stats_info(self.rp_suggest_metrics_index_template)
-            self.es_client._bulk_index(
+            self.es_client.bulk_index(
                 [
                     {
                         "_index": self.rp_suggest_metrics_index_template,

@@ -440,7 +440,7 @@ class ClusterService:
                             },
                         }
                     )
-                self.es_client._bulk_index(
+                self.es_client.bulk_index(
                     bodies, refresh=False, chunk_size=self.app_config.esChunkNumberUpdateClusters
                 )
         except Exception as exc:

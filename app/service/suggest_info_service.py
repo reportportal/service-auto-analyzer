@@ -75,7 +75,7 @@ class SuggestInfoService:
                 )
                 project_index_names.add(project_index_name)
             bodies.append({"_index": project_index_name, "_source": obj_info})
-        bulk_result = self.es_client._bulk_index(bodies)
+        bulk_result = self.es_client.bulk_index(bodies)
         self.index_data_for_metrics(metrics_data_by_test_item)
         logger.info("Finished saving %.2f s", time() - t_start)
         return bulk_result
@@ -98,7 +98,7 @@ class SuggestInfoService:
                 chosen_data["reciprocalRank"] = 0.0
             chosen_data["reciprocalRank"] = int(chosen_data["reciprocalRank"] * 100)
             bodies.append({"_index": self.rp_suggest_metrics_index_template, "_source": chosen_data})
-        self.es_client._bulk_index(bodies)
+        self.es_client.bulk_index(bodies)
 
     def remove_suggest_info(self, project_id):
         logger.info("Removing suggest_info index")
@@ -156,7 +156,7 @@ class SuggestInfoService:
                     "_index": index_name,
                 }
             )
-        result = self.es_client._bulk_index(bodies)
+        result = self.es_client.bulk_index(bodies)
         logger.info(
             "Finished deleting logs %s for the project %s. It took %.2f sec",
             clean_index.ids,
@@ -259,7 +259,7 @@ class SuggestInfoService:
                     log_update_queries.append(
                         {"_op_type": "update", "_id": res["_id"], "_index": index_name, "doc": {"userChoice": 0}}
                     )
-        result = self.es_client._bulk_index(log_update_queries)
+        result = self.es_client.bulk_index(log_update_queries)
         self.update_train_data(defect_update_info["project"], result)
         logger.info("Finished updating suggest info for %.2f sec.", time() - t_start)
         return result.took

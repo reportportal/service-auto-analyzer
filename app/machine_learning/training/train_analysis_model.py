@@ -135,6 +135,7 @@ def train_several_times(
 class AnalysisModelTraining:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
+    es_client: EsClient
     model_type: ModelType
     model_class: Type[BoostingDecisionMaker]
     baseline_folder: Optional[str]

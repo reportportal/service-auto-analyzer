@@ -544,7 +544,7 @@ class EsClient:
         lte_time: str,
         for_scan: bool = False,
     ) -> dict:
-        query = {"query": {"range": {time_field: {"gte": gte_time, "lte": lte_time}}}}
+        query: dict[str, Any] = {"query": {"range": {time_field: {"gte": gte_time, "lte": lte_time}}}}
         if for_scan:
             query["size"] = self.app_config.esChunkNumber
         return query

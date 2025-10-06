@@ -16,7 +16,6 @@ from unittest import mock
 import pytest
 
 from app.commons import esclient
-from app.commons.model.launch_objects import Launch, Log, TestItem
 from test import DEFAULT_ES_CONFIG
 
 TEST_PROJECT_ID = 2

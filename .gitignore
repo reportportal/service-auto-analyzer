@@ -132,3 +132,6 @@ dmypy.json
 .pyre/
 
 /storage
+
+# AI agents config files
+AGENTS.md

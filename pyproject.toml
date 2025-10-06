@@ -1,9 +1,17 @@
 [tool.isort]
 line_length = 119
 profile = "black"
-py_version=311
-force_to_top=["app.machine_learning.models.ml_model"]
+py_version = 311
+force_to_top = ["app.machine_learning.models.ml_model"]
 
 [tool.black]
 line-length = 119
 target-version = ["py311"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+required_plugins = "pytest-cov"
+addopts = "--cov-config=.coveragerc --cov --cov-report=xml -s -vv"
+testpaths = [
+    "test"
+]

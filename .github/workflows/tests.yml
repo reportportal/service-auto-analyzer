@@ -39,7 +39,7 @@ jobs:
         run: pre-commit run --all-files --show-diff-on-failure
 
       - name: Test
-        run: pytest --cov-config=.coveragerc --cov --cov-report=xml test/ -s -vv
+        run: pytest
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

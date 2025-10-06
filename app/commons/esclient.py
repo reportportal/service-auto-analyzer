@@ -532,7 +532,7 @@ class EsClient:
             sub_ids_for_removal = ids_for_removal[i * batch_size : (i + 1) * batch_size]
             if not sub_ids_for_removal:
                 continue
-            result = self.es_client.delete_by_query(index_name, body=delete_query_deriver(sub_ids_for_removal))
+            result = self.es_client.delete_by_query(index=index_name, body=delete_query_deriver(sub_ids_for_removal))
             if "deleted" in result:
                 deleted_logs += result["deleted"]
         return deleted_logs
@@ -562,7 +562,7 @@ class EsClient:
     def remove_by_launch_start_time_range(self, project: int, start_date: str, end_date: str) -> int:
         index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
         query = self.__time_range_query("launch_start_time", start_date, end_date)
-        delete_response = self.es_client.delete_by_query(index_name, body=query)
+        delete_response = self.es_client.delete_by_query(index=index_name, body=query)
         return delete_response["deleted"]
 
     @utils.ignore_warnings
@@ -578,5 +578,5 @@ class EsClient:
     def remove_by_log_time_range(self, project: int, start_date: str, end_date: str) -> int:
         index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
         query = self.__time_range_query("log_time", start_date, end_date)
-        delete_response = self.es_client.delete_by_query(index_name, body=query)
+        delete_response = self.es_client.delete_by_query(index=index_name, body=query)
         return delete_response["deleted"]

@@ -21,7 +21,7 @@ from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.trigger_manager import TriggerManager
-from app.utils import text_processing, utils
+from app.utils import text_processing
 
 LOGGER = logging.getLogger("analyzerApp.deleteIndexService")
 

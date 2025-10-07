@@ -15,7 +15,6 @@
 from unittest import mock
 
 import pytest
-from commons.object_saving import ObjectSaver
 from opensearchpy import OpenSearch
 from opensearchpy.client import IndicesClient
 
@@ -23,6 +22,7 @@ from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import SearchConfig
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
+from app.commons.object_saving import ObjectSaver
 from app.commons.trigger_manager import TriggerManager
 from app.service.delete_index_service import DeleteIndexService
 from test import APP_CONFIG, DEFAULT_BOOST_LAUNCH

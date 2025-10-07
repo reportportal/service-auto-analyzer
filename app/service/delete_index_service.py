@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from time import time
+from typing import Optional
 
 from app.commons import logging, namespace_finder, trigger_manager
 from app.commons.esclient import EsClient
@@ -31,14 +32,27 @@ class DeleteIndexService:
     es_client: EsClient
     model_chooser: ModelChooser
 
-    def __init__(self, model_chooser: ModelChooser, app_config: ApplicationConfig, search_cfg: SearchConfig):
+    def __init__(
+        self,
+        model_chooser: ModelChooser,
+        app_config: ApplicationConfig,
+        search_cfg: SearchConfig,
+        es_client: Optional[EsClient] = None,
+    ):
+        """Initialize DeleteIndexService
+
+        :param model_chooser: Model chooser instance
+        :param app_config: Application configuration object
+        :param search_cfg: Search configuration object
+        :param es_client: Optional EsClient instance. If not provided, a new one will be created.
+        """
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.namespace_finder = namespace_finder.NamespaceFinder(self.app_config)
         self.trigger_manager = trigger_manager.TriggerManager(
             model_chooser, app_config=self.app_config, search_cfg=self.search_cfg
         )
-        self.es_client = EsClient(app_config=self.app_config)
+        self.es_client = es_client or EsClient(app_config=self.app_config)
         self.model_chooser = model_chooser
 
     @utils.ignore_warnings

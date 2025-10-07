@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from time import time
+from typing import Optional
 
 from app.commons import logging
 from app.commons.esclient import EsClient
@@ -27,9 +28,14 @@ class CleanIndexService:
     es_client: EsClient
     suggest_info_service: SuggestInfoService
 
-    def __init__(self, app_config: ApplicationConfig):
+    def __init__(self, app_config: ApplicationConfig, es_client: Optional[EsClient] = None):
+        """Initialize CleanIndexService
+
+        :param app_config: Application configuration object
+        :param es_client: Optional EsClient instance. If not provided, a new one will be created.
+        """
         self.app_config = app_config
-        self.es_client = EsClient(app_config=self.app_config)
+        self.es_client = es_client or EsClient(app_config=self.app_config)
         self.suggest_info_service = SuggestInfoService(app_config=app_config)
 
     @utils.ignore_warnings

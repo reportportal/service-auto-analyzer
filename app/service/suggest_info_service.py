@@ -15,6 +15,7 @@
 import json
 from datetime import datetime
 from time import time
+from typing import Optional
 
 import opensearchpy.helpers
 
@@ -39,9 +40,14 @@ class SuggestInfoService:
     rp_suggest_index_template: str
     rp_suggest_metrics_index_template: str
 
-    def __init__(self, app_config: ApplicationConfig):
+    def __init__(self, app_config: ApplicationConfig, es_client: Optional[EsClient] = None):
+        """Initialize SuggestInfoService
+
+        :param app_config: Application configuration object
+        :param es_client: Optional EsClient instance. If not provided, a new one will be created.
+        """
         self.app_config = app_config
-        self.es_client = EsClient(app_config=self.app_config)
+        self.es_client = es_client or EsClient(app_config=self.app_config)
         self.rp_suggest_index_template = "rp_suggestions_info"
         self.rp_suggest_metrics_index_template = "rp_suggestions_info_metrics"
 

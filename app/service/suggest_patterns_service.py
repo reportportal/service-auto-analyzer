@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from time import time
+from typing import Optional
 
 import opensearchpy.helpers
 
@@ -29,10 +30,16 @@ class SuggestPatternsService:
     search_cfg: SearchConfig
     es_client: EsClient
 
-    def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig):
+    def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig, es_client: Optional[EsClient] = None):
+        """Initialize SuggestPatternsService
+
+        :param app_config: Application configuration object
+        :param search_cfg: Search configuration object
+        :param es_client: Optional EsClient instance. If not provided, a new one will be created.
+        """
         self.app_config = app_config
         self.search_cfg = search_cfg
-        self.es_client = EsClient(app_config=self.app_config)
+        self.es_client = es_client or EsClient(app_config=self.app_config)
 
     def query_data(self, project, label):
         data = []

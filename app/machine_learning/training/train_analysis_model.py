@@ -154,12 +154,14 @@ class AnalysisModelTraining:
         model_chooser: ModelChooser,
         model_class: Optional[Type[BoostingDecisionMaker]] = None,
         use_baseline_features: bool = True,
+        *,
+        es_client: Optional[EsClient] = None,
     ) -> None:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.due_proportion = 0.05
         self.due_proportion_to_smote = 0.4
-        self.es_client = EsClient(app_config=app_config)
+        self.es_client = es_client or EsClient(app_config=app_config)
         self.model_type = model_type
         if model_type is ModelType.suggestion:
             self.baseline_folder = self.search_cfg.SuggestBoostModelFolder

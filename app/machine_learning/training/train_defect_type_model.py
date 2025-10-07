@@ -201,10 +201,12 @@ class DefectTypeModelTraining:
         search_cfg: SearchConfig,
         model_chooser: Optional[ModelChooser] = None,
         model_class: Optional[Type[DefectTypeModel]] = None,
+        *,
+        es_client: Optional[EsClient] = None,
     ) -> None:
         self.app_config = app_config
         self.search_cfg = search_cfg
-        self.es_client = EsClient(app_config=app_config)
+        self.es_client = es_client or EsClient(app_config=app_config)
         if search_cfg.GlobalDefectTypeModelFolder:
             self.baseline_model = DefectTypeModel(
                 object_saving.create_filesystem(search_cfg.GlobalDefectTypeModelFolder)

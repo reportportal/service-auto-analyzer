@@ -15,18 +15,18 @@
 import json
 from datetime import datetime
 from time import time
-from typing import Optional
+from typing import Any, Optional
 
 import opensearchpy.helpers
 
 from app.amqp.amqp import AmqpClient
 from app.commons import logging
 from app.commons.esclient import EsClient
-from app.commons.model.launch_objects import ApplicationConfig, BulkResponse
+from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, CleanIndexStrIds
 from app.commons.model.ml import ModelType, TrainInfo
 from app.utils import text_processing, utils
 
-logger = logging.getLogger("analyzerApp.suggestInfoService")
+LOGGER = logging.getLogger("analyzerApp.suggestInfoService")
 
 
 class SuggestInfoService:
@@ -56,7 +56,7 @@ class SuggestInfoService:
 
     @utils.ignore_warnings
     def index_suggest_info(self, suggest_info_list):
-        logger.info("Started saving suggest_info_list")
+        LOGGER.info("Started saving suggest_info_list")
         t_start = time()
         bodies = []
         project_index_names = set()
@@ -83,7 +83,7 @@ class SuggestInfoService:
             bodies.append({"_index": project_index_name, "_source": obj_info})
         bulk_result = self.es_client.bulk_index(bodies)
         self.index_data_for_metrics(metrics_data_by_test_item)
-        logger.info("Finished saving %.2f s", time() - t_start)
+        LOGGER.info("Finished saving %.2f s", time() - t_start)
         return bulk_result
 
     def index_data_for_metrics(self, metrics_data_by_test_item):
@@ -107,14 +107,14 @@ class SuggestInfoService:
         self.es_client.bulk_index(bodies)
 
     def remove_suggest_info(self, project_id):
-        logger.info("Removing suggest_info index")
+        LOGGER.info("Removing suggest_info index")
         project_index_name = self.build_index_name(project_id)
         project_index_name = text_processing.unite_project_name(
             project_index_name, self.app_config.esProjectIndexPrefix
         )
         return self.es_client.delete_index(project_index_name)
 
-    def build_suggest_info_ids_query(self, log_ids):
+    def build_suggest_info_ids_query(self, log_ids: list[str]) -> dict[str, Any]:
         return {
             "_source": ["testItem"],
             "size": self.app_config.esChunkNumber,
@@ -135,14 +135,14 @@ class SuggestInfoService:
     def build_suggest_info_ids_query_by_launch_ids(self, launch_ids):
         return {"query": {"bool": {"filter": [{"terms": {"launchId": launch_ids}}]}}}
 
-    def clean_suggest_info_logs(self, clean_index):
+    def clean_suggest_info_logs(self, clean_index: CleanIndexStrIds):
         """Delete logs from OpenSearch"""
         index_name = self.build_index_name(clean_index.project)
         index_name = text_processing.unite_project_name(index_name, self.app_config.esProjectIndexPrefix)
-        logger.info("Delete logs %s for the index %s", clean_index.ids, index_name)
+        LOGGER.info("Delete logs %s for the index %s", clean_index.ids, index_name)
         t_start = time()
         if not self.es_client.index_exists(index_name, print_error=False):
-            logger.info("Didn't find index '%s'", index_name)
+            LOGGER.info("Didn't find index '%s'", index_name)
             return 0
         suggest_log_ids = set()
         try:
@@ -152,7 +152,7 @@ class SuggestInfoService:
             ):
                 suggest_log_ids.add(res["_id"])
         except Exception as exc:
-            logger.exception("Couldn't find logs with specified ids", exc_info=exc)
+            LOGGER.exception("Couldn't find logs with specified ids", exc_info=exc)
         bodies = []
         for _id in suggest_log_ids:
             bodies.append(
@@ -163,7 +163,7 @@ class SuggestInfoService:
                 }
             )
         result = self.es_client.bulk_index(bodies)
-        logger.info(
+        LOGGER.info(
             "Finished deleting logs %s for the project %s. It took %.2f sec",
             clean_index.ids,
             index_name,
@@ -175,12 +175,12 @@ class SuggestInfoService:
         """Delete logs from OpenSearch"""
         index_name = self.build_index_name(remove_items_info["project"])
         index_name = text_processing.unite_project_name(index_name, self.app_config.esProjectIndexPrefix)
-        logger.info("Delete test items %s for the index %s", remove_items_info["itemsToDelete"], index_name)
+        LOGGER.info("Delete test items %s for the index %s", remove_items_info["itemsToDelete"], index_name)
         t_start = time()
         deleted_logs = self.es_client.delete_by_query(
             index_name, remove_items_info["itemsToDelete"], self.build_suggest_info_ids_query_by_test_item
         )
-        logger.info(
+        LOGGER.info(
             "Finished deleting logs %s for the project %s. It took %.2f sec",
             remove_items_info["itemsToDelete"],
             index_name,
@@ -194,12 +194,12 @@ class SuggestInfoService:
         launch_ids = launch_remove_info["launch_ids"]
         index_name = self.build_index_name(project)
         index_name = text_processing.unite_project_name(index_name, self.app_config.esProjectIndexPrefix)
-        logger.info("Delete launches %s for the index %s", launch_ids, index_name)
+        LOGGER.info("Delete launches %s for the index %s", launch_ids, index_name)
         t_start = time()
         deleted_logs = self.es_client.delete_by_query(
             index_name, launch_ids, self.build_suggest_info_ids_query_by_launch_ids
         )
-        logger.info(
+        LOGGER.info(
             "Finished deleting launches %s for the index %s. It took %.2f sec. %s logs deleted",
             launch_ids,
             index_name,
@@ -234,7 +234,7 @@ class SuggestInfoService:
             amqp_client.close()
 
     def update_suggest_info(self, defect_update_info):
-        logger.info("Started updating suggest info")
+        LOGGER.info("Started updating suggest info")
         t_start = time()
         test_item_ids = [int(key_) for key_ in defect_update_info["itemsToUpdate"].keys()]
         defect_update_info["itemsToUpdate"] = {
@@ -267,5 +267,5 @@ class SuggestInfoService:
                     )
         result = self.es_client.bulk_index(log_update_queries)
         self.update_train_data(defect_update_info["project"], result)
-        logger.info("Finished updating suggest info for %.2f sec.", time() - t_start)
+        LOGGER.info("Finished updating suggest info for %.2f sec.", time() - t_start)
         return result.took

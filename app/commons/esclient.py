@@ -14,7 +14,7 @@
 
 import traceback
 from time import time
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import opensearchpy.helpers
 import urllib3
@@ -22,12 +22,13 @@ from opensearchpy import OpenSearch, RequestsHttpConnection
 from urllib3.exceptions import InsecureRequestWarning
 
 from app.commons import log_merger, logging
-from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, Response
+from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, CleanIndex, Response
 from app.utils import text_processing, utils
 
 ES_URL_MESSAGE = "OpenSearch Url %s"
+TABLES_TO_RECREATE = ["rp_aa_stats", "rp_model_train_stats", "rp_suggestions_info_metrics"]
 
-logger = logging.getLogger("analyzerApp.esclient")
+LOGGER = logging.getLogger("analyzerApp.esclient")
 
 
 class EsClient:
@@ -36,17 +37,16 @@ class EsClient:
     app_config: ApplicationConfig
     es_client: OpenSearch
     host: str
-    tables_to_recreate: list[str]
 
-    def __init__(self, app_config: ApplicationConfig, es_client: OpenSearch = None):
+    def __init__(self, app_config: ApplicationConfig, es_client: Optional[OpenSearch] = None) -> None:
         self.app_config = app_config
         self.host = app_config.esHost
         if es_client:
-            logger.info("Creating service using provided client")
+            LOGGER.debug("Creating service using provided client")
+            self.es_client = es_client
         else:
-            logger.info(f"Creating service using host URL: {text_processing.remove_credentials_from_url(self.host)}")
-        self.es_client = es_client or self.create_es_client(app_config)
-        self.tables_to_recreate = ["rp_aa_stats", "rp_model_train_stats", "rp_suggestions_info_metrics"]
+            LOGGER.debug(f"Creating service using host URL: {text_processing.remove_credentials_from_url(self.host)}")
+            self.es_client = self.create_es_client(app_config)
 
     def create_es_client(self, app_config: ApplicationConfig) -> OpenSearch:
         if not app_config.esVerifyCerts:
@@ -71,7 +71,7 @@ class EsClient:
 
         return OpenSearch([self.host], **kwargs)
 
-    def get_test_item_query(self, test_item_ids, is_merged, full_log):
+    def get_test_item_query(self, test_item_ids: list, is_merged: bool, full_log: bool) -> dict[str, Any]:
         """Build test item query"""
         if full_log:
             return {
@@ -99,7 +99,7 @@ class EsClient:
                 },
             }
 
-    def build_search_test_item_ids_query(self, log_ids):
+    def build_search_test_item_ids_query(self, log_ids: list) -> dict[str, Any]:
         """Build search test item ids query"""
         return {
             "_source": ["test_item"],
@@ -119,7 +119,7 @@ class EsClient:
     def __get_base_url(self) -> Optional[str]:
         """Get base URL for OpenSearch"""
         if not self.host:
-            logger.error("OpenSearch host is not set")
+            LOGGER.error("OpenSearch host is not set")
             return None
         url = self.host
         if not self.host.startswith("http"):
@@ -152,7 +152,7 @@ class EsClient:
 
     def create_index(self, index_name: str) -> Response:
         """Create index in OpenSearch"""
-        logger.info(f"Creating index: {index_name}")
+        LOGGER.info(f"Creating index: {index_name}")
         response = self.es_client.indices.create(
             index=index_name,
             body={
@@ -160,28 +160,28 @@ class EsClient:
                 "mappings": utils.read_json_file("res", "index_mapping_settings.json", to_json=True),
             },
         )
-        logger.debug(f"Index '{index_name}' created")
+        LOGGER.debug(f"Index '{index_name}' created")
         return Response(**response)
 
-    def index_exists(self, index_name: str, print_error: bool = True):
+    def index_exists(self, index_name: str, print_error: bool = True) -> bool:
         """Checks whether index exists"""
         try:
             index = self.es_client.indices.get(index=str(index_name))
             return index is not None
         except Exception as err:
             if print_error:
-                logger.exception(f"Index '{index_name}' was not found", exc_info=err)
+                LOGGER.exception(f"Index '{index_name}' was not found", exc_info=err)
             return False
 
-    def delete_index(self, index_name):
+    def delete_index(self, index_name: str) -> bool:
         """Delete the whole index"""
-        logger.info(f"Deleting index: {index_name}")
+        LOGGER.info(f"Deleting index: {index_name}")
         try:
             self.es_client.indices.delete(index=str(index_name))
-            logger.debug(f"Index '{str(index_name)}' deleted")
+            LOGGER.debug(f"Index '{str(index_name)}' deleted")
             return True
         except Exception as err:
-            logger.exception(f"Failed to delete index: {str(index_name)}", exc_info=err)
+            LOGGER.exception(f"Failed to delete index: {str(index_name)}", exc_info=err)
             return False
 
     def create_index_if_not_exists(self, index_name: str) -> bool:
@@ -191,7 +191,7 @@ class EsClient:
             return response.acknowledged
         return True
 
-    def merge_logs(self, test_item_ids, project):
+    def merge_logs(self, test_item_ids: list, project: str) -> tuple[BulkResponse, int]:
         bodies = []
         batch_size = 1000
         self._delete_merged_logs(test_item_ids, project)
@@ -227,8 +227,8 @@ class EsClient:
                         num_logs_with_defect_types += 1
         return self.bulk_index(bodies), num_logs_with_defect_types
 
-    def _delete_merged_logs(self, test_items_to_delete, project):
-        logger.debug("Delete merged logs for %d test items", len(test_items_to_delete))
+    def _delete_merged_logs(self, test_items_to_delete: list, project: str) -> None:
+        LOGGER.debug("Delete merged logs for %d test items", len(test_items_to_delete))
         bodies = []
         batch_size = 1000
         for i in range(int(len(test_items_to_delete) / batch_size) + 1):
@@ -242,7 +242,7 @@ class EsClient:
         if bodies:
             self.bulk_index(bodies)
 
-    def _recreate_index_if_needed(self, bodies, formatted_exception):
+    def _recreate_index_if_needed(self, bodies: list[dict[str, Any]], formatted_exception: str) -> None:
         index_name = ""
         if bodies:
             index_name = bodies[0]["_index"]
@@ -251,15 +251,17 @@ class EsClient:
         if (
             "'type': 'mapper_parsing_exception'" in formatted_exception
             or "RequestError(400, 'illegal_argument_exception'" in formatted_exception
-        ) and index_name in self.tables_to_recreate:
+        ) and index_name in TABLES_TO_RECREATE:
             self.delete_index(index_name)
             self.create_index_for_stats_info(index_name)
 
-    def bulk_index(self, bodies, refresh=True, chunk_size=None):
+    def bulk_index(
+        self, bodies: list[dict[str, Any]], refresh: bool = True, chunk_size: Optional[int] = None
+    ) -> BulkResponse:
         if not bodies:
             return BulkResponse(took=0, errors=False)
         start_time = time()
-        logger.debug(f"Indexing {len(bodies)} logs")
+        LOGGER.debug(f"Indexing {len(bodies)} logs")
         es_chunk_number = self.app_config.esChunkNumber
         if chunk_size is not None:
             es_chunk_number = chunk_size
@@ -278,20 +280,20 @@ class EsClient:
             error_str = ""
             if errors:
                 error_str = ", ".join([str(error) for error in errors])
-            logger.debug(
+            LOGGER.debug(
                 f"{success_count} logs were successfully indexed{'. Errors:' + error_str if error_str else ''}"
             )
-            logger.debug("Finished indexing for %.2f s", time() - start_time)
+            LOGGER.debug("Finished indexing for %.2f s", time() - start_time)
             return BulkResponse(took=success_count, errors=len(errors) > 0)
         except Exception as exc:
-            logger.exception("Error in bulk indexing", exc_info=exc)
+            LOGGER.exception("Error in bulk indexing", exc_info=exc)
             return BulkResponse(took=0, errors=True)
 
-    def delete_logs(self, clean_index):
+    def delete_logs(self, clean_index: CleanIndex) -> int:
         """Delete logs from OpenSearch"""
         index_name = text_processing.unite_project_name(clean_index.project, self.app_config.esProjectIndexPrefix)
         log_ids = ", ".join([str(log_id) for log_id in clean_index.ids])
-        logger.info(f"Delete project '{index_name}' logs: {log_ids}")
+        LOGGER.info(f"Delete project '{index_name}' logs: {log_ids}")
         t_start = time()
         if not self.index_exists(index_name):
             return 0
@@ -301,7 +303,7 @@ class EsClient:
             for res in opensearchpy.helpers.scan(self.es_client, query=search_query, index=index_name, scroll="5m"):
                 test_item_ids.add(res["_source"]["test_item"])
         except Exception as err:
-            logger.exception("Couldn't find test items for logs", exc_info=err)
+            LOGGER.exception("Couldn't find test items for logs", exc_info=err)
 
         bodies = []
         for _id in clean_index.ids:
@@ -314,12 +316,12 @@ class EsClient:
             )
         result = self.bulk_index(bodies)
         self.merge_logs(list(test_item_ids), index_name)
-        logger.info(
+        LOGGER.info(
             f"Finished deleting project '{index_name}' logs: {log_ids}. It took {round(time() - t_start, 2)} sec"
         )
         return result.took
 
-    def create_index_for_stats_info(self, rp_aa_stats_index, override_index_name=None):
+    def create_index_for_stats_info(self, rp_aa_stats_index: str, override_index_name: Optional[str] = None) -> None:
         index_name = rp_aa_stats_index
         if override_index_name is not None:
             index_name = override_index_name
@@ -346,22 +348,22 @@ class EsClient:
                 formatted_exception = traceback.format_exc()
                 self._recreate_index_if_needed([{"_index": index_name}], formatted_exception)
 
-    def get_test_items_by_ids_query(self, test_item_ids):
+    def get_test_items_by_ids_query(self, test_item_ids: list) -> dict[str, Any]:
         return {
             "_source": ["test_item"],
             "size": self.app_config.esChunkNumber,
             "query": {"bool": {"filter": [{"terms": {"test_item": test_item_ids}}]}},
         }
 
-    def build_delete_query_by_test_items(self, sub_test_item_ids):
+    def build_delete_query_by_test_items(self, sub_test_item_ids: list) -> dict[str, Any]:
         return {"query": {"bool": {"filter": [{"terms": {"test_item": sub_test_item_ids}}]}}}
 
-    def build_delete_query_by_launch_ids(self, launch_ids):
+    def build_delete_query_by_launch_ids(self, launch_ids: list) -> dict[str, Any]:
         return {"query": {"bool": {"filter": [{"terms": {"launch_id": launch_ids}}]}}}
 
     @utils.ignore_warnings
-    def remove_test_items(self, remove_items_info):
-        logger.info("Started removing test items")
+    def remove_test_items(self, remove_items_info: dict[str, Any]) -> int:
+        LOGGER.info("Started removing test items")
         t_start = time()
         index_name = text_processing.unite_project_name(
             str(remove_items_info["project"]), self.app_config.esProjectIndexPrefix
@@ -369,15 +371,15 @@ class EsClient:
         deleted_logs = self.delete_by_query(
             index_name, remove_items_info["itemsToDelete"], self.build_delete_query_by_test_items
         )
-        logger.debug("Removed %s logs by test item ids", deleted_logs)
-        logger.info("Finished removing test items. It took %.2f sec", time() - t_start)
+        LOGGER.debug("Removed %s logs by test item ids", deleted_logs)
+        LOGGER.info("Finished removing test items. It took %.2f sec", time() - t_start)
         return deleted_logs
 
     @utils.ignore_warnings
-    def remove_launches(self, remove_launches_info):
+    def remove_launches(self, remove_launches_info: dict[str, Any]) -> int:
         project = remove_launches_info["project"]
         launch_ids = remove_launches_info["launch_ids"]
-        logger.info("Started removing launches")
+        LOGGER.info("Started removing launches")
         t_start = time()
         index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
         deleted_logs = self.delete_by_query(
@@ -385,12 +387,14 @@ class EsClient:
             launch_ids,
             self.build_delete_query_by_launch_ids,
         )
-        logger.debug("Removed %s logs by launch ids", deleted_logs)
-        logger.info("Finished removing launches. It took %.2f sec", time() - t_start)
+        LOGGER.debug("Removed %s logs by launch ids", deleted_logs)
+        LOGGER.info("Finished removing launches. It took %.2f sec", time() - t_start)
         return deleted_logs
 
     @utils.ignore_warnings
-    def delete_by_query(self, index_name, ids_for_removal, delete_query_deriver):
+    def delete_by_query(
+        self, index_name: str, ids_for_removal: list, delete_query_deriver: Callable[[list], dict[str, Any]]
+    ) -> int:
         if not self.index_exists(index_name):
             return 0
         batch_size = 1000
@@ -410,13 +414,12 @@ class EsClient:
         gte_time: str,
         lte_time: str,
         for_scan: bool = False,
-    ) -> dict:
+    ) -> dict[str, Any]:
         query: dict[str, Any] = {"query": {"range": {time_field: {"gte": gte_time, "lte": lte_time}}}}
         if for_scan:
             query["size"] = self.app_config.esChunkNumber
         return query
 
-    @utils.ignore_warnings
     def get_launch_ids_by_start_time_range(self, project: int, start_date: str, end_date: str) -> list[str]:
         index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
         query = self.__time_range_query("launch_start_time", start_date, end_date, for_scan=True)
@@ -425,14 +428,12 @@ class EsClient:
             launch_ids.add(log["_source"]["launch_id"])
         return list(launch_ids)
 
-    @utils.ignore_warnings
     def remove_by_launch_start_time_range(self, project: int, start_date: str, end_date: str) -> int:
         index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
         query = self.__time_range_query("launch_start_time", start_date, end_date)
         delete_response = self.es_client.delete_by_query(index=index_name, body=query)
         return delete_response["deleted"]
 
-    @utils.ignore_warnings
     def get_log_ids_by_log_time_range(self, project: int, start_date: str, end_date: str) -> list[str]:
         index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
         query = self.__time_range_query("log_time", start_date, end_date, for_scan=True)
@@ -441,7 +442,6 @@ class EsClient:
             log_ids.add(log["_id"])
         return list(log_ids)
 
-    @utils.ignore_warnings
     def remove_by_log_time_range(self, project: int, start_date: str, end_date: str) -> int:
         index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
         query = self.__time_range_query("log_time", start_date, end_date)

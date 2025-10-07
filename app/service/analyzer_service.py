@@ -21,7 +21,7 @@ from app.commons.model.ml import ModelInfo
 from app.commons.model_chooser import ModelChooser
 from app.utils import utils
 
-logger = logging.getLogger("analyzerApp.analyzerService")
+LOGGER = logging.getLogger("analyzerApp.analyzerService")
 
 
 def _add_launch_name_boost(query: dict, launch_name: str, launch_boost: float) -> None:
@@ -110,7 +110,7 @@ class AnalyzerService:
         self.launch_boost = abs(self.search_cfg.BoostLaunch)
         self.model_chooser = model_chooser
 
-    def find_min_should_match_threshold(self, analyzer_config: AnalyzerConf):
+    def find_min_should_match_threshold(self, analyzer_config: AnalyzerConf) -> int:
         return (
             analyzer_config.minShouldMatch
             if analyzer_config.minShouldMatch > 0
@@ -126,11 +126,11 @@ class AnalyzerService:
     def build_more_like_this_query(
         self,
         min_should_match: str,
-        log_message,
+        log_message: str,
         field_name: str = "message",
         boost: float = 1.0,
-        override_min_should_match=None,
-    ):
+        override_min_should_match: str = None,
+    ) -> dict:
         """Build more like this query"""
         return utils.build_more_like_this_query(
             min_should_match=min_should_match,
@@ -142,7 +142,7 @@ class AnalyzerService:
         )
 
     @staticmethod
-    def prepare_restrictions_by_issue_type(filter_no_defect=True):
+    def prepare_restrictions_by_issue_type(filter_no_defect: bool = True) -> list[dict]:
         if filter_no_defect:
             return [{"wildcard": {"issue_type": "ti*"}}, {"wildcard": {"issue_type": "nd*"}}]
         return [{"term": {"issue_type": "ti001"}}]
@@ -205,26 +205,26 @@ class AnalyzerService:
             },
         }
 
-    def remove_models(self, model_info: ModelInfo):
+    def remove_models(self, model_info: ModelInfo) -> int:
         try:
-            logger.info("Started removing %s models from project %d", model_info.model_type.name, model_info.project)
+            LOGGER.info("Started removing %s models from project %d", model_info.model_type.name, model_info.project)
             deleted_models = self.model_chooser.delete_old_model(model_info.model_type, model_info.project)
-            logger.info("Finished removing %s models from project %d", model_info.model_type.name, model_info.project)
+            LOGGER.info("Finished removing %s models from project %d", model_info.model_type.name, model_info.project)
             return deleted_models
         except Exception as err:
-            logger.exception("Error while removing models.", exc_info=err)
+            LOGGER.exception("Error while removing models.", exc_info=err)
             return 0
 
-    def get_model_info(self, model_info: ModelInfo):
+    def get_model_info(self, model_info: ModelInfo) -> dict:
         try:
-            logger.info(
+            LOGGER.info(
                 "Started getting info for %s model from project %d", model_info.model_type.name, model_info.project
             )
             model_folder = self.model_chooser.get_model_info(model_info.model_type, model_info.project)
-            logger.info(
+            LOGGER.info(
                 "Finished getting info for %s model from project %d", model_info.model_type.name, model_info.project
             )
             return {"model_folder": model_folder}
         except Exception as err:
-            logger.exception("Error while getting info for models.", exc_info=err)
-            return ""
+            LOGGER.exception("Error while getting info for models.", exc_info=err)
+            return {}

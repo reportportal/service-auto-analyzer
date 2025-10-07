@@ -22,7 +22,7 @@ from app.commons.model.ml import TrainInfo
 from app.commons.model_chooser import ModelChooser
 from app.utils import utils
 
-logger = logging.getLogger("analyzerApp.retrainingService")
+LOGGER = logging.getLogger("analyzerApp.retrainingService")
 
 
 class RetrainingService:
@@ -40,16 +40,16 @@ class RetrainingService:
     @utils.ignore_warnings
     def train_models(self, train_info: TrainInfo) -> None:
         assert self.trigger_manager.does_trigger_exist(train_info.model_type)
-        logger.info(f"Started training model for {train_info.model_type} in project {train_info.project}")
+        LOGGER.info(f"Started training model for {train_info.model_type} in project {train_info.project}")
         t_start = time()
         _retraining_triggering, _retraining = self.trigger_manager.get_trigger_info(train_info.model_type)
         if _retraining_triggering.should_model_training_be_triggered(train_info):
-            logger.debug(f"Should be trained: {train_info.json()}")
+            LOGGER.debug(f"Should be trained: {train_info.json()}")
             gathered_data, training_log_info = _retraining.train(train_info)
             _retraining_triggering.clean_triggering_info(train_info.project, gathered_data)
-            logger.debug(training_log_info)
+            LOGGER.debug(training_log_info)
             if self.app_config.amqpUrl.strip():
                 amqp_client = AmqpClient(self.app_config)
                 amqp_client.send_to_inner_queue("stats_info", json.dumps(training_log_info))
                 amqp_client.close()
-        logger.info("Finished training %.2f s", time() - t_start)
+        LOGGER.info("Finished training %.2f s", time() - t_start)

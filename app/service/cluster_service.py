@@ -34,7 +34,7 @@ from app.commons.model.launch_objects import (
 )
 from app.utils import text_processing, utils
 
-logger = logging.getLogger("analyzerApp.clusterService")
+LOGGER = logging.getLogger("analyzerApp.clusterService")
 
 
 class ClusterService:
@@ -117,7 +117,6 @@ class ClusterService:
                             message,
                             field_name="whole_message",
                             boost=1.0,
-                            override_min_should_match=None,
                             max_query_terms=self.search_cfg.MaxQueryTerms,
                         ),
                     ],
@@ -237,7 +236,7 @@ class ClusterService:
                         clusterMessage=cluster_message,
                         clusterId=cluster_id,
                     )
-                    logger.debug(
+                    LOGGER.debug(
                         "ES found cluster Id: %s log ids %s cluster message: % s",
                         cluster_id,
                         new_group_log_ids,
@@ -381,13 +380,13 @@ class ClusterService:
 
     @utils.ignore_warnings
     def find_clusters(self, launch_info: LaunchInfoForClustering) -> ClusterResult:
-        logger.info(
+        LOGGER.info(
             f"Started clusterizing logs for launch {launch_info.launch.launchId} in project {launch_info.project}"
         )
         index_name = text_processing.unite_project_name(launch_info.project, self.app_config.esProjectIndexPrefix)
         if not self.es_client.index_exists(index_name):
-            logger.info("Project %s doesn't exist", index_name)
-            logger.info("Finished clustering log with 0 clusters.")
+            LOGGER.info("Project %s doesn't exist", index_name)
+            LOGGER.info("Finished clustering log with 0 clusters.")
             return ClusterResult(project=launch_info.project, launchId=launch_info.launch.launchId, clusters=[])
         t_start = time()
         errors_found = []
@@ -407,7 +406,7 @@ class ClusterService:
             groups = self.cluster_messages_with_grouping_by_error(
                 log_messages, log_dict, unique_errors_min_should_match
             )
-            logger.debug("Groups: %s", groups)
+            LOGGER.debug("Groups: %s", groups)
             additional_results = self.find_similar_items_from_es(
                 groups, log_dict, log_messages, log_ids, launch_info, unique_errors_min_should_match
             )
@@ -417,8 +416,8 @@ class ClusterService:
             if clusters:
                 bodies = []
                 for result in clusters:
-                    logger.debug("Cluster Id: %s, Cluster message: %s", result.clusterId, result.clusterMessage)
-                    logger.debug("Cluster Ids: %s", result.logIds)
+                    LOGGER.debug("Cluster Id: %s, Cluster message: %s", result.clusterId, result.clusterMessage)
+                    LOGGER.debug("Cluster Ids: %s", result.logIds)
                     for log_id in result.logIds:
                         bodies.append(
                             {
@@ -450,7 +449,7 @@ class ClusterService:
                     bodies, refresh=False, chunk_size=self.app_config.esChunkNumberUpdateClusters
                 )
         except Exception as exc:
-            logger.exception(exc)
+            LOGGER.exception(exc)
             errors_found.append(utils.extract_exception(exc))
             errors_count += 1
 
@@ -477,9 +476,9 @@ class ClusterService:
             amqp_client.send_to_inner_queue("stats_info", json.dumps(results_to_share))
             amqp_client.close()
 
-        logger.debug("Stats info %s", results_to_share)
-        logger.info("Processed the launch. It took %.2f sec.", time() - t_start)
-        logger.info("Finished clustering for the launch with %d clusters.", cluster_num)
+        LOGGER.debug("Stats info %s", results_to_share)
+        LOGGER.info("Processed the launch. It took %.2f sec.", time() - t_start)
+        LOGGER.info("Finished clustering for the launch with %d clusters.", cluster_num)
         for cluster in clusters:
             # Put readable text instead of tokens
             cluster.clusterMessage = text_processing.replace_tokens_with_readable_text(cluster.clusterMessage)

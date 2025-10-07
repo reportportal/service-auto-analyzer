@@ -39,7 +39,7 @@ class CleanIndexService:
         self.suggest_info_service = SuggestInfoService(app_config=app_config)
 
     @utils.ignore_warnings
-    def delete_logs(self, clean_index: CleanIndex):
+    def delete_logs(self, clean_index: CleanIndex) -> int:
         LOGGER.info("Started cleaning index")
         t_start = time()
         deleted_logs_cnt = self.es_client.delete_logs(clean_index)
@@ -50,7 +50,7 @@ class CleanIndexService:
         return deleted_logs_cnt
 
     @utils.ignore_warnings
-    def delete_test_items(self, remove_items_info):
+    def delete_test_items(self, remove_items_info: dict) -> int:
         LOGGER.info("Started removing test items")
         t_start = time()
         deleted_logs_cnt = self.es_client.remove_test_items(remove_items_info)
@@ -59,7 +59,7 @@ class CleanIndexService:
         return deleted_logs_cnt
 
     @utils.ignore_warnings
-    def delete_launches(self, launch_remove_info):
+    def delete_launches(self, launch_remove_info: dict) -> int:
         LOGGER.info("Started removing launches")
         t_start = time()
         deleted_logs_cnt = self.es_client.remove_launches(launch_remove_info)

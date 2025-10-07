@@ -39,7 +39,8 @@ from app.machine_learning.predictor import PREDICTION_CLASSES, PredictionResult
 from app.service.analyzer_service import AnalyzerService
 from app.utils import text_processing, utils
 
-logger = logging.getLogger("analyzerApp.suggestService")
+LOGGER = logging.getLogger("analyzerApp.suggestService")
+
 SPECIAL_FIELDS_BOOST_SCORES = [
     ("detected_message_without_params_extended", 2.0),
     ("only_numbers", 2.0),
@@ -106,7 +107,7 @@ class SuggestService(AnalyzerService):
         message_field: str = "message",
         det_mes_field: str = "detected_message",
         stacktrace_field: str = "stacktrace",
-    ):
+    ) -> dict:
         min_should_match = (
             "{}%".format(test_item_info.analyzerConfig.minShouldMatch)
             if test_item_info.analyzerConfig.minShouldMatch > 0
@@ -173,7 +174,7 @@ class SuggestService(AnalyzerService):
 
         return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
-    def query_es_for_suggested_items(self, test_item_info: TestItemInfo, logs: list[dict]):
+    def query_es_for_suggested_items(self, test_item_info: TestItemInfo, logs: list[dict]) -> list[tuple[dict, dict]]:
         full_results = []
         index_name = text_processing.unite_project_name(test_item_info.project, self.app_config.esProjectIndexPrefix)
 
@@ -291,8 +292,12 @@ class SuggestService(AnalyzerService):
         return sorted_results
 
     def prepare_not_found_object_info(
-        self, test_item_info, processed_time, model_feature_names: Optional[str], model_info: Optional[list[str]]
-    ):
+        self,
+        test_item_info: TestItemInfo,
+        processed_time: float,
+        model_feature_names: Optional[str],
+        model_info: Optional[list[str]],
+    ) -> dict:
         return {  # reciprocalRank is not filled for not found results not to count in the metrics dashboard
             "project": test_item_info.project,
             "testItem": test_item_info.testItemId,
@@ -319,7 +324,7 @@ class SuggestService(AnalyzerService):
             "clusterId": test_item_info.clusterId,
         }
 
-    def get_query_for_test_item_in_cluster(self, test_item_info):
+    def get_query_for_test_item_in_cluster(self, test_item_info: TestItemInfo) -> dict:
         return {
             "_source": ["test_item"],
             "query": {
@@ -338,7 +343,7 @@ class SuggestService(AnalyzerService):
             },
         }
 
-    def get_query_for_logs_by_test_item(self, test_item_id):
+    def get_query_for_logs_by_test_item(self, test_item_id: int) -> dict:
         return {
             "query": {
                 "bool": {
@@ -388,13 +393,13 @@ class SuggestService(AnalyzerService):
         logs, _ = log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
         return logs, test_item_id_for_suggest
 
-    def suggest_items(self, test_item_info: TestItemInfo):
-        logger.info(f"Started suggesting for test item with id: {test_item_info.testItemId}")
-        logger.debug(f"Started suggesting items by request: {test_item_info.json()}")
+    def suggest_items(self, test_item_info: TestItemInfo) -> list[SuggestAnalysisResult]:
+        LOGGER.info(f"Started suggesting for test item with id: {test_item_info.testItemId}")
+        LOGGER.debug(f"Started suggesting items by request: {test_item_info.json()}")
         index_name = text_processing.unite_project_name(test_item_info.project, self.app_config.esProjectIndexPrefix)
         if not self.es_client.index_exists(index_name):
-            logger.info(f"Project {index_name} doesn't exist.")
-            logger.info("Finished suggesting for test item with 0 results.")
+            LOGGER.info(f"Project {index_name} doesn't exist.")
+            LOGGER.info("Finished suggesting for test item with 0 results.")
             return []
 
         t_start = time()
@@ -405,12 +410,12 @@ class SuggestService(AnalyzerService):
         feature_names = None
         try:
             logs, test_item_id_for_suggest = self.prepare_logs_for_suggestions(test_item_info, index_name)
-            logger.info(f"Number of prepared log search requests for suggestions: {len(logs)}")
-            logger.debug(f"Log search requests for suggestions: {json.dumps(logs)}")
+            LOGGER.info(f"Number of prepared log search requests for suggestions: {len(logs)}")
+            LOGGER.debug(f"Log search requests for suggestions: {json.dumps(logs)}")
             searched_res = self.query_es_for_suggested_items(test_item_info, logs)
             res_num = reduce(lambda a, b: a + b, [len(res[1]["hits"]["hits"]) for res in searched_res], 0)
-            logger.info(f"Found {res_num} items by FTS (KNN)")
-            logger.debug(f"Items for suggestions by FTS (KNN): {json.dumps(searched_res)}")
+            LOGGER.info(f"Found {res_num} items by FTS (KNN)")
+            LOGGER.debug(f"Items for suggestions by FTS (KNN): {json.dumps(searched_res)}")
 
             boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
             boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(test_item_info.project)
@@ -434,12 +439,12 @@ class SuggestService(AnalyzerService):
                 sorted_results = self.sort_results(prediction_results)
                 unique_results = self.deduplicate_results(sorted_results)
 
-                logger.debug(f"Found {len(unique_results)} results for test items.")
+                LOGGER.debug(f"Found {len(unique_results)} results for test items.")
                 for result in unique_results:
                     prob = result.probability[1]
                     identity = result.identity
                     issue_type = result.data["mrHit"]["_source"]["issue_type"]
-                    logger.debug(f"Test item '{identity}' with issue type '{issue_type}' has probability {prob:.2f}")
+                    LOGGER.debug(f"Test item '{identity}' with issue type '{issue_type}' has probability {prob:.2f}")
                 processed_time = time() - t_start
                 for pos_idx, result in enumerate(unique_results[: self.search_cfg.MaxSuggestionsNumber]):
                     prob = result.probability[1]
@@ -480,12 +485,12 @@ class SuggestService(AnalyzerService):
                             methodName="suggestion",
                         )
                         results.append(analysis_result)
-                        logger.debug(analysis_result)
+                        LOGGER.debug(analysis_result)
             else:
-                logger.debug(f"There are no results for test item {test_item_info.testItemId}")
+                LOGGER.debug(f"There are no results for test item {test_item_info.testItemId}")
         except Exception as exc:
             traceback.print_exc()
-            logger.exception(exc)
+            LOGGER.exception(exc)
             errors_found.append(utils.extract_exception(exc))
             errors_count += 1
         results_to_share = {
@@ -532,7 +537,7 @@ class SuggestService(AnalyzerService):
                         ).json(),
                     )
             amqp_client.close()
-        logger.debug(f"Stats info: {json.dumps(results_to_share)}")
-        logger.info(f"Processed the test item. It took {time() - t_start:.2f} sec.")
-        logger.info(f"Finished suggesting for test item with {len(results)} results.")
+        LOGGER.debug(f"Stats info: {json.dumps(results_to_share)}")
+        LOGGER.info(f"Processed the test item. It took {time() - t_start:.2f} sec.")
+        LOGGER.info(f"Finished suggesting for test item with {len(results)} results.")
         return results

@@ -31,7 +31,7 @@ from app.service.suggest_info_service import SuggestInfoService
 from app.service.suggest_patterns_service import SuggestPatternsService
 from app.service.suggest_service import SuggestService
 
-logger = logging.getLogger("analyzerApp.processor")
+LOGGER = logging.getLogger("analyzerApp.processor")
 
 
 # Helper functions for data preparation and response formatting
@@ -289,7 +289,7 @@ class ServiceProcessor:
                     config_def["handler"] = handler_func(self)
                 config[key] = config_def
 
-        logger.debug(f"Routing configuration built: {config.keys()}")
+        LOGGER.debug(f"Routing configuration built: {config.keys()}")
         return config
 
     def process(self, routing_key: str, body: Any) -> Optional[str]:
@@ -305,11 +305,11 @@ class ServiceProcessor:
             try:
                 message = prepare_data_func(message)
             except Exception as exc:
-                logger.exception("Failed to prepare message body", exc_info=exc)
+                LOGGER.exception("Failed to prepare message body", exc_info=exc)
                 return None
 
         response = request_processor(message)
-        logger.debug("Finished processing request")
+        LOGGER.debug("Finished processing request")
 
         # Prepare response if applicable
         if response is None or not prepare_response_data:
@@ -318,7 +318,7 @@ class ServiceProcessor:
         try:
             response_body = prepare_response_data(response)
         except Exception as exc:
-            logger.exception("Failed to prepare response body", exc_info=exc)
+            LOGGER.exception("Failed to prepare response body", exc_info=exc)
             return None
 
         return response_body

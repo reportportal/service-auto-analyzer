@@ -230,7 +230,7 @@ def fill_previously_gathered_features(
 
 
 def gather_feature_list(gathered_data_dict: dict[int, list[list[float]]], feature_ids: list[int]) -> list[list[float]]:
-    features_array: np.array = None
+    features_array: Optional[np.array] = None
     axis_x_size = max([len(x) for x in gathered_data_dict.values()])
     if axis_x_size <= 0:
         return []
@@ -286,7 +286,7 @@ def build_more_like_this_query(
     log_message,
     field_name: str = "message",
     boost: float = 1.0,
-    override_min_should_match=None,
+    override_min_should_match: Optional[str] = None,
     max_query_terms: int = 50,
 ):
     return {

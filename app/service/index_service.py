@@ -26,7 +26,7 @@ from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, La
 from app.commons.model.ml import ModelType, TrainInfo
 from app.utils import text_processing, utils
 
-logger = logging.getLogger("analyzerApp.indexService")
+LOGGER = logging.getLogger("analyzerApp.indexService")
 
 
 class IndexService:
@@ -74,8 +74,8 @@ class IndexService:
                 test_item_ids.append(str(test_item.testItemId))
         return test_item_ids, bodies
 
-    def _delete_merged_logs(self, test_items_to_delete, project):
-        logger.debug("Delete merged logs for %d test items", len(test_items_to_delete))
+    def _delete_merged_logs(self, test_items_to_delete: list[str], project: str) -> None:
+        LOGGER.debug("Delete merged logs for %d test items", len(test_items_to_delete))
         bodies = []
         batch_size = 1000
         for i in range(int(len(test_items_to_delete) / batch_size) + 1):
@@ -91,12 +91,12 @@ class IndexService:
         if bodies:
             self.es_client.bulk_index(bodies)
 
-    def index_logs(self, launches: list[Launch]):
+    def index_logs(self, launches: list[Launch]) -> BulkResponse:
         """Index launches to the index with project name"""
         launch_ids = {str(launch_obj.launchId) for launch_obj in launches}
         launch_ids_str = ", ".join(launch_ids)
         project = launches[0].project if launches else None
-        logger.info(f"Indexing {len(launch_ids)} launches of project '{project}': {launch_ids_str}")
+        LOGGER.info(f"Indexing {len(launch_ids)} launches of project '{project}': {launch_ids_str}")
         t_start = time()
         test_item_queue = self._to_launch_test_item_list(launches)
         if project is None:
@@ -121,14 +121,14 @@ class IndexService:
             amqp_client.close()
 
         time_passed = round(time() - t_start, 2)
-        logger.info(
+        LOGGER.info(
             f"Indexing {len(launch_ids)} launches of project '{project}' finished: {launch_ids_str}. "
             f"It took {time_passed} sec."
         )
         return result
 
     def send_stats_info(self, stats_info: dict) -> None:
-        logger.info("Started sending stats about analysis")
+        LOGGER.info("Started sending stats about analysis")
 
         stat_info_array = []
         for obj_info in stats_info.values():
@@ -138,11 +138,11 @@ class IndexService:
             self.es_client.create_index_for_stats_info(rp_aa_stats_index)
             stat_info_array.append({"_index": rp_aa_stats_index, "_source": obj_info})
         self.es_client.bulk_index(stat_info_array)
-        logger.info("Finished sending stats about analysis")
+        LOGGER.info("Finished sending stats about analysis")
 
     @utils.ignore_warnings
-    def defect_update(self, defect_update_info):
-        logger.info("Started updating defect types")
+    def defect_update(self, defect_update_info: dict) -> list[int]:
+        LOGGER.info("Started updating defect types")
         t_start = time()
         test_item_ids = [int(key_) for key_ in defect_update_info["itemsToUpdate"].keys()]
         defect_update_info["itemsToUpdate"] = {
@@ -183,10 +183,10 @@ class IndexService:
                     )
         self.es_client.bulk_index(log_update_queries)
         items_not_updated = list(set(test_item_ids) - found_test_items)
-        logger.debug("Not updated test items: %s", items_not_updated)
+        LOGGER.debug("Not updated test items: %s", items_not_updated)
         if self.app_config.amqpUrl:
             amqp_client = AmqpClient(self.app_config)
             amqp_client.send_to_inner_queue("update_suggest_info", json.dumps(defect_update_info))
             amqp_client.close()
-        logger.info("Finished updating defect types. It took %.2f sec", time() - t_start)
+        LOGGER.info("Finished updating defect types. It took %.2f sec", time() - t_start)
         return items_not_updated

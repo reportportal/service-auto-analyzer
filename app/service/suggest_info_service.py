@@ -51,11 +51,11 @@ class SuggestInfoService:
         self.rp_suggest_index_template = "rp_suggestions_info"
         self.rp_suggest_metrics_index_template = "rp_suggestions_info_metrics"
 
-    def build_index_name(self, project_id):
+    def build_index_name(self, project_id: int) -> str:
         return str(project_id) + "_suggest"
 
     @utils.ignore_warnings
-    def index_suggest_info(self, suggest_info_list):
+    def index_suggest_info(self, suggest_info_list: list) -> BulkResponse:
         LOGGER.info("Started saving suggest_info_list")
         t_start = time()
         bodies = []
@@ -86,7 +86,7 @@ class SuggestInfoService:
         LOGGER.info("Finished saving %.2f s", time() - t_start)
         return bulk_result
 
-    def index_data_for_metrics(self, metrics_data_by_test_item):
+    def index_data_for_metrics(self, metrics_data_by_test_item: dict) -> None:
         bodies = []
         for test_item in metrics_data_by_test_item:
             sorted_metrics_data = sorted(metrics_data_by_test_item[test_item], key=lambda x: x["resultPosition"])
@@ -106,7 +106,7 @@ class SuggestInfoService:
             bodies.append({"_index": self.rp_suggest_metrics_index_template, "_source": chosen_data})
         self.es_client.bulk_index(bodies)
 
-    def remove_suggest_info(self, project_id):
+    def remove_suggest_info(self, project_id: int) -> bool:
         LOGGER.info("Removing suggest_info index")
         project_index_name = self.build_index_name(project_id)
         project_index_name = text_processing.unite_project_name(
@@ -123,7 +123,7 @@ class SuggestInfoService:
             },
         }
 
-    def build_suggest_info_ids_query_by_test_item(self, test_item_ids):
+    def build_suggest_info_ids_query_by_test_item(self, test_item_ids: list) -> dict:
         return {
             "query": {
                 "bool": {
@@ -132,7 +132,7 @@ class SuggestInfoService:
             }
         }
 
-    def build_suggest_info_ids_query_by_launch_ids(self, launch_ids):
+    def build_suggest_info_ids_query_by_launch_ids(self, launch_ids: list) -> dict:
         return {"query": {"bool": {"filter": [{"terms": {"launchId": launch_ids}}]}}}
 
     def clean_suggest_info_logs(self, clean_index: CleanIndexStrIds):
@@ -171,7 +171,7 @@ class SuggestInfoService:
         )
         return result.took
 
-    def clean_suggest_info_logs_by_test_item(self, remove_items_info):
+    def clean_suggest_info_logs_by_test_item(self, remove_items_info: dict) -> int:
         """Delete logs from OpenSearch"""
         index_name = self.build_index_name(remove_items_info["project"])
         index_name = text_processing.unite_project_name(index_name, self.app_config.esProjectIndexPrefix)
@@ -188,7 +188,7 @@ class SuggestInfoService:
         )
         return deleted_logs
 
-    def clean_suggest_info_logs_by_launch_id(self, launch_remove_info):
+    def clean_suggest_info_logs_by_launch_id(self, launch_remove_info: dict) -> int:
         """Delete logs with specified launch ids from OpenSearch"""
         project = launch_remove_info["project"]
         launch_ids = launch_remove_info["launch_ids"]
@@ -208,7 +208,7 @@ class SuggestInfoService:
         )
         return deleted_logs
 
-    def build_query_for_getting_suggest_info(self, test_item_ids):
+    def build_query_for_getting_suggest_info(self, test_item_ids: list) -> dict:
         return {
             "_source": ["testItem", "issueType"],
             "size": self.app_config.esChunkNumber,
@@ -233,7 +233,7 @@ class SuggestInfoService:
                 )
             amqp_client.close()
 
-    def update_suggest_info(self, defect_update_info):
+    def update_suggest_info(self, defect_update_info: dict) -> int:
         LOGGER.info("Started updating suggest info")
         t_start = time()
         test_item_ids = [int(key_) for key_ in defect_update_info["itemsToUpdate"].keys()]

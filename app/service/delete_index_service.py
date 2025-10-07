@@ -21,7 +21,7 @@ from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model_chooser import ModelChooser
 from app.utils import text_processing, utils
 
-logger = logging.getLogger("analyzerApp.deleteIndexService")
+LOGGER = logging.getLogger("analyzerApp.deleteIndexService")
 
 
 class DeleteIndexService:
@@ -57,7 +57,7 @@ class DeleteIndexService:
 
     @utils.ignore_warnings
     def delete_index(self, index_name: int) -> int:
-        logger.info("Started deleting index")
+        LOGGER.info("Started deleting index")
         t_start = time()
         is_index_deleted = self.es_client.delete_index(
             text_processing.unite_project_name(index_name, self.app_config.esProjectIndexPrefix)
@@ -65,5 +65,5 @@ class DeleteIndexService:
         self.namespace_finder.remove_namespaces(index_name)
         self.trigger_manager.delete_triggers(index_name)
         self.model_chooser.delete_all_custom_models(index_name)
-        logger.info("Finished deleting index %.2f s", time() - t_start)
+        LOGGER.info("Finished deleting index %.2f s", time() - t_start)
         return int(is_index_deleted)

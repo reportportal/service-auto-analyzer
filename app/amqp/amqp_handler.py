@@ -369,7 +369,7 @@ class ProcessAmqpRequestHandler:
             if not self.__running_tasks.queue:
                 return
 
-            tasks_to_resend = list(self.__running_tasks.queue)
+            tasks_to_resend: list[ProcessingItem] = list(self.__running_tasks.queue)
             self.__running_tasks.queue.clear()
             if not tasks_to_resend:
                 return
@@ -382,7 +382,8 @@ class ProcessAmqpRequestHandler:
             for task in tasks_to_resend:
                 if task.retries >= self.app_config.amqpHandlerMaxRetries:
                     LOGGER.warning(
-                        f"Task {task.routing_key} - {task.msg_correlation_id} exceeded max retries, skipping",
+                        f"Task exceeded max retries, skipping. --Routing key: {task.routing_key}"
+                        f" --Correlation ID: {task.msg_correlation_id} Body: {json.dumps(task.item)}",
                         correlation_id=task.log_correlation_id,
                     )
                     continue
@@ -443,8 +444,8 @@ class ProcessAmqpRequestHandler:
             )
         elif not result.success:
             LOGGER.error(
-                f"Task {result.item.routing_key} - {result.item.msg_correlation_id} failed after "
-                f"{result.retry_count} retries."
+                f"Task failed after {result.retry_count} retries. --Routing key: {result.item.routing_key}"
+                f" --Correlation ID: {result.item.msg_correlation_id} Body: {json.dumps(result.item.item)}"
             )
         self.__handle_response(result)
 

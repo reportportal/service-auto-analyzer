@@ -11,7 +11,4 @@ target-version = ["py311"]
 [tool.pytest.ini_options]
 minversion = "6.0"
 required_plugins = "pytest-cov"
-addopts = "--cov-config=.coveragerc --cov --cov-report=xml -s -vv"
-testpaths = [
-    "test"
-]
+testpaths = ["test"]

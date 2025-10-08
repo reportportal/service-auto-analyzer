@@ -13,19 +13,26 @@
 #  limitations under the License.
 
 from time import time
+from typing import Optional
 
-from app.commons import logging, namespace_finder, request_factory
+from app.commons import logging, request_factory
 from app.commons.model.launch_objects import ApplicationConfig, Launch
+from app.commons.namespace_finder import NamespaceFinder
 from app.utils import utils
 
 LOGGER = logging.getLogger("analyzerApp.namespaceFinderService")
 
 
 class NamespaceFinderService:
-    namespace_finder: namespace_finder.NamespaceFinder
+    namespace_finder: NamespaceFinder
 
-    def __init__(self, app_config: ApplicationConfig):
-        self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
+    def __init__(
+        self,
+        app_config: ApplicationConfig,
+        *,
+        namespace_finder: Optional[NamespaceFinder] = None,
+    ):
+        self.namespace_finder = namespace_finder or NamespaceFinder(app_config)
 
     @utils.ignore_warnings
     def update_chosen_namespaces(self, launches: list[Launch]) -> None:

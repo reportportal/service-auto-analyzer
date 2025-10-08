@@ -1,0 +1,66 @@
+{
+  "launches": [
+    {
+      "launchId": 1001,
+      "project": 123,
+      "launchName": "Test Launch 1",
+      "launchNumber": 1,
+      "testItems": [
+        {
+          "testItemId": 2001,
+          "isAutoAnalyzed": false,
+          "testItemName": "Test Item 1",
+          "logs": [
+            {
+              "logId": 3001,
+              "logLevel": 40000,
+              "message": "Error occurred in method\nStacktrace:\n  at com.example.service.UserService.findUser(UserService.java:45)\n  at com.example.controller.UserController.getUser(UserController.java:123)\n  at com.example.api.RestApiHandler.handleRequest(RestApiHandler.java:89)"
+            },
+            {
+              "logId": 3002,
+              "logLevel": 40000,
+              "message": "Database connection failed\nStacktrace:\n  at org.hibernate.engine.jdbc.connections.internal.DriverConnectionCreator.createConnection(DriverConnectionCreator.java:65)\n  at org.hibernate.engine.jdbc.connections.internal.BasicConnectionCreator.createConnection(BasicConnectionCreator.java:45)\n  at com.example.service.DatabaseService.connect(DatabaseService.java:234)"
+            }
+          ]
+        },
+        {
+          "testItemId": 2002,
+          "isAutoAnalyzed": false,
+          "testItemName": "Test Item 2",
+          "logs": [
+            {
+              "logId": 3003,
+              "logLevel": 40000,
+              "message": "Null pointer exception\nStacktrace:\n  at com.example.util.StringHelper.parseString(StringHelper.java:12)\n  at com.example.service.DataProcessor.process(DataProcessor.java:78)\n  at com.example.controller.DataController.handleData(DataController.java:56)\n  at com.example.api.RestApiHandler.handleRequest(RestApiHandler.java:91)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "launchId": 1002,
+      "project": 123,
+      "launchName": "Test Launch 2",
+      "launchNumber": 2,
+      "testItems": [
+        {
+          "testItemId": 2003,
+          "isAutoAnalyzed": false,
+          "testItemName": "Test Item 3",
+          "logs": [
+            {
+              "logId": 3004,
+              "logLevel": 40000,
+              "message": "Authentication failed\nStacktrace:\n  at com.example.security.AuthService.authenticate(AuthService.java:99)\n  at com.example.security.SecurityFilter.doFilter(SecurityFilter.java:44)\n  at com.example.controller.LoginController.login(LoginController.java:23)\n  at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1040)"
+            },
+            {
+              "logId": 3005,
+              "logLevel": 40000,
+              "message": "Validation error\nStacktrace:\n  at com.example.validator.UserValidator.validate(UserValidator.java:34)\n  at com.example.service.UserService.createUser(UserService.java:67)\n  at com.example.controller.UserController.create(UserController.java:145)\n  at org.springframework.web.method.support.InvocableHandlerMethod.invoke(InvocableHandlerMethod.java:219)"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

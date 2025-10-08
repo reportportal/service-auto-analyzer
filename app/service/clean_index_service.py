@@ -27,7 +27,13 @@ class CleanIndexService:
     es_client: EsClient
     suggest_info_service: SuggestInfoService
 
-    def __init__(self, app_config: ApplicationConfig, es_client: Optional[EsClient] = None):
+    def __init__(
+        self,
+        app_config: ApplicationConfig,
+        *,
+        es_client: Optional[EsClient] = None,
+        suggest_info_service: Optional[SuggestInfoService] = None,
+    ):
         """Initialize CleanIndexService
 
         :param app_config: Application configuration object
@@ -35,7 +41,7 @@ class CleanIndexService:
         """
         self.app_config = app_config
         self.es_client = es_client or EsClient(app_config=self.app_config)
-        self.suggest_info_service = SuggestInfoService(app_config=app_config)
+        self.suggest_info_service = suggest_info_service or SuggestInfoService(app_config, es_client=self.es_client)
 
     def delete_logs(self, clean_index: CleanIndex) -> int:
         LOGGER.info("Started cleaning index")

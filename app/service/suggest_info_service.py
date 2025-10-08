@@ -40,7 +40,7 @@ class SuggestInfoService:
     rp_suggest_index_template: str
     rp_suggest_metrics_index_template: str
 
-    def __init__(self, app_config: ApplicationConfig, es_client: Optional[EsClient] = None):
+    def __init__(self, app_config: ApplicationConfig, *, es_client: Optional[EsClient] = None):
         """Initialize SuggestInfoService
 
         :param app_config: Application configuration object

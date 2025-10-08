@@ -19,7 +19,6 @@ from app.commons import logging
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, CleanIndex, CleanIndexStrIds
 from app.service.suggest_info_service import SuggestInfoService
-from app.utils import utils
 
 LOGGER = logging.getLogger("analyzerApp.cleanIndexService")
 
@@ -38,7 +37,6 @@ class CleanIndexService:
         self.es_client = es_client or EsClient(app_config=self.app_config)
         self.suggest_info_service = SuggestInfoService(app_config=app_config)
 
-    @utils.ignore_warnings
     def delete_logs(self, clean_index: CleanIndex) -> int:
         LOGGER.info("Started cleaning index")
         t_start = time()
@@ -49,7 +47,6 @@ class CleanIndexService:
         LOGGER.info("Finished cleaning index %.2f s", time() - t_start)
         return deleted_logs_cnt
 
-    @utils.ignore_warnings
     def delete_test_items(self, remove_items_info: dict) -> int:
         LOGGER.info("Started removing test items")
         t_start = time()
@@ -58,7 +55,6 @@ class CleanIndexService:
         LOGGER.info("Finished removing test items %.2f s", time() - t_start)
         return deleted_logs_cnt
 
-    @utils.ignore_warnings
     def delete_launches(self, launch_remove_info: dict) -> int:
         LOGGER.info("Started removing launches")
         t_start = time()
@@ -67,7 +63,6 @@ class CleanIndexService:
         LOGGER.info("Finished removing launches %.2f s", time() - t_start)
         return deleted_logs_cnt
 
-    @utils.ignore_warnings
     def remove_by_launch_start_time(self, remove_by_launch_start_time_info: dict) -> int:
         project: int = remove_by_launch_start_time_info["project"]
         start_date: str = remove_by_launch_start_time_info["interval_start_date"]
@@ -81,7 +76,6 @@ class CleanIndexService:
         LOGGER.info("Finished removing logs by launch start time %.2f s", time() - t_start)
         return deleted_logs_cnt
 
-    @utils.ignore_warnings
     def remove_by_log_time(self, remove_by_log_time_info: dict) -> int:
         project: int = remove_by_log_time_info["project"]
         start_date: str = remove_by_log_time_info["interval_start_date"]

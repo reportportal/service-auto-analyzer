@@ -97,7 +97,6 @@ class SuggestPatternsService:
                 )
         return suggested_patterns_without_labels
 
-    @utils.ignore_warnings
     def suggest_patterns(self, project_id: int) -> SuggestPattern:
         index_name = text_processing.unite_project_name(project_id, self.app_config.esProjectIndexPrefix)
         LOGGER.info("Started suggesting patterns for project '%s'", index_name)

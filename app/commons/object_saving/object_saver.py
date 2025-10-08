@@ -88,7 +88,7 @@ class ObjectSaver:
     def does_object_exists(self, object_name: str, project_id: str | int | None = None) -> bool:
         return self.storage.does_object_exists(self.get_project_id(project_id), self.get_object_name(object_name))
 
-    def get_folder_objects(self, folder: str, project_id: str | int | None = None) -> list:
+    def get_folder_objects(self, folder: str, project_id: str | int | None = None) -> list[str]:
         return self.storage.get_folder_objects(self.get_project_id(project_id), self.get_object_name(folder))
 
     def remove_folder_objects(self, folder: str, project_id: str | int | None = None) -> bool:

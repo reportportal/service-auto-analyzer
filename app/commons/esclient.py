@@ -191,6 +191,21 @@ class EsClient:
             return response.acknowledged
         return True
 
+    def _delete_merged_logs(self, test_items_to_delete: list, project: str) -> None:
+        LOGGER.debug("Delete merged logs for %d test items", len(test_items_to_delete))
+        bodies = []
+        batch_size = 1000
+        for i in range(int(len(test_items_to_delete) / batch_size) + 1):
+            test_item_ids = test_items_to_delete[i * batch_size : (i + 1) * batch_size]
+            if not test_item_ids:
+                continue
+            for log in opensearchpy.helpers.scan(
+                self.es_client, query=self.get_test_item_query(test_item_ids, True, False), index=project
+            ):
+                bodies.append({"_op_type": "delete", "_id": log["_id"], "_index": project})
+        if bodies:
+            self.bulk_index(bodies)
+
     def merge_logs(self, test_item_ids: list, project: str) -> tuple[BulkResponse, int]:
         bodies = []
         batch_size = 1000
@@ -226,21 +241,6 @@ class EsClient:
                     if log_issue_type.strip() and not log_issue_type.lower().startswith("ti"):
                         num_logs_with_defect_types += 1
         return self.bulk_index(bodies), num_logs_with_defect_types
-
-    def _delete_merged_logs(self, test_items_to_delete: list, project: str) -> None:
-        LOGGER.debug("Delete merged logs for %d test items", len(test_items_to_delete))
-        bodies = []
-        batch_size = 1000
-        for i in range(int(len(test_items_to_delete) / batch_size) + 1):
-            test_item_ids = test_items_to_delete[i * batch_size : (i + 1) * batch_size]
-            if not test_item_ids:
-                continue
-            for log in opensearchpy.helpers.scan(
-                self.es_client, query=self.get_test_item_query(test_item_ids, True, False), index=project
-            ):
-                bodies.append({"_op_type": "delete", "_id": log["_id"], "_index": project})
-        if bodies:
-            self.bulk_index(bodies)
 
     def _recreate_index_if_needed(self, bodies: list[dict[str, Any]], formatted_exception: str) -> None:
         index_name = ""

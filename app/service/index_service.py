@@ -140,7 +140,6 @@ class IndexService:
         self.es_client.bulk_index(stat_info_array)
         LOGGER.info("Finished sending stats about analysis")
 
-    @utils.ignore_warnings
     def defect_update(self, defect_update_info: dict) -> list[int]:
         LOGGER.info("Started updating defect types")
         t_start = time()

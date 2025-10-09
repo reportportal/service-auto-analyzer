@@ -277,7 +277,7 @@ def test_suggest_patterns_query_structure_with_different_config(
     # Create service with custom configuration
     from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 
-    esChunkNumber = 500
+    es_chunk_number = 500
     custom_app_config = ApplicationConfig(
         esHost="http://localhost:9200",
         esUser="",
@@ -293,7 +293,7 @@ def test_suggest_patterns_query_structure_with_different_config(
         minioRegion="",
         bucketPrefix="",
         filesystemDefaultPath="",
-        esChunkNumber=esChunkNumber,
+        esChunkNumber=es_chunk_number,
         binaryStoreType="filesystem",
         minioHost="",
         minioAccessKey="",
@@ -327,7 +327,7 @@ def test_suggest_patterns_query_structure_with_different_config(
     # Verify first scan call uses custom chunk size
     first_scan_call = mock_scan.call_args_list[0]
     query = first_scan_call[1]["query"]
-    assert query["size"] == esChunkNumber, "Query should use custom esChunkNumber"
+    assert query["size"] == es_chunk_number, "Query should use custom esChunkNumber"
 
     # Verify boost was applied according to custom search config
     boost_clause = query["query"]["bool"]["should"]

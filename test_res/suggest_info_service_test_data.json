@@ -1,0 +1,141 @@
+{
+  "suggest_info_list": [
+    {
+      "project": 123,
+      "testItem": 2001,
+      "testItemLogId": 3001,
+      "launchId": 1001,
+      "launchName": "Test Launch 1",
+      "launchNumber": 1,
+      "issueType": "AB001",
+      "relevantItem": 2002,
+      "relevantLogId": 3002,
+      "isMergedLog": false,
+      "matchScore": 0.95,
+      "resultPosition": 0,
+      "esScore": 12.5,
+      "esPosition": 0,
+      "modelFeatureNames": "feature1;feature2",
+      "modelFeatureValues": "0.8;0.9",
+      "modelInfo": "model_v1;suggestion",
+      "usedLogLines": 5,
+      "minShouldMatch": 80,
+      "processedTime": 1.5,
+      "userChoice": 1,
+      "methodName": "suggestion",
+      "clusterId": 0
+    },
+    {
+      "project": 123,
+      "testItem": 2002,
+      "testItemLogId": 3003,
+      "launchId": 1001,
+      "launchName": "Test Launch 1",
+      "launchNumber": 1,
+      "issueType": "PB002",
+      "relevantItem": 2003,
+      "relevantLogId": 3004,
+      "isMergedLog": false,
+      "matchScore": 0.88,
+      "resultPosition": 1,
+      "esScore": 10.2,
+      "esPosition": 1,
+      "modelFeatureNames": "feature1;feature2;feature3",
+      "modelFeatureValues": "0.7;0.85;0.9",
+      "modelInfo": "model_v2;auto_analysis",
+      "usedLogLines": 3,
+      "minShouldMatch": 75,
+      "processedTime": 2.1,
+      "userChoice": 0,
+      "methodName": "auto_analysis",
+      "clusterId": 5
+    },
+    {
+      "project": 123,
+      "testItem": 2003,
+      "testItemLogId": 3005,
+      "launchId": 1002,
+      "launchName": "Test Launch 2",
+      "launchNumber": 2,
+      "issueType": "SI003",
+      "relevantItem": 2001,
+      "relevantLogId": 3001,
+      "isMergedLog": true,
+      "matchScore": 0.92,
+      "resultPosition": 0,
+      "esScore": 11.8,
+      "esPosition": 0,
+      "modelFeatureNames": "feature1",
+      "modelFeatureValues": "0.92",
+      "modelInfo": "model_v1",
+      "usedLogLines": 4,
+      "minShouldMatch": 85,
+      "processedTime": 1.8,
+      "userChoice": 1,
+      "methodName": "suggestion",
+      "clusterId": 0
+    }
+  ],
+  "scan_results_for_clean_logs": [
+    {
+      "_id": "suggest_log_1",
+      "_index": "rp_123_suggest",
+      "_source": {
+        "testItem": "2001"
+      }
+    },
+    {
+      "_id": "suggest_log_2",
+      "_index": "rp_123_suggest",
+      "_source": {
+        "testItem": "2002"
+      }
+    }
+  ],
+  "scan_results_for_update": [
+    {
+      "_id": "suggest_log_1",
+      "_index": "rp_123_suggest",
+      "_source": {
+        "testItem": "2001",
+        "issueType": "AB001"
+      }
+    },
+    {
+      "_id": "suggest_log_2",
+      "_index": "rp_123_suggest",
+      "_source": {
+        "testItem": "2002",
+        "issueType": "PB002"
+      }
+    },
+    {
+      "_id": "suggest_log_3",
+      "_index": "rp_123_suggest",
+      "_source": {
+        "testItem": "2003",
+        "issueType": "SI003"
+      }
+    }
+  ],
+  "clean_index_str_ids": {
+    "project": 123,
+    "ids": ["3001", "3002", "3003"]
+  },
+  "remove_items_info": {
+    "project": 123,
+    "itemsToDelete": [2001, 2002, 2003]
+  },
+  "launch_remove_info": {
+    "project": 123,
+    "launch_ids": [1001, 1002]
+  },
+  "defect_update_info": {
+    "project": 123,
+    "itemsToUpdate": {
+      "2001": "PB001",
+      "2002": "SI002",
+      "2003": "AB003"
+    }
+  }
+}

@@ -28,7 +28,7 @@ def create_test_index_service():
     es_mock = mock.Mock()
     es_mock.search.return_value = {"hits": {"hits": []}}
     es_client = esclient.EsClient(DEFAULT_ES_CONFIG, es_mock)
-    return IndexService(DEFAULT_ES_CONFIG, es_client)
+    return IndexService(DEFAULT_ES_CONFIG, es_client=es_client)
 
 
 def create_test_launch_one_item():

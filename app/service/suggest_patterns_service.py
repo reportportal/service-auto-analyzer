@@ -53,9 +53,7 @@ class SuggestPatternsService:
                         {
                             "bool": {
                                 "should": [
-                                    {"wildcard": {"issue_type": "{}*".format(label.upper())}},
-                                    {"wildcard": {"issue_type": "{}*".format(label.lower())}},
-                                    {"wildcard": {"issue_type": "{}*".format(label)}},
+                                    {"wildcard": {"issue_type": "{}*".format(label)}, "case_insensitive": True},
                                 ]
                             }
                         }

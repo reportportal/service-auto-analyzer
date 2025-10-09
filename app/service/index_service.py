@@ -74,23 +74,6 @@ class IndexService:
                 test_item_ids.append(str(test_item.testItemId))
         return test_item_ids, bodies
 
-    def _delete_merged_logs(self, test_items_to_delete: list[str], project: str) -> None:
-        LOGGER.debug("Delete merged logs for %d test items", len(test_items_to_delete))
-        bodies = []
-        batch_size = 1000
-        for i in range(int(len(test_items_to_delete) / batch_size) + 1):
-            test_item_ids = test_items_to_delete[i * batch_size : (i + 1) * batch_size]
-            if not test_item_ids:
-                continue
-            for log in opensearchpy.helpers.scan(
-                self.es_client.es_client,
-                query=self.es_client.get_test_item_query(test_item_ids, True, False),
-                index=project,
-            ):
-                bodies.append({"_op_type": "delete", "_id": log["_id"], "_index": project})
-        if bodies:
-            self.es_client.bulk_index(bodies)
-
     def index_logs(self, launches: list[Launch]) -> BulkResponse:
         """Index launches to the index with project name"""
         launch_ids = {str(launch_obj.launchId) for launch_obj in launches}

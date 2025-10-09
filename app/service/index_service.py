@@ -35,7 +35,7 @@ class IndexService:
     app_config: ApplicationConfig
     es_client: EsClient
 
-    def __init__(self, app_config: ApplicationConfig, es_client: Optional[EsClient] = None):
+    def __init__(self, app_config: ApplicationConfig, *, es_client: Optional[EsClient] = None):
         """Initialize IndexService
 
         :param app_config: Application configuration object

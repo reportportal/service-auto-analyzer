@@ -1,0 +1,136 @@
+{
+  "launches": [
+    {
+      "launchId": 1001,
+      "project": 123,
+      "launchName": "Test Launch 1",
+      "launchNumber": 1,
+      "testItems": [
+        {
+          "testItemId": 2001,
+          "isAutoAnalyzed": false,
+          "issueType": "AB001",
+          "testItemName": "Test Item 1",
+          "testCaseHash": 1234567,
+          "uniqueId": "unique-test-1",
+          "logs": [
+            {
+              "logId": 3001,
+              "logLevel": 40000,
+              "message": "java.lang.NullPointerException: null pointer\nStacktrace:\n  at com.example.service.UserService.findUser(UserService.java:45)\n  at com.example.controller.UserController.getUser(UserController.java:123)"
+            },
+            {
+              "logId": 3002,
+              "logLevel": 40000,
+              "message": "Database connection failed\nStacktrace:\n  at org.hibernate.engine.jdbc.connections.internal.DriverConnectionCreator.createConnection(DriverConnectionCreator.java:65)"
+            }
+          ]
+        },
+        {
+          "testItemId": 2002,
+          "isAutoAnalyzed": true,
+          "issueType": "PB002",
+          "testItemName": "Test Item 2",
+          "testCaseHash": 7654321,
+          "uniqueId": "unique-test-2",
+          "logs": [
+            {
+              "logId": 3003,
+              "logLevel": 40000,
+              "message": "Assertion failed\nStacktrace:\n  at com.example.test.TestClass.testMethod(TestClass.java:12)"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scan_results_for_delete_merged": [
+    {
+      "_id": "old_merged_log_1",
+      "_index": "rp_123",
+      "_source": {
+        "test_item": "2001"
+      }
+    },
+    {
+      "_id": "old_merged_log_2",
+      "_index": "rp_123",
+      "_source": {
+        "test_item": "2002"
+      }
+    }
+  ],
+  "scan_results_for_merge": [
+    {
+      "_id": "log_1",
+      "_index": "rp_123",
+      "_source": {
+        "test_item": "2001",
+        "log_level": 40000,
+        "message": "Test log message",
+        "message_lines": 5,
+        "message_words_number": 150,
+        "is_merged": false,
+        "issue_type": "AB001",
+        "merged_small_logs": "",
+        "detected_message": "Test log message",
+        "stacktrace": "at com.example.Test.method"
+      }
+    },
+    {
+      "_id": "log_2",
+      "_index": "rp_123",
+      "_source": {
+        "test_item": "2002",
+        "log_level": 40000,
+        "message": "Another test log",
+        "message_lines": 3,
+        "message_words_number": 80,
+        "is_merged": false,
+        "issue_type": "PB002",
+        "merged_small_logs": "",
+        "detected_message": "Another test log",
+        "stacktrace": "at com.example.Another.method"
+      }
+    }
+  ],
+  "scan_results_for_defect_update": [
+    {
+      "_id": "log_1",
+      "_index": "rp_123",
+      "_source": {
+        "test_item": "2001",
+        "issue_type": "AB001"
+      }
+    },
+    {
+      "_id": "log_2",
+      "_index": "rp_123",
+      "_source": {
+        "test_item": "2002",
+        "issue_type": "PB002"
+      }
+    }
+  ],
+  "defect_update_info": {
+    "project": 123,
+    "itemsToUpdate": {
+      "2001": "PB001",
+      "2002": "SI002"
+    }
+  },
+  "stats_info": {
+    "stat1": {
+      "method": "analysis",
+      "project": 123,
+      "launch_id": 1001,
+      "duration": 12.5
+    },
+    "stat2": {
+      "method": "training",
+      "project": 123,
+      "model_type": "defect_type",
+      "accuracy": 0.95
+    }
+  }
+}

@@ -229,7 +229,7 @@ def test_send_stats_info_calls_correct_services(
     # Verify create_index_for_stats_info was called for each stat type
     # Should be called exactly twice: once for rp_aa_stats and once for rp_model_train_stats
     assert mocked_opensearch_client.indices.get.call_count == 2, "indices.get should be called twice for stats indexes"
-    
+
     # Verify indices.get was called for correct indexes
     indices_get_calls = [call[1]["index"] for call in mocked_opensearch_client.indices.get.call_args_list]
     assert "rp_aa_stats" in indices_get_calls, "Should check for rp_aa_stats index"

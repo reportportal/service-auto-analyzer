@@ -491,21 +491,21 @@ def test_search_logs_builds_query_with_found_exceptions(
         (m for m in mlt_queries if "found_exceptions" in m["more_like_this"]["fields"]),
         None,
     )
-    assert exception_mlt is not None, (
-        "found_exceptions more_like_this query should be present when exception is detected in message"
-    )
-    
+    assert (
+        exception_mlt is not None
+    ), "found_exceptions more_like_this query should be present when exception is detected in message"
+
     # Verify found_exceptions query has the expected structure
     assert "found_exceptions" in exception_mlt["more_like_this"]["fields"], "found_exceptions should be in fields"
     assert "like" in exception_mlt["more_like_this"], "found_exceptions query should have 'like' field"
-    
+
     # The minimum_should_match should be set to "1" for found_exceptions
-    assert "minimum_should_match" in exception_mlt["more_like_this"], (
-        "found_exceptions query should have minimum_should_match parameter"
-    )
-    assert exception_mlt["more_like_this"]["minimum_should_match"] == "1", (
-        "found_exceptions should use minimum_should_match=1"
-    )
+    assert (
+        "minimum_should_match" in exception_mlt["more_like_this"]
+    ), "found_exceptions query should have minimum_should_match parameter"
+    assert (
+        exception_mlt["more_like_this"]["minimum_should_match"] == "1"
+    ), "found_exceptions should use minimum_should_match=1"
 
     # Verify result
     assert isinstance(result, list), "result should be a list"

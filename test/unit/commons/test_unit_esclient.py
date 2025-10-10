@@ -24,7 +24,7 @@ TEST_PROJECT_ID = 2
 def create_test_es_client():
     es_mock = mock.Mock()
     es_mock.search.return_value = {"hits": {"hits": []}}
-    return esclient.EsClient(DEFAULT_ES_CONFIG, es_mock)
+    return esclient.EsClient(DEFAULT_ES_CONFIG, es_client=es_mock)
 
 
 @pytest.mark.parametrize(
@@ -52,7 +52,7 @@ def test_get_base_url_variations(host, use_ssl, expected):
             "esUseSsl": use_ssl,
         }
     )
-    client = esclient.EsClient(config, es_mock)
+    client = esclient.EsClient(config, es_client=es_mock)
     # Accessing name-mangled private method
     base_url = client._EsClient__get_base_url()
     assert base_url == expected

@@ -38,7 +38,7 @@ class EsClient:
     es_client: OpenSearch
     host: str
 
-    def __init__(self, app_config: ApplicationConfig, es_client: Optional[OpenSearch] = None) -> None:
+    def __init__(self, app_config: ApplicationConfig, *, es_client: Optional[OpenSearch] = None) -> None:
         self.app_config = app_config
         self.host = app_config.esHost
         if es_client:

@@ -442,6 +442,9 @@ def test_search_logs_query_structure_for_merged_logs(
     # Execute the method
     result = search_service.search_logs(search_request)
 
+    # Verify index_exists was called
+    mocked_opensearch_client.indices.get.assert_called_once_with(index=expected_index_name)
+
     # Verify scan was NOT called because empty message is filtered out in _prepare_messages_for_queries
     mock_scan.assert_not_called()
 
@@ -470,6 +473,9 @@ def test_search_logs_builds_query_with_found_exceptions(
 
     # Execute the method
     result = search_service.search_logs(search_request)
+
+    # Verify index_exists was called
+    mocked_opensearch_client.indices.get.assert_called_once_with(index=expected_index_name)
 
     # Verify scan was called exactly twice (once for each message)
     assert mock_scan.call_count == 2, "scan should be called twice: once for each log message"

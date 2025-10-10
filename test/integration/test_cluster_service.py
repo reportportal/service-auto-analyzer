@@ -166,7 +166,6 @@ def test_find_clusters_calls_correct_services(
         assert "cluster_id" in doc, "Doc should have cluster_id"
         assert "cluster_message" in doc, "Doc should have cluster_message"
         assert "cluster_with_numbers" in doc, "Doc should have cluster_with_numbers"
-        # cluster_with_numbers = not launch_info.cleanNumbers
         expected_cluster_with_numbers = not launch_info.cleanNumbers
         assert (
             doc["cluster_with_numbers"] == expected_cluster_with_numbers

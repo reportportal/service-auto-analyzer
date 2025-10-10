@@ -88,7 +88,7 @@ def test_find_clusters_calls_correct_services(
     # - Log 7004: SQLException "Database connection timeout" -> group 3
     # Total: 3 groups, so search should be called exactly 3 times
     actual_search_call_count = mocked_opensearch_client.search.call_count
-    assert actual_search_call_count == 3, f"search should be called exactly 3 times (once per group)"
+    assert actual_search_call_count == 3, "search should be called exactly 3 times (once per group)"
 
     # Verify search call structure
     search_calls = mocked_opensearch_client.search.call_args_list
@@ -267,7 +267,7 @@ def test_find_clusters_with_no_similar_items(
     # With the same test data as test_find_clusters_calls_correct_services:
     # 3 groups (2 different NullPointerException message clusters + 1 SQLException), so 3 search calls
     actual_search_call_count = mocked_opensearch_client.search.call_count
-    assert actual_search_call_count == 3, f"search should be called exactly 3 times (once per group)"
+    assert actual_search_call_count == 3, "search should be called exactly 3 times (once per group)"
 
     # Verify opensearchpy.helpers.bulk was called to update cluster information
     # Even without similar items, new clusters should be created based on hash calculation
@@ -327,7 +327,7 @@ def test_find_clusters_with_for_update_mode(
     # Verify es_client.search was called
     # With 1 log (test item 6005 with IOException), there is 1 group, so 1 search call
     actual_search_call_count = mocked_opensearch_client.search.call_count
-    assert actual_search_call_count == 1, f"search should be called exactly 1 time (once per group)"
+    assert actual_search_call_count == 1, "search should be called exactly 1 time (once per group)"
 
     # Verify search query structure for forUpdate mode
     search_call = mocked_opensearch_client.search.call_args_list[0]
@@ -384,7 +384,7 @@ def test_find_clusters_with_clean_numbers_mode(
     # Verify es_client.search was called
     # With cleanNumbers=True, using full test data creates 3 groups (same as without cleanNumbers mode)
     actual_search_call_count = mocked_opensearch_client.search.call_count
-    assert actual_search_call_count == 3, f"search should be called exactly 3 times (once per group)"
+    assert actual_search_call_count == 3, "search should be called exactly 3 times (once per group)"
 
     # Verify search query structure for cleanNumbers mode
     search_call = mocked_opensearch_client.search.call_args_list[0]

@@ -30,7 +30,9 @@ class SearchService:
     search_cfg: SearchConfig
     es_client: EsClient
 
-    def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig, es_client: Optional[EsClient] = None):
+    def __init__(
+        self, app_config: ApplicationConfig, search_cfg: SearchConfig, *, es_client: Optional[EsClient] = None
+    ):
         """Initialize SearchService
 
         :param app_config: Application configuration object
@@ -41,7 +43,7 @@ class SearchService:
         self.search_cfg = search_cfg
         self.es_client = es_client or EsClient(app_config=self.app_config)
 
-    def build_search_query(
+    def _build_search_query(
         self, search_req: SearchLogs, queried_log: dict, search_min_should_match: str = "95%"
     ) -> dict:
         """Build search query"""
@@ -118,7 +120,7 @@ class SearchService:
         )
         return query
 
-    def find_log_ids_for_test_items_with_merged_logs(
+    def _find_log_ids_for_test_items_with_merged_logs(
         self, test_item_ids: list, index_name: str, batch_size: int = 1000
     ) -> dict:
         test_items_dict = {}
@@ -137,13 +139,13 @@ class SearchService:
                 test_items_dict[test_item_id].append(r["_id"])
         return test_items_dict
 
-    def prepare_final_search_results(self, similar_log_ids: dict, index_name: str) -> list[SearchLogInfo]:
+    def _prepare_final_search_results(self, similar_log_ids: dict, index_name: str) -> list[SearchLogInfo]:
         final_results = []
         all_logs_to_find_for_test_items = set()
         for log_id, test_item, is_merged in similar_log_ids:
             if is_merged:
                 all_logs_to_find_for_test_items.add(test_item)
-        test_items_dict = self.find_log_ids_for_test_items_with_merged_logs(
+        test_items_dict = self._find_log_ids_for_test_items_with_merged_logs(
             list(all_logs_to_find_for_test_items), index_name
         )
         for log_id, test_item, is_merged in similar_log_ids:
@@ -161,7 +163,7 @@ class SearchService:
                 final_results.append(search_result_object)
         return final_results
 
-    def filter_test_items_to_have_all_messages_match(
+    def _filter_test_items_to_have_all_messages_match(
         self, similar_log_ids: dict, test_items_found_dict: dict, messages_length: int
     ) -> dict:
         new_similar_log_ids = {}
@@ -171,7 +173,7 @@ class SearchService:
                 new_similar_log_ids[similar_log_result_obj] = similar_log_ids[similar_log_result_obj]
         return new_similar_log_ids
 
-    def prepare_messages_for_queries(self, search_req: SearchLogs) -> list[dict]:
+    def _prepare_messages_for_queries(self, search_req: SearchLogs) -> list[dict]:
         searched_logs = set()
         logs_to_query = []
         global_id = 0
@@ -194,7 +196,7 @@ class SearchService:
         logs_to_query, _ = log_merger.decompose_logs_merged_and_without_duplicates(logs_to_query)
         return logs_to_query
 
-    def search_similar_items_for_log(
+    def _search_similar_items_for_log(
         self,
         search_req: SearchLogs,
         queried_log: dict,
@@ -202,7 +204,7 @@ class SearchService:
         test_item_info: dict,
         index_name: str,
     ) -> dict:
-        query = self.build_search_query(
+        query = self._build_search_query(
             search_req,
             queried_log,
             search_min_should_match=text_processing.prepare_es_min_should_match(search_min_should_match),
@@ -226,7 +228,7 @@ class SearchService:
         if not self.es_client.index_exists(index_name):
             return []
 
-        logs_to_query = self.prepare_messages_for_queries(search_req)
+        logs_to_query = self._prepare_messages_for_queries(search_req)
 
         global_search_min_should_match = search_req.analyzerConfig.searchLogsMinShouldMatch / 100
         test_items_found_dict = {}
@@ -238,7 +240,7 @@ class SearchService:
             search_min_should_match = utils.calculate_threshold_for_text(
                 message_to_use, global_search_min_should_match
             )
-            search_results = self.search_similar_items_for_log(
+            search_results = self._search_similar_items_for_log(
                 search_req, queried_log, search_min_should_match, test_item_info, index_name
             )
 
@@ -279,10 +281,10 @@ class SearchService:
                         test_items_found_dict[test_item_id] = 0
                     test_items_found_dict[test_item_id] += 1
         if search_req.analyzerConfig.allMessagesShouldMatch:
-            similar_log_ids = self.filter_test_items_to_have_all_messages_match(
+            similar_log_ids = self._filter_test_items_to_have_all_messages_match(
                 similar_log_ids, test_items_found_dict, len(logs_to_query)
             )
-        final_results = self.prepare_final_search_results(similar_log_ids, index_name)
+        final_results = self._prepare_final_search_results(similar_log_ids, index_name)
 
         LOGGER.info(
             "Finished searching by request %s with %d results. It took %.2f sec.",

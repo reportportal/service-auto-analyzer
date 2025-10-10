@@ -42,7 +42,9 @@ class ClusterService:
     search_cfg: SearchConfig
     es_client: EsClient
 
-    def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig, es_client: Optional[EsClient] = None):
+    def __init__(
+        self, app_config: ApplicationConfig, search_cfg: SearchConfig, *, es_client: Optional[EsClient] = None
+    ) -> None:
         """Initialize ClusterService
 
         :param app_config: Application configuration object
@@ -53,7 +55,7 @@ class ClusterService:
         self.search_cfg = search_cfg
         self.es_client = es_client or EsClient(app_config=self.app_config)
 
-    def get_query_with_start_time_decay(self, main_query: dict[str, Any]) -> dict[str, Any]:
+    def _get_query_with_start_time_decay(self, main_query: dict[str, Any]) -> dict[str, Any]:
         return {
             "_source": main_query["_source"],
             "size": main_query["size"],
@@ -79,7 +81,7 @@ class ClusterService:
             },
         }
 
-    def build_search_similar_items_query(
+    def _build_search_similar_items_query(
         self,
         queried_log: dict[str, Any],
         message: str,
@@ -144,9 +146,9 @@ class ClusterService:
         utils.append_potential_status_codes(
             query, queried_log, boost=1.0, max_query_terms=self.search_cfg.MaxQueryTerms
         )
-        return self.get_query_with_start_time_decay(query)
+        return self._get_query_with_start_time_decay(query)
 
-    def find_similar_items_from_es(
+    def _find_similar_items_from_es(
         self,
         groups: dict[int, list[int]],
         log_dict: dict[int, dict[str, Any]],
@@ -162,7 +164,7 @@ class ClusterService:
             min_should_match = utils.calculate_threshold_for_text(
                 log_messages[first_item_ind], unique_errors_min_should_match
             )
-            query = self.build_search_similar_items_query(
+            query = self._build_search_similar_items_query(
                 log_dict[first_item_ind],
                 log_messages[first_item_ind],
                 launch_info,
@@ -254,7 +256,7 @@ class ClusterService:
                 additional_results[group] = new_clusters[group]
         return additional_results
 
-    def regroup_by_error_and_status_codes(
+    def _regroup_by_error_and_status_codes(
         self, log_messages: list[str], log_dict: dict[int, dict[str, Any]]
     ) -> dict[tuple[str, str], list[int]]:
         regroupped_by_error = defaultdict(list)
@@ -265,10 +267,10 @@ class ClusterService:
             regroupped_by_error[group_key].append(i)
         return regroupped_by_error
 
-    def cluster_messages_with_grouping_by_error(
+    def _cluster_messages_with_grouping_by_error(
         self, log_messages: list[str], log_dict: dict[int, dict[str, Any]], unique_errors_min_should_match: float
     ) -> dict[int, list[int]]:
-        regrouped_by_error = self.regroup_by_error_and_status_codes(log_messages, log_dict)
+        regrouped_by_error = self._regroup_by_error_and_status_codes(log_messages, log_dict)
         _clusterizer = clusterizer.Clusterizer()
         all_groups: dict[int, list[int]] = {}
         start_group_id = 0
@@ -289,7 +291,7 @@ class ClusterService:
             start_group_id = start_group_id + max_group_id + 1
         return all_groups
 
-    def calculate_hash(
+    def _calculate_hash(
         self,
         group_ids: list[int],
         log_dict: dict[int, dict[str, Any]],
@@ -322,7 +324,7 @@ class ClusterService:
         hash_message = hash_message * 10 + int(not launch_info.cleanNumbers)
         return hash_message, log_message
 
-    def gather_cluster_results(
+    def _gather_cluster_results(
         self,
         groups: dict[int, list[int]],
         additional_results: dict[int, ClusterInfo],
@@ -341,7 +343,7 @@ class ClusterService:
                 cluster_id = additional_results[group].clusterId
                 cluster_message = additional_results[group].clusterMessage
             if not cluster_id or not cluster_message:
-                cluster_id, cluster_message = self.calculate_hash(groups[group], log_dict, log_messages, launch_info)
+                cluster_id, cluster_message = self._calculate_hash(groups[group], log_dict, log_messages, launch_info)
             log_ids = []
             test_item_ids = []
             for ind in groups[group]:
@@ -403,14 +405,14 @@ class ClusterService:
                 prepared_logs, launch_info.numberOfLogLines, launch_info.cleanNumbers
             )
             log_ids = {str(log["_id"]) for log in log_dict.values()}
-            groups = self.cluster_messages_with_grouping_by_error(
+            groups = self._cluster_messages_with_grouping_by_error(
                 log_messages, log_dict, unique_errors_min_should_match
             )
             LOGGER.debug("Groups: %s", groups)
-            additional_results = self.find_similar_items_from_es(
+            additional_results = self._find_similar_items_from_es(
                 groups, log_dict, log_messages, log_ids, launch_info, unique_errors_min_should_match
             )
-            clusters, cluster_num, merged_logs_to_update = self.gather_cluster_results(
+            clusters, cluster_num, merged_logs_to_update = self._gather_cluster_results(
                 groups, additional_results, log_dict, log_messages, log_ids_for_merged_logs, launch_info
             )
             if clusters:

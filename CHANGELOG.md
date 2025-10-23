@@ -1,5 +1,11 @@
 # Changelog
 ## [Unreleased]
+### Changed
+- `ProcessAmqpRequestHandler` skips retrying of `Input X contains NaN` errors on model training now, by @HardNorth
+
+## [5.14.5]
+### Added
+- Newly trained suggestion model, by @HardNorth
 ### Fixed
 - Text similarity calculation doesn't use IDF now, to be less confusing for users, by @HardNorth
 
@@ -35,6 +41,7 @@
 ### Fixed
 - 11 Sonar issues, by @HardNorth
 ### Removed
+- `ANALYZER_ENABLE_MEMORY_DUMP` environment variable due to security reasons, by @HardNorth
 - `analyzer-train` service, as it is no longer needed, by @HardNorth
 
 ## [5.14.1]

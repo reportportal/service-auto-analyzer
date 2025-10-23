@@ -10,4 +10,5 @@ jobs:
     uses: reportportal/.github/.github/workflows/update-jira-versions.yaml@main
     with:
       jira-server: ${{ vars.JIRA_SERVER }}
-    secrets: inherit
+    secrets:
+      JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}

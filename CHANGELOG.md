@@ -1,5 +1,7 @@
 # Changelog
 ## [Unreleased]
+### Changed
+- `ProcessAmqpRequestHandler` skips retrying of `Input X contains NaN` errors on model training now, by @HardNorth
 
 ## [5.14.5]
 ### Added

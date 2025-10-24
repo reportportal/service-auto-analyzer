@@ -345,10 +345,6 @@ class ProcessAmqpRequestHandler:
         return None
 
     def __process_result(self, result: ProcessingResult) -> None:
-        # Check if we have tasks in running queue
-        if self.__running_tasks.empty():
-            LOGGER.warning("Received result but no tasks in running queue, possible bug")
-
         # Handle successful result
         if result.success:
             # Remove the completed task from running queue
@@ -403,7 +399,6 @@ class ProcessAmqpRequestHandler:
 
         # We should retry - update the task in place (without removing from running_tasks)
         with self.__running_tasks.mutex:
-
             if self.__running_tasks.queue:
                 # Get original tracking task and use it (without removing it)
                 task_to_retry = self.__running_tasks.queue[0]

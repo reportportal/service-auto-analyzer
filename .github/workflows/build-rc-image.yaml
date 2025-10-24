@@ -40,4 +40,8 @@ jobs:
       version: ${{ needs.variables-setup.outputs.version }}
       date: ${{ needs.variables-setup.outputs.date }}
       scan-image: true
-    secrets: inherit
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      GH_USER: ${{ secrets.GH_USER }}
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}

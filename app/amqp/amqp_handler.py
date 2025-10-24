@@ -80,6 +80,8 @@ def retry(item: ProcessingItem, exc: Exception) -> bool:
         return "but no document was found" not in exc.error
     if isinstance(exc, NotFoundError) and item.routing_key == "remove_by_launch_start_time":
         return "no such index" not in exc.error
+    if isinstance(exc, ValueError) and item.routing_key == "train_models":
+        return "Input X contains NaN" not in str(exc)
     return True
 
 

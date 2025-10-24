@@ -35,4 +35,3 @@ class ProcessingResult:
     result: Optional[Any]
     success: bool
     error: Optional[Exception] = None
-    retry_count: int = 0

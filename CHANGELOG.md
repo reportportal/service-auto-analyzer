@@ -1,6 +1,11 @@
 # Changelog
 ## [Unreleased]
 ### Changed
+- Exception retry logic was moved from `Worker` class to `ProcessAmqpRequestHandler.__process_result` method, by @HardNorth
+- `Worker` class moved from `app.amqp.amqp_handler.py` module to `commons.processing` module, by @HardNorth
+
+## [5.14.6]
+### Changed
 - `ProcessAmqpRequestHandler` skips retrying of `Input X contains NaN` errors on model training now, by @HardNorth
 
 ## [5.14.5]

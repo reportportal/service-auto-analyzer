@@ -17,5 +17,5 @@ minio==7.2.11
 gensim==4.3.3
 pandas==1.5.3
 urllib3==2.5.0
-werkzeug==3.0.6 # not directly required, pinned by Snyk to avoid a vulnerability
+werkzeug==3.1.4 # not directly required, pinned by Snyk to avoid a vulnerability
 certifi>=2025.8.3

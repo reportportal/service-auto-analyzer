@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/python-312:latest AS test
+FROM registry.access.redhat.com/ubi9/python-312:4d15474371fe0d593796f2207f686a5d4b5ee3aa1e7fd0436f5194ffa9af630e AS test
 USER root
 RUN dnf -y upgrade \
     && python -m venv /venv \
@@ -13,7 +13,7 @@ RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
 RUN "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir -r requirements-dev.txt
 RUN make test-all
 
-FROM registry.access.redhat.com/ubi9/python-312:latest AS builder
+FROM registry.access.redhat.com/ubi9/python-312:4d15474371fe0d593796f2207f686a5d4b5ee3aa1e7fd0436f5194ffa9af630e AS builder
 USER root
 RUN dnf -y upgrade && dnf -y install pcre-devel \
     && dnf -y remove emacs-filesystem libjpeg-turbo libtiff libpng wget \
@@ -38,7 +38,7 @@ RUN mkdir /backend \
     && cp -r /build/app /backend/ \
     && cp -r /build/res /backend/
 
-FROM registry.access.redhat.com/ubi9:latest
+FROM registry.access.redhat.com/ubi9:55110c0e79e7745757e9045002203b257ebbcf62808ee0de27e82b000c8764d0
 USER root
 WORKDIR /backend/
 COPY --from=builder /backend ./

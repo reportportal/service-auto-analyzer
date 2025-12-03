@@ -3,7 +3,7 @@ flask-cors==6.0.0
 Flask-WTF==1.2.1
 pika==1.2.1
 pydantic==1.10.13
-opensearch-py==3.0.0
+opensearch-py==3.1.0
 requests==2.32.4
 bump2version==1.0.1
 nltk==3.9.1

@@ -73,7 +73,6 @@ APP_CONFIG = ApplicationConfig(
     binaryStoreType=os.getenv("ANALYZER_BINSTORE_TYPE", os.getenv("ANALYZER_BINARYSTORE_TYPE", "filesystem")),
     bucketPrefix=os.getenv("ANALYZER_BINSTORE_BUCKETPREFIX", os.getenv("ANALYZER_BINARYSTORE_BUCKETPREFIX", "prj-")),
     minioRegion=os.getenv("ANALYZER_BINSTORE_MINIO_REGION", os.getenv("ANALYZER_BINARYSTORE_MINIO_REGION", None)),
-    instanceTaskType=os.getenv("INSTANCE_TASK_TYPE", "").strip(),
     filesystemDefaultPath=os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
     analyzerHttpPort=int(os.getenv("ANALYZER_HTTP_PORT", "5001")),
     analyzerPathToLog=os.getenv("ANALYZER_FILE_LOGGING_PATH", "/tmp/config.log"),

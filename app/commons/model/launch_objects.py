@@ -34,9 +34,19 @@ class AnalyzerConf(BaseModel):
 
 
 class ApplicationConfig(BaseModel):
+
     esHost: str = ""
     esUser: str = ""
     esPassword: str = ""
+    esVerifyCerts: bool = False
+    esUseSsl: bool = False
+    esSslShowWarn: bool = False
+    esCAcert: str = ""
+    esClientCert: str = ""
+    esClientKey: str = ""
+    esChunkNumber: int = 1000
+    esChunkNumberUpdateClusters: int = 500
+    esProjectIndexPrefix: str = ""
 
     debugMode: bool = False
     logLevel: str = "DEBUG"
@@ -51,33 +61,24 @@ class ApplicationConfig(BaseModel):
     amqpHandlerMaxRetries: int = 3
     amqpHandlerTaskTimeout: int = 600
 
+    analyzerHttpPort: int = 5001
+    analyzerPathToLog: str = "/tmp/config.log"
     analyzerPriority: int = 1
     analyzerIndex: bool = True
     analyzerLogSearch: bool = True
     analyzerSuggest: bool = True
     analyzerCluster: bool = True
     turnOffSslVerification: bool = False
-    esVerifyCerts: bool = False
-    esUseSsl: bool = False
-    esSslShowWarn: bool = False
-    esCAcert: str = ""
-    esClientCert: str = ""
-    esClientKey: str = ""
+    appVersion: str = ""
+
     minioHost: str = "minio:9000"
     minioAccessKey: str = "minio"
     minioSecretKey: str = "minio123"
     minioUseTls: bool = False
-    appVersion: str = ""
     binaryStoreType: str = "filesystem"
     bucketPrefix: str = "prj-"
     minioRegion: str | None = None
-    instanceTaskType: str = ""
     filesystemDefaultPath: str = "storage"
-    esChunkNumber: int = 1000
-    esChunkNumberUpdateClusters: int = 500
-    esProjectIndexPrefix: str = ""
-    analyzerHttpPort: int = 5001
-    analyzerPathToLog: str = "/tmp/config.log"
 
 
 class SearchConfig(BaseModel):

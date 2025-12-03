@@ -17,7 +17,6 @@ from collections import Counter
 from typing import Any, Optional
 
 import numpy as np
-import pandas as pd
 from scipy.sparse import csr_matrix
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -50,10 +49,10 @@ class DummyVectorizer:
 
 # noinspection PyMethodMayBeStatic
 class DummyClassifier:
-    def predict(self, data: pd.DataFrame) -> np.ndarray:
+    def predict(self, data: np.ndarray) -> np.ndarray:
         return np.zeros(data.shape[0])
 
-    def predict_proba(self, data: pd.DataFrame) -> np.ndarray:
+    def predict_proba(self, data: np.ndarray) -> np.ndarray:
         return np.zeros((data.shape[0], 2))
 
 
@@ -61,7 +60,7 @@ DEFAULT_MODEL = DummyClassifier()
 DEFAULT_VECTORIZER = DummyVectorizer()
 
 
-def get_model(self: DefaultDict, model_name: str, default_value: any) -> Any:
+def get_model(self: DefaultDict, model_name: str, default_value: Any) -> Any:
     m = BASE_DEFECT_TYPE_PATTERN.match(model_name)
     if not m:
         raise KeyError(model_name)
@@ -132,13 +131,10 @@ class DefectTypeModel(MlModel):
             max_features=DEFAULT_MAX_FEATURES,
             random_state=random_state,
         )
-        x_train_values = pd.DataFrame(
-            transformed_values.toarray(), columns=self.count_vectorizer_models[name].get_feature_names_out()
-        )
-        model.fit(x_train_values, labels)
+        model.fit(transformed_values, labels)
         self.models[name] = model
         self._loaded = True
-        res = model.predict(x_train_values)
+        res = model.predict(transformed_values)
         f1 = f1_score(y_pred=res, y_true=labels)
         if f1 is None:
             f1 = 0.0
@@ -162,9 +158,6 @@ class DefectTypeModel(MlModel):
         if len(data) == 0:
             return [], []
         transformed_values = self.count_vectorizer_models[model_name].transform(data)
-        x_test_values = pd.DataFrame(
-            transformed_values.toarray(), columns=self.count_vectorizer_models[model_name].get_feature_names_out()
-        )
-        predicted_labels = self.models[model_name].predict(x_test_values)
-        predicted_probs = self.models[model_name].predict_proba(x_test_values)
+        predicted_labels = self.models[model_name].predict(transformed_values)
+        predicted_probs = self.models[model_name].predict_proba(transformed_values)
         return predicted_labels.tolist(), predicted_probs.tolist()

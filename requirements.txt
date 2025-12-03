@@ -8,15 +8,14 @@ requests==2.32.4
 bump2version==1.0.1
 nltk==3.9.2
 scipy==1.13.1
-scikit-learn==1.5.0
-imbalanced-learn==0.12.3
+scikit-learn==1.5.2
+imbalanced-learn==0.12.4
 numpy==1.26.4
 xgboost==1.7.3
 python-dateutil==2.8.2
 minio==7.2.11
 boto3==1.42.1
 gensim==4.3.3
-pandas==1.5.3
 urllib3==2.5.0
 werkzeug==3.1.4 # not directly required, pinned by Snyk to avoid a vulnerability
 certifi==2025.11.12

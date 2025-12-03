@@ -41,6 +41,5 @@ jobs:
       date: ${{ needs.variables-setup.outputs.date }}
       scan-image: true
     secrets:
-      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       GH_USER: ${{ secrets.GH_USER }}
       GH_TOKEN: ${{ secrets.GH_TOKEN }}

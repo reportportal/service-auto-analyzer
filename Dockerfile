@@ -48,9 +48,9 @@ COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
 ENV VIRTUAL_ENV="/venv"
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend
 
-RUN dnf -y upgrade && dnf -y install python3.12 ca-certificates pcre-devel \
-    && dnf -y autoremove \
-    && dnf clean all \
+RUN microdnf -y upgrade && microdnf -y install python3.12 ca-certificates pcre-devel \
+    && microdnf -y autoremove \
+    && microdnf clean all \
     && mkdir -p -m 0744 /backend/storage \
     && source "${VIRTUAL_ENV}/bin/activate"
 

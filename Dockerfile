@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/python-311:latest AS test
+FROM registry.access.redhat.com/ubi9/python-312:latest AS test
 USER root
 RUN dnf -y upgrade \
     && python -m venv /venv \
@@ -13,7 +13,7 @@ RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
 RUN "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir -r requirements-dev.txt
 RUN make test-all
 
-FROM registry.access.redhat.com/ubi9/python-311:latest AS builder
+FROM registry.access.redhat.com/ubi9/python-312:latest AS builder
 USER root
 RUN dnf -y upgrade && dnf -y install pcre-devel \
     && dnf -y remove emacs-filesystem libjpeg-turbo libtiff libpng wget \
@@ -48,7 +48,7 @@ COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
 ENV VIRTUAL_ENV="/venv"
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend
 
-RUN dnf -y upgrade && dnf -y install python3.11 ca-certificates pcre-devel \
+RUN dnf -y upgrade && dnf -y install python3.12 ca-certificates pcre-devel \
     && dnf -y autoremove \
     && dnf clean all \
     && mkdir -p -m 0744 /backend/storage \

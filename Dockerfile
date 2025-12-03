@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi9/python-312@sha256:69aa8a11f6aef38aa5130c44ac94bad8a65e9641b7eaa0a44f04fd7decdf8be2 AS test
+FROM registry.access.redhat.com/ubi9/python-312@sha256:69aa8a11f6aef38aa5130c44ac94bad8a65e9641b7eaa0a44f04fd7decdf8be2 AS test
 USER root
 RUN dnf -y upgrade \
     && python -m venv /venv \
@@ -13,7 +13,7 @@ RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
 RUN "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir -r requirements-dev.txt
 RUN make test-all
 
-FROM registry.redhat.io/ubi9/python-312@sha256:69aa8a11f6aef38aa5130c44ac94bad8a65e9641b7eaa0a44f04fd7decdf8be2 AS builder
+FROM registry.access.redhat.com/ubi9/python-312@sha256:69aa8a11f6aef38aa5130c44ac94bad8a65e9641b7eaa0a44f04fd7decdf8be2 AS builder
 USER root
 RUN dnf -y upgrade && dnf -y install pcre-devel \
     && dnf -y remove emacs-filesystem libjpeg-turbo libtiff libpng wget \
@@ -38,7 +38,7 @@ RUN mkdir /backend \
     && cp -r /build/app /backend/ \
     && cp -r /build/res /backend/
 
-FROM registry.redhat.io/ubi9-minimal@sha256:161a4e29ea482bab6048c2b36031b4f302ae81e4ff18b83e61785f40dc576f5d
+FROM registry.access.redhat.com/ubi9-minimal@sha256:161a4e29ea482bab6048c2b36031b4f302ae81e4ff18b83e61785f40dc576f5d
 USER root
 WORKDIR /backend/
 COPY --from=builder /backend ./

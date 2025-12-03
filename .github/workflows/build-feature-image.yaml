@@ -37,5 +37,6 @@ jobs:
       branch: ${{ github.head_ref }}
       date: ${{ needs.variables-setup.outputs.date }}
     secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       GH_USER: ${{ secrets.GH_USER }}
       GH_TOKEN: ${{ secrets.GH_TOKEN }}

@@ -6,7 +6,12 @@ RUN dnf -y upgrade \
 ENV VIRTUAL_ENV=/venv
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 WORKDIR /build
-COPY ./ ./
+COPY ./app ./app
+COPY ./res ./res
+COPY ./test ./test
+COPY ./test_res ./test_res
+COPY ./requirements.txt ./requirements.txt
+COPY ./requirements-dev.txt ./requirements-dev.txt
 RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
     && LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "${VIRTUAL_ENV}/bin/pip install --no-cache-dir -r requirements.txt" \
     && "${VIRTUAL_ENV}/bin/python3" -m nltk.downloader -d /usr/share/nltk_data stopwords wordnet omw-1.4
@@ -24,7 +29,9 @@ RUN dnf -y upgrade && dnf -y install pcre-devel \
 ENV VIRTUAL_ENV=/venv
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 WORKDIR /build
-COPY ./ ./
+COPY ./app ./app
+COPY ./res ./res
+COPY ./requirements.txt ./requirements.txt
 RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
     && "${VIRTUAL_ENV}/bin/pip" install --upgrade setuptools \
     && LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "${VIRTUAL_ENV}/bin/pip install --no-cache-dir -r requirements.txt" \

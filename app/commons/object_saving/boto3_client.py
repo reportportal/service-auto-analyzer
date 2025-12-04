@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Any
+from typing import Any, Generator
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
@@ -53,6 +53,20 @@ class Boto3Client(BlobStorage):
         self.s3_client = boto3.client("s3", **config_params)
         LOGGER.debug(f"Boto3 S3 client initialized with region {self.region}")
 
+    def _paginate_objects(self, bucket_name: str, prefix: str) -> Generator[dict, None, None]:
+        """Paginate through S3 objects with a given prefix.
+
+        :param bucket_name: Name of the S3 bucket
+        :param prefix: Prefix to filter objects
+        :return: Generator yielding S3 object dictionaries from the paginated results
+        """
+        paginator = self.s3_client.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
+            if "Contents" not in page:
+                continue
+            for obj in page["Contents"]:
+                yield obj
+
     def remove_project_objects(self, bucket: str, object_names: list[str]) -> None:
         bucket_name = self.get_bucket(bucket)
         try:
@@ -78,13 +92,11 @@ class Boto3Client(BlobStorage):
             except ClientError:
                 LOGGER.debug(f"Creating S3 bucket {bucket_name}")
                 try:
-                    if self.region == "us-east-1":
+                    bucket_config = {}
+                    if self.region != "us-east-1":
                         # us-east-1 doesn't accept LocationConstraint
-                        self.s3_client.create_bucket(Bucket=bucket_name)
-                    else:
-                        self.s3_client.create_bucket(
-                            Bucket=bucket_name, CreateBucketConfiguration={"LocationConstraint": self.region}
-                        )
+                        bucket_config["CreateBucketConfiguration"] = {"LocationConstraint": self.region}
+                    self.s3_client.create_bucket(Bucket=bucket_name, **bucket_config)
                     LOGGER.debug(f"Created S3 bucket {bucket_name}")
                 except ClientError as e:
                     if e.response["Error"]["Code"] != "BucketAlreadyOwnedByYou":
@@ -144,13 +156,9 @@ class Boto3Client(BlobStorage):
         prefix = self.get_prefix(path)
 
         try:
-            paginator = self.s3_client.get_paginator("list_objects_v2")
-            for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
-                if "Contents" not in page:
-                    continue
-                for obj in page["Contents"]:
-                    object_name = self.extract_object_name(obj["Key"], folder, path)
-                    object_names.add(object_name)
+            for obj in self._paginate_objects(bucket_name, prefix):
+                object_name = self.extract_object_name(obj["Key"], folder, path)
+                object_names.add(object_name)
         except ClientError as e:
             LOGGER.warning(f"Failed to list objects in bucket {bucket_name} with prefix {prefix}: {e}")
             return []
@@ -171,13 +179,9 @@ class Boto3Client(BlobStorage):
         prefix = self.get_prefix(path)
 
         try:
-            paginator = self.s3_client.get_paginator("list_objects_v2")
-            for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
-                if "Contents" not in page:
-                    continue
-                for obj in page["Contents"]:
-                    self.s3_client.delete_object(Bucket=bucket_name, Key=obj["Key"])
-                    result = True
+            for obj in self._paginate_objects(bucket_name, prefix):
+                self.s3_client.delete_object(Bucket=bucket_name, Key=obj["Key"])
+                result = True
         except ClientError as e:
             LOGGER.warning(f"Failed to remove folder objects in bucket {bucket_name} with prefix {prefix}: {e}")
             return False

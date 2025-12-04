@@ -37,9 +37,10 @@ def run_s3():
 
 
 def create_storage_client(bucket_prefix=BUCKET_PREFIX):
+    # noinspection HttpUrlsUsage
     return Boto3Client(
         ApplicationConfig(
-            s3Endpoint=f"http://{SERVER_HOST}",
+            s3Endpoint=f"http://{SERVER_HOST}",  # NOSONAR
             s3Region=REGION,
             bucketPrefix=bucket_prefix,
             s3AccessKey="test",

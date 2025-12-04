@@ -19,10 +19,8 @@ from app.machine_learning.models.defect_type_model import DefectTypeModel
 from app.utils import utils
 
 WEB_DRIVER_ERROR = (
-    "org.openqa.selenium.TimeoutException: Expected condition failed: waiting for visibility of "
-    "element located by By.xpath: "
-    "//*[contains(@class,'nav-bar_menu-items') and contains(text(),'Blog')] "
-    "(tried for 20 second(s) with 500 milliseconds interval)"
+    "Verify that for https://test.example.com/api/v1/User/reminders Response Codes are equal  - "
+    "Expected: 'BadRequest'; Actual: 'InternalServerError'"
 )
 
 
@@ -43,12 +41,12 @@ def defect_type_model(object_saver: object_saving.ObjectSaver) -> DefectTypeMode
     "defect_type, expected",
     [
         ("nd001", 0.0),
-        ("pb001", 0.0),
-        ("ab001", 1.0),
+        ("pb001", 1.0),
+        ("ab001", 0.0),
         ("si001", 0.0),
         ("pd001", 0.0),
-        ("ab_abracadabra", 1.0),
-        ("pb_abracadabra", 0.0),
+        ("ab_abracadabra", 0.0),
+        ("pb_abracadabra", 1.0),
         ("si_abracadabra", 0.0),
     ],
 )

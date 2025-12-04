@@ -25,7 +25,7 @@ from test import random_alphanumeric
 
 SERVER_PORT = 5123
 REGION = "us-west-1"
-BUCKET_PREFIX = "prj-"
+BUCKET_PREFIX = "mprj-"
 SERVER_HOST = f"localhost:{SERVER_PORT}"
 
 

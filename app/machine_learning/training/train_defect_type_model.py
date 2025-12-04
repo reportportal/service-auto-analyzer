@@ -161,8 +161,8 @@ def train_several_times(
             new_model.train_model(label, x_train, y_train, random_state)
             LOGGER.debug("New model results")
             new_model_results.append(new_model.validate_model(label, x_test, y_test))
-            LOGGER.debug("Baseline model results")
             if baseline_model:
+                LOGGER.debug("Baseline model results")
                 baseline_model_results.append(baseline_model.validate_model(label, x_test, y_test))
             else:
                 baseline_model_results.append(0.0)

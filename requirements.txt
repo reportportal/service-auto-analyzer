@@ -13,8 +13,14 @@ imbalanced-learn==0.12.4
 numpy==1.26.4
 xgboost==1.7.3
 minio==7.2.11
-boto3==1.42.1
+
 gensim==4.3.3
 urllib3==2.5.0
 werkzeug==3.1.4 # not directly required, pinned by Snyk to avoid a vulnerability
+
+# AWS S3 client
+boto3==1.42.2
+botocore==1.42.2
+
+# Root SSL certificates
 certifi==2025.11.12

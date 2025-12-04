@@ -33,6 +33,7 @@ COPY ./app ./app
 COPY ./res ./res
 COPY ./requirements.txt ./requirements.txt
 COPY ./VERSION ./VERSION
+COPY ./Makefile ./Makefile
 RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
     && "${VIRTUAL_ENV}/bin/pip" install --upgrade setuptools \
     && LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "${VIRTUAL_ENV}/bin/pip install --no-cache-dir -r requirements.txt" \

@@ -17,6 +17,7 @@ from typing import Any, Callable
 
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig
+from app.commons.object_saving.boto3_client import Boto3Client
 from app.commons.object_saving.filesystem_saver import FilesystemSaver
 from app.commons.object_saving.minio_client import MinioClient
 from app.commons.object_saving.storage import Storage
@@ -32,9 +33,14 @@ def create_filesystem_client(app_config: ApplicationConfig) -> Storage:
     return FilesystemSaver(app_config)
 
 
+def create_boto3_client(app_config: ApplicationConfig) -> Storage:
+    return Boto3Client(app_config)
+
+
 STORAGE_FACTORIES: dict[str, Callable[[ApplicationConfig], Storage]] = {
     "minio": create_minio_client,
     "filesystem": create_filesystem_client,
+    "s3": create_boto3_client,
 }
 
 

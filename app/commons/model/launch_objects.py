@@ -79,6 +79,10 @@ class ApplicationConfig(BaseModel):
     bucketPrefix: str = "prj-"
     minioRegion: str | None = None
     filesystemDefaultPath: str = "storage"
+    s3AccessKey: str = ""
+    s3SecretKey: str = ""
+    s3Region: str | None = None
+    s3Endpoint: str = ""
 
 
 class SearchConfig(BaseModel):

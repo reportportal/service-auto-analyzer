@@ -108,7 +108,7 @@ SEARCH_CONFIG = SearchConfig(
 def create_application():
     """Creates a Flask application"""
     _application = Flask(__name__)
-    CORS(_application)
+    CORS(_application, resources={r"/*": {"origins": "*", "send_wildcard": "False"}})
     CSRFProtect(_application)
     return _application
 

@@ -134,7 +134,8 @@ if old_datastore_bucketprefix:
 old_datastore_bucketprefix = os.getenv("ANALYZER_BINARYSTORE_BUCKETPREFIX")
 if old_datastore_bucketprefix:
     warnings.warn(
-        "'ANALYZER_BINARYSTORE_BUCKETPREFIX' configuration variable is deprecated, use 'DATASTORE_BUCKETPREFIX' instead.",
+        "'ANALYZER_BINARYSTORE_BUCKETPREFIX' configuration variable is deprecated, use 'DATASTORE_BUCKETPREFIX' "
+        "instead.",
         DeprecationWarning,
         stacklevel=2,
     )

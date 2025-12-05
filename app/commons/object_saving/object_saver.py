@@ -54,11 +54,11 @@ class ObjectSaver:
     ) -> None:
         self.project_id = project_id
         self.path = path or ""
-        if app_config.binaryStoreType in STORAGE_FACTORIES:
-            self.storage = STORAGE_FACTORIES[app_config.binaryStoreType](app_config)
+        if app_config.datastoreType in STORAGE_FACTORIES:
+            self.storage = STORAGE_FACTORIES[app_config.datastoreType](app_config)
         else:
             raise ValueError(
-                f'Storage "{app_config.binaryStoreType}" is not supported, possible types are: '
+                f'Storage "{app_config.datastoreType}" is not supported, possible types are: '
                 + str(STORAGE_FACTORIES.keys())
             )
 

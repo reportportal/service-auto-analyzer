@@ -30,13 +30,17 @@ class MinioClient(BlobStorage):
 
     def __init__(self, app_config: ApplicationConfig) -> None:
         super().__init__(app_config)
-        minio_host = app_config.minioHost
-        self.region = app_config.minioRegion
+        # noinspection HttpUrlsUsage
+        endpoint = app_config.datastoreEndpoint or "http://minio:9000"  # NOSONAR
+        minio_use_tls = endpoint.startswith("https://")
+        # noinspection HttpUrlsUsage
+        minio_host = endpoint.rstrip().rstrip("/").removeprefix("https://").removeprefix("http://")  # NOSONAR
+        self.region = app_config.datastoreRegion
         self.minio_client = Minio(
             minio_host,
-            access_key=app_config.minioAccessKey,
-            secret_key=app_config.minioSecretKey,
-            secure=app_config.minioUseTls,
+            access_key=app_config.datastoreAccessKey or "minio",
+            secret_key=app_config.datastoreSecretKey or "minio123",
+            secure=minio_use_tls,
             region=self.region,
         )
         LOGGER.debug(f"Minio initialized {minio_host}")

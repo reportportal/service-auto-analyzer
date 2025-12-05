@@ -26,7 +26,9 @@ from test import random_alphanumeric
 SERVER_PORT = 5123
 REGION = "us-west-1"
 BUCKET_PREFIX = "mprj-"
-SERVER_HOST = f"localhost:{SERVER_PORT}"
+# Mute Sonar warning about hardcoded HTTP URL, since this is a test setup
+# noinspection HttpUrlsUsage
+ENDPOINT = f"http://localhost:{SERVER_PORT}"  # NOSONAR
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -37,17 +39,21 @@ def run_s3():
     server.stop()
 
 
-def create_storage_client(bucket_prefix=BUCKET_PREFIX):
+def create_storage_client(bucket_prefix=BUCKET_PREFIX, bucket_postfix=""):
     return MinioClient(
         ApplicationConfig(
-            minioHost=SERVER_HOST,
-            minioRegion=REGION,
-            bucketPrefix=bucket_prefix,
-            minioAccessKey="minio",
-            minioSecretKey="minio",
-            minioUseTls=False,
+            datastoreEndpoint=ENDPOINT,
+            datastoreRegion=REGION,
+            datastoreBucketPrefix=bucket_prefix,
+            datastoreBucketPostfix=bucket_postfix,
+            datastoreAccessKey="minio",
+            datastoreSecretKey="minio",
         )
     )
+
+
+def get_url(bucket, object_name):
+    return f"{ENDPOINT}/{bucket}/{object_name}"
 
 
 @pytest.mark.parametrize(
@@ -76,12 +82,6 @@ def test_object_exists(bucket_prefix, bucket, object_name):
     minio_client.put_project_object({"test": True}, "2", object_name)
 
     assert minio_client.does_object_exists("2", object_name)
-
-
-def get_url(bucket, object_name):
-    # Mute Sonar warning about hardcoded HTTP URL, since this is a test setup
-    # noinspection HttpUrlsUsage
-    return f"http://{SERVER_HOST}/{bucket}/{object_name}"  # NOSONAR
 
 
 @pytest.mark.parametrize(
@@ -335,3 +335,80 @@ def test_remove_project_objects(bucket_prefix, bucket, bucket_name, object_name,
     minio_client.remove_project_objects(bucket, [resource])
     with pytest.raises(ValueError):
         minio_client.get_project_object(bucket, resource)
+
+
+@pytest.mark.parametrize(
+    "bucket_prefix, bucket_postfix, bucket, bucket_name, object_name, object_path",
+    [
+        (BUCKET_PREFIX, "-data", "9", f"{BUCKET_PREFIX}9-data", "postfix_test_file.json", "postfix_test_file.json"),
+        (
+            f"test/{BUCKET_PREFIX}",
+            "-storage",
+            "9",
+            "test",
+            "postfix_test_file.json",
+            f"{BUCKET_PREFIX}9-storage/postfix_test_file.json",
+        ),
+    ],
+)
+def test_bucket_postfix_write(bucket_prefix, bucket_postfix, bucket, bucket_name, object_name, object_path):
+    minio_client = create_storage_client(bucket_prefix, bucket_postfix)
+
+    minio_client.put_project_object({"test_postfix": True}, bucket, object_name, using_json=True)
+
+    headers = {
+        "x-amz-date": "20231124T123217Z",
+        "x-amz-content-sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "authorization": "AWS4-HMAC-SHA256 Credential=minio/20231124/us-west-1/s3/aws4_request, "
+        "SignedHeaders=host;user-agent;x-amz-content-sha256;x-amz-date, "
+        "Signature=dc971726ff2b266f208b250089b2ba0be86352efad2858145b33c2ae085e7d71",
+    }
+    response = requests.get(get_url(bucket_name, object_path), headers=headers)
+    assert response.text == '{"test_postfix": true}'
+
+
+@pytest.mark.parametrize(
+    "bucket_prefix, bucket_postfix, bucket, bucket_name, object_name, object_path",
+    [
+        (BUCKET_PREFIX, "-data", "9", f"{BUCKET_PREFIX}9-data", "postfix_read_test.json", "postfix_read_test.json"),
+        (
+            f"test/{BUCKET_PREFIX}",
+            "-storage",
+            "9",
+            "test",
+            "postfix_read_test.json",
+            f"{BUCKET_PREFIX}9-storage/postfix_read_test.json",
+        ),
+    ],
+)
+def test_bucket_postfix_read(bucket_prefix, bucket_postfix, bucket, bucket_name, object_name, object_path):
+    minio_client = create_storage_client(bucket_prefix, bucket_postfix)
+
+    headers = {
+        "x-amz-date": "20231124T124147Z",
+        "x-amz-content-sha256": "80f65706d935d3b928d95207937dd81bad43ab56cd4d3b7ed41772318e734168",
+        "authorization": "AWS4-HMAC-SHA256 Credential=minio/20231124/us-west-1/s3/aws4_request, "
+        "SignedHeaders=content-length;content-type;host;user-agent;x-amz-content-sha256;x-amz-date, "
+        "Signature=d592f084a4f9fd46a8624a37323b5be843120bd9e7c075c925faea573f00511e",
+    }
+    requests.put(get_url(bucket_name, object_path), headers=headers, data='{"test_postfix": true}'.encode("utf-8"))
+
+    result = minio_client.get_project_object(bucket, object_name, using_json=True)
+    assert isinstance(result, dict)
+    assert result["test_postfix"] is True
+
+
+@pytest.mark.parametrize(
+    "bucket_prefix, bucket_postfix, bucket, bucket_name",
+    [
+        (BUCKET_PREFIX, "-data", "11", f"{BUCKET_PREFIX}11-data"),
+        (f"test/{BUCKET_PREFIX}", "-storage", "11", "test"),
+    ],
+)
+def test_bucket_postfix_object_exists(bucket_prefix, bucket_postfix, bucket, bucket_name):
+    object_name = f"{random_alphanumeric(16)}.json"
+    minio_client = create_storage_client(bucket_prefix, bucket_postfix)
+
+    minio_client.put_project_object({"test": True}, bucket, object_name)
+
+    assert minio_client.does_object_exists(bucket, object_name)

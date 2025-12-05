@@ -71,18 +71,14 @@ class ApplicationConfig(BaseModel):
     turnOffSslVerification: bool = False
     appVersion: str = ""
 
-    minioHost: str = "minio:9000"
-    minioAccessKey: str = "minio"
-    minioSecretKey: str = "minio123"
-    minioUseTls: bool = False
-    binaryStoreType: str = "filesystem"
-    bucketPrefix: str = "prj-"
-    minioRegion: str | None = None
+    datastoreEndpoint: str | None = None
+    datastoreType: str = "filesystem"
+    datastoreAccessKey: str | None = None
+    datastoreSecretKey: str | None = None
+    datastoreRegion: str | None = None
+    datastoreBucketPrefix: str = "prj-"
+    datastoreBucketPostfix: str = ""
     filesystemDefaultPath: str = "storage"
-    s3AccessKey: str = ""
-    s3SecretKey: str = ""
-    s3Region: str | None = None
-    s3Endpoint: str = ""
 
 
 class SearchConfig(BaseModel):

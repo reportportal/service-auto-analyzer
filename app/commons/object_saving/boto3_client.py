@@ -30,7 +30,7 @@ class Boto3Client(BlobStorage):
 
     def __init__(self, app_config: ApplicationConfig) -> None:
         super().__init__(app_config)
-        self.region = app_config.s3Region or "us-east-1"
+        self.region = app_config.datastoreRegion or "us-east-1"
 
         # Build boto3 client configuration
         config_params = {
@@ -42,13 +42,13 @@ class Boto3Client(BlobStorage):
         # - Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
         # - AWS credentials file (~/.aws/credentials)
         # - IAM roles for ECS tasks
-        if app_config.s3AccessKey and app_config.s3SecretKey:
-            config_params["aws_access_key_id"] = app_config.s3AccessKey
-            config_params["aws_secret_access_key"] = app_config.s3SecretKey
+        if app_config.datastoreAccessKey and app_config.datastoreSecretKey:
+            config_params["aws_access_key_id"] = app_config.datastoreAccessKey
+            config_params["aws_secret_access_key"] = app_config.datastoreSecretKey
 
         # Add endpoint_url if s3Endpoint is configured (for S3-compatible services or local testing)
-        if app_config.s3Endpoint:
-            config_params["endpoint_url"] = app_config.s3Endpoint
+        if app_config.datastoreEndpoint:
+            config_params["endpoint_url"] = app_config.datastoreEndpoint
 
         self.s3_client = boto3.client("s3", **config_params)
         LOGGER.debug(f"Boto3 S3 client initialized with region {self.region}")

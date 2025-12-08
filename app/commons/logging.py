@@ -22,7 +22,8 @@ from typing import Any, Optional
 
 from app.commons.model.launch_objects import ApplicationConfig
 
-CORRELATION_ID_PARAM = "correlation_id"
+CORRELATION_ID_PARAM: str = "correlation_id"
+CONFIG_FILE_PATH: str = "res/logging.conf"
 
 __INSTANCES = local()
 
@@ -100,8 +101,7 @@ def getLogger(logger_name: str) -> Logger:  # NOSONAR
 
 
 def setup(app_config: ApplicationConfig):
-    log_file_path = "res/logging.conf"
-    logging.config.fileConfig(log_file_path, defaults={"logfilename": app_config.analyzerPathToLog})
+    logging.config.fileConfig(CONFIG_FILE_PATH, defaults={"logfilename": app_config.analyzerPathToLog})
     if app_config.logLevel.lower() == "debug":
         logging.disable(logging.NOTSET)
     elif app_config.logLevel.lower() == "info":

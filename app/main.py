@@ -91,10 +91,9 @@ if minio_use_tls:
         DeprecationWarning,
         stacklevel=2,
     )
-if not datastore_endpoint:
-    if minio_short_host:
-        use_tls = to_bool(minio_use_tls)
-        datastore_endpoint = f"http{'s' if use_tls else ''}://{minio_short_host}"
+if not datastore_endpoint and minio_short_host:
+    use_tls = to_bool(minio_use_tls)
+    datastore_endpoint = f"http{'s' if use_tls else ''}://{minio_short_host}"
 
 # Handle all datastore region settings, old and new
 datastore_region = os.getenv("DATASTORE_REGION")

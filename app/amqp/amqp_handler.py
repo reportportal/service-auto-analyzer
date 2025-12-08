@@ -29,6 +29,8 @@ from app.commons.model.processing import ProcessingItem, ProcessingResult
 from app.commons.processing import DummyProcessor, Processor, RealProcessor, Worker
 from app.service.processor import ServiceProcessor
 
+QUEUE_POSSIBLE_BUG = "Received result but no tasks in running queue, possible bug"
+
 LOGGER = logging.getLogger("analyzerApp.amqpHandler")
 NUMBER_OF_TASKS_TO_SEND = 2
 
@@ -356,7 +358,7 @@ class ProcessAmqpRequestHandler:
                         f"{completed_task.msg_correlation_id}. Possible mismatch."
                     )
             except Empty:
-                LOGGER.warning("Received result but no tasks in running queue, possible bug")
+                LOGGER.warning(QUEUE_POSSIBLE_BUG)
 
             if result.item.retries > 0:
                 LOGGER.warning(
@@ -389,7 +391,7 @@ class ProcessAmqpRequestHandler:
                         f"{completed_task.msg_correlation_id}. Possible mismatch."
                     )
             except Empty:
-                LOGGER.warning("Received result but no tasks in running queue, possible bug")
+                LOGGER.warning(QUEUE_POSSIBLE_BUG)
 
             LOGGER.error(
                 f"Task failed after {result.item.retries} retries. --Routing key: {result.item.routing_key}"
@@ -410,7 +412,7 @@ class ProcessAmqpRequestHandler:
                         f"{task_to_retry.msg_correlation_id}. Possible mismatch."
                     )
             else:
-                LOGGER.warning("Received result but no tasks in running queue, possible bug")
+                LOGGER.warning(QUEUE_POSSIBLE_BUG)
                 task_to_retry = result.item
 
             # Update the task

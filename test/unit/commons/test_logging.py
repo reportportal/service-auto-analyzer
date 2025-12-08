@@ -39,7 +39,27 @@ def test_log_methods_add_correlation_id_to_extra(logger, mock_logger, log_method
     getattr(mock_logger, log_method).assert_called_once()
     call_kwargs = getattr(mock_logger, log_method).call_args[1]
     assert "extra" in call_kwargs
-    assert call_kwargs["extra"][CORRELATION_ID_PARAM] == "test-corr-id"
+    extra = call_kwargs["extra"]
+    assert CORRELATION_ID_PARAM in extra
+    assert extra[CORRELATION_ID_PARAM] == "test-corr-id"
+    assert CORRELATION_ID_PARAM not in call_kwargs
+
+
+@pytest.mark.parametrize(
+    "log_method",
+    ["debug", "info", "warning", "error", "critical"],
+)
+def test_log_methods_generates_correlation_id(logger, mock_logger, log_method):
+    # noinspection PyTypeChecker
+    set_correlation_id(None)
+    getattr(logger, log_method)("test message")
+    getattr(mock_logger, log_method).assert_called_once()
+    call_kwargs = getattr(mock_logger, log_method).call_args[1]
+    assert "extra" in call_kwargs
+    extra = call_kwargs["extra"]
+    assert CORRELATION_ID_PARAM in extra
+    assert len(extra[CORRELATION_ID_PARAM]) == 22
+    assert CORRELATION_ID_PARAM not in call_kwargs
 
 
 @pytest.mark.parametrize(

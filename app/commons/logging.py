@@ -32,7 +32,7 @@ def _process_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
     my_kwargs = kwargs.copy()
     correlation_id = None
     if CORRELATION_ID_PARAM in my_kwargs:
-        correlation_id = my_kwargs[CORRELATION_ID_PARAM]
+        correlation_id = my_kwargs.pop(CORRELATION_ID_PARAM)
     if not correlation_id:
         correlation_id = get_correlation_id()
     my_kwargs["extra"] = {CORRELATION_ID_PARAM: correlation_id}

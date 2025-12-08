@@ -71,7 +71,7 @@ class EsClient:
 
         return OpenSearch([self.host], **kwargs)
 
-    def get_test_item_query(self, test_item_ids: list, is_merged: bool, full_log: bool) -> dict[str, Any]:
+    def get_test_item_query(self, test_item_ids: list[Any], is_merged: bool, full_log: bool) -> dict[str, Any]:
         """Build test item query"""
         if full_log:
             return {
@@ -206,41 +206,50 @@ class EsClient:
         if bodies:
             self.bulk_index(bodies)
 
-    def merge_logs(self, test_item_ids: list, project: str) -> tuple[BulkResponse, int]:
+    def _proceed_with_log_merging(self, test_item_ids: list[Any], project: str) -> tuple[list[dict[str, Any]], int]:
+        bodies: list[dict[str, Any]] = []
+        num_logs_with_defect_types = 0
+        if not test_item_ids:
+            return bodies, num_logs_with_defect_types
+        test_items_dict = {}
+        for r in opensearchpy.helpers.scan(
+            self.es_client, query=self.get_test_item_query(test_item_ids, False, True), index=project
+        ):
+            test_item_id = r["_source"]["test_item"]
+            if test_item_id not in test_items_dict:
+                test_items_dict[test_item_id] = []
+            test_items_dict[test_item_id].append(r)
+        for test_item_id in test_items_dict:
+            merged_logs, _ = log_merger.decompose_logs_merged_and_without_duplicates(test_items_dict[test_item_id])
+            for log in merged_logs:
+                if log["_source"]["is_merged"]:
+                    bodies.append(log)
+                else:
+                    bodies.append(
+                        {
+                            "_op_type": "update",
+                            "_id": log["_id"],
+                            "_index": log["_index"],
+                            "doc": {"merged_small_logs": log["_source"]["merged_small_logs"]},
+                        }
+                    )
+                log_issue_type = log["_source"]["issue_type"]
+                if log_issue_type.strip() and not log_issue_type.lower().startswith("ti"):
+                    num_logs_with_defect_types += 1
+        return bodies, num_logs_with_defect_types
+
+    def merge_logs(self, test_item_ids: list[Any], project: str) -> int:
         bodies = []
         batch_size = 1000
         self._delete_merged_logs(test_item_ids, project)
         num_logs_with_defect_types = 0
         for i in range(int(len(test_item_ids) / batch_size) + 1):
             test_items = test_item_ids[i * batch_size : (i + 1) * batch_size]
-            if not test_items:
-                continue
-            test_items_dict = {}
-            for r in opensearchpy.helpers.scan(
-                self.es_client, query=self.get_test_item_query(test_items, False, True), index=project
-            ):
-                test_item_id = r["_source"]["test_item"]
-                if test_item_id not in test_items_dict:
-                    test_items_dict[test_item_id] = []
-                test_items_dict[test_item_id].append(r)
-            for test_item_id in test_items_dict:
-                merged_logs, _ = log_merger.decompose_logs_merged_and_without_duplicates(test_items_dict[test_item_id])
-                for log in merged_logs:
-                    if log["_source"]["is_merged"]:
-                        bodies.append(log)
-                    else:
-                        bodies.append(
-                            {
-                                "_op_type": "update",
-                                "_id": log["_id"],
-                                "_index": log["_index"],
-                                "doc": {"merged_small_logs": log["_source"]["merged_small_logs"]},
-                            }
-                        )
-                    log_issue_type = log["_source"]["issue_type"]
-                    if log_issue_type.strip() and not log_issue_type.lower().startswith("ti"):
-                        num_logs_with_defect_types += 1
-        return self.bulk_index(bodies), num_logs_with_defect_types
+            new_bodies, logs_with_defect_types = self._proceed_with_log_merging(test_items, project=project)
+            bodies.extend(new_bodies)
+            num_logs_with_defect_types += logs_with_defect_types
+        self.bulk_index(bodies)
+        return num_logs_with_defect_types
 
     def _recreate_index_if_needed(self, bodies: list[dict[str, Any]], formatted_exception: str) -> None:
         index_name = ""

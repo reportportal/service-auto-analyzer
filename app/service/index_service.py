@@ -91,7 +91,7 @@ class IndexService:
         logs_with_exceptions = utils.extract_all_exceptions(bodies)
         result = self.es_client.bulk_index(bodies)
         result.logResults = logs_with_exceptions
-        _, num_logs_with_defect_types = self.es_client.merge_logs(test_item_ids, project_with_prefix)
+        num_logs_with_defect_types = self.es_client.merge_logs(test_item_ids, project_with_prefix)
 
         if self.app_config.amqpUrl:
             amqp_client = AmqpClient(self.app_config)

@@ -346,20 +346,22 @@ class ProcessAmqpRequestHandler:
         LOGGER.debug("Finished processing response")
         return None
 
+    def __remove_last_task_from_queue(self, result: ProcessingResult):
+        try:
+            completed_task = self.__running_tasks.get()
+            if completed_task.msg_correlation_id != result.item.msg_correlation_id:
+                LOGGER.warning(
+                    f"Received result for task {result.item.msg_correlation_id} but expected "
+                    f"{completed_task.msg_correlation_id}. Possible mismatch."
+                )
+        except Empty:
+            LOGGER.warning(QUEUE_POSSIBLE_BUG)
+
     def __process_result(self, result: ProcessingResult) -> None:
         # Handle successful result
         if result.success:
             # Remove the completed task from running queue
-            try:
-                completed_task = self.__running_tasks.get()
-                if completed_task.msg_correlation_id != result.item.msg_correlation_id:
-                    LOGGER.warning(
-                        f"Received result for task {result.item.msg_correlation_id} but expected "
-                        f"{completed_task.msg_correlation_id}. Possible mismatch."
-                    )
-            except Empty:
-                LOGGER.warning(QUEUE_POSSIBLE_BUG)
-
+            self.__remove_last_task_from_queue(result)
             if result.item.retries > 0:
                 LOGGER.warning(
                     f"Task {result.item.routing_key} - {result.item.msg_correlation_id} "
@@ -383,16 +385,7 @@ class ProcessAmqpRequestHandler:
 
         # If we should NOT retry, remove the task from running queue
         if not should_retry or exceeded_max_retries:
-            try:
-                completed_task = self.__running_tasks.get()
-                if completed_task.msg_correlation_id != result.item.msg_correlation_id:
-                    LOGGER.warning(
-                        f"Received result for task {result.item.msg_correlation_id} but expected "
-                        f"{completed_task.msg_correlation_id}. Possible mismatch."
-                    )
-            except Empty:
-                LOGGER.warning(QUEUE_POSSIBLE_BUG)
-
+            self.__remove_last_task_from_queue(result)
             LOGGER.error(
                 f"Task failed after {result.item.retries} retries. --Routing key: {result.item.routing_key}"
                 f" --Correlation ID: {result.item.msg_correlation_id} Body: {json.dumps(result.item.item)}"

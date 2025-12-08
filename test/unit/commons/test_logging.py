@@ -51,7 +51,7 @@ def test_log_methods_add_correlation_id_to_extra(logger, mock_logger, log_method
 )
 def test_log_methods_generates_correlation_id(logger, mock_logger, log_method):
     # noinspection PyTypeChecker
-    set_correlation_id(None)
+    set_correlation_id(None)  # NOSONAR
     getattr(logger, log_method)("test message")
     getattr(mock_logger, log_method).assert_called_once()
     call_kwargs = getattr(mock_logger, log_method).call_args[1]

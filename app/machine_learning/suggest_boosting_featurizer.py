@@ -32,8 +32,8 @@ class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
         for search_rs in scores_by_issue_type.values():
             issue_type = search_rs["mrHit"]["_source"]["issue_type"]
             issue_types.add(issue_type)
-        for test_item in scores_by_issue_type:
-            percent_by_issue_type[test_item] = 1 / len(issue_types) if len(issue_types) > 0 else 0
+        for test_item in scores_by_issue_type.keys():
+            percent_by_issue_type[test_item] = 1 / len(issue_types)
         return percent_by_issue_type
 
     def find_most_relevant_by_type(self) -> dict[str, dict[str, Any]]:

@@ -545,9 +545,10 @@ class BoostingFeaturizer:
         :return: dict with issue type as key and float value as weight
         """
         scores_by_issue_type = self._calculate_score()
+        scores_by_type_length = len(scores_by_issue_type)
         percent_by_issue_type = {}
         for issue_type in scores_by_issue_type:
-            percent_by_issue_type[issue_type] = 1 / len(scores_by_issue_type) if len(scores_by_issue_type) else 0
+            percent_by_issue_type[issue_type] = 1 / scores_by_type_length
         return percent_by_issue_type
 
     def _has_test_item_several_logs(self) -> dict[str, int]:

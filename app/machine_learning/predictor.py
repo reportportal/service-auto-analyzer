@@ -169,7 +169,9 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
         model_info_tags = featurizer.get_used_model_info() + self.boosting_decision_maker.get_model_info()
 
         # If no feature data, return empty result
-        if not feature_data:
+        if feature_data:
+            LOGGER.debug(f"Feature data extracted for {len(feature_data)} items.")
+        else:
             LOGGER.debug("No feature data extracted, skipping prediction.")
             return []
 

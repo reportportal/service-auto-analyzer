@@ -89,7 +89,10 @@ class Boto3Client(BlobStorage):
         if bucket_name:
             try:
                 self.s3_client.head_bucket(Bucket=bucket_name)
-            except ClientError:
+            except ClientError as e:
+                if e.response["Error"]["Code"] != "404":
+                    raise e
+
                 LOGGER.debug(f"Creating S3 bucket {bucket_name}")
                 try:
                     bucket_config = {}

@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""This module contains functions for preparing requests to Vector DB such as OpenSearch and OpenSearch."""
+"""This module contains functions for preparing requests to Vector DB such as OpenSearch and ElasticSearch."""
 
 from datetime import datetime
 from typing import Any

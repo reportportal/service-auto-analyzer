@@ -12,3 +12,6 @@ target-version = ["py312"]
 minversion = "6.0"
 required_plugins = "pytest-cov"
 testpaths = ["test"]
+
+[tool.mypy]
+exclude = ["test/"]

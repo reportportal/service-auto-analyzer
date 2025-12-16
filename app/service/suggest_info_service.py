@@ -80,7 +80,7 @@ class SuggestInfoService:
         project_index_names = set()
         if len(suggest_info_list):
             self.es_client.create_index_for_stats_info(RP_SUGGEST_METRICS_INDEX_TEMPLATE)
-        metrics_data_by_test_item = {}
+        metrics_data_by_test_item: dict[Any, list[Any]] = {}
         for obj in suggest_info_list:
             obj_info = json.loads(obj.json())
             obj_info["savedDate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

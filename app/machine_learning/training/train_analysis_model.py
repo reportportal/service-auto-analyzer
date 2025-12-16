@@ -15,7 +15,7 @@ import math
 import os
 from datetime import datetime
 from time import time
-from typing import Any, Optional, Type
+from typing import Any, Optional, Type, cast
 
 import numpy as np
 import opensearchpy.helpers
@@ -29,7 +29,7 @@ from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model_chooser import ModelChooser
 from app.machine_learning.boosting_featurizer import BoostingFeaturizer
-from app.machine_learning.models import BoostingDecisionMaker, CustomBoostingDecisionMaker
+from app.machine_learning.models import BoostingDecisionMaker, CustomBoostingDecisionMaker, DefectTypeModel
 from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import text_processing, utils
 from app.utils.defaultdict import DefaultDict
@@ -96,9 +96,9 @@ def train_several_times(
     random_states: Optional[list[int]] = None,
     baseline_model: Optional[BoostingDecisionMaker] = None,
 ) -> tuple[dict[str, list[float]], dict[str, list[float]], bool, float]:
-    new_model_results = DefaultDict(lambda _, __: [])
-    baseline_model_results = DefaultDict(lambda _, __: [])
-    my_random_states = random_states if random_states else TRAIN_DATA_RANDOM_STATES
+    new_model_results: dict[str, list[float]] = DefaultDict(lambda _, __: [])
+    baseline_model_results: dict[str, list[float]] = DefaultDict(lambda _, __: [])
+    my_random_states: list[int] = random_states if random_states else TRAIN_DATA_RANDOM_STATES
 
     bad_data = False
     proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
@@ -123,12 +123,11 @@ def train_several_times(
             LOGGER.debug("New model results")
             new_model_results[METRIC].append(new_model.validate_model(x_test, y_test))
             LOGGER.debug("Baseline results")
-            x_test_for_baseline = (
-                transform_data_from_feature_lists(x_test, new_model.feature_ids, baseline_model.feature_ids)
-                if baseline_model
-                else x_test
-            )
-            baseline_model_results[METRIC].append(baseline_model.validate_model(x_test_for_baseline, y_test))
+            if baseline_model:
+                x_test_for_baseline = transform_data_from_feature_lists(
+                    x_test, new_model.feature_ids, baseline_model.feature_ids
+                )
+                baseline_model_results[METRIC].append(baseline_model.validate_model(x_test_for_baseline, y_test))
     return baseline_model_results, new_model_results, bad_data, proportion_binary_labels
 
 
@@ -343,7 +342,9 @@ class AnalysisModelTraining:
         for project_id in projects:
             namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
             gathered_suggested_data, log_id_dict = self.query_es_for_suggest_info(project_id)
-            defect_type_model = self.model_chooser.choose_model(project_id, ModelType.defect_type)
+            defect_type_model = cast(
+                DefectTypeModel, self.model_chooser.choose_model(project_id, ModelType.defect_type)
+            )
 
             for _suggest_res in gathered_suggested_data:
                 searched_res = []
@@ -359,6 +360,7 @@ class AnalysisModelTraining:
                     log_relevant["_score"] = _suggest_res["_source"]["esScore"]
                     searched_res = [(found_logs["testItemLogId"], {"hits": {"hits": [log_relevant]}})]
                 if searched_res:
+                    _boosting_data_gatherer: BoostingFeaturizer
                     if self.model_type is ModelType.suggestion:
                         _boosting_data_gatherer = SuggestBoostingFeaturizer(
                             searched_res,
@@ -396,7 +398,7 @@ class AnalysisModelTraining:
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, Any]]:
         time_training = time()
         model_name = f'{project_info.model_type.name}_model_{datetime.now().strftime("%Y-%m-%d")}'
-        baseline_model = os.path.basename(self.baseline_folder)
+        baseline_model = os.path.basename(self.baseline_folder) if self.baseline_folder else ""
         new_model_folder = f"{project_info.model_type.name}_model/{model_name}/"
 
         LOGGER.info(f'Train "{self.model_type.name}" model using class: {self.model_class}')
@@ -408,7 +410,9 @@ class AnalysisModelTraining:
             max_depth=self.max_depth,
         )
 
-        train_log_info = DefaultDict(lambda _, k: self.get_info_template(project_info, baseline_model, model_name, k))
+        train_log_info: DefaultDict[str, dict[str, Any]] = DefaultDict(
+            lambda _, k: self.get_info_template(project_info, baseline_model, model_name, k)
+        )
 
         LOGGER.debug(f"Initialized model training {project_info.model_type.name}")
         projects = [project_info.project]
@@ -426,7 +430,7 @@ class AnalysisModelTraining:
             train_log_info[metric]["data_proportion"] = data_proportion
 
         use_custom_model = False
-        mean_metric_results: Optional[list[float]] = None
+        mean_metric_results: list[float] = []
         if not bad_data:
             LOGGER.debug(f"Baseline test results {baseline_model_results}")
             LOGGER.debug(f"New model test results {new_model_results}")
@@ -455,7 +459,7 @@ class AnalysisModelTraining:
 
         if use_custom_model:
             LOGGER.debug("Custom model should be saved")
-            max_train_result_idx = int(np.argmax(mean_metric_results))
+            max_train_result_idx = int(np.argmax(mean_metric_results)) if mean_metric_results else 0
             best_random_state = TRAIN_DATA_RANDOM_STATES[max_train_result_idx]
 
             LOGGER.info(f"Perform final training with random state: {best_random_state}")

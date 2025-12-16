@@ -100,7 +100,7 @@ class SuggestPatternsService:
         LOGGER.info("Started suggesting patterns for project '%s'", index_name)
         t_start = time()
         found_data = []
-        exceptions_with_labels = {}
+        exceptions_with_labels: dict[str, dict[str, int]] = {}
         all_exceptions = {}
         if not self.es_client.index_exists(index_name):
             return SuggestPattern(suggestionsWithLabels=[], suggestionsWithoutLabels=[])

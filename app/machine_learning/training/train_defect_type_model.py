@@ -98,7 +98,7 @@ def split_train_test(
 def perform_light_deduplication(data: list[tuple[str, str, str]]) -> tuple[dict[int, list[int]], list[int]]:
     text_messages_set = {}
     logs_to_train_idx = []
-    additional_logs = {}
+    additional_logs: dict[int, list[int]] = {}
     for idx, text_message_data in enumerate(data):
         text_message = text_message_data[0]
         text_message_normalized = " ".join(sorted(text_processing.split_words(text_message, to_lower=True)))
@@ -365,7 +365,7 @@ class DefectTypeModelTraining:
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, dict[str, Any]]]:
         start_time = time()
         model_name = f'{project_info.model_type.name}_model_{datetime.now().strftime("%Y-%m-%d")}'
-        baseline_model = os.path.basename(self.search_cfg.GlobalDefectTypeModelFolder)
+        baseline_model_folder = os.path.basename(self.search_cfg.GlobalDefectTypeModelFolder)
         new_model_folder = f"{project_info.model_type.name}_model/{model_name}/"
 
         LOGGER.info(f'Train "{ModelType.defect_type.name}" model using class: {self.model_class}')
@@ -374,7 +374,9 @@ class DefectTypeModelTraining:
             n_estimators=self.search_cfg.DefectTypeModelNumEstimators,
         )
 
-        train_log_info = DefaultDict(lambda _, k: self.get_info_template(project_info, baseline_model, model_name, k))
+        train_log_info: DefaultDict[str, dict[str, Any]] = DefaultDict(
+            lambda _, k: self.get_info_template(project_info, baseline_model_folder, model_name, k)
+        )
         projects = [project_info.project]
         if project_info.additional_projects:
             projects.extend(project_info.additional_projects)
@@ -433,7 +435,8 @@ class DefectTypeModelTraining:
                 custom_models.append(label)
             else:
                 train_log_info[label]["model_saved"] = 0
-                copy_model_part_from_baseline(label, new_model, self.baseline_model)
+                if self.baseline_model:
+                    copy_model_part_from_baseline(label, new_model, self.baseline_model)
                 if train_log_info[label]["baseline_mean_metric"] > 0.001:
                     f1_baseline_models.append(train_log_info[label]["baseline_mean_metric"])
                     f1_chosen_models.append(train_log_info[label]["baseline_mean_metric"])

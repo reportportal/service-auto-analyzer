@@ -108,11 +108,10 @@ class SuggestService(AnalyzerService):
         det_mes_field: str = "detected_message",
         stacktrace_field: str = "stacktrace",
     ) -> dict:
-        min_should_match = (
-            "{}%".format(test_item_info.analyzerConfig.minShouldMatch)
-            if test_item_info.analyzerConfig.minShouldMatch > 0
-            else self.search_cfg.MinShouldMatch
-        )
+        if test_item_info.analyzerConfig.minShouldMatch > 0:
+            min_should_match = "{}%".format(test_item_info.analyzerConfig.minShouldMatch)
+        else:
+            min_should_match = self.search_cfg.MinShouldMatch
         log_lines = test_item_info.analyzerConfig.numberOfLogLines
 
         query = self.build_common_query(log, size=size, filter_no_defect=False)

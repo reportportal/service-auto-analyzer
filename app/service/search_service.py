@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 from time import time
-from typing import Optional
+from typing import Any, Optional
 
 import opensearchpy.helpers
 
@@ -45,9 +45,9 @@ class SearchService:
 
     def _build_search_query(
         self, search_req: SearchLogs, queried_log: dict, search_min_should_match: str = "95%"
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Build search query"""
-        query = {
+        query: dict[str, Any] = {
             "_source": [
                 "message",
                 "test_item",
@@ -123,7 +123,7 @@ class SearchService:
     def _find_log_ids_for_test_items_with_merged_logs(
         self, test_item_ids: list, index_name: str, batch_size: int = 1000
     ) -> dict:
-        test_items_dict = {}
+        test_items_dict: dict[Any, list[Any]] = {}
         for i in range(int(len(test_item_ids) / batch_size) + 1):
             test_items = test_item_ids[i * batch_size : (i + 1) * batch_size]
             if not test_items:
@@ -232,7 +232,7 @@ class SearchService:
 
         global_search_min_should_match = search_req.analyzerConfig.searchLogsMinShouldMatch / 100
         test_items_found_dict = {}
-        test_item_info = {}
+        test_item_info: dict[Any, Any] = {}
         for queried_log in logs_to_query:
             message_to_use = queried_log["_source"]["message"]
             if not message_to_use.strip():

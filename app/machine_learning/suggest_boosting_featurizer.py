@@ -39,7 +39,7 @@ class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
     def find_most_relevant_by_type(self) -> dict[str, dict[str, Any]]:
         if self.scores_by_type is not None:
             return self.scores_by_type
-        scores_by_type = defaultdict(lambda: {"mrHit": {"_score": -1}, "score": 0})
+        scores_by_type: dict[str, dict[str, Any]] = defaultdict(lambda: {"mrHit": {"_score": -1}, "score": 0})
         for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
                 test_item = str(hit["_source"]["test_item"])

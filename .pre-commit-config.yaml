@@ -13,15 +13,18 @@ repos:
     rev: '782e5605c86aab56be6f905da10dcd3e463fd9c2'
     hooks:
       - id: black
+        language: system
         args: [ '--check', 'app', 'test' ]
   - repo: https://github.com/pycqa/isort
     rev: '0a09c783808cfe77bb3269250f663ff733d23302'
     hooks:
       - id: isort
+        language: system
   - repo: https://github.com/pycqa/flake8
     rev: 'c48217e1fc006c2dddd14df54e83b67da15de5cd'
     hooks:
       - id: flake8
+        language: system
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: 'a66e98df7b4aeeb3724184b332785976d062b92e'
     hooks:

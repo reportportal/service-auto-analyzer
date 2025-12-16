@@ -19,7 +19,7 @@ import threading
 import warnings
 from signal import SIGINT, signal
 from sys import exit
-from typing import Any, Optional
+from typing import Any
 
 from flask import Flask, Response
 from flask_cors import CORS
@@ -34,15 +34,13 @@ from app.commons.model.ml import ModelType
 from app.utils import utils
 
 
-def to_bool(value: Optional[Any]) -> Optional[bool]:
+def to_bool(value: Any) -> bool:
     """Convert value of any type to boolean or raise ValueError.
 
     :param value: value to convert
     :return: boolean value
     :raises ValueError: if value is not boolean
     """
-    if value is None or value == "":
-        return None
     if value in {"TRUE", "True", "true", "1", "Y", "y", True}:
         return True
     if value in {"FALSE", "False", "false", "0", "N", "n", False}:
@@ -92,7 +90,7 @@ if minio_use_tls:
         stacklevel=2,
     )
 if not datastore_endpoint and minio_short_host:
-    use_tls = to_bool(minio_use_tls)
+    use_tls = to_bool(minio_use_tls) if minio_use_tls else False
     datastore_endpoint = f"http{'s' if use_tls else ''}://{minio_short_host}"
 
 # Handle all datastore region settings, old and new
@@ -182,7 +180,7 @@ APP_CONFIG = ApplicationConfig(
     esHost=os.getenv("ES_HOSTS", "http://opensearch:9200").strip("/").strip("\\"),  # NOSONAR
     esUser=os.getenv("ES_USER", "").strip(),
     esPassword=os.getenv("ES_PASSWORD", "").strip(),
-    esUseSsl=to_bool(os.getenv("ES_USE_SSL", "false")),
+    esUseSsl=to_bool(os.getenv("ES_USE_SSL", "false")) or False,
     esVerifyCerts=to_bool(os.getenv("ES_VERIFY_CERTS", "false")),
     esSslShowWarn=to_bool(os.getenv("ES_SSL_SHOW_WARN", "false")),
     esCAcert=os.getenv("ES_CA_CERT", ""),

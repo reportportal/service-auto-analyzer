@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 import re
-from typing import Any
+from typing import Any, Optional
 
 from app.commons import logging
 from app.commons.model.launch_objects import AnalyzerConf, Launch, SearchConfig, TestItemInfo
@@ -129,7 +129,7 @@ class AnalyzerService:
         log_message: str,
         field_name: str = "message",
         boost: float = 1.0,
-        override_min_should_match: str = None,
+        override_min_should_match: Optional[str] = None,
     ) -> dict:
         """Build more like this query"""
         return utils.build_more_like_this_query(

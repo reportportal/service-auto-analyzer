@@ -28,7 +28,7 @@ from app.commons.model.launch_objects import Log, SimilarityResult
 try:
     from app.commons import logging
 except ImportError:
-    import logging
+    import logging  # type: ignore
 
 logger = logging.getLogger("analyzerApp.utils.textProcessing")
 

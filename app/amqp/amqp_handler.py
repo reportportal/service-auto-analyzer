@@ -167,7 +167,7 @@ class ProcessAmqpRequestHandler:
     _receiver_thread: Optional[threading.Thread]
     _shutdown: bool
     _init_services: set[str]
-    _retry_predicate: Optional[Callable[[ProcessingItem, Exception], bool]]
+    _retry_predicate: Optional[Callable[[ProcessingItem, Optional[Exception]], bool]]
 
     def __init__(
         self,

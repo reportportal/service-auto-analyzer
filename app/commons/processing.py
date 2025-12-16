@@ -14,7 +14,7 @@
 import os
 import time
 from multiprocessing import Pipe, Process
-from typing import Any, Callable, Optional, Protocol
+from typing import Any, Callable, Optional, Protocol, runtime_checkable
 
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
@@ -24,9 +24,10 @@ from app.service import ServiceProcessor
 LOGGER = logging.getLogger("analyzerApp.processing")
 
 
+@runtime_checkable
 class Processor(Protocol):
     @property
-    def pid(self) -> int:
+    def pid(self) -> Optional[int]:
         """Return the process ID of the processor."""
         ...
 
@@ -98,7 +99,7 @@ class RealProcessor:
         self.process.start()
 
     @property
-    def pid(self) -> int:
+    def pid(self) -> Optional[int]:
         return self.process.pid
 
     def is_alive(self) -> bool:

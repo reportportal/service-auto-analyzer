@@ -37,7 +37,7 @@ STOPWORDS_ALL = set(STOPWORDS)
 FILE_EXTENSIONS = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
 
 
-def create_punctuation_map(split_urls) -> dict[str, str | int | None]:
+def create_punctuation_map(split_urls: bool) -> dict[str, str | int | None]:
     translate_map: dict[str, str | int | None] = {}
     for punct in string.punctuation + "<>{}[];=()'\"":
         if punct != "." and (split_urls or punct not in ["/", "\\"]):

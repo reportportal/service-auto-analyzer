@@ -70,10 +70,11 @@ def transform_issue_type_into_lowercase(issue_type):
 def _fill_launch_test_item_fields(log_template: dict, launch: Launch, test_item: TestItem, project: str):
     log_template["_index"] = project
     source = compute_if_absent(log_template, "_source", {})
+    start_time = datetime(*launch.launchStartTime[:6]).strftime("%Y-%m-%d %H:%M:%S")  # type: ignore[arg-type]
     source["launch_id"] = launch.launchId
     source["launch_name"] = launch.launchName
     source["launch_number"] = getattr(launch, "launchNumber", 0)
-    source["launch_start_time"] = datetime(*launch.launchStartTime[:6]).strftime("%Y-%m-%d %H:%M:%S")  # type: ignore[arg-type]
+    source["launch_start_time"] = start_time
     source["test_item"] = test_item.testItemId
     source["unique_id"] = test_item.uniqueId
     source["test_case_hash"] = test_item.testCaseHash

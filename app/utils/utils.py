@@ -60,12 +60,12 @@ def read_json_file(folder: str, filename: str, to_json: bool = False) -> Any:
 
 def validate_folder(folder_path: str) -> bool:
     """Check that passed path points to a directory and it exists."""
-    return folder_path and folder_path.strip() and os.path.exists(folder_path) and os.path.isdir(folder_path)
+    return bool(folder_path and folder_path.strip() and os.path.exists(folder_path) and os.path.isdir(folder_path))
 
 
 def validate_file(file_path: str) -> bool:
     """Check that passed path points to a file and it exists."""
-    return file_path and file_path.strip() and os.path.exists(file_path) and os.path.isfile(file_path)
+    return bool(file_path and file_path.strip() and os.path.exists(file_path) and os.path.isfile(file_path))
 
 
 def extract_real_id(elastic_id):
@@ -84,7 +84,7 @@ def send_request(
 ) -> Optional[Any]:
     """Send request with specified url and http method"""
 
-    kwargs = {}
+    kwargs: dict[str, Any] = {}
     if username:
         kwargs["auth"] = (username, password)
 
@@ -215,7 +215,7 @@ def to_float_list(features_list: str) -> list[float]:
 def fill_previously_gathered_features(
     feature_list: list[list[float]], feature_ids: list[int]
 ) -> dict[int, list[list[float]]]:
-    previously_gathered_features = {}
+    previously_gathered_features: dict[int, list[list[float]]] = {}
     try:
         for i in range(len(feature_list)):
             for idx, feature in enumerate(feature_ids):
@@ -230,24 +230,28 @@ def fill_previously_gathered_features(
 
 
 def gather_feature_list(gathered_data_dict: dict[int, list[list[float]]], feature_ids: list[int]) -> list[list[float]]:
-    features_array: Optional[np.array] = None
     axis_x_size = max([len(x) for x in gathered_data_dict.values()])
     if axis_x_size <= 0:
         return []
-    for idx, feature in enumerate(feature_ids):
+
+    # Initialize result list with empty lists for each row
+    result: list[list[float]] = [[] for _ in range(axis_x_size)]
+
+    for feature in feature_ids:
         if feature not in gathered_data_dict or len(gathered_data_dict[feature]) == 0:
             gathered_data_dict[feature] = [[0.0] for _ in range(axis_x_size)]
-        if features_array is None:
-            features_array = np.asarray(gathered_data_dict[feature])
-        else:
-            features_array = np.concatenate([features_array, gathered_data_dict[feature]], axis=1)
-    return features_array.tolist()
+
+        # Append features from this feature ID to each row
+        for row_idx, row in enumerate(gathered_data_dict[feature]):
+            result[row_idx].extend(row)
+
+    return result
 
 
 def extract_exception(err: Exception) -> str:
-    err_message = traceback.format_exception_only(type(err), err)
-    if len(err_message):
-        err_message = err_message[-1]
+    err_message_list = traceback.format_exception_only(type(err), err)
+    if len(err_message_list):
+        err_message = err_message_list[-1]
     else:
         err_message = ""
     return err_message

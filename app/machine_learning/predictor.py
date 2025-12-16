@@ -339,7 +339,7 @@ class SimilarityPredictor(Predictor):
         similarity_scores = calculate_text_similarity(query_text, *hit_texts)
 
         # Group results by test_item to find most relevant for each
-        results_by_test_item = {}
+        results_by_test_item: dict[str, dict[str, Any]] = {}
 
         for idx, (hit, sim_result) in enumerate(zip(valid_hits, similarity_scores)):
             # Get test_item identifier

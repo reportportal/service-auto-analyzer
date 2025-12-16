@@ -211,7 +211,7 @@ class EsClient:
         num_logs_with_defect_types = 0
         if not test_item_ids:
             return bodies, num_logs_with_defect_types
-        test_items_dict = {}
+        test_items_dict: dict[Any, list[Any]] = {}
         for r in opensearchpy.helpers.scan(
             self.es_client, query=self.get_test_item_query(test_item_ids, False, True), index=project
         ):

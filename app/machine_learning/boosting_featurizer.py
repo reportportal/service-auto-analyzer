@@ -39,6 +39,7 @@ class BoostingFeaturizer:
     raw_results: list[tuple[dict[str, Any], dict[str, Any]]]
     all_results: list[tuple[dict[str, Any], list[dict[str, Any]]]]
     total_normalized_score: float
+    used_model_info: set[str]
 
     def __init__(
         self,
@@ -50,7 +51,7 @@ class BoostingFeaturizer:
         self.config = config
         self.previously_gathered_features = {}
         self.similarity_calculator = similarity_calculator.SimilarityCalculator()
-        if type(feature_ids) is str:
+        if isinstance(feature_ids, str):
             self.feature_ids = text_processing.transform_string_feature_range_into_list(feature_ids)
         else:
             self.feature_ids = feature_ids
@@ -233,7 +234,7 @@ class BoostingFeaturizer:
         :param list[tuple[dict[str, Any], dict[str, Any]]] all_results: list of logs queried and their search results
         :return: dict with test item id as key and value as the relation between the number of logs found and queried
         """
-        test_item_log_stats = defaultdict(lambda: 0.0)
+        test_item_log_stats: defaultdict[Any, float] = defaultdict(lambda: 0.0)
         for _, res in all_results:
             for hit in res["hits"]["hits"]:
                 test_item = hit["_source"]["test_item"]
@@ -308,6 +309,8 @@ class BoostingFeaturizer:
         :return: dict with issue type as key and value as the probability of the most relevant log to be of a certain
                  defect type
         """
+        if not self.defect_type_predict_model:
+            return {}
         scores_by_issue_type = self.find_most_relevant_by_type()
         result = {}
         for issue_type, search_rs in scores_by_issue_type.items():
@@ -357,7 +360,7 @@ class BoostingFeaturizer:
     ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         new_results = []
         for log, res in all_results:
-            test_case_hash_dict = {}
+            test_case_hash_dict: dict[Any, list[tuple[str, int, datetime]]] = {}
             for r in res["hits"]["hits"]:
                 test_case_hash = r["_source"]["test_case_hash"]
                 if test_case_hash not in test_case_hash_dict:
@@ -595,7 +598,7 @@ class BoostingFeaturizer:
         :param str return_val_name: name of return value, can be 'max_score' or 'max_score_pos'
         :return: dict with issue type as key and value as maximum score or inverse order of this score
         """
-        max_scores_by_issue_type = {}
+        max_scores_by_issue_type: dict[str, dict[str, float]] = {}
         for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
@@ -616,7 +619,7 @@ class BoostingFeaturizer:
         :param str return_val_name: name of return value, can be 'min_score' or 'min_score_pos'
         :return: dict with issue type as key and value as minimum score or inverse order of this score
         """
-        min_scores_by_issue_type = {}
+        min_scores_by_issue_type: dict[str, dict[str, float]] = {}
         for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
                 issue_type = hit["_source"]["issue_type"]
@@ -655,7 +658,7 @@ class BoostingFeaturizer:
     def normalize_results(
         self, all_elastic_results: list[tuple[dict[str, Any], dict[str, Any]]]
     ) -> list[tuple[dict[str, Any], list[dict[str, Any]]]]:
-        all_results = []
+        all_results: list[tuple[dict[str, Any], list[dict[str, Any]]]] = []
         max_score = 0
         self.total_normalized_score = 0.0
         for query_log, es_results in all_elastic_results:
@@ -665,8 +668,8 @@ class BoostingFeaturizer:
                 max_score = max(max_score, my_hit["_score"])
                 my_hits.append(my_hit)
             all_results.append((query_log, my_hits))
-        for query_log, es_results in all_results:
-            for hit in es_results:
+        for query_log, es_hits in all_results:
+            for hit in es_hits:
                 hit["normalized_score"] = hit["_score"] / max_score
                 self.total_normalized_score += hit["normalized_score"]
         return all_results

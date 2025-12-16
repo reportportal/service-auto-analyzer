@@ -15,7 +15,7 @@
 """This module contains functions for preparing requests to Vector DB such as OpenSearch and ElasticSearch."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from app.commons.model.launch_objects import Launch, Log, TestItem, TestItemInfo
 from app.commons.prepared_log import PreparedLogMessage, PreparedLogMessageClustering
@@ -73,14 +73,14 @@ def _fill_launch_test_item_fields(log_template: dict, launch: Launch, test_item:
     source["launch_id"] = launch.launchId
     source["launch_name"] = launch.launchName
     source["launch_number"] = getattr(launch, "launchNumber", 0)
-    source["launch_start_time"] = datetime(*launch.launchStartTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
+    source["launch_start_time"] = datetime(*launch.launchStartTime[:6]).strftime("%Y-%m-%d %H:%M:%S")  # type: ignore[arg-type]
     source["test_item"] = test_item.testItemId
     source["unique_id"] = test_item.uniqueId
     source["test_case_hash"] = test_item.testCaseHash
     source["is_auto_analyzed"] = test_item.isAutoAnalyzed
     source["test_item_name"] = text_processing.preprocess_test_item_name(test_item.testItemName)
     source["issue_type"] = transform_issue_type_into_lowercase(test_item.issueType)
-    source["start_time"] = datetime(*test_item.startTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
+    source["start_time"] = datetime(*test_item.startTime[:6]).strftime("%Y-%m-%d %H:%M:%S")  # type: ignore[arg-type]
     return log_template
 
 
@@ -106,7 +106,7 @@ def _fill_log_fields(log_template: dict, log: Log, number_of_lines: int) -> dict
     source = compute_if_absent(log_template, "_source", {})
     source["detected_message"] = prepared_log.exception_message_no_numbers
     source["detected_message_with_numbers"] = prepared_log.exception_message
-    source["log_time"] = datetime(*log.logTime[:6]).strftime("%Y-%m-%d %H:%M:%S")
+    source["log_time"] = datetime(*log.logTime[:6]).strftime("%Y-%m-%d %H:%M:%S")  # type: ignore[arg-type]
     source["cluster_with_numbers"] = utils.extract_clustering_setting(log.clusterId)
     source["only_numbers"] = prepared_log.exception_message_numbers
     source["urls"] = prepared_log.exception_message_urls
@@ -187,7 +187,7 @@ def get_words_in_stacktrace(stacktrace: str) -> dict[str, int]:
     return words
 
 
-def prepare_log_words(launches: list[Launch]) -> tuple[dict[str, int], int]:
+def prepare_log_words(launches: list[Launch]) -> tuple[dict[str, int], Optional[int]]:
     log_words = {}
     project = None
     for launch in launches:

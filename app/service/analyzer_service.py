@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import re
 from typing import Any, Optional
 
 from app.commons import logging
@@ -111,11 +110,9 @@ class AnalyzerService:
         self.model_chooser = model_chooser
 
     def find_min_should_match_threshold(self, analyzer_config: AnalyzerConf) -> int:
-        return (
-            analyzer_config.minShouldMatch
-            if analyzer_config.minShouldMatch > 0
-            else int(re.search(r"\d+", self.search_cfg.MinShouldMatch).group(0))
-        )
+        if analyzer_config.minShouldMatch > 0:
+            return analyzer_config.minShouldMatch
+        return int(self.search_cfg.MinShouldMatch.rstrip("%"))
 
     def add_constraints_for_launches_into_query(self, query: dict, launch: Launch) -> dict:
         return add_constraints_for_launches_into_query(query, launch, self.launch_boost)

@@ -52,18 +52,18 @@ class BoostingDecisionMaker(MlModel):
         n_estimators: Optional[int] = None,
         max_depth: Optional[int] = None,
         random_state: Optional[int] = None,
-        learning_rate: Optional[float] = DEFAULT_LEARNING_RATE,
+        learning_rate: Optional[float] = None,
     ) -> None:
         super().__init__(object_saver, tags)
         self.n_estimators = n_estimators if n_estimators is not None else DEFAULT_N_ESTIMATORS
         self.max_depth = max_depth if max_depth is not None else DEFAULT_MAX_DEPTH
         self.random_state = random_state if random_state is not None else DEFAULT_RANDOM_STATE
-        self.learning_rate = learning_rate
+        self.learning_rate = learning_rate if learning_rate is not None else DEFAULT_LEARNING_RATE
         self.boost_model = XGBClassifier(
             n_estimators=n_estimators, max_depth=max_depth, random_state=self.random_state
         )
         self.feature_ids = features if features else []
-        self.monotonous_features = set(monotonous_features) if monotonous_features else {}
+        self.monotonous_features = set(monotonous_features) if monotonous_features else set()
         self._loaded = False
 
     @property
@@ -80,6 +80,7 @@ class BoostingDecisionMaker(MlModel):
     def feature_importances(self) -> Optional[dict[int, float]]:
         if self.loaded:
             return dict(zip(self.feature_ids, self.boost_model.feature_importances_.tolist()))
+        return None
 
     def load_model(self) -> None:
         if self.loaded:

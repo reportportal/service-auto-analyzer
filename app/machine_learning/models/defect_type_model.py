@@ -40,6 +40,9 @@ DEFAULT_MAX_FEATURES = "sqrt"
 
 # noinspection PyMethodMayBeStatic
 class DummyVectorizer:
+    def fit_transform(self, data: list[str]) -> csr_matrix:
+        return csr_matrix(np.zeros((len(data), 1)))
+
     def transform(self, data: list[str]) -> csr_matrix:
         return csr_matrix(np.zeros((len(data), 1)))
 

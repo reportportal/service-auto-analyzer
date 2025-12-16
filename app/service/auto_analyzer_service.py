@@ -92,7 +92,6 @@ def _prepare_logs(launch: Launch, test_item: TestItem, index_name: str) -> list[
 
 class AutoAnalyzerService(AnalyzerService):
     app_config: ApplicationConfig
-    search_cfg: SearchConfig
     es_client: EsClient
     namespace_finder: NamespaceFinder
 
@@ -103,9 +102,8 @@ class AutoAnalyzerService(AnalyzerService):
         search_cfg: SearchConfig,
         es_client: Optional[EsClient] = None,
     ) -> None:
+        super().__init__(model_chooser, search_cfg=search_cfg)
         self.app_config = app_config
-        self.search_cfg = search_cfg
-        super().__init__(model_chooser, search_cfg=self.search_cfg)
         self.es_client = es_client or EsClient(app_config=self.app_config)
         self.namespace_finder = NamespaceFinder(app_config)
 
@@ -133,11 +131,9 @@ class AutoAnalyzerService(AnalyzerService):
         return fields
 
     def get_min_should_match_setting(self, launch: Launch) -> str:
-        return (
-            f"{launch.analyzerConfig.minShouldMatch}%"
-            if launch.analyzerConfig.minShouldMatch > 0
-            else self.search_cfg.MinShouldMatch
-        )
+        if launch.analyzerConfig.minShouldMatch > 0:
+            return f"{launch.analyzerConfig.minShouldMatch}%"
+        return self.search_cfg.MinShouldMatch
 
     def build_analyze_query(self, launch: Launch, log: dict[str, Any], size: int = 10) -> dict[str, Any]:
         """Build query to get similar log entries for the given log entry.
@@ -224,7 +220,7 @@ class AutoAnalyzerService(AnalyzerService):
 
     def build_query_with_no_defect(self, launch: Launch, log: dict[str, Any], size: int = 10) -> dict[str, Any]:
         min_should_match = self.get_min_should_match_setting(launch)
-        query = {
+        query: dict[str, Any] = {
             "size": size,
             "sort": ["_score", {"start_time": "desc"}],
             "query": {
@@ -478,7 +474,7 @@ class AutoAnalyzerService(AnalyzerService):
         analyzed_results_for_index = []
         t_start = time()
         results = []
-        results_to_share = {}
+        results_to_share: dict[int, dict[str, Any]] = {}
         cnt_items_to_process = 0
         chosen_namespaces = {}
 

@@ -247,7 +247,7 @@ class ClusterService:
                     break
             if new_group:
                 new_clusters[global_group] = new_group
-        additional_results = {}
+        additional_results: dict[Any, ClusterInfo] = {}
         for group in new_clusters:
             if group in additional_results:
                 additional_results[group].logIds.extend(new_clusters[group].logIds)
@@ -333,7 +333,7 @@ class ClusterService:
         log_ids_for_merged_logs: dict[str, list[int]],
         launch_info: LaunchInfoForClustering,
     ) -> tuple[list[ClusterInfo], int, dict[str, tuple[int, str]]]:
-        merged_logs_to_update = {}
+        merged_logs_to_update: dict[str, tuple[int, str]] = {}
         clusters_found: dict[int, tuple[list[int], list[int]]] = {}
         cluster_message_by_id = {}
         for group in groups:
@@ -394,8 +394,8 @@ class ClusterService:
         errors_found = []
         errors_count = 0
         cluster_num = 0
-        clusters = []
-        log_ids = {}
+        clusters: list[ClusterInfo] = []
+        log_ids: set[str] = set()
         try:
             unique_errors_min_should_match = (
                 launch_info.launch.analyzerConfig.uniqueErrorsMinShouldMatch / 100.0
@@ -433,12 +433,12 @@ class ClusterService:
                                 },
                             }
                         )
-                for log_id in merged_logs_to_update:
-                    cluster_id, cluster_message = merged_logs_to_update[log_id]
+                for merged_log_id in merged_logs_to_update:
+                    cluster_id, cluster_message = merged_logs_to_update[merged_log_id]
                     bodies.append(
                         {
                             "_op_type": "update",
-                            "_id": log_id,
+                            "_id": merged_log_id,
                             "_index": index_name,
                             "doc": {
                                 "cluster_id": str(cluster_id),

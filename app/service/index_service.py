@@ -45,7 +45,7 @@ class IndexService:
         self.es_client = es_client or EsClient(app_config=self.app_config)
 
     def _to_launch_test_item_list(self, launches: list[Launch]) -> deque[tuple[Launch, TestItem]]:
-        test_item_queue = deque()
+        test_item_queue: deque[tuple[Launch, TestItem]] = deque()
         for launch in launches:
             test_items = launch.testItems
             launch.testItems = []

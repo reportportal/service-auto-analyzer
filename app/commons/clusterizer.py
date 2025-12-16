@@ -44,7 +44,7 @@ class Clusterizer:
     ) -> dict[int, list[int]]:
         if len(messages) == 0:
             return {}
-        rearranged_groups = {}
+        rearranged_groups: dict[int, list[int]] = {}
         group_id = 0
         start_time = time()
         for key_word in groups_to_check:
@@ -123,7 +123,7 @@ class Clusterizer:
         if not has_no_empty:
             return {}
         hash_groups = self.similarity_groupping(hash_prints, for_text=False, threshold=threshold)
-        rearranged_groups = {}
+        rearranged_groups: dict[int, list[int]] = {}
         for key in hash_groups:
             cluster = hash_groups[key]
             if cluster not in rearranged_groups:

@@ -111,13 +111,13 @@ def decompose_logs_merged_and_without_duplicates(
     logs: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], dict[str, list[int]]]:
     """Merge big logs with small ones without duplicates."""
-    log_level_messages = {}
+    log_level_messages: dict[str, dict[int, str]] = {}
     for field in FIELDS_TO_MERGE:
         log_level_messages[field] = {}
-    log_level_ids_to_add = {}
-    log_level_ids_merged = {}
-    logs_unique_log_level = {}
-    logs_ids_in_merged_logs = {}
+    log_level_ids_to_add: dict[int, list[int]] = {}
+    log_level_ids_merged: dict[int, dict[str, Any]] = {}
+    logs_unique_log_level: dict[int, set[str]] = {}
+    logs_ids_in_merged_logs: dict[int, list[int]] = {}
 
     for log in logs:
         source = log["_source"]

@@ -264,25 +264,33 @@ def clean_special_chars(text: str) -> str:
 
 # Mute Sonar's "Group parts of the regex together to make the intended operator precedence explicit." which is invalid
 STATUS_CODES_PATTERNS = [
-    re.compile(r"\bcode[^\w.]+(\d+)\D*(\d*)|\bcode[^\w.]+(\d*)$", flags=re.IGNORECASE),  # NOSONAR
-    re.compile(r"\w+_code[^\w.]+(\d+)\D*(\d*)|\w+_code[^\w.]+(\d*)$", flags=re.IGNORECASE),  # NOSONAR
-    re.compile(r"\bstatus[^\w.]+(\d+)\D*(\d*)|\bstatus[^\w.]+(\d*)$", flags=re.IGNORECASE),  # NOSONAR
-    re.compile(r"\w+_status[^\w.]+(\d+)\D*(\d*)|\w+_status[^\w.]+(\d*)$", flags=re.IGNORECASE),  # NOSONAR
+    re.compile(r"\bcode[^\w.]+(\d{3})\D*(\d{3})?|\bcode[^\w.]+(\d{3})?$", flags=re.IGNORECASE),  # NOSONAR
+    re.compile(r"\w+_code[^\w.]+(\d{3})\D*(\d{3})?|\w+_code[^\w.]+(\d{3})?$", flags=re.IGNORECASE),  # NOSONAR
+    re.compile(r"\bstatus[^\w.]+(\d{3})\D*(\d{3})?|\bstatus[^\w.]+(\d{3})?$", flags=re.IGNORECASE),  # NOSONAR
+    re.compile(r"\w+_status[^\w.]+(\d{3})\D*(\d{3})?|\w+_status[^\w.]+(\d{3})?$", flags=re.IGNORECASE),  # NOSONAR
+    re.compile(
+        r"\bcode\W+expected[:.\s-]+[\"'`]?(\d{3})\D*(\d{3})?|\bcode\W+expected[:.\s-]+[\"'`]?(\d{3})[\"'`]?$",
+        flags=re.IGNORECASE,
+    ),
+    re.compile(
+        r"\"(?:statusCode|status_code|httpCode|http_code|responseCode|response_code)\":\s*\"?(\d{3})\b",
+        flags=re.IGNORECASE,
+    ),
 ]
 
 
 def get_potential_status_codes(text: str) -> list[str]:
     potential_codes_list = []
     for line in text.split("\n"):
-        line = clean_from_brackets(line)
         for pattern in STATUS_CODES_PATTERNS:
             result = pattern.search(line)
             if not result:
                 continue
-            for i in range(1, 4):
-                found_code = (result.group(i) or "").strip()
+            for found_code in result.groups():
                 if found_code:
-                    potential_codes_list.append(found_code)
+                    strip_code = found_code.strip()
+                    if strip_code:
+                        potential_codes_list.append(strip_code)
     return potential_codes_list
 
 

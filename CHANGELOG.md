@@ -1,5 +1,9 @@
 # Changelog
 ## [Unreleased]
+### Changed
+- Status code detection improved, by @HardNorth
+
+## [Unreleased]
 ### Added
 - S3 buckets support with `boto3` client (with handling instance roles, etc.), by @HardNorth
 ### Changed

@@ -16,6 +16,9 @@ jobs:
   retag-image:
     name: Retag and push image
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     environment: rc
     if: github.event.pull_request.base.ref == 'master' || github.event.pull_request.base.ref == 'main'
     steps:

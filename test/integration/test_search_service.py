@@ -55,7 +55,6 @@ def search_service(mocked_opensearch_client: OpenSearch) -> SearchService:
     return service
 
 
-# noinspection PyUnresolvedReferences
 @mock.patch("opensearchpy.helpers.scan")
 def test_search_logs_calls_correct_services(
     mock_scan,
@@ -184,7 +183,6 @@ def test_search_logs_with_nonexistent_index(
     assert result == [], "Should return empty list when index doesn't exist"
 
 
-# noinspection PyUnresolvedReferences
 @mock.patch("opensearchpy.helpers.scan")
 def test_search_logs_with_all_messages_should_match(
     mock_scan,
@@ -265,7 +263,6 @@ def test_search_logs_with_all_messages_should_match(
         assert item.matchScore <= 100, "matchScore should be <= 100"
 
 
-# noinspection PyUnresolvedReferences
 @mock.patch("opensearchpy.helpers.scan")
 def test_search_logs_with_merged_logs(
     mock_scan,
@@ -316,7 +313,6 @@ def test_search_logs_with_merged_logs(
         assert item.matchScore <= 100, "matchScore should be <= 100"
 
 
-# noinspection PyUnresolvedReferences
 @mock.patch("opensearchpy.helpers.scan")
 def test_search_logs_with_merged_logs_expansion(
     mock_scan,
@@ -395,7 +391,6 @@ def test_search_logs_with_merged_logs_expansion(
         assert item.testItemId == 3004, "all results should be for test_item 3004"
 
 
-# noinspection PyUnresolvedReferences
 @mock.patch("opensearchpy.helpers.scan")
 def test_search_logs_with_empty_log_messages(
     mock_scan,
@@ -452,7 +447,6 @@ def test_search_logs_query_structure_for_merged_logs(
     assert result == [], "Should return empty list when all messages are empty"
 
 
-# noinspection PyUnresolvedReferences
 @mock.patch("opensearchpy.helpers.scan")
 def test_search_logs_builds_query_with_found_exceptions(
     mock_scan,
@@ -517,7 +511,6 @@ def test_search_logs_builds_query_with_found_exceptions(
     assert isinstance(result, list), "result should be a list"
 
 
-# noinspection PyUnresolvedReferences
 @mock.patch("opensearchpy.helpers.scan")
 def test_search_logs_with_potential_status_codes(
     mock_scan,

@@ -263,17 +263,25 @@ def clean_special_chars(text: str) -> str:
 
 
 # Mute Sonar's "Group parts of the regex together to make the intended operator precedence explicit." which is invalid
+HTTP_CODE = r"[1-5]\d{2}"
 STATUS_CODES_PATTERNS = [
-    re.compile(r"\bcode[^\w.]+(\d{3})\D*(\d{3})?|\bcode[^\w.]+(\d{3})?$", flags=re.IGNORECASE),  # NOSONAR
-    re.compile(r"\w+_code[^\w.]+(\d{3})\D*(\d{3})?|\w+_code[^\w.]+(\d{3})?$", flags=re.IGNORECASE),  # NOSONAR
-    re.compile(r"\bstatus[^\w.]+(\d{3})\D*(\d{3})?|\bstatus[^\w.]+(\d{3})?$", flags=re.IGNORECASE),  # NOSONAR
-    re.compile(r"\w+_status[^\w.]+(\d{3})\D*(\d{3})?|\w+_status[^\w.]+(\d{3})?$", flags=re.IGNORECASE),  # NOSONAR
     re.compile(
-        r"\bcode\W+expected[:.\s-]+[\"'`]?(\d{3})\D*(\d{3})?|\bcode\W+expected[:.\s-]+[\"'`]?(\d{3})[\"'`]?$",
+        r"\bcode[^\w.]+({0})\D*({0})?|\bcode[^\w.]+({0})?$".format(HTTP_CODE),
+        flags=re.IGNORECASE,
+    ),
+    re.compile(r"\w+_code[^\w.]+({0})\D*({0})?|\w+_code[^\w.]+({0})?$".format(HTTP_CODE), flags=re.IGNORECASE),
+    re.compile(r"\bstatus[^\w.]+({0})\D*({0})?|\bstatus[^\w.]+({0})?$".format(HTTP_CODE), flags=re.IGNORECASE),
+    re.compile(r"\w+_status[^\w.]+({0})\D*({0})?|\w+_status[^\w.]+({0})?$".format(HTTP_CODE), flags=re.IGNORECASE),
+    re.compile(
+        r"\bcode\W+expected[:.\s-]+[\"'`]?({0})\D*({0})?|\bcode\W+expected[:.\s-]+[\"'`]?({0})[\"'`]?$".format(
+            HTTP_CODE
+        ),
         flags=re.IGNORECASE,
     ),
     re.compile(
-        r"\"(?:statusCode|status_code|httpCode|http_code|responseCode|response_code)\":\s*\"?(\d{3})\b",
+        r"\"(?:statusCode|status_code|httpCode|http_code|responseCode|response_code)\":\s*\"?({0})\b".format(
+            HTTP_CODE
+        ),
         flags=re.IGNORECASE,
     ),
 ]

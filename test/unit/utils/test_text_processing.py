@@ -402,3 +402,19 @@ def test_calculate_text_similarity_script_scenarios():
             for i, r in enumerate(previous_similarities):
                 assert result[i].similarity == pytest.approx(r.similarity, abs=0.01)
         previous_similarities = result
+
+
+@pytest.mark.parametrize(
+    "test_texts, expected_result",
+    [
+        (["a", "a", "a"], [2]),
+        (["a", "b", "a"], [1, 2]),
+        (["a", "b", "b"], [0, 2]),
+        (["a", "b", "a", "b"], [2, 3]),
+        (["a", "b", "a", "b", "a"], [3, 4]),
+        (["a", "b", "a", "b", "a", "c"], [3, 4, 5]),
+    ],
+)
+def test_find_last_unique_texts(test_texts, expected_result):
+    _, logs_left = text_processing.find_last_unique_texts(None, 0.95, test_texts)
+    assert logs_left == expected_result

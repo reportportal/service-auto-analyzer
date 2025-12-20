@@ -15,11 +15,12 @@
 import re
 import string
 import urllib.parse
-from typing import Iterable
+from typing import Iterable, Optional
 from urllib.parse import urlparse
 
 import nltk
 from nltk.stem import WordNetLemmatizer
+from scipy.sparse import csr_matrix
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -981,6 +982,26 @@ def preprocess_text_for_similarity(text: str) -> str:
     return " ".join(processed_words)
 
 
+def __calculate_tf_matrix(
+    vectorizer: Optional[TfidfVectorizer], all_texts: list[str]
+) -> tuple[TfidfVectorizer, csr_matrix]:
+    my_vectorizer = vectorizer
+    if not my_vectorizer:
+        # Use TF-IDF vectorization and cosine similarity for efficient computation
+        my_vectorizer = TfidfVectorizer(
+            lowercase=False,  # Already lowercased in preprocessing
+            token_pattern=r"\b\w+\b",  # Simple word tokenization
+            min_df=1,  # Include all terms
+            max_df=1.0,  # Include all terms
+            ngram_range=(1, 2),  # Use unigrams and bigrams
+            use_idf=False,
+        )
+
+    # Fit and transform all texts at once
+    tf_matrix: csr_matrix = my_vectorizer.fit_transform(all_texts)
+    return my_vectorizer, tf_matrix
+
+
 def calculate_text_similarity(base_text: str, *other_texts: str) -> list[SimilarityResult]:
     """
     Calculate similarity between a base text and multiple other texts using TF-IDF vectorization and cosine similarity.
@@ -1039,18 +1060,7 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[Similar
     # Create all texts list: base text + all valid other texts
     all_texts = [processed_base_text] + valid_texts
 
-    # Use TF-IDF vectorization and cosine similarity for efficient computation
-    vectorizer = TfidfVectorizer(
-        lowercase=False,  # Already lowercased in preprocessing
-        token_pattern=r"\b\w+\b",  # Simple word tokenization
-        min_df=1,  # Include all terms
-        max_df=1.0,  # Include all terms
-        ngram_range=(1, 2),  # Use unigrams and bigrams
-        use_idf=False,
-    )
-
-    # Fit and transform all texts at once
-    tfidf_matrix = vectorizer.fit_transform(all_texts)
+    _, tfidf_matrix = __calculate_tf_matrix(None, all_texts)
 
     # Calculate cosine similarity between base text (index 0) and all other texts
     base_vector = tfidf_matrix[0:1]  # Base text vector
@@ -1066,6 +1076,28 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[Similar
         )
 
     return similarity_scores
+
+
+def find_last_unique_texts(
+    vectorizer: Optional[TfidfVectorizer], threshold: float, texts: list[str]
+) -> tuple[TfidfVectorizer, list[int]]:
+    """Returns the list of indexes of unique passed texts which are closer to the list end."""
+    my_vectorizer = vectorizer
+    my_vectorizer, matrix = __calculate_tf_matrix(my_vectorizer, texts)
+    result = set()
+    for i in range(len(texts) - 1):
+        if i in result:
+            continue
+        first_vector = matrix[i]
+        other_vectors = matrix[i + 1 :]
+        similarity_vector = cosine_similarity(first_vector, other_vectors)[0]
+        use_index = i
+        for si, s in enumerate(similarity_vector):
+            if s >= threshold:
+                use_index = i + 1 + si
+        result.add(use_index)
+    result.add(len(texts) - 1)
+    return my_vectorizer, sorted(list(result))
 
 
 def calculate_similarity_by_values(first_field: str, second_field: str) -> float:

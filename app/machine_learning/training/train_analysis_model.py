@@ -17,9 +17,8 @@ from datetime import datetime
 from time import time
 from typing import Any, Optional, Type
 
-import elasticsearch
-import elasticsearch.helpers
 import numpy as np
+import opensearchpy.helpers
 import scipy.stats as stats
 from imblearn.over_sampling import BorderlineSMOTE
 from sklearn.model_selection import train_test_split
@@ -136,6 +135,7 @@ def train_several_times(
 class AnalysisModelTraining:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
+    es_client: EsClient
     model_type: ModelType
     model_class: Type[BoostingDecisionMaker]
     baseline_folder: Optional[str]
@@ -154,12 +154,14 @@ class AnalysisModelTraining:
         model_chooser: ModelChooser,
         model_class: Optional[Type[BoostingDecisionMaker]] = None,
         use_baseline_features: bool = True,
+        *,
+        es_client: Optional[EsClient] = None,
     ) -> None:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.due_proportion = 0.05
         self.due_proportion_to_smote = 0.4
-        self.es_client = EsClient(app_config=app_config)
+        self.es_client = es_client or EsClient(app_config=app_config)
         self.model_type = model_type
         if model_type is ModelType.suggestion:
             self.baseline_folder = self.search_cfg.SuggestBoostModelFolder
@@ -250,7 +252,7 @@ class AnalysisModelTraining:
                 "size": self.app_config.esChunkNumber,
                 "query": {"bool": {"filter": [{"terms": {"_id": log_ids}}]}},
             }
-            for r in elasticsearch.helpers.scan(
+            for r in opensearchpy.helpers.scan(
                 self.es_client.es_client, query=ids_query, index=project_index_name, scroll="5m"
             ):
                 log_id_dict[str(r["_id"])] = r
@@ -301,9 +303,7 @@ class AnalysisModelTraining:
         ]:
             if cur_number_of_logs >= max_number_of_logs:
                 break
-            for res in elasticsearch.helpers.scan(
-                self.es_client.es_client, query=query, index=index_name, scroll="5m"
-            ):
+            for res in opensearchpy.helpers.scan(self.es_client.es_client, query=query, index=index_name, scroll="5m"):
                 if cur_number_of_logs >= max_number_of_logs:
                     break
                 saved_model_features = f'{res["_source"]["modelFeatureNames"]}|{res["_source"]["modelFeatureValues"]}'

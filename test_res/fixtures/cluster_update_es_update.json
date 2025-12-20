@@ -1,8 +1,0 @@
-{"update":{"_id":4,"_index":"2"}}
-{"doc":{"cluster_id":"123","cluster_message":"error occurred \n error found \n error mined","cluster_with_numbers":true}}
-{"update":{"_id":5,"_index":"2"}}
-{"doc":{"cluster_id":"123","cluster_message":"error occurred \n error found \n error mined","cluster_with_numbers":true}}
-{"update":{"_id":111,"_index":"2"}}
-{"doc":{"cluster_id":"123","cluster_message":"error occurred \n error found \n error mined","cluster_with_numbers":true}}
-{"update":{"_id":9,"_index":"2"}}
-{"doc":{"cluster_id":"44972330576749361","cluster_message":"error occurred\nerror found\nassert query","cluster_with_numbers":true}}

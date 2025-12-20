@@ -46,14 +46,11 @@ APP_CONFIG = ApplicationConfig(
     esClientCert="",
     esClientKey="",
     appVersion="",
-    minioRegion="",
-    bucketPrefix="",
+    datastoreBucketPrefix="",
     filesystemDefaultPath="",
     esChunkNumber=1000,
-    binaryStoreType="filesystem",
-    minioHost="",
-    minioAccessKey="",
-    minioSecretKey="",
+    datastoreType="filesystem",
+    datastoreEndpoint="",
     esProjectIndexPrefix="rp_",
     esChunkNumberUpdateClusters=500,
 )
@@ -63,7 +60,7 @@ DEFAULT_SEARCH_CONFIG = SearchConfig(BoostLaunch=DEFAULT_BOOST_LAUNCH)
 
 
 def get_fixture(fixture_name: str, to_json: bool = False) -> Any:
-    return read_json_file("test_res/fixtures", fixture_name, to_json)
+    return read_json_file("test_res/test_logs", fixture_name, to_json)
 
 
 def read_file_lines(folder: str, filename: str) -> list[str]:

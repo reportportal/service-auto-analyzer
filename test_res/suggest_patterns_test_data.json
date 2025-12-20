@@ -1,0 +1,64 @@
+{
+  "scan_results_ab": [
+    {
+      "_source": {
+        "detected_message": "java.lang.NullPointerException at com.example.TestClass.method",
+        "issue_type": "AB001"
+      }
+    },
+    {
+      "_source": {
+        "detected_message": "org.openqa.selenium.TimeoutException: Element not found",
+        "issue_type": "ab_timeout"
+      }
+    },
+    {
+      "_source": {
+        "detected_message": "java.lang.AssertionError: Expected value does not match",
+        "issue_type": "AB002"
+      }
+    }
+  ],
+  "scan_results_pb": [
+    {
+      "_source": {
+        "detected_message": "java.sql.SQLException: Connection timeout",
+        "issue_type": "PB001"
+      }
+    },
+    {
+      "_source": {
+        "detected_message": "com.example.service.DataException: Invalid data format",
+        "issue_type": "pb_data"
+      }
+    }
+  ],
+  "scan_results_si": [
+    {
+      "_source": {
+        "detected_message": "java.net.ConnectException: Connection refused",
+        "issue_type": "SI001"
+      }
+    },
+    {
+      "_source": {
+        "detected_message": "java.io.IOException: Disk space error",
+        "issue_type": "si_disk"
+      }
+    }
+  ],
+  "scan_results_ti": [
+    {
+      "_source": {
+        "detected_message": "Test skipped due to configuration",
+        "issue_type": "TI001"
+      }
+    },
+    {
+      "_source": {
+        "detected_message": "Test ignored by design",
+        "issue_type": "ti_ignored"
+      }
+    }
+  ]
+}

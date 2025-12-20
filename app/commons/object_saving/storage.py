@@ -25,14 +25,16 @@ def unify_path_separator(path: str) -> str:
 
 class Storage(metaclass=ABCMeta):
     _bucket_prefix: str
+    _bucket_postfix: str
 
     def __init__(self, app_config: ApplicationConfig) -> None:
-        self._bucket_prefix = app_config.bucketPrefix
+        self._bucket_prefix = app_config.datastoreBucketPrefix
+        self._bucket_postfix = app_config.datastoreBucketPostfix
 
     def _get_project_name(self, project_id: str | None) -> str:
         if not project_id:
             return ""
-        return self._bucket_prefix + project_id
+        return self._bucket_prefix + project_id + self._bucket_postfix
 
     @abstractmethod
     def remove_project_objects(self, path: str, object_names: list[str]) -> None:

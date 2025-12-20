@@ -80,7 +80,7 @@ class Predictor(metaclass=ABCMeta):
         """Execute the full prediction workflow.
 
         :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
-                                                                           from Elasticsearch
+                                                                           from OpenSearch
         :return: List of PredictionResult objects, one for each prediction
         """
         ...
@@ -156,7 +156,7 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
         """Execute the full prediction workflow.
 
         :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
-                                                                           from Elasticsearch
+                                                                           from OpenSearch
         :return: List of PredictionResult objects, one for each prediction
         """
         # Create and configure featurizer
@@ -169,7 +169,9 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
         model_info_tags = featurizer.get_used_model_info() + self.boosting_decision_maker.get_model_info()
 
         # If no feature data, return empty result
-        if not feature_data:
+        if feature_data:
+            LOGGER.debug(f"Feature data extracted for {len(feature_data)} items.")
+        else:
             LOGGER.debug("No feature data extracted, skipping prediction.")
             return []
 

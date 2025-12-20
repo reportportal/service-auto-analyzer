@@ -79,29 +79,31 @@ def merge_big_and_small_logs(
 
     log_ids_for_merged_logs = {}
     for log_level in log_level_messages["message"]:
-        if not log_level_ids_to_add[log_level] and log_level_messages["message"][log_level].strip():
-            log = log_level_ids_merged[log_level]
-            merged_logs_id = str(log["_id"]) + "_m"
-            new_log = _prepare_new_log(
-                log,
-                merged_logs_id,
-                True,
-                text_processing.compress(log_level_messages["message"][log_level]),
-                fields_to_clean=FIELDS_TO_CLEAN,
-            )
-            log_ids_for_merged_logs[merged_logs_id] = logs_ids_in_merged_logs[log_level]
-            for field in log_level_messages:
-                if field == "message":
-                    continue
-                if field == "whole_message":
-                    new_log["_source"][field] = log_level_messages[field][log_level]
-                else:
-                    new_log["_source"][field] = text_processing.compress(log_level_messages[field][log_level])
-            new_log["_source"]["found_exceptions_extended"] = text_processing.compress(
-                text_processing.enrich_found_exceptions(log_level_messages["found_exceptions"][log_level])
-            )
+        if log_level_ids_to_add[log_level] or not log_level_messages["message"][log_level].strip():
+            continue
 
-            new_logs.append(new_log)
+        log = log_level_ids_merged[log_level]
+        merged_logs_id = str(log["_id"]) + "_m"
+        new_log = _prepare_new_log(
+            log,
+            merged_logs_id,
+            True,
+            text_processing.compress(log_level_messages["message"][log_level]),
+            fields_to_clean=FIELDS_TO_CLEAN,
+        )
+        log_ids_for_merged_logs[merged_logs_id] = logs_ids_in_merged_logs[log_level]
+        for field in log_level_messages:
+            if field == "message":
+                continue
+            if field == "whole_message":
+                new_log["_source"][field] = log_level_messages[field][log_level]
+            else:
+                new_log["_source"][field] = text_processing.compress(log_level_messages[field][log_level])
+        new_log["_source"]["found_exceptions_extended"] = text_processing.compress(
+            text_processing.enrich_found_exceptions(log_level_messages["found_exceptions"][log_level])
+        )
+
+        new_logs.append(new_log)
     return new_logs, log_ids_for_merged_logs
 
 

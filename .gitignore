@@ -8,6 +8,8 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+.cursor/
+.vscode/
 .idea
 build/
 develop-eggs/
@@ -130,3 +132,7 @@ dmypy.json
 .pyre/
 
 /storage
+
+# AI agents config files
+AGENTS.md
+PROMPTS.md

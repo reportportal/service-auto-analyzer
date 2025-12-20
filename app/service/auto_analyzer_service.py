@@ -40,7 +40,8 @@ from app.machine_learning.predictor import AutoAnalysisPredictor, PredictionResu
 from app.service.analyzer_service import AnalyzerService
 from app.utils import text_processing, utils
 
-logger = logging.getLogger("analyzerApp.autoAnalyzerService")
+LOGGER = logging.getLogger("analyzerApp.autoAnalyzerService")
+
 SPECIAL_FIELDS_BOOST_SCORES = [
     ("detected_message_without_params_extended", 2.0),
     ("only_numbers", 2.0),
@@ -328,7 +329,7 @@ class AutoAnalyzerService(AnalyzerService):
             latest_item = None
             latest_date = None
             for obj in search_res["hits"]["hits"]:
-                logger.debug(
+                LOGGER.debug(
                     "%s %s %s", obj["_source"]["start_time"], obj["_source"]["issue_type"], obj["_source"]["test_item"]
                 )
                 start_time = datetime.strptime(obj["_source"]["start_time"], "%Y-%m-%d %H:%M:%S")
@@ -350,11 +351,11 @@ class AutoAnalyzerService(AnalyzerService):
         search_results = self.es_client.es_client.msearch(body="\n".join(batches) + "\n")
         partial_res = search_results["responses"] if search_results else []
         if not partial_res:
-            logger.warning("No search results for batches")
+            LOGGER.warning("No search results for batches")
             return []
         res_num = reduce(lambda a, b: a + b, [len(res["hits"]["hits"]) for res in partial_res], 0)
-        logger.info(f"Found {res_num} items by FTS (KNN)")
-        logger.debug(f"Items for analysis by FTS (KNN): {json.dumps(search_results)}")
+        LOGGER.info(f"Found {res_num} items by FTS (KNN)")
+        LOGGER.debug(f"Items for analysis by FTS (KNN): {json.dumps(search_results)}")
 
         avg_time_processed = (time() - t_start) / (len(partial_res) if partial_res else 1)
         analysis_candidates = []
@@ -389,7 +390,7 @@ class AutoAnalyzerService(AnalyzerService):
     def _should_stop_processing(self, test_items_processed: int) -> bool:
         """Check if we've reached the maximum number of test items to process."""
         if test_items_processed >= self.search_cfg.MaxAutoAnalysisItemsToProcess:
-            logger.info("Only first %d test items were taken", self.search_cfg.MaxAutoAnalysisItemsToProcess)
+            LOGGER.info("Only first %d test items were taken", self.search_cfg.MaxAutoAnalysisItemsToProcess)
             return True
         return False
 
@@ -464,15 +465,15 @@ class AutoAnalyzerService(AnalyzerService):
                 all_candidates.extend(batch_candidates)
 
         except Exception as exc:
-            logger.exception("Error in ES query", exc_info=exc)
+            LOGGER.exception("Error in ES query", exc_info=exc)
 
-        logger.info("Es queries finished %.2f s.", time() - t_start)
+        LOGGER.info("Es queries finished %.2f s.", time() - t_start)
         return all_candidates
 
     @utils.ignore_warnings
     def analyze_logs(self, launches: list[Launch]) -> list[AnalysisResult]:
         cnt_launches = len(launches)
-        logger.info(f"Started analysis for {cnt_launches} launches")
+        LOGGER.info(f"Started analysis for {cnt_launches} launches")
 
         analyzed_results_for_index = []
         t_start = time()
@@ -493,7 +494,7 @@ class AutoAnalyzerService(AnalyzerService):
             # Process candidates sequentially
             for (project_id, launch_id), analyzer_candidates in all_candidates_by_launch_and_project.items():
                 if not analyzer_candidates:
-                    logger.info(f"No candidates found for project {project_id}, launch {launch_id}")
+                    LOGGER.info(f"No candidates found for project {project_id}, launch {launch_id}")
                     continue
 
                 # Create predictor for auto analysis
@@ -555,7 +556,7 @@ class AutoAnalyzerService(AnalyzerService):
                             prediction_results = predictor.predict(candidates)
 
                             if not prediction_results:
-                                logger.debug(f"There are no results for test item {analyzer_candidate.testItemId}")
+                                LOGGER.debug(f"There are no results for test item {analyzer_candidate.testItemId}")
                                 continue
 
                             # Get model info tags from the first result (same for all results)
@@ -569,7 +570,7 @@ class AutoAnalyzerService(AnalyzerService):
                                 test_item_id = analyzer_candidate.testItemId
                                 relevant_test_item_id = result.data["mrHit"]["_source"]["test_item"]
                                 log_id = result.data["mrHit"]["_id"]
-                                logger.debug(
+                                LOGGER.debug(
                                     f"Most relevant ID for item '{test_item_id}' is '{relevant_test_item_id}', it has "
                                     f"issue type '{result.identity}', log ID '{log_id}' and probability: "
                                     + str(round(result.probability[1], 4))
@@ -577,7 +578,7 @@ class AutoAnalyzerService(AnalyzerService):
 
                             best = _choose_issue_type(prediction_results)
                             if not best:
-                                logger.debug(f"Test item {analyzer_candidate.testItemId} has no relevant items")
+                                LOGGER.debug(f"Test item {analyzer_candidate.testItemId} has no relevant items")
                                 continue
 
                             predicted_issue_type = best.identity
@@ -628,7 +629,7 @@ class AutoAnalyzerService(AnalyzerService):
 
                             results.append(analysis_result)
                             found_result = True
-                            logger.debug(analysis_result)
+                            LOGGER.debug(analysis_result)
 
                             if found_result:
                                 break
@@ -638,7 +639,7 @@ class AutoAnalyzerService(AnalyzerService):
                         results_to_share[launch_id]["processed_time"] += time() - t_start_item
 
                     except Exception as exc:
-                        logger.exception(
+                        LOGGER.exception(
                             f"Unable to process candidate for analysis {analyzer_candidate.testItemId}", exc_info=exc
                         )
                         if launch_id in results_to_share:
@@ -657,9 +658,9 @@ class AutoAnalyzerService(AnalyzerService):
                 amqp_client.close()
 
         except Exception as exc:
-            logger.exception("Unable to process analysis candidates", exc_info=exc)
+            LOGGER.exception("Unable to process analysis candidates", exc_info=exc)
 
-        logger.debug(f"Stats info: {json.dumps(results_to_share)}")
-        logger.info(f"Processed {cnt_items_to_process} test items. It took {time() - t_start:.2f} sec.")
-        logger.info(f"Finished analysis for {cnt_launches} launches with {len(results)} results.")
+        LOGGER.debug(f"Stats info: {json.dumps(results_to_share)}")
+        LOGGER.info(f"Processed {cnt_items_to_process} test items. It took {time() - t_start:.2f} sec.")
+        LOGGER.info(f"Finished analysis for {cnt_launches} launches with {len(results)} results.")
         return results

@@ -58,9 +58,9 @@ class TestModelChooserChooseModel:
     def app_config(self, temp_dir: str) -> ApplicationConfig:
         """Create test ApplicationConfig with filesystem storage."""
         return ApplicationConfig(
-            binaryStoreType="filesystem",
+            datastoreType="filesystem",
             filesystemDefaultPath=temp_dir,
-            bucketPrefix="test-",
+            datastoreBucketPrefix="test-",
         )
 
     @pytest.fixture(scope="session")

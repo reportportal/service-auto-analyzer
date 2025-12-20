@@ -28,7 +28,7 @@ def create_storage_client(path, bucket_prefix=None):
     if bucket_prefix is None:
         return FilesystemSaver(ApplicationConfig(filesystemDefaultPath=path))
     else:
-        return FilesystemSaver(ApplicationConfig(filesystemDefaultPath=path, bucketPrefix=bucket_prefix))
+        return FilesystemSaver(ApplicationConfig(filesystemDefaultPath=path, datastoreBucketPrefix=bucket_prefix))
 
 
 def test_object_not_exists():

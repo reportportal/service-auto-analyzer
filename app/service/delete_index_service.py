@@ -13,37 +13,55 @@
 #  limitations under the License.
 
 from time import time
+from typing import Optional
 
-from app.commons import logging, namespace_finder, trigger_manager
+from app.commons import logging
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model_chooser import ModelChooser
-from app.utils import text_processing, utils
+from app.commons.namespace_finder import NamespaceFinder
+from app.commons.trigger_manager import TriggerManager
+from app.utils import text_processing
 
-logger = logging.getLogger("analyzerApp.deleteIndexService")
+LOGGER = logging.getLogger("analyzerApp.deleteIndexService")
 
 
 class DeleteIndexService:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
-    namespace_finder: namespace_finder.NamespaceFinder
-    trigger_manager: trigger_manager.TriggerManager
+    namespace_finder: NamespaceFinder
+    trigger_manager: TriggerManager
     es_client: EsClient
     model_chooser: ModelChooser
 
-    def __init__(self, model_chooser: ModelChooser, app_config: ApplicationConfig, search_cfg: SearchConfig):
+    def __init__(
+        self,
+        model_chooser: ModelChooser,
+        app_config: ApplicationConfig,
+        search_cfg: SearchConfig,
+        *,
+        es_client: Optional[EsClient] = None,
+        namespace_finder: Optional[NamespaceFinder] = None,
+        trigger_manager: Optional[TriggerManager] = None,
+    ):
+        """Initialize DeleteIndexService
+
+        :param model_chooser: Model chooser instance
+        :param app_config: Application configuration object
+        :param search_cfg: Search configuration object
+        :param es_client: Optional EsClient instance. If not provided, a new one will be created.
+        """
+        self.model_chooser = model_chooser
         self.app_config = app_config
         self.search_cfg = search_cfg
-        self.namespace_finder = namespace_finder.NamespaceFinder(self.app_config)
-        self.trigger_manager = trigger_manager.TriggerManager(
+        self.es_client = es_client or EsClient(app_config=self.app_config)
+        self.namespace_finder = namespace_finder or NamespaceFinder(self.app_config)
+        self.trigger_manager = trigger_manager or TriggerManager(
             model_chooser, app_config=self.app_config, search_cfg=self.search_cfg
         )
-        self.es_client = EsClient(app_config=self.app_config)
-        self.model_chooser = model_chooser
 
-    @utils.ignore_warnings
     def delete_index(self, index_name: int) -> int:
-        logger.info("Started deleting index")
+        LOGGER.info("Started deleting index")
         t_start = time()
         is_index_deleted = self.es_client.delete_index(
             text_processing.unite_project_name(index_name, self.app_config.esProjectIndexPrefix)
@@ -51,5 +69,5 @@ class DeleteIndexService:
         self.namespace_finder.remove_namespaces(index_name)
         self.trigger_manager.delete_triggers(index_name)
         self.model_chooser.delete_all_custom_models(index_name)
-        logger.info("Finished deleting index %.2f s", time() - t_start)
+        LOGGER.info("Finished deleting index %.2f s", time() - t_start)
         return int(is_index_deleted)

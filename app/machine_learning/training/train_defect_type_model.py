@@ -18,8 +18,8 @@ from datetime import datetime
 from time import sleep, time
 from typing import Any, Optional, Type
 
-import elasticsearch.helpers
 import numpy as np
+import opensearchpy.helpers
 import scipy.stats as stats
 from pydantic import BaseModel
 from sklearn.model_selection import train_test_split
@@ -59,16 +59,17 @@ def return_similar_objects_into_sample(
     for idx, ind in enumerate(x_train_ind):
         x_train.append(data[ind][0])
         label_to_use = y_train[idx]
-        if ind in additional_logs and label_to_use != 1:
+        if ind not in additional_logs:
+            continue
+        if label_to_use != 1:
             for idx_ in additional_logs[ind]:
                 _, label_res, _ = data[idx_]
                 if label_res == label:
                     label_to_use = 1
                     break
-        if ind in additional_logs:
-            for idx_ in additional_logs[ind]:
-                x_train_add.append(data[idx_][0])
-                y_train_add.append(label_to_use)
+        for idx_ in additional_logs[ind]:
+            x_train_add.append(data[idx_][0])
+            y_train_add.append(label_to_use)
     x_train.extend(x_train_add)
     y_train.extend(y_train_add)
     return x_train, y_train
@@ -160,8 +161,8 @@ def train_several_times(
             new_model.train_model(label, x_train, y_train, random_state)
             LOGGER.debug("New model results")
             new_model_results.append(new_model.validate_model(label, x_test, y_test))
-            LOGGER.debug("Baseline model results")
             if baseline_model:
+                LOGGER.debug("Baseline model results")
                 baseline_model_results.append(baseline_model.validate_model(label, x_test, y_test))
             else:
                 baseline_model_results.append(0.0)
@@ -200,10 +201,12 @@ class DefectTypeModelTraining:
         search_cfg: SearchConfig,
         model_chooser: Optional[ModelChooser] = None,
         model_class: Optional[Type[DefectTypeModel]] = None,
+        *,
+        es_client: Optional[EsClient] = None,
     ) -> None:
         self.app_config = app_config
         self.search_cfg = search_cfg
-        self.es_client = EsClient(app_config=app_config)
+        self.es_client = es_client or EsClient(app_config=app_config)
         if search_cfg.GlobalDefectTypeModelFolder:
             self.baseline_model = DefectTypeModel(
                 object_saving.create_filesystem(search_cfg.GlobalDefectTypeModelFolder)
@@ -248,7 +251,7 @@ class DefectTypeModelTraining:
         query_result = []
         while error_count <= RETRY_COUNT:
             try:
-                query_result = elasticsearch.helpers.scan(
+                query_result = opensearchpy.helpers.scan(
                     self.es_client.es_client,
                     query=self.get_messages_by_issue_type(query),
                     index=project_index_name,

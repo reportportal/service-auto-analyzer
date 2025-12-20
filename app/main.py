@@ -16,9 +16,10 @@ import json
 import logging.config
 import os
 import threading
+import warnings
 from signal import SIGINT, signal
 from sys import exit
-from typing import Any
+from typing import Any, Optional
 
 from flask import Flask, Response
 from flask_cors import CORS
@@ -32,25 +33,165 @@ from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType
 from app.utils import utils
 
+
+def to_bool(value: Optional[Any]) -> Optional[bool]:
+    """Convert value of any type to boolean or raise ValueError.
+
+    :param value: value to convert
+    :return: boolean value
+    :raises ValueError: if value is not boolean
+    """
+    if value is None or value == "":
+        return None
+    if value in {"TRUE", "True", "true", "1", "Y", "y", True}:
+        return True
+    if value in {"FALSE", "False", "false", "0", "N", "n", False}:
+        return False
+    raise ValueError(f"Invalid boolean value {value}.")
+
+
+# Handle all datastore type settings, old and new
+datastore_type = os.getenv("DATASTORE_TYPE")
+old_datastore_type = os.getenv("ANALYZER_BINSTORE_TYPE")
+if old_datastore_type:
+    warnings.warn(
+        "'ANALYZER_BINSTORE_TYPE' configuration variable is deprecated, use 'DATASTORE_TYPE' instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    if not datastore_type:
+        datastore_type = os.getenv("DATASTORE_TYPE")
+    old_datastore_type = None
+old_datastore_type = os.getenv("ANALYZER_BINARYSTORE_TYPE")
+if old_datastore_type:
+    warnings.warn(
+        "'ANALYZER_BINARYSTORE_TYPE' configuration variable is deprecated, use 'DATASTORE_TYPE' instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    if not datastore_type:
+        datastore_type = old_datastore_type
+if not datastore_type:
+    datastore_type = "filesystem"
+
+
+# Handle all datastore endpoint settings, old and new
+datastore_endpoint = os.getenv("DATASTORE_ENDPOINT")
+minio_short_host = os.getenv("MINIO_SHORT_HOST")
+if minio_short_host:
+    warnings.warn(
+        "'MINIO_SHORT_HOST' configuration variable is deprecated, use 'DATASTORE_ENDPOINT' instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+minio_use_tls = os.getenv("MINIO_USE_TLS")
+if minio_use_tls:
+    warnings.warn(
+        "'MINIO_USE_TLS' configuration variable is deprecated, use 'DATASTORE_ENDPOINT' instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+if not datastore_endpoint and minio_short_host:
+    use_tls = to_bool(minio_use_tls)
+    datastore_endpoint = f"http{'s' if use_tls else ''}://{minio_short_host}"
+
+# Handle all datastore region settings, old and new
+datastore_region = os.getenv("DATASTORE_REGION")
+old_datastore_region = os.getenv("ANALYZER_BINSTORE_MINIO_REGION")
+if old_datastore_region:
+    warnings.warn(
+        "'ANALYZER_BINSTORE_MINIO_REGION' configuration variable is deprecated, use 'DATASTORE_REGION' instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    if not datastore_region:
+        datastore_region = old_datastore_region
+    old_datastore_region = None
+old_datastore_region = os.getenv("ANALYZER_BINARYSTORE_MINIO_REGION")
+if old_datastore_region:
+    warnings.warn(
+        "'ANALYZER_BINARYSTORE_MINIO_REGION' configuration variable is deprecated, use 'DATASTORE_REGION' instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    if not datastore_region:
+        datastore_region = old_datastore_region
+
+# Handle all datastore bucket prefix settings, old and new
+datastore_default_bucket_name = os.getenv("DATASTORE_DEFAULTBUCKETNAME")
+datastore_bucket_prefix = os.getenv("DATASTORE_BUCKETPREFIX")
+old_datastore_bucketprefix = os.getenv("ANALYZER_BINSTORE_BUCKETPREFIX")
+if old_datastore_bucketprefix:
+    warnings.warn(
+        "'ANALYZER_BINSTORE_BUCKETPREFIX' configuration variable is deprecated, use 'DATASTORE_BUCKETPREFIX' instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    if not datastore_bucket_prefix:
+        datastore_bucket_prefix = old_datastore_bucketprefix
+    old_datastore_bucketprefix = None
+old_datastore_bucketprefix = os.getenv("ANALYZER_BINARYSTORE_BUCKETPREFIX")
+if old_datastore_bucketprefix:
+    warnings.warn(
+        "'ANALYZER_BINARYSTORE_BUCKETPREFIX' configuration variable is deprecated, use 'DATASTORE_BUCKETPREFIX' "
+        "instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    if not datastore_bucket_prefix:
+        datastore_bucket_prefix = old_datastore_bucketprefix
+if datastore_default_bucket_name:
+    if datastore_bucket_prefix:
+        datastore_bucket_prefix = f"{datastore_default_bucket_name}/{datastore_bucket_prefix}"
+    else:
+        datastore_bucket_prefix = datastore_default_bucket_name
+else:
+    if not datastore_bucket_prefix:
+        datastore_bucket_prefix = "prj-"
+
+datastore_bucket_postfix = os.getenv("DATASTORE_BUCKETPOSTFIX", "")
+
+# Handle all datastore access key settings, old and new
+datastore_access_key = os.getenv("DATASTORE_ACCESSKEY")
+minio_access_key = os.getenv("MINIO_ACCESS_KEY")
+if minio_access_key:
+    warnings.warn(
+        "'MINIO_ACCESS_KEY' configuration variable is deprecated, use 'DATASTORE_ACCESSKEY' instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    if not datastore_access_key:
+        datastore_access_key = minio_access_key
+
+# Handle all datastore secret key settings, old and new
+datastore_secret_key = os.getenv("DATASTORE_SECRETKEY")
+minio_secret_key = os.getenv("MINIO_SECRET_KEY")
+if minio_secret_key:
+    warnings.warn(
+        "'MINIO_SECRET_KEY' configuration variable is deprecated, use 'DATASTORE_SECRETKEY' instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    if not datastore_secret_key:
+        datastore_secret_key = minio_secret_key
+
+
 APP_CONFIG = ApplicationConfig(
     # ES/OS settings
     # Mute Sonar about hardcoded HTTP URL, since this is a hostname inside a docker-compose file
-    esHost=os.getenv("ES_HOSTS", "http://elasticsearch:9200").strip("/").strip("\\"),  # NOSONAR
+    esHost=os.getenv("ES_HOSTS", "http://opensearch:9200").strip("/").strip("\\"),  # NOSONAR
     esUser=os.getenv("ES_USER", "").strip(),
     esPassword=os.getenv("ES_PASSWORD", "").strip(),
-    esUseSsl=json.loads(os.getenv("ES_USE_SSL", "false").lower()),
-    esVerifyCerts=json.loads(os.getenv("ES_VERIFY_CERTS", "false").lower()),
-    esSslShowWarn=json.loads(os.getenv("ES_SSL_SHOW_WARN", "false").lower()),
+    esUseSsl=to_bool(os.getenv("ES_USE_SSL", "false")),
+    esVerifyCerts=to_bool(os.getenv("ES_VERIFY_CERTS", "false")),
+    esSslShowWarn=to_bool(os.getenv("ES_SSL_SHOW_WARN", "false")),
     esCAcert=os.getenv("ES_CA_CERT", ""),
     esClientCert=os.getenv("ES_CLIENT_CERT", ""),
     esClientKey=os.getenv("ES_CLIENT_KEY", ""),
-    turnOffSslVerification=json.loads(os.getenv("ES_TURN_OFF_SSL_VERIFICATION", "false").lower()),
+    turnOffSslVerification=to_bool(os.getenv("ES_TURN_OFF_SSL_VERIFICATION", "false")),
     esChunkNumber=int(os.getenv("ES_CHUNK_NUMBER", "1000")),
     esChunkNumberUpdateClusters=int(os.getenv("ES_CHUNK_NUMBER_UPDATE_CLUSTERS", "500")),
     esProjectIndexPrefix=os.getenv("ES_PROJECT_INDEX_PREFIX", "").strip(),
-    # Debug settings
-    logLevel=os.getenv("LOGGING_LEVEL", "DEBUG").strip(),
-    debugMode=json.loads(os.getenv("DEBUG_MODE", "false").lower()),
     # AMQP settings
     amqpUrl=os.getenv("AMQP_URL", "").strip("/").strip("\\") + "/" + os.getenv("AMQP_VIRTUAL_HOST", "analyzer"),
     amqpExchangeName=os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
@@ -61,22 +202,27 @@ APP_CONFIG = ApplicationConfig(
     amqpHandlerMaxRetries=int(os.getenv("AMQP_HANDLER_MAX_RETRIES", "3")),
     amqpHandlerTaskTimeout=int(os.getenv("AMQP_HANDLER_TASK_TIMEOUT", "600")),
     analyzerPriority=int(os.getenv("ANALYZER_PRIORITY", "1")),
-    analyzerIndex=json.loads(os.getenv("ANALYZER_INDEX", "true").lower()),
-    analyzerLogSearch=json.loads(os.getenv("ANALYZER_LOG_SEARCH", "true").lower()),
-    analyzerSuggest=json.loads(os.getenv("ANALYZER_SUGGEST", "true").lower()),
-    analyzerCluster=json.loads(os.getenv("ANALYZER_CLUSTER", "true").lower()),
-    minioHost=os.getenv("MINIO_SHORT_HOST", "minio:9000"),
-    minioAccessKey=os.getenv("MINIO_ACCESS_KEY", "minio"),
-    minioSecretKey=os.getenv("MINIO_SECRET_KEY", "minio123"),
-    minioUseTls=json.loads(os.getenv("MINIO_USE_TLS", "false").lower()),
+    analyzerIndex=to_bool(os.getenv("ANALYZER_INDEX", "true")),
+    analyzerLogSearch=to_bool(os.getenv("ANALYZER_LOG_SEARCH", "true")),
+    analyzerSuggest=to_bool(os.getenv("ANALYZER_SUGGEST", "true")),
+    analyzerCluster=to_bool(os.getenv("ANALYZER_CLUSTER", "true")),
     appVersion="",
-    binaryStoreType=os.getenv("ANALYZER_BINSTORE_TYPE", os.getenv("ANALYZER_BINARYSTORE_TYPE", "filesystem")),
-    bucketPrefix=os.getenv("ANALYZER_BINSTORE_BUCKETPREFIX", os.getenv("ANALYZER_BINARYSTORE_BUCKETPREFIX", "prj-")),
-    minioRegion=os.getenv("ANALYZER_BINSTORE_MINIO_REGION", os.getenv("ANALYZER_BINARYSTORE_MINIO_REGION", None)),
-    instanceTaskType=os.getenv("INSTANCE_TASK_TYPE", "").strip(),
+    # Storage settings
+    datastoreType=datastore_type,
+    datastoreEndpoint=datastore_endpoint,
+    datastoreRegion=datastore_region,
+    datastoreBucketPrefix=datastore_bucket_prefix,
+    datastoreBucketPostfix=datastore_bucket_postfix,
+    datastoreAccessKey=datastore_access_key,
+    datastoreSecretKey=datastore_secret_key,
     filesystemDefaultPath=os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
+    # HTTP endpoint settings
     analyzerHttpPort=int(os.getenv("ANALYZER_HTTP_PORT", "5001")),
+    # Log settings
     analyzerPathToLog=os.getenv("ANALYZER_FILE_LOGGING_PATH", "/tmp/config.log"),
+    logLevel=os.getenv("LOGGING_LEVEL", "DEBUG").strip(),
+    # Debug settings, controls if AMQP handler runs in threaded mode to ease debugging
+    debugMode=to_bool(os.getenv("DEBUG_MODE", "false")),
 )
 
 SEARCH_CONFIG = SearchConfig(
@@ -109,7 +255,7 @@ SEARCH_CONFIG = SearchConfig(
 def create_application():
     """Creates a Flask application"""
     _application = Flask(__name__)
-    CORS(_application)
+    CORS(_application, resources={r"/*": {"origins": "*", "send_wildcard": "False"}})
     CSRFProtect(_application)
     return _application
 
@@ -245,7 +391,7 @@ def get_health_status():
     status_code = 200
     if not es_client.is_healthy():
         logger.error("Analyzer health check status failed: %s", status)
-        status["status"] = "Elasticsearch is not healthy"
+        status["status"] = "OpenSearch is not healthy"
         status_code = 503
     if THREADS:
         status["threads"] = []

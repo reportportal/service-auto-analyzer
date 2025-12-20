@@ -1,0 +1,341 @@
+{
+  "launch_info_for_clustering": {
+    "launch": {
+      "launchId": 5001,
+      "project": 555,
+      "launchName": "Test Launch for Clustering",
+      "launchNumber": 1,
+      "previousLaunchId": 5000,
+      "launchStartTime": [2025, 10, 10, 12, 0, 0, 0],
+      "analyzerConfig": {
+        "analyzerMode": "ALL",
+        "minShouldMatch": 80,
+        "numberOfLogLines": 5,
+        "isAutoAnalyzerEnabled": true,
+        "indexingRunning": true,
+        "allMessagesShouldMatch": false,
+        "searchLogsMinShouldMatch": 95,
+        "uniqueErrorsMinShouldMatch": 80
+      },
+      "testItems": [
+        {
+          "testItemId": 6001,
+          "isAutoAnalyzed": false,
+          "uniqueId": "unique-6001",
+          "issueType": "",
+          "testItemName": "Test Item 1",
+          "logs": [
+            {
+              "logId": 7001,
+              "logLevel": 40000,
+              "message": "java.lang.NullPointerException: Cannot invoke method on null object\nStacktrace:\n  at com.example.service.DataService.processData(DataService.java:123)\n  at com.example.controller.DataController.handleData(DataController.java:456)",
+              "clusterId": 0,
+              "clusterMessage": ""
+            },
+            {
+              "logId": 7002,
+              "logLevel": 40000,
+              "message": "java.lang.NullPointerException: Object reference is null\nStacktrace:\n  at com.example.service.DataService.processData(DataService.java:125)\n  at com.example.controller.DataController.handleData(DataController.java:456)",
+              "clusterId": 0,
+              "clusterMessage": ""
+            }
+          ]
+        },
+        {
+          "testItemId": 6002,
+          "isAutoAnalyzed": false,
+          "uniqueId": "unique-6002",
+          "issueType": "",
+          "testItemName": "Test Item 2",
+          "logs": [
+            {
+              "logId": 7003,
+              "logLevel": 40000,
+              "message": "java.lang.NullPointerException: Cannot invoke method on null object\nStacktrace:\n  at com.example.service.DataService.processData(DataService.java:124)\n  at com.example.controller.DataController.handleData(DataController.java:456)",
+              "clusterId": 0,
+              "clusterMessage": ""
+            }
+          ]
+        },
+        {
+          "testItemId": 6003,
+          "isAutoAnalyzed": false,
+          "uniqueId": "unique-6003",
+          "issueType": "",
+          "testItemName": "Test Item 3",
+          "logs": [
+            {
+              "logId": 7004,
+              "logLevel": 40000,
+              "message": "java.sql.SQLException: Database connection timeout\nStacktrace:\n  at org.hibernate.engine.jdbc.ConnectionManager.getConnection(ConnectionManager.java:789)\n  at org.hibernate.engine.jdbc.QueryExecutor.execute(QueryExecutor.java:234)",
+              "clusterId": 0,
+              "clusterMessage": ""
+            }
+          ]
+        }
+      ]
+    },
+    "project": 555,
+    "forUpdate": false,
+    "numberOfLogLines": 5,
+    "cleanNumbers": false
+  },
+  "scan_results_for_prepared_logs": [
+    {
+      "_id": "7001",
+      "_index": "rp_555",
+      "_source": {
+        "launch_id": 5001,
+        "test_item": "6001",
+        "unique_id": "unique-6001",
+        "message": "NullPointerException Cannot invoke method null object DataService.processData DataController.handleData",
+        "message_lines": 5,
+        "message_words_number": 12,
+        "whole_message": "java.lang.NullPointerException: Cannot invoke method on null object\nStacktrace:\n  at com.example.service.DataService.processData(DataService.java:123)\n  at com.example.controller.DataController.handleData(DataController.java:456)",
+        "detected_message": "NullPointerException Cannot invoke method null object",
+        "stacktrace": "com.example.service.DataService.processData com.example.controller.DataController.handleData",
+        "found_exceptions": "java.lang.NullPointerException",
+        "potential_status_codes": "",
+        "is_merged": false,
+        "cluster_id": "",
+        "cluster_message": "",
+        "cluster_with_numbers": false,
+        "issue_type": "PB001",
+        "log_level": 40000,
+        "merged_small_logs": ""
+      }
+    },
+    {
+      "_id": "7002",
+      "_index": "rp_555",
+      "_source": {
+        "launch_id": 5001,
+        "test_item": "6001",
+        "unique_id": "unique-6001",
+        "message": "NullPointerException Object reference null DataService.processData DataController.handleData",
+        "message_lines": 5,
+        "message_words_number": 11,
+        "whole_message": "java.lang.NullPointerException: Object reference is null\nStacktrace:\n  at com.example.service.DataService.processData(DataService.java:125)\n  at com.example.controller.DataController.handleData(DataController.java:456)",
+        "detected_message": "NullPointerException Object reference null",
+        "stacktrace": "com.example.service.DataService.processData com.example.controller.DataController.handleData",
+        "found_exceptions": "java.lang.NullPointerException",
+        "potential_status_codes": "",
+        "is_merged": false,
+        "cluster_id": "",
+        "cluster_message": "",
+        "cluster_with_numbers": false,
+        "issue_type": "PB001",
+        "log_level": 40000,
+        "merged_small_logs": ""
+      }
+    },
+    {
+      "_id": "7003",
+      "_index": "rp_555",
+      "_source": {
+        "launch_id": 5001,
+        "test_item": "6002",
+        "unique_id": "unique-6002",
+        "message": "NullPointerException Cannot invoke method null object DataService.processData DataController.handleData",
+        "message_lines": 5,
+        "message_words_number": 12,
+        "whole_message": "java.lang.NullPointerException: Cannot invoke method on null object\nStacktrace:\n  at com.example.service.DataService.processData(DataService.java:124)\n  at com.example.controller.DataController.handleData(DataController.java:456)",
+        "detected_message": "NullPointerException Cannot invoke method null object",
+        "stacktrace": "com.example.service.DataService.processData com.example.controller.DataController.handleData",
+        "found_exceptions": "java.lang.NullPointerException",
+        "potential_status_codes": "",
+        "is_merged": false,
+        "cluster_id": "",
+        "cluster_message": "",
+        "cluster_with_numbers": false,
+        "issue_type": "PB001",
+        "log_level": 40000,
+        "merged_small_logs": ""
+      }
+    },
+    {
+      "_id": "7004",
+      "_index": "rp_555",
+      "_source": {
+        "launch_id": 5001,
+        "test_item": "6003",
+        "unique_id": "unique-6003",
+        "message": "SQLException Database connection timeout ConnectionManager.getConnection QueryExecutor.execute",
+        "message_lines": 5,
+        "message_words_number": 10,
+        "whole_message": "java.sql.SQLException: Database connection timeout\nStacktrace:\n  at org.hibernate.engine.jdbc.ConnectionManager.getConnection(ConnectionManager.java:789)\n  at org.hibernate.engine.jdbc.QueryExecutor.execute(QueryExecutor.java:234)",
+        "detected_message": "SQLException Database connection timeout",
+        "stacktrace": "org.hibernate.engine.jdbc.ConnectionManager.getConnection org.hibernate.engine.jdbc.QueryExecutor.execute",
+        "found_exceptions": "java.sql.SQLException",
+        "potential_status_codes": "",
+        "is_merged": false,
+        "cluster_id": "",
+        "cluster_message": "",
+        "cluster_with_numbers": false,
+        "issue_type": "SI001",
+        "log_level": 40000,
+        "merged_small_logs": ""
+      }
+    }
+  ],
+  "search_results_for_similar_items": {
+    "hits": {
+      "total": {
+        "value": 2,
+        "relation": "eq"
+      },
+      "max_score": 9.5,
+      "hits": [
+        {
+          "_id": "8001",
+          "_index": "rp_555",
+          "_score": 9.5,
+          "_source": {
+            "launch_id": 5000,
+            "test_item": "6100",
+            "unique_id": "unique-6100",
+            "whole_message": "java.lang.NullPointerException: Cannot invoke method on null object\nStacktrace:\n  at com.example.service.DataService.processData(DataService.java:120)\n  at com.example.controller.DataController.handleData(DataController.java:450)",
+            "detected_message": "NullPointerException Cannot invoke method null object",
+            "found_exceptions": "java.lang.NullPointerException",
+            "potential_status_codes": "",
+            "is_merged": false,
+            "cluster_id": "12345678901",
+            "cluster_message": "java.lang.NullPointerException: Cannot invoke method on null object at DataService.processData",
+            "cluster_with_numbers": false,
+            "issue_type": "PB001",
+            "log_level": 40000
+          }
+        },
+        {
+          "_id": "8002",
+          "_index": "rp_555",
+          "_score": 9.2,
+          "_source": {
+            "launch_id": 5001,
+            "test_item": "6004",
+            "unique_id": "unique-6004",
+            "whole_message": "java.lang.NullPointerException: Cannot invoke method on null\nStacktrace:\n  at com.example.service.DataService.processData(DataService.java:122)\n  at com.example.controller.DataController.handleData(DataController.java:455)",
+            "detected_message": "NullPointerException Cannot invoke method null",
+            "found_exceptions": "java.lang.NullPointerException",
+            "potential_status_codes": "",
+            "is_merged": false,
+            "cluster_id": "12345678901",
+            "cluster_message": "java.lang.NullPointerException: Cannot invoke method on null object at DataService.processData",
+            "cluster_with_numbers": false,
+            "issue_type": "PB001",
+            "log_level": 40000
+          }
+        }
+      ]
+    }
+  },
+  "search_results_no_similar_items": {
+    "hits": {
+      "total": {
+        "value": 0,
+        "relation": "eq"
+      },
+      "max_score": null,
+      "hits": []
+    }
+  },
+  "launch_info_for_update": {
+    "launch": {
+      "launchId": 5001,
+      "project": 555,
+      "launchName": "Test Launch for Update",
+      "launchNumber": 1,
+      "previousLaunchId": 5000,
+      "launchStartTime": [2025, 10, 10, 12, 0, 0, 0],
+      "analyzerConfig": {
+        "analyzerMode": "ALL",
+        "minShouldMatch": 80,
+        "numberOfLogLines": 5,
+        "isAutoAnalyzerEnabled": true,
+        "indexingRunning": true,
+        "allMessagesShouldMatch": false,
+        "searchLogsMinShouldMatch": 95,
+        "uniqueErrorsMinShouldMatch": 80
+      },
+      "testItems": [
+        {
+          "testItemId": 6005,
+          "isAutoAnalyzed": false,
+          "uniqueId": "unique-6005",
+          "issueType": "",
+          "testItemName": "Test Item for Update",
+          "logs": [
+            {
+              "logId": 7010,
+              "logLevel": 40000,
+              "message": "java.io.IOException: File not found\nStacktrace:\n  at java.io.FileInputStream.open(FileInputStream.java:146)\n  at com.example.service.FileService.readFile(FileService.java:23)",
+              "clusterId": 0,
+              "clusterMessage": ""
+            }
+          ]
+        }
+      ]
+    },
+    "project": 555,
+    "forUpdate": true,
+    "numberOfLogLines": 5,
+    "cleanNumbers": false
+  },
+  "scan_results_for_update": [
+    {
+      "_id": "7010",
+      "_index": "rp_555",
+      "_source": {
+        "launch_id": 5001,
+        "test_item": "6005",
+        "unique_id": "unique-6005",
+        "message": "IOException File not found FileInputStream.open FileService.readFile",
+        "message_lines": 4,
+        "message_words_number": 9,
+        "whole_message": "java.io.IOException: File not found\nStacktrace:\n  at java.io.FileInputStream.open(FileInputStream.java:146)\n  at com.example.service.FileService.readFile(FileService.java:23)",
+        "detected_message": "IOException File not found",
+        "stacktrace": "java.io.FileInputStream.open com.example.service.FileService.readFile",
+        "found_exceptions": "java.io.IOException",
+        "potential_status_codes": "",
+        "is_merged": false,
+        "cluster_id": "",
+        "cluster_message": "",
+        "cluster_with_numbers": false,
+        "issue_type": "AB001",
+        "log_level": 40000,
+        "merged_small_logs": ""
+      }
+    }
+  ],
+  "search_results_for_update": {
+    "hits": {
+      "total": {
+        "value": 1,
+        "relation": "eq"
+      },
+      "max_score": 8.8,
+      "hits": [
+        {
+          "_id": "8010",
+          "_index": "rp_555",
+          "_score": 8.8,
+          "_source": {
+            "launch_id": 5001,
+            "test_item": "6006",
+            "unique_id": "unique-6006",
+            "whole_message": "java.io.IOException: File not found exception\nStacktrace:\n  at java.io.FileInputStream.open(FileInputStream.java:145)",
+            "detected_message": "IOException File not found exception",
+            "found_exceptions": "java.io.IOException",
+            "potential_status_codes": "",
+            "is_merged": false,
+            "cluster_id": "98765432101",
+            "cluster_message": "java.io.IOException: File not found at FileInputStream.open",
+            "cluster_with_numbers": false,
+            "issue_type": "AB001",
+            "log_level": 40000
+          }
+        }
+      ]
+    }
+  }
+}

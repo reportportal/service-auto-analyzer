@@ -13,16 +13,16 @@
 #  limitations under the License.
 
 from time import time
+from typing import Optional
 
-import elasticsearch
-import elasticsearch.helpers
+import opensearchpy.helpers
 
 from app.commons import logging
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig, SuggestPattern, SuggestPatternLabel
 from app.utils import text_processing, utils
 
-logger = logging.getLogger("analyzerApp.suggestPatternsService")
+LOGGER = logging.getLogger("analyzerApp.suggestPatternsService")
 
 
 class SuggestPatternsService:
@@ -30,12 +30,18 @@ class SuggestPatternsService:
     search_cfg: SearchConfig
     es_client: EsClient
 
-    def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig):
+    def __init__(self, app_config: ApplicationConfig, search_cfg: SearchConfig, es_client: Optional[EsClient] = None):
+        """Initialize SuggestPatternsService
+
+        :param app_config: Application configuration object
+        :param search_cfg: Search configuration object
+        :param es_client: Optional EsClient instance. If not provided, a new one will be created.
+        """
         self.app_config = app_config
         self.search_cfg = search_cfg
-        self.es_client = EsClient(app_config=self.app_config)
+        self.es_client = es_client or EsClient(app_config=self.app_config)
 
-    def query_data(self, project, label):
+    def query_data(self, project: str, label: str) -> list[tuple[str, str]]:
         data = []
         query = {
             "_source": ["detected_message", "issue_type"],
@@ -47,9 +53,7 @@ class SuggestPatternsService:
                         {
                             "bool": {
                                 "should": [
-                                    {"wildcard": {"issue_type": "{}*".format(label.upper())}},
-                                    {"wildcard": {"issue_type": "{}*".format(label.lower())}},
-                                    {"wildcard": {"issue_type": "{}*".format(label)}},
+                                    {"wildcard": {"issue_type": "{}*".format(label)}, "case_insensitive": True},
                                 ]
                             }
                         }
@@ -58,11 +62,11 @@ class SuggestPatternsService:
             },
         }
         utils.append_aa_ma_boosts(query, self.search_cfg)
-        for d in elasticsearch.helpers.scan(self.es_client.es_client, index=project, query=query):
+        for d in opensearchpy.helpers.scan(self.es_client.es_client, index=project, query=query):
             data.append((d["_source"]["detected_message"], d["_source"]["issue_type"]))
         return data
 
-    def get_patterns_with_labels(self, exceptions_with_labels):
+    def get_patterns_with_labels(self, exceptions_with_labels: dict) -> list[SuggestPatternLabel]:
         min_count = self.search_cfg.PatternLabelMinCountToSuggest
         min_percent = self.search_cfg.PatternLabelMinPercentToSuggest
         suggested_patterns_with_labels = []
@@ -82,7 +86,7 @@ class SuggestPatternsService:
                     )
         return suggested_patterns_with_labels
 
-    def get_patterns_without_labels(self, all_exceptions):
+    def get_patterns_without_labels(self, all_exceptions: dict) -> list[SuggestPatternLabel]:
         suggested_patterns_without_labels = []
         for exception in all_exceptions:
             if all_exceptions[exception] >= self.search_cfg.PatternMinCountToSuggest:
@@ -91,10 +95,9 @@ class SuggestPatternsService:
                 )
         return suggested_patterns_without_labels
 
-    @utils.ignore_warnings
-    def suggest_patterns(self, project_id):
+    def suggest_patterns(self, project_id: int) -> SuggestPattern:
         index_name = text_processing.unite_project_name(project_id, self.app_config.esProjectIndexPrefix)
-        logger.info("Started suggesting patterns for project '%s'", index_name)
+        LOGGER.info("Started suggesting patterns for project '%s'", index_name)
         t_start = time()
         found_data = []
         exceptions_with_labels = {}
@@ -118,7 +121,7 @@ class SuggestPatternsService:
                         exceptions_with_labels[exception][label] += 1
         suggested_patterns_with_labels = self.get_patterns_with_labels(exceptions_with_labels)
         suggested_patterns_without_labels = self.get_patterns_without_labels(all_exceptions)
-        logger.info("Finished suggesting patterns %.2f s", time() - t_start)
+        LOGGER.info("Finished suggesting patterns %.2f s", time() - t_start)
         return SuggestPattern(
             suggestionsWithLabels=suggested_patterns_with_labels,
             suggestionsWithoutLabels=suggested_patterns_without_labels,

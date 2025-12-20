@@ -17,6 +17,7 @@ from typing import Any, Callable
 
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig
+from app.commons.object_saving.boto3_client import Boto3Client
 from app.commons.object_saving.filesystem_saver import FilesystemSaver
 from app.commons.object_saving.minio_client import MinioClient
 from app.commons.object_saving.storage import Storage
@@ -32,9 +33,14 @@ def create_filesystem_client(app_config: ApplicationConfig) -> Storage:
     return FilesystemSaver(app_config)
 
 
+def create_boto3_client(app_config: ApplicationConfig) -> Storage:
+    return Boto3Client(app_config)
+
+
 STORAGE_FACTORIES: dict[str, Callable[[ApplicationConfig], Storage]] = {
     "minio": create_minio_client,
     "filesystem": create_filesystem_client,
+    "s3": create_boto3_client,
 }
 
 
@@ -48,11 +54,11 @@ class ObjectSaver:
     ) -> None:
         self.project_id = project_id
         self.path = path or ""
-        if app_config.binaryStoreType in STORAGE_FACTORIES:
-            self.storage = STORAGE_FACTORIES[app_config.binaryStoreType](app_config)
+        if app_config.datastoreType in STORAGE_FACTORIES:
+            self.storage = STORAGE_FACTORIES[app_config.datastoreType](app_config)
         else:
             raise ValueError(
-                f'Storage "{app_config.binaryStoreType}" is not supported, possible types are: '
+                f'Storage "{app_config.datastoreType}" is not supported, possible types are: '
                 + str(STORAGE_FACTORIES.keys())
             )
 
@@ -88,7 +94,7 @@ class ObjectSaver:
     def does_object_exists(self, object_name: str, project_id: str | int | None = None) -> bool:
         return self.storage.does_object_exists(self.get_project_id(project_id), self.get_object_name(object_name))
 
-    def get_folder_objects(self, folder: str, project_id: str | int | None = None) -> list:
+    def get_folder_objects(self, folder: str, project_id: str | int | None = None) -> list[str]:
         return self.storage.get_folder_objects(self.get_project_id(project_id), self.get_object_name(folder))
 
     def remove_folder_objects(self, folder: str, project_id: str | int | None = None) -> bool:

@@ -36,6 +36,7 @@ def app_config() -> ApplicationConfig:
         amqpExchangeName="test_analyzer",
         appVersion="test",
         instanceTaskType="test",
+        amqpHandlerMaxRetries=2,
         amqpHandlerTaskTimeout=6,
     )
 

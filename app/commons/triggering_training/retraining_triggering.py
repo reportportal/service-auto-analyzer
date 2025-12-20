@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 from app.commons import logging
-from app.commons.model.launch_objects import ApplicationConfig
 from app.commons.model.ml import TrainInfo
 from app.commons.object_saving.object_saver import ObjectSaver
 
@@ -32,12 +31,12 @@ class RetrainingTriggering:
 
     def __init__(
         self,
-        app_config: ApplicationConfig,
+        object_saver: ObjectSaver,
         trigger_saving_name: str,
         start_number: int = 100,
         accumulated_difference: int = 100,
     ):
-        self.object_saver = ObjectSaver(app_config)
+        self.object_saver = object_saver
         self.start_number = start_number
         self.accumulated_difference = accumulated_difference
         self.trigger_saving_name = trigger_saving_name

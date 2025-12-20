@@ -18,7 +18,7 @@ import time
 from queue import Empty, PriorityQueue, Queue
 from typing import Any, Callable, Optional, Protocol
 
-from elasticsearch import ConflictError, NotFoundError
+from opensearchpy import ConflictError, NotFoundError
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
 
@@ -26,8 +26,10 @@ from app.amqp.amqp import AmqpClient
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.processing import ProcessingItem, ProcessingResult
-from app.commons.processing import DummyProcessor, Processor, RealProcessor
+from app.commons.processing import DummyProcessor, Processor, RealProcessor, Worker
 from app.service.processor import ServiceProcessor
+
+QUEUE_POSSIBLE_BUG = "Received result but no tasks in running queue, possible bug"
 
 LOGGER = logging.getLogger("analyzerApp.amqpHandler")
 NUMBER_OF_TASKS_TO_SEND = 2
@@ -73,9 +75,11 @@ def get_priority(props: BasicProperties) -> int:
     return priority
 
 
-def retry(item: ProcessingItem, exc: Exception) -> bool:
+def retry(item: ProcessingItem, exc: Optional[Exception]) -> bool:
     """Default retry predicate for handling exceptions."""
     # You can customize this logic based on your requirements
+    if exc is None:
+        return True
     if isinstance(exc, ConflictError) and item.routing_key == "item_remove":
         return "but no document was found" not in exc.error
     if isinstance(exc, NotFoundError) and item.routing_key == "remove_by_launch_start_time":
@@ -83,92 +87,6 @@ def retry(item: ProcessingItem, exc: Exception) -> bool:
     if isinstance(exc, ValueError) and item.routing_key == "train_models":
         return "Input X contains NaN" not in str(exc)
     return True
-
-
-class Worker:
-    """Worker class for processing AMQP messages in a separate process.
-
-    Handles initialization of services and provides retry logic for failed processing attempts.
-    Contains the main worker function that runs in a separate process and processes messages.
-    """
-
-    _init_services: set[str]
-    _retry_predicate: Optional[Callable[[ProcessingItem, Exception], bool]]
-
-    def __init__(
-        self,
-        init_services: set[str],
-        retry_predicate: Optional[Callable[[ProcessingItem, Exception], bool]] = None,
-    ):
-        """Initialize worker with services to initialize and optional retry predicate.
-
-        :param set[str] init_services: Set of service names to initialize in the worker process
-        :param Optional[Callable[[ProcessingItem, Exception], bool]] retry_predicate: Optional function to determine
-        if a failed processing attempt should be retried
-        """
-        self._init_services = init_services
-        self._retry_predicate = retry_predicate
-
-    def __process(
-        self, processing_item: ProcessingItem, processor: ServiceProcessor, max_retries: int
-    ) -> Optional[ProcessingResult]:
-        result = None
-        routing_key = processing_item.routing_key
-        for i in range(max_retries):
-            try:
-                result_value = processor.process(routing_key, processing_item.item)
-                result = ProcessingResult(processing_item, result_value, success=True, retry_count=i)
-                break
-            except Exception as exc:
-                LOGGER.exception(
-                    f"Failed to process message '{routing_key}' in worker on attempt {i + 1} of {max_retries}",
-                    exc_info=exc,
-                )
-                result = ProcessingResult(processing_item, None, success=False, error=exc, retry_count=i)
-                if self._retry_predicate is not None:
-                    if not self._retry_predicate(processing_item, exc):
-                        LOGGER.info(
-                            f"Retry predicate failed for message {routing_key} - "
-                            f"{processing_item.msg_correlation_id}, not retrying"
-                        )
-                        break
-                time.sleep(0.01)  # Small sleep to prevent busy waiting
-        return result
-
-    def work(
-        self,
-        conn: Any,
-        app_config: ApplicationConfig,
-        search_config: SearchConfig,
-    ) -> None:
-        """Worker function that runs in separate process.
-
-        Continuously polls for processing items from the connection, processes them using ServiceProcessor,
-        handles retries based on the retry predicate, and sends results back through the connection.
-
-        :param Any conn: Process connection object for communication with parent process
-        :param ApplicationConfig app_config: Application configuration containing retry settings
-        :param SearchConfig search_config: Search configuration for the processor
-        """
-        processor = ServiceProcessor(app_config, search_config, services_to_init=self._init_services)
-        try:
-            while True:
-                if not conn.poll():
-                    # If no message is available, wait for a short time before checking again
-                    time.sleep(0.01)  # Small sleep to prevent busy waiting
-                    continue
-
-                processing_item: ProcessingItem = conn.recv()
-                if not processing_item:  # Shutdown signal
-                    break
-
-                logging.set_correlation_id(processing_item.log_correlation_id)
-
-                result = self.__process(processing_item, processor, app_config.amqpHandlerMaxRetries)
-                conn.send(result)
-        except Exception as exc:
-            LOGGER.exception("Processor worker encountered error", exc_info=exc)
-        conn.close()
 
 
 class AtomicInteger:
@@ -260,7 +178,7 @@ class ProcessAmqpRequestHandler:
         routing_key_predicate: Optional[Callable[[str], bool]] = None,
         client: Optional[AmqpClient] = None,
         init_services: Optional[list[str]] = None,
-        retry_predicate: Optional[Callable[[ProcessingItem, Exception], bool]] = retry,
+        retry_predicate: Optional[Callable[[ProcessingItem, Optional[Exception]], bool]] = retry,
         name: Optional[str] = None,
     ):
         """Initialize handler for processing requests with process-based communication.
@@ -297,7 +215,7 @@ class ProcessAmqpRequestHandler:
         self.processor = RealProcessor(
             app_config,
             search_config,
-            Worker(self._init_services, self._retry_predicate).work,
+            Worker(self._init_services).work,
         )
         self._shutdown = False
 
@@ -357,7 +275,7 @@ class ProcessAmqpRequestHandler:
         self.processor = RealProcessor(
             self.app_config,
             self.search_config,
-            Worker(self._init_services, self._retry_predicate).work,
+            Worker(self._init_services).work,
         )
         LOGGER.info("Successfully restarted processor process")
 
@@ -371,7 +289,7 @@ class ProcessAmqpRequestHandler:
             if not self.__running_tasks.queue:
                 return
 
-            tasks_to_resend = list(self.__running_tasks.queue)
+            tasks_to_resend: list[ProcessingItem] = list(self.__running_tasks.queue)
             self.__running_tasks.queue.clear()
             if not tasks_to_resend:
                 return
@@ -384,7 +302,8 @@ class ProcessAmqpRequestHandler:
             for task in tasks_to_resend:
                 if task.retries >= self.app_config.amqpHandlerMaxRetries:
                     LOGGER.warning(
-                        f"Task {task.routing_key} - {task.msg_correlation_id} exceeded max retries, skipping",
+                        f"Task exceeded max retries, skipping. --Routing key: {task.routing_key}"
+                        f" --Correlation ID: {task.msg_correlation_id} Body: {json.dumps(task.item)}",
                         correlation_id=task.log_correlation_id,
                     )
                     continue
@@ -427,28 +346,81 @@ class ProcessAmqpRequestHandler:
         LOGGER.debug("Finished processing response")
         return None
 
+    def __remove_last_task_from_queue(self, result: ProcessingResult):
+        try:
+            completed_task = self.__running_tasks.get()
+            if completed_task.msg_correlation_id != result.item.msg_correlation_id:
+                LOGGER.warning(
+                    f"Received result for task {result.item.msg_correlation_id} but expected "
+                    f"{completed_task.msg_correlation_id}. Possible mismatch."
+                )
+        except Empty:
+            LOGGER.warning(QUEUE_POSSIBLE_BUG)
+
     def __process_result(self, result: ProcessingResult) -> None:
-        if not self.__running_tasks.empty():
-            try:
-                completed_task = self.__running_tasks.get()  # FIFO for completed tasks
-                if completed_task.msg_correlation_id != result.item.msg_correlation_id:
+        # Handle successful result
+        if result.success:
+            # Remove the completed task from running queue
+            self.__remove_last_task_from_queue(result)
+            if result.item.retries > 0:
+                LOGGER.warning(
+                    f"Task {result.item.routing_key} - {result.item.msg_correlation_id} "
+                    f"was retried {result.item.retries} times"
+                )
+            self.__handle_response(result)
+            return
+
+        # Handle failed result - check if we should retry
+        should_retry = True
+        if self._retry_predicate is not None:
+            should_retry = self._retry_predicate(result.item, result.error)
+            if not should_retry:
+                LOGGER.info(
+                    f"Retry predicate failed for message {result.item.routing_key} - "
+                    f"{result.item.msg_correlation_id}, not retrying"
+                )
+
+        # Check if we exceeded max retries
+        exceeded_max_retries = result.item.retries >= self.app_config.amqpHandlerMaxRetries
+
+        # If we should NOT retry, remove the task from running queue
+        if not should_retry or exceeded_max_retries:
+            self.__remove_last_task_from_queue(result)
+            LOGGER.error(
+                f"Task failed after {result.item.retries} retries. --Routing key: {result.item.routing_key}"
+                f" --Correlation ID: {result.item.msg_correlation_id} Body: {json.dumps(result.item.item)}"
+            )
+            return
+
+        # We should retry - update the task in place (without removing from running_tasks)
+        with self.__running_tasks.mutex:
+            if self.__running_tasks.queue:
+                # Get original tracking task and use it (without removing it)
+                task_to_retry = self.__running_tasks.queue[0]
+
+                # Verify it matches the result
+                if task_to_retry.msg_correlation_id != result.item.msg_correlation_id:
                     LOGGER.warning(
                         f"Received result for task {result.item.msg_correlation_id} but expected "
-                        f"{completed_task.msg_correlation_id}. Possible mismatch."
+                        f"{task_to_retry.msg_correlation_id}. Possible mismatch."
                     )
-            except Empty:
-                LOGGER.warning("Received result but no tasks in running queue, possible bug")
-        if result.success and result.retry_count > 0:
-            LOGGER.warning(
-                f"Task {result.item.routing_key} - {result.item.msg_correlation_id} "
-                f"was retried {result.retry_count} times"
-            )
-        elif not result.success:
-            LOGGER.error(
-                f"Task {result.item.routing_key} - {result.item.msg_correlation_id} failed after "
-                f"{result.retry_count} retries."
-            )
-        self.__handle_response(result)
+            else:
+                LOGGER.warning(QUEUE_POSSIBLE_BUG)
+                task_to_retry = result.item
+
+            # Update the task
+            task_to_retry.retries += 1
+            task_to_retry.send_time = time.time()
+
+            # Resend to processor
+            try:
+                self.processor.send(task_to_retry)
+                LOGGER.debug(
+                    f"Retrying task {task_to_retry.routing_key} - {task_to_retry.msg_correlation_id}, "
+                    f"attempt {task_to_retry.retries} of {self.app_config.amqpHandlerMaxRetries}"
+                )
+            except Exception as exc:
+                LOGGER.exception(f"Failed to retry task {task_to_retry.routing_key}", exc_info=exc)
 
     def __receive_results(self) -> None:
         try:

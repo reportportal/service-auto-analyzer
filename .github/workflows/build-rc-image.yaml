@@ -13,7 +13,7 @@ jobs:
     environment: rc
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Create variables
         id: vars
@@ -31,7 +31,7 @@ jobs:
   call-docker-build:
     name: Call release candidate Docker build
     needs: variables-setup
-    uses: reportportal/.github/.github/workflows/build-docker-image.yaml@main
+    uses: reportportal/.github/.github/workflows/build-docker-image.yaml@19701f281bc74246cf273735cda548050606f017
     with:
       aws-region: ${{ vars.AWS_REGION }}
       image-tag: ${{ needs.variables-setup.outputs.tag }}
@@ -41,7 +41,6 @@ jobs:
       date: ${{ needs.variables-setup.outputs.date }}
       scan-image: true
     secrets:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       GH_USER: ${{ secrets.GH_USER }}
       GH_TOKEN: ${{ secrets.GH_TOKEN }}

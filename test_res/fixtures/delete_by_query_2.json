@@ -1,6 +1,0 @@
-{"query": {
- "bool": {
-    "filter": [
-        {"terms": {"launch_id": [1,2]}}
-    ]
-}}}

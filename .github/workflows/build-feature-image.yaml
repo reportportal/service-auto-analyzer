@@ -13,12 +13,14 @@ jobs:
     if: (!startsWith(github.head_ref, 'rc/') || !startsWith(github.head_ref, 'hotfix/') || !startsWith(github.head_ref, 'master') || !startsWith(github.head_ref, 'main'))
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Create variables
         id: vars
+        env:
+          GITHUB_REF: ${{ github.head_ref }}
         run: |
-          echo "tag=$(echo ${{ github.head_ref }}-${{ github.run_number }} | tr '/' '-')" >> $GITHUB_OUTPUT
+          echo "tag=$(echo ${GITHUB_REF}-${{ github.run_number }} | tr '/' '-')" >> $GITHUB_OUTPUT
           echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
     outputs:
       tag: ${{ steps.vars.outputs.tag }}
@@ -27,7 +29,7 @@ jobs:
   call-docker-build:
     name: Call feature Docker build
     needs: variables-setup
-    uses: reportportal/.github/.github/workflows/build-docker-image.yaml@main
+    uses: reportportal/.github/.github/workflows/build-docker-image.yaml@19701f281bc74246cf273735cda548050606f017
     with:
       aws-region: ${{ vars.AWS_REGION }}
       image-tag: ${{ needs.variables-setup.outputs.tag }}
@@ -35,7 +37,6 @@ jobs:
       branch: ${{ github.head_ref }}
       date: ${{ needs.variables-setup.outputs.date }}
     secrets:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       GH_USER: ${{ secrets.GH_USER }}
       GH_TOKEN: ${{ secrets.GH_TOKEN }}

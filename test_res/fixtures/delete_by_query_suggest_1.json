@@ -1,9 +1,0 @@
-{
-"query": {
-    "bool": {
-        "should": [
-            {"terms": {"testItem": [1,2]}},
-            {"terms": {"relevantItem": [1,2]}}
-        ]
-    }
-}}

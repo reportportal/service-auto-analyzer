@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from typing import Optional
 
 from gensim.models.phrases import Phrases
 
@@ -18,7 +19,7 @@ from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig
 from app.commons.object_saving.object_saver import ObjectSaver
 
-logger = logging.getLogger("analyzerApp.namespace_finder")
+LOGGER = logging.getLogger("analyzerApp.namespace_finder")
 
 UNIQUE_WORDS_OBJECT = "project_log_unique_words"
 CHOSEN_NAMESPACES_OBJECT = "chosen_namespaces"
@@ -27,8 +28,8 @@ CHOSEN_NAMESPACES_OBJECT = "chosen_namespaces"
 class NamespaceFinder:
     object_saver: ObjectSaver
 
-    def __init__(self, app_config: ApplicationConfig):
-        self.object_saver = ObjectSaver(app_config)
+    def __init__(self, app_config: ApplicationConfig, *, object_saver: Optional[ObjectSaver] = None):
+        self.object_saver = object_saver or ObjectSaver(app_config)
 
     def remove_namespaces(self, project_id: int):
         self.object_saver.remove_project_objects([UNIQUE_WORDS_OBJECT, CHOSEN_NAMESPACES_OBJECT], project_id)
@@ -60,5 +61,5 @@ class NamespaceFinder:
         for item, cnt in potential_project_namespaces.items():
             if cnt > 10:
                 chosen_namespaces[item.replace("_", ".")] = cnt
-        logger.debug("Chosen namespaces %s", chosen_namespaces)
+        LOGGER.debug("Chosen namespaces %s", chosen_namespaces)
         self.object_saver.put_project_object(chosen_namespaces, CHOSEN_NAMESPACES_OBJECT, project_id, using_json=True)

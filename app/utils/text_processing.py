@@ -1081,7 +1081,36 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[Similar
 def find_last_unique_texts(
     vectorizer: Optional[TfidfVectorizer], threshold: float, texts: list[str]
 ) -> tuple[TfidfVectorizer, list[int]]:
-    """Returns the list of indexes of unique passed texts which are closer to the list end."""
+    """Find the last occurrence indices of unique texts using similarity-based deduplication.
+
+    This function identifies duplicate or highly similar texts within a list and returns the indices
+    of the last occurrences of each unique text group. It uses TF-IDF vectorization and cosine
+    similarity to compare texts, making it efficient for processing large text collections.
+
+    The algorithm works by comparing each text with all subsequent texts in the list. When texts are
+    found to be similar above the given threshold, only the index of the last similar text is kept.
+    This is useful for deduplicating test logs, error messages, or any text collections where you
+    want to preserve the most recent occurrence of similar content while removing earlier duplicates.
+
+    :param vectorizer: Optional TF-IDF vectorizer instance to reuse for efficiency. If None, a new
+        vectorizer will be created.
+    :param threshold: Similarity threshold in the range [0.0, 1.0].
+    :param texts: List of text strings to analyze for uniqueness. Texts should ideally be
+        preprocessed (e.g., using preprocess_text_for_similarity) before passing to this function
+        for optimal results.
+
+    :return: A tuple containing:
+        - TfidfVectorizer: The vectorizer used (either the input vectorizer or newly created one).
+          This can be cached and reused in subsequent calls for better performance.
+        - list[int]: Sorted list of indices representing the last occurrence of each unique text
+          group.
+
+    :raises: ValueError in case of empty input text list, since it's not possible to initialize vectorizer in this
+        case.
+    """
+    if not texts:
+        raise ValueError("Input texts cannot be empty")
+
     my_vectorizer = vectorizer
     my_vectorizer, matrix = __calculate_tf_matrix(my_vectorizer, texts)
     result = set()

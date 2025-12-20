@@ -998,6 +998,7 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[Similar
 
     # Preprocess the base text
     processed_base_text = preprocess_text_for_similarity(base_text)
+    base_text_is_valid = bool(processed_base_text.strip())
 
     # Preprocess all other texts
     processed_other_texts = [preprocess_text_for_similarity(text) for text in other_texts]
@@ -1008,8 +1009,8 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[Similar
     valid_indices = []
 
     for i, processed_other_text in enumerate(processed_other_texts):
-        both_empty = not processed_base_text.strip() and not processed_other_text.strip()
-        if both_empty:
+        processed_other_text_strip = processed_other_text.strip()
+        if not base_text_is_valid and not processed_other_text_strip:
             # The next variable will be False if base texts contain only stop words
             base_both_empty = not base_text.strip() and not other_texts[i].strip()
             similarity_scores.append(
@@ -1018,24 +1019,23 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[Similar
                     both_empty=base_both_empty,
                 )
             )
-        elif not processed_base_text.strip() or not processed_other_text.strip():
+        elif not base_text_is_valid or not processed_other_text_strip:
             # If one of the texts is empty after preprocessing, append 0
-            similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=both_empty))
+            similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=False))
         elif processed_base_text == processed_other_text:
             # If both texts are identical after preprocessing, append 1
-            similarity_scores.append(SimilarityResult(similarity=1.0, both_empty=both_empty))
+            similarity_scores.append(SimilarityResult(similarity=1.0, both_empty=False))
         else:
             # Store valid texts for batch processing
             valid_texts.append(processed_other_text)
             valid_indices.append(i)
             # Placeholder, will be replaced
-            similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=both_empty))
+            similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=False))
 
     if not valid_texts:
         return similarity_scores
 
     # If we have valid texts to process, use single TF-IDF vectorizer
-
     # Create all texts list: base text + all valid other texts
     all_texts = [processed_base_text] + valid_texts
 

@@ -14,11 +14,11 @@
 
 """Common package for ML models."""
 
+from app.ml.models.ml_model import MlModel
 from app.ml.models.boosting_decision_maker import BoostingDecisionMaker
 from app.ml.models.custom_boosting_decision_maker import CustomBoostingDecisionMaker
 from app.ml.models.custom_defect_type_model import CustomDefectTypeModel
 from app.ml.models.defect_type_model import DefectTypeModel
-from app.ml.models.ml_model import MlModel
 
 __all__ = [
     "MlModel",

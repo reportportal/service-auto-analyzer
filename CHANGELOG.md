@@ -9,6 +9,8 @@
 - `Worker` class moved from `app.amqp.amqp_handler.py` module to `app.commons.processing` module, by @HardNorth
 - Data storing properties were reworked, by @HardNorth
 - Python version updated to `3.12`, by @HardNorth
+- OpenSearch client updated on `opensearch-py` of version `3.1.0`, by @HardNorth
+- `urllib3` dependency updated to version `2.6.0`, by @HardNorth
 ### Fixed
 - Fix TypeError in logging when 'correlation_id' passed explicitly with kwargs, by @HardNorth
 

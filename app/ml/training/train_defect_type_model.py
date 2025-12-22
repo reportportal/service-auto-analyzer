@@ -21,13 +21,12 @@ from typing import Any, Optional, Type
 import numpy as np
 import opensearchpy.helpers
 import scipy.stats as stats
-from pydantic import BaseModel
 from sklearn.model_selection import train_test_split
 
 from app.commons import logging, object_saving
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
-from app.commons.model.ml import ModelType, TrainInfo
+from app.commons.model.ml import ModelType, QueryResult, TrainInfo
 from app.commons.model_chooser import ModelChooser
 from app.ml.models import CustomDefectTypeModel, DefectTypeModel
 from app.ml.models.defect_type_model import DATA_FIELD
@@ -179,12 +178,6 @@ def copy_model_part_from_baseline(label: str, new_model: DefectTypeModel, baseli
         new_model.models[label] = baseline_model.models[label]
         _count_vectorizer = baseline_model.count_vectorizer_models[label]
         new_model.count_vectorizer_models[label] = _count_vectorizer
-
-
-class QueryResult(BaseModel):
-    result: list[tuple[str, str, str]]
-    error_count: int
-    errors: list[str]
 
 
 class DefectTypeModelTraining:

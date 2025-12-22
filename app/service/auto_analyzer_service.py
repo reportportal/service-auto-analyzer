@@ -646,7 +646,7 @@ class AutoAnalyzerService(AnalyzerService):
             if self.app_config.amqpUrl and analyzed_results_for_index:
                 amqp_client = AmqpClient(self.app_config)
                 amqp_client.send_to_inner_queue(
-                    "index_suggest_info", json.dumps([_info.dict() for _info in analyzed_results_for_index])
+                    "index_suggest_info", json.dumps([_info.model_dump() for _info in analyzed_results_for_index])
                 )
                 for launch_id in results_to_share:
                     results_to_share[launch_id]["model_info"] = list(results_to_share[launch_id]["model_info"])

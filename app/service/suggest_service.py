@@ -394,7 +394,7 @@ class SuggestService(AnalyzerService):
 
     def suggest_items(self, test_item_info: TestItemInfo) -> list[SuggestAnalysisResult]:
         LOGGER.info(f"Started suggesting for test item with id: {test_item_info.testItemId}")
-        LOGGER.debug(f"Started suggesting items by request: {test_item_info.json()}")
+        LOGGER.debug(f"Started suggesting items by request: {test_item_info.model_dump_json()}")
         index_name = text_processing.unite_project_name(test_item_info.project, self.app_config.esProjectIndexPrefix)
         if not self.es_client.index_exists(index_name):
             LOGGER.info(f"Project {index_name} doesn't exist.")
@@ -533,7 +533,7 @@ class SuggestService(AnalyzerService):
                         "train_models",
                         TrainInfo(
                             model_type=model_type, project=test_item_info.project, gathered_metric_total=len(results)
-                        ).json(),
+                        ).model_dump_json(),
                     )
             amqp_client.close()
         LOGGER.debug(f"Stats info: {json.dumps(results_to_share)}")

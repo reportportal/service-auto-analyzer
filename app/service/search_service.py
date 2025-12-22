@@ -221,7 +221,7 @@ class SearchService:
         """Get all logs similar to given logs"""
         similar_log_ids = {}
         LOGGER.info(f"Started searching for test item with id: {search_req.itemId}")
-        LOGGER.debug(f"Started searching by request: {search_req.json()}")
+        LOGGER.debug(f"Started searching by request: {search_req.model_dump_json()}")
         LOGGER.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))
         index_name = text_processing.unite_project_name(search_req.projectId, self.app_config.esProjectIndexPrefix)
         t_start = time()
@@ -288,7 +288,7 @@ class SearchService:
 
         LOGGER.info(
             "Finished searching by request %s with %d results. It took %.2f sec.",
-            search_req.json(),
+            search_req.model_dump_json(),
             len(final_results),
             time() - t_start,
         )

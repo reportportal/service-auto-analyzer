@@ -82,13 +82,13 @@ def to_json(response: list | dict) -> str:
 
 def prepare_analyze_response_data(response: list) -> str:
     """Function for serializing response from analyze request"""
-    return to_json([resp.dict() for resp in response])
+    return to_json([resp.model_dump() for resp in response])
 
 
 def prepare_index_response_data(response: Any) -> str:
     """Function for serializing response from index request
     and other objects, which are pydantic objects"""
-    return response.json()
+    return response.model_dump_json()
 
 
 def to_str(response: Any) -> str:

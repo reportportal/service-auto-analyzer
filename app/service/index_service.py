@@ -99,7 +99,7 @@ class IndexService:
                 "train_models",
                 TrainInfo(
                     model_type=ModelType.defect_type, project=project, gathered_metric_total=num_logs_with_defect_types
-                ).json(),
+                ).model_dump_json(),
             )
             amqp_client.close()
 

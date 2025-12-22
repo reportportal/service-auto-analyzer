@@ -82,7 +82,7 @@ class SuggestInfoService:
             self.es_client.create_index_for_stats_info(RP_SUGGEST_METRICS_INDEX_TEMPLATE)
         metrics_data_by_test_item: dict[Any, list[Any]] = {}
         for obj in suggest_info_list:
-            obj_info = json.loads(obj.json())
+            obj_info = json.loads(obj.model_dump_json())
             obj_info["savedDate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             obj_info["modelInfo"] = [obj.strip() for obj in obj_info["modelInfo"].split(";") if obj.strip()]
             obj_info["module_version"] = [self.app_config.appVersion]
@@ -227,7 +227,9 @@ class SuggestInfoService:
             for model_type in [ModelType.suggestion, ModelType.auto_analysis]:
                 amqp_client.send_to_inner_queue(
                     "train_models",
-                    TrainInfo(model_type=model_type, project=project_id, gathered_metric_total=result.took).json(),
+                    TrainInfo(
+                        model_type=model_type, project=project_id, gathered_metric_total=result.took
+                    ).model_dump_json(),
                 )
             amqp_client.close()
 

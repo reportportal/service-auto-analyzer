@@ -489,7 +489,7 @@ def test_update_suggest_info_with_amqp_enabled(
     # Create a config with amqpUrl enabled
     from app.commons.model.launch_objects import ApplicationConfig
 
-    app_config_with_amqp = ApplicationConfig(**{**APP_CONFIG.dict(), "amqpUrl": "amqp://localhost:5672"})
+    app_config_with_amqp = ApplicationConfig(**{**APP_CONFIG.model_dump(), "amqpUrl": "amqp://localhost:5672"})
 
     # Create service with AMQP enabled
     es_client = EsClient(app_config_with_amqp, es_client=mocked_opensearch_client)

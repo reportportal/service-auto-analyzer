@@ -1,5 +1,5 @@
 # Changelog
-## [Unreleased]
+## [5.15.0]
 ### Added
 - S3 buckets support with `boto3` client (with handling instance roles, etc.), by @HardNorth
 ### Changed

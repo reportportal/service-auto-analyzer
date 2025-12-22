@@ -36,7 +36,7 @@ from app.commons.model.launch_objects import (
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.similarity_calculator import SimilarityCalculator
-from app.machine_learning.predictor import AutoAnalysisPredictor, PredictionResult
+from app.ml.predictor import AutoAnalysisPredictor, PredictionResult
 from app.service.analyzer_service import AnalyzerService
 from app.utils import text_processing, utils
 

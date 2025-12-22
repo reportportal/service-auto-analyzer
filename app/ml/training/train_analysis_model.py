@@ -28,9 +28,9 @@ from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model_chooser import ModelChooser
-from app.machine_learning.boosting_featurizer import BoostingFeaturizer
-from app.machine_learning.models import BoostingDecisionMaker, CustomBoostingDecisionMaker, DefectTypeModel
-from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
+from app.ml.boosting_featurizer import BoostingFeaturizer
+from app.ml.models import BoostingDecisionMaker, CustomBoostingDecisionMaker, DefectTypeModel
+from app.ml.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils import text_processing, utils
 from app.utils.defaultdict import DefaultDict
 

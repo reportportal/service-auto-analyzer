@@ -17,7 +17,7 @@ from unittest.mock import Mock
 import pytest
 
 from app.commons.model.ml import ModelType
-from app.machine_learning.predictor import (
+from app.ml.predictor import (
     PREDICTION_CLASSES,
     AutoAnalysisPredictor,
     FeatureInfo,
@@ -635,7 +635,7 @@ class TestAutoAnalysisPredictor:
         featurizer = predictor.create_featurizer(search_results)
 
         # Verify it's the right type and has expected configuration
-        from app.machine_learning.boosting_featurizer import BoostingFeaturizer
+        from app.ml.boosting_featurizer import BoostingFeaturizer
 
         assert isinstance(featurizer, BoostingFeaturizer)
 
@@ -858,7 +858,7 @@ class TestSuggestionPredictor:
         featurizer = predictor.create_featurizer(search_results)
 
         # Verify it's the right type and has expected configuration
-        from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
+        from app.ml.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 
         assert isinstance(featurizer, SuggestBoostingFeaturizer)
 

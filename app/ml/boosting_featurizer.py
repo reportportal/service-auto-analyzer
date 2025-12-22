@@ -19,7 +19,7 @@ from typing import Any, Callable, Optional
 import numpy as np
 
 from app.commons import logging, similarity_calculator
-from app.machine_learning.models.defect_type_model import DATA_FIELD, DefectTypeModel
+from app.ml.models.defect_type_model import DATA_FIELD, DefectTypeModel
 from app.utils import text_processing, utils
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")

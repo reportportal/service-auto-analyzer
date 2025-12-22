@@ -17,7 +17,7 @@ from typing import Optional
 from typing_extensions import override
 
 from app.commons.object_saving.object_saver import ObjectSaver
-from app.machine_learning.models.defect_type_model import DefectTypeModel
+from app.ml.models.defect_type_model import DefectTypeModel
 
 MODEL_TAG = "custom defect type model"
 

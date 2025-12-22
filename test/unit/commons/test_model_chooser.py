@@ -22,7 +22,7 @@ from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType
 from app.commons.model_chooser import ModelChooser
 from app.commons.object_saving import ObjectSaver
-from app.machine_learning.models import (
+from app.ml.models import (
     BoostingDecisionMaker,
     CustomBoostingDecisionMaker,
     CustomDefectTypeModel,

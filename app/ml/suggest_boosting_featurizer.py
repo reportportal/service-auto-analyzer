@@ -15,7 +15,7 @@
 from collections import defaultdict
 from typing import Any
 
-from app.machine_learning import boosting_featurizer
+from app.ml import boosting_featurizer
 
 
 class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):

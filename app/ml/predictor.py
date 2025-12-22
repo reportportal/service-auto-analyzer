@@ -21,9 +21,9 @@ from typing_extensions import override
 from app.commons import logging
 from app.commons.model.ml import ModelType
 from app.commons.model_chooser import ModelChooser
-from app.machine_learning.boosting_featurizer import BoostingFeaturizer
-from app.machine_learning.models import BoostingDecisionMaker, DefectTypeModel
-from app.machine_learning.suggest_boosting_featurizer import SuggestBoostingFeaturizer
+from app.ml.boosting_featurizer import BoostingFeaturizer
+from app.ml.models import BoostingDecisionMaker, DefectTypeModel
+from app.ml.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.utils.text_processing import calculate_text_similarity
 
 LOGGER = logging.getLogger("analyzerApp.predictor")

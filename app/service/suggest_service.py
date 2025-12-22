@@ -35,7 +35,7 @@ from app.commons.model.launch_objects import (
 from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
-from app.machine_learning.predictor import PREDICTION_CLASSES, PredictionResult
+from app.ml.predictor import PREDICTION_CLASSES, PredictionResult
 from app.service.analyzer_service import AnalyzerService
 from app.utils import text_processing, utils
 

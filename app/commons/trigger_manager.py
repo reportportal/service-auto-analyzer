@@ -20,8 +20,8 @@ from app.commons.model.ml import ModelType
 from app.commons.model_chooser import ModelChooser
 from app.commons.object_saving import ObjectSaver
 from app.commons.triggering_training.retraining_triggering import RetrainingTriggering
-from app.machine_learning.training.train_analysis_model import AnalysisModelTraining
-from app.machine_learning.training.train_defect_type_model import DefectTypeModelTraining
+from app.ml.training.train_analysis_model import AnalysisModelTraining
+from app.ml.training.train_defect_type_model import DefectTypeModelTraining
 
 logger = logging.getLogger("analyzerApp.triggerManager")
 

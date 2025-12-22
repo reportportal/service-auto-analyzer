@@ -25,7 +25,7 @@ from typing_extensions import override
 
 from app.commons import logging
 from app.commons.object_saving.object_saver import ObjectSaver
-from app.machine_learning.models import MlModel
+from app.ml.models import MlModel
 from app.utils import text_processing
 from app.utils.defaultdict import DefaultDict
 

@@ -29,8 +29,8 @@ from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model_chooser import ModelChooser
-from app.machine_learning.models import CustomDefectTypeModel, DefectTypeModel
-from app.machine_learning.models.defect_type_model import DATA_FIELD
+from app.ml.models import CustomDefectTypeModel, DefectTypeModel
+from app.ml.models.defect_type_model import DATA_FIELD
 from app.utils import text_processing, utils
 from app.utils.defaultdict import DefaultDict
 

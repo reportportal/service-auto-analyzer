@@ -15,7 +15,7 @@
 import pytest
 
 from app.commons import object_saving
-from app.machine_learning.models.defect_type_model import DefectTypeModel
+from app.ml.models.defect_type_model import DefectTypeModel
 from app.utils import utils
 
 WEB_DRIVER_ERROR = (

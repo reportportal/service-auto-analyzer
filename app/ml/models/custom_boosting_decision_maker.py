@@ -17,7 +17,7 @@ from typing import Optional
 from typing_extensions import override
 
 from app.commons.object_saving.object_saver import ObjectSaver
-from app.machine_learning.models.boosting_decision_maker import BoostingDecisionMaker
+from app.ml.models.boosting_decision_maker import BoostingDecisionMaker
 
 
 class CustomBoostingDecisionMaker(BoostingDecisionMaker):

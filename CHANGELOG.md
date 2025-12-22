@@ -8,6 +8,7 @@
 - Exception retry logic was moved from `Worker` class to `ProcessAmqpRequestHandler.__process_result` method, by @HardNorth
 - `Worker` class moved from `app.amqp.amqp_handler.py` module to `app.commons.processing` module, by @HardNorth
 - Data storing properties were reworked, by @HardNorth
+- Python version updated to `3.12`, by @HardNorth
 ### Fixed
 - Fix TypeError in logging when 'correlation_id' passed explicitly with kwargs, by @HardNorth
 

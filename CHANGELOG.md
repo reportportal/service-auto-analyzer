@@ -6,10 +6,10 @@
 - S3 buckets support with `boto3` client (with handling instance roles, etc.), by @HardNorth
 ### Changed
 - Exception retry logic was moved from `Worker` class to `ProcessAmqpRequestHandler.__process_result` method, by @HardNorth
-- `Worker` class moved from `app.amqp.amqp_handler.py` module to `commons.processing` module, by @HardNorth
+- `Worker` class moved from `app.amqp.amqp_handler.py` module to `app.commons.processing` module, by @HardNorth
 - Data storing properties were reworked, by @HardNorth
 ### Fixed
-- Fix TypeError when 'correlation_id' passed explicitly with kwargs, by @HardNorth
+- Fix TypeError in logging when 'correlation_id' passed explicitly with kwargs, by @HardNorth
 
 ## [5.14.6]
 ### Changed

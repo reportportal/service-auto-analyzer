@@ -23,7 +23,7 @@ import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 
 from app.amqp.amqp import AmqpClient
-from app.commons import clusterizer, log_merger, logging, request_factory
+from app.commons import clustering, log_merger, logging, request_factory
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import (
     ApplicationConfig,
@@ -158,7 +158,6 @@ class ClusterService:
         unique_errors_min_should_match: float,
     ) -> dict[int, ClusterInfo]:
         new_clusters = {}
-        _clusterizer = clusterizer.Clusterizer()
         for global_group in groups:
             first_item_ind = groups[global_group][0]
             min_should_match = utils.calculate_threshold_for_text(
@@ -204,7 +203,7 @@ class ClusterService:
                     continue
                 log_messages_part.append(log_message)
                 ind += 1
-            groups_part = _clusterizer.find_clusters(log_messages_part, threshold=min_should_match)
+            groups_part = clustering.find_clusters(log_messages_part, threshold=min_should_match)
             new_group = None
             for group in groups_part:
                 if 0 in groups_part[group]:
@@ -271,7 +270,6 @@ class ClusterService:
         self, log_messages: list[str], log_dict: dict[int, dict[str, Any]], unique_errors_min_should_match: float
     ) -> dict[int, list[int]]:
         regrouped_by_error = self._regroup_by_error_and_status_codes(log_messages, log_dict)
-        _clusterizer = clusterizer.Clusterizer()
         all_groups: dict[int, list[int]] = {}
         start_group_id = 0
         for group in regrouped_by_error.values():
@@ -280,7 +278,7 @@ class ClusterService:
             for i, idx in enumerate(group):
                 log_messages_part.append(log_messages[idx])
                 log_messages_idx_dict[i] = idx
-            groups = _clusterizer.find_clusters(log_messages_part, threshold=unique_errors_min_should_match)
+            groups = clustering.find_clusters(log_messages_part, threshold=unique_errors_min_should_match)
             max_group_id = max(groups.keys())
             for group_id in groups:
                 global_idx = start_group_id + group_id

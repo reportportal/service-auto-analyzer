@@ -360,7 +360,7 @@ def prepare_message_for_clustering(
     message = first_lines(message, number_of_log_lines)
     if leave_log_structure:
         return message
-    words = split_words(message, min_word_length=2, only_unique=False)
+    words = split_words(message, min_word_length=2, only_unique=False, to_lower=False)
     if len(words) == 1:
         return " ".join(words) + " error"
     return " ".join(words)
@@ -937,7 +937,7 @@ CAMEL_CASE_PATTERN = re.compile(r"([a-z])([A-Z])")
 UPPER_LOWER_CASE_PATTERN = re.compile(r"([A-Z])([A-Z][a-z])")
 
 
-def preprocess_text_for_similarity(text: str) -> str:
+def preprocess_text_for_similarity(text: str) -> list[str]:
     """
     Preprocess text for similarity calculation following the specified requirements.
 
@@ -945,7 +945,7 @@ def preprocess_text_for_similarity(text: str) -> str:
     :return: Preprocessed text ready for similarity calculation
     """
     if not text:
-        return ""
+        return []
 
     result = text
 
@@ -979,7 +979,7 @@ def preprocess_text_for_similarity(text: str) -> str:
         lemmatized_word = lemmatizer.lemmatize(word)
         processed_words.append(lemmatized_word)
 
-    return " ".join(processed_words)
+    return processed_words
 
 
 def __calculate_tf_matrix(
@@ -1018,11 +1018,11 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[Similar
         return []
 
     # Preprocess the base text
-    processed_base_text = preprocess_text_for_similarity(base_text)
+    processed_base_text = " ".join(preprocess_text_for_similarity(base_text))
     base_text_is_valid = bool(processed_base_text.strip())
 
     # Preprocess all other texts
-    processed_other_texts = [preprocess_text_for_similarity(text) for text in other_texts]
+    processed_other_texts = [" ".join(preprocess_text_for_similarity(text)) for text in other_texts]
 
     # Handle empty texts and identical texts first
     similarity_scores: list[SimilarityResult] = []

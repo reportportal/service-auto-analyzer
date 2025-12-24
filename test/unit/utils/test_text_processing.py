@@ -269,7 +269,7 @@ def test_calculate_text_similarity_basic_cases(base_text, other_texts, expected_
 )
 def test_preprocess_text_for_similarity(text, expected_preprocessing_contains):
     """Test text preprocessing for similarity calculation"""
-    processed = text_processing.preprocess_text_for_similarity(text)
+    processed = " ".join(text_processing.preprocess_text_for_similarity(text))
 
     # Check that the processed text is lowercase
     assert processed == processed.lower()

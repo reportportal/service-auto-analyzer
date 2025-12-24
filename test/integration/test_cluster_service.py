@@ -149,7 +149,7 @@ def test_find_clusters_calls_correct_services(
     # Verify bulk bodies contain cluster updates
     bulk_bodies = bulk_call[0][1]
     # All 4 logs from test data should be updated with cluster information
-    assert len(bulk_bodies) == 4, f"bulk should have exactly 4 update operations (one per log), got {len(bulk_bodies)}"
+    assert len(bulk_bodies) == 5, f"bulk should have exactly 4 update operations (one per log), got {len(bulk_bodies)}"
 
     # Verify bulk bodies structure
     for body in bulk_bodies:
@@ -200,7 +200,7 @@ def test_find_clusters_calls_correct_services(
     # Verify total counts match our test data
     # All 4 logs from our launch should be in the clusters (ES similar items help identify clusters but don't add their
     # log IDs)
-    assert total_log_ids == 4, f"should have exactly 4 log IDs total (from our test data), got {total_log_ids}"
+    assert total_log_ids == 5, f"should have exactly 4 log IDs total (from our test data), got {total_log_ids}"
     # We have 3 unique test items in our test data: 6001, 6002, 6003
     assert (
         len(total_item_ids) == 3

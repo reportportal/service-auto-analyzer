@@ -267,7 +267,7 @@ def get_allowed_number_of_missed(cur_threshold: float) -> int:
     return 0
 
 
-def calculate_threshold(text_size, cur_threshold, min_recalculated_threshold=0.8):
+def calculate_threshold(text_size: int, cur_threshold: float, min_recalculated_threshold: float = 0.8) -> float:
     if not text_size:
         return cur_threshold
     allowed_words_missed = get_allowed_number_of_missed(cur_threshold)
@@ -275,7 +275,7 @@ def calculate_threshold(text_size, cur_threshold, min_recalculated_threshold=0.8
     for _ in range(allowed_words_missed, 0, -1):
         threshold = (text_size - allowed_words_missed) / text_size
         if threshold >= min_recalculated_threshold:
-            new_threshold = round(threshold, 2)
+            new_threshold = round(threshold, 4)
             break
     return min(new_threshold, cur_threshold)
 

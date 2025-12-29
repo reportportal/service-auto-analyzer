@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import json
 from datetime import datetime
 from time import time
 from typing import Any, Optional
@@ -20,11 +19,10 @@ from typing import Any, Optional
 import opensearchpy.helpers
 
 from app.amqp.amqp import AmqpClient
-from app.commons import logging
+from app.commons import esclient, logging
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, CleanIndexStrIds
 from app.commons.model.ml import ModelType, TrainInfo
-from app.utils import text_processing
 
 LOGGER = logging.getLogger("analyzerApp.suggestInfoService")
 
@@ -49,9 +47,6 @@ class SuggestInfoService:
         """
         self.app_config = app_config
         self.es_client = es_client or EsClient(app_config=self.app_config)
-
-    def _build_index_name(self, project_id: int) -> str:
-        return str(project_id) + "_suggest"
 
     def _index_data_for_metrics(self, metrics_data_by_test_item: dict) -> None:
         bodies = []
@@ -82,16 +77,15 @@ class SuggestInfoService:
             self.es_client.create_index_for_stats_info(RP_SUGGEST_METRICS_INDEX_TEMPLATE)
         metrics_data_by_test_item: dict[Any, list[Any]] = {}
         for obj in suggest_info_list:
-            obj_info = json.loads(obj.model_dump_json())
+            obj_info = obj.model_dump()
             obj_info["savedDate"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             obj_info["modelInfo"] = [obj.strip() for obj in obj_info["modelInfo"].split(";") if obj.strip()]
             obj_info["module_version"] = [self.app_config.appVersion]
             if obj_info["testItem"] not in metrics_data_by_test_item:
                 metrics_data_by_test_item[obj_info["testItem"]] = []
             metrics_data_by_test_item[obj_info["testItem"]].append(obj_info)
-            project_index_name = self._build_index_name(obj_info["project"])
-            project_index_name = text_processing.unite_project_name(
-                project_index_name, self.app_config.esProjectIndexPrefix
+            project_index_name = esclient.get_index_name(
+                obj_info["project"], self.app_config.esProjectIndexPrefix, "rp_suggest_info"
             )
             if project_index_name not in project_index_names:
                 self.es_client.create_index_for_stats_info(
@@ -106,9 +100,8 @@ class SuggestInfoService:
 
     def remove_suggest_info(self, project_id: int) -> bool:
         LOGGER.info("Removing suggest_info index")
-        project_index_name = self._build_index_name(project_id)
-        project_index_name = text_processing.unite_project_name(
-            project_index_name, self.app_config.esProjectIndexPrefix
+        project_index_name = esclient.get_index_name(
+            project_id, self.app_config.esProjectIndexPrefix, "rp_suggest_info"
         )
         return self.es_client.delete_index(project_index_name)
 
@@ -123,8 +116,9 @@ class SuggestInfoService:
 
     def clean_suggest_info_logs(self, clean_index: CleanIndexStrIds):
         """Delete logs from OpenSearch"""
-        index_name = self._build_index_name(clean_index.project)
-        index_name = text_processing.unite_project_name(index_name, self.app_config.esProjectIndexPrefix)
+        index_name = esclient.get_index_name(
+            clean_index.project, self.app_config.esProjectIndexPrefix, "rp_suggest_info"
+        )
         LOGGER.info("Delete logs %s for the index %s", clean_index.ids, index_name)
         t_start = time()
         if not self.es_client.index_exists(index_name, print_error=False):
@@ -168,8 +162,9 @@ class SuggestInfoService:
 
     def clean_suggest_info_logs_by_test_item(self, remove_items_info: dict) -> int:
         """Delete logs from OpenSearch"""
-        index_name = self._build_index_name(remove_items_info["project"])
-        index_name = text_processing.unite_project_name(index_name, self.app_config.esProjectIndexPrefix)
+        index_name = esclient.get_index_name(
+            remove_items_info["project"], self.app_config.esProjectIndexPrefix, "rp_suggest_info"
+        )
         LOGGER.info("Delete test items %s for the index %s", remove_items_info["itemsToDelete"], index_name)
         t_start = time()
         deleted_logs = self.es_client.delete_by_query(
@@ -190,8 +185,7 @@ class SuggestInfoService:
         """Delete logs with specified launch ids from OpenSearch"""
         project = launch_remove_info["project"]
         launch_ids = launch_remove_info["launch_ids"]
-        index_name = self._build_index_name(project)
-        index_name = text_processing.unite_project_name(index_name, self.app_config.esProjectIndexPrefix)
+        index_name = esclient.get_index_name(project, self.app_config.esProjectIndexPrefix, "rp_suggest_info")
         LOGGER.info("Delete launches %s for the index %s", launch_ids, index_name)
         t_start = time()
         deleted_logs = self.es_client.delete_by_query(
@@ -240,8 +234,9 @@ class SuggestInfoService:
         defect_update_info["itemsToUpdate"] = {
             int(key_): val for key_, val in defect_update_info["itemsToUpdate"].items()
         }
-        index_name = self._build_index_name(defect_update_info["project"])
-        index_name = text_processing.unite_project_name(index_name, self.app_config.esProjectIndexPrefix)
+        index_name = esclient.get_index_name(
+            defect_update_info["project"], self.app_config.esProjectIndexPrefix, "rp_suggest_info"
+        )
         if not self.es_client.index_exists(index_name):
             return 0
         batch_size = 1000

@@ -17,7 +17,7 @@ from typing import Any, Optional
 
 import opensearchpy.helpers
 
-from app.commons import log_merger, logging, request_factory, similarity_calculator
+from app.commons import esclient, log_merger, logging, request_factory, similarity_calculator
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, Log, SearchConfig, SearchLogInfo, SearchLogs
 from app.utils import text_processing, utils
@@ -222,8 +222,7 @@ class SearchService:
         similar_log_ids = {}
         LOGGER.info(f"Started searching for test item with id: {search_req.itemId}")
         LOGGER.debug(f"Started searching by request: {search_req.model_dump_json()}")
-        LOGGER.info("ES Url %s", text_processing.remove_credentials_from_url(self.es_client.host))
-        index_name = text_processing.unite_project_name(search_req.projectId, self.app_config.esProjectIndexPrefix)
+        index_name = esclient.get_index_name(search_req.projectId, self.app_config.esProjectIndexPrefix, "rp_log_item")
         t_start = time()
         if not self.es_client.index_exists(index_name):
             return []

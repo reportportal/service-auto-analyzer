@@ -23,7 +23,7 @@ import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 
 from app.amqp.amqp import AmqpClient
-from app.commons import clustering, log_merger, logging, request_factory
+from app.commons import clustering, esclient, log_merger, logging, request_factory
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import (
     ApplicationConfig,
@@ -383,7 +383,7 @@ class ClusterService:
         LOGGER.info(
             f"Started clusterizing logs for launch {launch_info.launch.launchId} in project {launch_info.project}"
         )
-        index_name = text_processing.unite_project_name(launch_info.project, self.app_config.esProjectIndexPrefix)
+        index_name = esclient.get_index_name(launch_info.project, self.app_config.esProjectIndexPrefix, "rp_log_item")
         if not self.es_client.index_exists(index_name):
             LOGGER.info("Project %s doesn't exist", index_name)
             LOGGER.info("Finished clustering log with 0 clusters.")

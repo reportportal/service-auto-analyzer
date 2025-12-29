@@ -23,7 +23,7 @@ import opensearchpy.helpers
 import scipy.stats as stats
 from sklearn.model_selection import train_test_split
 
-from app.commons import logging, object_saving
+from app.commons import esclient, logging, object_saving
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType, QueryResult, TrainInfo
@@ -294,7 +294,7 @@ class DefectTypeModelTraining:
         error_count = 0
         start_time = time()
         for project in projects:
-            project_index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
+            project_index_name = esclient.get_index_name(project, self.app_config.esProjectIndexPrefix, "rp_log_item")
             for label in BASE_ISSUE_CLASS_INDEXES:
                 query = f"{label}???"
                 found_data = self.query_label(

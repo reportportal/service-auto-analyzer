@@ -364,7 +364,7 @@ def read_version():
 
 def read_model_settings():
     """Reads paths to models"""
-    model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
+    model_settings = utils.read_resource_file("model_settings.json", to_json=True)
     if not model_settings or not isinstance(model_settings, dict):
         raise RuntimeError("Failed to read model settings")
 

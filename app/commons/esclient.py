@@ -25,10 +25,23 @@ from app.commons import log_merger, logging
 from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, CleanIndex, Response
 from app.utils import text_processing, utils
 
-ES_URL_MESSAGE = "OpenSearch Url %s"
 TABLES_TO_RECREATE = ["rp_aa_stats", "rp_model_train_stats", "rp_suggestions_info_metrics"]
+INDEX_SETTINGS_FILE = "index_settings.json"
+INDEX_MAPPINGS = {
+    "rp_aa_stats": "rp_aa_stats_mappings.json",
+    "rp_train_stats": "rp_train_stats_mappings.json",
+    "rp_suggest_info": "rp_suggestions_info_mappings.json",
+    "rp_suggest_info_metrics": "rp_suggestions_info_metrics_mappings.json",
+    "rp_test_item": "test_item_index_mappings.json",
+    "rp_log_item": "log_item_index_mappings.json",
+}
+INDEX_NAME_DELIMITER = "."
 
 LOGGER = logging.getLogger("analyzerApp.esclient")
+
+
+def get_index_name(project_id: str | int, prefix: str, index: str) -> str:
+    return f"{prefix}{project_id}{INDEX_NAME_DELIMITER}{index}"
 
 
 class EsClient:
@@ -37,8 +50,14 @@ class EsClient:
     app_config: ApplicationConfig
     es_client: OpenSearch
     host: str
+    checked_indexes: set[str]
 
-    def __init__(self, app_config: ApplicationConfig, *, es_client: Optional[OpenSearch] = None) -> None:
+    def __init__(
+        self,
+        app_config: ApplicationConfig,
+        *,
+        es_client: Optional[OpenSearch] = None,
+    ) -> None:
         self.app_config = app_config
         self.host = app_config.esHost
         if es_client:
@@ -47,6 +66,7 @@ class EsClient:
         else:
             LOGGER.debug(f"Creating service using host URL: {text_processing.remove_credentials_from_url(self.host)}")
             self.es_client = self.create_es_client(app_config)
+        self.checked_indexes = set()
 
     def create_es_client(self, app_config: ApplicationConfig) -> OpenSearch:
         if not app_config.esVerifyCerts:
@@ -156,8 +176,8 @@ class EsClient:
         response = self.es_client.indices.create(
             index=index_name,
             body={
-                "settings": utils.read_json_file("res", "index_settings.json", to_json=True),
-                "mappings": utils.read_json_file("res", "log_item_index_mappings.json", to_json=True),
+                "settings": utils.read_resource_file(INDEX_SETTINGS_FILE, to_json=True),
+                "mappings": utils.read_resource_file("log_item_index_mappings.json", to_json=True),
             },
         )
         LOGGER.debug(f"Index '{index_name}' created")
@@ -166,7 +186,7 @@ class EsClient:
     def index_exists(self, index_name: str, print_error: bool = True) -> bool:
         """Checks whether index exists"""
         try:
-            index = self.es_client.indices.get(index=str(index_name))
+            index = self.es_client.indices.get(index=index_name)
             return index is not None
         except Exception as err:
             if print_error:
@@ -300,7 +320,7 @@ class EsClient:
 
     def delete_logs(self, clean_index: CleanIndex) -> int:
         """Delete logs from OpenSearch"""
-        index_name = text_processing.unite_project_name(clean_index.project, self.app_config.esProjectIndexPrefix)
+        index_name = get_index_name(clean_index.project, self.app_config.esProjectIndexPrefix, "rp_log_item")
         log_ids = ", ".join([str(log_id) for log_id in clean_index.ids])
         LOGGER.info(f"Delete project '{index_name}' logs: {log_ids}")
         t_start = time()
@@ -343,15 +363,15 @@ class EsClient:
             self.es_client.indices.create(
                 index=index_name,
                 body={
-                    "settings": utils.read_json_file("res", "index_settings.json", to_json=True),
-                    "mappings": utils.read_json_file("res", "%s_mappings.json" % rp_aa_stats_index, to_json=True),
+                    "settings": utils.read_resource_file(INDEX_SETTINGS_FILE, to_json=True),
+                    "mappings": utils.read_resource_file("%s_mappings.json" % rp_aa_stats_index, to_json=True),
                 },
             )
         else:
             try:
                 self.es_client.indices.put_mapping(
                     index=index_name,
-                    body=utils.read_json_file("res", "%s_mappings.json" % rp_aa_stats_index, to_json=True),
+                    body=utils.read_resource_file("%s_mappings.json" % rp_aa_stats_index, to_json=True),
                 )
             except:  # noqa
                 formatted_exception = traceback.format_exc()
@@ -374,8 +394,8 @@ class EsClient:
     def remove_test_items(self, remove_items_info: dict[str, Any]) -> int:
         LOGGER.info("Started removing test items")
         t_start = time()
-        index_name = text_processing.unite_project_name(
-            str(remove_items_info["project"]), self.app_config.esProjectIndexPrefix
+        index_name = get_index_name(
+            str(remove_items_info["project"]), self.app_config.esProjectIndexPrefix, "rp_log_item"
         )
         deleted_logs = self.delete_by_query(
             index_name, remove_items_info["itemsToDelete"], self.build_delete_query_by_test_items
@@ -390,7 +410,7 @@ class EsClient:
         launch_ids = remove_launches_info["launch_ids"]
         LOGGER.info("Started removing launches")
         t_start = time()
-        index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
+        index_name = get_index_name(project, self.app_config.esProjectIndexPrefix, "rp_log_item")
         deleted_logs = self.delete_by_query(
             index_name,
             launch_ids,
@@ -430,7 +450,7 @@ class EsClient:
         return query
 
     def get_launch_ids_by_start_time_range(self, project: int, start_date: str, end_date: str) -> list[str]:
-        index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
+        index_name = get_index_name(project, self.app_config.esProjectIndexPrefix, "rp_log_item")
         query = self.__time_range_query("launch_start_time", start_date, end_date, for_scan=True)
         launch_ids = set()
         for log in opensearchpy.helpers.scan(self.es_client, query=query, index=index_name):
@@ -438,13 +458,13 @@ class EsClient:
         return list(launch_ids)
 
     def remove_by_launch_start_time_range(self, project: int, start_date: str, end_date: str) -> int:
-        index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
+        index_name = get_index_name(project, self.app_config.esProjectIndexPrefix, "rp_log_item")
         query = self.__time_range_query("launch_start_time", start_date, end_date)
         delete_response = self.es_client.delete_by_query(index=index_name, body=query)
         return delete_response["deleted"]
 
     def get_log_ids_by_log_time_range(self, project: int, start_date: str, end_date: str) -> list[str]:
-        index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
+        index_name = get_index_name(project, self.app_config.esProjectIndexPrefix, "rp_log_item")
         query = self.__time_range_query("log_time", start_date, end_date, for_scan=True)
         log_ids = set()
         for log in opensearchpy.helpers.scan(self.es_client, query=query, index=index_name):
@@ -452,7 +472,7 @@ class EsClient:
         return list(log_ids)
 
     def remove_by_log_time_range(self, project: int, start_date: str, end_date: str) -> int:
-        index_name = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
+        index_name = get_index_name(project, self.app_config.esProjectIndexPrefix, "rp_log_item")
         query = self.__time_range_query("log_time", start_date, end_date)
         delete_response = self.es_client.delete_by_query(index=index_name, body=query)
         return delete_response["deleted"]

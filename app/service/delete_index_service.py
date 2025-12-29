@@ -15,13 +15,12 @@
 from time import time
 from typing import Optional
 
-from app.commons import logging
+from app.commons import esclient, logging
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.trigger_manager import TriggerManager
-from app.utils import text_processing
 
 LOGGER = logging.getLogger("analyzerApp.deleteIndexService")
 
@@ -64,7 +63,7 @@ class DeleteIndexService:
         LOGGER.info("Started deleting index")
         t_start = time()
         is_index_deleted = self.es_client.delete_index(
-            text_processing.unite_project_name(index_name, self.app_config.esProjectIndexPrefix)
+            esclient.get_index_name(index_name, self.app_config.esProjectIndexPrefix, "rp_log_item")
         )
         self.namespace_finder.remove_namespaces(index_name)
         self.trigger_manager.delete_triggers(index_name)

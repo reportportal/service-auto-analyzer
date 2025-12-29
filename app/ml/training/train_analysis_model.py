@@ -23,7 +23,7 @@ import scipy.stats as stats
 from imblearn.over_sampling import BorderlineSMOTE
 from sklearn.model_selection import train_test_split
 
-from app.commons import logging, namespace_finder, object_saving
+from app.commons import esclient, logging, namespace_finder, object_saving
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType, TrainInfo
@@ -240,7 +240,7 @@ class AnalysisModelTraining:
 
     def query_logs(self, project_id: int, log_ids_to_find: list[str]) -> dict[str, Any]:
         log_ids_to_find = list(log_ids_to_find)
-        project_index_name = text_processing.unite_project_name(str(project_id), self.app_config.esProjectIndexPrefix)
+        project_index_name = esclient.get_index_name(project_id, self.app_config.esProjectIndexPrefix, "rp_log_item")
         batch_size = 1000
         log_id_dict = {}
         for i in range(int(len(log_ids_to_find) / batch_size) + 1):
@@ -287,9 +287,7 @@ class AnalysisModelTraining:
         log_ids_to_find = set()
         gathered_suggested_data = []
         log_id_pairs_set = set()
-        index_name = text_processing.unite_project_name(
-            str(project_id) + "_suggest", self.app_config.esProjectIndexPrefix
-        )
+        index_name = esclient.get_index_name(str(project_id), self.app_config.esProjectIndexPrefix, "rp_suggest_info")
         max_number_of_logs = 30000
         cur_number_of_logs = 0
         cur_number_of_logs_0 = 0

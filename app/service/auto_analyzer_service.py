@@ -20,7 +20,7 @@ from time import time
 from typing import Any, Optional
 
 from app.amqp.amqp import AmqpClient
-from app.commons import log_merger, logging, request_factory
+from app.commons import esclient, log_merger, logging, request_factory
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import (
     AnalysisCandidate,
@@ -407,7 +407,9 @@ class AutoAnalyzerService(AnalyzerService):
 
         try:
             for launch in launches:
-                index_name = text_processing.unite_project_name(launch.project, self.app_config.esProjectIndexPrefix)
+                index_name = esclient.get_index_name(
+                    launch.project, self.app_config.esProjectIndexPrefix, "rp_log_item"
+                )
                 if not self.es_client.index_exists(index_name):
                     continue
 

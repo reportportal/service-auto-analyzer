@@ -22,7 +22,7 @@ from typing import Optional
 import opensearchpy.helpers
 
 from app.amqp.amqp import AmqpClient
-from app.commons import log_merger, logging, request_factory, similarity_calculator
+from app.commons import esclient, log_merger, logging, request_factory, similarity_calculator
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import (
     AnalyzerConf,
@@ -175,7 +175,9 @@ class SuggestService(AnalyzerService):
 
     def query_es_for_suggested_items(self, test_item_info: TestItemInfo, logs: list[dict]) -> list[tuple[dict, dict]]:
         full_results = []
-        index_name = text_processing.unite_project_name(test_item_info.project, self.app_config.esProjectIndexPrefix)
+        index_name = esclient.get_index_name(
+            test_item_info.project, self.app_config.esProjectIndexPrefix, "rp_log_item"
+        )
 
         for log in logs:
             message = log["_source"]["message"].strip()
@@ -395,7 +397,9 @@ class SuggestService(AnalyzerService):
     def suggest_items(self, test_item_info: TestItemInfo) -> list[SuggestAnalysisResult]:
         LOGGER.info(f"Started suggesting for test item with id: {test_item_info.testItemId}")
         LOGGER.debug(f"Started suggesting items by request: {test_item_info.model_dump_json()}")
-        index_name = text_processing.unite_project_name(test_item_info.project, self.app_config.esProjectIndexPrefix)
+        index_name = esclient.get_index_name(
+            test_item_info.project, self.app_config.esProjectIndexPrefix, "rp_log_item"
+        )
         if not self.es_client.index_exists(index_name):
             LOGGER.info(f"Project {index_name} doesn't exist.")
             LOGGER.info("Finished suggesting for test item with 0 results.")

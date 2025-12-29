@@ -20,11 +20,11 @@ from typing import Optional
 import opensearchpy.helpers
 
 from app.amqp.amqp import AmqpClient
-from app.commons import logging, request_factory
+from app.commons import esclient, logging, request_factory
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, Launch, TestItem
 from app.commons.model.ml import ModelType, TrainInfo
-from app.utils import text_processing, utils
+from app.utils import utils
 
 LOGGER = logging.getLogger("analyzerApp.indexService")
 
@@ -85,7 +85,8 @@ class IndexService:
         if project is None:
             return BulkResponse(took=0, errors=False)
 
-        project_with_prefix = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
+        # TODO: Theoretically, Launches can be for several projects
+        project_with_prefix = esclient.get_index_name(project, self.app_config.esProjectIndexPrefix, "rp_log_item")
         self.es_client.create_index_if_not_exists(project_with_prefix)
         test_item_ids, bodies = self._to_index_bodies(project_with_prefix, test_item_queue)
         logs_with_exceptions = utils.extract_all_exceptions(bodies)
@@ -130,8 +131,8 @@ class IndexService:
         defect_update_info["itemsToUpdate"] = {
             int(key_): val for key_, val in defect_update_info["itemsToUpdate"].items()
         }
-        index_name = text_processing.unite_project_name(
-            defect_update_info["project"], self.app_config.esProjectIndexPrefix
+        index_name = esclient.get_index_name(
+            defect_update_info["project"], self.app_config.esProjectIndexPrefix, "rp_log_item"
         )
         if not self.es_client.index_exists(index_name):
             return test_item_ids

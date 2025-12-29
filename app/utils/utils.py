@@ -58,6 +58,11 @@ def read_json_file(folder: str, filename: str, to_json: bool = False) -> Any:
     return content if not to_json else json.loads(content)
 
 
+def read_resource_file(filename: str, to_json: bool = False) -> Any:
+    """Read fixture from file."""
+    return read_json_file("res", filename, to_json)
+
+
 def validate_folder(folder_path: str) -> bool:
     """Check that passed path points to a directory and it exists."""
     return bool(folder_path and folder_path.strip() and os.path.exists(folder_path) and os.path.isdir(folder_path))

@@ -799,10 +799,6 @@ def transform_string_feature_range_into_list(text: str) -> list[int]:
     return values
 
 
-def unite_project_name(project_id: str | int, prefix: str) -> str:
-    return f"{prefix}{project_id}"
-
-
 def replace_text_pieces(text: str, text_pieces: Iterable[str]) -> str:
     result = text
     for w in sorted(text_pieces, key=lambda x: len(x), reverse=True):

@@ -17,7 +17,7 @@ from typing import Optional
 
 import opensearchpy.helpers
 
-from app.commons import logging
+from app.commons import esclient, logging
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig, SuggestPattern, SuggestPatternLabel
 from app.utils import text_processing, utils
@@ -96,7 +96,7 @@ class SuggestPatternsService:
         return suggested_patterns_without_labels
 
     def suggest_patterns(self, project_id: int) -> SuggestPattern:
-        index_name = text_processing.unite_project_name(project_id, self.app_config.esProjectIndexPrefix)
+        index_name = esclient.get_index_name(project_id, self.app_config.esProjectIndexPrefix, "rp_log_item")
         LOGGER.info("Started suggesting patterns for project '%s'", index_name)
         t_start = time()
         found_data = []

@@ -157,7 +157,7 @@ class EsClient:
             index=index_name,
             body={
                 "settings": utils.read_json_file("res", "index_settings.json", to_json=True),
-                "mappings": utils.read_json_file("res", "index_mapping_settings.json", to_json=True),
+                "mappings": utils.read_json_file("res", "log_item_index_mappings.json", to_json=True),
             },
         )
         LOGGER.debug(f"Index '{index_name}' created")

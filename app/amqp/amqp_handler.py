@@ -213,9 +213,7 @@ class ProcessAmqpRequestHandler:
 
         # Setup process communication
         self.processor = RealProcessor(
-            app_config,
-            search_config,
-            Worker(self._init_services).work,
+            Worker(app_config, search_config, self._init_services).work,
         )
         self._shutdown = False
 
@@ -273,9 +271,7 @@ class ProcessAmqpRequestHandler:
 
         # Create new processor instance
         self.processor = RealProcessor(
-            self.app_config,
-            self.search_config,
-            Worker(self._init_services).work,
+            Worker(self.app_config, self.search_config, self._init_services).work,
         )
         LOGGER.info("Successfully restarted processor process")
 

@@ -159,7 +159,7 @@ class ProcessAmqpRequestHandler:
     queue_size: int
     routing_key_predicate: Callable[[str], bool]
     counter: AtomicInteger
-    queue: PriorityQueue[ProcessingItem]
+    queue: Queue[ProcessingItem]
     __running_tasks: Queue[ProcessingItem]
     processor: Processor
     _monitor_thread: Optional[threading.Thread]

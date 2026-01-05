@@ -21,7 +21,7 @@ import opensearchpy.helpers
 from app.amqp.amqp import AmqpClient
 from app.commons import esclient, logging
 from app.commons.esclient import EsClient
-from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, CleanIndexStrIds
+from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, CleanIndexStrIds, SuggestAnalysisResult
 from app.commons.model.ml import ModelType, TrainInfo
 
 LOGGER = logging.getLogger("analyzerApp.suggestInfoService")
@@ -68,7 +68,7 @@ class SuggestInfoService:
             bodies.append({"_index": RP_SUGGEST_METRICS_INDEX_TEMPLATE, "_source": chosen_data})
         self.es_client.bulk_index(bodies)
 
-    def index_suggest_info(self, suggest_info_list: list) -> BulkResponse:
+    def index_suggest_info(self, suggest_info_list: list[SuggestAnalysisResult]) -> BulkResponse:
         LOGGER.info("Started saving suggest_info_list")
         t_start = time()
         bodies = []

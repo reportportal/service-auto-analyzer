@@ -27,12 +27,6 @@
       "type": "date",
       "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
     },
-    "is_auto_analyzed": {
-      "type": "boolean"
-    },
-    "issue_type": {
-      "type": "keyword"
-    },
     "start_time": {
       "type": "date",
       "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
@@ -154,6 +148,25 @@
         "whole_message": {
           "type": "text",
           "analyzer": "standard_english_analyzer"
+        }
+      }
+    },
+    "issue_history": {
+      "type": "nested",
+      "properties": {
+        "is_auto_analyzed": {
+          "type": "boolean"
+        },
+        "issue_type": {
+          "type": "keyword"
+        },
+        "timestamp": {
+          "type": "date",
+          "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        },
+        "issue_comment": {
+          "type": "text",
+          "index": false
         }
       }
     }

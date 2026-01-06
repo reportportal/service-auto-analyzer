@@ -340,8 +340,8 @@ def prepare_test_items(
     vectorizer = None
     for test_item in launch.testItems:
         # Prepare test item level fields
-        launch_start_time = datetime(*launch.launchStartTime[:6]).strftime("%Y-%m-%d %H:%M:%S")  # type: ignore[arg-type]
-        test_item_start_time = datetime(*test_item.startTime[:6]).strftime("%Y-%m-%d %H:%M:%S")  # type: ignore[arg-type]
+        launch_time = datetime(*launch.launchStartTime[:6]).strftime("%Y-%m-%d %H:%M:%S")  # type: ignore[arg-type]
+        test_item_time = datetime(*test_item.startTime[:6]).strftime("%Y-%m-%d %H:%M:%S")  # type: ignore[arg-type]
         test_item_name = text_processing.preprocess_test_item_name(test_item.testItemName)
         issue_type = transform_issue_type_into_lowercase(test_item.issueType)
         number_of_lines = launch.analyzerConfig.numberOfLogLines
@@ -368,10 +368,10 @@ def prepare_test_items(
                 launch_id=str(launch.launchId),
                 launch_name=launch.launchName,
                 launch_number=str(getattr(launch, "launchNumber", 0)),
-                launch_start_time=launch_start_time,
+                launch_start_time=launch_time,
                 is_auto_analyzed=test_item.isAutoAnalyzed,
                 issue_type=issue_type,
-                start_time=test_item_start_time,
+                start_time=test_item_time,
                 log_count=len(prepared_logs),
                 logs=prepared_logs,
             )

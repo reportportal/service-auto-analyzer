@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 """Test Item-centric index data model for OpenSearch storage."""
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -82,7 +83,7 @@ class TestItemIndexData(BaseModel):
     log_count: int = Field(description="Number of logs in this Test Item")
     logs: list[LogData] = Field(description="Nested log entries")
 
-    def to_index_dict(self) -> dict:
+    def to_index_dict(self) -> dict[str, Any]:
         """
         Convert the model to a dictionary suitable for OpenSearch indexing.
 
@@ -91,11 +92,11 @@ class TestItemIndexData(BaseModel):
         return self.model_dump()
 
     @classmethod
-    def from_dict(cls, data: dict) -> "TestItemIndexData":
+    def from_dict(cls, data: dict[str, Any]) -> "TestItemIndexData":
         """
         Create TestItemIndexData instance from dictionary.
 
         :param data: Dictionary containing test item data
         :return: TestItemIndexData instance
         """
-        return cls(**data)
+        return cls.model_validate(data)

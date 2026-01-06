@@ -318,45 +318,62 @@ def _prepare_log_data(log: Log, log_order: int, number_of_lines: int) -> LogData
     )
 
 
-def prepare_test_item(
+def prepare_test_items(
     launch: Launch,
-    test_item: TestItem,
-) -> TestItemIndexData:
-    """
-    Prepare a Test Item for Test Item-centric OpenSearch indexing.
+    maximum_log_number_to_take: int = 20,
+    minimal_log_level: int = utils.ERROR_LOGGING_LEVEL,
+    similarity_threshold: float = 0.95,
+) -> list[TestItemIndexData]:
+    """Prepare a Test Item list for Test Item-centric OpenSearch indexing.
 
-    This creates a single document containing all test item metadata and
-    nested log entries, enabling holistic test failure analysis.
+    This creates a list of documents containing all test item metadata and nested log entries, enabling holistic test
+    failure analysis.
 
     :param launch: Launch object containing test execution context
-    :param test_item: Test item with logs to be indexed
-    :return: TestItemIndexData object ready for OpenSearch indexing
+    :param maximum_log_number_to_take: maximum number of logs to index
+    :param minimal_log_level: minimum required log level for logs to index
+    :param similarity_threshold: a threshold to drop similar log entries (by text): 1.0 - take all entries (no drop);
+    0.0 - leave only the last log entry (drop all others)
+    :return: a list of TestItemIndexData objects ready for OpenSearch indexing
     """
-    # Prepare test item level fields
-    launch_start_time = datetime(*launch.launchStartTime[:6]).strftime("%Y-%m-%d %H:%M:%S")  # type: ignore[arg-type]
-    test_item_start_time = datetime(*test_item.startTime[:6]).strftime("%Y-%m-%d %H:%M:%S")  # type: ignore[arg-type]
-    test_item_name = text_processing.preprocess_test_item_name(test_item.testItemName)
-    issue_type = transform_issue_type_into_lowercase(test_item.issueType)
-    number_of_lines = launch.analyzerConfig.numberOfLogLines
+    results = []
+    vectorizer = None
+    for test_item in launch.testItems:
+        # Prepare test item level fields
+        launch_start_time = datetime(*launch.launchStartTime[:6]).strftime("%Y-%m-%d %H:%M:%S")  # type: ignore[arg-type]
+        test_item_start_time = datetime(*test_item.startTime[:6]).strftime("%Y-%m-%d %H:%M:%S")  # type: ignore[arg-type]
+        test_item_name = text_processing.preprocess_test_item_name(test_item.testItemName)
+        issue_type = transform_issue_type_into_lowercase(test_item.issueType)
+        number_of_lines = launch.analyzerConfig.numberOfLogLines
 
-    # Prepare all logs as nested objects
-    logs = []
-    for log_order, log in enumerate(test_item.logs):
-        log_data = _prepare_log_data(log, log_order, number_of_lines)
-        logs.append(log_data)
+        # Prepare all logs as nested objects
+        logs = [log for log in test_item.logs if log.logLevel >= minimal_log_level]
+        log_messages = [log.message for log in logs]
+        logs_to_take: list[int] = []
+        if log_messages:
+            vectorizer, logs_to_take = text_processing.find_last_unique_texts(
+                vectorizer, similarity_threshold, log_messages
+            )
+        prepared_logs = []
+        for log_order, log_idx in enumerate(logs_to_take[-maximum_log_number_to_take:]):
+            log_data = _prepare_log_data(logs[log_idx], log_order, number_of_lines)
+            prepared_logs.append(log_data)
 
-    return TestItemIndexData(
-        test_item_id=str(test_item.testItemId),
-        test_item_name=test_item_name,
-        unique_id=test_item.uniqueId,
-        test_case_hash=test_item.testCaseHash,
-        launch_id=str(launch.launchId),
-        launch_name=launch.launchName,
-        launch_number=str(getattr(launch, "launchNumber", 0)),
-        launch_start_time=launch_start_time,
-        is_auto_analyzed=test_item.isAutoAnalyzed,
-        issue_type=issue_type,
-        start_time=test_item_start_time,
-        log_count=len(logs),
-        logs=logs,
-    )
+        results.append(
+            TestItemIndexData(
+                test_item_id=str(test_item.testItemId),
+                test_item_name=test_item_name,
+                unique_id=test_item.uniqueId,
+                test_case_hash=test_item.testCaseHash,
+                launch_id=str(launch.launchId),
+                launch_name=launch.launchName,
+                launch_number=str(getattr(launch, "launchNumber", 0)),
+                launch_start_time=launch_start_time,
+                is_auto_analyzed=test_item.isAutoAnalyzed,
+                issue_type=issue_type,
+                start_time=test_item_start_time,
+                log_count=len(prepared_logs),
+                logs=prepared_logs,
+            )
+        )
+    return results

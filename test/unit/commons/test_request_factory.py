@@ -15,14 +15,14 @@
 """Unit tests for request_factory module."""
 
 from app.commons.model.launch_objects import AnalyzerConf, Launch, Log, TestItem
-from app.commons.request_factory import prepare_test_item
+from app.commons.request_factory import prepare_test_items
 
 
 class TestPrepareTestItem:
     """Test suite for prepare_test_item function."""
 
     def test_prepare_test_item_basic(self):
-        """Test basic test item preparation with single log."""
+        """Test basic item preparation with single log."""
         # Arrange
         log = Log(
             logId=1001,
@@ -50,10 +50,11 @@ class TestPrepareTestItem:
             launchNumber=42,
             launchStartTime=[2025, 1, 15, 22, 0, 0, 0],
             analyzerConfig=AnalyzerConf(numberOfLogLines=-1),
+            testItems=[test_item],
         )
 
         # Act
-        result = prepare_test_item(launch, test_item)
+        result = prepare_test_items(launch)[0]
 
         # Assert - Test Item level fields
         assert result.test_item_id == "12345"
@@ -82,7 +83,7 @@ class TestPrepareTestItem:
         assert log_data.message_words_number > 0
 
     def test_prepare_test_item_multiple_logs(self):
-        """Test test item preparation with multiple logs."""
+        """Test item preparation with multiple logs."""
         # Arrange
         logs = [
             Log(
@@ -123,10 +124,11 @@ class TestPrepareTestItem:
             launchNumber=10,
             launchStartTime=[2025, 1, 15, 22, 0, 0, 0],
             analyzerConfig=AnalyzerConf(numberOfLogLines=-1),
+            testItems=[test_item],
         )
 
         # Act
-        result = prepare_test_item(launch, test_item)
+        result = prepare_test_items(launch)[0]
 
         # Assert
         assert result.test_item_id == "12345"
@@ -141,7 +143,7 @@ class TestPrepareTestItem:
             assert log_data.log_id == str(logs[idx].logId)
 
     def test_prepare_test_item_with_cluster_info(self):
-        """Test test item preparation with clustered logs."""
+        """Test item preparation with clustered logs."""
         # Arrange
         log = Log(
             logId=2001,
@@ -170,10 +172,11 @@ class TestPrepareTestItem:
             launchNumber=5,
             launchStartTime=[2025, 1, 16, 10, 0, 0, 0],
             analyzerConfig=AnalyzerConf(numberOfLogLines=-1),
+            testItems=[test_item],
         )
 
         # Act
-        result = prepare_test_item(launch, test_item)
+        result = prepare_test_items(launch)[0]
 
         # Assert
         assert result.test_item_id == "54321"
@@ -184,7 +187,7 @@ class TestPrepareTestItem:
         assert isinstance(log_data.cluster_with_numbers, bool)
 
     def test_prepare_test_item_empty_logs(self):
-        """Test test item preparation with no logs."""
+        """Test item preparation with no logs."""
         # Arrange
         test_item = TestItem(
             testItemId=99999,
@@ -204,10 +207,11 @@ class TestPrepareTestItem:
             launchNumber=1,
             launchStartTime=[2025, 1, 16, 11, 0, 0, 0],
             analyzerConfig=AnalyzerConf(numberOfLogLines=-1),
+            testItems=[test_item],
         )
 
         # Act
-        result = prepare_test_item(launch, test_item)
+        result = prepare_test_items(launch)[0]
 
         # Assert
         assert result.test_item_id == "99999"
@@ -244,10 +248,11 @@ class TestPrepareTestItem:
             launchNumber=20,
             launchStartTime=[2025, 1, 17, 13, 0, 0, 0],
             analyzerConfig=AnalyzerConf(numberOfLogLines=5),
+            testItems=[test_item],
         )
 
         # Act
-        result = prepare_test_item(launch, test_item)
+        result = prepare_test_items(launch)[0]
 
         # Assert
         log_data = result.logs[0]
@@ -297,10 +302,11 @@ class TestPrepareTestItem:
             launchNumber=30,
             launchStartTime=[2025, 1, 18, 8, 0, 0, 0],
             analyzerConfig=AnalyzerConf(numberOfLogLines=-1),
+            testItems=[test_item],
         )
 
         # Act
-        result = prepare_test_item(launch, test_item)
+        result = prepare_test_items(launch)[0]
         result_dict = result.to_index_dict()
 
         # Assert
@@ -311,3 +317,219 @@ class TestPrepareTestItem:
         assert isinstance(result_dict["logs"], list)
         assert len(result_dict["logs"]) == 1
         assert result_dict["logs"][0]["log_id"] == "4001"
+
+    def test_prepare_multiple_test_items(self):
+        """Test processing multiple test items within a single launch."""
+        first_log = Log(
+            logId=5001,
+            logLevel=40000,
+            logTime=[2025, 1, 19, 9, 0, 0, 0],
+            message="First failure",
+        )
+        second_log = Log(
+            logId=5002,
+            logLevel=40000,
+            logTime=[2025, 1, 19, 9, 5, 0, 0],
+            message="Second failure",
+        )
+
+        first_test_item = TestItem(
+            testItemId=11111,
+            testItemName="first_item",
+            uniqueId="auto:first",
+            testCaseHash=111,
+            isAutoAnalyzed=False,
+            issueType="PB001",
+            startTime=[2025, 1, 19, 9, 0, 0, 0],
+            logs=[first_log],
+        )
+        second_test_item = TestItem(
+            testItemId=22222,
+            testItemName="second_item",
+            uniqueId="auto:second",
+            testCaseHash=222,
+            isAutoAnalyzed=True,
+            issueType="AB001",
+            startTime=[2025, 1, 19, 9, 10, 0, 0],
+            logs=[second_log],
+        )
+
+        launch = Launch(
+            launchId=700,
+            project=7,
+            launchName="multi_items",
+            launchNumber=2,
+            launchStartTime=[2025, 1, 19, 8, 45, 0, 0],
+            analyzerConfig=AnalyzerConf(numberOfLogLines=-1),
+            testItems=[first_test_item, second_test_item],
+        )
+
+        # Act
+        results = prepare_test_items(launch)
+
+        # Assert
+        assert len(results) == 2
+        first_result, second_result = results
+        assert first_result.test_item_id == "11111"
+        assert first_result.log_count == 1
+        assert second_result.test_item_id == "22222"
+        assert second_result.log_count == 1
+
+    def test_prepare_test_item_similarity_thresholds(self):
+        """Test log deduplication with different similarity thresholds."""
+        logs = [
+            Log(
+                logId=6001,
+                logLevel=40000,
+                logTime=[2025, 1, 20, 10, 0, 0, 0],
+                message="Timeout error while connecting to database",
+            ),
+            Log(
+                logId=6002,
+                logLevel=40000,
+                logTime=[2025, 1, 20, 10, 1, 0, 0],
+                message="Timeout error while connecting to database again",
+            ),
+            Log(
+                logId=6003,
+                logLevel=40000,
+                logTime=[2025, 1, 20, 10, 2, 0, 0],
+                message="Different failure occurred during processing",
+            ),
+        ]
+        test_item = TestItem(
+            testItemId=33333,
+            testItemName="deduplication_item",
+            uniqueId="auto:dedup",
+            testCaseHash=333,
+            isAutoAnalyzed=False,
+            issueType="PB001",
+            startTime=[2025, 1, 20, 9, 59, 0, 0],
+            logs=logs,
+        )
+        base_launch = Launch(
+            launchId=800,
+            project=8,
+            launchName="dedup_launch",
+            launchNumber=3,
+            launchStartTime=[2025, 1, 20, 9, 45, 0, 0],
+            analyzerConfig=AnalyzerConf(numberOfLogLines=-1),
+            testItems=[test_item],
+        )
+
+        # Act - threshold 1.0 preserves all distinct logs
+        all_logs_result = prepare_test_items(base_launch, similarity_threshold=1.0)[0]
+        # Act - threshold 0.0 keeps only the last log
+        last_log_only_result = prepare_test_items(base_launch, similarity_threshold=0.0)[0]
+        # Act - threshold 0.5 merges similar first two logs, keeps different third
+        merged_logs_result = prepare_test_items(base_launch, similarity_threshold=0.5)[0]
+
+        # Assert
+        assert all_logs_result.log_count == 3
+        assert [log_data.log_id for log_data in all_logs_result.logs] == ["6001", "6002", "6003"]
+
+        assert last_log_only_result.log_count == 1
+        assert [log_data.log_id for log_data in last_log_only_result.logs] == ["6003"]
+
+        assert merged_logs_result.log_count == 2
+        assert [log_data.log_id for log_data in merged_logs_result.logs] == ["6002", "6003"]
+
+    def test_prepare_test_item_maximum_log_number_to_take(self):
+        """Test that only the configured number of logs are taken after deduplication."""
+        logs = [
+            Log(
+                logId=7001,
+                logLevel=40000,
+                logTime=[2025, 1, 21, 11, 0, 0, 0],
+                message="First unique error",
+            ),
+            Log(
+                logId=7002,
+                logLevel=40000,
+                logTime=[2025, 1, 21, 11, 1, 0, 0],
+                message="Second unique error",
+            ),
+            Log(
+                logId=7003,
+                logLevel=40000,
+                logTime=[2025, 1, 21, 11, 2, 0, 0],
+                message="Third unique error",
+            ),
+            Log(
+                logId=7004,
+                logLevel=40000,
+                logTime=[2025, 1, 21, 11, 3, 0, 0],
+                message="Fourth unique error",
+            ),
+        ]
+        test_item = TestItem(
+            testItemId=44444,
+            testItemName="limit_logs_item",
+            uniqueId="auto:limit",
+            testCaseHash=444,
+            isAutoAnalyzed=False,
+            issueType="PB001",
+            startTime=[2025, 1, 21, 10, 59, 0, 0],
+            logs=logs,
+        )
+        launch = Launch(
+            launchId=900,
+            project=9,
+            launchName="limit_launch",
+            launchNumber=4,
+            launchStartTime=[2025, 1, 21, 10, 45, 0, 0],
+            analyzerConfig=AnalyzerConf(numberOfLogLines=-1),
+            testItems=[test_item],
+        )
+
+        # Act
+        result = prepare_test_items(launch, maximum_log_number_to_take=2, similarity_threshold=1.0)[0]
+
+        # Assert - only the last two logs remain, log order reset
+        assert result.log_count == 2
+        assert [log_data.log_id for log_data in result.logs] == ["7003", "7004"]
+        assert [log_data.log_order for log_data in result.logs] == [0, 1]
+
+    def test_prepare_test_item_minimal_log_level_filter(self):
+        """Test that logs below minimal_log_level are filtered out."""
+        logs = [
+            Log(
+                logId=8001,
+                logLevel=20000,
+                logTime=[2025, 1, 22, 12, 0, 0, 0],
+                message="Info level message",
+            ),
+            Log(
+                logId=8002,
+                logLevel=40000,
+                logTime=[2025, 1, 22, 12, 1, 0, 0],
+                message="Error level message",
+            ),
+        ]
+        test_item = TestItem(
+            testItemId=55555,
+            testItemName="log_level_filter_item",
+            uniqueId="auto:level",
+            testCaseHash=555,
+            isAutoAnalyzed=False,
+            issueType="PB001",
+            startTime=[2025, 1, 22, 11, 59, 0, 0],
+            logs=logs,
+        )
+        launch = Launch(
+            launchId=1000,
+            project=10,
+            launchName="log_level_launch",
+            launchNumber=5,
+            launchStartTime=[2025, 1, 22, 11, 45, 0, 0],
+            analyzerConfig=AnalyzerConf(numberOfLogLines=-1),
+            testItems=[test_item],
+        )
+
+        # Act
+        result = prepare_test_items(launch, minimal_log_level=30000, similarity_threshold=1.0)[0]
+
+        # Assert
+        assert result.log_count == 1
+        assert len(result.logs) == 1
+        assert result.logs[0].log_id == "8002"

@@ -645,8 +645,8 @@ class OsClient:
             return BulkResponse(took=0, errors=False)
 
         index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
-        if not self._ensure_index_exists(index_name):
-            LOGGER.error(f"Failed to ensure index exists: {index_name}")
+        if not self._index_exists(index_name, print_error=True):
+            LOGGER.error(f"Index not exists: {index_name}")
             return BulkResponse(took=0, errors=True)
 
         bodies: list[dict[str, Any]] = []

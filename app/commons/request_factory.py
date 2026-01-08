@@ -17,7 +17,7 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from app.commons.model.launch_objects import Launch, Log, TestItem, TestItemInfo
+from app.commons.model.launch_objects import ERROR_LOGGING_LEVEL, Launch, Log, TestItem, TestItemInfo
 from app.commons.model.test_item_index import LogData, TestItemIndexData
 from app.commons.prepared_log import PreparedLogMessage, PreparedLogMessageClustering
 from app.utils import text_processing, utils
@@ -196,7 +196,7 @@ def prepare_log_words(launches: list[Launch]) -> tuple[dict[str, int], Optional[
         project = launch.project
         for test_item in launch.testItems:
             for log in test_item.logs:
-                if log.logLevel < utils.ERROR_LOGGING_LEVEL or not log.message.strip():
+                if log.logLevel < ERROR_LOGGING_LEVEL or not log.message.strip():
                     continue
                 cleaned_message = unify_message(log.message)
                 _, stacktrace = text_processing.detect_log_description_and_stacktrace(cleaned_message)
@@ -217,7 +217,7 @@ def prepare_logs_for_clustering(launch: Launch, project: str) -> list[list[dict[
     for test_item in launch.testItems:
         prepared_logs = []
         for log in test_item.logs:
-            if log.logLevel < utils.ERROR_LOGGING_LEVEL:
+            if log.logLevel < ERROR_LOGGING_LEVEL:
                 continue
             prepared_logs.append(prepare_log_clustering_light(launch, test_item, log, project))
         log_messages.append(prepared_logs)
@@ -320,9 +320,9 @@ def _prepare_log_data(log: Log, log_order: int, number_of_lines: int) -> LogData
 
 def prepare_test_items(
     launch: Launch,
-    maximum_log_number_to_take: int = 20,
-    minimal_log_level: int = utils.ERROR_LOGGING_LEVEL,
-    similarity_threshold: float = 0.95,
+    number_of_logs_to_index: int = 20,
+    minimal_log_level: int = ERROR_LOGGING_LEVEL,
+    similarity_threshold_to_drop: float = 0.95,
 ) -> list[TestItemIndexData]:
     """Prepare a Test Item list for Test Item-centric OpenSearch indexing.
 
@@ -330,9 +330,9 @@ def prepare_test_items(
     failure analysis.
 
     :param launch: Launch object containing test execution context
-    :param maximum_log_number_to_take: maximum number of logs to index
+    :param number_of_logs_to_index: maximum number of log entries to index
     :param minimal_log_level: minimum required log level for logs to index
-    :param similarity_threshold: a threshold to drop similar log entries (by text): 1.0 - take all entries (no drop);
+    :param similarity_threshold_to_drop: a threshold to drop similar log entries (by text): 1.0 - take all entries (no drop);
     0.0 - leave only the last log entry (drop all others)
     :return: a list of TestItemIndexData objects ready for OpenSearch indexing
     """
@@ -352,10 +352,10 @@ def prepare_test_items(
         logs_to_take: list[int] = []
         if log_messages:
             vectorizer, logs_to_take = text_processing.find_last_unique_texts(
-                vectorizer, similarity_threshold, log_messages
+                vectorizer, similarity_threshold_to_drop, log_messages
             )
         prepared_logs = []
-        for log_order, log_idx in enumerate(logs_to_take[-maximum_log_number_to_take:]):
+        for log_order, log_idx in enumerate(logs_to_take[-number_of_logs_to_index:]):
             log_data = _prepare_log_data(logs[log_idx], log_order, number_of_lines)
             prepared_logs.append(log_data)
 

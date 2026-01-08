@@ -25,7 +25,7 @@ from sklearn.model_selection import train_test_split
 
 from app.commons import esclient, logging, object_saving
 from app.commons.esclient import EsClient
-from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
+from app.commons.model.launch_objects import ERROR_LOGGING_LEVEL, ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType, QueryResult, TrainInfo
 from app.commons.model_chooser import ModelChooser
 from app.ml.models import CustomDefectTypeModel, DefectTypeModel
@@ -215,7 +215,7 @@ class DefectTypeModelTraining:
             "query": {
                 "bool": {
                     "filter": [
-                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
+                        {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
                         {"exists": {"field": "issue_type"}},
                         {"term": {"is_merged": False}},
                     ],

@@ -23,6 +23,7 @@ from app.amqp.amqp import AmqpClient
 from app.commons import esclient, log_merger, logging, request_factory
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import (
+    ERROR_LOGGING_LEVEL,
     AnalysisCandidate,
     AnalysisResult,
     AnalyzerConf,
@@ -84,7 +85,7 @@ def _prepare_logs(launch: Launch, test_item: TestItem, index_name: str) -> list[
     prepared_logs = [
         request_factory.prepare_log(launch, test_item, log, index_name)
         for log in unique_logs
-        if log.logLevel >= utils.ERROR_LOGGING_LEVEL
+        if log.logLevel >= ERROR_LOGGING_LEVEL
     ]
     results, _ = log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
     return results
@@ -226,7 +227,7 @@ class AutoAnalyzerService(AnalyzerService):
             "query": {
                 "bool": {
                     "filter": [
-                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
+                        {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
                         {"exists": {"field": "issue_type"}},
                     ],
                     "must_not": [
@@ -421,9 +422,7 @@ class AutoAnalyzerService(AnalyzerService):
                     for log in logs:
                         message = log["_source"]["message"].strip()
                         merged_logs = log["_source"]["merged_small_logs"].strip()
-                        if log["_source"]["log_level"] < utils.ERROR_LOGGING_LEVEL or (
-                            not message and not merged_logs
-                        ):
+                        if log["_source"]["log_level"] < ERROR_LOGGING_LEVEL or (not message and not merged_logs):
                             continue
                         for query_type, query in [
                             ("without no defect", self.build_analyze_query(launch, log)),

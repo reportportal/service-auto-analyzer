@@ -22,7 +22,7 @@ from opensearchpy import OpenSearch, RequestsHttpConnection
 from urllib3.exceptions import InsecureRequestWarning
 
 from app.commons import log_merger, logging
-from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, CleanIndex, Response
+from app.commons.model.launch_objects import ERROR_LOGGING_LEVEL, ApplicationConfig, BulkResponse, CleanIndex, Response
 from app.utils import text_processing, utils
 
 TABLES_TO_RECREATE = ["rp_aa_stats", "rp_model_train_stats", "rp_suggestions_info_metrics"]
@@ -127,7 +127,7 @@ class EsClient:
             "query": {
                 "bool": {
                     "filter": [
-                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
+                        {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
                         {"exists": {"field": "issue_type"}},
                         {"term": {"is_merged": False}},
                         {"terms": {"_id": [str(log_id) for log_id in log_ids]}},

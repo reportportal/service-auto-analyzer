@@ -22,7 +22,7 @@ import opensearchpy.helpers
 from app.amqp.amqp import AmqpClient
 from app.commons import esclient, logging, request_factory
 from app.commons.esclient import EsClient
-from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, Launch, TestItem
+from app.commons.model.launch_objects import ERROR_LOGGING_LEVEL, ApplicationConfig, BulkResponse, Launch, TestItem
 from app.commons.model.ml import ModelType, TrainInfo
 from app.utils import utils
 
@@ -65,7 +65,7 @@ class IndexService:
             launch, test_item = test_item_queue.popleft()
             logs_added = False
             for log in test_item.logs:
-                if log.logLevel < utils.ERROR_LOGGING_LEVEL or not log.message.strip():
+                if log.logLevel < ERROR_LOGGING_LEVEL or not log.message.strip():
                     continue
 
                 bodies.append(request_factory.prepare_log(launch, test_item, log, project_with_prefix))

@@ -30,7 +30,6 @@ from app.commons.model import launch_objects
 from app.utils.text_processing import remove_credentials_from_url, split_words
 
 logger = logging.getLogger("analyzerApp.utils")
-ERROR_LOGGING_LEVEL: int = 40000
 
 
 def ignore_warnings(func):

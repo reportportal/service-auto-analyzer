@@ -26,6 +26,7 @@ from app.amqp.amqp import AmqpClient
 from app.commons import clustering, esclient, log_merger, logging, request_factory
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import (
+    ERROR_LOGGING_LEVEL,
     ApplicationConfig,
     ClusterInfo,
     ClusterResult,
@@ -105,7 +106,7 @@ class ClusterService:
             "query": {
                 "bool": {
                     "filter": [
-                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
+                        {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
                         {"exists": {"field": "issue_type"}},
                     ],
                     "must_not": [

@@ -25,6 +25,7 @@ from app.amqp.amqp import AmqpClient
 from app.commons import esclient, log_merger, logging, request_factory, similarity_calculator
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import (
+    ERROR_LOGGING_LEVEL,
     AnalyzerConf,
     ApplicationConfig,
     SearchConfig,
@@ -182,7 +183,7 @@ class SuggestService(AnalyzerService):
         for log in logs:
             message = log["_source"]["message"].strip()
             merged_small_logs = log["_source"]["merged_small_logs"].strip()
-            if log["_source"]["log_level"] < utils.ERROR_LOGGING_LEVEL or (not message and not merged_small_logs):
+            if log["_source"]["log_level"] < ERROR_LOGGING_LEVEL or (not message and not merged_small_logs):
                 continue
             queries = []
 
@@ -331,7 +332,7 @@ class SuggestService(AnalyzerService):
             "query": {
                 "bool": {
                     "filter": [
-                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
+                        {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
                         {"exists": {"field": "issue_type"}},
                         {"term": {"is_merged": False}},
                     ],
@@ -349,7 +350,7 @@ class SuggestService(AnalyzerService):
             "query": {
                 "bool": {
                     "filter": [
-                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
+                        {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
                         {"exists": {"field": "issue_type"}},
                         {"term": {"is_merged": False}},
                         {"term": {"test_item": test_item_id}},
@@ -389,7 +390,7 @@ class SuggestService(AnalyzerService):
             prepared_logs = [
                 request_factory.prepare_log_for_suggests(test_item_info, log, index_name)
                 for log in unique_logs
-                if log.logLevel >= utils.ERROR_LOGGING_LEVEL
+                if log.logLevel >= ERROR_LOGGING_LEVEL
             ]
         logs, _ = log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
         return logs, test_item_id_for_suggest

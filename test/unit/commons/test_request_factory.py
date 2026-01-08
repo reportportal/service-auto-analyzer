@@ -418,11 +418,11 @@ class TestPrepareTestItem:
         )
 
         # Act - threshold 1.0 preserves all distinct logs
-        all_logs_result = prepare_test_items(base_launch, similarity_threshold=1.0)[0]
+        all_logs_result = prepare_test_items(base_launch, similarity_threshold_to_drop=1.0)[0]
         # Act - threshold 0.0 keeps only the last log
-        last_log_only_result = prepare_test_items(base_launch, similarity_threshold=0.0)[0]
+        last_log_only_result = prepare_test_items(base_launch, similarity_threshold_to_drop=0.0)[0]
         # Act - threshold 0.5 merges similar first two logs, keeps different third
-        merged_logs_result = prepare_test_items(base_launch, similarity_threshold=0.5)[0]
+        merged_logs_result = prepare_test_items(base_launch, similarity_threshold_to_drop=0.5)[0]
 
         # Assert
         assert all_logs_result.log_count == 3
@@ -483,7 +483,7 @@ class TestPrepareTestItem:
         )
 
         # Act
-        result = prepare_test_items(launch, maximum_log_number_to_take=2, similarity_threshold=1.0)[0]
+        result = prepare_test_items(launch, number_of_logs_to_index=2, similarity_threshold_to_drop=1.0)[0]
 
         # Assert - only the last two logs remain, log order reset
         assert result.log_count == 2
@@ -527,7 +527,7 @@ class TestPrepareTestItem:
         )
 
         # Act
-        result = prepare_test_items(launch, minimal_log_level=30000, similarity_threshold=1.0)[0]
+        result = prepare_test_items(launch, minimal_log_level=30000, similarity_threshold_to_drop=1.0)[0]
 
         # Assert
         assert result.log_count == 1

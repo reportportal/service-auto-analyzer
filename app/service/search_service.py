@@ -19,7 +19,14 @@ import opensearchpy.helpers
 
 from app.commons import esclient, log_merger, logging, request_factory, similarity_calculator
 from app.commons.esclient import EsClient
-from app.commons.model.launch_objects import ApplicationConfig, Log, SearchConfig, SearchLogInfo, SearchLogs
+from app.commons.model.launch_objects import (
+    ERROR_LOGGING_LEVEL,
+    ApplicationConfig,
+    Log,
+    SearchConfig,
+    SearchLogInfo,
+    SearchLogs,
+)
 from app.utils import text_processing, utils
 
 LOGGER = logging.getLogger("analyzerApp.searchService")
@@ -60,7 +67,7 @@ class SearchService:
             "query": {
                 "bool": {
                     "filter": [
-                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
+                        {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
                         {"exists": {"field": "issue_type"}},
                     ],
                     "must_not": [{"term": {"test_item": {"value": search_req.itemId, "boost": 1.0}}}],

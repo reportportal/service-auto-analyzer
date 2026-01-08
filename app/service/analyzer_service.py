@@ -15,7 +15,7 @@
 from typing import Any, Optional
 
 from app.commons import logging
-from app.commons.model.launch_objects import AnalyzerConf, Launch, SearchConfig, TestItemInfo
+from app.commons.model.launch_objects import ERROR_LOGGING_LEVEL, AnalyzerConf, Launch, SearchConfig, TestItemInfo
 from app.commons.model.ml import ModelInfo
 from app.commons.model_chooser import ModelChooser
 from app.utils import utils
@@ -155,7 +155,7 @@ class AnalyzerService:
             "query": {
                 "bool": {
                     "filter": [
-                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
+                        {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
                         {"exists": {"field": "issue_type"}},
                     ],
                     "must_not": issue_type_conditions + [{"term": {"test_item": log["_source"]["test_item"]}}],

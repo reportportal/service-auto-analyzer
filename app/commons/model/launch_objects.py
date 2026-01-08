@@ -19,6 +19,8 @@ from pydantic import BaseModel
 
 from app.commons.model.ml import ModelType
 
+ERROR_LOGGING_LEVEL: int = 40000
+
 
 class AnalyzerConf(BaseModel):
     """Analyzer config object"""
@@ -31,6 +33,9 @@ class AnalyzerConf(BaseModel):
     allMessagesShouldMatch: bool = False
     searchLogsMinShouldMatch: int = 95
     uniqueErrorsMinShouldMatch: int = 95
+    numberOfLogsToIndex: int = 20
+    minimumLogLevel: int = ERROR_LOGGING_LEVEL
+    similarityThresholdToDrop: float = 0.95
 
 
 class ApplicationConfig(BaseModel):

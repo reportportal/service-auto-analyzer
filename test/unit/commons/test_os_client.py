@@ -4,7 +4,7 @@ from unittest import mock
 import pytest
 
 from app.commons.model.launch_objects import BulkResponse
-from app.commons.model.test_item_index import LogData, TestItemIndexData
+from app.commons.model.test_item_index import LogData, TestItemIndexData, TestItemUpdateData
 from app.commons.os_client import OsClient, get_test_item_index_name
 from test import APP_CONFIG, DEFAULT_ES_CONFIG
 
@@ -115,13 +115,13 @@ def test_bulk_update_issue_history_not_creates_index_and_return_error(monkeypatc
 
     client = OsClient(app_config, os_client=os_client_mock)
     updates = [
-        {
-            "test_item_id": "ti-1",
-            "is_auto_analyzed": True,
-            "issue_type": "pb001",
-            "timestamp": "2025-01-02T00:00:00Z",
-            "issue_comment": "comment",
-        }
+        TestItemUpdateData(
+            test_item_id="ti-1",
+            is_auto_analyzed=True,
+            issue_type="pb001",
+            timestamp="2025-01-02T00:00:00Z",
+            issue_comment="comment",
+        )
     ]
 
     response = client.bulk_update_issue_history(PROJECT_ID, updates)
@@ -150,13 +150,13 @@ def test_bulk_update_issue_history_success(monkeypatch, os_client_mock, app_conf
 
     client = OsClient(app_config, os_client=os_client_mock)
     updates = [
-        {
-            "test_item_id": "ti-1",
-            "is_auto_analyzed": True,
-            "issue_type": "pb001",
-            "timestamp": "2025-01-02T00:00:00Z",
-            "issue_comment": "comment",
-        }
+        TestItemUpdateData(
+            test_item_id="ti-1",
+            is_auto_analyzed=True,
+            issue_type="pb001",
+            timestamp="2025-01-02T00:00:00Z",
+            issue_comment="comment",
+        )
     ]
 
     response = client.bulk_update_issue_history(PROJECT_ID, updates)
@@ -303,32 +303,6 @@ def test_get_test_item_returns_instance(os_client_mock, app_config, test_item):
     assert result is not None
     assert result.test_item_id == test_item.test_item_id
     assert result.launch_id == test_item.launch_id
-
-
-def test_update_issue_history_builds_script(os_client_mock, app_config):
-    os_client_mock.indices.get.return_value = {}
-    client = OsClient(app_config, os_client=os_client_mock)
-
-    updated = client.update_issue_history(
-        PROJECT_ID,
-        "ti-1",
-        is_auto_analyzed=True,
-        issue_type="ab001",
-        timestamp="2025-01-01T00:00:00Z",
-        issue_comment="comment",
-    )
-
-    assert updated is True
-    os_client_mock.update.assert_called_once()
-
-    _, kwargs = os_client_mock.update.call_args
-    assert kwargs["index"] == get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
-    assert kwargs["id"] == "ti-1"
-    script = kwargs["body"]["script"]
-    assert script["params"]["is_auto_analyzed"] is True
-    assert script["params"]["issue_type"] == "ab001"
-    assert script["params"]["timestamp"] == "2025-01-01T00:00:00Z"
-    assert script["params"]["issue_comment"] == "comment"
 
 
 def test_get_test_item_ids_returns_empty_when_index_missing(monkeypatch, os_client_mock, app_config):

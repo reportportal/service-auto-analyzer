@@ -26,7 +26,7 @@ from urllib3.exceptions import InsecureRequestWarning
 
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, Response
-from app.commons.model.test_item_index import TestItemIndexData
+from app.commons.model.test_item_index import TestItemIndexData, TestItemUpdateData
 from app.utils import text_processing, utils
 
 INDEX_SETTINGS_FILE = "index_settings.json"
@@ -525,7 +525,7 @@ class OsClient:
 
         hits: list[Hit[TestItemIndexData]] = []
         try:
-            kwargs = {}
+            kwargs: dict[str, Any] = {}
             if scroll:
                 kwargs["scroll"] = scroll
             for doc in opensearchpy.helpers.scan(self.os_client, query=query, index=index_name, **kwargs):
@@ -566,65 +566,11 @@ class OsClient:
             test_item_ids.add(hit.source.test_item_id)
         return list(test_item_ids)
 
-    def update_issue_history(
-        self,
-        project_id: str | int,
-        test_item_id: str,
-        is_auto_analyzed: bool,
-        issue_type: str,
-        timestamp: str,
-        issue_comment: str = "",
-    ) -> bool:
-        """Append a new entry to the issue_history array of a Test Item.
-
-        :param project_id: The project identifier
-        :param test_item_id: The test item ID to update
-        :param is_auto_analyzed: Whether this assignment was made by auto-analysis
-        :param issue_type: The assigned issue type
-        :param timestamp: When this issue assignment was made
-        :param issue_comment: Optional comment explaining the issue
-        :return: True if update was successful
-        """
-        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
-        if not self._index_exists(index_name, print_error=False):
-            LOGGER.warning(f"Index '{index_name}' does not exist for issue history update")
-            return False
-
-        script = {
-            "source": """
-                if (ctx._source.issue_history == null) {
-                    ctx._source.issue_history = [];
-                }
-                def newEntry = [
-                    'is_auto_analyzed': params.is_auto_analyzed,
-                    'issue_type': params.issue_type,
-                    'timestamp': params.timestamp,
-                    'issue_comment': params.issue_comment
-                ];
-                ctx._source.issue_history.add(newEntry);
-            """,
-            "lang": "painless",
-            "params": {
-                "is_auto_analyzed": is_auto_analyzed,
-                "issue_type": issue_type,
-                "timestamp": timestamp,
-                "issue_comment": issue_comment,
-            },
-        }
-
-        try:
-            self.os_client.update(index=index_name, id=test_item_id, body={"script": script})
-            return True
-        except Exception as err:
-            LOGGER.exception(f"Error updating issue history for test item {test_item_id}", exc_info=err)
-            return False
-
-    def bulk_update_issue_history(self, project_id: str | int, updates: list[dict[str, Any]]) -> BulkResponse:
+    def bulk_update_issue_history(self, project_id: str | int, updates: list[TestItemUpdateData]) -> BulkResponse:
         """Bulk update issue_history for multiple Test Items.
 
         :param project_id: The project identifier
-        :param updates: List of dicts with keys: test_item_id, is_auto_analyzed, issue_type,
-                        timestamp, issue_comment (optional)
+        :param updates: List of TestItemUpdateData payloads
         :return: BulkResponse with update results
         """
         if not updates:
@@ -637,17 +583,12 @@ class OsClient:
 
         bodies: list[dict[str, Any]] = []
         for update in updates:
-            entry = {
-                "is_auto_analyzed": update["is_auto_analyzed"],
-                "issue_type": update["issue_type"],
-                "timestamp": update["timestamp"],
-                "issue_comment": update.get("issue_comment", ""),
-            }
+            entry = update.to_update_dict()
             bodies.append(
                 {
                     "_op_type": "update",
                     "_index": index_name,
-                    "_id": update["test_item_id"],
+                    "_id": update.test_item_id,
                     "script": {
                         "source": """
                             if (ctx._source.issue_history == null) {

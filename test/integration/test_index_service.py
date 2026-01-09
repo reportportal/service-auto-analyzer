@@ -3,9 +3,8 @@ from unittest import mock
 
 import pytest
 
-from app.commons.model.launch_objects import AnalyzerConf, Launch, DefectUpdate
-from app.commons.model.test_item_index import TestItemIndexData
-from app.commons.model.launch_objects import BulkResponse
+from app.commons.model.launch_objects import AnalyzerConf, BulkResponse, DefectUpdate, Launch
+from app.commons.model.test_item_index import TestItemIndexData, TestItemUpdateData
 from app.service.index_service import IndexService
 from test import APP_CONFIG
 
@@ -110,23 +109,23 @@ def test_defect_update_updates_issue_history_and_docs() -> None:
     project_id, doc_updates = os_client.bulk_update_issue_history.call_args[0]
     assert project_id == 123
     assert len(doc_updates) == 2
-    doc_ids = {doc["test_item_id"] for doc in doc_updates}
+    doc_ids = {doc.test_item_id for doc in doc_updates}
     assert doc_ids == {"1001", "1002"}
-    assert {doc["issue_type"] for doc in doc_updates} == {"pb001", "si002"}
+    assert {doc.issue_type for doc in doc_updates} == {"pb001", "si002"}
 
-    history_updates = os_client.bulk_update_issue_history.call_args[0][1]
-    assert {entry["test_item_id"] for entry in history_updates} == {"1001", "1002"}
+    history_updates: list[TestItemUpdateData] = os_client.bulk_update_issue_history.call_args[0][1]
+    assert {entry.test_item_id for entry in history_updates} == {"1001", "1002"}
 
-    first_entry = next(entry for entry in history_updates if entry["test_item_id"] == "1001")
-    assert first_entry["issue_type"] == "pb001"
-    assert first_entry["issue_comment"] == "user fix"
-    assert first_entry["timestamp"] == "2025-01-02 10:00:00"
-    assert first_entry["is_auto_analyzed"] is False
+    first_entry = next(entry for entry in history_updates if entry.test_item_id == "1001")
+    assert first_entry.issue_type == "pb001"
+    assert first_entry.issue_comment == "user fix"
+    assert first_entry.timestamp == "2025-01-02 10:00:00"
+    assert first_entry.is_auto_analyzed is False
 
-    second_entry = next(entry for entry in history_updates if entry["test_item_id"] == "1002")
-    assert second_entry["issue_type"] == "si002"
-    assert second_entry["issue_comment"] == ""
-    assert second_entry["timestamp"] == timestamp
-    assert second_entry["is_auto_analyzed"] is False
+    second_entry = next(entry for entry in history_updates if entry.test_item_id == "1002")
+    assert second_entry.issue_type == "si002"
+    assert second_entry.issue_comment == ""
+    assert second_entry.timestamp == timestamp
+    assert second_entry.is_auto_analyzed is False
 
     assert set(not_updated) == {9999}

@@ -15,13 +15,13 @@
 from collections import defaultdict
 from datetime import datetime
 from time import time
-from typing import Optional, Union
+from typing import Optional, Union, cast
 
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory
 from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, DefectUpdate, ItemUpdate, Launch
 from app.commons.model.ml import ModelType, TrainInfo
-from app.commons.model.test_item_index import TestItemIndexData
+from app.commons.model.test_item_index import TestItemIndexData, TestItemUpdateData
 from app.commons.os_client import OsClient
 
 LOGGER = logging.getLogger("analyzerApp.indexService")
@@ -120,7 +120,8 @@ class IndexService:
             if isinstance(raw_value, ItemUpdate):
                 issue_type = raw_value.issueType
                 issue_comment = raw_value.issueComment
-                timestamp = format_timestamp(datetime(*raw_value.timestamp))
+                timestamp_values = cast(tuple[int, int, int, int, int, int, int], tuple(raw_value.timestamp))
+                timestamp = format_timestamp(datetime(*timestamp_values))
             else:
                 issue_type = raw_value
                 timestamp = current_timestamp()
@@ -144,7 +145,7 @@ class IndexService:
 
         batch_size = self.app_config.esChunkNumber
         found_test_items: set[str] = set()
-        history_updates: list[dict[str, str | bool]] = []
+        history_updates: list[TestItemUpdateData] = []
 
         for i in range(int(len(test_item_ids) / batch_size) + 1):
             batch_ids = test_item_ids[i * batch_size : (i + 1) * batch_size]
@@ -163,13 +164,13 @@ class IndexService:
                 timestamp = update_payload["timestamp"]
 
                 history_updates.append(
-                    {
-                        "test_item_id": item.test_item_id,
-                        "is_auto_analyzed": False,
-                        "issue_type": issue_type,
-                        "timestamp": timestamp,
-                        "issue_comment": issue_comment,
-                    }
+                    TestItemUpdateData(
+                        test_item_id=item.test_item_id,
+                        is_auto_analyzed=False,
+                        issue_type=issue_type,
+                        timestamp=timestamp,
+                        issue_comment=issue_comment,
+                    )
                 )
 
         if history_updates:

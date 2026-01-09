@@ -470,12 +470,8 @@ class ClusterService:
                 "errors_count": errors_count,
             }
         }
-        if self.app_config.amqpUrl.strip():
-            amqp_client = AmqpClient(self.app_config)
-            amqp_client.send_to_inner_queue("stats_info", json.dumps(results_to_share))
-            amqp_client.close()
 
-        LOGGER.debug("Stats info %s", results_to_share)
+        LOGGER.debug(f"Stats info: {json.dumps(results_to_share)}")
         LOGGER.info("Processed the launch. It took %.2f sec.", time() - t_start)
         LOGGER.info("Finished clustering for the launch with %d clusters.", cluster_num)
         for cluster in clusters:

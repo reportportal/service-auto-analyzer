@@ -64,7 +64,7 @@ def create_log_template() -> dict:
     }
 
 
-def transform_issue_type_into_lowercase(issue_type):
+def transform_issue_type_into_lowercase(issue_type: str) -> str:
     return issue_type[:2].lower() + issue_type[2:]
 
 

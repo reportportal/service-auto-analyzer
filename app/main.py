@@ -297,7 +297,6 @@ def init_amqp_queues():
             "search",
             "suggest",
             "cluster",
-            "stats_info",
             "namespace_finder",
             "suggest_patterns",
             "index_suggest_info",

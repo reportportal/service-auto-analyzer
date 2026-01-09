@@ -40,6 +40,10 @@ def prepare_launches(launches: list) -> list[launch_objects.Launch]:
     return [launch_objects.Launch(**launch) for launch in launches]
 
 
+def prepare_update(update_data: dict) -> launch_objects.DefectUpdate:
+    return launch_objects.DefectUpdate(**update_data)
+
+
 def prepare_suggest_info_list(suggest_info_list: list) -> list[launch_objects.SuggestAnalysisResult]:
     """Function for deserializing array of suggest info results"""
     return [launch_objects.SuggestAnalysisResult(**res) for res in suggest_info_list]
@@ -125,6 +129,11 @@ class ServiceProcessor:
             "prepare_data_func": prepare_launches,
             "prepare_response_data": prepare_index_response_data,
         },
+        "defect_update": {
+            "handler": lambda s: s.index_service.defect_update,
+            "prepare_data_func": prepare_update,
+            "prepare_response_data": to_json,
+        },
         "analyze": {
             "handler": lambda s: AutoAnalyzerService(s.model_chooser, s.app_config, s.search_config).analyze_logs,
             "prepare_data_func": prepare_launches,
@@ -154,9 +163,6 @@ class ServiceProcessor:
             "handler": lambda s: ClusterService(s.app_config, s.search_config).find_clusters,
             "prepare_data_func": prepare_launch_info,
             "prepare_response_data": prepare_index_response_data,
-        },
-        "stats_info": {
-            "handler": lambda s: s.index_service.send_stats_info,
         },
         "namespace_finder": {
             "handler": lambda s: NamespaceFinderService(s.app_config).update_chosen_namespaces,
@@ -189,11 +195,6 @@ class ServiceProcessor:
         },
         "get_model_info": {
             "handler": lambda s: s.analyzer_service.get_model_info,
-            "prepare_data_func": same_data,
-            "prepare_response_data": to_json,
-        },
-        "defect_update": {
-            "handler": lambda s: s.index_service.defect_update,
             "prepare_data_func": same_data,
             "prepare_response_data": to_json,
         },

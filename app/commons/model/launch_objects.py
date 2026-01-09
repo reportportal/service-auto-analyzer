@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel
 
@@ -195,6 +195,19 @@ class Launch(BaseModel):
     analyzerConfig: AnalyzerConf = AnalyzerConf()
     testItems: list[TestItem] = []
     clusters: dict = {}
+
+
+class ItemUpdate(BaseModel):
+    timestamp: list[int] = list(datetime.now().timetuple())[:7]
+    issueType: str
+    issueComment: str = ""
+
+
+class DefectUpdate(BaseModel):
+    """Item update object"""
+
+    project: int | str
+    itemsToUpdate: dict[int | str, Union[str, ItemUpdate]]
 
 
 class LaunchInfoForClustering(BaseModel):

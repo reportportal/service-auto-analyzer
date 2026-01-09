@@ -332,7 +332,8 @@ def prepare_test_items(
     :param launch: Launch object containing test execution context
     :param number_of_logs_to_index: maximum number of log entries to index
     :param minimal_log_level: minimum required log level for logs to index
-    :param similarity_threshold_to_drop: a threshold to drop similar log entries (by text): 1.0 - take all entries (no drop);
+    :param similarity_threshold_to_drop: a threshold to drop similar log entries (by text): 1.0 - take all entries
+                                        (no drop);
     0.0 - leave only the last log entry (drop all others)
     :return: a list of TestItemIndexData objects ready for OpenSearch indexing
     """

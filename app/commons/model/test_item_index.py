@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 """Test Item-centric index data model for OpenSearch storage."""
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -70,18 +70,18 @@ class TestItemIndexData(BaseModel):
     """
 
     test_item_id: str = Field(description="Unique identifier for the Test Item")
-    test_item_name: str = Field(description="Name of the test (preprocessed)")
-    unique_id: str = Field(description="Unique ID from ReportPortal")
-    test_case_hash: int = Field(description="Hash for test case grouping")
+    test_item_name: Optional[str] = Field(default=None, description="Name of the test (preprocessed)")
+    unique_id: Optional[str] = Field(default=None, description="Unique ID from ReportPortal")
+    test_case_hash: Optional[int] = Field(default=None, description="Hash for test case grouping")
     launch_id: str = Field(description="Parent launch identifier")
-    launch_name: str = Field(description="Name of the launch")
-    launch_number: str = Field(description="Launch execution number")
-    launch_start_time: str = Field(description="When the launch started")
-    is_auto_analyzed: bool = Field(description="Whether auto-analysis was applied")
-    issue_type: str = Field(description="Assigned issue type (e.g., pb001, ab001)")
-    start_time: str = Field(description="When the test item started")
-    log_count: int = Field(description="Number of logs in this Test Item")
-    logs: list[LogData] = Field(description="Nested log entries")
+    launch_name: Optional[str] = Field(default=None, description="Name of the launch")
+    launch_number: Optional[str] = Field(default=None, description="Launch execution number")
+    launch_start_time: Optional[str] = Field(default=None, description="When the launch started")
+    is_auto_analyzed: Optional[bool] = Field(default=None, description="Whether auto-analysis was applied")
+    issue_type: Optional[str] = Field(default=None, description="Assigned issue type (e.g., pb001, ab001)")
+    start_time: Optional[str] = Field(default=None, description="When the test item started")
+    log_count: Optional[int] = Field(default=None, description="Number of logs in this Test Item")
+    logs: Optional[list[LogData]] = Field(default=None, description="Nested log entries")
 
     def to_index_dict(self) -> dict[str, Any]:
         """

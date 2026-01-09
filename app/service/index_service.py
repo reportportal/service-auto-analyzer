@@ -139,7 +139,7 @@ class IndexService:
         t_start = time()
 
         project_id = defect_update_info.project
-        normalized_updates = self._normalize_items_to_update(defect_update_info.get("itemsToUpdate", {}))
+        normalized_updates = self._normalize_items_to_update(defect_update_info.itemsToUpdate)
         test_item_ids = list(normalized_updates.keys())
 
         batch_size = self.app_config.esChunkNumber

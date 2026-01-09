@@ -1,8 +1,9 @@
+import datetime
 from unittest import mock
 
 import pytest
 
-from app.commons.model.launch_objects import AnalyzerConf, Launch
+from app.commons.model.launch_objects import AnalyzerConf, Launch, DefectUpdate
 from app.commons.model.test_item_index import TestItemIndexData
 from app.commons.model.launch_objects import BulkResponse
 from app.service.index_service import IndexService
@@ -88,27 +89,30 @@ def test_defect_update_updates_issue_history_and_docs() -> None:
 
     service = IndexService(APP_CONFIG, os_client=os_client)
 
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     defect_update_info = {
         "project": 123,
         "itemsToUpdate": {
-            "1001": {"issue_type": "PB001", "issue_comment": "user fix", "timestamp": "2025-01-02 10:00:00"},
+            "1001": {
+                "issueType": "PB001",
+                "issueComment": "user fix",
+                "timestamp": list(datetime.datetime.fromisoformat("2025-01-02 10:00:00").timetuple())[:7],
+            },
             "1002": "SI002",
             "9999": "AB003",
         },
-        "timestamp": "2025-01-01 00:00:00",
     }
 
-    not_updated = service.defect_update(defect_update_info)
+    not_updated = service.defect_update(DefectUpdate(**defect_update_info))
 
     os_client.get_test_items_by_ids.assert_called_once_with(123, ["1001", "1002", "9999"])
 
-    doc_updates = os_client.bulk_index_raw.call_args[0][0]
+    project_id, doc_updates = os_client.bulk_update_issue_history.call_args[0]
+    assert project_id == 123
     assert len(doc_updates) == 2
-    doc_ids = {doc["_id"] for doc in doc_updates}
+    doc_ids = {doc["test_item_id"] for doc in doc_updates}
     assert doc_ids == {"1001", "1002"}
-    assert {doc["_index"] for doc in doc_updates} == {"rp_123"}
-    assert all(doc["doc"]["is_auto_analyzed"] is False for doc in doc_updates)
-    assert {doc["doc"]["issue_type"] for doc in doc_updates} == {"pb001", "si002"}
+    assert {doc["issue_type"] for doc in doc_updates} == {"pb001", "si002"}
 
     history_updates = os_client.bulk_update_issue_history.call_args[0][1]
     assert {entry["test_item_id"] for entry in history_updates} == {"1001", "1002"}
@@ -122,7 +126,7 @@ def test_defect_update_updates_issue_history_and_docs() -> None:
     second_entry = next(entry for entry in history_updates if entry["test_item_id"] == "1002")
     assert second_entry["issue_type"] == "si002"
     assert second_entry["issue_comment"] == ""
-    assert second_entry["timestamp"] == "2025-01-01 00:00:00"
+    assert second_entry["timestamp"] == timestamp
     assert second_entry["is_auto_analyzed"] is False
 
     assert set(not_updated) == {9999}

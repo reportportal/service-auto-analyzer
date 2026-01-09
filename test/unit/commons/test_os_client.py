@@ -271,8 +271,8 @@ def test_get_launch_ids_by_start_time_range_builds_query(monkeypatch, os_client_
         captured["client"] = self
         captured["query"] = query
         captured["index"] = index
-        yield {"_source": {"launch_id": "l1"}}
-        yield {"_source": {"launch_id": "l2"}}
+        yield {"_source": {"launch_id": "l1", "test_item_id": "t1"}, "_index": index, "_id": "t1"}
+        yield {"_source": {"launch_id": "l2", "test_item_id": "t2"}, "_index": index, "_id": "t2"}
 
     monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", fake_scan)
 
@@ -283,6 +283,7 @@ def test_get_launch_ids_by_start_time_range_builds_query(monkeypatch, os_client_
     assert captured["client"] is os_client_mock
     assert captured["index"] == get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
     assert captured["query"] == {
+        "_source": ["launch_id", "test_item_id"],
         "query": {"range": {"launch_start_time": {"gte": "2025-01-01", "lte": "2025-01-02"}}},
         "size": app_config.esChunkNumber,
     }
@@ -350,8 +351,8 @@ def test_get_test_item_ids_by_start_time_range_builds_query(monkeypatch, os_clie
         captured["client"] = self
         captured["query"] = query
         captured["index"] = index
-        yield {"_source": {"test_item_id": "t1"}}
-        yield {"_source": {"test_item_id": "t2"}}
+        yield {"_source": {"launch_id": "l1", "test_item_id": "t1"}, "_index": index, "_id": "t1"}
+        yield {"_source": {"launch_id": "l2", "test_item_id": "t2"}, "_index": index, "_id": "t2"}
 
     monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", fake_scan)
 
@@ -362,6 +363,7 @@ def test_get_test_item_ids_by_start_time_range_builds_query(monkeypatch, os_clie
     assert captured["client"] is os_client_mock
     assert captured["index"] == get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
     assert captured["query"] == {
+        "_source": ["launch_id", "test_item_id"],
         "query": {"range": {"start_time": {"gte": "2025-01-01", "lte": "2025-01-02"}}},
         "size": app_config.esChunkNumber,
     }
@@ -387,7 +389,7 @@ def test_get_test_items_by_ids_builds_terms_query(monkeypatch, os_client_mock, a
         captured["client"] = self
         captured["query"] = query
         captured["index"] = index
-        yield {"_source": test_item.to_index_dict()}
+        yield {"_source": test_item.to_index_dict(), "_id": test_item.test_item_id, "_index": index}
 
     monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", fake_scan)
     client = OsClient(app_config, os_client=os_client_mock)
@@ -404,29 +406,32 @@ def test_get_test_items_by_ids_builds_terms_query(monkeypatch, os_client_mock, a
     }
 
 
-def test_search_without_scroll_calls_search(os_client_mock, app_config, test_item):
+def test_search_without_scroll_calls_scan(monkeypatch, os_client_mock, app_config, test_item):
     os_client_mock.indices.get.return_value = {}
-    index_name = get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
-    os_client_mock.search.return_value = {
-        "hits": {
-            "hits": [
-                {
-                    "_index": index_name,
-                    "_id": test_item.test_item_id,
-                    "_score": 1.0,
-                    "_source": test_item.to_index_dict(),
-                }
-            ]
+    captured: dict[str, object] = {}
+
+    def fake_scan(self, query, index):
+        captured["client"] = self
+        captured["query"] = query
+        captured["index"] = index
+        yield {
+            "_index": index,
+            "_id": test_item.test_item_id,
+            "_score": 1.0,
+            "_source": test_item.to_index_dict(),
         }
-    }
+
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", fake_scan)
     client = OsClient(app_config, os_client=os_client_mock)
     query = {"query": {"match": {"test_item_id": test_item.test_item_id}}}
 
     results = client.search(PROJECT_ID, query)
 
-    os_client_mock.search.assert_called_once_with(index=index_name, body=query)
     assert len(results) == 1
     assert results[0].source.test_item_id == test_item.test_item_id
+    assert captured["client"] is os_client_mock
+    assert captured["index"] == get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
+    assert captured["query"] == query
 
 
 def test_search_calls_scan_when_scroll_provided(monkeypatch, os_client_mock, app_config, test_item):

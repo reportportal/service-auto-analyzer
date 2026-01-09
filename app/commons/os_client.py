@@ -509,6 +509,31 @@ class OsClient:
             LOGGER.exception("Error in delete_by_test_item_start_time_range", exc_info=err)
             return 0
 
+    def search(
+        self, project_id: str | int, query: dict[str, Any], scroll: Optional[str] = None
+    ) -> list[Hit[TestItemIndexData]]:
+        """Execute a search query and return all results.
+
+        :param project_id: The project identifier
+        :param query: OpenSearch query
+        :param scroll: Optional custom scroll timeout for large result sets
+        :return: List of typed search hits
+        """
+        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
+        if not self._index_exists(index_name, print_error=False):
+            return []
+
+        hits: list[Hit[TestItemIndexData]] = []
+        try:
+            kwargs = {}
+            if scroll:
+                kwargs["scroll"] = scroll
+            for doc in opensearchpy.helpers.scan(self.os_client, query=query, index=index_name, **kwargs):
+                hits.append(Hit[TestItemIndexData].from_dict(doc))
+        except Exception as err:
+            LOGGER.exception("Error in search", exc_info=err)
+        return hits
+
     def get_launch_ids_by_start_time_range(self, project_id: str | int, start_date: str, end_date: str) -> list[str]:
         """Get launch IDs within a start time range.
 
@@ -517,17 +542,11 @@ class OsClient:
         :param end_date: End date in 'yyyy-MM-dd HH:mm:ss' or 'yyyy-MM-dd' format
         :return: List of launch IDs
         """
-        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
-        if not self._index_exists(index_name, print_error=False):
-            return []
-
         query = self._time_range_query("launch_start_time", start_date, end_date, for_scan=True)
+        query["_source"] = ["launch_id", "test_item_id"]  # Narrow down output to just two required fields
         launch_ids: set[str] = set()
-        try:
-            for doc in opensearchpy.helpers.scan(self.os_client, query=query, index=index_name):
-                launch_ids.add(doc["_source"]["launch_id"])
-        except Exception as err:
-            LOGGER.exception("Error in get_launch_ids_by_start_time_range", exc_info=err)
+        for hit in self.search(project_id, query):
+            launch_ids.add(hit.source.launch_id)
         return list(launch_ids)
 
     def get_test_item_ids_by_start_time_range(
@@ -540,45 +559,12 @@ class OsClient:
         :param end_date: End date in 'yyyy-MM-dd HH:mm:ss' or 'yyyy-MM-dd' format
         :return: List of test item IDs
         """
-        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
-        if not self._index_exists(index_name, print_error=False):
-            return []
-
         query = self._time_range_query("start_time", start_date, end_date, for_scan=True)
+        query["_source"] = ["launch_id", "test_item_id"]  # Narrow down output to just two required fields
         test_item_ids: set[str] = set()
-        try:
-            for doc in opensearchpy.helpers.scan(self.os_client, query=query, index=index_name):
-                test_item_ids.add(doc["_source"]["test_item_id"])
-        except Exception as err:
-            LOGGER.exception("Error in get_test_item_ids_by_start_time_range", exc_info=err)
+        for hit in self.search(project_id, query):
+            test_item_ids.add(hit.source.test_item_id)
         return list(test_item_ids)
-
-    def search(
-        self, project_id: str | int, query: dict[str, Any], scroll: Optional[str] = None
-    ) -> list[Hit[TestItemIndexData]]:
-        """Execute a search query and return all results.
-
-        :param project_id: The project identifier
-        :param query: OpenSearch query
-        :param scroll: Optional scroll timeout for large result sets
-        :return: List of typed search hits
-        """
-        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
-        if not self._index_exists(index_name, print_error=False):
-            return []
-
-        hits: list[Hit[TestItemIndexData]] = []
-        try:
-            if scroll:
-                for doc in opensearchpy.helpers.scan(self.os_client, query=query, index=index_name, scroll=scroll):
-                    hits.append(Hit[TestItemIndexData].from_dict(doc))
-            else:
-                response = self.os_client.search(index=index_name, body=query)
-                for doc in response.get("hits", {}).get("hits", []):
-                    hits.append(Hit[TestItemIndexData].from_dict(doc))
-        except Exception as err:
-            LOGGER.exception("Error in search", exc_info=err)
-        return hits
 
     def update_issue_history(
         self,
@@ -710,19 +696,12 @@ class OsClient:
         if not test_item_ids:
             return []
 
-        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
-        if not self._index_exists(index_name, print_error=False):
-            return []
-
         query = {
             "size": self.app_config.esChunkNumber,
             "query": {"terms": {"test_item_id": test_item_ids}},
         }
 
         results: list[TestItemIndexData] = []
-        try:
-            for doc in opensearchpy.helpers.scan(self.os_client, query=query, index=index_name):
-                results.append(TestItemIndexData.from_dict(doc["_source"]))
-        except Exception as err:
-            LOGGER.exception("Error in get_test_items_by_ids", exc_info=err)
+        for hit in self.search(project_id, query):
+            results.append(hit.source)
         return results

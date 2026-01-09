@@ -15,7 +15,6 @@
 import json
 from time import time
 
-from app.amqp.amqp import AmqpClient
 from app.commons import logging, trigger_manager
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import TrainInfo

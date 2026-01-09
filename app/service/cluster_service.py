@@ -22,7 +22,6 @@ from typing import Any, Optional
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 
-from app.amqp.amqp import AmqpClient
 from app.commons import clustering, esclient, log_merger, logging, request_factory
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import (

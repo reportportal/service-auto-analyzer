@@ -1,8 +1,6 @@
 import datetime
 from unittest import mock
 
-import pytest
-
 from app.commons.model.launch_objects import AnalyzerConf, BulkResponse, DefectUpdate, Launch
 from app.commons.model.test_item_index import TestItemIndexData, TestItemUpdateData
 from app.service.index_service import IndexService

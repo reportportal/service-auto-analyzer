@@ -423,15 +423,15 @@ def test_search_without_scroll_calls_scan(monkeypatch, os_client_mock, app_confi
 
     monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", fake_scan)
     client = OsClient(app_config, os_client=os_client_mock)
-    query = {"query": {"match": {"test_item_id": test_item.test_item_id}}}
+    request = {"query": {"match": {"test_item_id": test_item.test_item_id}}}
 
-    results = client.search(PROJECT_ID, query)
+    results = client.search(PROJECT_ID, request)
 
     assert len(results) == 1
     assert results[0].source.test_item_id == test_item.test_item_id
     assert captured["client"] is os_client_mock
     assert captured["index"] == get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
-    assert captured["query"] == query
+    assert captured["query"] == request
 
 
 def test_search_calls_scan_when_scroll_provided(monkeypatch, os_client_mock, app_config, test_item):

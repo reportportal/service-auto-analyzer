@@ -15,8 +15,8 @@ xgboost==1.7.3
 minio==7.2.11
 
 gensim==4.3.3
-urllib3==2.6.0
-werkzeug==3.1.4 # not directly required, pinned by Snyk to avoid a vulnerability
+urllib3==2.6.3
+werkzeug==3.1.5 # not directly required, pinned by Snyk to avoid a vulnerability
 
 # AWS S3 client
 boto3==1.42.2

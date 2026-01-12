@@ -1,6 +1,7 @@
-FROM registry.access.redhat.com/ubi9/python-312@sha256:3da39d0c938994161bdf9b6b13eb2eacd9a023c86dd5166f3da31df171c88780 AS test
+FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:c4bf720deab13a016c345ddc46ac35e32924d42aca225c78e98f5b27c88e4413 AS test
 USER root
-RUN dnf -y upgrade \
+RUN microdnf -y upgrade && microdnf -y install pcre-devel \
+    && microdnf clean all \
     && python -m venv /venv \
     && mkdir /build
 ENV VIRTUAL_ENV=/venv
@@ -18,12 +19,10 @@ RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
 RUN "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir -r requirements-dev.txt
 RUN make test-all
 
-FROM registry.access.redhat.com/ubi9/python-312@sha256:3da39d0c938994161bdf9b6b13eb2eacd9a023c86dd5166f3da31df171c88780 AS builder
+FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:c4bf720deab13a016c345ddc46ac35e32924d42aca225c78e98f5b27c88e4413 AS builder
 USER root
-RUN dnf -y upgrade && dnf -y install pcre-devel \
-    && dnf -y remove emacs-filesystem libjpeg-turbo libtiff libpng wget \
-    && dnf -y autoremove \
-    && dnf clean all \
+RUN microdnf -y upgrade && microdnf -y install pcre-devel \
+    && microdnf clean all \
     && python -m venv /venv \
     && mkdir /build
 ENV VIRTUAL_ENV=/venv
@@ -47,7 +46,7 @@ RUN mkdir /backend \
     && cp -r /build/app /backend/ \
     && cp -r /build/res /backend/
 
-FROM registry.access.redhat.com/ubi9-minimal@sha256:6fc28bcb6776e387d7a35a2056d9d2b985dc4e26031e98a2bd35a7137cd6fd71
+FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:c4bf720deab13a016c345ddc46ac35e32924d42aca225c78e98f5b27c88e4413
 USER root
 WORKDIR /backend/
 COPY --from=builder /backend ./
@@ -57,7 +56,7 @@ COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
 ENV VIRTUAL_ENV="/venv"
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend
 
-RUN microdnf -y upgrade && microdnf -y install python3.12 ca-certificates pcre-devel \
+RUN microdnf -y upgrade && microdnf -y install pcre-devel \
     && microdnf clean all \
     && mkdir -p -m 0744 /backend/storage \
     && source "${VIRTUAL_ENV}/bin/activate"

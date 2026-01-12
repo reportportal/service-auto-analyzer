@@ -56,7 +56,7 @@ COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
 ENV VIRTUAL_ENV="/venv"
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend
 
-RUN microdnf -y upgrade \
+RUN microdnf -y upgrade && microdnf -y install pcre2-devel \
     && microdnf clean all \
     && mkdir -p -m 0744 /backend/storage \
     && source "${VIRTUAL_ENV}/bin/activate"

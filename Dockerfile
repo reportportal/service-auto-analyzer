@@ -1,6 +1,6 @@
 FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:c4bf720deab13a016c345ddc46ac35e32924d42aca225c78e98f5b27c88e4413 AS test
 USER root
-RUN microdnf -y upgrade && microdnf -y install pcre-devel \
+RUN microdnf -y upgrade \
     && microdnf clean all \
     && python -m venv /venv \
     && mkdir /build
@@ -21,7 +21,7 @@ RUN make test-all
 
 FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:c4bf720deab13a016c345ddc46ac35e32924d42aca225c78e98f5b27c88e4413 AS builder
 USER root
-RUN microdnf -y upgrade && microdnf -y install pcre-devel \
+RUN microdnf -y upgrade \
     && microdnf clean all \
     && python -m venv /venv \
     && mkdir /build
@@ -56,7 +56,7 @@ COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
 ENV VIRTUAL_ENV="/venv"
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend
 
-RUN microdnf -y upgrade && microdnf -y install pcre-devel \
+RUN microdnf -y upgrade \
     && microdnf clean all \
     && mkdir -p -m 0744 /backend/storage \
     && source "${VIRTUAL_ENV}/bin/activate"

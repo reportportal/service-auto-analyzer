@@ -1,6 +1,6 @@
 FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:c4bf720deab13a016c345ddc46ac35e32924d42aca225c78e98f5b27c88e4413 AS test
 USER root
-RUN microdnf -y upgrade \
+RUN microdnf -y upgrade && microdnf -y install make \
     && microdnf clean all \
     && python -m venv /venv \
     && mkdir /build
@@ -21,7 +21,7 @@ RUN make test-all
 
 FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:c4bf720deab13a016c345ddc46ac35e32924d42aca225c78e98f5b27c88e4413 AS builder
 USER root
-RUN microdnf -y upgrade \
+RUN microdnf -y upgrade && microdnf -y install make \
     && microdnf clean all \
     && python -m venv /venv \
     && mkdir /build

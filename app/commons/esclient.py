@@ -22,7 +22,13 @@ from opensearchpy import OpenSearch, RequestsHttpConnection
 from urllib3.exceptions import InsecureRequestWarning
 
 from app.commons import log_merger, logging
-from app.commons.model.launch_objects import ERROR_LOGGING_LEVEL, ApplicationConfig, BulkResponse, CleanIndex, Response
+from app.commons.model.launch_objects import (
+    ERROR_LOGGING_LEVEL,
+    ApplicationConfig,
+    BulkResponse,
+    DeleteLogsRequest,
+    Response,
+)
 from app.utils import text_processing, utils
 
 TABLES_TO_RECREATE = ["rp_aa_stats", "rp_model_train_stats", "rp_suggestions_info_metrics"]
@@ -318,7 +324,7 @@ class EsClient:
             LOGGER.exception("Error in bulk indexing", exc_info=exc)
             return BulkResponse(took=0, errors=True)
 
-    def delete_logs(self, clean_index: CleanIndex) -> int:
+    def delete_logs(self, clean_index: DeleteLogsRequest) -> int:
         """Delete logs from OpenSearch"""
         index_name = get_index_name(clean_index.project, self.app_config.esProjectIndexPrefix, "rp_log_item")
         log_ids = ", ".join([str(log_id) for log_id in clean_index.ids])

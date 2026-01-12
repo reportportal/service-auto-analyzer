@@ -15,6 +15,7 @@
 """OpenSearch client for Test Item-centric indexing approach."""
 
 import traceback
+from datetime import datetime, timezone
 from time import time
 from typing import Any, Callable, Generic, Optional, TypeVar
 
@@ -26,7 +27,7 @@ from urllib3.exceptions import InsecureRequestWarning
 
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, Response
-from app.commons.model.test_item_index import TestItemIndexData, TestItemUpdateData
+from app.commons.model.test_item_index import LogData, TestItemIndexData, TestItemUpdateData
 from app.utils import text_processing, utils
 
 INDEX_SETTINGS_FILE = "index_settings.json"
@@ -646,3 +647,138 @@ class OsClient:
         for hit in self.search(project_id, query):
             results.append(hit.source)
         return results
+
+    def _remove_logs_with_predicate(
+        self,
+        project_id: str | int,
+        query: dict[str, Any],
+        predicate: Callable[[LogData], bool],
+    ) -> int:
+        """
+        Remove logs matching predicate from Test Items and delete empty Test Items.
+
+        :param project_id: Project identifier
+        :param query: Query to fetch candidate Test Items
+        :param predicate: Predicate to decide which logs to remove
+        :return: Number of removed logs
+        """
+        my_query = {**query, "_source": ["logs", "test_item_id", "log_count"], "size": self.app_config.esChunkNumber}
+        hits = self.search(project_id, my_query)
+        if not hits:
+            return 0
+
+        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
+        bodies: list[dict[str, Any]] = []
+        removed_logs = 0
+
+        for hit in hits:
+            source = hit.source
+            logs = list(source.logs or [])
+            remaining_logs: list[LogData] = []
+            removed_from_item = 0
+
+            for log in logs:
+                if predicate(log):
+                    removed_from_item += 1
+                else:
+                    remaining_logs.append(log)
+
+            if removed_from_item == 0:
+                continue
+
+            removed_logs += removed_from_item
+            if not remaining_logs:
+                bodies.append({"_op_type": "delete", "_index": index_name, "_id": source.test_item_id})
+            else:
+                bodies.append(
+                    {
+                        "_op_type": "update",
+                        "_index": index_name,
+                        "_id": source.test_item_id,
+                        "doc": {
+                            "logs": [log.model_dump() for log in remaining_logs],
+                            "log_count": len(remaining_logs),
+                        },
+                    }
+                )
+
+        if not bodies:
+            return removed_logs
+
+        bulk_response = self._execute_bulk(bodies)
+        if bulk_response.errors:
+            LOGGER.error("Errors encountered while removing logs for project %s", project_id)
+        return removed_logs
+
+    def delete_logs_by_ids(self, project_id: str | int, log_ids: list[str]) -> int:
+        """
+        Delete logs by their identifiers and remove Test Items that become empty.
+
+        :param project_id: Project identifier
+        :param log_ids: List of log identifiers to delete
+        :return: Number of deleted logs
+        """
+        if not log_ids:
+            return 0
+
+        log_id_set = {str(log_id) for log_id in log_ids}
+        query = {
+            "query": {
+                "nested": {
+                    "path": "logs",
+                    "query": {"terms": {"logs.log_id": list(log_id_set)}},
+                }
+            }
+        }
+
+        return self._remove_logs_with_predicate(project_id, query, lambda log: log.log_id in log_id_set)
+
+    @staticmethod
+    def _normalize_datetime(value: str) -> Optional[datetime]:
+        """Parse and normalize datetime strings to naive UTC for comparisons."""
+        try:
+            normalized = value.replace("Z", "+00:00")
+            parsed = datetime.fromisoformat(normalized)
+        except ValueError:
+            parsed = None
+
+        if parsed is None:
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+                try:
+                    parsed = datetime.strptime(value, fmt)
+                    break
+                except ValueError:
+                    continue
+
+        if parsed and parsed.tzinfo:
+            return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+        return parsed
+
+    def delete_by_log_time_range(self, project_id: str | int, start_date: str, end_date: str) -> int:
+        """
+        Delete logs by log_time range and remove Test Items that become empty.
+
+        :param project_id: Project identifier
+        :param start_date: Start of the log_time interval
+        :param end_date: End of the log_time interval
+        :return: Number of deleted logs
+        """
+        start_dt = self._normalize_datetime(start_date)
+        end_dt = self._normalize_datetime(end_date)
+
+        def is_in_range(log: LogData) -> bool:
+            log_dt = self._normalize_datetime(log.log_time)
+            if start_dt and end_dt and log_dt:
+                return start_dt <= log_dt <= end_dt
+            return start_date <= log.log_time <= end_date
+
+        query = {
+            "query": {
+                "nested": {
+                    "path": "logs",
+                    "query": {"range": {"logs.log_time": {"gte": start_date, "lte": end_date}}},
+                }
+            }
+        }
+
+        return self._remove_logs_with_predicate(project_id, query, is_in_range)

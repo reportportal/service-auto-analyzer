@@ -519,6 +519,159 @@ def test_get_test_item_ids_by_start_time_range_returns_empty_when_index_missing(
     scan_mock.assert_not_called()
 
 
+def test_delete_logs_by_ids_removes_logs(monkeypatch, os_client_mock, app_config):
+    os_client_mock.indices.get.return_value = {}
+    captured: dict[str, Any] = {}
+
+    # noinspection PyUnusedLocal
+    def fake_execute_bulk(self, bodies, refresh: bool = True, chunk_size: int | None = None):
+        captured["bodies"] = bodies
+        return BulkResponse(took=len(bodies), errors=False)
+
+    base_log = LogData(
+        log_id="remove_me",
+        log_order=0,
+        log_time="2025-01-01T00:00:00Z",
+        log_level=40000,
+        cluster_id="",
+        cluster_message="",
+        cluster_with_numbers=False,
+        original_message="original",
+        message="clean",
+        message_lines=1,
+        message_words_number=1,
+        message_extended="clean",
+        message_without_params_extended="clean",
+        message_without_params_and_brackets="clean",
+        detected_message="clean",
+        detected_message_with_numbers="clean",
+        detected_message_extended="clean",
+        detected_message_without_params_extended="clean",
+        detected_message_without_params_and_brackets="clean",
+        stacktrace="trace",
+        stacktrace_extended="trace",
+        only_numbers="",
+        potential_status_codes="",
+        found_exceptions="",
+        found_exceptions_extended="",
+        found_tests_and_methods="",
+        urls="",
+        paths="",
+        message_params="",
+        whole_message="whole",
+    )
+    keep_log = base_log.model_copy(update={"log_id": "keep", "log_time": "2025-02-01T00:00:00Z"})
+    test_item = TestItemIndexData(
+        test_item_id="ti-1",
+        test_item_name="name",
+        unique_id="uid",
+        test_case_hash=123,
+        launch_id="l-1",
+        launch_name="launch",
+        launch_number="1",
+        launch_start_time="2025-01-01T00:00:00Z",
+        is_auto_analyzed=True,
+        issue_type="ab001",
+        start_time="2025-01-01T00:00:00Z",
+        log_count=2,
+        logs=[base_log, keep_log],
+    )
+
+    # noinspection PyUnusedLocal
+    def fake_scan(client, query, index, **kwargs):
+        return iter([{"_index": index, "_id": test_item.test_item_id, "_source": test_item.to_index_dict()}])
+
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", fake_scan)
+    monkeypatch.setattr("app.commons.os_client.OsClient._execute_bulk", fake_execute_bulk)
+
+    os_client = OsClient(app_config, os_client=os_client_mock)
+    removed = os_client.delete_logs_by_ids(PROJECT_ID, ["remove_me"])
+
+    assert removed == 1
+    captured_bodies = captured["bodies"]
+    assert len(captured_bodies) == 1
+    body = captured_bodies[0]
+    assert body["_op_type"] == "update"
+    assert body["_index"] == get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
+    assert body["doc"]["log_count"] == 1
+    assert body["doc"]["logs"][0]["log_id"] == "keep"
+
+
+def test_delete_by_log_time_range_deletes_empty_items(monkeypatch, os_client_mock, app_config):
+    os_client_mock.indices.get.return_value = {}
+    captured: dict[str, Any] = {}
+
+    # noinspection PyUnusedLocal
+    def fake_execute_bulk(self, bodies, refresh: bool = True, chunk_size: int | None = None):
+        captured["bodies"] = bodies
+        return BulkResponse(took=len(bodies), errors=False)
+
+    log_one = LogData(
+        log_id="log-1",
+        log_order=0,
+        log_time="2025-03-01T00:00:00Z",
+        log_level=40000,
+        cluster_id="",
+        cluster_message="",
+        cluster_with_numbers=False,
+        original_message="original",
+        message="clean",
+        message_lines=1,
+        message_words_number=1,
+        message_extended="clean",
+        message_without_params_extended="clean",
+        message_without_params_and_brackets="clean",
+        detected_message="clean",
+        detected_message_with_numbers="clean",
+        detected_message_extended="clean",
+        detected_message_without_params_extended="clean",
+        detected_message_without_params_and_brackets="clean",
+        stacktrace="trace",
+        stacktrace_extended="trace",
+        only_numbers="",
+        potential_status_codes="",
+        found_exceptions="",
+        found_exceptions_extended="",
+        found_tests_and_methods="",
+        urls="",
+        paths="",
+        message_params="",
+        whole_message="whole",
+    )
+    log_two = log_one.model_copy(update={"log_id": "log-2", "log_time": "2025-03-02T00:00:00Z"})
+    test_item = TestItemIndexData(
+        test_item_id="ti-2",
+        test_item_name="name",
+        unique_id="uid",
+        test_case_hash=321,
+        launch_id="l-2",
+        launch_name="launch",
+        launch_number="2",
+        launch_start_time="2025-03-01T00:00:00Z",
+        is_auto_analyzed=False,
+        issue_type="pb001",
+        start_time="2025-03-01T00:00:00Z",
+        log_count=2,
+        logs=[log_one, log_two],
+    )
+
+    # noinspection PyUnusedLocal
+    def fake_scan(client, query, index, **kwargs):
+        return iter([{"_index": index, "_id": test_item.test_item_id, "_source": test_item.to_index_dict()}])
+
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", fake_scan)
+    monkeypatch.setattr("app.commons.os_client.OsClient._execute_bulk", fake_execute_bulk)
+
+    os_client = OsClient(app_config, os_client=os_client_mock)
+    removed = os_client.delete_by_log_time_range(PROJECT_ID, "2025-03-01", "2025-03-03")
+
+    assert removed == 2
+    captured_bodies = captured["bodies"]
+    assert len(captured_bodies) == 1
+    assert captured_bodies[0]["_op_type"] == "delete"
+    assert captured_bodies[0]["_id"] == test_item.test_item_id
+
+
 @pytest.mark.parametrize(
     "host, use_ssl, expected",
     [

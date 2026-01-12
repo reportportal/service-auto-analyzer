@@ -269,13 +269,6 @@ class SuggestAnalysisResult(BaseModel):
     clusterId: int = 0
 
 
-class CleanIndex(BaseModel):
-    """Clean index object"""
-
-    ids: list[int]
-    project: int
-
-
 class CleanIndexStrIds(BaseModel):
     """Clean index object that supports string ids"""
 
@@ -358,3 +351,32 @@ class AnalysisCandidate(BaseModel):
     launchId: int
     launchName: str
     launchNumber: int = 0
+
+
+class DeleteLogsRequest(BaseModel):
+    """Clean index object"""
+
+    ids: list[int]
+    project: int
+
+
+class DeleteTestItemsRequest(BaseModel):
+    """Request payload for deleting Test Items."""
+
+    project: int | str
+    itemsToDelete: list[int | str]
+
+
+class DeleteLaunchesRequest(BaseModel):
+    """Request payload for deleting launches."""
+
+    project: int | str
+    launch_ids: list[int | str]
+
+
+class RemoveByDatesRequest(BaseModel):
+    """Request payload for removing logs by launch start time."""
+
+    project: int | str
+    interval_start_date: str
+    interval_end_date: str

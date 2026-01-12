@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
 import json
 import time
 from typing import Any, Optional
@@ -59,9 +60,26 @@ def prepare_launch_info(launch_info: dict) -> launch_objects.LaunchInfoForCluste
     return launch_objects.LaunchInfoForClustering(**launch_info)
 
 
-def prepare_clean_index(clean_index: dict) -> launch_objects.CleanIndex:
+def prepare_clean_index(clean_index: dict) -> launch_objects.DeleteLogsRequest:
     """Function for deserializing clean index object"""
-    return launch_objects.CleanIndex(**clean_index)
+    return launch_objects.DeleteLogsRequest(**clean_index)
+
+
+def prepare_delete_test_items(remove_items_info: dict) -> launch_objects.DeleteTestItemsRequest:
+    """Function for deserializing delete test items payload"""
+    return launch_objects.DeleteTestItemsRequest(**remove_items_info)
+
+
+def prepare_delete_launches(launch_remove_info: dict) -> launch_objects.DeleteLaunchesRequest:
+    """Function for deserializing delete launches payload"""
+    return launch_objects.DeleteLaunchesRequest(**launch_remove_info)
+
+
+def prepare_remove_by_dates(
+    remove_by_dates: dict,
+) -> launch_objects.RemoveByDatesRequest:
+    """Function for deserializing remove by launch start time payload"""
+    return launch_objects.RemoveByDatesRequest(**remove_by_dates)
 
 
 def to_int(body: Any) -> int:
@@ -149,6 +167,26 @@ class ServiceProcessor:
             "prepare_data_func": prepare_clean_index,
             "prepare_response_data": to_str,
         },
+        "item_remove": {
+            "handler": lambda s: s.clean_index_service.delete_test_items,
+            "prepare_data_func": prepare_delete_test_items,
+            "prepare_response_data": to_str,
+        },
+        "launch_remove": {
+            "handler": lambda s: s.clean_index_service.delete_launches,
+            "prepare_data_func": prepare_delete_launches,
+            "prepare_response_data": to_str,
+        },
+        "remove_by_launch_start_time": {
+            "handler": lambda s: s.clean_index_service.remove_by_launch_start_time,
+            "prepare_data_func": prepare_remove_by_dates,
+            "prepare_response_data": to_str,
+        },
+        "remove_by_log_time": {
+            "handler": lambda s: s.clean_index_service.remove_by_log_time,
+            "prepare_data_func": prepare_remove_by_dates,
+            "prepare_response_data": to_str,
+        },
         "search": {
             "handler": lambda s: SearchService(s.app_config, s.search_config).search_logs,
             "prepare_data_func": prepare_search_logs,
@@ -197,26 +235,6 @@ class ServiceProcessor:
             "handler": lambda s: s.analyzer_service.get_model_info,
             "prepare_data_func": same_data,
             "prepare_response_data": to_json,
-        },
-        "item_remove": {
-            "handler": lambda s: s.clean_index_service.delete_test_items,
-            "prepare_data_func": same_data,
-            "prepare_response_data": to_str,
-        },
-        "launch_remove": {
-            "handler": lambda s: s.clean_index_service.delete_launches,
-            "prepare_data_func": same_data,
-            "prepare_response_data": to_str,
-        },
-        "remove_by_launch_start_time": {
-            "handler": lambda s: s.clean_index_service.remove_by_launch_start_time,
-            "prepare_data_func": same_data,
-            "prepare_response_data": to_str,
-        },
-        "remove_by_log_time": {
-            "handler": lambda s: s.clean_index_service.remove_by_log_time,
-            "prepare_data_func": same_data,
-            "prepare_response_data": to_str,
         },
         "noop_sleep": {
             "handler": lambda s: lambda x: time.sleep(x),

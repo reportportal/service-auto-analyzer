@@ -16,81 +16,75 @@ from time import time
 from typing import Optional
 
 from app.commons import logging
-from app.commons.esclient import EsClient
-from app.commons.model.launch_objects import ApplicationConfig, CleanIndex, CleanIndexStrIds
-from app.service.suggest_info_service import SuggestInfoService
+from app.commons.model.launch_objects import (
+    ApplicationConfig,
+    DeleteLaunchesRequest,
+    DeleteLogsRequest,
+    DeleteTestItemsRequest,
+    RemoveByDatesRequest,
+)
+from app.commons.os_client import OsClient
 
 LOGGER = logging.getLogger("analyzerApp.cleanIndexService")
 
 
 class CleanIndexService:
-    es_client: EsClient
-    suggest_info_service: SuggestInfoService
+    os_client: OsClient
 
     def __init__(
         self,
         app_config: ApplicationConfig,
         *,
-        es_client: Optional[EsClient] = None,
-        suggest_info_service: Optional[SuggestInfoService] = None,
+        os_client: Optional[OsClient] = None,
     ):
         """Initialize CleanIndexService
 
         :param app_config: Application configuration object
-        :param es_client: Optional EsClient instance. If not provided, a new one will be created.
+        :param os_client: Optional OsClient instance. If not provided, a new one will be created.
         """
         self.app_config = app_config
-        self.es_client = es_client or EsClient(app_config=self.app_config)
-        self.suggest_info_service = suggest_info_service or SuggestInfoService(app_config, es_client=self.es_client)
+        self.os_client = os_client or OsClient(app_config=self.app_config)
 
-    def delete_logs(self, clean_index: CleanIndex) -> int:
+    def delete_logs(self, clean_index: DeleteLogsRequest) -> int:
         LOGGER.info("Started cleaning index")
         t_start = time()
-        deleted_logs_cnt = self.es_client.delete_logs(clean_index)
-        self.suggest_info_service.clean_suggest_info_logs(
-            CleanIndexStrIds(ids=[str(_id) for _id in clean_index.ids], project=clean_index.project)
-        )
+        log_ids = [str(log_id) for log_id in clean_index.ids]
+        deleted_logs_cnt = self.os_client.delete_logs_by_ids(clean_index.project, log_ids)
         LOGGER.info("Finished cleaning index %.2f s", time() - t_start)
         return deleted_logs_cnt
 
-    def delete_test_items(self, remove_items_info: dict) -> int:
+    def delete_test_items(self, remove_items_info: DeleteTestItemsRequest) -> int:
         LOGGER.info("Started removing test items")
         t_start = time()
-        deleted_logs_cnt = self.es_client.remove_test_items(remove_items_info)
-        self.suggest_info_service.clean_suggest_info_logs_by_test_item(remove_items_info)
+        test_item_ids = [str(test_item_id) for test_item_id in remove_items_info.itemsToDelete]
+        deleted_logs_cnt = self.os_client.delete_test_items(remove_items_info.project, test_item_ids)
         LOGGER.info("Finished removing test items %.2f s", time() - t_start)
         return deleted_logs_cnt
 
-    def delete_launches(self, launch_remove_info: dict) -> int:
+    def delete_launches(self, launch_remove_info: DeleteLaunchesRequest) -> int:
         LOGGER.info("Started removing launches")
         t_start = time()
-        deleted_logs_cnt = self.es_client.remove_launches(launch_remove_info)
-        self.suggest_info_service.clean_suggest_info_logs_by_launch_id(launch_remove_info)
+        launch_ids = [str(launch_id) for launch_id in launch_remove_info.launch_ids]
+        deleted_logs_cnt = self.os_client.delete_by_launch_ids(launch_remove_info.project, launch_ids)
         LOGGER.info("Finished removing launches %.2f s", time() - t_start)
         return deleted_logs_cnt
 
-    def remove_by_launch_start_time(self, remove_by_launch_start_time_info: dict) -> int:
-        project: int = remove_by_launch_start_time_info["project"]
-        start_date: str = remove_by_launch_start_time_info["interval_start_date"]
-        end_date: str = remove_by_launch_start_time_info["interval_end_date"]
+    def remove_by_launch_start_time(self, remove_by_launch_start_time_info: RemoveByDatesRequest) -> int:
+        project: int | str = remove_by_launch_start_time_info.project
+        start_date: str = remove_by_launch_start_time_info.interval_start_date
+        end_date: str = remove_by_launch_start_time_info.interval_end_date
         LOGGER.info("Started removing logs by launch start time")
         t_start = time()
-        launch_ids = self.es_client.get_launch_ids_by_start_time_range(project, start_date, end_date)
-        deleted_logs_cnt = self.es_client.remove_by_launch_start_time_range(project, start_date, end_date)
-        launch_remove_info = {"project": project, "launch_ids": launch_ids}
-        self.suggest_info_service.clean_suggest_info_logs_by_launch_id(launch_remove_info)
+        deleted_logs_cnt = self.os_client.delete_by_launch_start_time_range(project, start_date, end_date)
         LOGGER.info("Finished removing logs by launch start time %.2f s", time() - t_start)
         return deleted_logs_cnt
 
-    def remove_by_log_time(self, remove_by_log_time_info: dict) -> int:
-        project: int = remove_by_log_time_info["project"]
-        start_date: str = remove_by_log_time_info["interval_start_date"]
-        end_date: str = remove_by_log_time_info["interval_end_date"]
+    def remove_by_log_time(self, remove_by_log_time_info: RemoveByDatesRequest) -> int:
+        project: int | str = remove_by_log_time_info.project
+        start_date: str = remove_by_log_time_info.interval_start_date
+        end_date: str = remove_by_log_time_info.interval_end_date
         LOGGER.info("Started removing logs by log time range")
         t_start = time()
-        log_ids = self.es_client.get_log_ids_by_log_time_range(project, start_date, end_date)
-        deleted_logs_cnt = self.es_client.remove_by_log_time_range(project, start_date, end_date)
-        clean_index = CleanIndexStrIds(ids=log_ids, project=project)
-        self.suggest_info_service.clean_suggest_info_logs(clean_index)
+        deleted_logs_cnt = self.os_client.delete_by_log_time_range(project, start_date, end_date)
         LOGGER.info("Finished removing logs by log time range %.2f s", time() - t_start)
         return deleted_logs_cnt

@@ -3,7 +3,6 @@ from unittest import mock
 
 import pytest
 
-from app.commons.model.launch_objects import BulkResponse
 from app.commons.model.test_item_index import LogData, TestItemIndexData, TestItemUpdateData
 from app.commons.os_client import OsClient, get_test_item_index_name
 from test import APP_CONFIG, DEFAULT_ES_CONFIG
@@ -139,13 +138,14 @@ def test_bulk_update_issue_history_success(monkeypatch, os_client_mock, app_conf
     captured: dict[str, Any] = {}
 
     # noinspection PyUnusedLocal
-    def fake_execute_bulk(self: Any, request: list, refresh: bool = True, chunk_size: int = None):
+    def fake_bulk(client: Any, request: list, chunk_size: int, request_timeout: int, refresh: bool):
+        captured["client"] = client
         captured["bodies"] = request
-        captured["refresh"] = refresh
         captured["chunk_size"] = chunk_size
-        return BulkResponse(took=len(request), errors=False)
+        captured["refresh"] = refresh
+        return len(request), []
 
-    monkeypatch.setattr("app.commons.os_client.OsClient._execute_bulk", fake_execute_bulk)
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.bulk", fake_bulk)
     monkeypatch.setattr("app.commons.os_client.utils.read_resource_file", lambda *args, **kwargs: {})
 
     client = OsClient(app_config, os_client=os_client_mock)
@@ -524,9 +524,12 @@ def test_delete_logs_by_ids_removes_logs(monkeypatch, os_client_mock, app_config
     captured: dict[str, Any] = {}
 
     # noinspection PyUnusedLocal
-    def fake_execute_bulk(self, bodies, refresh: bool = True, chunk_size: int | None = None):
+    def fake_bulk(client: Any, bodies, chunk_size: int, request_timeout: int, refresh: bool):
+        captured["client"] = client
         captured["bodies"] = bodies
-        return BulkResponse(took=len(bodies), errors=False)
+        captured["chunk_size"] = chunk_size
+        captured["refresh"] = refresh
+        return len(bodies), []
 
     base_log = LogData(
         log_id="remove_me",
@@ -582,7 +585,7 @@ def test_delete_logs_by_ids_removes_logs(monkeypatch, os_client_mock, app_config
         return iter([{"_index": index, "_id": test_item.test_item_id, "_source": test_item.to_index_dict()}])
 
     monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", fake_scan)
-    monkeypatch.setattr("app.commons.os_client.OsClient._execute_bulk", fake_execute_bulk)
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.bulk", fake_bulk)
 
     os_client = OsClient(app_config, os_client=os_client_mock)
     removed = os_client.delete_logs_by_ids(PROJECT_ID, ["remove_me"])
@@ -602,9 +605,12 @@ def test_delete_by_log_time_range_deletes_empty_items(monkeypatch, os_client_moc
     captured: dict[str, Any] = {}
 
     # noinspection PyUnusedLocal
-    def fake_execute_bulk(self, bodies, refresh: bool = True, chunk_size: int | None = None):
+    def fake_bulk(client: Any, bodies, chunk_size: int, request_timeout: int, refresh: bool):
+        captured["client"] = client
         captured["bodies"] = bodies
-        return BulkResponse(took=len(bodies), errors=False)
+        captured["chunk_size"] = chunk_size
+        captured["refresh"] = refresh
+        return len(bodies), []
 
     log_one = LogData(
         log_id="log-1",
@@ -660,7 +666,7 @@ def test_delete_by_log_time_range_deletes_empty_items(monkeypatch, os_client_moc
         return iter([{"_index": index, "_id": test_item.test_item_id, "_source": test_item.to_index_dict()}])
 
     monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", fake_scan)
-    monkeypatch.setattr("app.commons.os_client.OsClient._execute_bulk", fake_execute_bulk)
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.bulk", fake_bulk)
 
     os_client = OsClient(app_config, os_client=os_client_mock)
     removed = os_client.delete_by_log_time_range(PROJECT_ID, "2025-03-01", "2025-03-03")

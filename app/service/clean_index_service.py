@@ -22,28 +22,51 @@ from app.commons.model.launch_objects import (
     DeleteLogsRequest,
     DeleteTestItemsRequest,
     RemoveByDatesRequest,
+    SearchConfig,
 )
+from app.commons.model_chooser import ModelChooser
+from app.commons.namespace_finder import NamespaceFinder
 from app.commons.os_client import OsClient
+from app.commons.trigger_manager import TriggerManager
 
 LOGGER = logging.getLogger("analyzerApp.cleanIndexService")
 
 
 class CleanIndexService:
     os_client: OsClient
+    namespace_finder: Optional[NamespaceFinder]
+    trigger_manager: Optional[TriggerManager]
+    model_chooser: Optional[ModelChooser]
 
     def __init__(
         self,
+        model_chooser: ModelChooser,
         app_config: ApplicationConfig,
+        search_cfg: SearchConfig,
         *,
         os_client: Optional[OsClient] = None,
+        namespace_finder: Optional[NamespaceFinder] = None,
+        trigger_manager: Optional[TriggerManager] = None,
     ):
         """Initialize CleanIndexService
 
         :param app_config: Application configuration object
+        :param search_cfg: Optional search configuration object required for delete_index
         :param os_client: Optional OsClient instance. If not provided, a new one will be created.
+        :param namespace_finder: Optional NamespaceFinder instance for namespace cleanup.
+        :param trigger_manager: Optional TriggerManager instance for trigger cleanup.
+        :param model_chooser: Optional ModelChooser instance for model cleanup.
         """
+        self.model_chooser = model_chooser
         self.app_config = app_config
+        self.search_cfg = search_cfg
         self.os_client = os_client or OsClient(app_config=self.app_config)
+        self.namespace_finder = namespace_finder or NamespaceFinder(self.app_config)
+        self.trigger_manager = trigger_manager or TriggerManager(
+            model_chooser, app_config=self.app_config, search_cfg=self.search_cfg
+        )
+
+    search_cfg: Optional[SearchConfig]
 
     def delete_logs(self, clean_index: DeleteLogsRequest) -> int:
         LOGGER.info("Started cleaning index")
@@ -88,3 +111,13 @@ class CleanIndexService:
         deleted_logs_cnt = self.os_client.delete_by_log_time_range(project, start_date, end_date)
         LOGGER.info("Finished removing logs by log time range %.2f s", time() - t_start)
         return deleted_logs_cnt
+
+    def delete_index(self, project_id: int | str) -> int:
+        LOGGER.info("Started deleting index")
+        t_start = time()
+        is_index_deleted = self.os_client.delete_index(project_id)
+        self.namespace_finder.remove_namespaces(int(project_id))
+        self.trigger_manager.delete_triggers(int(project_id))
+        self.model_chooser.delete_all_custom_models(int(project_id))
+        LOGGER.info("Finished deleting index %.2f s", time() - t_start)
+        return int(is_index_deleted)

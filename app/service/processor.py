@@ -23,7 +23,6 @@ from app.service.analyzer_service import AnalyzerService
 from app.service.auto_analyzer_service import AutoAnalyzerService
 from app.service.clean_index_service import CleanIndexService
 from app.service.cluster_service import ClusterService
-from app.service.delete_index_service import DeleteIndexService
 from app.service.index_service import IndexService
 from app.service.namespace_finder_service import NamespaceFinderService
 from app.service.retraining_service import RetrainingService
@@ -158,7 +157,7 @@ class ServiceProcessor:
             "prepare_response_data": prepare_analyze_response_data,
         },
         "delete": {
-            "handler": lambda s: DeleteIndexService(s.model_chooser, s.app_config, s.search_config).delete_index,
+            "handler": lambda s: s.clean_index_service.delete_index,
             "prepare_data_func": to_int,
             "prepare_response_data": to_str,
         },
@@ -275,7 +274,7 @@ class ServiceProcessor:
     @property
     def clean_index_service(self) -> CleanIndexService:
         if not self._clean_index_service:
-            self._clean_index_service = CleanIndexService(self.app_config)
+            self._clean_index_service = CleanIndexService(self.model_chooser, self.app_config, self.search_config)
         return self._clean_index_service
 
     @property

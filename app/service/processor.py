@@ -19,7 +19,6 @@ from typing import Any, Optional
 from app.commons import logging, model_chooser
 from app.commons.model import launch_objects, ml
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
-from app.service.analyzer_service import AnalyzerService
 from app.service.auto_analyzer_service import AutoAnalyzerService
 from app.service.clean_index_service import CleanIndexService
 from app.service.cluster_service import ClusterService
@@ -133,7 +132,6 @@ class ServiceProcessor:
     _model_chooser: Optional[model_chooser.ModelChooser] = None
     _index_service: Optional[IndexService] = None
     _clean_index_service: Optional[CleanIndexService] = None
-    _analyzer_service: Optional[AnalyzerService] = None
     _suggest_info_service: Optional[SuggestInfoService] = None
 
     __configs: dict[str, dict[str, Any]] = {
@@ -286,12 +284,6 @@ class ServiceProcessor:
         if not self._index_service:
             self._index_service = IndexService(self.app_config)
         return self._index_service
-
-    @property
-    def analyzer_service(self) -> AnalyzerService:
-        if not self._analyzer_service:
-            self._analyzer_service = AnalyzerService(self.model_chooser, self.search_config)
-        return self._analyzer_service
 
     @property
     def suggest_info_service(self) -> SuggestInfoService:

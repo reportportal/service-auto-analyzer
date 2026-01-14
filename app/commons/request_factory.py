@@ -374,6 +374,7 @@ def prepare_test_items(
                 start_time=test_item_time,
                 log_count=len(prepared_logs),
                 logs=prepared_logs,
+                issue_history=[],
             )
         )
     return results

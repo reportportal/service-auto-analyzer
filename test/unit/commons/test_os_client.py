@@ -3,7 +3,7 @@ from unittest import mock
 
 import pytest
 
-from app.commons.model.test_item_index import LogData, TestItemIndexData, TestItemUpdateData
+from app.commons.model.test_item_index import LogData, TestItemHistoryData, TestItemIndexData
 from app.commons.os_client import OsClient, get_test_item_index_name
 from test import APP_CONFIG, DEFAULT_ES_CONFIG
 
@@ -70,6 +70,7 @@ def test_item():
         start_time="2025-01-01T00:00:00Z",
         log_count=1,
         logs=[log],
+        issue_history=[],
     )
 
 
@@ -114,7 +115,7 @@ def test_bulk_update_issue_history_not_creates_index_and_return_error(monkeypatc
 
     client = OsClient(app_config, os_client=os_client_mock)
     updates = [
-        TestItemUpdateData(
+        TestItemHistoryData(
             test_item_id="ti-1",
             is_auto_analyzed=True,
             issue_type="pb001",
@@ -150,7 +151,7 @@ def test_bulk_update_issue_history_success(monkeypatch, os_client_mock, app_conf
 
     client = OsClient(app_config, os_client=os_client_mock)
     updates = [
-        TestItemUpdateData(
+        TestItemHistoryData(
             test_item_id="ti-1",
             is_auto_analyzed=True,
             issue_type="pb001",
@@ -439,6 +440,7 @@ def test_search_calls_scan_when_scroll_provided(monkeypatch, os_client_mock, app
 
 
 def test_delete_index_calls_opensearch_delete(os_client_mock, app_config):
+    os_client_mock.indices.get.side_effect = lambda idx: None if idx.endswith("_suggest") else {}
     client = OsClient(app_config, os_client=os_client_mock)
 
     result = client.delete_index(PROJECT_ID)
@@ -578,6 +580,7 @@ def test_delete_logs_by_ids_removes_logs(monkeypatch, os_client_mock, app_config
         start_time="2025-01-01T00:00:00Z",
         log_count=2,
         logs=[base_log, keep_log],
+        issue_history=[],
     )
 
     # noinspection PyUnusedLocal
@@ -659,6 +662,7 @@ def test_delete_by_log_time_range_deletes_empty_items(monkeypatch, os_client_moc
         start_time="2025-03-01T00:00:00Z",
         log_count=2,
         logs=[log_one, log_two],
+        issue_history=[],
     )
 
     # noinspection PyUnusedLocal

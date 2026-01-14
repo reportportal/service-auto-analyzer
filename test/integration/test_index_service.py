@@ -2,7 +2,7 @@ import datetime
 from unittest import mock
 
 from app.commons.model.launch_objects import AnalyzerConf, BulkResponse, DefectUpdate, Launch
-from app.commons.model.test_item_index import TestItemIndexData, TestItemUpdateData
+from app.commons.model.test_item_index import TestItemHistoryData, TestItemIndexData
 from app.service.index_service import IndexService
 from test import APP_CONFIG
 
@@ -111,7 +111,7 @@ def test_defect_update_updates_issue_history_and_docs() -> None:
     assert doc_ids == {"1001", "1002"}
     assert {doc.issue_type for doc in doc_updates} == {"pb001", "si002"}
 
-    history_updates: list[TestItemUpdateData] = os_client.bulk_update_issue_history.call_args[0][1]
+    history_updates: list[TestItemHistoryData] = os_client.bulk_update_issue_history.call_args[0][1]
     assert {entry.test_item_id for entry in history_updates} == {"1001", "1002"}
 
     first_entry = next(entry for entry in history_updates if entry.test_item_id == "1001")

@@ -21,7 +21,7 @@ from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory
 from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, DefectUpdate, ItemUpdate, Launch
 from app.commons.model.ml import ModelType, TrainInfo
-from app.commons.model.test_item_index import TestItemIndexData, TestItemUpdateData
+from app.commons.model.test_item_index import TestItemHistoryData, TestItemIndexData
 from app.commons.os_client import OsClient
 
 LOGGER = logging.getLogger("analyzerApp.indexService")
@@ -145,7 +145,7 @@ class IndexService:
 
         batch_size = self.app_config.esChunkNumber
         found_test_items: set[str] = set()
-        history_updates: list[TestItemUpdateData] = []
+        history_updates: list[TestItemHistoryData] = []
 
         for i in range(int(len(test_item_ids) / batch_size) + 1):
             batch_ids = test_item_ids[i * batch_size : (i + 1) * batch_size]
@@ -164,7 +164,7 @@ class IndexService:
                 timestamp = update_payload["timestamp"]
 
                 history_updates.append(
-                    TestItemUpdateData(
+                    TestItemHistoryData(
                         test_item_id=item.test_item_id,
                         is_auto_analyzed=False,
                         issue_type=issue_type,

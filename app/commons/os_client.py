@@ -27,7 +27,7 @@ from urllib3.exceptions import InsecureRequestWarning
 
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, Response
-from app.commons.model.test_item_index import LogData, TestItemIndexData, TestItemUpdateData
+from app.commons.model.test_item_index import LogData, TestItemHistoryData, TestItemIndexData
 from app.utils import text_processing, utils
 
 INDEX_SETTINGS_FILE = "index_settings.json"
@@ -574,7 +574,7 @@ class OsClient:
             test_item_ids.add(hit.source.test_item_id)
         return list(test_item_ids)
 
-    def bulk_update_issue_history(self, project_id: str | int, updates: list[TestItemUpdateData]) -> BulkResponse:
+    def bulk_update_issue_history(self, project_id: str | int, updates: list[TestItemHistoryData]) -> BulkResponse:
         """Bulk update issue_history for multiple Test Items.
 
         :param project_id: The project identifier
@@ -599,12 +599,13 @@ class OsClient:
                     "_id": update.test_item_id,
                     "script": {
                         "source": """
+                            ctx._source.issue_type = params.issue_type; 
                             if (ctx._source.issue_history == null) {
                                 ctx._source.issue_history = [];
                             }
                             ctx._source.issue_history.add(params.entry);
                         """,
-                        "params": {"entry": entry},
+                        "params": {"entry": entry, "issue_type": update.issue_type},
                     },
                 }
             )

@@ -60,6 +60,29 @@ class LogData(BaseModel):
     whole_message: str = Field(description="Combined exception message and stacktrace")
 
 
+class TestItemHistoryData(BaseModel):
+    """Payload for updating issue history of a Test Item."""
+
+    test_item_id: str = Field(description="Identifier of the Test Item to update")
+    is_auto_analyzed: bool = Field(description="Whether assignment was made by auto-analysis")
+    issue_type: str = Field(description="Assigned issue type (e.g., pb001, ab001)")
+    timestamp: str = Field(description="Timestamp of the assignment")
+    issue_comment: str = Field(default="", description="Optional comment for the assignment")
+
+    def to_update_dict(self) -> dict[str, Any]:
+        """
+        Convert update data into issue_history entry shape used in OpenSearch script.
+
+        :return: Dictionary for painless script params
+        """
+        return {
+            "is_auto_analyzed": self.is_auto_analyzed,
+            "issue_type": self.issue_type,
+            "timestamp": self.timestamp,
+            "issue_comment": self.issue_comment,
+        }
+
+
 class TestItemIndexData(BaseModel):
     """
     Test Item-centric document for OpenSearch indexing.
@@ -82,6 +105,7 @@ class TestItemIndexData(BaseModel):
     start_time: Optional[str] = Field(default=None, description="When the test item started")
     log_count: Optional[int] = Field(default=None, description="Number of logs in this Test Item")
     logs: Optional[list[LogData]] = Field(default=None, description="Nested log entries")
+    issue_history: Optional[list[TestItemHistoryData]] = Field(default=None, description="Nested issue type history")
 
     def to_index_dict(self) -> dict[str, Any]:
         """
@@ -100,26 +124,3 @@ class TestItemIndexData(BaseModel):
         :return: TestItemIndexData instance
         """
         return cls.model_validate(data)
-
-
-class TestItemUpdateData(BaseModel):
-    """Payload for updating issue history of a Test Item."""
-
-    test_item_id: str = Field(description="Identifier of the Test Item to update")
-    is_auto_analyzed: bool = Field(description="Whether assignment was made by auto-analysis")
-    issue_type: str = Field(description="Assigned issue type (e.g., pb001, ab001)")
-    timestamp: str = Field(description="Timestamp of the assignment")
-    issue_comment: str = Field(default="", description="Optional comment for the assignment")
-
-    def to_update_dict(self) -> dict[str, Any]:
-        """
-        Convert update data into issue_history entry shape used in OpenSearch script.
-
-        :return: Dictionary for painless script params
-        """
-        return {
-            "is_auto_analyzed": self.is_auto_analyzed,
-            "issue_type": self.issue_type,
-            "timestamp": self.timestamp,
-            "issue_comment": self.issue_comment,
-        }

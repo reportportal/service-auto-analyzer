@@ -41,7 +41,7 @@ class SuggestPatternsService:
         self.search_cfg = search_cfg
         self.es_client = es_client or EsClient(app_config=self.app_config)
 
-    def query_data(self, project: str, label: str) -> list[tuple[str, str]]:
+    def _query_data(self, project: str, label: str) -> list[tuple[str, str]]:
         data = []
         query = {
             "_source": ["detected_message", "issue_type"],
@@ -53,7 +53,7 @@ class SuggestPatternsService:
                         {
                             "bool": {
                                 "should": [
-                                    {"wildcard": {"issue_type": "{}*".format(label)}, "case_insensitive": True},
+                                    {"wildcard": {"issue_type": f"{label}*"}, "case_insensitive": True},
                                 ]
                             }
                         }
@@ -66,7 +66,7 @@ class SuggestPatternsService:
             data.append((d["_source"]["detected_message"], d["_source"]["issue_type"]))
         return data
 
-    def get_patterns_with_labels(self, exceptions_with_labels: dict) -> list[SuggestPatternLabel]:
+    def _get_patterns_with_labels(self, exceptions_with_labels: dict) -> list[SuggestPatternLabel]:
         min_count = self.search_cfg.PatternLabelMinCountToSuggest
         min_percent = self.search_cfg.PatternLabelMinPercentToSuggest
         suggested_patterns_with_labels = []
@@ -86,7 +86,7 @@ class SuggestPatternsService:
                     )
         return suggested_patterns_with_labels
 
-    def get_patterns_without_labels(self, all_exceptions: dict) -> list[SuggestPatternLabel]:
+    def _get_patterns_without_labels(self, all_exceptions: dict) -> list[SuggestPatternLabel]:
         suggested_patterns_without_labels = []
         for exception in all_exceptions:
             if all_exceptions[exception] >= self.search_cfg.PatternMinCountToSuggest:
@@ -105,7 +105,7 @@ class SuggestPatternsService:
         if not self.es_client.index_exists(index_name):
             return SuggestPattern(suggestionsWithLabels=[], suggestionsWithoutLabels=[])
         for label in ["ab", "pb", "si", "ti"]:
-            found_data.extend(self.query_data(index_name, label))
+            found_data.extend(self._query_data(index_name, label))
         for log, label in found_data:
             for exception in text_processing.get_found_exceptions(log).split(" "):
                 if exception.strip():
@@ -119,8 +119,8 @@ class SuggestPatternsService:
                         if label not in exceptions_with_labels[exception]:
                             exceptions_with_labels[exception][label] = 0
                         exceptions_with_labels[exception][label] += 1
-        suggested_patterns_with_labels = self.get_patterns_with_labels(exceptions_with_labels)
-        suggested_patterns_without_labels = self.get_patterns_without_labels(all_exceptions)
+        suggested_patterns_with_labels = self._get_patterns_with_labels(exceptions_with_labels)
+        suggested_patterns_without_labels = self._get_patterns_without_labels(all_exceptions)
         LOGGER.info("Finished suggesting patterns %.2f s", time() - t_start)
         return SuggestPattern(
             suggestionsWithLabels=suggested_patterns_with_labels,

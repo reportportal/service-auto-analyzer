@@ -202,16 +202,6 @@ class AnalyzerService:
             },
         }
 
-    def remove_models(self, model_info: ModelInfo) -> int:
-        try:
-            LOGGER.info("Started removing %s models from project %d", model_info.model_type.name, model_info.project)
-            deleted_models = self.model_chooser.delete_old_model(model_info.model_type, model_info.project)
-            LOGGER.info("Finished removing %s models from project %d", model_info.model_type.name, model_info.project)
-            return deleted_models
-        except Exception as err:
-            LOGGER.exception("Error while removing models.", exc_info=err)
-            return 0
-
     def get_model_info(self, model_info: ModelInfo) -> dict:
         try:
             LOGGER.info(

@@ -226,7 +226,7 @@ class ServiceProcessor:
             "prepare_response_data": to_json,
         },
         "remove_models": {
-            "handler": lambda s: s.analyzer_service.remove_models,
+            "handler": lambda s: s.clean_index_service.remove_models,
             "prepare_data_func": same_data,
             "prepare_response_data": to_str,
         },

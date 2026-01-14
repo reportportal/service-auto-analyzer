@@ -34,9 +34,9 @@ LOGGER = logging.getLogger("analyzerApp.cleanIndexService")
 
 class CleanIndexService:
     os_client: OsClient
-    namespace_finder: Optional[NamespaceFinder]
-    trigger_manager: Optional[TriggerManager]
-    model_chooser: Optional[ModelChooser]
+    namespace_finder: NamespaceFinder
+    trigger_manager: TriggerManager
+    model_chooser: ModelChooser
 
     def __init__(
         self,

@@ -599,7 +599,7 @@ class OsClient:
                     "_id": update.test_item_id,
                     "script": {
                         "source": """
-                            ctx._source.issue_type = params.issue_type; 
+                            ctx._source.issue_type = params.issue_type;
                             if (ctx._source.issue_history == null) {
                                 ctx._source.issue_history = [];
                             }

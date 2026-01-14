@@ -24,7 +24,6 @@ from app.commons.model.launch_objects import (
     RemoveByDatesRequest,
     SearchConfig,
 )
-from app.commons.model.ml import ModelInfo
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.os_client import OsClient
@@ -122,13 +121,3 @@ class CleanIndexService:
         self.model_chooser.delete_all_custom_models(int(project_id))
         LOGGER.info("Finished deleting index %.2f s", time() - t_start)
         return int(is_index_deleted)
-
-    def remove_models(self, model_info: ModelInfo) -> int:
-        try:
-            LOGGER.info("Started removing %s models from project %d", model_info.model_type.name, model_info.project)
-            deleted_models = self.model_chooser.delete_old_model(model_info.model_type, model_info.project)
-            LOGGER.info("Finished removing %s models from project %d", model_info.model_type.name, model_info.project)
-            return deleted_models
-        except Exception as err:
-            LOGGER.exception("Error while removing models.", exc_info=err)
-            return 0

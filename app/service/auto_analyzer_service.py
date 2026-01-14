@@ -95,6 +95,7 @@ class AutoAnalyzerService(AnalyzerService):
     app_config: ApplicationConfig
     es_client: EsClient
     namespace_finder: NamespaceFinder
+    model_chooser: ModelChooser
 
     def __init__(
         self,
@@ -103,7 +104,8 @@ class AutoAnalyzerService(AnalyzerService):
         search_cfg: SearchConfig,
         es_client: Optional[EsClient] = None,
     ) -> None:
-        super().__init__(model_chooser, search_cfg=search_cfg)
+        super().__init__(search_cfg=search_cfg)
+        self.model_chooser = model_chooser
         self.app_config = app_config
         self.es_client = es_client or EsClient(app_config=self.app_config)
         self.namespace_finder = NamespaceFinder(app_config)

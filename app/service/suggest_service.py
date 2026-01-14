@@ -61,6 +61,7 @@ class SuggestService(AnalyzerService):
     search_cfg: SearchConfig
     es_client: EsClient
     namespace_finder: NamespaceFinder
+    model_chooser: ModelChooser
 
     def __init__(
         self,
@@ -69,9 +70,10 @@ class SuggestService(AnalyzerService):
         search_cfg: SearchConfig,
         es_client: Optional[EsClient] = None,
     ):
+        self.model_chooser = model_chooser
         self.app_config = app_config
         self.search_cfg = search_cfg
-        super().__init__(model_chooser, search_cfg=self.search_cfg)
+        super().__init__(search_cfg=self.search_cfg)
         self.es_client = es_client or EsClient(app_config=self.app_config)
         self.suggest_threshold = 0.4
         self.rp_suggest_index_template = "rp_suggestions_info"

@@ -16,8 +16,6 @@ from typing import Any, Optional
 
 from app.commons import logging
 from app.commons.model.launch_objects import ERROR_LOGGING_LEVEL, AnalyzerConf, Launch, SearchConfig, TestItemInfo
-from app.commons.model.ml import ModelInfo
-from app.commons.model_chooser import ModelChooser
 from app.utils import utils
 
 LOGGER = logging.getLogger("analyzerApp.analyzerService")
@@ -102,12 +100,10 @@ def add_constraints_for_launches_into_query_suggest(
 class AnalyzerService:
     search_cfg: SearchConfig
     launch_boost: float
-    model_chooser: ModelChooser
 
-    def __init__(self, model_chooser: ModelChooser, search_cfg: SearchConfig):
+    def __init__(self, search_cfg: SearchConfig):
         self.search_cfg = search_cfg
         self.launch_boost = abs(self.search_cfg.BoostLaunch)
-        self.model_chooser = model_chooser
 
     def find_min_should_match_threshold(self, analyzer_config: AnalyzerConf) -> int:
         if analyzer_config.minShouldMatch > 0:
@@ -201,17 +197,3 @@ class AnalyzerService:
                 }
             },
         }
-
-    def get_model_info(self, model_info: ModelInfo) -> dict:
-        try:
-            LOGGER.info(
-                "Started getting info for %s model from project %d", model_info.model_type.name, model_info.project
-            )
-            model_folder = self.model_chooser.get_model_info(model_info.model_type, model_info.project)
-            LOGGER.info(
-                "Finished getting info for %s model from project %d", model_info.model_type.name, model_info.project
-            )
-            return {"model_folder": model_folder}
-        except Exception as err:
-            LOGGER.exception("Error while getting info for models.", exc_info=err)
-            return {}

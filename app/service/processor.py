@@ -226,12 +226,16 @@ class ServiceProcessor:
             "prepare_response_data": to_json,
         },
         "remove_models": {
-            "handler": lambda s: s.clean_index_service.remove_models,
+            "handler": lambda s: lambda x: LOGGER.warning(
+                f"Deprecated 'remove_models' route called with {json.dumps(x)}"
+            ),
             "prepare_data_func": same_data,
             "prepare_response_data": to_str,
         },
         "get_model_info": {
-            "handler": lambda s: s.analyzer_service.get_model_info,
+            "handler": lambda s: lambda x: LOGGER.warning(
+                f"Deprecated 'get_model_info' route called with {json.dumps(x)}"
+            ),
             "prepare_data_func": same_data,
             "prepare_response_data": to_json,
         },

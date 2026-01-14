@@ -155,14 +155,7 @@ class OsClient:
         res = utils.send_request(url, "GET", self.app_config.esUser, self.app_config.esPassword)
         return res.get("status", "") in {"green", "yellow"} if res else False
 
-    def delete_index(self, project_id: str | int) -> bool:
-        """Delete the Test Item index for a project.
-
-        :param project_id: The project identifier
-        :return: True if deletion was successful
-        """
-        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
-        LOGGER.info(f"Deleting index: {index_name}")
+    def _delete_index(self, index_name: str) -> bool:
         try:
             self.os_client.indices.delete(index=index_name)
             self._checked_indexes.discard(index_name)
@@ -171,6 +164,20 @@ class OsClient:
         except Exception as err:
             LOGGER.exception(f"Failed to delete index: {index_name}", exc_info=err)
             return False
+
+    def delete_index(self, project_id: str | int) -> bool:
+        """Delete the Test Item index for a project.
+
+        :param project_id: The project identifier
+        :return: True if deletion was successful
+        """
+        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
+        LOGGER.info(f"Deleting index: {index_name}")
+        result = self._delete_index(index_name)
+        old_suggest_index = f"{index_name}_suggest"  # for sake of cleanup
+        if self._index_exists(old_suggest_index):
+            result = result and self._delete_index(old_suggest_index)
+        return result
 
     def _create_index(self, index_name: str) -> Response:
         """

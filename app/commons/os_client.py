@@ -669,7 +669,11 @@ class OsClient:
         :param predicate: Predicate to decide which logs to remove
         :return: Number of removed logs
         """
-        my_query = {**query, "_source": ["logs", "test_item_id", "log_count"], "size": self.app_config.esChunkNumber}
+        my_query = {
+            **query,
+            "_source": ["launch_id", "logs", "test_item_id", "log_count"],
+            "size": self.app_config.esChunkNumber,
+        }
         index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
         bodies: list[dict[str, Any]] = []
         removed_logs = 0

@@ -17,7 +17,7 @@ from typing import Any, Optional
 
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig, SuggestPattern, SuggestPatternLabel
-from app.commons.os_client import OsClient, get_test_item_index_name
+from app.commons.os_client import OsClient
 from app.utils import text_processing
 
 LOGGER = logging.getLogger("analyzerApp.suggestPatternsService")

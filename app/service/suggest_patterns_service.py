@@ -52,6 +52,7 @@ class SuggestPatternsService:
             "sort": {"start_time": "desc"},
             "size": self.app_config.esChunkNumber,
             "query": {"bool": {"filter": [{"bool": {"should": label_filters}}]}},
+            "_source": ["launch_id", "test_item_id", "logs", "issue_type"],
         }
         return query
 

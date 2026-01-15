@@ -180,7 +180,7 @@ def test_search_returns_empty_when_index_missing(os_client_mock, app_config):
     os_client_mock.indices.get.side_effect = Exception("missing index")
     client = OsClient(app_config, os_client=os_client_mock)
 
-    results = client.search(PROJECT_ID, {"query": {"match_all": {}}})
+    results = [hit for hit in client.search(PROJECT_ID, {"query": {"match_all": {}}})]
 
     assert results == []
     os_client_mock.search.assert_not_called()
@@ -400,7 +400,7 @@ def test_search_without_scroll_calls_scan(monkeypatch, os_client_mock, app_confi
     client = OsClient(app_config, os_client=os_client_mock)
     request = {"query": {"match": {"test_item_id": test_item.test_item_id}}}
 
-    results = client.search(PROJECT_ID, request)
+    results = [hit for hit in client.search(PROJECT_ID, request)]
 
     assert len(results) == 1
     assert results[0].source.test_item_id == test_item.test_item_id
@@ -429,7 +429,7 @@ def test_search_calls_scan_when_scroll_provided(monkeypatch, os_client_mock, app
 
     client = OsClient(app_config, os_client=os_client_mock)
     request = {"query": {"match": {"test_item_id": test_item.test_item_id}}}
-    results = client.search(PROJECT_ID, request, scroll="1m")
+    results = [hit for hit in client.search(PROJECT_ID, request, scroll="1m")]
 
     assert len(results) == 1
     assert results[0].source.test_item_id == test_item.test_item_id

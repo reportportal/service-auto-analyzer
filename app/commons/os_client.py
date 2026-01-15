@@ -17,7 +17,7 @@
 import traceback
 from datetime import datetime, timezone
 from time import time
-from typing import Any, Callable, Generic, Optional, TypeVar
+from typing import Any, Callable, Generic, Iterator, Optional, TypeVar
 
 import opensearchpy.helpers
 import urllib3
@@ -519,28 +519,26 @@ class OsClient:
 
     def search(
         self, project_id: str | int, query: dict[str, Any], scroll: Optional[str] = None
-    ) -> list[Hit[TestItemIndexData]]:
-        """Execute a search query and return all results.
+    ) -> Iterator[Hit[TestItemIndexData]]:
+        """Execute a search query and yield results as a generator.
 
         :param project_id: The project identifier
         :param query: OpenSearch query
         :param scroll: Optional custom scroll timeout for large result sets
-        :return: List of typed search hits
+        :return: Iterator of typed search hits
         """
         index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
         if not self._index_exists(index_name, print_error=False):
-            return []
+            return
 
-        hits: list[Hit[TestItemIndexData]] = []
         try:
             kwargs: dict[str, Any] = {}
             if scroll:
                 kwargs["scroll"] = scroll
             for doc in opensearchpy.helpers.scan(self.os_client, query=query, index=index_name, **kwargs):
-                hits.append(Hit[TestItemIndexData].from_dict(doc))
+                yield Hit[TestItemIndexData].from_dict(doc)
         except Exception as err:
             LOGGER.exception("Error in search", exc_info=err)
-        return hits
 
     def get_launch_ids_by_start_time_range(self, project_id: str | int, start_date: str, end_date: str) -> list[str]:
         """Get launch IDs within a start time range.
@@ -671,15 +669,11 @@ class OsClient:
         :return: Number of removed logs
         """
         my_query = {**query, "_source": ["logs", "test_item_id", "log_count"], "size": self.app_config.esChunkNumber}
-        hits = self.search(project_id, my_query)
-        if not hits:
-            return 0
-
         index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
         bodies: list[dict[str, Any]] = []
         removed_logs = 0
 
-        for hit in hits:
+        for hit in self.search(project_id, my_query):
             source = hit.source
             logs = list(source.logs or [])
             remaining_logs: list[LogData] = []

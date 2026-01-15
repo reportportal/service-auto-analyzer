@@ -597,13 +597,14 @@ class OsClient:
                     "_id": update.test_item_id,
                     "script": {
                         "source": """
-                            ctx._source.issue_type = params.issue_type;
+                            ctx._source.issue_type = params.entry.issue_type;
+                            ctx._source.is_auto_analyzed = params.entry.is_auto_analyzed;
                             if (ctx._source.issue_history == null) {
                                 ctx._source.issue_history = [];
                             }
                             ctx._source.issue_history.add(params.entry);
                         """,
-                        "params": {"entry": entry, "issue_type": update.issue_type},
+                        "params": {"entry": entry},
                     },
                 }
             )

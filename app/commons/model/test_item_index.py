@@ -100,7 +100,7 @@ class TestItemIndexData(BaseModel):
     launch_name: Optional[str] = Field(default=None, description="Name of the launch")
     launch_number: Optional[str] = Field(default=None, description="Launch execution number")
     launch_start_time: Optional[str] = Field(default=None, description="When the launch started")
-    is_auto_analyzed: Optional[bool] = Field(default=None, description="Whether auto-analysis was applied")
+    is_auto_analyzed: Optional[bool] = Field(default=None, description="Whether the Test Item was auto-analyzed")
     issue_type: Optional[str] = Field(default=None, description="Assigned issue type (e.g., pb001, ab001)")
     start_time: Optional[str] = Field(default=None, description="When the test item started")
     log_count: Optional[int] = Field(default=None, description="Number of logs in this Test Item")

@@ -37,6 +37,9 @@
     "issue_type": {
         "type": "keyword"
     },
+    "is_auto_analyzed": {
+        "type": "boolean"
+    },
     "logs": {
       "type": "nested",
       "properties": {

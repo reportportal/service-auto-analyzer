@@ -36,6 +36,7 @@ class AnalyzerConf(BaseModel):
     numberOfLogsToIndex: int = 20
     minimumLogLevel: int = ERROR_LOGGING_LEVEL
     similarityThresholdToDrop: float = 0.95
+    searchScoreMode: str = "avg"
 
 
 class ApplicationConfig(BaseModel):

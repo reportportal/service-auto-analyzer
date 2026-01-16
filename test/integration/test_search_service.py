@@ -23,7 +23,7 @@ from app.service.search_service import SearchService
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
 
 
-def _make_log_data(log_id: str, log_order: int, message: str) -> LogData:
+def _make_log_data(log_id: str, log_order: int, message: str, potential_status_codes: str = "") -> LogData:
     return LogData(
         log_id=log_id,
         log_order=log_order,
@@ -47,7 +47,7 @@ def _make_log_data(log_id: str, log_order: int, message: str) -> LogData:
         stacktrace="",
         stacktrace_extended="",
         only_numbers="",
-        potential_status_codes="",
+        potential_status_codes=potential_status_codes,
         found_exceptions="",
         found_exceptions_extended="",
         found_tests_and_methods="",
@@ -142,3 +142,93 @@ def test_search_logs_filters_and_returns_best_log(search_service: SearchService,
     assert result[0].testItemId == 3001
     assert result[0].logId == 501
     assert result[0].matchScore == 100
+
+
+def test_search_logs_filters_by_potential_status_codes(
+    search_service: SearchService, mocked_os_client: OsClient
+) -> None:
+    analyzer_config = AnalyzerConf(searchLogsMinShouldMatch=30)
+    search_request = SearchLogs(
+        launchId=1001,
+        launchName="Test Launch",
+        itemId=2001,
+        projectId=123,
+        filteredLaunchIds=[1001],
+        logMessages=["request failed with status 404", "request failed with status 500"],
+        analyzerConfig=analyzer_config,
+        logLines=5,
+    )
+
+    item_one = TestItemIndexData(
+        test_item_id="3001",
+        launch_id="1001",
+        logs=[_make_log_data("701", 0, "request failed with status 404", potential_status_codes="404")],
+        issue_type="ti001",
+    )
+    item_two = TestItemIndexData(
+        test_item_id="3002",
+        launch_id="1001",
+        logs=[_make_log_data("702", 0, "request failed with status 500", potential_status_codes="500")],
+        issue_type="ti001",
+    )
+    item_three = TestItemIndexData(
+        test_item_id="3003",
+        launch_id="1001",
+        logs=[_make_log_data("703", 0, "request failed with status 403", potential_status_codes="403")],
+        issue_type="ti001",
+    )
+
+    mocked_os_client.search.return_value = iter(
+        [
+            Hit[TestItemIndexData].from_dict({"_index": "rp_123", "_id": "3001", "_source": item_one.model_dump()}),
+            Hit[TestItemIndexData].from_dict({"_index": "rp_123", "_id": "3002", "_source": item_two.model_dump()}),
+            Hit[TestItemIndexData].from_dict({"_index": "rp_123", "_id": "3003", "_source": item_three.model_dump()}),
+        ]
+    )
+
+    result = search_service.search_logs(search_request)
+
+    assert {item.testItemId for item in result} == {3001, 3002}
+    assert {item.logId for item in result} == {701, 702}
+
+
+def test_search_logs_all_messages_should_match(search_service: SearchService, mocked_os_client: OsClient) -> None:
+    analyzer_config = AnalyzerConf(searchLogsMinShouldMatch=30, allMessagesShouldMatch=True)
+    search_request = SearchLogs(
+        launchId=1001,
+        launchName="Test Launch",
+        itemId=2001,
+        projectId=123,
+        filteredLaunchIds=[1001],
+        logMessages=["login failed error", "database timeout error"],
+        analyzerConfig=analyzer_config,
+        logLines=5,
+    )
+
+    item_one = TestItemIndexData(
+        test_item_id="3001",
+        launch_id="1001",
+        logs=[
+            _make_log_data("801", 0, "login failed error"),
+            _make_log_data("802", 1, "database timeout error"),
+        ],
+        issue_type="ti001",
+    )
+    item_two = TestItemIndexData(
+        test_item_id="3002",
+        launch_id="1001",
+        logs=[_make_log_data("803", 0, "login failed error")],
+        issue_type="ti001",
+    )
+
+    mocked_os_client.search.return_value = iter(
+        [
+            Hit[TestItemIndexData].from_dict({"_index": "rp_123", "_id": "3001", "_source": item_one.model_dump()}),
+            Hit[TestItemIndexData].from_dict({"_index": "rp_123", "_id": "3002", "_source": item_two.model_dump()}),
+        ]
+    )
+
+    result = search_service.search_logs(search_request)
+
+    assert len(result) == 1
+    assert result[0].testItemId == 3001

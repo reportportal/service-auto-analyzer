@@ -139,6 +139,9 @@ class SearchService:
         joined_request_messages = "\n".join(log_messages)
         min_similarity = search_req.analyzerConfig.searchLogsMinShouldMatch / 100.0
         filtered_results: list[tuple[SearchLogInfo, float]] = []
+        request_status_codes = [
+            " ".join(sorted(text_processing.get_unique_potential_status_codes(message))) for message in log_messages
+        ]
 
         candidates: list[tuple[Any, list[tuple[Any, str]], list[str]]] = []
         joined_item_messages_list: list[str] = []
@@ -179,8 +182,33 @@ class SearchService:
 
             request_similarity = text_processing.calculate_text_similarity(best_log.message, log_messages)
             best_request_similarity = 0.0
+            best_request_index = 0
             if request_similarity:
-                best_request_similarity = max(result.similarity for result in request_similarity)
+                best_request_index = max(
+                    range(len(request_similarity)),
+                    key=lambda idx: request_similarity[idx].similarity,
+                )
+                best_request_similarity = request_similarity[best_request_index].similarity
+
+            request_codes = request_status_codes[best_request_index] if request_status_codes else ""
+            log_codes = " ".join(sorted(best_log.potential_status_codes.split()))
+            if log_codes != request_codes:
+                continue
+
+            if search_req.analyzerConfig.allMessagesShouldMatch:
+                all_messages_match = True
+                for request_message in log_messages:
+                    per_request_similarity = text_processing.calculate_text_similarity(
+                        request_message, log_messages_sorted
+                    )
+                    if not per_request_similarity:
+                        all_messages_match = False
+                        break
+                    if max(result.similarity for result in per_request_similarity) < min_similarity:
+                        all_messages_match = False
+                        break
+                if not all_messages_match:
+                    continue
 
             search_info = SearchLogInfo(
                 logId=utils.extract_real_id(best_log.log_id),

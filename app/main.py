@@ -224,7 +224,6 @@ APP_CONFIG = ApplicationConfig(
 )
 
 SEARCH_CONFIG = SearchConfig(
-    SearchLogsMinSimilarity=float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.95")),
     MinShouldMatch=os.getenv("ES_MIN_SHOULD_MATCH", "80%"),
     BoostAA=float(os.getenv("ES_BOOST_AA", "0.0")),
     BoostMA=float(os.getenv("ES_BOOST_MA", "10.0")),

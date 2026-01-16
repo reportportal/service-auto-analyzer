@@ -39,6 +39,7 @@ class AnalyzerConf(BaseModel):
 
 
 class ApplicationConfig(BaseModel):
+    """General application config object"""
 
     esHost: str = ""
     esUser: str = ""
@@ -87,9 +88,8 @@ class ApplicationConfig(BaseModel):
 
 
 class SearchConfig(BaseModel):
-    """Search config object"""
+    """Configuration object for full-text search engine and auto-analysis."""
 
-    SearchLogsMinSimilarity: float = 0.95
     MinShouldMatch: str = "80%"
     BoostAA: float = 0.0
     BoostMA: float = 5.0

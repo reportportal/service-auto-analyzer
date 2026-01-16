@@ -979,7 +979,7 @@ def preprocess_text_for_similarity(text: str) -> list[str]:
 
 
 def __calculate_tfidf_matrix(
-    vectorizer: Optional[TfidfVectorizer], all_texts: list[str], use_idf: bool = False
+    vectorizer: Optional[TfidfVectorizer], all_texts: list[str], *, use_idf: bool = False
 ) -> tuple[TfidfVectorizer, csr_matrix]:
     my_vectorizer = vectorizer
     if not my_vectorizer:
@@ -998,14 +998,14 @@ def __calculate_tfidf_matrix(
     return my_vectorizer, tf_matrix
 
 
-def calculate_text_similarity(base_text: str, *other_texts: str) -> list[SimilarityResult]:
+def calculate_text_similarity(base_text: str, other_texts: list[str]) -> list[SimilarityResult]:
     """
     Calculate similarity between a base text and multiple other texts using TF-IDF vectorization and cosine similarity.
 
     This function preprocesses all texts according to specified requirements and then
     computes their similarity using computationally efficient methods.
 
-    :param base_text: Base text to compare against
+    :param base_text:   Base text to compare against
     :param other_texts: Variable number of texts to compare with the base text
     :return: List of SimilarityResult objects where `similarity` is in [0.0, 1.0]
              and `both_empty` indicates both texts were empty

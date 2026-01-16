@@ -233,7 +233,7 @@ def test_remove_credentials_from_url(url, expected_url):
 )
 def test_calculate_text_similarity_basic_cases(base_text, other_texts, expected_scores):
     """Test basic text similarity calculation cases"""
-    actual_scores = text_processing.calculate_text_similarity(base_text, *other_texts)
+    actual_scores = text_processing.calculate_text_similarity(base_text, other_texts)
 
     assert len(actual_scores) == len(expected_scores)
 
@@ -310,7 +310,7 @@ def test_preprocess_text_for_similarity(text, expected_preprocessing_contains):
 )
 def test_calculate_text_similarity_edge_cases(base_text, other_texts):
     """Test text similarity calculation with edge cases"""
-    actual_scores = text_processing.calculate_text_similarity(base_text, *other_texts)
+    actual_scores = text_processing.calculate_text_similarity(base_text, other_texts)
 
     # Basic validation
     assert len(actual_scores) == len(other_texts)
@@ -324,7 +324,7 @@ def test_calculate_text_similarity_edge_cases(base_text, other_texts):
 
 def test_calculate_text_similarity_no_other_texts():
     """Test calculate_text_similarity with no other texts provided"""
-    result = text_processing.calculate_text_similarity("base text")
+    result = text_processing.calculate_text_similarity("base text", [])
     assert result == []
 
 
@@ -338,14 +338,14 @@ def test_calculate_text_similarity_appium_exceptions():
     )
 
     # Test overall similarity
-    similarity_scores = text_processing.calculate_text_similarity(ios_exception, android_exception)
+    similarity_scores = text_processing.calculate_text_similarity(ios_exception, [android_exception])
     assert len(similarity_scores) == 1
     assert 0.0 <= similarity_scores[0].similarity <= 1.0
 
     # Test first line similarity
     ios_first_line = ios_exception.split("\n")[0]
     android_first_line = android_exception.split("\n")[0]
-    first_line_scores = text_processing.calculate_text_similarity(ios_first_line, android_first_line)
+    first_line_scores = text_processing.calculate_text_similarity(ios_first_line, [android_first_line])
     assert len(first_line_scores) == 1
     assert 0.0 <= first_line_scores[0].similarity <= 1.0
 
@@ -361,7 +361,7 @@ def test_calculate_text_similarity_appium_exceptions():
 )
 def test_calculate_text_similarity_multiple_texts(base_text, other_texts, expected_length):
     """Test that calculate_text_similarity handles multiple texts correctly"""
-    scores = text_processing.calculate_text_similarity(base_text, *other_texts)
+    scores = text_processing.calculate_text_similarity(base_text, other_texts)
     assert len(scores) == expected_length
 
     for score in scores:
@@ -394,9 +394,13 @@ HISTORY_TEXTS = [
 
 
 def test_calculate_text_similarity_script_scenarios():
-    previous_similarities = []
+    """Users complain that if they "slightly" change log message analyzer stops to classify test items because of IDF.
+
+    This test ensures that IDF is off for `calculate_text_similarity` function, which is used in classification.
+    """
+    previous_similarities = None
     for n in range(1, len(HISTORY_TEXTS) + 1):
-        result = text_processing.calculate_text_similarity(REQUEST_TEXT, *HISTORY_TEXTS[:n])
+        result = text_processing.calculate_text_similarity(REQUEST_TEXT, HISTORY_TEXTS[:n])
         assert len(result) == n
         if previous_similarities:
             for i, r in enumerate(previous_similarities):

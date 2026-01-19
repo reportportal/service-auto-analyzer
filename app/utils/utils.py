@@ -284,7 +284,7 @@ def calculate_threshold(text_size: int, cur_threshold: float, min_recalculated_t
     return min(new_threshold, cur_threshold)
 
 
-def calculate_threshold_for_text(text, cur_threshold, min_recalculated_threshold=0.8):
+def calculate_threshold_for_text(text: str, cur_threshold: float, min_recalculated_threshold: float = 0.8):
     text_size = len(split_words(text))
     return calculate_threshold(text_size, cur_threshold, min_recalculated_threshold=min_recalculated_threshold)
 

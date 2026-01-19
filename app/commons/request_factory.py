@@ -237,6 +237,7 @@ def _prepare_log_data(log: Log, log_order: int, number_of_lines: int) -> LogData
 
     # Clean and prepare all text fields
     message = prepared_log.message
+    message_for_clustering = prepared_log.message_for_clustering
     detected_message = prepared_log.exception_message_no_numbers
     detected_message_with_numbers = prepared_log.exception_message
     stacktrace = prepared_log.stacktrace
@@ -263,6 +264,7 @@ def _prepare_log_data(log: Log, log_order: int, number_of_lines: int) -> LogData
     # Apply text cleanup operations
     text_fields = {
         "message": message,
+        "message_for_clustering": message_for_clustering,
         "detected_message": detected_message,
         "detected_message_with_numbers": detected_message_with_numbers,
         "stacktrace": stacktrace,
@@ -294,6 +296,7 @@ def _prepare_log_data(log: Log, log_order: int, number_of_lines: int) -> LogData
         cluster_with_numbers=utils.extract_clustering_setting(log.clusterId),
         original_message=log.message,
         message=text_fields["message"],
+        message_for_clustering=text_fields["message_for_clustering"],
         message_lines=text_processing.calculate_line_number(prepared_log.clean_message),
         message_words_number=len(text_processing.split_words(prepared_log.clean_message, split_urls=False)),
         message_extended=text_fields["message_extended"],

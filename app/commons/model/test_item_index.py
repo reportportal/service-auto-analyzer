@@ -27,37 +27,69 @@ class LogData(BaseModel):
     """
 
     log_id: str = Field(description="Unique identifier for the log entry")
-    log_order: int = Field(description="Position of log within Test Item (0-based)")
-    log_time: str = Field(description="Timestamp of the log entry")
+    log_order: Optional[int] = Field(default=None, description="Position of log within Test Item (0-based)")
+    log_time: Optional[str] = Field(default=None, description="Timestamp of the log entry")
     log_level: int = Field(description="Log level (e.g., 40000 for ERROR)")
     cluster_id: str = Field(default="", description="Cluster identifier if clustered")
     cluster_message: str = Field(default="", description="Cluster representative message")
     cluster_with_numbers: bool = Field(default=False, description="Whether cluster includes numbers")
-    original_message: str = Field(description="Raw log message for display")
-    message: str = Field(description="Cleaned message (garbage removed)")
-    message_lines: int = Field(description="Number of lines in message")
-    message_words_number: int = Field(description="Word count in message")
-    message_extended: str = Field(description="Message with enriched class/method names")
-    message_without_params_extended: str = Field(description="Message without params, enriched")
-    message_without_params_and_brackets: str = Field(description="Message without params and brackets")
-    detected_message: str = Field(description="Exception message without numbers")
-    detected_message_with_numbers: str = Field(description="Exception message with numbers")
-    detected_message_extended: str = Field(description="Enriched exception message")
-    detected_message_without_params_extended: str = Field(description="Exception message without params, enriched")
-    detected_message_without_params_and_brackets: str = Field(
-        description="Exception message without params and brackets"
+    original_message: Optional[str] = Field(default=None, description="Raw log message for display")
+    message: Optional[str] = Field(default=None, description="Cleaned message (garbage removed)")
+    message_for_clustering: Optional[str] = Field(
+        default=None, description="Cleaned message for clustering (less removed text)"
     )
-    stacktrace: str = Field(description="Stack trace portion")
-    stacktrace_extended: str = Field(description="Enriched stack trace")
-    only_numbers: str = Field(description="Extracted numeric values")
-    potential_status_codes: str = Field(description="Detected status/error codes")
-    found_exceptions: str = Field(description="Exception type names found")
-    found_exceptions_extended: str = Field(description="Enriched exception names")
-    found_tests_and_methods: str = Field(description="Test method references")
-    urls: str = Field(description="URLs found in message")
-    paths: str = Field(description="File paths found in message")
-    message_params: str = Field(description="Extracted parameters")
-    whole_message: str = Field(description="Combined exception message and stacktrace")
+    message_lines: Optional[int] = Field(default=None, description="Number of lines in message")
+    message_words_number: Optional[int] = Field(default=None, description="Word count in message")
+    message_extended: Optional[str] = Field(default=None, description="Message with enriched class/method names")
+    message_without_params_extended: Optional[str] = Field(
+        default=None, description="Message without params, enriched"
+    )
+    message_without_params_and_brackets: Optional[str] = Field(
+        default=None, description="Message without params and brackets"
+    )
+    detected_message: Optional[str] = Field(default=None, description="Exception message without numbers")
+    detected_message_with_numbers: Optional[str] = Field(default=None, description="Exception message with numbers")
+    detected_message_extended: Optional[str] = Field(default=None, description="Enriched exception message")
+    detected_message_without_params_extended: Optional[str] = Field(
+        default=None, description="Exception message without params, enriched"
+    )
+    detected_message_without_params_and_brackets: Optional[str] = Field(
+        default=None, description="Exception message without params and brackets"
+    )
+    stacktrace: str = Field(default=None, description="Stack trace portion")
+    stacktrace_extended: str = Field(default=None, description="Enriched stack trace")
+    only_numbers: Optional[str] = Field(default=None, description="Extracted numeric values")
+    potential_status_codes: Optional[str] = Field(default=None, description="Detected status/error codes")
+    found_exceptions: Optional[str] = Field(default=None, description="Exception type names found")
+    found_exceptions_extended: Optional[str] = Field(default=None, description="Enriched exception names")
+    found_tests_and_methods: Optional[str] = Field(default=None, description="Test method references")
+    urls: Optional[str] = Field(default=None, description="URLs found in message")
+    paths: Optional[str] = Field(default=None, description="File paths found in message")
+    message_params: Optional[str] = Field(default=None, description="Extracted parameters")
+    whole_message: Optional[str] = Field(default=None, description="Combined exception message and stacktrace")
+
+
+class LogClusterData(BaseModel):
+    """Payload for updating cluster data on a nested log."""
+
+    log_id: str = Field(description="Identifier of the log entry to update")
+    test_item_id: str = Field(description="Identifier of the parent Test Item document")
+    cluster_id: str = Field(description="Cluster identifier to assign")
+    cluster_message: str = Field(description="Cluster representative message")
+    cluster_with_numbers: bool = Field(description="Whether cluster includes numbers")
+
+    def to_update_params(self) -> dict[str, Any]:
+        """
+        Convert the update data into OpenSearch script parameters.
+
+        :return: Dictionary of painless script params
+        """
+        return {
+            "log_id": self.log_id,
+            "cluster_id": self.cluster_id,
+            "cluster_message": self.cluster_message,
+            "cluster_with_numbers": self.cluster_with_numbers,
+        }
 
 
 class TestItemHistoryData(BaseModel):

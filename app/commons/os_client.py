@@ -27,7 +27,7 @@ from urllib3.exceptions import InsecureRequestWarning
 
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, Response
-from app.commons.model.test_item_index import LogData, TestItemHistoryData, TestItemIndexData
+from app.commons.model.test_item_index import LogClusterData, LogData, TestItemHistoryData, TestItemIndexData
 from app.utils import text_processing, utils
 
 INDEX_SETTINGS_FILE = "index_settings.json"
@@ -41,13 +41,14 @@ T = TypeVar("T")
 class Hit(BaseModel, Generic[T]):
     """Typed representation of an OpenSearch search hit."""
 
-    index: str = Field(validation_alias="_index")
-    id: str = Field(validation_alias="_id")
+    index: Optional[str] = Field(default=None, validation_alias="_index")
+    id: Optional[str] = Field(default=None, validation_alias="_id")
     score: Optional[float] = Field(default=None, validation_alias="_score")
     source: T = Field(validation_alias="_source")
     sort: Optional[list[Any]] = None
     highlight: Optional[dict[str, Any]] = None
     fields: Optional[dict[str, Any]] = None
+    inner_hits: Optional[dict[str, Any]] = Field(default=None)
 
     @classmethod
     def from_dict(cls, hit: dict[str, Any]) -> "Hit[T]":
@@ -75,7 +76,7 @@ class OsClient:
     """OpenSearch client for Test Item-centric document indexing."""
 
     app_config: ApplicationConfig
-    os_client: OpenSearch
+    _os_client: OpenSearch
     host: str
     _checked_indexes: set[str]
 
@@ -94,10 +95,10 @@ class OsClient:
         self.host = app_config.esHost
         if os_client:
             LOGGER.debug("Creating service using provided client")
-            self.os_client = os_client
+            self._os_client = os_client
         else:
             LOGGER.debug(f"Creating service using host URL: {text_processing.remove_credentials_from_url(self.host)}")
-            self.os_client = self._create_os_client(app_config)
+            self._os_client = self._create_os_client(app_config)
         self._checked_indexes = set()
 
     def _create_os_client(self, app_config: ApplicationConfig) -> OpenSearch:
@@ -157,7 +158,7 @@ class OsClient:
 
     def _delete_index(self, index_name: str) -> bool:
         try:
-            self.os_client.indices.delete(index=index_name)
+            self._os_client.indices.delete(index=index_name)
             self._checked_indexes.discard(index_name)
             LOGGER.debug(f"Index '{index_name}' deleted")
             return True
@@ -187,7 +188,7 @@ class OsClient:
         :return: Response with acknowledgment status
         """
         LOGGER.info(f"Creating Test Item index: {index_name}")
-        response = self.os_client.indices.create(
+        response = self._os_client.indices.create(
             index=index_name,
             body={
                 "settings": utils.read_resource_file(INDEX_SETTINGS_FILE, to_json=True),
@@ -205,7 +206,7 @@ class OsClient:
         :return: True if index exists
         """
         try:
-            index = self.os_client.indices.get(index=index_name)
+            index = self._os_client.indices.get(index=index_name)
             return index is not None
         except Exception as err:
             if print_error:
@@ -277,7 +278,7 @@ class OsClient:
         try:
             try:
                 success_count, errors = opensearchpy.helpers.bulk(
-                    self.os_client,
+                    self._os_client,
                     bodies,
                     chunk_size=es_chunk_number,
                     request_timeout=30,
@@ -288,7 +289,7 @@ class OsClient:
                 LOGGER.warning(f"Bulk indexing failed, retrying: {formatted_exception}")
                 self._update_settings_after_read_only()
                 success_count, errors = opensearchpy.helpers.bulk(
-                    self.os_client,
+                    self._os_client,
                     bodies,
                     chunk_size=es_chunk_number,
                     request_timeout=30,
@@ -404,7 +405,7 @@ class OsClient:
             if not batch_ids:
                 continue
             try:
-                result = self.os_client.delete_by_query(index=index_name, body=query_builder(batch_ids))
+                result = self._os_client.delete_by_query(index=index_name, body=query_builder(batch_ids))
                 if "deleted" in result:
                     deleted += result["deleted"]
             except Exception as err:
@@ -491,7 +492,7 @@ class OsClient:
 
         query = self._time_range_query("launch_start_time", start_date, end_date)
         try:
-            result = self.os_client.delete_by_query(index=index_name, body=query)
+            result = self._os_client.delete_by_query(index=index_name, body=query)
             return result.get("deleted", 0)
         except Exception as err:
             LOGGER.exception("Error in delete_by_launch_start_time_range", exc_info=err)
@@ -511,7 +512,7 @@ class OsClient:
 
         query = self._time_range_query("start_time", start_date, end_date)
         try:
-            result = self.os_client.delete_by_query(index=index_name, body=query)
+            result = self._os_client.delete_by_query(index=index_name, body=query)
             return result.get("deleted", 0)
         except Exception as err:
             LOGGER.exception("Error in delete_by_test_item_start_time_range", exc_info=err)
@@ -535,7 +536,7 @@ class OsClient:
             kwargs: dict[str, Any] = {}
             if scroll:
                 kwargs["scroll"] = scroll
-            for doc in opensearchpy.helpers.scan(self.os_client, query=query, index=index_name, **kwargs):
+            for doc in opensearchpy.helpers.scan(self._os_client, query=query, index=index_name, **kwargs):
                 yield Hit[TestItemIndexData].from_dict(doc)
         except Exception as err:
             LOGGER.exception("Error in search", exc_info=err)
@@ -611,6 +612,56 @@ class OsClient:
 
         return self._execute_bulk(bodies)
 
+    def bulk_update_cluster_info(
+        self,
+        project_id: str | int,
+        updates: list[LogClusterData],
+        refresh: bool = False,
+        chunk_size: Optional[int] = None,
+    ) -> BulkResponse:
+        """Bulk update cluster information for nested logs.
+
+        :param project_id: The project identifier
+        :param updates: List of LogClusterData update payloads
+        :param refresh: Whether to refresh the index after update
+        :param chunk_size: Optional chunk size for bulk operations
+        :return: BulkResponse with update results
+        """
+        if not updates:
+            return BulkResponse(took=0, errors=False)
+
+        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
+        if not self._index_exists(index_name, print_error=True):
+            LOGGER.error(f"Index not exists: {index_name}")
+            return BulkResponse(took=0, errors=True)
+
+        script_source = """
+            if (ctx._source.logs != null) {
+                for (int i = 0; i < ctx._source.logs.size(); i++) {
+                    if (ctx._source.logs[i].log_id == params.log_id) {
+                        ctx._source.logs[i].cluster_id = params.cluster_id;
+                        ctx._source.logs[i].cluster_message = params.cluster_message;
+                        ctx._source.logs[i].cluster_with_numbers = params.cluster_with_numbers;
+                    }
+                }
+            }
+        """
+        bodies: list[dict[str, Any]] = []
+        for update in updates:
+            bodies.append(
+                {
+                    "_op_type": "update",
+                    "_index": index_name,
+                    "_id": update.test_item_id,
+                    "script": {
+                        "source": script_source,
+                        "params": update.to_update_params(),
+                    },
+                }
+            )
+
+        return self._execute_bulk(bodies, refresh=refresh, chunk_size=chunk_size)
+
     def get_test_item(self, project_id: str | int, test_item_id: str) -> Optional[TestItemIndexData]:
         """Get a single Test Item by ID.
 
@@ -623,7 +674,7 @@ class OsClient:
             return None
 
         try:
-            response = self.os_client.get(index=index_name, id=test_item_id)
+            response = self._os_client.get(index=index_name, id=test_item_id)
             source = response.get("_source")
             if source is None:
                 return None

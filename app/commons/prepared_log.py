@@ -35,6 +35,7 @@ class PreparedLogMessage:
     _clean_message: Optional[str] = None
     _test_and_methods: Optional[set[str]] = None
     _message: Optional[str] = None
+    _message_for_clustering: Optional[str] = None
     _message_no_params: Optional[str] = None
     _exception_message: Optional[str] = None
     _stacktrace: Optional[str] = None
@@ -84,6 +85,14 @@ class PreparedLogMessage:
         if not self._message:
             self._message = prepare_message_no_numbers(self.clean_message, self.number_of_lines, self.test_and_methods)
         return self._message
+
+    @property
+    def message_for_clustering(self) -> str:
+        if not self._message_for_clustering:
+            self._message_for_clustering = prepare_message(
+                self.basic_message, self.number_of_lines, self.test_and_methods
+            )
+        return self._message_for_clustering
 
     @property
     def message_no_params(self) -> str:

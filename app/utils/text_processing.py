@@ -153,8 +153,10 @@ def is_starting_message_pattern(text):
     return False
 
 
-def get_found_exceptions(text: str, to_lower: bool = False) -> str:
+def get_found_exceptions(text: Optional[str], to_lower: bool = False) -> list[str]:
     """Extract exception and errors from logs"""
+    if not text:
+        return []
     unique_exceptions = set()
     found_exceptions = []
     for word in split_words(text, to_lower=to_lower):
@@ -164,7 +166,7 @@ def get_found_exceptions(text: str, to_lower: bool = False) -> str:
                     found_exceptions.append(word)
                     unique_exceptions.add(word)
                 break
-    return " ".join(found_exceptions)
+    return found_exceptions
 
 
 def detect_log_parts_python(message, default_log_number=1):
@@ -343,8 +345,10 @@ def first_lines(log_str: str, n_lines: int) -> str:
 
 
 def prepare_message_for_clustering(
-    message: str, number_of_log_lines: int, clean_numbers: bool, leave_log_structure: bool = False
-) -> str:
+    message: Optional[str], number_of_log_lines: int, clean_numbers: bool, leave_log_structure: bool = False
+) -> Optional[str]:
+    if not message:
+        return None
     potential_status_codes = get_unique_potential_status_codes(message)
     message = remove_starting_datetime(message)
     if clean_numbers:
@@ -998,7 +1002,7 @@ def __calculate_tfidf_matrix(
     return my_vectorizer, tf_matrix
 
 
-def calculate_text_similarity(base_text: str, other_texts: list[str]) -> list[SimilarityResult]:
+def calculate_text_similarity(base_text: Optional[str], other_texts: list[str]) -> list[SimilarityResult]:
     """
     Calculate similarity between a base text and multiple other texts using TF-IDF vectorization and cosine similarity.
 
@@ -1010,7 +1014,7 @@ def calculate_text_similarity(base_text: str, other_texts: list[str]) -> list[Si
     :return: List of SimilarityResult objects where `similarity` is in [0.0, 1.0]
              and `both_empty` indicates both texts were empty
     """
-    if not other_texts:
+    if not base_text or not other_texts:
         return []
 
     # Preprocess the base text

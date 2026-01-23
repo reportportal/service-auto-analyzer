@@ -184,7 +184,7 @@ def merge_logs(
             log_message = text_processing.prepare_message_for_clustering(
                 log["_source"]["whole_message"], number_of_log_lines, clean_numbers
             )
-            if not log_message.strip():
+            if not log_message or not log_message.strip():
                 continue
             log_messages.append(log_message)
             log_dict[ind] = log

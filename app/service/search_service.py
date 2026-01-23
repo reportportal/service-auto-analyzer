@@ -149,11 +149,11 @@ class SearchService:
             source = hit.source
             if not source.logs:
                 continue
-            logs_sorted = sorted(source.logs, key=lambda log: log.log_order)
-            logs_with_messages = [(log, log.message) for log in logs_sorted if log.message.strip()]
+            logs_sorted = sorted(source.logs, key=lambda log: log.log_order if log.log_order else log.log_id)
+            logs_with_messages = [(log, log.message) for log in logs_sorted if log.message and log.message.strip()]
             if not logs_with_messages:
                 continue
-            log_messages_sorted = [message for _, message in logs_with_messages]
+            log_messages_sorted: list[str] = [message for _, message in logs_with_messages if message]
             joined_item_messages = "\n".join(log_messages_sorted)
             candidates.append((source, logs_with_messages, log_messages_sorted))
             joined_item_messages_list.append(joined_item_messages)
@@ -191,7 +191,7 @@ class SearchService:
                 best_request_similarity = request_similarity[best_request_index].similarity
 
             request_codes = request_status_codes[best_request_index] if request_status_codes else ""
-            log_codes = " ".join(sorted(best_log.potential_status_codes.split()))
+            log_codes = " ".join(sorted((best_log.potential_status_codes or "").split()))
             if log_codes != request_codes:
                 continue
 

@@ -99,7 +99,7 @@ class SuggestPatternsService:
                 continue
             for log in hit.source.logs or []:
                 detected_message = log.detected_message
-                for exception in text_processing.get_found_exceptions(detected_message).split(" "):
+                for exception in text_processing.get_found_exceptions(detected_message):
                     if exception.strip():
                         if exception not in all_exceptions:
                             all_exceptions[exception] = 0

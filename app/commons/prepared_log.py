@@ -173,7 +173,7 @@ class PreparedLogMessage:
     @property
     def exception_found(self) -> str:
         if not self._exception_found:
-            self._exception_found = text_processing.get_found_exceptions(self.exception_message_no_numbers)
+            self._exception_found = " ".join(text_processing.get_found_exceptions(self.exception_message_no_numbers))
         return self._exception_found
 
     @property

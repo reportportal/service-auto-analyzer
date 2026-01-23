@@ -197,7 +197,7 @@ def test_find_clusters_calls_correct_services(
 
     # Verify total counts match our test data
     # All 4 logs from our launch plus 1 similar same-launch log should be in the clusters
-    assert total_log_ids == 5, f"should have exactly 5 log IDs total (including same-launch similar log)"
+    assert total_log_ids == 5, "should have exactly 5 log IDs total (including same-launch similar log)"
     # We have 3 unique test items in our test data: 6001, 6002, 6003; plus 1 similar 6004 same-launch test item from
     # search
     assert (

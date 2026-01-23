@@ -56,8 +56,8 @@ class LogData(BaseModel):
     detected_message_without_params_and_brackets: Optional[str] = Field(
         default=None, description="Exception message without params and brackets"
     )
-    stacktrace: str = Field(default=None, description="Stack trace portion")
-    stacktrace_extended: str = Field(default=None, description="Enriched stack trace")
+    stacktrace: Optional[str] = Field(default=None, description="Stack trace portion")
+    stacktrace_extended: Optional[str] = Field(default=None, description="Enriched stack trace")
     only_numbers: Optional[str] = Field(default=None, description="Extracted numeric values")
     potential_status_codes: Optional[str] = Field(default=None, description="Detected status/error codes")
     found_exceptions: Optional[str] = Field(default=None, description="Exception type names found")

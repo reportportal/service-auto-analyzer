@@ -825,10 +825,13 @@ class OsClient:
         end_dt = self._normalize_datetime(end_date)
 
         def is_in_range(log: LogData) -> bool:
-            log_dt = self._normalize_datetime(log.log_time)
+            log_time = log.log_time
+            if not log_time:
+                return False
+            log_dt = self._normalize_datetime(log_time)
             if start_dt and end_dt and log_dt:
                 return start_dt <= log_dt <= end_dt
-            return start_date <= log.log_time <= end_date
+            return start_date <= log_time <= end_date
 
         query = {
             "query": {

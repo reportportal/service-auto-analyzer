@@ -24,17 +24,17 @@ import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 
 from app.commons import clustering, logging, request_factory
+from app.commons.model import TestItemIndexData
 from app.commons.model.launch_objects import (
     ApplicationConfig,
     ClusterInfo,
     ClusterResult,
+    LaunchInfoForClustering,
     SearchConfig,
 )
 from app.commons.model.test_item_index import LogClusterData, LogData
-from app.commons.os_client import OsClient, Hit
+from app.commons.os_client import Hit, OsClient
 from app.utils import text_processing, utils
-from commons.model import TestItemIndexData
-from commons.model.launch_objects import LaunchInfoForClustering
 
 LOGGER = logging.getLogger("analyzerApp.clusterService")
 
@@ -107,18 +107,19 @@ class ClusterService:
                 max_query_terms=self.search_cfg.MaxQueryTerms,
             )
         ]
-        if queried_log.log.found_exceptions.strip():
+        found_exceptions = queried_log.log.found_exceptions
+        if found_exceptions and found_exceptions.strip():
             nested_must.append(
                 utils.build_more_like_this_query(
                     "1",
-                    queried_log.log.found_exceptions,
+                    found_exceptions,
                     field_name="logs.found_exceptions",
                     boost=1.0,
                     override_min_should_match="1",
                     max_query_terms=self.search_cfg.MaxQueryTerms,
                 )
             )
-        potential_status_codes = queried_log.log.potential_status_codes.strip()
+        potential_status_codes = queried_log.log.potential_status_codes
         if potential_status_codes:
             number_of_status_codes = str(len(set(potential_status_codes.split())))
             nested_must.append(
@@ -215,6 +216,8 @@ class ClusterService:
                     log_message = text_processing.prepare_message_for_clustering(
                         inner_hit.source.whole_message, number_of_log_lines, launch_info.cleanNumbers
                     )
+                    if not log_message or not log_message.strip():
+                        continue
                     inner_log = Log(
                         test_item_id=hit.source.test_item_id,
                         message=log_message,
@@ -228,7 +231,7 @@ class ClusterService:
                         number_of_log_lines,
                         launch_info.cleanNumbers,
                         leave_log_structure=True,
-                    ).strip()
+                    )
 
                     if cluster_message_original and cluster_message_processed != cluster_message_original:
                         continue
@@ -258,7 +261,7 @@ class ClusterService:
                             current_cluster_message = log_dict_part[ind].log.cluster_message.strip()
                             if current_cluster_message:
                                 cluster_message = current_cluster_message
-                    new_group_log_ids = []
+                    new_group_log_ids: list[int] = []
                     new_test_items = set()
                     for ind in groups_part[group]:
                         if ind == 0:
@@ -266,7 +269,7 @@ class ClusterService:
                         if log_dict_part[ind].launch_id != str(launch_info.launch.launchId):
                             continue
                         new_logs.append(log_dict_part[ind])
-                        new_group_log_ids.append(log_dict_part[ind].log.log_id)
+                        new_group_log_ids.append(int(log_dict_part[ind].log.log_id))
                         new_test_items.add(int(log_dict_part[ind].test_item_id))
                     if not cluster_id or not cluster_message:
                         continue
@@ -297,8 +300,8 @@ class ClusterService:
     def _regroup_by_error_and_status_codes(self, logs: list[Log]) -> list[list[int]]:
         regrouped_by_error = defaultdict(list)
         for i, log in enumerate(logs):
-            found_exceptions = " ".join(sorted(log.log.found_exceptions.split()))
-            potential_status_codes = " ".join(sorted(log.log.potential_status_codes.split()))
+            found_exceptions = " ".join(sorted((log.log.found_exceptions or "").split()))
+            potential_status_codes = " ".join(sorted((log.log.potential_status_codes or "").split()))
             group_key = (found_exceptions, potential_status_codes)
             regrouped_by_error[group_key].append(i)
         return list(regrouped_by_error.values())
@@ -336,11 +339,14 @@ class ClusterService:
             ind = group_ids[i]
             group_logs.append(logs[ind].message)
             if not log_message:
-                log_message = text_processing.prepare_message_for_clustering(
-                    logs[ind].log.whole_message,
-                    launch_info.numberOfLogLines,
-                    launch_info.cleanNumbers,
-                    leave_log_structure=True,
+                log_message = (
+                    text_processing.prepare_message_for_clustering(
+                        logs[ind].log.whole_message,
+                        launch_info.numberOfLogLines,
+                        launch_info.cleanNumbers,
+                        leave_log_structure=True,
+                    )
+                    or ""
                 ).strip()
         _cnt_vectorizer = CountVectorizer(binary=True, analyzer="word", token_pattern="[^ ]+", ngram_range=(2, 2))
         group_res = _cnt_vectorizer.fit_transform(group_logs).astype(np.int8)
@@ -374,12 +380,12 @@ class ClusterService:
             log_ids: list[int] = []
             test_item_ids: list[int] = []
             for ind in groups[group]:
-                additional_log_id = logs[ind].log.log_id
-                log_ids.append(int(additional_log_id))
+                additional_log_id_str = logs[ind].log.log_id
+                log_ids.append(int(additional_log_id_str))
                 test_item_ids.append(int(logs[ind].test_item_id))
                 updates.append(
                     LogClusterData(
-                        log_id=additional_log_id,
+                        log_id=additional_log_id_str,
                         test_item_id=logs[ind].test_item_id,
                         cluster_id=str(cluster_id),
                         cluster_message=cluster_message,
@@ -433,10 +439,10 @@ class ClusterService:
                     log.message_for_clustering,
                     launch_info.numberOfLogLines,
                     launch_info.cleanNumbers,
-                ).strip()
-                if not log_message:
+                )
+                if not log_message or not log_message.strip():
                     continue
-                logs.append(Log(test_item_id=item.test_item_id, message=log_message, log=log))
+                logs.append(Log(test_item_id=item.test_item_id, message=log_message.strip(), log=log))
         return logs
 
     def find_clusters(self, launch_info: LaunchInfoForClustering) -> ClusterResult:
@@ -449,7 +455,7 @@ class ClusterService:
         cluster_num = 0
         clusters: list[ClusterInfo] = []
         logs: list[Log] = []
-        additional_logs = []
+        additional_logs: list[Log] = []
         try:
             min_match_threshold = launch_info.launch.analyzerConfig.uniqueErrorsMinShouldMatch / 100.0
             config = launch_info.launch.analyzerConfig

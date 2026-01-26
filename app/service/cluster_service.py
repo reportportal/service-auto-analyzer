@@ -518,8 +518,10 @@ class ClusterService:
             # Update cluster info in DB if anything found
             if common_clusters:
                 for result in common_clusters:
-                    LOGGER.debug(f"Cluster Id: {result.clusterId}, Cluster message: '{result.clusterMessage}'")
-                    LOGGER.debug(f"Cluster Ids: {result.logIds}")
+                    LOGGER.debug(
+                        f"Cluster Id: {result.clusterId}; Cluster message: '{result.clusterMessage}'; Log IDs: "
+                        + str(result.logIds)
+                    )
                 self.os_client.bulk_update_cluster_info(
                     launch_info.project,
                     db_updates,

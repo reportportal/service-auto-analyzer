@@ -47,6 +47,211 @@ class Log:
     launch_id: Optional[str] = None
 
 
+def find_non_zero_id_non_empty_message(group: list[int], logs: dict[int, Log]) -> tuple[Optional[int], Optional[str]]:
+    cluster_id: Optional[int] = None
+    cluster_message: Optional[str] = None
+    for ind in group:
+        if ind == 0:  # not to use old cluster id and message
+            continue
+        current_cluster_id = logs[ind].log.cluster_id.strip()
+        if current_cluster_id and int(current_cluster_id) != 0:
+            cluster_id = int(current_cluster_id)
+            current_cluster_message = logs[ind].log.cluster_message.strip()
+            if current_cluster_message:
+                cluster_message = current_cluster_message
+    return cluster_id, cluster_message
+
+
+def collect_log_and_item_ids(
+    cluster: list[int], logs: dict[int, Log], launch_info: LaunchInfoForClustering
+) -> tuple[list[int], list[int]]:
+    new_group_log_ids: list[int] = []
+    new_group_test_items: list[int] = []
+    for ind in cluster:
+        if ind == 0:
+            continue
+        if logs[ind].launch_id != str(launch_info.launch.launchId):
+            continue
+        new_group_log_ids.append(int(logs[ind].log.log_id))
+        new_group_test_items.append(int(logs[ind].test_item_id))
+    return new_group_log_ids, new_group_test_items
+
+
+def regroup_logs_by_error_and_status_codes(logs: list[Log]) -> list[list[int]]:
+    regrouped_by_error = defaultdict(list)
+    for i, log in enumerate(logs):
+        found_exceptions_raw: str = log.log.found_exceptions or ""
+        found_exceptions = " ".join(sorted(found_exceptions_raw.split()))
+        potential_status_codes_raw: str = log.log.potential_status_codes or ""
+        potential_status_codes = " ".join(sorted(potential_status_codes_raw.split()))
+        group_key = (found_exceptions, potential_status_codes)
+        regrouped_by_error[group_key].append(i)
+    return list(regrouped_by_error.values())
+
+
+def cluster_messages_with_grouping_by_error(logs: list[Log], min_match_threshold: float) -> dict[int, list[int]]:
+    regrouped_by_error = regroup_logs_by_error_and_status_codes(logs)
+    all_clusters: dict[int, list[int]] = defaultdict(list)
+    start_cluster_id = 0
+    for group in regrouped_by_error:
+        similar_messages = []
+        similar_messages_indexes = {}
+        for i, idx in enumerate(group):
+            similar_messages.append(logs[idx].message)
+            similar_messages_indexes[i] = idx
+        clusters = clustering.find_clusters(similar_messages, threshold=min_match_threshold)
+        max_group_id = max(clusters.keys())
+        for cluster_id, cluster in clusters.items():
+            global_idx = start_cluster_id + cluster_id
+            for i in cluster:
+                all_clusters[global_idx].append(similar_messages_indexes[i])
+        start_cluster_id = start_cluster_id + max_group_id + 1
+    return dict(all_clusters)
+
+
+def calculate_hash(
+    group_ids: list[int],
+    logs: list[Log],
+    launch_info: LaunchInfoForClustering,
+) -> tuple[int, str]:
+    group_logs = []
+    log_message = ""
+    for i in range(min(100, len(group_ids))):
+        ind = group_ids[i]
+        group_logs.append(logs[ind].message)
+        if not log_message:
+            log_message = (
+                text_processing.prepare_message_for_clustering(
+                    logs[ind].log.whole_message,
+                    launch_info.numberOfLogLines,
+                    launch_info.cleanNumbers,
+                    leave_log_structure=True,
+                )
+                or ""
+            ).strip()
+    _cnt_vectorizer = CountVectorizer(binary=True, analyzer="word", token_pattern="[^ ]+", ngram_range=(2, 2))
+    group_res = _cnt_vectorizer.fit_transform(group_logs).astype(np.int8)
+    res_bitwise = np.bitwise_and.reduce(group_res.toarray(), axis=0)
+    bigrams_list = []
+    for i, feature_name in enumerate(_cnt_vectorizer.get_feature_names_out()):
+        if res_bitwise[i] == 1:
+            bigrams_list.append(feature_name)
+    hash_message = int(hashlib.sha1(" ".join(bigrams_list).encode("utf-8")).hexdigest(), 16) % (10**16)
+    hash_message = hash_message * 10 + int(not launch_info.cleanNumbers)
+    return hash_message, log_message
+
+
+def create_new_cluster(
+    similar_logs: dict[int, Log], launch_info: LaunchInfoForClustering, min_should_match: float
+) -> Optional[ClusterInfo]:
+    similar_log_messages = [similar_logs[idx].message for idx in sorted(similar_logs.keys())]
+    local_clusters = clustering.find_clusters(similar_log_messages, threshold=min_should_match)
+    for local_cluster in local_clusters.values():
+        if 0 not in local_cluster:
+            # We only need a cluster with idx==0 (with original message)
+            continue
+        cluster_id, cluster_message = find_non_zero_id_non_empty_message(local_cluster, similar_logs)
+        if not cluster_id or not cluster_message:
+            continue
+
+        new_group_log_ids, new_group_test_items = collect_log_and_item_ids(local_cluster, similar_logs, launch_info)
+        new_group = ClusterInfo(
+            logIds=new_group_log_ids,
+            itemIds=new_group_test_items,
+            clusterMessage=cluster_message,
+            clusterId=cluster_id,
+        )
+        return new_group
+    return None
+
+
+def generate_clustering_messages(
+    launch_info: LaunchInfoForClustering, prepared_items: list[TestItemIndexData]
+) -> list[Log]:
+    """Generate messages which will be used for clustering, save their metadata."""
+    logs: list[Log] = []
+    for item in prepared_items:
+        item_logs: list[LogData] = item.logs or []
+        for log in item_logs:
+            log_message = text_processing.prepare_message_for_clustering(
+                log.message_for_clustering,
+                launch_info.numberOfLogLines,
+                launch_info.cleanNumbers,
+            )
+            if not log_message or not log_message.strip():
+                continue
+            logs.append(Log(test_item_id=item.test_item_id, message=log_message.strip(), log=log))
+    return logs
+
+
+def gather_cluster_results(
+    initial_clusters: dict[int, list[int]],
+    additional_clusters: dict[int, ClusterInfo],
+    logs: list[Log],
+    launch_info: LaunchInfoForClustering,
+) -> tuple[list[ClusterInfo], list[LogClusterData]]:
+    updates: list[LogClusterData] = []
+    clusters_found: dict[int, tuple[list[int], list[int]]] = {}
+    cluster_message_by_id = {}
+    for cluster_idx, cluster in initial_clusters.items():
+        cluster_id = 0
+        cluster_message = ""
+        if cluster_idx in additional_clusters:
+            cluster_id = additional_clusters[cluster_idx].clusterId
+            cluster_message = additional_clusters[cluster_idx].clusterMessage
+        if not cluster_id or not cluster_message:
+            cluster_id, cluster_message = calculate_hash(cluster, logs, launch_info)
+        log_ids: list[int] = []
+        test_item_ids: list[int] = []
+        for ind in cluster:
+            additional_log_id_str = logs[ind].log.log_id
+            log_ids.append(int(additional_log_id_str))
+            test_item_ids.append(int(logs[ind].test_item_id))
+            updates.append(
+                LogClusterData(
+                    log_id=additional_log_id_str,
+                    test_item_id=logs[ind].test_item_id,
+                    cluster_id=str(cluster_id),
+                    cluster_message=cluster_message,
+                    cluster_with_numbers=not launch_info.cleanNumbers,
+                )
+            )
+        if cluster_idx in additional_clusters:
+            for additional_log_id, additional_item_id in zip(
+                additional_clusters[cluster_idx].logIds, additional_clusters[cluster_idx].itemIds
+            ):
+                log_ids.append(additional_log_id)
+                test_item_ids.append(additional_item_id)
+                updates.append(
+                    LogClusterData(
+                        log_id=str(additional_log_id),
+                        test_item_id=str(additional_item_id),
+                        cluster_id=str(cluster_id),
+                        cluster_message=cluster_message,
+                        cluster_with_numbers=not launch_info.cleanNumbers,
+                    )
+                )
+        if cluster_id not in clusters_found:
+            clusters_found[cluster_id] = (log_ids, test_item_ids)
+        else:
+            cluster_log_ids, cluster_test_items = clusters_found[cluster_id]
+            cluster_log_ids.extend(log_ids)
+            cluster_test_items.extend(test_item_ids)
+            clusters_found[cluster_id] = (cluster_log_ids, cluster_test_items)
+        cluster_message_by_id[cluster_id] = cluster_message
+    results_to_return = []
+    for cluster_id in clusters_found:
+        results_to_return.append(
+            ClusterInfo(
+                clusterId=cluster_id,
+                clusterMessage=cluster_message_by_id[cluster_id],
+                logIds=clusters_found[cluster_id][0],
+                itemIds=list(set(clusters_found[cluster_id][1])),
+            )
+        )
+    return results_to_return, updates
+
+
 class ClusterService:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
@@ -181,269 +386,90 @@ class ClusterService:
         query["query"]["bool"]["should"].append({"term": {"launch_name": launch_info.launch.launchName}})
         return self._get_query_with_start_time_decay(query)
 
-    def _find_similar_items(
+    def _find_similar_logs(
+        self, log: Log, launch_info: LaunchInfoForClustering, min_should_match: float
+    ) -> dict[int, Log]:
+        log_dict_part: dict[int, Log] = {0: log}
+        query = self._build_search_similar_items_query(
+            log,
+            launch_info,
+            min_should_match=text_processing.prepare_es_min_should_match(min_should_match),
+        )
+        ind = 0
+        for hit in self.os_client.search(launch_info.project, query):
+            inner_hits = hit.inner_hits
+            if not inner_hits:
+                continue
+            inner_hits_logs = inner_hits.get("logs", {})
+            if not inner_hits_logs:
+                continue
+            for raw_inner_hit in inner_hits_logs.get("hits", {}).get("hits", []):
+                inner_hit = Hit[LogData].from_dict(raw_inner_hit)
+                number_of_log_lines = launch_info.numberOfLogLines
+                log_message = text_processing.prepare_message_for_clustering(
+                    inner_hit.source.whole_message, number_of_log_lines, launch_info.cleanNumbers
+                )
+                if not log_message or not log_message.strip():
+                    continue
+                inner_log = Log(
+                    test_item_id=hit.source.test_item_id,
+                    message=log_message,
+                    log=inner_hit.source,
+                    launch_id=hit.source.launch_id,
+                )
+                cluster_message_original = inner_log.log.cluster_message.strip()
+                cluster_message_processed = text_processing.prepare_message_for_clustering(
+                    cluster_message_original,
+                    number_of_log_lines,
+                    launch_info.cleanNumbers,
+                    leave_log_structure=True,
+                )
+                if cluster_message_original and cluster_message_processed != cluster_message_original:
+                    continue
+
+                equal = True
+                for column in ["found_exceptions", "potential_status_codes"]:
+                    candidate_text = " ".join(sorted(getattr(inner_log.log, column, "").split())).strip()
+                    text_to_compare = " ".join(sorted(getattr(log.log, column, "").split())).strip()
+                    if candidate_text != text_to_compare:
+                        equal = False
+                        break
+                if not equal:
+                    continue
+                ind += 1
+                log_dict_part[ind] = inner_log
+        return log_dict_part
+
+    def _find_similar_clusters(
         self,
         groups: dict[int, list[int]],
         logs: list[Log],
         launch_info: LaunchInfoForClustering,
         min_match_threshold: float,
-    ) -> tuple[dict[int, ClusterInfo], list[Log]]:
-        new_clusters = {}
-        new_logs = []
-        for global_group in groups:
-            first_item_ind = groups[global_group][0]
+    ) -> dict[int, ClusterInfo]:
+        new_clusters: dict[int, ClusterInfo] = {}
+        for global_group_idx, global_group in groups.items():
+            first_item_ind = global_group[0]
             log = logs[first_item_ind]
-            message = log.message
-            min_should_match = utils.calculate_threshold_for_text(message, min_match_threshold)
-            query = self._build_search_similar_items_query(
-                log,
-                launch_info,
-                min_should_match=text_processing.prepare_es_min_should_match(min_should_match),
-            )
-            log_messages_part = [message]
-            log_dict_part: dict[int, Log] = {0: log}
-            ind = 1
-            for hit in self.os_client.search(launch_info.project, query):
-                inner_hits = hit.inner_hits
-                if not inner_hits:
-                    continue
-                inner_hits_logs = inner_hits.get("logs", {})
-                if not inner_hits_logs:
-                    continue
-                for raw_inner_hit in inner_hits_logs.get("hits", {}).get("hits", []):
-                    inner_hit = Hit[LogData].from_dict(raw_inner_hit)
-                    number_of_log_lines = launch_info.numberOfLogLines
-                    log_message = text_processing.prepare_message_for_clustering(
-                        inner_hit.source.whole_message, number_of_log_lines, launch_info.cleanNumbers
-                    )
-                    if not log_message or not log_message.strip():
-                        continue
-                    inner_log = Log(
-                        test_item_id=hit.source.test_item_id,
-                        message=log_message,
-                        log=inner_hit.source,
-                        launch_id=hit.source.launch_id,
-                    )
-                    log_dict_part[ind] = inner_log
-                    cluster_message_original = inner_log.log.cluster_message.strip()
-                    cluster_message_processed = text_processing.prepare_message_for_clustering(
-                        cluster_message_original,
-                        number_of_log_lines,
-                        launch_info.cleanNumbers,
-                        leave_log_structure=True,
-                    )
+            min_should_match = utils.calculate_threshold_for_text(log.message, min_match_threshold)
 
-                    if cluster_message_original and cluster_message_processed != cluster_message_original:
-                        continue
-                    equal = True
-                    for column in ["found_exceptions", "potential_status_codes"]:
-                        candidate_text = " ".join(sorted(getattr(inner_log.log, column).split())).strip()
-                        text_to_compare = " ".join(sorted(getattr(log.log, column).split())).strip()
-                        if candidate_text != text_to_compare:
-                            equal = False
-                            break
-                    if not log_message.strip() or not equal:
-                        continue
-                    log_messages_part.append(log_message)
-                    ind += 1
-            groups_part = clustering.find_clusters(log_messages_part, threshold=min_should_match)
-            new_group = None
-            for group in groups_part:
-                if 0 in groups_part[group]:
-                    cluster_id = 0
-                    cluster_message = ""
-                    for ind in groups_part[group]:
-                        if ind == 0:  # not to use old cluster id and message
-                            continue
-                        current_cluster_id = log_dict_part[ind].log.cluster_id.strip()
-                        if current_cluster_id and int(current_cluster_id) != 0:
-                            cluster_id = int(current_cluster_id)
-                            current_cluster_message = log_dict_part[ind].log.cluster_message.strip()
-                            if current_cluster_message:
-                                cluster_message = current_cluster_message
-                    new_group_log_ids: list[int] = []
-                    new_test_items = set()
-                    for ind in groups_part[group]:
-                        if ind == 0:
-                            continue
-                        if log_dict_part[ind].launch_id != str(launch_info.launch.launchId):
-                            continue
-                        new_logs.append(log_dict_part[ind])
-                        new_group_log_ids.append(int(log_dict_part[ind].log.log_id))
-                        new_test_items.add(int(log_dict_part[ind].test_item_id))
-                    if not cluster_id or not cluster_message:
-                        continue
-                    new_group = ClusterInfo(
-                        logIds=new_group_log_ids,
-                        itemIds=list(new_test_items),
-                        clusterMessage=cluster_message,
-                        clusterId=cluster_id,
-                    )
-                    LOGGER.debug(
-                        "ES found cluster Id: %s log ids %s cluster message: % s",
-                        cluster_id,
-                        new_group_log_ids,
-                        cluster_message,
-                    )
-                    break
-            if new_group:
-                new_clusters[global_group] = new_group
-        additional_results: dict[Any, ClusterInfo] = {}
-        for group in new_clusters:
-            if group in additional_results:
-                additional_results[group].logIds.extend(new_clusters[group].logIds)
-                additional_results[group].itemIds.extend(new_clusters[group].itemIds)
+            similar_logs = self._find_similar_logs(log, launch_info, min_should_match)
+
+            new_cluster = create_new_cluster(similar_logs, launch_info, min_should_match)
+            if new_cluster:
+                LOGGER.debug(
+                    f"Found cluster Id: '{new_cluster.clusterId}'; Log IDs: {new_cluster.logIds}; Cluster message: "
+                    + new_cluster.clusterMessage,
+                )
+                new_clusters[global_group_idx] = new_cluster
+        additional_clusters: dict[int, ClusterInfo] = {}
+        for local_group_idx in new_clusters:
+            if local_group_idx in additional_clusters:
+                additional_clusters[local_group_idx].logIds.extend(new_clusters[local_group_idx].logIds)
+                additional_clusters[local_group_idx].itemIds.extend(new_clusters[local_group_idx].itemIds)
             else:
-                additional_results[group] = new_clusters[group]
-        return additional_results, new_logs
-
-    def _regroup_by_error_and_status_codes(self, logs: list[Log]) -> list[list[int]]:
-        regrouped_by_error = defaultdict(list)
-        for i, log in enumerate(logs):
-            found_exceptions = " ".join(sorted((log.log.found_exceptions or "").split()))
-            potential_status_codes = " ".join(sorted((log.log.potential_status_codes or "").split()))
-            group_key = (found_exceptions, potential_status_codes)
-            regrouped_by_error[group_key].append(i)
-        return list(regrouped_by_error.values())
-
-    def _cluster_messages_with_grouping_by_error(
-        self, logs: list[Log], min_match_threshold: float
-    ) -> dict[int, list[int]]:
-        regrouped_by_error = self._regroup_by_error_and_status_codes(logs)
-        all_groups: dict[int, list[int]] = defaultdict(list)
-        start_group_id = 0
-        for group in regrouped_by_error:
-            log_messages_part = []
-            log_messages_idx_dict = {}
-            for i, idx in enumerate(group):
-                log_messages_part.append(logs[idx].message)
-                log_messages_idx_dict[i] = idx
-            clusters = clustering.find_clusters(log_messages_part, threshold=min_match_threshold)
-            max_group_id = max(clusters.keys())
-            for group_id, cluster in clusters.items():
-                global_idx = start_group_id + group_id
-                for i in cluster:
-                    all_groups[global_idx].append(log_messages_idx_dict[i])
-            start_group_id = start_group_id + max_group_id + 1
-        return dict(all_groups)
-
-    def _calculate_hash(
-        self,
-        group_ids: list[int],
-        logs: list[Log],
-        launch_info: LaunchInfoForClustering,
-    ) -> tuple[int, str]:
-        group_logs = []
-        log_message = ""
-        for i in range(min(100, len(group_ids))):
-            ind = group_ids[i]
-            group_logs.append(logs[ind].message)
-            if not log_message:
-                log_message = (
-                    text_processing.prepare_message_for_clustering(
-                        logs[ind].log.whole_message,
-                        launch_info.numberOfLogLines,
-                        launch_info.cleanNumbers,
-                        leave_log_structure=True,
-                    )
-                    or ""
-                ).strip()
-        _cnt_vectorizer = CountVectorizer(binary=True, analyzer="word", token_pattern="[^ ]+", ngram_range=(2, 2))
-        group_res = _cnt_vectorizer.fit_transform(group_logs).astype(np.int8)
-        res_bitwise = np.bitwise_and.reduce(group_res.toarray(), axis=0)
-        bigrams_list = []
-        for i, feature_name in enumerate(_cnt_vectorizer.get_feature_names_out()):
-            if res_bitwise[i] == 1:
-                bigrams_list.append(feature_name)
-        hash_message = int(hashlib.sha1(" ".join(bigrams_list).encode("utf-8")).hexdigest(), 16) % (10**16)
-        hash_message = hash_message * 10 + int(not launch_info.cleanNumbers)
-        return hash_message, log_message
-
-    def _gather_cluster_results(
-        self,
-        groups: dict[int, list[int]],
-        additional_results: dict[int, ClusterInfo],
-        logs: list[Log],
-        launch_info: LaunchInfoForClustering,
-    ) -> tuple[list[ClusterInfo], int, list[LogClusterData]]:
-        updates: list[LogClusterData] = []
-        clusters_found: dict[int, tuple[list[int], list[int]]] = {}
-        cluster_message_by_id = {}
-        for group in groups:
-            cluster_id = 0
-            cluster_message = ""
-            if group in additional_results:
-                cluster_id = additional_results[group].clusterId
-                cluster_message = additional_results[group].clusterMessage
-            if not cluster_id or not cluster_message:
-                cluster_id, cluster_message = self._calculate_hash(groups[group], logs, launch_info)
-            log_ids: list[int] = []
-            test_item_ids: list[int] = []
-            for ind in groups[group]:
-                additional_log_id_str = logs[ind].log.log_id
-                log_ids.append(int(additional_log_id_str))
-                test_item_ids.append(int(logs[ind].test_item_id))
-                updates.append(
-                    LogClusterData(
-                        log_id=additional_log_id_str,
-                        test_item_id=logs[ind].test_item_id,
-                        cluster_id=str(cluster_id),
-                        cluster_message=cluster_message,
-                        cluster_with_numbers=not launch_info.cleanNumbers,
-                    )
-                )
-            if group in additional_results:
-                for additional_log_id, additional_item_id in zip(
-                    additional_results[group].logIds, additional_results[group].itemIds
-                ):
-                    log_ids.append(additional_log_id)
-                    test_item_ids.append(additional_item_id)
-                    updates.append(
-                        LogClusterData(
-                            log_id=str(additional_log_id),
-                            test_item_id=str(additional_item_id),
-                            cluster_id=str(cluster_id),
-                            cluster_message=cluster_message,
-                            cluster_with_numbers=not launch_info.cleanNumbers,
-                        )
-                    )
-            if cluster_id not in clusters_found:
-                clusters_found[cluster_id] = (log_ids, test_item_ids)
-            else:
-                cluster_log_ids, cluster_test_items = clusters_found[cluster_id]
-                cluster_log_ids.extend(log_ids)
-                cluster_test_items.extend(test_item_ids)
-                clusters_found[cluster_id] = (cluster_log_ids, cluster_test_items)
-            cluster_message_by_id[cluster_id] = cluster_message
-        results_to_return = []
-        for cluster_id in clusters_found:
-            results_to_return.append(
-                ClusterInfo(
-                    clusterId=cluster_id,
-                    clusterMessage=cluster_message_by_id[cluster_id],
-                    logIds=clusters_found[cluster_id][0],
-                    itemIds=list(set(clusters_found[cluster_id][1])),
-                )
-            )
-        return results_to_return, len(results_to_return), updates
-
-    def _generate_clustering_messages(
-        self, launch_info: LaunchInfoForClustering, prepared_items: list[TestItemIndexData]
-    ) -> list[Log]:
-        """Generate messages which will be used for clustering, save their metadata."""
-        logs: list[Log] = []
-        for item in prepared_items:
-            item_logs: list[LogData] = item.logs or []
-            for log in item_logs:
-                log_message = text_processing.prepare_message_for_clustering(
-                    log.message_for_clustering,
-                    launch_info.numberOfLogLines,
-                    launch_info.cleanNumbers,
-                )
-                if not log_message or not log_message.strip():
-                    continue
-                logs.append(Log(test_item_id=item.test_item_id, message=log_message.strip(), log=log))
-        return logs
+                additional_clusters[local_group_idx] = new_clusters[local_group_idx]
+        return additional_clusters
 
     def find_clusters(self, launch_info: LaunchInfoForClustering) -> ClusterResult:
         LOGGER.info(
@@ -453,9 +479,8 @@ class ClusterService:
         errors_found = []
         errors_count = 0
         cluster_num = 0
-        clusters: list[ClusterInfo] = []
-        logs: list[Log] = []
-        additional_logs: list[Log] = []
+        common_clusters: list[ClusterInfo] = []
+        unique_log_ids: set[str] = set()
         try:
             min_match_threshold = launch_info.launch.analyzerConfig.uniqueErrorsMinShouldMatch / 100.0
             config = launch_info.launch.analyzerConfig
@@ -467,28 +492,37 @@ class ClusterService:
                 similarity_threshold_to_drop=config.similarityThresholdToDrop,
             )
 
-            logs = self._generate_clustering_messages(launch_info, prepared_items)
+            logs: list[Log] = generate_clustering_messages(launch_info, prepared_items)
             if not logs:
                 return ClusterResult(project=launch_info.project, launchId=launch_info.launch.launchId, clusters=[])
 
-            # Cluster messages which were sent by the Backend
-            groups = self._cluster_messages_with_grouping_by_error(logs, min_match_threshold)
-            LOGGER.debug(f"Groups: {json.dumps(groups)}")
+            # Cluster messages which were sent by the Backend by error messages and HTTP status codes
+            initial_clusters = cluster_messages_with_grouping_by_error(logs, min_match_threshold)
+            LOGGER.debug(f"Initial clusters: {json.dumps(initial_clusters)}")
 
             # Find similar patterns in DB
-            additional_results, additional_logs = self._find_similar_items(
-                groups, logs, launch_info, min_match_threshold
+            additional_clusters = self._find_similar_clusters(initial_clusters, logs, launch_info, min_match_threshold)
+
+            # Collect all unique log IDs for statistics
+            for cluster in additional_clusters.values():
+                for log_id in cluster.logIds:
+                    unique_log_ids.add(str(log_id))
+            for log in logs:
+                unique_log_ids.add(log.log.log_id)
+
+            # Form final clusters (sent + additionally collected)
+            common_clusters, db_updates = gather_cluster_results(
+                initial_clusters, additional_clusters, logs, launch_info
             )
-            clusters, cluster_num, updates = self._gather_cluster_results(
-                groups, additional_results, logs, launch_info
-            )
-            if clusters:
-                for result in clusters:
-                    LOGGER.debug("Cluster Id: %s, Cluster message: %s", result.clusterId, result.clusterMessage)
-                    LOGGER.debug("Cluster Ids: %s", result.logIds)
+
+            # Update cluster info in DB if anything found
+            if common_clusters:
+                for result in common_clusters:
+                    LOGGER.debug(f"Cluster Id: {result.clusterId}, Cluster message: '{result.clusterMessage}'")
+                    LOGGER.debug(f"Cluster Ids: {result.logIds}")
                 self.os_client.bulk_update_cluster_info(
                     launch_info.project,
-                    updates,
+                    db_updates,
                     refresh=False,
                     chunk_size=self.app_config.esChunkNumberUpdateClusters,
                 )
@@ -499,10 +533,10 @@ class ClusterService:
 
         results_to_share = {
             launch_info.launch.launchId: {
-                "not_found": int(cluster_num == 0),
-                "items_to_process": len(logs) + len(additional_logs),
+                "not_found": int(len(common_clusters) == 0),
+                "items_to_process": len(unique_log_ids),
                 "processed_time": time() - t_start,
-                "found_clusters": cluster_num,
+                "found_clusters": len(common_clusters),
                 "launch_id": launch_info.launch.launchId,
                 "launch_name": launch_info.launch.launchName,
                 "project_id": launch_info.project,
@@ -519,7 +553,9 @@ class ClusterService:
         LOGGER.debug(f"Stats info: {json.dumps(results_to_share)}")
         LOGGER.info("Processed the launch. It took %.2f sec.", time() - t_start)
         LOGGER.info("Finished clustering for the launch with %d clusters.", cluster_num)
-        for cluster in clusters:
+        for cluster in common_clusters:
             # Put readable text instead of tokens
             cluster.clusterMessage = text_processing.replace_tokens_with_readable_text(cluster.clusterMessage)
-        return ClusterResult(project=launch_info.project, launchId=launch_info.launch.launchId, clusters=clusters)
+        return ClusterResult(
+            project=launch_info.project, launchId=launch_info.launch.launchId, clusters=common_clusters
+        )

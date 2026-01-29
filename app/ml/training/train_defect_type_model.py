@@ -25,7 +25,9 @@ from sklearn.model_selection import train_test_split
 
 from app.commons import esclient, logging, object_saving
 from app.commons.esclient import EsClient
+from app.commons.model.db import Hit
 from app.commons.model.launch_objects import ERROR_LOGGING_LEVEL, ApplicationConfig, SearchConfig
+from app.commons.model.log_item_index import LogItemIndexData
 from app.commons.model.ml import ModelType, QueryResult, TrainInfo
 from app.commons.model_chooser import ModelChooser
 from app.ml.models import CustomDefectTypeModel, DefectTypeModel
@@ -261,13 +263,14 @@ class DefectTypeModelTraining:
             return QueryResult(result=[], error_count=error_count, errors=errors)
         data = []
         message_launch_dict = set()
-        for r in query_result:
-            detected_message = r["_source"][DATA_FIELD]
+        for raw_hit in query_result:
+            hit = Hit[LogItemIndexData].from_dict(raw_hit)
+            detected_message = getattr(hit.source, DATA_FIELD)
             if not detected_message.strip():
                 continue
             text_message_normalized = text_processing.normalize_message(detected_message)
-            issue_type = r["_source"]["issue_type"]
-            message_info = (text_message_normalized, r["_source"]["launch_id"], issue_type)
+            issue_type = hit.source.issue_type
+            message_info = (text_message_normalized, hit.source.launch_id, issue_type)
             if message_info not in message_launch_dict:
                 data.append((detected_message, issue_type[:2], issue_type))
                 message_launch_dict.add(message_info)

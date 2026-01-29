@@ -25,6 +25,7 @@ class Hit(BaseModel, Generic[T]):
     id: Optional[str] = Field(default=None, validation_alias="_id")
     score: Optional[float] = Field(default=None, validation_alias="_score")
     source: T = Field(validation_alias="_source")
+    normalized_score: float = 0.0
     sort: Optional[list[Any]] = None
     highlight: Optional[dict[str, Any]] = None
     fields: Optional[dict[str, Any]] = None

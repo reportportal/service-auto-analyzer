@@ -19,6 +19,8 @@ from typing import Any, Optional, Union
 from typing_extensions import override
 
 from app.commons import logging
+from app.commons.model.db import Hit
+from app.commons.model.log_item_index import LogItemIndexData
 from app.commons.model.ml import ModelType
 from app.commons.model_chooser import ModelChooser
 from app.ml.boosting_featurizer import BoostingFeaturizer
@@ -75,12 +77,12 @@ class Predictor(metaclass=ABCMeta):
     @abstractmethod
     def predict(
         self,
-        search_results: list[tuple[dict[str, Any], dict[str, Any]]],
+        search_results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]],
     ) -> list[PredictionResult]:
         """Execute the full prediction workflow.
 
-        :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
-                                                                           from OpenSearch
+        :param list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]] search_results: List of (log_info, hits)
+                                                                                          tuples from OpenSearch
         :return: List of PredictionResult objects, one for each prediction
         """
         ...
@@ -140,10 +142,13 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
         ...
 
     @abstractmethod
-    def create_featurizer(self, search_results: list[tuple[dict[str, Any], dict[str, Any]]]) -> BoostingFeaturizer:
+    def create_featurizer(
+        self, search_results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]
+    ) -> BoostingFeaturizer:
         """Create the appropriate featurizer for this prediction type.
 
-        :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
+        :param list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]] search_results: List of (log_info, hits)
+                                                                                          tuples
         :return: Configured featurizer instance
         """
         ...
@@ -151,12 +156,12 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
     @override
     def predict(
         self,
-        search_results: list[tuple[dict[str, Any], dict[str, Any]]],
+        search_results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]],
     ) -> list[PredictionResult]:
         """Execute the full prediction workflow.
 
-        :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
-                                                                           from OpenSearch
+        :param list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]] search_results: List of (log_info, hits)
+                                                                                          tuples from OpenSearch
         :return: List of PredictionResult objects, one for each prediction
         """
         # Create and configure featurizer
@@ -241,10 +246,13 @@ class AutoAnalysisPredictor(MlPredictor):
         return ModelType.auto_analysis
 
     @override
-    def create_featurizer(self, search_results: list[tuple[dict[str, Any], dict[str, Any]]]) -> BoostingFeaturizer:
+    def create_featurizer(
+        self, search_results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]
+    ) -> BoostingFeaturizer:
         """Create a BoostingFeaturizer for auto analysis.
 
-        :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
+        :param list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]] search_results: List of (log_info, hits)
+                                                                                          tuples
         :return: Configured BoostingFeaturizer instance
         """
         featurizer = BoostingFeaturizer(
@@ -291,10 +299,13 @@ class SuggestionPredictor(MlPredictor):
         return ModelType.suggestion
 
     @override
-    def create_featurizer(self, search_results: list[tuple[dict[str, Any], dict[str, Any]]]) -> BoostingFeaturizer:
+    def create_featurizer(
+        self, search_results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]
+    ) -> BoostingFeaturizer:
         """Create a SuggestBoostingFeaturizer for suggestions.
 
-        :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (log_info, search_results) tuples
+        :param list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]] search_results: List of (log_info, hits)
+                                                                                          tuples
         :return: Configured SuggestBoostingFeaturizer instance
         """
         featurizer = SuggestBoostingFeaturizer(
@@ -306,9 +317,13 @@ class SuggestionPredictor(MlPredictor):
         return featurizer
 
 
-def extract_text_fields_for_comparison(search_request: dict[str, Any]) -> str:
-    query_message = search_request.get("_source", {}).get("message", "") or ""
-    query_merged_logs = search_request.get("_source", {}).get("merged_small_logs", "") or ""
+def extract_text_fields_for_comparison(search_request: Any) -> str:
+    if isinstance(search_request, LogItemIndexData):
+        query_message = search_request.message or ""
+        query_merged_logs = search_request.merged_small_logs or ""
+    else:
+        query_message = search_request.get("_source", {}).get("message", "") or ""
+        query_merged_logs = search_request.get("_source", {}).get("merged_small_logs", "") or ""
     # Combine query text fields
     query_text = " ".join([text.strip() for text in [query_message, query_merged_logs] if text.strip()])
     return query_text
@@ -333,7 +348,11 @@ class SimilarityPredictor(Predictor):
         self.similarity_threshold = kwargs.get("similarity_threshold", 0.5)
 
     def __do_prediction_for_request(
-        self, query_text: str, search_request: dict[str, Any], valid_hits: list[Any], hit_texts: list[str]
+        self,
+        query_text: str,
+        search_request: LogItemIndexData,
+        valid_hits: list[Hit[LogItemIndexData]],
+        hit_texts: list[str],
     ) -> list[PredictionResult]:
         # Calculate similarities for all hits at once
         similarity_scores = calculate_text_similarity(query_text, hit_texts)
@@ -343,7 +362,7 @@ class SimilarityPredictor(Predictor):
 
         for idx, (hit, sim_result) in enumerate(zip(valid_hits, similarity_scores)):
             # Get test_item identifier
-            test_item = str(hit.get("_source", {}).get("test_item", "unknown"))
+            test_item = str(hit.source.test_item)
 
             # Track the best hit for each test_item
             if (
@@ -387,12 +406,12 @@ class SimilarityPredictor(Predictor):
     @override
     def predict(
         self,
-        search_results: list[tuple[dict[str, Any], dict[str, Any]]],
+        search_results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]],
     ) -> list[PredictionResult]:
         """Execute similarity-based prediction workflow.
 
-        :param list[tuple[dict[str, Any], dict[str, Any]]] search_results: List of (search_request, search_results)
-                                                                           tuples
+        :param list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]] search_results: List of (search_request, hits)
+                                                                                          tuples
         :return: List of PredictionResult objects, one for each prediction
         """
         if not search_results:
@@ -401,8 +420,7 @@ class SimilarityPredictor(Predictor):
         results = []
 
         for search_request, search_result in search_results:
-            # Get all candidate logs from search hits
-            hits = search_result.get("hits", {}).get("hits", [])
+            hits = search_result
 
             if not hits:
                 continue
@@ -415,12 +433,11 @@ class SimilarityPredictor(Predictor):
                 continue
 
             # Collect valid hits and their texts for batch processing
-            valid_hits = []
+            valid_hits: list[Hit[LogItemIndexData]] = []
             hit_texts = []
 
             for idx, hit in enumerate(hits):
-                # Extract and combine message and merged_small_logs from hit
-                hit_text = extract_text_fields_for_comparison(hit)
+                hit_text = extract_text_fields_for_comparison(hit.source)
 
                 # If hit text is empty, skip this hit
                 if not hit_text.strip():

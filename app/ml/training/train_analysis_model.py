@@ -26,6 +26,7 @@ from sklearn.model_selection import train_test_split
 from app.commons import esclient, logging, namespace_finder, object_saving
 from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
+from app.commons.model.log_item_index import deserialize_log_item_search_results
 from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model_chooser import ModelChooser
 from app.ml.boosting_featurizer import BoostingFeaturizer
@@ -345,7 +346,7 @@ class AnalysisModelTraining:
             )
 
             for _suggest_res in gathered_suggested_data:
-                searched_res = []
+                searched_res: list[tuple[dict[str, Any], dict[str, Any]]] = []
                 found_logs = {}
                 for col in ["testItemLogId", "relevantLogId"]:
                     log_id = str(_suggest_res["_source"][col])
@@ -358,16 +359,17 @@ class AnalysisModelTraining:
                     log_relevant["_score"] = _suggest_res["_source"]["esScore"]
                     searched_res = [(found_logs["testItemLogId"], {"hits": {"hits": [log_relevant]}})]
                 if searched_res:
+                    typed_results = deserialize_log_item_search_results(searched_res)
                     _boosting_data_gatherer: BoostingFeaturizer
                     if self.model_type is ModelType.suggestion:
                         _boosting_data_gatherer = SuggestBoostingFeaturizer(
-                            searched_res,
+                            typed_results,
                             self._get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
                             feature_ids=features,
                         )
                     else:
                         _boosting_data_gatherer = BoostingFeaturizer(
-                            searched_res,
+                            typed_results,
                             self._get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
                             feature_ids=features,
                         )

@@ -33,6 +33,7 @@ from app.commons.model.launch_objects import (
     SuggestAnalysisResult,
     TestItemInfo,
 )
+from app.commons.model.log_item_index import deserialize_log_item_search_results
 from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
@@ -229,12 +230,12 @@ class SuggestService(AnalyzerService):
         for i, result_first in enumerate(prediction_results):
             for j in range(i + 1, len(prediction_results)):
                 result_second = prediction_results[j]
-                issue_type1 = result_first.data["mrHit"]["_source"]["issue_type"]
-                issue_type2 = result_second.data["mrHit"]["_source"]["issue_type"]
+                issue_type1 = result_first.data["mrHit"].source.issue_type
+                issue_type2 = result_second.data["mrHit"].source.issue_type
                 if issue_type1 != issue_type2:
                     continue
-                items_to_compare = {"hits": {"hits": [result_first.data["mrHit"]]}}
-                all_pairs_to_check.append((result_second.data["mrHit"], items_to_compare))
+                items_to_compare = [result_first.data["mrHit"]]
+                all_pairs_to_check.append((result_second.data["mrHit"].source, items_to_compare))
         sim_dict = _similarity_calculator.find_similarity(
             all_pairs_to_check, ["detected_message_with_numbers", "stacktrace", "merged_small_logs"]
         )
@@ -255,8 +256,8 @@ class SuggestService(AnalyzerService):
                 result_first = prediction_results[i]
                 result_second = prediction_results[j]
                 group_id = (
-                    str(result_first.data["mrHit"]["_id"]),
-                    str(result_second.data["mrHit"]["_id"]),
+                    str(result_first.data["mrHit"].id),
+                    str(result_second.data["mrHit"].id),
                 )
                 if group_id not in sim_dict["detected_message_with_numbers"]:
                     continue
@@ -290,7 +291,7 @@ class SuggestService(AnalyzerService):
         # Sort by probability (index 1) and start_time, both descending
         sorted_results = sorted(
             prediction_results,
-            key=lambda x: (round(x.probability[1], 4), x.data["mrHit"]["_source"]["start_time"]),
+            key=lambda x: (round(x.probability[1], 4), x.data["mrHit"].source.start_time),
             reverse=True,
         )
         return sorted_results
@@ -437,7 +438,7 @@ class SuggestService(AnalyzerService):
             )
 
             # Use predictor for the complete prediction workflow
-            prediction_results = predictor.predict(searched_res)
+            prediction_results = predictor.predict(deserialize_log_item_search_results(searched_res))
 
             if prediction_results:
                 # Extract model info tags (same for all results)
@@ -449,7 +450,7 @@ class SuggestService(AnalyzerService):
                 for result in unique_results:
                     prob = result.probability[1]
                     identity = result.identity
-                    issue_type = result.data["mrHit"]["_source"]["issue_type"]
+                    issue_type = result.data["mrHit"].source.issue_type
                     LOGGER.debug(f"Test item '{identity}' with issue type '{issue_type}' has probability {prob:.2f}")
                 processed_time = time() - t_start
                 for pos_idx, result in enumerate(unique_results[: self.search_cfg.MaxSuggestionsNumber]):
@@ -460,12 +461,12 @@ class SuggestService(AnalyzerService):
                             feature_names = ";".join([str(f_id) for f_id in result.feature_info.feature_ids])
                             feature_values = ";".join([str(f) for f in result.feature_info.feature_data])
 
-                        issue_type = result.data["mrHit"]["_source"]["issue_type"]
-                        relevant_log_id = utils.extract_real_id(result.data["mrHit"]["_id"])
-                        real_log_id = str(result.data["mrHit"]["_id"])
+                        issue_type = result.data["mrHit"].source.issue_type
+                        relevant_log_id = utils.extract_real_id(result.data["mrHit"].id)
+                        real_log_id = str(result.data["mrHit"].id)
                         is_merged = real_log_id != str(relevant_log_id)
-                        test_item_log_id = utils.extract_real_id(result.data["compared_log"]["_id"])
-                        test_item_id = result.data["mrHit"]["_source"]["test_item"]
+                        test_item_log_id = utils.extract_real_id(result.data["compared_log"].log_id)
+                        test_item_id = result.data["mrHit"].source.test_item
                         analysis_result = SuggestAnalysisResult(
                             project=test_item_info.project,
                             testItem=test_item_id_for_suggest,
@@ -478,7 +479,7 @@ class SuggestService(AnalyzerService):
                             relevantLogId=relevant_log_id,
                             isMergedLog=is_merged,
                             matchScore=round(prob, 2) * 100,
-                            esScore=round(result.data["mrHit"]["_score"], 2),
+                            esScore=round(result.data["mrHit"].score, 2),
                             esPosition=result.original_position,
                             modelFeatureNames=feature_names,
                             modelFeatureValues=feature_values,

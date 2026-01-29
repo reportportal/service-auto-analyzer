@@ -34,6 +34,7 @@ from app.commons.model.launch_objects import (
     SuggestAnalysisResult,
     TestItem,
 )
+from app.commons.model.log_item_index import deserialize_log_item_search_results
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.similarity_calculator import SimilarityCalculator
@@ -67,7 +68,7 @@ def _choose_issue_type(prediction_results: list[PredictionResult]) -> Optional[P
 
     for result in prediction_results:
         if result.label == 1:
-            start_time = result.data["mrHit"]["_source"]["start_time"]
+            start_time = result.data["mrHit"].source.start_time
             predicted_prob = round(result.probability[1], 4)
 
             if (predicted_prob > max_prob) or (
@@ -552,7 +553,7 @@ class AutoAnalyzerService(AnalyzerService):
 
                         for candidates in candidates_to_check:
                             # Use predictor for the complete prediction workflow
-                            prediction_results = predictor.predict(candidates)
+                            prediction_results = predictor.predict(deserialize_log_item_search_results(candidates))
 
                             if not prediction_results:
                                 LOGGER.debug(f"There are no results for test item {analyzer_candidate.testItemId}")
@@ -567,8 +568,8 @@ class AutoAnalyzerService(AnalyzerService):
                             # Debug logging
                             for result in prediction_results:
                                 test_item_id = analyzer_candidate.testItemId
-                                relevant_test_item_id = result.data["mrHit"]["_source"]["test_item"]
-                                log_id = result.data["mrHit"]["_id"]
+                                relevant_test_item_id = result.data["mrHit"].source.test_item
+                                log_id = result.data["mrHit"].id
                                 LOGGER.debug(
                                     f"Most relevant ID for item '{test_item_id}' is '{relevant_test_item_id}', it has "
                                     f"issue type '{result.identity}', log ID '{log_id}' and probability: "
@@ -589,14 +590,14 @@ class AutoAnalyzerService(AnalyzerService):
                                 feature_names = ";".join([str(f_id) for f_id in best.feature_info.feature_ids])
                                 feature_values = ";".join([str(f) for f in best.feature_info.feature_data])
 
-                            relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
+                            relevant_item = chosen_type["mrHit"].source.test_item
                             analysis_result = AnalysisResult(
                                 testItem=analyzer_candidate.testItemId,
                                 issueType=predicted_issue_type,
                                 relevantItem=relevant_item,
                             )
-                            relevant_log_id = utils.extract_real_id(chosen_type["mrHit"]["_id"])
-                            test_item_log_id = utils.extract_real_id(chosen_type["compared_log"]["_id"])
+                            relevant_log_id = utils.extract_real_id(chosen_type["mrHit"].id)
+                            test_item_log_id = utils.extract_real_id(chosen_type["compared_log"].log_id)
                             analyzed_results_for_index.append(
                                 SuggestAnalysisResult(
                                     project=analyzer_candidate.project,
@@ -608,9 +609,9 @@ class AutoAnalyzerService(AnalyzerService):
                                     issueType=predicted_issue_type,
                                     relevantItem=relevant_item,
                                     relevantLogId=relevant_log_id,
-                                    isMergedLog=chosen_type["compared_log"]["_source"]["is_merged"],
+                                    isMergedLog=chosen_type["compared_log"].is_merged,
                                     matchScore=round(prob * 100, 2),
-                                    esScore=round(chosen_type["mrHit"]["_score"], 2),
+                                    esScore=round(chosen_type["mrHit"].score, 2),
                                     esPosition=best.original_position,
                                     modelFeatureNames=feature_names,
                                     modelFeatureValues=feature_values,

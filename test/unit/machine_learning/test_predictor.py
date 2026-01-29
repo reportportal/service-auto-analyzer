@@ -12,10 +12,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from typing import Optional
 from unittest.mock import Mock
 
 import pytest
 
+from app.commons.model.db import Hit
+from app.commons.model.log_item_index import LogItemIndexData
 from app.commons.model.ml import ModelType
 from app.ml.predictor import (
     PREDICTION_CLASSES,
@@ -53,6 +56,8 @@ def assert_prediction_result_structure(
     assert isinstance(result.data, dict)
     assert "mrHit" in result.data
     assert "compared_log" in result.data
+    assert isinstance(result.data["mrHit"], Hit)
+    assert isinstance(result.data["compared_log"], LogItemIndexData)
     assert result.identity == expected_identity
     assert result.feature_info is not None
     assert isinstance(result.feature_info, FeatureInfo)
@@ -63,37 +68,58 @@ def assert_prediction_result_structure(
     assert result.original_position == expected_original_position
 
 
+def build_log_item(
+    *,
+    log_id: str = "log1",
+    message: str = "Error message",
+    merged_small_logs: str = "",
+    test_item: int = 0,
+    issue_type: str = "",
+) -> LogItemIndexData:
+    return LogItemIndexData(
+        log_id=log_id,
+        message=message,
+        merged_small_logs=merged_small_logs,
+        test_item=test_item,
+        issue_type=issue_type,
+    )
+
+
+def build_hit(source: LogItemIndexData, score: float = 0.95) -> Hit[LogItemIndexData]:
+    return Hit[LogItemIndexData].from_dict({"_id": source.log_id, "_score": score, "_source": source.model_dump()})
+
+
 def create_test_search_results(
     message: str = "Error message", log_id: str = "log1", test_item: int = 456, issue_type: str = "pb001"
-) -> list[tuple[dict, dict]]:
+) -> list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]:
     """Helper function to create test search results structure.
 
     :param message: Message content for both query and hit
     :param log_id: Log ID for the hit
     :param test_item: Test item ID
     :param issue_type: Issue type
-    :return: List of (search_request, search_results) tuples
+    :return: List of (search_request, hits) tuples
     """
-    return [
-        (
-            {"_source": {"message": message, "merged_small_logs": ""}},
-            {
-                "hits": {
-                    "hits": [
-                        {
-                            "_id": log_id,
-                            "_source": {
-                                "message": message,
-                                "merged_small_logs": "",
-                                "test_item": test_item,
-                                "issue_type": issue_type,
-                            },
-                        }
-                    ]
-                }
-            },
-        )
-    ]
+    query = build_log_item(log_id="query1", message=message, merged_small_logs="")
+    hit_source = build_log_item(
+        log_id=log_id,
+        message=message,
+        merged_small_logs="",
+        test_item=test_item,
+        issue_type=issue_type,
+    )
+    return [(query, [build_hit(hit_source)])]
+
+
+def build_search_results(
+    query: LogItemIndexData,
+    hits: list[LogItemIndexData],
+    scores: Optional[list[float]] = None,
+) -> list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]:
+    if scores is None:
+        scores = [0.95] * len(hits)
+    hit_items = [build_hit(hit, score) for hit, score in zip(hits, scores)]
+    return [(query, hit_items)]
 
 
 class TestExtractTextFieldsForComparison:
@@ -104,76 +130,44 @@ class TestExtractTextFieldsForComparison:
         [
             # Both fields present
             (
-                {
-                    "_source": {
-                        "message": "Error: Connection timeout",
-                        "merged_small_logs": "Additional context log",
-                    }
-                },
+                build_log_item(
+                    message="Error: Connection timeout",
+                    merged_small_logs="Additional context log",
+                ),
                 "Error: Connection timeout Additional context log",
             ),
             # Only message field present
             (
-                {
-                    "_source": {
-                        "message": "Error: Connection timeout",
-                        "merged_small_logs": "",
-                    }
-                },
+                build_log_item(message="Error: Connection timeout", merged_small_logs=""),
                 "Error: Connection timeout",
             ),
             # Only merged_small_logs field present
             (
-                {
-                    "_source": {
-                        "message": "",
-                        "merged_small_logs": "Only merged logs here",
-                    }
-                },
+                build_log_item(message="", merged_small_logs="Only merged logs here"),
                 "Only merged logs here",
             ),
             # Both fields empty
             (
-                {
-                    "_source": {
-                        "message": "",
-                        "merged_small_logs": "",
-                    }
-                },
+                build_log_item(message="", merged_small_logs=""),
                 "",
             ),
             # Fields with None values
             (
-                {
-                    "_source": {
-                        "message": None,
-                        "merged_small_logs": None,
-                    }
-                },
+                build_log_item(message="", merged_small_logs=""),
                 "",
             ),
             # Missing _source
-            ({}, ""),
+            (build_log_item(message="", merged_small_logs=""), ""),
             # Missing fields in _source
-            ({"_source": {}}, ""),
+            (build_log_item(message="", merged_small_logs=""), ""),
             # Fields with whitespace only
             (
-                {
-                    "_source": {
-                        "message": "   ",
-                        "merged_small_logs": "\t\n",
-                    }
-                },
+                build_log_item(message="   ", merged_small_logs="\t\n"),
                 "",
             ),
             # Mixed whitespace and content
             (
-                {
-                    "_source": {
-                        "message": "  Error message  ",
-                        "merged_small_logs": "  Context log  ",
-                    }
-                },
+                build_log_item(message="  Error message  ", merged_small_logs="  Context log  "),
                 "Error message Context log",
             ),
         ],
@@ -211,62 +205,25 @@ class TestSimilarityPredictor:
     def test_predict_with_no_hits(self):
         """Test predict method when search results have no hits."""
         predictor = SimilarityPredictor()
-        search_results = [
-            (
-                {"_source": {"message": "Some message", "merged_small_logs": ""}},
-                {"hits": {"hits": []}},
-            )
-        ]
+        search_results = [(build_log_item(message="Some message", merged_small_logs=""), [])]
         result = predictor.predict(search_results)
         assert result == []
 
     def test_predict_with_empty_query_text(self):
         """Test predict method when query has no meaningful text."""
         predictor = SimilarityPredictor()
-        search_results = [
-            (
-                {"_source": {"message": "", "merged_small_logs": ""}},  # Empty query
-                {
-                    "hits": {
-                        "hits": [
-                            {
-                                "_source": {
-                                    "message": "Error message",
-                                    "merged_small_logs": "",
-                                    "test_item": 456,
-                                },
-                                "_score": 0.95,
-                            }
-                        ]
-                    }
-                },
-            )
-        ]
+        query = build_log_item(message="", merged_small_logs="")
+        hit_source = build_log_item(message="Error message", merged_small_logs="", test_item=456)
+        search_results = build_search_results(query, [hit_source])
         result = predictor.predict(search_results)
         assert result == []
 
     def test_predict_with_empty_hit_text(self):
         """Test predict method when hits have no meaningful text."""
         predictor = SimilarityPredictor()
-        search_results = [
-            (
-                {"_source": {"message": "Query message", "merged_small_logs": ""}},
-                {
-                    "hits": {
-                        "hits": [
-                            {
-                                "_source": {
-                                    "message": "",  # Empty hit
-                                    "merged_small_logs": "",
-                                    "test_item": 456,
-                                },
-                                "_score": 0.95,
-                            }
-                        ]
-                    }
-                },
-            )
-        ]
+        query = build_log_item(message="Query message", merged_small_logs="")
+        hit_source = build_log_item(message="", merged_small_logs="", test_item=456)
+        search_results = build_search_results(query, [hit_source])
         result = predictor.predict(search_results)
         assert result == []
 
@@ -296,24 +253,9 @@ class TestSimilarityPredictor:
     def test_predict_threshold_behavior(self, threshold, expected_label, query_message, hit_message):
         """Test that threshold properly affects binary classification."""
         predictor = SimilarityPredictor(similarity_threshold=threshold)
-        search_results = [
-            (
-                {"_source": {"message": query_message, "merged_small_logs": ""}},
-                {
-                    "hits": {
-                        "hits": [
-                            {
-                                "_source": {
-                                    "message": hit_message,
-                                    "merged_small_logs": "",
-                                    "test_item": 456,
-                                },
-                            }
-                        ]
-                    }
-                },
-            )
-        ]
+        query = build_log_item(message=query_message, merged_small_logs="")
+        hit_source = build_log_item(message=hit_message, merged_small_logs="", test_item=456)
+        search_results = build_search_results(query, [hit_source])
         results = predictor.predict(search_results)
         assert len(results) == 1
         assert results[0].label == expected_label
@@ -321,24 +263,9 @@ class TestSimilarityPredictor:
     def test_predict_identical_texts(self):
         """Test predict method with identical texts."""
         predictor = SimilarityPredictor(similarity_threshold=0.5)
-        search_results = [
-            (
-                {"_source": {"message": "Exact same message", "merged_small_logs": ""}},
-                {
-                    "hits": {
-                        "hits": [
-                            {
-                                "_source": {
-                                    "message": "Exact same message",
-                                    "merged_small_logs": "",
-                                    "test_item": 456,
-                                },
-                            }
-                        ]
-                    }
-                },
-            )
-        ]
+        query = build_log_item(message="Exact same message", merged_small_logs="")
+        hit_source = build_log_item(message="Exact same message", merged_small_logs="", test_item=456)
+        search_results = build_search_results(query, [hit_source])
         results = predictor.predict(search_results)
         assert len(results) == 1
         assert results[0].label == 1
@@ -348,29 +275,13 @@ class TestSimilarityPredictor:
     def test_predict_combined_text_fields(self):
         """Test predict method when combining message and merged_small_logs fields."""
         predictor = SimilarityPredictor(similarity_threshold=0.5)
-        search_results = [
-            (
-                {
-                    "_source": {
-                        "message": "Error: Connection timeout",
-                        "merged_small_logs": "Additional context",
-                    }
-                },
-                {
-                    "hits": {
-                        "hits": [
-                            {
-                                "_source": {
-                                    "message": "Error: Connection timeout Additional context",
-                                    "merged_small_logs": "",
-                                    "test_item": 456,
-                                },
-                            }
-                        ]
-                    }
-                },
-            )
-        ]
+        query = build_log_item(message="Error: Connection timeout", merged_small_logs="Additional context")
+        hit_source = build_log_item(
+            message="Error: Connection timeout Additional context",
+            merged_small_logs="",
+            test_item=456,
+        )
+        search_results = build_search_results(query, [hit_source])
         results = predictor.predict(search_results)
         assert len(results) == 1
         assert results[0].label == 1  # Should be high similarity
@@ -379,31 +290,12 @@ class TestSimilarityPredictor:
     def test_predict_multiple_test_items(self):
         """Test predict method with multiple test items."""
         predictor = SimilarityPredictor(similarity_threshold=0.3)
-        search_results = [
-            (
-                {"_source": {"message": "Error: Connection timeout", "merged_small_logs": ""}},
-                {
-                    "hits": {
-                        "hits": [
-                            {
-                                "_source": {
-                                    "message": "Error: Connection timeout",
-                                    "merged_small_logs": "",
-                                    "test_item": 456,
-                                },
-                            },
-                            {
-                                "_source": {
-                                    "message": "Different error message",
-                                    "merged_small_logs": "",
-                                    "test_item": 789,
-                                },
-                            },
-                        ]
-                    }
-                },
-            )
+        query = build_log_item(message="Error: Connection timeout", merged_small_logs="")
+        hits = [
+            build_log_item(message="Error: Connection timeout", merged_small_logs="", test_item=456),
+            build_log_item(message="Different error message", merged_small_logs="", test_item=789),
         ]
+        search_results = build_search_results(query, hits)
         results = predictor.predict(search_results)
         assert len(results) == 2
 
@@ -435,39 +327,13 @@ class TestSimilarityPredictor:
     def test_predict_multiple_search_requests(self):
         """Test predict method with multiple search requests."""
         predictor = SimilarityPredictor(similarity_threshold=0.5)
+        first_query = build_log_item(message="First error", merged_small_logs="")
+        second_query = build_log_item(message="Second error", merged_small_logs="")
+        first_hit = build_log_item(message="First error", merged_small_logs="", test_item=456)
+        second_hit = build_log_item(message="Second error", merged_small_logs="", test_item=789)
         search_results = [
-            (
-                {"_source": {"message": "First error", "merged_small_logs": ""}},
-                {
-                    "hits": {
-                        "hits": [
-                            {
-                                "_source": {
-                                    "message": "First error",
-                                    "merged_small_logs": "",
-                                    "test_item": 456,
-                                },
-                            }
-                        ]
-                    }
-                },
-            ),
-            (
-                {"_source": {"message": "Second error", "merged_small_logs": ""}},
-                {
-                    "hits": {
-                        "hits": [
-                            {
-                                "_source": {
-                                    "message": "Second error",
-                                    "merged_small_logs": "",
-                                    "test_item": 789,
-                                },
-                            }
-                        ]
-                    }
-                },
-            ),
+            (first_query, [build_hit(first_hit)]),
+            (second_query, [build_hit(second_hit)]),
         ]
         results = predictor.predict(search_results)
         assert len(results) == 2
@@ -493,29 +359,13 @@ class TestSimilarityPredictor:
     ):
         """Test that similarity calculations fall within expected ranges."""
         predictor = SimilarityPredictor(similarity_threshold=0.1)  # Low threshold to test all cases
-        search_results = [
-            (
-                {
-                    "_source": {
-                        "message": query_message,
-                        "merged_small_logs": query_merged_logs,
-                    }
-                },
-                {
-                    "hits": {
-                        "hits": [
-                            {
-                                "_source": {
-                                    "message": hit_message,
-                                    "merged_small_logs": hit_merged_logs,
-                                    "test_item": 456,
-                                },
-                            }
-                        ]
-                    }
-                },
-            )
-        ]
+        query = build_log_item(message=query_message, merged_small_logs=query_merged_logs)
+        hit_source = build_log_item(
+            message=hit_message,
+            merged_small_logs=hit_merged_logs,
+            test_item=456,
+        )
+        search_results = build_search_results(query, [hit_source])
         results = predictor.predict(search_results)
 
         if query_message or query_merged_logs:  # Only if query has content
@@ -529,24 +379,9 @@ class TestSimilarityPredictor:
     def test_predict_probability_format(self):
         """Test that probability format matches other predictors."""
         predictor = SimilarityPredictor(similarity_threshold=0.5)
-        search_results = [
-            (
-                {"_source": {"message": "Error message", "merged_small_logs": ""}},
-                {
-                    "hits": {
-                        "hits": [
-                            {
-                                "_source": {
-                                    "message": "Error message",
-                                    "merged_small_logs": "",
-                                    "test_item": 456,
-                                },
-                            }
-                        ]
-                    }
-                },
-            )
-        ]
+        query = build_log_item(message="Error message", merged_small_logs="")
+        hit_source = build_log_item(message="Error message", merged_small_logs="", test_item=456)
+        search_results = build_search_results(query, [hit_source])
         results = predictor.predict(search_results)
         assert len(results) == 1
 
@@ -630,7 +465,7 @@ class TestAutoAnalysisPredictor:
         deps = self.create_mock_dependencies()
         predictor = AutoAnalysisPredictor(**deps)
 
-        search_results = [({"_source": {"message": "test"}}, {"hits": {"hits": []}})]
+        search_results = [(build_log_item(message="test"), [])]
 
         featurizer = predictor.create_featurizer(search_results)
 
@@ -657,12 +492,7 @@ class TestAutoAnalysisPredictor:
         mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
         predictor.create_featurizer = Mock(return_value=mock_featurizer)
 
-        search_results = [
-            (
-                {"_source": {"message": "Some message", "merged_small_logs": ""}},
-                {"hits": {"hits": []}},
-            )
-        ]
+        search_results = [(build_log_item(message="Some message", merged_small_logs=""), [])]
         result = predictor.predict(search_results)
         assert result == []
 
@@ -675,10 +505,11 @@ class TestAutoAnalysisPredictor:
         mock_featurizer = Mock()
         mock_featurizer.gather_features_info.return_value = ([[0.1, 0.2, 0.3]], ["456"])
         mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
+        mr_hit_source = build_log_item(log_id="log1", message="test", test_item=456)
         mock_featurizer.find_most_relevant_by_type.return_value = {
             "456": {
-                "mrHit": {"_id": "log1", "_source": {"test_item": 456}},
-                "compared_log": {"_source": {"message": "test"}},
+                "mrHit": build_hit(mr_hit_source),
+                "compared_log": build_log_item(log_id="query1", message="test"),
                 "original_position": 0,
             }
         }
@@ -706,29 +537,19 @@ class TestAutoAnalysisPredictor:
         mock_featurizer = Mock()
         mock_featurizer.gather_features_info.return_value = ([[0.1, 0.2, 0.3]], ["456"])
         mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
+        mr_hit_source = build_log_item(log_id="log1", message="test")
         mock_featurizer.find_most_relevant_by_type.return_value = {
-            "456": {"mrHit": {"_id": "log1"}, "compared_log": {"_source": {"message": "test"}}, "original_position": 0}
+            "456": {
+                "mrHit": build_hit(mr_hit_source),
+                "compared_log": build_log_item(log_id="query1", message="test"),
+                "original_position": 0,
+            }
         }
         predictor.create_featurizer = Mock(return_value=mock_featurizer)
 
-        search_results = [
-            (
-                {"_source": {"message": "Error message", "merged_small_logs": ""}},
-                {
-                    "hits": {
-                        "hits": [
-                            {
-                                "_source": {
-                                    "message": "Error message",
-                                    "merged_small_logs": "",
-                                    "test_item": 456,
-                                },
-                            }
-                        ]
-                    }
-                },
-            )
-        ]
+        query = build_log_item(message="Error message", merged_small_logs="")
+        hit_source = build_log_item(message="Error message", merged_small_logs="", test_item=456)
+        search_results = build_search_results(query, [hit_source])
         results = predictor.predict(search_results)
         assert len(results) == 1
 
@@ -750,24 +571,24 @@ class TestAutoAnalysisPredictor:
         mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
         mock_featurizer.find_most_relevant_by_type.return_value = {
             "456": {
-                "mrHit": {"_id": "log1"},
-                "compared_log": {"_source": {"message": "test1"}},
+                "mrHit": build_hit(build_log_item(log_id="log1", message="test1")),
+                "compared_log": build_log_item(log_id="query1", message="test1"),
                 "original_position": 0,
             },
             "789": {
-                "mrHit": {"_id": "log2"},
-                "compared_log": {"_source": {"message": "test2"}},
+                "mrHit": build_hit(build_log_item(log_id="log2", message="test2")),
+                "compared_log": build_log_item(log_id="query2", message="test2"),
                 "original_position": 1,
             },
         }
         predictor.create_featurizer = Mock(return_value=mock_featurizer)
 
-        search_results = [
-            (
-                {"_source": {"message": "Error message", "merged_small_logs": ""}},
-                {"hits": {"hits": [{"_source": {"test_item": 456}}, {"_source": {"test_item": 789}}]}},
-            )
+        query = build_log_item(message="Error message", merged_small_logs="")
+        hits = [
+            build_log_item(message="Error message", merged_small_logs="", test_item=456),
+            build_log_item(message="Another error", merged_small_logs="", test_item=789),
         ]
+        search_results = build_search_results(query, hits)
         results = predictor.predict(search_results)
         assert len(results) == 2
 
@@ -853,7 +674,7 @@ class TestSuggestionPredictor:
         deps = self.create_mock_dependencies()
         predictor = SuggestionPredictor(**deps)
 
-        search_results = [({"_source": {"message": "test"}}, {"hits": {"hits": []}})]
+        search_results = [(build_log_item(message="test"), [])]
 
         featurizer = predictor.create_featurizer(search_results)
 
@@ -880,12 +701,7 @@ class TestSuggestionPredictor:
         mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
         predictor.create_featurizer = Mock(return_value=mock_featurizer)
 
-        search_results = [
-            (
-                {"_source": {"message": "Some message", "merged_small_logs": ""}},
-                {"hits": {"hits": []}},
-            )
-        ]
+        search_results = [(build_log_item(message="Some message", merged_small_logs=""), [])]
         result = predictor.predict(search_results)
         assert result == []
 
@@ -898,10 +714,11 @@ class TestSuggestionPredictor:
         mock_featurizer = Mock()
         mock_featurizer.gather_features_info.return_value = ([[0.4, 0.5, 0.6]], ["789"])
         mock_featurizer.get_used_model_info.return_value = ["suggestion_featurizer_info"]
+        mr_hit_source = build_log_item(log_id="log2", message="suggestion_test", test_item=789)
         mock_featurizer.find_most_relevant_by_type.return_value = {
             "789": {
-                "mrHit": {"_id": "log2", "_source": {"test_item": 789}},
-                "compared_log": {"_source": {"message": "suggestion_test"}},
+                "mrHit": build_hit(mr_hit_source),
+                "compared_log": build_log_item(log_id="query1", message="suggestion_test"),
                 "original_position": 0,
             }
         }
@@ -931,29 +748,19 @@ class TestSuggestionPredictor:
         mock_featurizer = Mock()
         mock_featurizer.gather_features_info.return_value = ([[0.4, 0.5, 0.6]], ["789"])
         mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
+        mr_hit_source = build_log_item(log_id="log2", message="test")
         mock_featurizer.find_most_relevant_by_type.return_value = {
-            "789": {"mrHit": {"_id": "log2"}, "compared_log": {"_source": {"message": "test"}}, "original_position": 0}
+            "789": {
+                "mrHit": build_hit(mr_hit_source),
+                "compared_log": build_log_item(log_id="query1", message="test"),
+                "original_position": 0,
+            }
         }
         predictor.create_featurizer = Mock(return_value=mock_featurizer)
 
-        search_results = [
-            (
-                {"_source": {"message": "Suggestion message", "merged_small_logs": ""}},
-                {
-                    "hits": {
-                        "hits": [
-                            {
-                                "_source": {
-                                    "message": "Suggestion message",
-                                    "merged_small_logs": "",
-                                    "test_item": 789,
-                                },
-                            }
-                        ]
-                    }
-                },
-            )
-        ]
+        query = build_log_item(message="Suggestion message", merged_small_logs="")
+        hit_source = build_log_item(message="Suggestion message", merged_small_logs="", test_item=789)
+        search_results = build_search_results(query, [hit_source])
         results = predictor.predict(search_results)
         assert len(results) == 1
 
@@ -975,24 +782,24 @@ class TestSuggestionPredictor:
         mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
         mock_featurizer.find_most_relevant_by_type.return_value = {
             "789": {
-                "mrHit": {"_id": "log2"},
-                "compared_log": {"_source": {"message": "test1"}},
+                "mrHit": build_hit(build_log_item(log_id="log2", message="test1")),
+                "compared_log": build_log_item(log_id="query1", message="test1"),
                 "original_position": 0,
             },
             "101": {
-                "mrHit": {"_id": "log3"},
-                "compared_log": {"_source": {"message": "test2"}},
+                "mrHit": build_hit(build_log_item(log_id="log3", message="test2")),
+                "compared_log": build_log_item(log_id="query2", message="test2"),
                 "original_position": 1,
             },
         }
         predictor.create_featurizer = Mock(return_value=mock_featurizer)
 
-        search_results = [
-            (
-                {"_source": {"message": "Suggestion message", "merged_small_logs": ""}},
-                {"hits": {"hits": [{"_source": {"test_item": 789}}, {"_source": {"test_item": 101}}]}},
-            )
+        query = build_log_item(message="Suggestion message", merged_small_logs="")
+        hits = [
+            build_log_item(message="Suggestion message", merged_small_logs="", test_item=789),
+            build_log_item(message="Other message", merged_small_logs="", test_item=101),
         ]
+        search_results = build_search_results(query, hits)
         results = predictor.predict(search_results)
         assert len(results) == 2
 

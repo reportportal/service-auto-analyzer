@@ -410,8 +410,8 @@ class SimilarityPredictor(Predictor):
     ) -> list[PredictionResult]:
         """Execute similarity-based prediction workflow.
 
-        :param list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]] search_results: List of (search_request, hits)
-                                                                                          tuples
+        :param list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]] search_results: List of (search_request,
+                                                                                          hits) tuples
         :return: List of PredictionResult objects, one for each prediction
         """
         if not search_results:

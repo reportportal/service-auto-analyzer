@@ -1014,7 +1014,7 @@ def calculate_text_similarity(base_text: Optional[str], other_texts: list[str]) 
     :return: List of SimilarityResult objects where `similarity` is in [0.0, 1.0]
              and `both_empty` indicates both texts were empty
     """
-    if not base_text or not other_texts:
+    if not other_texts:
         return []
 
     # Preprocess the base text

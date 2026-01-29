@@ -26,7 +26,6 @@ from app.service.index_service import IndexService
 from app.service.namespace_finder_service import NamespaceFinderService
 from app.service.retraining_service import RetrainingService
 from app.service.search_service import SearchService
-from app.service.suggest_info_service import SuggestInfoService
 from app.service.suggest_patterns_service import SuggestPatternsService
 from app.service.suggest_service import SuggestService
 
@@ -126,13 +125,27 @@ def raise_exception(message: str) -> None:
     raise RuntimeError(message)
 
 
+def log_suggest_info_index_warning(s: Any) -> Any:
+    LOGGER.warning(f"Deprecated 'index_suggest_info' route called with: {json.dumps(s)}")
+    return {}
+
+
+def log_suggest_info_remove_warning(s: int) -> int:
+    LOGGER.warning(f"Deprecated 'remove_suggest_info' route called with: {s}")
+    return s
+
+
+def log_suggest_info_update_warning(s: Any) -> int:
+    LOGGER.warning(f"Deprecated 'update_suggest_info' route called with: {json.dumps(s)}")
+    return 1
+
+
 class ServiceProcessor:
     """Class for processing requests based on routing key and routing configuration"""
 
     _model_chooser: Optional[model_chooser.ModelChooser] = None
     _index_service: Optional[IndexService] = None
     _clean_index_service: Optional[CleanIndexService] = None
-    _suggest_info_service: Optional[SuggestInfoService] = None
 
     __configs: dict[str, dict[str, Any]] = {
         "train_models": {
@@ -209,17 +222,17 @@ class ServiceProcessor:
             "prepare_response_data": prepare_index_response_data,
         },
         "index_suggest_info": {
-            "handler": lambda s: s.suggest_info_service.index_suggest_info,
+            "handler": log_suggest_info_index_warning,
             "prepare_data_func": prepare_suggest_info_list,
             "prepare_response_data": prepare_index_response_data,
         },
         "remove_suggest_info": {
-            "handler": lambda s: s.suggest_info_service.remove_suggest_info,
+            "handler": log_suggest_info_remove_warning,
             "prepare_data_func": to_int,
             "prepare_response_data": to_str,
         },
         "update_suggest_info": {
-            "handler": lambda s: s.suggest_info_service.update_suggest_info,
+            "handler": log_suggest_info_update_warning,
             "prepare_data_func": same_data,
             "prepare_response_data": to_json,
         },
@@ -284,12 +297,6 @@ class ServiceProcessor:
         if not self._index_service:
             self._index_service = IndexService(self.app_config)
         return self._index_service
-
-    @property
-    def suggest_info_service(self) -> SuggestInfoService:
-        if not self._suggest_info_service:
-            self._suggest_info_service = SuggestInfoService(self.app_config)
-        return self._suggest_info_service
 
     def _build_routing_config(self, routing_keys: Optional[set[str]]) -> dict:
         """Build routing configuration for different routing keys"""

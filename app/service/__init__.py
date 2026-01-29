@@ -20,7 +20,6 @@ from app.service.namespace_finder_service import NamespaceFinderService
 from app.service.processor import ServiceProcessor
 from app.service.retraining_service import RetrainingService
 from app.service.search_service import SearchService
-from app.service.suggest_info_service import SuggestInfoService
 from app.service.suggest_patterns_service import SuggestPatternsService
 from app.service.suggest_service import SuggestService
 
@@ -33,7 +32,6 @@ __all__ = [
     "ServiceProcessor",
     "RetrainingService",
     "SearchService",
-    "SuggestInfoService",
     "SuggestPatternsService",
     "SuggestService",
 ]

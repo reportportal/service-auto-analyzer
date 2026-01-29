@@ -16,9 +16,10 @@ from unittest import mock
 
 import pytest
 
+from app.commons.model.db import Hit
 from app.commons.model.launch_objects import AnalyzerConf, SearchLogs
 from app.commons.model.test_item_index import LogData, TestItemIndexData
-from app.commons.os_client import Hit, OsClient
+from app.commons.os_client import OsClient
 from app.service.search_service import SearchService
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
 

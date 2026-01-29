@@ -25,6 +25,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 from app.commons import clustering, logging, request_factory
 from app.commons.model import TestItemIndexData
+from app.commons.model.db import Hit
 from app.commons.model.launch_objects import (
     ApplicationConfig,
     ClusterInfo,
@@ -33,7 +34,7 @@ from app.commons.model.launch_objects import (
     SearchConfig,
 )
 from app.commons.model.test_item_index import LogClusterData, LogData
-from app.commons.os_client import Hit, OsClient
+from app.commons.os_client import OsClient
 from app.utils import text_processing, utils
 
 LOGGER = logging.getLogger("analyzerApp.clusterService")

@@ -17,15 +17,15 @@
 import traceback
 from datetime import datetime, timezone
 from time import time
-from typing import Any, Callable, Generic, Iterator, Optional, TypeVar
+from typing import Any, Callable, Iterator, Optional
 
 import opensearchpy.helpers
 import urllib3
 from opensearchpy import OpenSearch, RequestsHttpConnection
-from pydantic import BaseModel, Field
 from urllib3.exceptions import InsecureRequestWarning
 
 from app.commons import logging
+from app.commons.model.db import Hit
 from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, Response
 from app.commons.model.test_item_index import LogClusterData, LogData, TestItemHistoryData, TestItemIndexData
 from app.utils import text_processing, utils
@@ -34,31 +34,6 @@ INDEX_SETTINGS_FILE = "index_settings.json"
 TEST_ITEM_INDEX_MAPPINGS_FILE = "test_item_index_mappings.json"
 
 LOGGER = logging.getLogger("analyzerApp.osClient")
-
-T = TypeVar("T")
-
-
-class Hit(BaseModel, Generic[T]):
-    """Typed representation of an OpenSearch search hit."""
-
-    index: Optional[str] = Field(default=None, validation_alias="_index")
-    id: Optional[str] = Field(default=None, validation_alias="_id")
-    score: Optional[float] = Field(default=None, validation_alias="_score")
-    source: T = Field(validation_alias="_source")
-    sort: Optional[list[Any]] = None
-    highlight: Optional[dict[str, Any]] = None
-    fields: Optional[dict[str, Any]] = None
-    inner_hits: Optional[dict[str, Any]] = Field(default=None)
-
-    @classmethod
-    def from_dict(cls, hit: dict[str, Any]) -> "Hit[T]":
-        """
-        Build a typed Hit object from OpenSearch raw hit using pydantic validation.
-
-        :param hit: Raw hit dictionary returned by OpenSearch
-        :return: Hit instance with mapped source
-        """
-        return cls.model_validate(hit)
 
 
 def get_test_item_index_name(project_id: str | int, prefix: str) -> str:

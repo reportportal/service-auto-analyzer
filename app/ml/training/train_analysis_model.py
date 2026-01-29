@@ -131,6 +131,39 @@ def train_several_times(
     return baseline_model_results, new_model_results, bad_data, proportion_binary_labels
 
 
+def stop_gathering_info_from_suggest_query(num_of_1s, num_of_0s, max_num):
+    if (num_of_1s + num_of_0s) == 0:
+        return False
+    percent_logs = (num_of_1s + num_of_0s) / max_num
+    percent_1s = num_of_1s / (num_of_1s + num_of_0s)
+    if percent_logs >= 0.8 and percent_1s <= 0.2:
+        return True
+    return False
+
+
+def get_info_template(
+    project_info: TrainInfo, baseline_model: str, model_name: str, metric_name: str
+) -> dict[str, Any]:
+    return {
+        "method": "training",
+        "sub_model_type": "all",
+        "model_type": project_info.model_type.name,
+        "baseline_model": [baseline_model],
+        "new_model": [model_name],
+        "project_id": str(project_info.project),
+        "model_saved": 0,
+        "p_value": 1.0,
+        "data_size": 0,
+        "data_proportion": 0.0,
+        "baseline_mean_metric": 0.0,
+        "new_model_mean_metric": 0.0,
+        "bad_data_proportion": 0,
+        "metric_name": metric_name,
+        "errors": [],
+        "errors_count": 0,
+    }
+
+
 class AnalysisModelTraining:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
@@ -201,7 +234,7 @@ class AnalysisModelTraining:
         self.namespace_finder = namespace_finder.NamespaceFinder(app_config)
         self.model_chooser = model_chooser
 
-    def get_config_for_boosting(self, number_of_log_lines: int, namespaces) -> dict[str, Any]:
+    def _get_config_for_boosting(self, number_of_log_lines: int, namespaces) -> dict[str, Any]:
         return {
             "max_query_terms": self.search_cfg.MaxQueryTerms,
             "min_should_match": 0.4,
@@ -215,30 +248,7 @@ class AnalysisModelTraining:
             "time_weight_decay": self.search_cfg.TimeWeightDecay,
         }
 
-    @staticmethod
-    def get_info_template(
-        project_info: TrainInfo, baseline_model: str, model_name: str, metric_name: str
-    ) -> dict[str, Any]:
-        return {
-            "method": "training",
-            "sub_model_type": "all",
-            "model_type": project_info.model_type.name,
-            "baseline_model": [baseline_model],
-            "new_model": [model_name],
-            "project_id": str(project_info.project),
-            "model_saved": 0,
-            "p_value": 1.0,
-            "data_size": 0,
-            "data_proportion": 0.0,
-            "baseline_mean_metric": 0.0,
-            "new_model_mean_metric": 0.0,
-            "bad_data_proportion": 0,
-            "metric_name": metric_name,
-            "errors": [],
-            "errors_count": 0,
-        }
-
-    def query_logs(self, project_id: int, log_ids_to_find: list[str]) -> dict[str, Any]:
+    def _query_logs(self, project_id: int, log_ids_to_find: list[str]) -> dict[str, Any]:
         log_ids_to_find = list(log_ids_to_find)
         project_index_name = esclient.get_index_name(project_id, self.app_config.esProjectIndexPrefix, "rp_log_item")
         batch_size = 1000
@@ -257,14 +267,14 @@ class AnalysisModelTraining:
                 log_id_dict[str(r["_id"])] = r
         return log_id_dict
 
-    def get_search_query_suggest(self):
+    def _get_search_query_suggest(self):
         return {
             "sort": {"savedDate": "desc"},
             "size": self.app_config.esChunkNumber,
             "query": {"bool": {"must": [{"term": {"methodName": "suggestion"}}]}},
         }
 
-    def get_search_query_aa(self, user_choice: int) -> dict[str, Any]:
+    def _get_search_query_aa(self, user_choice: int) -> dict[str, Any]:
         return {
             "sort": {"savedDate": "desc"},
             "size": self.app_config.esChunkNumber,
@@ -273,17 +283,7 @@ class AnalysisModelTraining:
             },
         }
 
-    @staticmethod
-    def stop_gathering_info_from_suggest_query(num_of_1s, num_of_0s, max_num):
-        if (num_of_1s + num_of_0s) == 0:
-            return False
-        percent_logs = (num_of_1s + num_of_0s) / max_num
-        percent_1s = num_of_1s / (num_of_1s + num_of_0s)
-        if percent_logs >= 0.8 and percent_1s <= 0.2:
-            return True
-        return False
-
-    def query_es_for_suggest_info(self, project_id: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    def _query_es_for_suggest_info(self, project_id: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         log_ids_to_find = set()
         gathered_suggested_data = []
         log_id_pairs_set = set()
@@ -294,9 +294,9 @@ class AnalysisModelTraining:
         cur_number_of_logs_1 = 0
         unique_saved_features = set()
         for query_name, query in [
-            ("auto_analysis 0s", self.get_search_query_aa(0)),
-            ("suggestion", self.get_search_query_suggest()),
-            ("auto_analysis 1s", self.get_search_query_aa(1)),
+            ("auto_analysis 0s", self._get_search_query_aa(0)),
+            ("suggestion", self._get_search_query_suggest()),
+            ("auto_analysis 1s", self._get_search_query_aa(1)),
         ]:
             if cur_number_of_logs >= max_number_of_logs:
                 break
@@ -322,7 +322,7 @@ class AnalysisModelTraining:
                     cur_number_of_logs_1 += 1
                 else:
                     cur_number_of_logs_0 += 1
-                if query_name == "suggestion" and self.stop_gathering_info_from_suggest_query(
+                if query_name == "suggestion" and stop_gathering_info_from_suggest_query(
                     cur_number_of_logs_1, cur_number_of_logs_0, max_number_of_logs
                 ):
                     break
@@ -332,14 +332,14 @@ class AnalysisModelTraining:
                 cur_number_of_logs,
                 cur_number_of_logs_1,
             )
-        log_id_dict = self.query_logs(project_id, list(log_ids_to_find))
+        log_id_dict = self._query_logs(project_id, list(log_ids_to_find))
         return gathered_suggested_data, log_id_dict
 
-    def query_data(self, projects: list[int], features: list[int]) -> tuple[list[list[float]], list[int]]:
+    def _query_data(self, projects: list[int], features: list[int]) -> tuple[list[list[float]], list[int]]:
         full_data_features, labels = [], []
         for project_id in projects:
             namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
-            gathered_suggested_data, log_id_dict = self.query_es_for_suggest_info(project_id)
+            gathered_suggested_data, log_id_dict = self._query_es_for_suggest_info(project_id)
             defect_type_model = cast(
                 DefectTypeModel, self.model_chooser.choose_model(project_id, ModelType.defect_type)
             )
@@ -362,13 +362,13 @@ class AnalysisModelTraining:
                     if self.model_type is ModelType.suggestion:
                         _boosting_data_gatherer = SuggestBoostingFeaturizer(
                             searched_res,
-                            self.get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
+                            self._get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
                             feature_ids=features,
                         )
                     else:
                         _boosting_data_gatherer = BoostingFeaturizer(
                             searched_res,
-                            self.get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
+                            self._get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
                             feature_ids=features,
                         )
 
@@ -384,7 +384,7 @@ class AnalysisModelTraining:
                         labels.append(_suggest_res["_source"]["userChoice"])
         return full_data_features, labels
 
-    def train_several_times(
+    def _train_several_times(
         self,
         new_model: BoostingDecisionMaker,
         data: list[list[float]],
@@ -409,17 +409,17 @@ class AnalysisModelTraining:
         )
 
         train_log_info: DefaultDict[str, dict[str, Any]] = DefaultDict(
-            lambda _, k: self.get_info_template(project_info, baseline_model, model_name, k)
+            lambda _, k: get_info_template(project_info, baseline_model, model_name, k)
         )
 
         LOGGER.debug(f"Initialized model training {project_info.model_type.name}")
         projects = [project_info.project]
         if project_info.additional_projects:
             projects.extend(project_info.additional_projects)
-        train_data, labels = self.query_data(projects, new_model.feature_ids)
+        train_data, labels = self._query_data(projects, new_model.feature_ids)
         LOGGER.debug(f"Loaded data for model training {self.model_type.name}")
 
-        baseline_model_results, new_model_results, bad_data, data_proportion = self.train_several_times(
+        baseline_model_results, new_model_results, bad_data, data_proportion = self._train_several_times(
             new_model, train_data, labels
         )
         for metric in new_model_results:
@@ -461,7 +461,7 @@ class AnalysisModelTraining:
             best_random_state = TRAIN_DATA_RANDOM_STATES[max_train_result_idx]
 
             LOGGER.info(f"Perform final training with random state: {best_random_state}")
-            self.train_several_times(new_model, train_data, labels, [best_random_state])
+            self._train_several_times(new_model, train_data, labels, [best_random_state])
             if self.model_chooser:
                 self.model_chooser.delete_old_model(project_info.model_type, project_info.project)
             new_model.save_model()

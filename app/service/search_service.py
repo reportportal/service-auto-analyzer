@@ -149,7 +149,7 @@ class SearchService:
             source = hit.source
             if not source.logs:
                 continue
-            logs_sorted = sorted(source.logs, key=lambda log: log.log_order if log.log_order else log.log_id)
+            logs_sorted = sorted(source.logs, key=lambda log: log.log_order if log.log_order else int(log.log_id))
             logs_with_messages = [(log, log.message) for log in logs_sorted if log.message and log.message.strip()]
             if not logs_with_messages:
                 continue

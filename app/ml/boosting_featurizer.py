@@ -612,7 +612,7 @@ class BoostingFeaturizer:
         :return: dict with issue type as key and value as maximum score or inverse order of this score
         """
         max_scores_by_issue_type: dict[str, dict[str, float]] = {}
-        for log, es_results in self.all_results:
+        for _, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
                 issue_type = hit.source.issue_type
 
@@ -633,7 +633,7 @@ class BoostingFeaturizer:
         :return: dict with issue type as key and value as minimum score or inverse order of this score
         """
         min_scores_by_issue_type: dict[str, dict[str, float]] = {}
-        for log, es_results in self.all_results:
+        for _, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
                 issue_type = hit.source.issue_type
 

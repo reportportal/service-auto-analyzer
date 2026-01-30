@@ -13,22 +13,25 @@
 #  limitations under the License.
 import math
 import os
+import random
+from collections import defaultdict
 from datetime import datetime
 from time import time
 from typing import Any, Optional, Type, cast
 
 import numpy as np
-import opensearchpy.helpers
 import scipy.stats as stats
 from imblearn.over_sampling import BorderlineSMOTE
 from sklearn.model_selection import train_test_split
 
-from app.commons import esclient, logging, namespace_finder, object_saving
-from app.commons.esclient import EsClient
+from app.commons import logging, namespace_finder, object_saving
+from app.commons.model.db import Hit
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
-from app.commons.model.log_item_index import deserialize_log_item_search_results
+from app.commons.model.log_item_index import LogItemIndexData
 from app.commons.model.ml import ModelType, TrainInfo
+from app.commons.model.test_item_index import LogData, TestItemHistoryData, TestItemIndexData
 from app.commons.model_chooser import ModelChooser
+from app.commons.os_client import OsClient
 from app.ml.boosting_featurizer import BoostingFeaturizer
 from app.ml.models import BoostingDecisionMaker, CustomBoostingDecisionMaker, DefectTypeModel
 from app.ml.suggest_boosting_featurizer import SuggestBoostingFeaturizer
@@ -37,23 +40,14 @@ from app.utils.defaultdict import DefaultDict
 
 LOGGER = logging.getLogger("analyzerApp.trainingAnalysisModel")
 TRAIN_DATA_RANDOM_STATES = [1257, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029, 2137]
-DUE_PROPORTION = 0.05
+DUE_PROPORTION = 0.2
 SMOTE_PROPORTION = 0.4
+NEGATIVE_RATIO_MIN = 2
+NEGATIVE_RATIO_MAX = 4
+MIN_POSITIVE_CASES_FOR_SMOTE = 5
+MAX_HISTORY_NEGATIVES = 2
 MIN_P_VALUE = 0.05
 METRIC = "F1"
-
-
-def deduplicate_data(data: list[list[float]], labels: list[int]) -> tuple[list[list[float]], list[int]]:
-    data_wo_duplicates = []
-    labels_wo_duplicates = []
-    data_set = set()
-    for i in range(len(data)):
-        data_tuple = tuple(data[i])
-        if data_tuple not in data_set:
-            data_set.add(data_tuple)
-            data_wo_duplicates.append(data[i])
-            labels_wo_duplicates.append(labels[i])
-    return data_wo_duplicates, labels_wo_duplicates
 
 
 def split_data(
@@ -103,21 +97,32 @@ def train_several_times(
 
     bad_data = False
     proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
+    positives_count = sum(1 for label in labels if label == 1)
+    negatives_count = sum(1 for label in labels if label == 0)
+    if positives_count < 2 or negatives_count < 2:
+        LOGGER.debug("Train data has too few samples: positives=%d, negatives=%d", positives_count, negatives_count)
+        bad_data = True
     if proportion_binary_labels < DUE_PROPORTION:
         LOGGER.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
         bad_data = True
 
     if not bad_data:
-        dedupe_data, labels = deduplicate_data(data, labels)
         for random_state in my_random_states:
-            x_train, x_test, y_train, y_test = split_data(dedupe_data, labels, random_state)
+            x_train, x_test, y_train, y_test = split_data(data, labels, random_state)
             LOGGER.debug(
                 f"Train data split with random state {random_state}: train size {len(x_train)}, test size "
                 + str(len(x_test))
             )
             proportion_binary_labels = utils.calculate_proportions_for_labels(y_train)
             LOGGER.debug(f"Train data proportion: {proportion_binary_labels:.2f}")
-            if proportion_binary_labels < SMOTE_PROPORTION:
+            positives_train = sum(1 for label in y_train if label == 1)
+            negatives_train = sum(1 for label in y_train if label == 0)
+            if MIN_POSITIVE_CASES_FOR_SMOTE > positives_train > 1 and negatives_train > 1:
+                LOGGER.debug(
+                    "Applying SMOTE due to low positive count: %d (negatives=%d)",
+                    positives_train,
+                    negatives_train,
+                )
                 oversample = BorderlineSMOTE(sampling_strategy=SMOTE_PROPORTION, random_state=random_state)
                 x_train, y_train = oversample.fit_resample(x_train, y_train)
             new_model.train_model(x_train, y_train)
@@ -130,16 +135,6 @@ def train_several_times(
                 )
                 baseline_model_results[METRIC].append(baseline_model.validate_model(x_test_for_baseline, y_test))
     return baseline_model_results, new_model_results, bad_data, proportion_binary_labels
-
-
-def stop_gathering_info_from_suggest_query(num_of_1s, num_of_0s, max_num):
-    if (num_of_1s + num_of_0s) == 0:
-        return False
-    percent_logs = (num_of_1s + num_of_0s) / max_num
-    percent_1s = num_of_1s / (num_of_1s + num_of_0s)
-    if percent_logs >= 0.8 and percent_1s <= 0.2:
-        return True
-    return False
 
 
 def get_info_template(
@@ -165,10 +160,300 @@ def get_info_template(
     }
 
 
+def _safe_int(value: Any) -> int:
+    """
+    Safely cast a value to integer.
+
+    :param value: Value to cast
+    :return: Integer value or 0 on failure
+    """
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _normalize_issue_type(issue_type: Any) -> str:
+    """
+    Normalize issue type to lowercase string.
+
+    :param issue_type: Raw issue type
+    :return: Normalized issue type
+    """
+    if issue_type is None:
+        return ""
+    return str(issue_type).strip().lower()
+
+
+def _get_log_text(log_item: LogItemIndexData) -> str:
+    """
+    Build a text payload for similarity comparison.
+
+    :param log_item: Log item to extract text from
+    :return: Combined text for similarity matching
+    """
+    parts = [
+        log_item.whole_message,
+        log_item.message,
+        log_item.detected_message,
+        log_item.stacktrace,
+    ]
+    return " ".join([part.strip() for part in parts if part and part.strip()])
+
+
+def convert_test_item_log(
+    test_item: TestItemIndexData,
+    log_data: LogData,
+    issue_type: str = "",
+) -> LogItemIndexData:
+    """
+    Convert Test Item-centric log data to log-centric model for ML featurizers.
+
+    :param test_item: Source Test Item document
+    :param log_data: Nested log entry data
+    :param issue_type: Optional issue type override for the log
+    :return: LogItemIndexData instance
+    """
+    resolved_issue_type = issue_type or _normalize_issue_type(test_item.issue_type)
+    return LogItemIndexData(
+        log_id=str(log_data.log_id or ""),
+        test_item=_safe_int(test_item.test_item_id),
+        test_item_name=test_item.test_item_name or "",
+        test_case_hash=_safe_int(test_item.test_case_hash),
+        unique_id=test_item.unique_id or "",
+        launch_id=_safe_int(test_item.launch_id),
+        launch_name=test_item.launch_name or "",
+        issue_type=resolved_issue_type,
+        is_auto_analyzed=bool(test_item.is_auto_analyzed),
+        start_time=test_item.start_time or "",
+        log_time=log_data.log_time or "",
+        log_level=log_data.log_level or 0,
+        is_merged=False,
+        merged_small_logs="",
+        message=log_data.message or "",
+        detected_message=log_data.detected_message or "",
+        detected_message_with_numbers=log_data.detected_message_with_numbers or "",
+        detected_message_extended=log_data.detected_message_extended or "",
+        detected_message_without_params_extended=log_data.detected_message_without_params_extended or "",
+        detected_message_without_params_and_brackets=log_data.detected_message_without_params_and_brackets or "",
+        stacktrace=log_data.stacktrace or "",
+        stacktrace_extended=log_data.stacktrace_extended or "",
+        message_extended=log_data.message_extended or "",
+        message_without_params_extended=log_data.message_without_params_extended or "",
+        message_without_params_and_brackets=log_data.message_without_params_and_brackets or "",
+        message_params=log_data.message_params or "",
+        only_numbers=log_data.only_numbers or "",
+        found_exceptions=log_data.found_exceptions or "",
+        found_tests_and_methods=log_data.found_tests_and_methods or "",
+        potential_status_codes=log_data.potential_status_codes or "",
+        urls=log_data.urls or "",
+        original_message=log_data.original_message or "",
+        whole_message=log_data.whole_message or "",
+        cluster_id=log_data.cluster_id or "",
+        cluster_message=log_data.cluster_message or "",
+        cluster_with_numbers=bool(log_data.cluster_with_numbers),
+    )
+
+
+def get_request_logs(test_item: TestItemIndexData, issue_type: str) -> list[LogItemIndexData]:
+    logs = list(test_item.logs or [])
+    if not logs:
+        return []
+    logs_sorted = sorted(
+        logs,
+        key=lambda log: log.log_order if log.log_order is not None else _safe_int(log.log_id),
+    )
+    return [convert_test_item_log(test_item, log_data, issue_type=issue_type) for log_data in logs_sorted]
+
+
+def bucket_sort_logs_by_similarity(
+    request_logs: list[LogItemIndexData],
+    found_hits: list[Hit[LogItemIndexData]],
+) -> list[list[Hit[LogItemIndexData]]]:
+    """
+    Align found logs to the most similar request logs using bucket sorting.
+
+    :param request_logs: Log items used as search requests
+    :param found_hits: Log hits retrieved from OpenSearch
+    :return: Buckets aligned with request logs
+    """
+    buckets: list[list[Hit[LogItemIndexData]]] = [[] for _ in request_logs]
+    request_texts = [_get_log_text(log_item) for log_item in request_logs]
+    if not request_texts:
+        return buckets
+    for hit in found_hits:
+        hit_text = _get_log_text(hit.source)
+        if not hit_text.strip():
+            continue
+        similarities = text_processing.calculate_text_similarity(hit_text, request_texts)
+        if not similarities:
+            continue
+        best_idx = max(range(len(similarities)), key=lambda idx: similarities[idx].similarity)
+        buckets[best_idx].append(hit)
+    return buckets
+
+
+def select_history_negative_types(
+    issue_history: list[TestItemHistoryData],
+    positive_issue_type: str,
+) -> list[str]:
+    """
+    Pick up to MAX_HISTORY_NEGATIVES negative issue types from history.
+
+    :param issue_history: Test item issue history entries
+    :param positive_issue_type: Current issue type (positive class)
+    :return: List of selected negative issue types
+    """
+    negatives = []
+    unique_negatives = set()
+    for entry in reversed(issue_history[:-1]):
+        entry_type = _normalize_issue_type(entry.issue_type)
+        if not entry_type or entry_type == positive_issue_type or entry_type in unique_negatives:
+            continue
+        negatives.append(entry_type)
+        unique_negatives.add(entry_type)
+        if len(negatives) >= MAX_HISTORY_NEGATIVES:
+            break
+    return negatives
+
+
+def select_candidate_entries(
+    candidate_issue_types: list[str],
+    positive_issue_type: str,
+    history_negative_types: list[str],
+) -> list[tuple[int, int]]:
+    """
+    Select candidate entries and assign labels based on issue history.
+
+    :param candidate_issue_types: Issue types aligned with feature rows
+    :param positive_issue_type: Issue type treated as positive
+    :param history_negative_types: Negative issue types from history (max 2)
+    :return: List of (index, label) tuples
+    """
+    candidates_by_type: dict[str, list[int]] = defaultdict(list)
+    for idx, issue_type in enumerate(candidate_issue_types):
+        candidates_by_type[issue_type].append(idx)
+
+    positive_indices = candidates_by_type.get(positive_issue_type, [])
+    if not positive_indices:
+        return []
+
+    selected_negatives: list[int] = []
+    history_indices: list[int] = []
+    for issue_type in history_negative_types:
+        indices = candidates_by_type.get(issue_type, [])
+        if indices:
+            history_indices.append(indices[0])
+
+    other_negatives: list[int] = []
+    for issue_type, indices in candidates_by_type.items():
+        if issue_type == positive_issue_type or issue_type in history_negative_types:
+            continue
+        other_negatives.extend(indices)
+
+    rng = random.Random(1257)
+    rng.shuffle(other_negatives)
+    if other_negatives:
+        selected_negatives.append(other_negatives.pop(0))
+
+    selected_negatives.extend(history_indices)
+
+    remaining_negatives = [idx for idx in other_negatives if idx not in selected_negatives]
+    max_negatives = len(positive_indices) * NEGATIVE_RATIO_MAX
+    min_negatives = len(positive_indices) * NEGATIVE_RATIO_MIN
+    rng.shuffle(remaining_negatives)
+    for idx in remaining_negatives:
+        if len(selected_negatives) >= max_negatives:
+            break
+        selected_negatives.append(idx)
+
+    selected_positive_indices = list(positive_indices)
+    if len(selected_negatives) < min_negatives:
+        max_positives = max(1, len(selected_negatives) // NEGATIVE_RATIO_MIN)
+        if max_positives < len(selected_positive_indices):
+            rng.shuffle(selected_positive_indices)
+            selected_positive_indices = selected_positive_indices[:max_positives]
+
+    selected_entries: list[tuple[int, int]] = [(idx, 1) for idx in selected_positive_indices]
+    selected_entries.extend((idx, 0) for idx in selected_negatives)
+    return selected_entries
+
+
+def _make_synthetic_test_item_id(base_id: int, index: int) -> int:
+    """
+    Build a deterministic synthetic test item ID.
+
+    :param base_id: Base test item identifier
+    :param index: Index of the synthetic entry
+    :return: Synthetic test item ID
+    """
+    base = abs(base_id)
+    if base == 0:
+        base = 1000000
+    return base * 10 + index + 1
+
+
+def build_history_negative_hits(
+    request_logs: list[LogItemIndexData],
+    history_negative_types: list[str],
+    base_test_item_id: str,
+) -> list[Hit[LogItemIndexData]]:
+    """
+    Create synthetic hits for history-negative issue types using request logs.
+
+    :param request_logs: Log items used as search requests
+    :param history_negative_types: Issue types from history to label as negatives
+    :param base_test_item_id: Test item identifier from the request item
+    :return: Synthetic log hits labeled with history issue types
+    """
+    base_id = _safe_int(base_test_item_id)
+    synthetic_hits: list[Hit[LogItemIndexData]] = []
+    for idx, issue_type in enumerate(history_negative_types):
+        synthetic_test_item_id = _make_synthetic_test_item_id(base_id, idx)
+        for log_item in request_logs:
+            synthetic_log = log_item.model_copy(
+                update={"issue_type": issue_type, "test_item": synthetic_test_item_id},
+                deep=True,
+            )
+            synthetic_hits.append(
+                Hit[LogItemIndexData].from_dict({"_id": synthetic_log.log_id, "_score": 0.0, "_source": synthetic_log})
+            )
+    return synthetic_hits
+
+
+def extract_inner_hit_logs(hits: list[Hit[TestItemIndexData]]) -> list[Hit[LogItemIndexData]]:
+    extracted_hits: list[Hit[LogItemIndexData]] = []
+    for hit in hits:
+        inner_hits = hit.inner_hits or {}
+        inner_hits_logs = inner_hits.get("logs", {})
+        raw_inner_hits = inner_hits_logs.get("hits", {}).get("hits", [])
+        issue_type = _normalize_issue_type(hit.source.issue_type)
+        for raw_inner_hit in raw_inner_hits:
+            inner_hit = Hit[LogData].from_dict(raw_inner_hit)
+            log_item = convert_test_item_log(hit.source, inner_hit.source, issue_type=issue_type)
+            extracted_hits.append(
+                Hit[LogItemIndexData].from_dict(
+                    {
+                        "_id": inner_hit.id or log_item.log_id,
+                        "_score": inner_hit.score or 0.0,
+                        "_source": log_item,
+                    }
+                )
+            )
+    return extracted_hits
+
+
+def build_search_results(
+    request_logs: list[LogItemIndexData],
+    buckets: list[list[Hit[LogItemIndexData]]],
+) -> list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]:
+    return [(log_item, bucket) for log_item, bucket in zip(request_logs, buckets) if bucket]
+
+
 class AnalysisModelTraining:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
-    es_client: EsClient
+    os_client: OsClient
     model_type: ModelType
     model_class: Type[BoostingDecisionMaker]
     baseline_folder: Optional[str]
@@ -188,13 +473,13 @@ class AnalysisModelTraining:
         model_class: Optional[Type[BoostingDecisionMaker]] = None,
         use_baseline_features: bool = True,
         *,
-        es_client: Optional[EsClient] = None,
+        os_client: Optional[OsClient] = None,
     ) -> None:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.due_proportion = 0.05
         self.due_proportion_to_smote = 0.4
-        self.es_client = es_client or EsClient(app_config=app_config)
+        self.os_client = os_client or OsClient(app_config=app_config)
         self.model_type = model_type
         if model_type is ModelType.suggestion:
             self.baseline_folder = self.search_cfg.SuggestBoostModelFolder
@@ -249,141 +534,248 @@ class AnalysisModelTraining:
             "time_weight_decay": self.search_cfg.TimeWeightDecay,
         }
 
-    def _query_logs(self, project_id: int, log_ids_to_find: list[str]) -> dict[str, Any]:
-        log_ids_to_find = list(log_ids_to_find)
-        project_index_name = esclient.get_index_name(project_id, self.app_config.esProjectIndexPrefix, "rp_log_item")
-        batch_size = 1000
-        log_id_dict = {}
-        for i in range(int(len(log_ids_to_find) / batch_size) + 1):
-            log_ids = log_ids_to_find[i * batch_size : (i + 1) * batch_size]
-            if not log_ids:
-                continue
-            ids_query = {
-                "size": self.app_config.esChunkNumber,
-                "query": {"bool": {"filter": [{"terms": {"_id": log_ids}}]}},
-            }
-            for r in opensearchpy.helpers.scan(
-                self.es_client.es_client, query=ids_query, index=project_index_name, scroll="5m"
-            ):
-                log_id_dict[str(r["_id"])] = r
-        return log_id_dict
-
-    def _get_search_query_suggest(self):
+    def _build_issue_history_query(self) -> dict[str, Any]:
         return {
-            "sort": {"savedDate": "desc"},
-            "size": self.app_config.esChunkNumber,
-            "query": {"bool": {"must": [{"term": {"methodName": "suggestion"}}]}},
-        }
-
-    def _get_search_query_aa(self, user_choice: int) -> dict[str, Any]:
-        return {
-            "sort": {"savedDate": "desc"},
+            "_source": [
+                "test_item_id",
+                "test_item_name",
+                "unique_id",
+                "test_case_hash",
+                "launch_id",
+                "launch_name",
+                "issue_type",
+                "is_auto_analyzed",
+                "start_time",
+                "logs",
+                "issue_history",
+            ],
             "size": self.app_config.esChunkNumber,
             "query": {
-                "bool": {"must": [{"term": {"methodName": "auto_analysis"}}, {"term": {"userChoice": user_choice}}]}
+                "nested": {
+                    "path": "issue_history",
+                    "query": {"exists": {"field": "issue_history.issue_type"}},
+                }
             },
         }
 
-    def _query_es_for_suggest_info(self, project_id: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-        log_ids_to_find = set()
-        gathered_suggested_data = []
-        log_id_pairs_set = set()
-        index_name = esclient.get_index_name(str(project_id), self.app_config.esProjectIndexPrefix, "rp_suggest_info")
-        max_number_of_logs = 30000
-        cur_number_of_logs = 0
-        cur_number_of_logs_0 = 0
-        cur_number_of_logs_1 = 0
-        unique_saved_features = set()
-        for query_name, query in [
-            ("auto_analysis 0s", self._get_search_query_aa(0)),
-            ("suggestion", self._get_search_query_suggest()),
-            ("auto_analysis 1s", self._get_search_query_aa(1)),
-        ]:
-            if cur_number_of_logs >= max_number_of_logs:
-                break
-            for res in opensearchpy.helpers.scan(self.es_client.es_client, query=query, index=index_name, scroll="5m"):
-                if cur_number_of_logs >= max_number_of_logs:
-                    break
-                saved_model_features = f'{res["_source"]["modelFeatureNames"]}|{res["_source"]["modelFeatureValues"]}'
-                if saved_model_features in unique_saved_features:
-                    continue
-                unique_saved_features.add(saved_model_features)
-                log_ids_pair = (res["_source"]["testItemLogId"], res["_source"]["relevantLogId"])
-                if log_ids_pair in log_id_pairs_set:
-                    continue
-                log_id_pairs_set.add(log_ids_pair)
-                for col in ["testItemLogId", "relevantLogId"]:
-                    log_id = str(res["_source"][col])
-                    if res["_source"]["isMergedLog"]:
-                        log_id = log_id + "_m"
-                    log_ids_to_find.add(log_id)
-                gathered_suggested_data.append(res)
-                cur_number_of_logs += 1
-                if res["_source"]["userChoice"] == 1:
-                    cur_number_of_logs_1 += 1
-                else:
-                    cur_number_of_logs_0 += 1
-                if query_name == "suggestion" and stop_gathering_info_from_suggest_query(
-                    cur_number_of_logs_1, cur_number_of_logs_0, max_number_of_logs
-                ):
-                    break
-            LOGGER.debug(
-                "Query: '%s', results number: %d, number of 1s: %d",
-                query_name,
-                cur_number_of_logs,
-                cur_number_of_logs_1,
+    def _build_similar_items_query(
+        self,
+        request_logs: list[LogItemIndexData],
+        request_test_item_id: str,
+        min_should_match: float,
+        exclude_issue_type: str = "",
+    ) -> dict[str, Any]:
+        log_messages = [_get_log_text(log_item) for log_item in request_logs]
+        log_messages = [message for message in log_messages if message.strip()]
+        if not log_messages:
+            return {}
+
+        min_should_match_str = text_processing.prepare_es_min_should_match(min_should_match)
+        nested_should = [
+            utils.build_more_like_this_query(
+                min_should_match_str,
+                message,
+                field_name="logs.whole_message",
+                boost=1.0,
+                max_query_terms=self.search_cfg.MaxQueryTerms,
             )
-        log_id_dict = self._query_logs(project_id, list(log_ids_to_find))
-        return gathered_suggested_data, log_id_dict
+            for message in log_messages
+        ]
+        inner_hits_source = [
+            "logs.log_id",
+            "logs.log_time",
+            "logs.log_level",
+            "logs.cluster_id",
+            "logs.cluster_message",
+            "logs.cluster_with_numbers",
+            "logs.original_message",
+            "logs.message",
+            "logs.message_extended",
+            "logs.message_without_params_extended",
+            "logs.message_without_params_and_brackets",
+            "logs.detected_message",
+            "logs.detected_message_with_numbers",
+            "logs.detected_message_extended",
+            "logs.detected_message_without_params_extended",
+            "logs.detected_message_without_params_and_brackets",
+            "logs.stacktrace",
+            "logs.stacktrace_extended",
+            "logs.only_numbers",
+            "logs.potential_status_codes",
+            "logs.found_exceptions",
+            "logs.found_tests_and_methods",
+            "logs.urls",
+            "logs.message_params",
+            "logs.whole_message",
+        ]
+        nested_query = {
+            "nested": {
+                "path": "logs",
+                "score_mode": "max",
+                "query": {"bool": {"should": nested_should}},
+                "inner_hits": {
+                    "size": max(5, len(log_messages)),
+                    "_source": inner_hits_source,
+                },
+            }
+        }
+        query: dict[str, Any] = {
+            "_source": [
+                "test_item_id",
+                "test_item_name",
+                "unique_id",
+                "test_case_hash",
+                "launch_id",
+                "launch_name",
+                "issue_type",
+                "is_auto_analyzed",
+                "start_time",
+            ],
+            "size": self.app_config.esChunkNumber,
+            "query": {
+                "bool": {
+                    "filter": [{"exists": {"field": "issue_type"}}],
+                    "must_not": [{"term": {"test_item_id": str(request_test_item_id)}}],
+                    "must": [nested_query],
+                }
+            },
+        }
+        if exclude_issue_type:
+            query["query"]["bool"]["must_not"].append({"term": {"issue_type": exclude_issue_type}})
+        utils.append_aa_ma_boosts(query, self.search_cfg)
+        return query
+
+    @staticmethod
+    def _has_inner_hits(hit: Hit[TestItemIndexData]) -> bool:
+        inner_hits = hit.inner_hits or {}
+        return bool(inner_hits.get("logs", {}).get("hits", {}).get("hits", []))
+
+    def _collect_similar_hits(
+        self,
+        project_id: int,
+        request_logs: list[LogItemIndexData],
+        request_test_item_id: str,
+        positive_issue_type: str,
+    ) -> list[Hit[TestItemIndexData]]:
+        query = self._build_similar_items_query(request_logs, request_test_item_id, 0.4)
+        if not query:
+            return []
+        hits = [hit for hit in self.os_client.search(project_id, query) or [] if self._has_inner_hits(hit)]
+        issue_types = {_normalize_issue_type(hit.source.issue_type) for hit in hits if hit.source.issue_type}
+        if positive_issue_type and (not issue_types or issue_types == {positive_issue_type}):
+            extra_query = self._build_similar_items_query(
+                request_logs, request_test_item_id, 0.4, exclude_issue_type=positive_issue_type
+            )
+            extra_hits = [
+                hit for hit in self.os_client.search(project_id, extra_query) or [] if self._has_inner_hits(hit)
+            ]
+            hits_by_id: dict[str, Hit[TestItemIndexData]] = {}
+            for hit in hits + extra_hits:
+                hits_by_id[str(hit.source.test_item_id)] = hit
+            hits = list(hits_by_id.values())
+        return hits
 
     def _query_data(self, projects: list[int], features: list[int]) -> tuple[list[list[float]], list[int]]:
         full_data_features, labels = [], []
         for project_id in projects:
             namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
-            gathered_suggested_data, log_id_dict = self._query_es_for_suggest_info(project_id)
             defect_type_model = cast(
                 DefectTypeModel, self.model_chooser.choose_model(project_id, ModelType.defect_type)
             )
+            for hit in self.os_client.search(project_id, self._build_issue_history_query()) or []:
+                test_item = hit.source
+                issue_history = list(test_item.issue_history or [])
+                if not issue_history:
+                    continue
+                if not test_item.logs:
+                    continue
 
-            for _suggest_res in gathered_suggested_data:
-                searched_res: list[tuple[dict[str, Any], dict[str, Any]]] = []
-                found_logs = {}
-                for col in ["testItemLogId", "relevantLogId"]:
-                    log_id = str(_suggest_res["_source"][col])
-                    if _suggest_res["_source"]["isMergedLog"]:
-                        log_id = log_id + "_m"
-                    if log_id in log_id_dict:
-                        found_logs[col] = log_id_dict[log_id]
-                if len(found_logs) == 2:
-                    log_relevant = found_logs["relevantLogId"]
-                    log_relevant["_score"] = _suggest_res["_source"]["esScore"]
-                    searched_res = [(found_logs["testItemLogId"], {"hits": {"hits": [log_relevant]}})]
-                if searched_res:
-                    typed_results = deserialize_log_item_search_results(searched_res)
-                    _boosting_data_gatherer: BoostingFeaturizer
-                    if self.model_type is ModelType.suggestion:
-                        _boosting_data_gatherer = SuggestBoostingFeaturizer(
-                            typed_results,
-                            self._get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
-                            feature_ids=features,
-                        )
-                    else:
-                        _boosting_data_gatherer = BoostingFeaturizer(
-                            typed_results,
-                            self._get_config_for_boosting(_suggest_res["_source"]["usedLogLines"], namespaces),
-                            feature_ids=features,
-                        )
+                positive_issue_type = _normalize_issue_type(issue_history[-1].issue_type or test_item.issue_type)
+                if not positive_issue_type:
+                    continue
+                history_negative_types = select_history_negative_types(issue_history, positive_issue_type)
 
-                    # noinspection PyTypeChecker
-                    _boosting_data_gatherer.set_defect_type_model(defect_type_model)
-                    _boosting_data_gatherer.fill_previously_gathered_features(
-                        [utils.to_float_list(_suggest_res["_source"]["modelFeatureValues"])],
-                        [int(_id) for _id in _suggest_res["_source"]["modelFeatureNames"].split(";")],
+                request_logs = get_request_logs(test_item, positive_issue_type)
+                if not request_logs:
+                    continue
+
+                similar_hits = self._collect_similar_hits(
+                    project_id, request_logs, str(test_item.test_item_id), positive_issue_type
+                )
+                if not similar_hits:
+                    continue
+
+                found_hits = extract_inner_hit_logs(similar_hits)
+                if history_negative_types:
+                    found_hits = [
+                        hit
+                        for hit in found_hits
+                        if _normalize_issue_type(hit.source.issue_type) not in history_negative_types
+                    ]
+                    found_hits.extend(
+                        build_history_negative_hits(
+                            request_logs,
+                            history_negative_types,
+                            str(test_item.test_item_id),
+                        )
                     )
-                    feature_data, _ = _boosting_data_gatherer.gather_features_info()
-                    if feature_data:
-                        full_data_features.extend(feature_data)
-                        labels.append(_suggest_res["_source"]["userChoice"])
+                if not found_hits:
+                    continue
+
+                buckets = bucket_sort_logs_by_similarity(request_logs, found_hits)
+                search_results = build_search_results(request_logs, buckets)
+                if not search_results:
+                    continue
+
+                _boosting_data_gatherer: BoostingFeaturizer
+                if self.model_type is ModelType.suggestion:
+                    _boosting_data_gatherer = SuggestBoostingFeaturizer(
+                        search_results,
+                        self._get_config_for_boosting(-1, namespaces),
+                        feature_ids=features,
+                    )
+                else:
+                    _boosting_data_gatherer = BoostingFeaturizer(
+                        search_results,
+                        self._get_config_for_boosting(-1, namespaces),
+                        feature_ids=features,
+                    )
+
+                # noinspection PyTypeChecker
+                _boosting_data_gatherer.set_defect_type_model(defect_type_model)
+                feature_data, candidate_names = _boosting_data_gatherer.gather_features_info()
+                if not feature_data or not candidate_names:
+                    continue
+
+                scores_by_type = _boosting_data_gatherer.find_most_relevant_by_type()
+                candidate_issue_types: list[str] = []
+                for candidate_name in candidate_names:
+                    score_info = scores_by_type.get(candidate_name)
+                    if not score_info:
+                        candidate_issue_types.append("")
+                        continue
+                    candidate_hit = score_info.get("mrHit")
+                    if not candidate_hit:
+                        candidate_issue_types.append("")
+                        continue
+                    candidate_issue_types.append(_normalize_issue_type(candidate_hit.source.issue_type))
+
+                filtered_features: list[list[float]] = []
+                filtered_issue_types: list[str] = []
+                for idx, issue_type in enumerate(candidate_issue_types):
+                    if not issue_type:
+                        continue
+                    filtered_features.append(feature_data[idx])
+                    filtered_issue_types.append(issue_type)
+
+                selected_entries = select_candidate_entries(
+                    filtered_issue_types, positive_issue_type, history_negative_types
+                )
+                if not selected_entries:
+                    continue
+                for idx, label in selected_entries:
+                    full_data_features.append(filtered_features[idx])
+                    labels.append(label)
         return full_data_features, labels
 
     def _train_several_times(

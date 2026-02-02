@@ -14,126 +14,151 @@
 
 import math
 import os
+import random
+from dataclasses import dataclass
 from datetime import datetime
-from time import sleep, time
+from time import time
 from typing import Any, Optional, Type
 
 import numpy as np
-import opensearchpy.helpers
 import scipy.stats as stats
 from sklearn.model_selection import train_test_split
 
-from app.commons import esclient, logging, object_saving
-from app.commons.esclient import EsClient
-from app.commons.model.db import Hit
-from app.commons.model.launch_objects import ERROR_LOGGING_LEVEL, ApplicationConfig, SearchConfig
-from app.commons.model.log_item_index import LogItemIndexData
-from app.commons.model.ml import ModelType, QueryResult, TrainInfo
+from app.commons import logging, object_saving
+from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
+from app.commons.model.ml import ModelType, TrainInfo
+from app.commons.model.test_item_index import LogData, TestItemIndexData
 from app.commons.model_chooser import ModelChooser
+from app.commons.os_client import OsClient
 from app.ml.models import CustomDefectTypeModel, DefectTypeModel
 from app.ml.models.defect_type_model import DATA_FIELD
-from app.utils import text_processing, utils
+from app.ml.training import normalize_issue_type, select_history_negative_types
 from app.utils.defaultdict import DefaultDict
 
 LOGGER = logging.getLogger("analyzerApp.trainingDefectTypeModel")
 TRAIN_DATA_RANDOM_STATES = [1257, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029, 2137]
-RETRY_COUNT = 5
-RETRY_PAUSES = [0, 1, 5, 10, 20, 40, 60]
 BASE_ISSUE_CLASS_INDEXES: dict[str, int] = {"ab": 0, "pb": 1, "si": 2}
-MINIMAL_LABEL_PROPORTION = 0.2
+NEGATIVE_RATIO_MIN = 2
+NEGATIVE_RATIO_MAX = 4
+MINIMAL_LABEL_PROPORTION = 0.25
 TEST_DATA_PROPORTION = 0.1
 MINIMAL_DATA_LENGTH_FOR_TRAIN = 50
 MIN_P_VALUE = 0.05
 
 
-def return_similar_objects_into_sample(
-    x_train_ind: list[int],
-    y_train: list[int],
-    data: list[tuple[str, str, str]],
-    additional_logs: dict[int, list[int]],
-    label: str,
-):
-    x_train = []
-    x_train_add = []
-    y_train_add = []
-
-    for idx, ind in enumerate(x_train_ind):
-        x_train.append(data[ind][0])
-        label_to_use = y_train[idx]
-        if ind not in additional_logs:
-            continue
-        if label_to_use != 1:
-            for idx_ in additional_logs[ind]:
-                _, label_res, _ = data[idx_]
-                if label_res == label:
-                    label_to_use = 1
-                    break
-        for idx_ in additional_logs[ind]:
-            x_train_add.append(data[idx_][0])
-            y_train_add.append(label_to_use)
-    x_train.extend(x_train_add)
-    y_train.extend(y_train_add)
-    return x_train, y_train
+@dataclass(frozen=True)
+class TrainingEntry:
+    message: str
+    issue_type: str
+    base_issue_type: str
+    is_positive: bool
 
 
 def split_train_test(
-    logs_to_train_idx: list[int],
-    data: list[tuple[str, str, str]],
+    train_data: list[str],
     labels_filtered: list[int],
-    additional_logs: dict[int, list[int]],
-    label: str,
     random_state: int = 1257,
-) -> tuple[list, list, list, list]:
-    x_train_ind, x_test_ind, y_train, y_test = train_test_split(
-        logs_to_train_idx,
+) -> tuple[list[str], list[str], list[int], list[int]]:
+    x_train, x_test, y_train, y_test = train_test_split(
+        train_data,
         labels_filtered,
         test_size=TEST_DATA_PROPORTION,
         random_state=random_state,
         stratify=labels_filtered,
     )
-    x_train, y_train = return_similar_objects_into_sample(x_train_ind, y_train, data, additional_logs, label)
-    x_test = [data[ind][0] for ind in x_test_ind]
     return x_train, x_test, y_train, y_test
 
 
-def perform_light_deduplication(data: list[tuple[str, str, str]]) -> tuple[dict[int, list[int]], list[int]]:
-    text_messages_set = {}
-    logs_to_train_idx = []
-    additional_logs: dict[int, list[int]] = {}
-    for idx, text_message_data in enumerate(data):
-        text_message = text_message_data[0]
-        text_message_normalized = " ".join(sorted(text_processing.split_words(text_message, to_lower=True)))
-        if text_message_normalized not in text_messages_set:
-            logs_to_train_idx.append(idx)
-            text_messages_set[text_message_normalized] = idx
-            additional_logs[idx] = []
-        else:
-            additional_logs[text_messages_set[text_message_normalized]].append(idx)
-    return additional_logs, logs_to_train_idx
+def _calculate_label_proportion(labels: list[int]) -> float:
+    positives_count = sum(1 for label in labels if label == 1)
+    negatives_count = sum(1 for label in labels if label == 0)
+    if positives_count == 0 or negatives_count == 0:
+        return 0.0
+    proportion = min(positives_count, negatives_count) / max(positives_count, negatives_count)
+    return round(proportion, 3)
 
 
-def create_binary_target_data(
-    label: str, data: list[tuple[str, str, str]]
-) -> tuple[list[int], list[int], dict[int, list[int]], float]:
-    additional_logs, logs_to_train_idx = perform_light_deduplication(data)
+def _balance_binary_target_data(
+    train_data: list[TrainingEntry],
+    labels: list[int],
+    label: str,
+) -> tuple[list[TrainingEntry], list[int], float]:
+    positives_idx = [idx for idx, entry_label in enumerate(labels) if entry_label == 1]
+    negatives_idx = [idx for idx, entry_label in enumerate(labels) if entry_label == 0]
+    if not positives_idx:
+        return train_data, labels, 0.0
+
+    rng = random.Random(1257)
+    min_negatives = len(positives_idx) * NEGATIVE_RATIO_MIN
+    max_negatives = len(positives_idx) * NEGATIVE_RATIO_MAX
+
+    balanced_data = list(train_data)
+    balanced_labels = list(labels)
+    target_base = _get_base_issue_type(label)
+    candidate_issue_types = [
+        entry.issue_type
+        for entry in train_data
+        if entry.issue_type and entry.issue_type != label and _get_base_issue_type(entry.issue_type) != target_base
+    ]
+    candidate_issue_types = list(dict.fromkeys(candidate_issue_types))
+    if not candidate_issue_types:
+        fallback_bases = [base for base in BASE_ISSUE_CLASS_INDEXES if base != target_base]
+        if not fallback_bases:
+            fallback_bases = list(BASE_ISSUE_CLASS_INDEXES.keys())
+        candidate_issue_types = [f"{base}000" for base in fallback_bases]
+
+    if len(negatives_idx) < min_negatives:
+        deficit = min_negatives - len(negatives_idx)
+        for idx in range(deficit):
+            positive_idx = positives_idx[idx % len(positives_idx)]
+            issue_type = candidate_issue_types[idx % len(candidate_issue_types)]
+            balanced_data.append(
+                TrainingEntry(
+                    message=train_data[positive_idx].message,
+                    issue_type=issue_type,
+                    base_issue_type=_get_base_issue_type(issue_type),
+                    is_positive=False,
+                )
+            )
+            balanced_labels.append(0)
+        negatives_idx = [idx for idx, entry_label in enumerate(balanced_labels) if entry_label == 0]
+
+    if len(negatives_idx) > max_negatives:
+        rng.shuffle(negatives_idx)
+        negatives_idx = negatives_idx[:max_negatives]
+
+    selected_idx = positives_idx + negatives_idx
+    rng.shuffle(selected_idx)
+    balanced_data = [balanced_data[idx] for idx in selected_idx]
+    balanced_labels = [balanced_labels[idx] for idx in selected_idx]
+    proportion_binary_labels = _calculate_label_proportion(balanced_labels)
+    return balanced_data, balanced_labels, proportion_binary_labels
+
+
+def create_binary_target_data(label: str, data: list[TrainingEntry]) -> tuple[list[str], list[int], float]:
     labels_filtered = []
-    for ind in logs_to_train_idx:
-        if data[ind][1] == label or data[ind][2] == label:
-            labels_filtered.append(1)
+    for entry in data:
+        if label == entry.issue_type or label == entry.base_issue_type:
+            labels_filtered.append(1 if entry.is_positive else 0)
         else:
             labels_filtered.append(0)
-    proportion_binary_labels = utils.calculate_proportions_for_labels(labels_filtered)
-    if proportion_binary_labels < MINIMAL_LABEL_PROPORTION:
-        logs_to_train_idx, labels_filtered, proportion_binary_labels = utils.balance_data(
-            logs_to_train_idx, labels_filtered, MINIMAL_LABEL_PROPORTION
-        )
-    return logs_to_train_idx, labels_filtered, additional_logs, proportion_binary_labels
+    balanced_entries, balanced_labels, proportion = _balance_binary_target_data(data, labels_filtered, label)
+    return [entry.message for entry in balanced_entries], balanced_labels, proportion
+
+
+def _get_log_message(log_data: LogData) -> Optional[str]:
+    message = getattr(log_data, DATA_FIELD, None)
+    if message is None:
+        return None
+    if not str(message).strip():
+        return None
+    return str(message)
 
 
 def train_several_times(
     new_model: DefectTypeModel,
     label: str,
-    data: list[tuple[str, str, str]],
+    data: list[TrainingEntry],
     random_states: Optional[list[int]] = None,
     baseline_model: Optional[DefectTypeModel] = None,
 ) -> tuple[list[float], list[float], bool, float]:
@@ -142,23 +167,23 @@ def train_several_times(
     baseline_model_results = []
     bad_data_proportion = False
 
-    logs_to_train_idx, labels_filtered, additional_logs, proportion_binary_labels = create_binary_target_data(
-        label, data
-    )
-
+    train_data, labels_filtered, proportion_binary_labels = create_binary_target_data(label, data)
+    positives_count = sum(1 for label_ in labels_filtered if label_ == 1)
+    negatives_count = sum(1 for label_ in labels_filtered if label_ == 0)
+    if positives_count < 2 or negatives_count < 2:
+        LOGGER.debug("Train data has too few samples: positives=%d, negatives=%d", positives_count, negatives_count)
+        bad_data_proportion = True
     if proportion_binary_labels < MINIMAL_LABEL_PROPORTION:
         LOGGER.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
         bad_data_proportion = True
-    data_length = len(data)
+    data_length = len(train_data)
     if data_length < MINIMAL_DATA_LENGTH_FOR_TRAIN:
         LOGGER.debug(f"Train data has a too few entities:{data_length}")
         bad_data_proportion = True
 
     if not bad_data_proportion:
         for random_state in my_random_states:
-            x_train, x_test, y_train, y_test = split_train_test(
-                logs_to_train_idx, data, labels_filtered, additional_logs, label, random_state=random_state
-            )
+            x_train, x_test, y_train, y_test = split_train_test(train_data, labels_filtered, random_state=random_state)
             new_model.train_model(label, x_train, y_train, random_state)
             LOGGER.debug("New model results")
             new_model_results.append(new_model.validate_model(label, x_test, y_test))
@@ -204,10 +229,59 @@ def get_info_template(project_info: TrainInfo, baseline_model: str, model_name: 
     }
 
 
+def _get_base_issue_type(issue_type: str) -> str:
+    return issue_type[:2] if issue_type else ""
+
+
+def _is_supported_issue_type(issue_type: str) -> bool:
+    return _get_base_issue_type(issue_type) in BASE_ISSUE_CLASS_INDEXES
+
+
+def build_entries_from_item(test_item: TestItemIndexData) -> list[TrainingEntry]:
+    issue_history = list(test_item.issue_history or [])
+    if not issue_history:
+        return []
+    positive_issue_type = normalize_issue_type(issue_history[-1].issue_type)
+    if not positive_issue_type or not _is_supported_issue_type(positive_issue_type):
+        return []
+
+    negative_issue_types = select_history_negative_types(issue_history, positive_issue_type)
+    negative_issue_types = [issue_type for issue_type in negative_issue_types if _is_supported_issue_type(issue_type)]
+
+    logs = list(test_item.logs or [])
+    if not logs:
+        return []
+
+    entries: list[TrainingEntry] = []
+    positive_base = _get_base_issue_type(positive_issue_type)
+    for log_data in logs:
+        log_message = _get_log_message(log_data)
+        if not log_message:
+            continue
+        entries.append(
+            TrainingEntry(
+                message=log_message,
+                issue_type=positive_issue_type,
+                base_issue_type=positive_base,
+                is_positive=True,
+            )
+        )
+        for negative_issue_type in negative_issue_types:
+            entries.append(
+                TrainingEntry(
+                    message=log_message,
+                    issue_type=negative_issue_type,
+                    base_issue_type=_get_base_issue_type(negative_issue_type),
+                    is_positive=False,
+                )
+            )
+    return entries
+
+
 class DefectTypeModelTraining:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
-    es_client: EsClient
+    os_client: OsClient
     baseline_model: Optional[DefectTypeModel] = None
     model_chooser: Optional[ModelChooser]
     model_class: Type[DefectTypeModel]
@@ -219,11 +293,11 @@ class DefectTypeModelTraining:
         model_chooser: Optional[ModelChooser] = None,
         model_class: Optional[Type[DefectTypeModel]] = None,
         *,
-        es_client: Optional[EsClient] = None,
+        os_client: Optional[OsClient] = None,
     ) -> None:
         self.app_config = app_config
         self.search_cfg = search_cfg
-        self.es_client = es_client or EsClient(app_config=app_config)
+        self.os_client = os_client or OsClient(app_config=app_config)
         if search_cfg.GlobalDefectTypeModelFolder:
             self.baseline_model = DefectTypeModel(
                 object_saving.create_filesystem(search_cfg.GlobalDefectTypeModelFolder)
@@ -232,128 +306,48 @@ class DefectTypeModelTraining:
         self.model_chooser = model_chooser
         self.model_class = model_class if model_class else CustomDefectTypeModel
 
-    def _get_messages_by_issue_type(self, issue_type_pattern: str) -> dict[str, Any]:
-        query = {
-            "_source": [DATA_FIELD, "issue_type", "launch_id", "_id"],
-            "sort": {"start_time": "desc"},
+    def _build_issue_history_query(self) -> dict[str, Any]:
+        return {
+            "_source": ["test_item_id", "issue_history", "logs"],
+            "size": self.app_config.esChunkNumber,
             "query": {
-                "bool": {
-                    "filter": [
-                        {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
-                        {"exists": {"field": "issue_type"}},
-                        {"term": {"is_merged": False}},
-                    ],
-                    "must": [
-                        {
-                            "bool": {
-                                "should": [
-                                    {
-                                        "wildcard": {
-                                            "issue_type": {"value": issue_type_pattern, "case_insensitive": True}
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    ],
+                "nested": {
+                    "path": "issue_history",
+                    "query": {"exists": {"field": "issue_history.issue_type"}},
                 }
             },
         }
-        utils.append_aa_ma_boosts(query, self.search_cfg)
-        return query
-
-    def _execute_data_query(self, project_index_name: str, query: str) -> QueryResult:
-        errors = []
-        error_count = 0
-        query_result = []
-        while error_count <= RETRY_COUNT:
-            try:
-                query_result = opensearchpy.helpers.scan(
-                    self.es_client.es_client,
-                    query=self._get_messages_by_issue_type(query),
-                    index=project_index_name,
-                    size=self.app_config.esChunkNumber,
-                )
-                break
-            except Exception as exc:
-                # Throttling, out of memory, connection error
-                LOGGER.exception(exc)
-                errors.append(utils.extract_exception(exc))
-                sleep(RETRY_PAUSES[error_count] if len(RETRY_PAUSES) < error_count else RETRY_PAUSES[-1])
-                error_count += 1
-        if error_count >= RETRY_COUNT:
-            return QueryResult(result=[], error_count=error_count, errors=errors)
-        data = []
-        message_launch_dict = set()
-        for raw_hit in query_result:
-            hit = Hit[LogItemIndexData].from_dict(raw_hit)
-            detected_message = getattr(hit.source, DATA_FIELD)
-            if not detected_message.strip():
-                continue
-            text_message_normalized = text_processing.normalize_message(detected_message)
-            issue_type = hit.source.issue_type
-            message_info = (text_message_normalized, hit.source.launch_id, issue_type)
-            if message_info not in message_launch_dict:
-                data.append((detected_message, issue_type[:2], issue_type))
-                message_launch_dict.add(message_info)
-            if len(data) >= self.search_cfg.MaxLogsForDefectTypeModel:
-                break
-        return QueryResult(result=data, error_count=error_count, errors=errors)
-
-    def _query_label(self, query: str, index: str, stat: Optional[dict[str, Any]]) -> QueryResult:
-        LOGGER.debug(f"Query to gather data {query}.")
-        time_querying = time()
-        found_data = self._execute_data_query(index, query)
-        time_spent = time() - time_querying
-        LOGGER.debug(f'Finished querying "{query}" for {time_spent:.2f} s')
-        if stat:
-            stat["time_spent"] = time_spent
-            stat["data_size"] = len(found_data.result)
-        return found_data
 
     def _query_data(
         self, projects: list[int], stat_data_storage: Optional[DefaultDict[str, dict[str, Any]]]
-    ) -> list[tuple[str, str, str]]:
-        data = []
-        errors = []
-        error_count = 0
+    ) -> list[TrainingEntry]:
+        data: list[TrainingEntry] = []
         start_time = time()
+        query = self._build_issue_history_query()
+
         for project in projects:
-            project_index_name = esclient.get_index_name(project, self.app_config.esProjectIndexPrefix, "rp_log_item")
-            for label in BASE_ISSUE_CLASS_INDEXES:
-                query = f"{label}???"
-                found_data = self._query_label(
-                    query, project_index_name, stat_data_storage[label] if stat_data_storage else None
-                )
-                errors.append(found_data.errors)
-                error_count += found_data.error_count
-                data.extend(found_data.result)
-                query = f"{label}_*"
-                found_data = self._execute_data_query(project_index_name, query)
-                errors.append(found_data.errors)
-                error_count += found_data.error_count
-                sub_labels = {l[2] for l in found_data.result}
-                for sub_label in sub_labels:
-                    found_data = self._query_label(
-                        sub_label, project_index_name, stat_data_storage[sub_label] if stat_data_storage else None
-                    )
-                    errors.append(found_data.errors)
-                    error_count += found_data.error_count
-                    data.extend(found_data.result)
+            for hit in self.os_client.search(project, query) or []:
+                data.extend(build_entries_from_item(hit.source))
 
         LOGGER.debug(f"Data gathered: {len(data)}")
         if stat_data_storage:
+            label_counts: dict[str, int] = {}
+            for entry in data:
+                if entry.is_positive and entry.issue_type:
+                    label_counts[entry.issue_type] = label_counts.get(entry.issue_type, 0) + 1
+                if entry.is_positive and entry.base_issue_type:
+                    label_counts[entry.base_issue_type] = label_counts.get(entry.base_issue_type, 0) + 1
+            for label, count in label_counts.items():
+                stat_data_storage[label]["data_size"] = count
             stat_data_storage["all"]["data_size"] = len(data)
-            stat_data_storage["all"]["errors"] = errors
-            stat_data_storage["all"]["errors_count"] = error_count
-            stat_data_storage["all"]["time_spent"] = start_time - time()
+            stat_data_storage["all"]["time_spent"] = time() - start_time
         return data
 
     def _train_several_times(
         self,
         new_model: DefectTypeModel,
         label: str,
-        data: list[tuple[str, str, str]],
+        data: list[TrainingEntry],
         random_states: Optional[list[int]] = None,
     ) -> tuple[list[float], list[float], bool, float]:
         return train_several_times(new_model, label, data, random_states, self.baseline_model)
@@ -379,7 +373,8 @@ class DefectTypeModelTraining:
         data = self._query_data(projects, train_log_info)
         LOGGER.debug(f"Loaded data for model training {project_info.model_type.name}")
 
-        unique_labels = {l[2] for l in data}
+        unique_labels = {entry.issue_type for entry in data if entry.issue_type}
+        unique_labels.update({entry.base_issue_type for entry in data if entry.base_issue_type})
 
         data_proportion_min = 1.0
         p_value_max = 0.0

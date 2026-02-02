@@ -29,12 +29,13 @@ from app.commons.model.db import Hit
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.log_item_index import LogItemIndexData
 from app.commons.model.ml import ModelType, TrainInfo
-from app.commons.model.test_item_index import LogData, TestItemHistoryData, TestItemIndexData
+from app.commons.model.test_item_index import LogData, TestItemIndexData
 from app.commons.model_chooser import ModelChooser
 from app.commons.os_client import OsClient
 from app.ml.boosting_featurizer import BoostingFeaturizer
 from app.ml.models import BoostingDecisionMaker, CustomBoostingDecisionMaker, DefectTypeModel
 from app.ml.suggest_boosting_featurizer import SuggestBoostingFeaturizer
+from app.ml.training import normalize_issue_type, select_history_negative_types
 from app.utils import text_processing, utils
 from app.utils.defaultdict import DefaultDict
 
@@ -45,7 +46,6 @@ SMOTE_PROPORTION = 0.4
 NEGATIVE_RATIO_MIN = 2
 NEGATIVE_RATIO_MAX = 4
 MIN_POSITIVE_CASES_FOR_SMOTE = 5
-MAX_HISTORY_NEGATIVES = 2
 MIN_P_VALUE = 0.05
 METRIC = "F1"
 
@@ -173,18 +173,6 @@ def _safe_int(value: Any) -> int:
         return 0
 
 
-def _normalize_issue_type(issue_type: Any) -> str:
-    """
-    Normalize issue type to lowercase string.
-
-    :param issue_type: Raw issue type
-    :return: Normalized issue type
-    """
-    if issue_type is None:
-        return ""
-    return str(issue_type).strip().lower()
-
-
 def convert_test_item_log(
     test_item: TestItemIndexData,
     log_data: LogData,
@@ -198,7 +186,7 @@ def convert_test_item_log(
     :param issue_type: Optional issue type override for the log
     :return: LogItemIndexData instance
     """
-    resolved_issue_type = issue_type or _normalize_issue_type(test_item.issue_type)
+    resolved_issue_type = issue_type or normalize_issue_type(test_item.issue_type)
     return LogItemIndexData(
         log_id=str(log_data.log_id or ""),
         test_item=_safe_int(test_item.test_item_id),
@@ -296,30 +284,6 @@ def bucket_sort_logs_by_similarity(
     return buckets
 
 
-def select_history_negative_types(
-    issue_history: list[TestItemHistoryData],
-    positive_issue_type: str,
-) -> list[str]:
-    """
-    Pick up to MAX_HISTORY_NEGATIVES negative issue types from history.
-
-    :param issue_history: Test item issue history entries
-    :param positive_issue_type: Current issue type (positive class)
-    :return: List of selected negative issue types
-    """
-    negatives = []
-    unique_negatives = set()
-    for entry in reversed(issue_history[:-1]):
-        entry_type = _normalize_issue_type(entry.issue_type)
-        if not entry_type or entry_type == positive_issue_type or entry_type in unique_negatives:
-            continue
-        negatives.append(entry_type)
-        unique_negatives.add(entry_type)
-        if len(negatives) >= MAX_HISTORY_NEGATIVES:
-            break
-    return negatives
-
-
 def select_candidate_entries(
     candidate_issue_types: list[str],
     positive_issue_type: str,
@@ -402,7 +366,7 @@ def extract_inner_hit_logs(hits: list[Hit[TestItemIndexData]]) -> list[Hit[LogIt
         inner_hits = hit.inner_hits or {}
         inner_hits_logs = inner_hits.get("logs", {})
         raw_inner_hits = inner_hits_logs.get("hits", {}).get("hits", [])
-        issue_type = _normalize_issue_type(hit.source.issue_type)
+        issue_type = normalize_issue_type(hit.source.issue_type)
         for raw_inner_hit in raw_inner_hits:
             inner_hit = Hit[LogData].from_dict(raw_inner_hit)
             log_item = convert_test_item_log(hit.source, inner_hit.source, issue_type=issue_type)
@@ -667,7 +631,7 @@ class AnalysisModelTraining:
         if not query:
             return []
         hits = [hit for hit in self.os_client.search(project_id, query) or [] if self._has_inner_hits(hit)]
-        issue_types = {_normalize_issue_type(hit.source.issue_type) for hit in hits if hit.source.issue_type}
+        issue_types = {normalize_issue_type(hit.source.issue_type) for hit in hits if hit.source.issue_type}
         if positive_issue_type and (not issue_types or issue_types == {positive_issue_type}):
             extra_query = self._build_similar_items_query(
                 request_logs, request_test_item_id, 0.4, exclude_issue_type=positive_issue_type
@@ -696,7 +660,7 @@ class AnalysisModelTraining:
                 if not test_item.logs:
                     continue
 
-                positive_issue_type = _normalize_issue_type(issue_history[-1].issue_type or test_item.issue_type)
+                positive_issue_type = normalize_issue_type(issue_history[-1].issue_type or test_item.issue_type)
                 if not positive_issue_type:
                     continue
                 history_negative_types = select_history_negative_types(issue_history, positive_issue_type)
@@ -716,7 +680,7 @@ class AnalysisModelTraining:
                     found_hits = [
                         hit
                         for hit in found_hits
-                        if _normalize_issue_type(hit.source.issue_type) not in history_negative_types
+                        if normalize_issue_type(hit.source.issue_type) not in history_negative_types
                     ]
                     found_hits.extend(
                         build_history_negative_hits(
@@ -764,7 +728,7 @@ class AnalysisModelTraining:
                     if not candidate_hit:
                         candidate_issue_types.append("")
                         continue
-                    candidate_issue_types.append(_normalize_issue_type(candidate_hit.source.issue_type))
+                    candidate_issue_types.append(normalize_issue_type(candidate_hit.source.issue_type))
 
                 filtered_features: list[list[float]] = []
                 filtered_issue_types: list[str] = []

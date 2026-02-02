@@ -983,8 +983,8 @@ def preprocess_text_for_similarity(text: str) -> list[str]:
 
 
 def __calculate_tfidf_matrix(
-    vectorizer: Optional[TfidfVectorizer], all_texts: list[str], *, use_idf: bool = False
-) -> tuple[TfidfVectorizer, csr_matrix]:
+    all_texts: list[str], *, vectorizer: Optional[TfidfVectorizer] = None, use_idf: bool = False
+) -> tuple[csr_matrix, TfidfVectorizer]:
     my_vectorizer = vectorizer
     if not my_vectorizer:
         # Use TF-IDF vectorization and cosine similarity for efficient computation
@@ -999,10 +999,12 @@ def __calculate_tfidf_matrix(
 
     # Fit and transform all texts at once
     tf_matrix: csr_matrix = my_vectorizer.fit_transform(all_texts)
-    return my_vectorizer, tf_matrix
+    return tf_matrix, my_vectorizer
 
 
-def calculate_text_similarity(base_text: Optional[str], other_texts: list[str]) -> list[SimilarityResult]:
+def calculate_text_similarity(
+    base_text: Optional[str], other_texts: list[str], *, vectorizer: Optional[TfidfVectorizer] = None
+) -> tuple[list[SimilarityResult], Optional[TfidfVectorizer]]:
     """
     Calculate similarity between a base text and multiple other texts using TF-IDF vectorization and cosine similarity.
 
@@ -1011,11 +1013,14 @@ def calculate_text_similarity(base_text: Optional[str], other_texts: list[str]) 
 
     :param base_text:   Base text to compare against
     :param other_texts: Variable number of texts to compare with the base text
+    :param vectorizer:  Optional TF-IDF vectorizer instance to reuse for efficiency. If None, a new
+                        vectorizer will be created.
+
     :return: List of SimilarityResult objects where `similarity` is in [0.0, 1.0]
              and `both_empty` indicates both texts were empty
     """
     if base_text is None or not other_texts:
-        return []
+        return [], None
 
     # Preprocess the base text
     processed_base_text = " ".join(preprocess_text_for_similarity(base_text))
@@ -1054,13 +1059,13 @@ def calculate_text_similarity(base_text: Optional[str], other_texts: list[str]) 
             similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=False))
 
     if not valid_texts:
-        return similarity_scores
+        return similarity_scores, None
 
     # If we have valid texts to process, use single TF-IDF vectorizer
     # Create all texts list: base text + all valid other texts
     all_texts = [processed_base_text] + valid_texts
 
-    _, tfidf_matrix = __calculate_tfidf_matrix(None, all_texts)
+    tfidf_matrix, my_vectorizer = __calculate_tfidf_matrix(all_texts, vectorizer=vectorizer)
 
     # Calculate cosine similarity between base text (index 0) and all other texts
     base_vector = tfidf_matrix[0:1]  # Base text vector
@@ -1075,12 +1080,12 @@ def calculate_text_similarity(base_text: Optional[str], other_texts: list[str]) 
             both_empty=False,
         )
 
-    return similarity_scores
+    return similarity_scores, my_vectorizer
 
 
 def find_last_unique_texts(
-    vectorizer: Optional[TfidfVectorizer], threshold: float, texts: list[str]
-) -> tuple[TfidfVectorizer, list[int]]:
+    threshold: float, texts: list[str], *, vectorizer: Optional[TfidfVectorizer] = None
+) -> tuple[list[int], TfidfVectorizer]:
     """Find the last occurrence indices of unique texts using similarity-based deduplication.
 
     This function identifies duplicate or highly similar texts within a list and returns the indices
@@ -1092,12 +1097,12 @@ def find_last_unique_texts(
     This is useful for deduplicating test logs, error messages, or any text collections where you
     want to preserve the most recent occurrence of similar content while removing earlier duplicates.
 
-    :param vectorizer: Optional TF-IDF vectorizer instance to reuse for efficiency. If None, a new
-        vectorizer will be created.
     :param threshold: Similarity threshold in the range [0.0, 1.0].
     :param texts: List of text strings to analyze for uniqueness. Texts should ideally be
         preprocessed (e.g., using preprocess_text_for_similarity) before passing to this function
         for optimal results.
+    :param vectorizer: Optional TF-IDF vectorizer instance to reuse for efficiency. If None, a new
+        vectorizer will be created.
 
     :return: A tuple containing:
         - TfidfVectorizer: The vectorizer used (either the input vectorizer or newly created one).
@@ -1111,8 +1116,7 @@ def find_last_unique_texts(
     if not texts:
         raise ValueError("Input texts cannot be empty")
 
-    my_vectorizer = vectorizer
-    my_vectorizer, matrix = __calculate_tfidf_matrix(my_vectorizer, texts, use_idf=True)
+    matrix, my_vectorizer = __calculate_tfidf_matrix(texts, vectorizer=vectorizer, use_idf=True)
     result = set()
     for i in range(len(texts) - 1):
         if i in result:
@@ -1126,7 +1130,7 @@ def find_last_unique_texts(
                 use_index = i + 1 + si
         result.add(use_index)
     result.add(len(texts) - 1)
-    return my_vectorizer, sorted(list(result))
+    return sorted(list(result)), my_vectorizer
 
 
 def calculate_similarity_by_values(first_field: str, second_field: str) -> float:

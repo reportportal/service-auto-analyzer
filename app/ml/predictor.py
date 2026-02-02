@@ -332,7 +332,7 @@ def extract_text_fields_for_comparison(search_request: Any) -> str:
 class SimilarityPredictor(Predictor):
     """Predictor implementation using text similarity calculation.
 
-    Uses calculate_text_similarity function to compute similarity scores
+    Uses `calculate_text_similarity` function to compute similarity scores
     between the current test item logs and candidate logs from search results.
     """
 
@@ -355,7 +355,7 @@ class SimilarityPredictor(Predictor):
         hit_texts: list[str],
     ) -> list[PredictionResult]:
         # Calculate similarities for all hits at once
-        similarity_scores = calculate_text_similarity(query_text, hit_texts)
+        similarity_scores, _ = calculate_text_similarity(query_text, hit_texts)
 
         # Group results by test_item to find most relevant for each
         results_by_test_item: dict[str, dict[str, Any]] = {}

@@ -354,8 +354,8 @@ def prepare_test_items(
         log_messages = [log.message for log in logs]
         logs_to_take: list[int] = []
         if log_messages:
-            vectorizer, logs_to_take = text_processing.find_last_unique_texts(
-                vectorizer, similarity_threshold_to_drop, log_messages
+            logs_to_take, vectorizer = text_processing.find_last_unique_texts(
+                similarity_threshold_to_drop, log_messages, vectorizer=vectorizer
             )
         prepared_logs = []
         for log_order, log_idx in enumerate(logs_to_take[-number_of_logs_to_index:]):

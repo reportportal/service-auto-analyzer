@@ -185,22 +185,6 @@ def _normalize_issue_type(issue_type: Any) -> str:
     return str(issue_type).strip().lower()
 
 
-def _get_log_text(log_item: LogItemIndexData) -> str:
-    """
-    Build a text payload for similarity comparison.
-
-    :param log_item: Log item to extract text from
-    :return: Combined text for similarity matching
-    """
-    parts = [
-        log_item.whole_message,
-        log_item.message,
-        log_item.detected_message,
-        log_item.stacktrace,
-    ]
-    return " ".join([part.strip() for part in parts if part and part.strip()])
-
-
 def convert_test_item_log(
     test_item: TestItemIndexData,
     log_data: LogData,
@@ -266,6 +250,22 @@ def get_request_logs(test_item: TestItemIndexData, issue_type: str) -> list[LogI
     return [convert_test_item_log(test_item, log_data, issue_type=issue_type) for log_data in logs_sorted]
 
 
+def _get_log_text(log_item: LogItemIndexData) -> str:
+    """
+    Build a text payload for similarity comparison.
+
+    :param log_item: Log item to extract text from
+    :return: Combined text for similarity matching
+    """
+    parts = [
+        log_item.whole_message,
+        log_item.message,
+        log_item.detected_message,
+        log_item.stacktrace,
+    ]
+    return " ".join([part.strip() for part in parts if part and part.strip()])
+
+
 def bucket_sort_logs_by_similarity(
     request_logs: list[LogItemIndexData],
     found_hits: list[Hit[LogItemIndexData]],
@@ -281,11 +281,14 @@ def bucket_sort_logs_by_similarity(
     request_texts = [_get_log_text(log_item) for log_item in request_logs]
     if not request_texts:
         return buckets
+    my_vectorizer = None
     for hit in found_hits:
         hit_text = _get_log_text(hit.source)
         if not hit_text.strip():
             continue
-        similarities = text_processing.calculate_text_similarity(hit_text, request_texts)
+        similarities, my_vectorizer = text_processing.calculate_text_similarity(
+            hit_text, request_texts, vectorizer=my_vectorizer
+        )
         if not similarities:
             continue
         best_idx = max(range(len(similarities)), key=lambda idx: similarities[idx].similarity)
@@ -393,6 +396,28 @@ def _make_synthetic_test_item_id(base_id: int, index: int) -> int:
     return base * 10 + index + 1
 
 
+def extract_inner_hit_logs(hits: list[Hit[TestItemIndexData]]) -> list[Hit[LogItemIndexData]]:
+    extracted_hits: list[Hit[LogItemIndexData]] = []
+    for hit in hits:
+        inner_hits = hit.inner_hits or {}
+        inner_hits_logs = inner_hits.get("logs", {})
+        raw_inner_hits = inner_hits_logs.get("hits", {}).get("hits", [])
+        issue_type = _normalize_issue_type(hit.source.issue_type)
+        for raw_inner_hit in raw_inner_hits:
+            inner_hit = Hit[LogData].from_dict(raw_inner_hit)
+            log_item = convert_test_item_log(hit.source, inner_hit.source, issue_type=issue_type)
+            extracted_hits.append(
+                Hit[LogItemIndexData].from_dict(
+                    {
+                        "_id": inner_hit.id or log_item.log_id,
+                        "_score": inner_hit.score or 0.0,
+                        "_source": log_item,
+                    }
+                )
+            )
+    return extracted_hits
+
+
 def build_history_negative_hits(
     request_logs: list[LogItemIndexData],
     history_negative_types: list[str],
@@ -419,28 +444,6 @@ def build_history_negative_hits(
                 Hit[LogItemIndexData].from_dict({"_id": synthetic_log.log_id, "_score": 0.0, "_source": synthetic_log})
             )
     return synthetic_hits
-
-
-def extract_inner_hit_logs(hits: list[Hit[TestItemIndexData]]) -> list[Hit[LogItemIndexData]]:
-    extracted_hits: list[Hit[LogItemIndexData]] = []
-    for hit in hits:
-        inner_hits = hit.inner_hits or {}
-        inner_hits_logs = inner_hits.get("logs", {})
-        raw_inner_hits = inner_hits_logs.get("hits", {}).get("hits", [])
-        issue_type = _normalize_issue_type(hit.source.issue_type)
-        for raw_inner_hit in raw_inner_hits:
-            inner_hit = Hit[LogData].from_dict(raw_inner_hit)
-            log_item = convert_test_item_log(hit.source, inner_hit.source, issue_type=issue_type)
-            extracted_hits.append(
-                Hit[LogItemIndexData].from_dict(
-                    {
-                        "_id": inner_hit.id or log_item.log_id,
-                        "_score": inner_hit.score or 0.0,
-                        "_source": log_item,
-                    }
-                )
-            )
-    return extracted_hits
 
 
 def build_search_results(

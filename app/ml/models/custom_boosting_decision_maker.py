@@ -12,9 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Optional
-
-from typing_extensions import override
+from typing import Optional, override
 
 from app.commons.object_saving.object_saver import ObjectSaver
 from app.ml.models.boosting_decision_maker import BoostingDecisionMaker

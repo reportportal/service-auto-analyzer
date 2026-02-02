@@ -12,10 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import json
-from typing import Any, Optional
+from typing import Any, Optional, override
 
 from sklearn.metrics import classification_report, confusion_matrix, f1_score
-from typing_extensions import override
 from xgboost import XGBClassifier
 
 from app.commons import logging

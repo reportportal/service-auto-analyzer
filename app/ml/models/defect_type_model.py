@@ -14,14 +14,13 @@
 
 import re
 from collections import Counter
-from typing import Any, Optional
+from typing import Any, Optional, override
 
 import numpy as np
 from scipy.sparse import csr_matrix
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import classification_report, confusion_matrix, f1_score
-from typing_extensions import override
 
 from app.commons import logging
 from app.commons.object_saving.object_saver import ObjectSaver
@@ -157,7 +156,7 @@ class DefectTypeModel(MlModel):
         LOGGER.debug(f"\n{classification_report(y_pred=res, y_true=labels)}")
         return f1
 
-    def predict(self, data: list, model_name: str) -> tuple[list[int], list[list[float]]]:
+    def predict(self, data: list[str], model_name: str) -> tuple[list[int], list[list[float]]]:
         if len(data) == 0:
             return [], []
         transformed_values = self.count_vectorizer_models[model_name].transform(data)

@@ -568,8 +568,11 @@ class AnalysisModelTraining:
         min_should_match: float,
         exclude_issue_type: str = "",
     ) -> dict[str, Any]:
-        log_messages = [_get_log_text(log_item) for log_item in request_logs]
-        log_messages = [message for message in log_messages if message.strip()]
+        log_messages = [
+            log_item.whole_message
+            for log_item in request_logs
+            if log_item.whole_message and log_item.whole_message.strip()
+        ]
         if not log_messages:
             return {}
 

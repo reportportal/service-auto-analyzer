@@ -182,6 +182,28 @@ def copy_model_part_from_baseline(label: str, new_model: DefectTypeModel, baseli
         new_model.count_vectorizer_models[label] = _count_vectorizer
 
 
+def get_info_template(project_info: TrainInfo, baseline_model: str, model_name: str, label: str) -> dict[str, Any]:
+    return {
+        "method": "training",
+        "sub_model_type": label,
+        "model_type": project_info.model_type.name,
+        "baseline_model": [baseline_model],
+        "new_model": [model_name],
+        "project_id": project_info.project,
+        "model_saved": 0,
+        "p_value": 1.0,
+        "data_size": 0,
+        "data_proportion": 0.0,
+        "baseline_mean_metric": 0.0,
+        "new_model_mean_metric": 0.0,
+        "bad_data_proportion": 0,
+        "metric_name": "F1",
+        "errors": [],
+        "errors_count": 0,
+        "time_spent": 0.0,
+    }
+
+
 class DefectTypeModelTraining:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
@@ -210,7 +232,7 @@ class DefectTypeModelTraining:
         self.model_chooser = model_chooser
         self.model_class = model_class if model_class else CustomDefectTypeModel
 
-    def get_messages_by_issue_type(self, issue_type_pattern: str) -> dict[str, Any]:
+    def _get_messages_by_issue_type(self, issue_type_pattern: str) -> dict[str, Any]:
         query = {
             "_source": [DATA_FIELD, "issue_type", "launch_id", "_id"],
             "sort": {"start_time": "desc"},
@@ -240,7 +262,7 @@ class DefectTypeModelTraining:
         utils.append_aa_ma_boosts(query, self.search_cfg)
         return query
 
-    def execute_data_query(self, project_index_name: str, query: str) -> QueryResult:
+    def _execute_data_query(self, project_index_name: str, query: str) -> QueryResult:
         errors = []
         error_count = 0
         query_result = []
@@ -248,7 +270,7 @@ class DefectTypeModelTraining:
             try:
                 query_result = opensearchpy.helpers.scan(
                     self.es_client.es_client,
-                    query=self.get_messages_by_issue_type(query),
+                    query=self._get_messages_by_issue_type(query),
                     index=project_index_name,
                     size=self.app_config.esChunkNumber,
                 )
@@ -278,10 +300,10 @@ class DefectTypeModelTraining:
                 break
         return QueryResult(result=data, error_count=error_count, errors=errors)
 
-    def query_label(self, query: str, index: str, stat: Optional[dict[str, Any]]) -> QueryResult:
+    def _query_label(self, query: str, index: str, stat: Optional[dict[str, Any]]) -> QueryResult:
         LOGGER.debug(f"Query to gather data {query}.")
         time_querying = time()
-        found_data = self.execute_data_query(index, query)
+        found_data = self._execute_data_query(index, query)
         time_spent = time() - time_querying
         LOGGER.debug(f'Finished querying "{query}" for {time_spent:.2f} s')
         if stat:
@@ -289,7 +311,7 @@ class DefectTypeModelTraining:
             stat["data_size"] = len(found_data.result)
         return found_data
 
-    def query_data(
+    def _query_data(
         self, projects: list[int], stat_data_storage: Optional[DefaultDict[str, dict[str, Any]]]
     ) -> list[tuple[str, str, str]]:
         data = []
@@ -300,19 +322,19 @@ class DefectTypeModelTraining:
             project_index_name = esclient.get_index_name(project, self.app_config.esProjectIndexPrefix, "rp_log_item")
             for label in BASE_ISSUE_CLASS_INDEXES:
                 query = f"{label}???"
-                found_data = self.query_label(
+                found_data = self._query_label(
                     query, project_index_name, stat_data_storage[label] if stat_data_storage else None
                 )
                 errors.append(found_data.errors)
                 error_count += found_data.error_count
                 data.extend(found_data.result)
                 query = f"{label}_*"
-                found_data = self.execute_data_query(project_index_name, query)
+                found_data = self._execute_data_query(project_index_name, query)
                 errors.append(found_data.errors)
                 error_count += found_data.error_count
                 sub_labels = {l[2] for l in found_data.result}
                 for sub_label in sub_labels:
-                    found_data = self.query_label(
+                    found_data = self._query_label(
                         sub_label, project_index_name, stat_data_storage[sub_label] if stat_data_storage else None
                     )
                     errors.append(found_data.errors)
@@ -327,29 +349,7 @@ class DefectTypeModelTraining:
             stat_data_storage["all"]["time_spent"] = start_time - time()
         return data
 
-    @staticmethod
-    def get_info_template(project_info: TrainInfo, baseline_model: str, model_name: str, label: str) -> dict[str, Any]:
-        return {
-            "method": "training",
-            "sub_model_type": label,
-            "model_type": project_info.model_type.name,
-            "baseline_model": [baseline_model],
-            "new_model": [model_name],
-            "project_id": project_info.project,
-            "model_saved": 0,
-            "p_value": 1.0,
-            "data_size": 0,
-            "data_proportion": 0.0,
-            "baseline_mean_metric": 0.0,
-            "new_model_mean_metric": 0.0,
-            "bad_data_proportion": 0,
-            "metric_name": "F1",
-            "errors": [],
-            "errors_count": 0,
-            "time_spent": 0.0,
-        }
-
-    def train_several_times(
+    def _train_several_times(
         self,
         new_model: DefectTypeModel,
         label: str,
@@ -371,12 +371,12 @@ class DefectTypeModelTraining:
         )
 
         train_log_info: DefaultDict[str, dict[str, Any]] = DefaultDict(
-            lambda _, k: self.get_info_template(project_info, baseline_model_folder, model_name, k)
+            lambda _, k: get_info_template(project_info, baseline_model_folder, model_name, k)
         )
         projects = [project_info.project]
         if project_info.additional_projects:
             projects.extend(project_info.additional_projects)
-        data = self.query_data(projects, train_log_info)
+        data = self._query_data(projects, train_log_info)
         LOGGER.debug(f"Loaded data for model training {project_info.model_type.name}")
 
         unique_labels = {l[2] for l in data}
@@ -392,7 +392,7 @@ class DefectTypeModelTraining:
             LOGGER.info(f"Label to train the model {label}")
 
             (baseline_model_results, new_model_results, bad_data_proportion, proportion_binary_labels) = (
-                self.train_several_times(new_model, label, data, TRAIN_DATA_RANDOM_STATES)
+                self._train_several_times(new_model, label, data, TRAIN_DATA_RANDOM_STATES)
             )
             data_proportion_min = min(proportion_binary_labels, data_proportion_min)
 
@@ -425,7 +425,7 @@ class DefectTypeModelTraining:
                 best_random_state = TRAIN_DATA_RANDOM_STATES[max_train_result_idx]
 
                 LOGGER.info(f"Perform final training with random state: {best_random_state}")
-                self.train_several_times(new_model, label, data, [best_random_state])
+                self._train_several_times(new_model, label, data, [best_random_state])
 
                 train_log_info[label]["model_saved"] = 1
                 custom_models.append(label)

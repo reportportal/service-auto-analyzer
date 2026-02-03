@@ -12,9 +12,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import dataclasses
 import math
 import os
 import random
+import re
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from time import time
@@ -36,8 +39,8 @@ from app.ml.training import normalize_issue_type, select_history_negative_types,
 from app.utils.defaultdict import DefaultDict
 
 LOGGER = logging.getLogger("analyzerApp.trainingDefectTypeModel")
-TRAIN_DATA_RANDOM_STATES = [1257, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029, 2137]
-BASE_ISSUE_CLASS_INDEXES: dict[str, int] = {"ab": 0, "pb": 1, "si": 2}
+DEFAULT_RANDOM_SEED = 1257
+TRAIN_DATA_RANDOM_STATES = [DEFAULT_RANDOM_SEED, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029, 2137]
 NEGATIVE_RATIO_MIN = 2
 NEGATIVE_RATIO_MAX = 4
 MINIMAL_LABEL_PROPORTION = 0.25
@@ -50,8 +53,13 @@ MIN_P_VALUE = 0.05
 class TrainingEntry:
     message: str
     issue_type: str
-    base_issue_type: str
     is_positive: bool
+
+
+def _get_issue_type(issue_type: str) -> str:
+    if not issue_type:
+        return issue_type
+    return _get_base_issue_type(issue_type) if re.match(r"^[a-z]{2}\d{,3}$", issue_type) else issue_type
 
 
 def split_train_test(
@@ -69,71 +77,80 @@ def split_train_test(
     return x_train, x_test, y_train, y_test
 
 
-def _balance_binary_target_data(
+def _balance_data(
     train_data: list[TrainingEntry],
-    labels: list[int],
-    label: str,
-) -> tuple[list[TrainingEntry], list[int]]:
-    positives_idx = [idx for idx, entry_label in enumerate(labels) if entry_label == 1]
-    negatives_idx = [idx for idx, entry_label in enumerate(labels) if entry_label == 0]
-    if not positives_idx:
-        return train_data, labels
+) -> list[TrainingEntry]:
+    """Make existing train data balanced for the given label.
 
-    rng = random.Random(1257)
-    min_negatives = len(positives_idx) * NEGATIVE_RATIO_MIN
-    max_negatives = len(positives_idx) * NEGATIVE_RATIO_MAX
+    This function shorten the amount of negative cases if there are to many of them and extend them out of existing
+    data if there are too few of them.
 
-    balanced_data = list(train_data)
-    balanced_labels = list(labels)
-    target_base = _get_base_issue_type(label)
-    candidate_issue_types = [
-        entry.issue_type
-        for entry in train_data
-        if entry.issue_type and entry.issue_type != label and _get_base_issue_type(entry.issue_type) != target_base
-    ]
-    candidate_issue_types = list(dict.fromkeys(candidate_issue_types))
-    if not candidate_issue_types:
-        fallback_bases = [base for base in BASE_ISSUE_CLASS_INDEXES if base != target_base]
-        if not fallback_bases:
-            fallback_bases = list(BASE_ISSUE_CLASS_INDEXES.keys())
-        candidate_issue_types = [f"{base}000" for base in fallback_bases]
+    :param train_data: Existing train data based on item history.
+    """
+    cases: dict[str, list[TrainingEntry]] = defaultdict(list)
+    for entry in train_data:
+        cases[entry.issue_type].append(entry)
 
-    if len(negatives_idx) < min_negatives:
-        deficit = min_negatives - len(negatives_idx)
-        for idx in range(deficit):
-            positive_idx = positives_idx[idx % len(positives_idx)]
-            issue_type = candidate_issue_types[idx % len(candidate_issue_types)]
-            balanced_data.append(
-                TrainingEntry(
-                    message=train_data[positive_idx].message,
-                    issue_type=issue_type,
-                    base_issue_type=_get_base_issue_type(issue_type),
-                    is_positive=False,
-                )
-            )
-            balanced_labels.append(0)
-        negatives_idx = [idx for idx, entry_label in enumerate(balanced_labels) if entry_label == 0]
+    cases_num: dict[str, tuple[int, int]] = defaultdict(lambda: (0, 0))
+    negative_indexes: list[int] = []
+    for i, entry in enumerate(train_data):
+        current = cases_num[entry.issue_type]
+        if entry.is_positive:
+            cases_num[entry.issue_type] = current[0] + 1, current[1]
+        else:
+            negative_indexes.append(i)
+            cases_num[entry.issue_type] = current[0], current[1] + 1
 
-    if len(negatives_idx) > max_negatives:
-        rng.shuffle(negatives_idx)
-        negatives_idx = negatives_idx[:max_negatives]
-
-    selected_idx = positives_idx + negatives_idx
-    rng.shuffle(selected_idx)
-    balanced_data = [balanced_data[idx] for idx in selected_idx]
-    balanced_labels = [balanced_labels[idx] for idx in selected_idx]
-    return balanced_data, balanced_labels
+    rnd = random.Random(DEFAULT_RANDOM_SEED)
+    results: list[TrainingEntry] = train_data.copy()
+    for issue_type, (positive, negative) in cases_num.items():
+        if positive <= 0:
+            continue
+        max_negative_cases = positive * NEGATIVE_RATIO_MAX
+        additional_negative_cases: list[TrainingEntry] = []
+        for issue, case_list in cases.items():
+            if issue_type == issue:
+                continue
+            for case in case_list:
+                if not case.is_positive:
+                    continue  # ignore uncertainty
+                additional_negative_cases.append(dataclasses.replace(case, issue_type=issue_type, is_positive=False))
+        if not additional_negative_cases:
+            continue
+        rnd.shuffle(additional_negative_cases)
+        if negative + len(additional_negative_cases) <= max_negative_cases:
+            # We can append all additional negative cases
+            cases[issue_type].extend(additional_negative_cases)
+        else:
+            # Need to balance negative cases
+            rnd.shuffle(negative_indexes)
+            case_num_to_remove = negative + len(additional_negative_cases) - max_negative_cases
+            if negative > positive:
+                remove_history_cases_num = negative - positive
+            else:
+                remove_history_cases_num = 0
+            if remove_history_cases_num < case_num_to_remove:
+                remove_additional_cases_num = case_num_to_remove - remove_history_cases_num
+            else:
+                remove_additional_cases_num = 0
+            additional_negative_cases = additional_negative_cases[:-remove_additional_cases_num]
+            cases_to_remove = negative_indexes[:remove_history_cases_num]
+            i = 0
+            for i, case_idx in enumerate(cases_to_remove):
+                results[case_idx] = additional_negative_cases[i]
+            if i <= len(additional_negative_cases):
+                results.extend(additional_negative_cases[i:])
+    return results
 
 
 def create_binary_target_data(label: str, data: list[TrainingEntry]) -> tuple[list[str], list[int]]:
     labels_filtered = []
     for entry in data:
-        if label == entry.issue_type or label == entry.base_issue_type:
+        if label == entry.issue_type:
             labels_filtered.append(1 if entry.is_positive else 0)
         else:
             labels_filtered.append(0)
-    balanced_entries, balanced_labels = _balance_binary_target_data(data, labels_filtered, label)
-    return [entry.message for entry in balanced_entries], balanced_labels
+    return [entry.message for entry in data], labels_filtered
 
 
 def _get_log_message(log_data: LogData) -> Optional[str]:
@@ -211,7 +228,7 @@ def _get_base_issue_type(issue_type: str) -> str:
 
 
 def _is_supported_issue_type(issue_type: str) -> bool:
-    return _get_base_issue_type(issue_type) in BASE_ISSUE_CLASS_INDEXES
+    return _get_base_issue_type(issue_type) != "ti"
 
 
 def build_entries_from_item(test_item: TestItemIndexData) -> list[TrainingEntry]:
@@ -230,7 +247,6 @@ def build_entries_from_item(test_item: TestItemIndexData) -> list[TrainingEntry]
         return []
 
     entries: list[TrainingEntry] = []
-    positive_base = _get_base_issue_type(positive_issue_type)
     for log_data in logs:
         log_message = _get_log_message(log_data)
         if not log_message:
@@ -238,8 +254,7 @@ def build_entries_from_item(test_item: TestItemIndexData) -> list[TrainingEntry]
         entries.append(
             TrainingEntry(
                 message=log_message,
-                issue_type=positive_issue_type,
-                base_issue_type=positive_base,
+                issue_type=_get_issue_type(positive_issue_type),
                 is_positive=True,
             )
         )
@@ -247,8 +262,7 @@ def build_entries_from_item(test_item: TestItemIndexData) -> list[TrainingEntry]
             entries.append(
                 TrainingEntry(
                     message=log_message,
-                    issue_type=negative_issue_type,
-                    base_issue_type=_get_base_issue_type(negative_issue_type),
+                    issue_type=_get_issue_type(negative_issue_type),
                     is_positive=False,
                 )
             )
@@ -312,8 +326,6 @@ class DefectTypeModelTraining:
             for entry in data:
                 if entry.is_positive and entry.issue_type:
                     label_counts[entry.issue_type] = label_counts.get(entry.issue_type, 0) + 1
-                if entry.is_positive and entry.base_issue_type:
-                    label_counts[entry.base_issue_type] = label_counts.get(entry.base_issue_type, 0) + 1
             for label, count in label_counts.items():
                 stat_data_storage[label]["data_size"] = count
             stat_data_storage["all"]["data_size"] = len(data)
@@ -348,10 +360,9 @@ class DefectTypeModelTraining:
         if project_info.additional_projects:
             projects.extend(project_info.additional_projects)
         data = self._query_data(projects, train_log_info)
-        LOGGER.debug(f"Loaded data for model training {project_info.model_type.name}")
+        train_data = _balance_data(data)
 
-        unique_labels = {entry.issue_type for entry in data if entry.issue_type}
-        unique_labels.update({entry.base_issue_type for entry in data if entry.base_issue_type})
+        LOGGER.debug(f"Loaded data for model training {project_info.model_type.name}")
 
         data_proportion_min = 1.0
         p_value_max = 0.0
@@ -359,12 +370,14 @@ class DefectTypeModelTraining:
         custom_models = []
         f1_chosen_models = []
         f1_baseline_models = []
+
+        unique_labels = {entry.issue_type for entry in data if entry.issue_type}
         for label in unique_labels:
             time_training = time()
             LOGGER.info(f"Label to train the model {label}")
 
             (baseline_model_results, new_model_results, bad_data_proportion, proportion_binary_labels) = (
-                self._train_several_times(new_model, label, data, TRAIN_DATA_RANDOM_STATES)
+                self._train_several_times(new_model, label, train_data, TRAIN_DATA_RANDOM_STATES)
             )
             data_proportion_min = min(proportion_binary_labels, data_proportion_min)
 
@@ -397,7 +410,7 @@ class DefectTypeModelTraining:
                 best_random_state = TRAIN_DATA_RANDOM_STATES[max_train_result_idx]
 
                 LOGGER.info(f"Perform final training with random state: {best_random_state}")
-                self._train_several_times(new_model, label, data, [best_random_state])
+                self._train_several_times(new_model, label, train_data, [best_random_state])
 
                 train_log_info[label]["model_saved"] = 1
                 custom_models.append(label)

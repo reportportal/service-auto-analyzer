@@ -16,9 +16,8 @@
 import logging
 from typing import Any
 
-from utils import utils
-
 from app.commons.model.test_item_index import TestItemHistoryData
+from app.utils import utils
 
 LOGGER = logging.getLogger("analyzerApp.training")
 

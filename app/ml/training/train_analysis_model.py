@@ -35,13 +35,12 @@ from app.commons.os_client import OsClient
 from app.ml.boosting_featurizer import BoostingFeaturizer
 from app.ml.models import BoostingDecisionMaker, CustomBoostingDecisionMaker, DefectTypeModel
 from app.ml.suggest_boosting_featurizer import SuggestBoostingFeaturizer
-from app.ml.training import normalize_issue_type, select_history_negative_types
+from app.ml.training import normalize_issue_type, select_history_negative_types, validate_proportions
 from app.utils import text_processing, utils
 from app.utils.defaultdict import DefaultDict
 
 LOGGER = logging.getLogger("analyzerApp.trainingAnalysisModel")
 TRAIN_DATA_RANDOM_STATES = [1257, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029, 2137]
-DUE_PROPORTION = 0.2
 SMOTE_PROPORTION = 0.4
 NEGATIVE_RATIO_MIN = 2
 NEGATIVE_RATIO_MAX = 4
@@ -95,17 +94,7 @@ def train_several_times(
     baseline_model_results: dict[str, list[float]] = DefaultDict(lambda _, __: [])
     my_random_states: list[int] = random_states if random_states else TRAIN_DATA_RANDOM_STATES
 
-    bad_data = False
-    proportion_binary_labels = utils.calculate_proportions_for_labels(labels)
-    positives_count = sum(1 for label in labels if label == 1)
-    negatives_count = sum(1 for label in labels if label == 0)
-    if positives_count < 2 or negatives_count < 2:
-        LOGGER.debug("Train data has too few samples: positives=%d, negatives=%d", positives_count, negatives_count)
-        bad_data = True
-    if proportion_binary_labels < DUE_PROPORTION:
-        LOGGER.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
-        bad_data = True
-
+    bad_data, data_proportion = validate_proportions(labels)
     if not bad_data:
         for random_state in my_random_states:
             x_train, x_test, y_train, y_test = split_data(data, labels, random_state)
@@ -134,7 +123,7 @@ def train_several_times(
                     x_test, new_model.feature_ids, baseline_model.feature_ids
                 )
                 baseline_model_results[METRIC].append(baseline_model.validate_model(x_test_for_baseline, y_test))
-    return baseline_model_results, new_model_results, bad_data, proportion_binary_labels
+    return baseline_model_results, new_model_results, bad_data, data_proportion
 
 
 def get_info_template(
@@ -423,6 +412,7 @@ class AnalysisModelTraining:
     os_client: OsClient
     model_type: ModelType
     model_class: Type[BoostingDecisionMaker]
+    featurizer_class: Type[BoostingFeaturizer]
     baseline_folder: Optional[str]
     baseline_model: Optional[BoostingDecisionMaker]
     model_chooser: ModelChooser
@@ -458,6 +448,7 @@ class AnalysisModelTraining:
             )
             self.n_estimators = self.search_cfg.SuggestBoostModelNumEstimators
             self.max_depth = self.search_cfg.SuggestBoostModelMaxDepth
+            self.featurizer_class = SuggestBoostingFeaturizer
         elif model_type is ModelType.auto_analysis:
             self.baseline_folder = self.search_cfg.BoostModelFolder
             self.features = text_processing.transform_string_feature_range_into_list(
@@ -468,6 +459,7 @@ class AnalysisModelTraining:
             )
             self.n_estimators = self.search_cfg.AutoBoostModelNumEstimators
             self.max_depth = self.search_cfg.AutoBoostModelMaxDepth
+            self.featurizer_class = BoostingFeaturizer
         else:
             raise ValueError(f"Incorrect model type {model_type}")
 
@@ -697,19 +689,9 @@ class AnalysisModelTraining:
                 if not search_results:
                     continue
 
-                _boosting_data_gatherer: BoostingFeaturizer
-                if self.model_type is ModelType.suggestion:
-                    _boosting_data_gatherer = SuggestBoostingFeaturizer(
-                        search_results,
-                        self._get_config_for_boosting(-1, namespaces),
-                        feature_ids=features,
-                    )
-                else:
-                    _boosting_data_gatherer = BoostingFeaturizer(
-                        search_results,
-                        self._get_config_for_boosting(-1, namespaces),
-                        feature_ids=features,
-                    )
+                _boosting_data_gatherer: BoostingFeaturizer = self.featurizer_class(
+                    search_results, self._get_config_for_boosting(-1, namespaces), feature_ids=features
+                )
 
                 # noinspection PyTypeChecker
                 _boosting_data_gatherer.set_defect_type_model(defect_type_model)

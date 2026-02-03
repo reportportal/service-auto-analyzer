@@ -32,7 +32,7 @@ from app.commons.model_chooser import ModelChooser
 from app.commons.os_client import OsClient
 from app.ml.models import CustomDefectTypeModel, DefectTypeModel
 from app.ml.models.defect_type_model import DATA_FIELD
-from app.ml.training import normalize_issue_type, select_history_negative_types
+from app.ml.training import normalize_issue_type, select_history_negative_types, validate_proportions
 from app.utils.defaultdict import DefaultDict
 
 LOGGER = logging.getLogger("analyzerApp.trainingDefectTypeModel")
@@ -69,24 +69,15 @@ def split_train_test(
     return x_train, x_test, y_train, y_test
 
 
-def _calculate_label_proportion(labels: list[int]) -> float:
-    positives_count = sum(1 for label in labels if label == 1)
-    negatives_count = sum(1 for label in labels if label == 0)
-    if positives_count == 0 or negatives_count == 0:
-        return 0.0
-    proportion = min(positives_count, negatives_count) / max(positives_count, negatives_count)
-    return round(proportion, 3)
-
-
 def _balance_binary_target_data(
     train_data: list[TrainingEntry],
     labels: list[int],
     label: str,
-) -> tuple[list[TrainingEntry], list[int], float]:
+) -> tuple[list[TrainingEntry], list[int]]:
     positives_idx = [idx for idx, entry_label in enumerate(labels) if entry_label == 1]
     negatives_idx = [idx for idx, entry_label in enumerate(labels) if entry_label == 0]
     if not positives_idx:
-        return train_data, labels, 0.0
+        return train_data, labels
 
     rng = random.Random(1257)
     min_negatives = len(positives_idx) * NEGATIVE_RATIO_MIN
@@ -131,19 +122,18 @@ def _balance_binary_target_data(
     rng.shuffle(selected_idx)
     balanced_data = [balanced_data[idx] for idx in selected_idx]
     balanced_labels = [balanced_labels[idx] for idx in selected_idx]
-    proportion_binary_labels = _calculate_label_proportion(balanced_labels)
-    return balanced_data, balanced_labels, proportion_binary_labels
+    return balanced_data, balanced_labels
 
 
-def create_binary_target_data(label: str, data: list[TrainingEntry]) -> tuple[list[str], list[int], float]:
+def create_binary_target_data(label: str, data: list[TrainingEntry]) -> tuple[list[str], list[int]]:
     labels_filtered = []
     for entry in data:
         if label == entry.issue_type or label == entry.base_issue_type:
             labels_filtered.append(1 if entry.is_positive else 0)
         else:
             labels_filtered.append(0)
-    balanced_entries, balanced_labels, proportion = _balance_binary_target_data(data, labels_filtered, label)
-    return [entry.message for entry in balanced_entries], balanced_labels, proportion
+    balanced_entries, balanced_labels = _balance_binary_target_data(data, labels_filtered, label)
+    return [entry.message for entry in balanced_entries], balanced_labels
 
 
 def _get_log_message(log_data: LogData) -> Optional[str]:
@@ -165,22 +155,9 @@ def train_several_times(
     my_random_states = random_states if random_states else TRAIN_DATA_RANDOM_STATES
     new_model_results = []
     baseline_model_results = []
-    bad_data_proportion = False
 
-    train_data, labels_filtered, proportion_binary_labels = create_binary_target_data(label, data)
-    positives_count = sum(1 for label_ in labels_filtered if label_ == 1)
-    negatives_count = sum(1 for label_ in labels_filtered if label_ == 0)
-    if positives_count < 2 or negatives_count < 2:
-        LOGGER.debug("Train data has too few samples: positives=%d, negatives=%d", positives_count, negatives_count)
-        bad_data_proportion = True
-    if proportion_binary_labels < MINIMAL_LABEL_PROPORTION:
-        LOGGER.debug("Train data has a bad proportion: %.3f", proportion_binary_labels)
-        bad_data_proportion = True
-    data_length = len(train_data)
-    if data_length < MINIMAL_DATA_LENGTH_FOR_TRAIN:
-        LOGGER.debug(f"Train data has a too few entities:{data_length}")
-        bad_data_proportion = True
-
+    train_data, labels_filtered = create_binary_target_data(label, data)
+    bad_data_proportion, data_proportion = validate_proportions(labels_filtered)
     if not bad_data_proportion:
         for random_state in my_random_states:
             x_train, x_test, y_train, y_test = split_train_test(train_data, labels_filtered, random_state=random_state)
@@ -192,7 +169,7 @@ def train_several_times(
                 baseline_model_results.append(baseline_model.validate_model(label, x_test, y_test))
             else:
                 baseline_model_results.append(0.0)
-    return baseline_model_results, new_model_results, bad_data_proportion, proportion_binary_labels
+    return baseline_model_results, new_model_results, bad_data_proportion, data_proportion
 
 
 def copy_model_part_from_baseline(label: str, new_model: DefectTypeModel, baseline_model: DefectTypeModel) -> None:

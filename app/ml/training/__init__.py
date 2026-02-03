@@ -13,11 +13,17 @@
 #  limitations under the License.
 
 """Common package for ML Model training code."""
+import logging
 from typing import Any
+
+from utils import utils
 
 from app.commons.model.test_item_index import TestItemHistoryData
 
+LOGGER = logging.getLogger("analyzerApp.training")
+
 MAX_HISTORY_NEGATIVES = 2
+DUE_PROPORTION = 0.2
 
 
 def normalize_issue_type(issue_type: Any) -> str:
@@ -54,3 +60,17 @@ def select_history_negative_types(
         if len(negatives) >= MAX_HISTORY_NEGATIVES:
             break
     return negatives
+
+
+def validate_proportions(labels: list[int]) -> tuple[bool, float]:
+    positives_count = sum(1 for label in labels if label == 1)
+    negatives_count = sum(1 for label in labels if label == 0)
+    bad_data = False
+    if positives_count < 2 or negatives_count < 2:
+        LOGGER.debug("Train data has too few samples: positives=%d, negatives=%d", positives_count, negatives_count)
+        bad_data = True
+    data_proportion = utils.calculate_proportions_for_labels(labels)
+    if data_proportion < DUE_PROPORTION:
+        LOGGER.debug("Train data has a bad proportion: %.3f", data_proportion)
+        bad_data = True
+    return bad_data, data_proportion

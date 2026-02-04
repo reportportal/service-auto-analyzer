@@ -92,13 +92,13 @@ def balance_data(
         cases[entry.issue_type].append(entry)
 
     cases_num: dict[str, tuple[int, int]] = defaultdict(lambda: (0, 0))
-    negative_indexes: list[int] = []
+    negative_cases: dict[str, list[int]] = defaultdict(list)
     for i, entry in enumerate(train_data):
         current = cases_num[entry.issue_type]
         if entry.is_positive:
             cases_num[entry.issue_type] = current[0] + 1, current[1]
         else:
-            negative_indexes.append(i)
+            negative_cases[entry.issue_type].append(i)
             cases_num[entry.issue_type] = current[0], current[1] + 1
 
     rnd = random.Random(DEFAULT_RANDOM_SEED)
@@ -120,26 +120,32 @@ def balance_data(
         rnd.shuffle(additional_negative_cases)
         if negative + len(additional_negative_cases) <= max_negative_cases:
             # We can append all additional negative cases
-            cases[issue_type].extend(additional_negative_cases)
+            results.extend(additional_negative_cases)
         else:
             # Need to balance negative cases
+            negative_indexes = negative_cases[issue_type]
             rnd.shuffle(negative_indexes)
             case_num_to_remove = negative + len(additional_negative_cases) - max_negative_cases
-            if negative > positive:
-                remove_history_cases_num = negative - positive
-            else:
+            if negative <= positive:
                 remove_history_cases_num = 0
+            else:
+                possible_to_remove = negative - positive
+                remove_history_cases_num = (
+                    possible_to_remove if possible_to_remove < case_num_to_remove else case_num_to_remove
+                )
             if remove_history_cases_num < case_num_to_remove:
                 remove_additional_cases_num = case_num_to_remove - remove_history_cases_num
             else:
                 remove_additional_cases_num = 0
-            additional_negative_cases = additional_negative_cases[:-remove_additional_cases_num]
+            additional_negative_cases = additional_negative_cases[
+                : len(additional_negative_cases) - remove_additional_cases_num
+            ]
             cases_to_remove = negative_indexes[:remove_history_cases_num]
             i = 0
             for i, case_idx in enumerate(cases_to_remove):
                 results[case_idx] = additional_negative_cases[i]
-            if i <= len(additional_negative_cases):
-                results.extend(additional_negative_cases[i:])
+            if i + 1 < len(additional_negative_cases):
+                results.extend(additional_negative_cases[i + 1 :])
     return results
 
 

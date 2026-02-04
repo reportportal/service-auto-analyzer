@@ -77,7 +77,7 @@ def split_train_test(
     return x_train, x_test, y_train, y_test
 
 
-def _balance_data(
+def balance_data(
     train_data: list[TrainingEntry],
 ) -> list[TrainingEntry]:
     """Make existing train data balanced for the given label.
@@ -360,7 +360,7 @@ class DefectTypeModelTraining:
         if project_info.additional_projects:
             projects.extend(project_info.additional_projects)
         data = self._query_data(projects, train_log_info)
-        train_data = _balance_data(data)
+        train_data = balance_data(data)
 
         LOGGER.debug(f"Loaded data for model training {project_info.model_type.name}")
 

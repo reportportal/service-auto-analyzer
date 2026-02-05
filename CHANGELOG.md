@@ -1,5 +1,7 @@
 # Changelog
 ## [Unreleased]
+### Changed
+- Base image update, by @HardNorth
 
 ## [5.15.0]
 ### Added

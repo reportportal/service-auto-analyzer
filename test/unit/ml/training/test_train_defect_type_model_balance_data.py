@@ -49,48 +49,48 @@ OTHER_NEGATIVE_CASES = [
         "expected_entries",
     ),
     [
-        # pytest.param(
-        #     [],
-        #     [],
-        #     id="empty-data",
-        # ),
-        # pytest.param(
-        #     [FIRST_POSITIVE_ENTRY],
-        #     [FIRST_POSITIVE_ENTRY],
-        #     id="single-positive",
-        # ),
-        # pytest.param(
-        #     [FIRST_POSITIVE_ENTRY, FIRST_CROSS_NEGATIVE_ENTRY],
-        #     [FIRST_POSITIVE_ENTRY, FIRST_CROSS_NEGATIVE_ENTRY],
-        #     id="same-message-opposite-labels",
-        # ),
-        # pytest.param(
-        #     [FIRST_POSITIVE_ENTRY, SECOND_POSITIVE_ENTRY],
-        #     [
-        #         FIRST_POSITIVE_ENTRY,
-        #         SECOND_POSITIVE_ENTRY,
-        #         SECOND_CROSS_NEGATIVE_ENTRY,
-        #         FIRST_CROSS_NEGATIVE_ENTRY,
-        #     ],
-        #     id="two-positives-create-cross-negatives",
-        # ),
-        # pytest.param(
-        #     [
-        #         FIRST_POSITIVE_ENTRY,
-        #         SECOND_POSITIVE_ENTRY,
-        #         FIRST_NEGATIVE_ENTRY,
-        #         SECOND_NEGATIVE_ENTRY,
-        #     ],
-        #     [
-        #         FIRST_POSITIVE_ENTRY,
-        #         SECOND_POSITIVE_ENTRY,
-        #         FIRST_NEGATIVE_ENTRY,
-        #         SECOND_NEGATIVE_ENTRY,
-        #         SECOND_CROSS_NEGATIVE_ENTRY,
-        #         FIRST_CROSS_NEGATIVE_ENTRY,
-        #     ],
-        #     id="two-positives-keep-negatives-add-cross",
-        # ),
+        pytest.param(
+            [],
+            [],
+            id="empty-data",
+        ),
+        pytest.param(
+            [FIRST_POSITIVE_ENTRY],
+            [FIRST_POSITIVE_ENTRY],
+            id="single-positive",
+        ),
+        pytest.param(
+            [FIRST_POSITIVE_ENTRY, FIRST_CROSS_NEGATIVE_ENTRY],
+            [FIRST_POSITIVE_ENTRY, FIRST_CROSS_NEGATIVE_ENTRY],
+            id="same-message-opposite-labels",
+        ),
+        pytest.param(
+            [FIRST_POSITIVE_ENTRY, SECOND_POSITIVE_ENTRY],
+            [
+                FIRST_POSITIVE_ENTRY,
+                SECOND_POSITIVE_ENTRY,
+                SECOND_CROSS_NEGATIVE_ENTRY,
+                FIRST_CROSS_NEGATIVE_ENTRY,
+            ],
+            id="two-positives-create-cross-negatives",
+        ),
+        pytest.param(
+            [
+                FIRST_POSITIVE_ENTRY,
+                SECOND_POSITIVE_ENTRY,
+                FIRST_NEGATIVE_ENTRY,
+                SECOND_NEGATIVE_ENTRY,
+            ],
+            [
+                FIRST_POSITIVE_ENTRY,
+                SECOND_POSITIVE_ENTRY,
+                FIRST_NEGATIVE_ENTRY,
+                SECOND_NEGATIVE_ENTRY,
+                SECOND_CROSS_NEGATIVE_ENTRY,
+                FIRST_CROSS_NEGATIVE_ENTRY,
+            ],
+            id="two-positives-keep-negatives-add-cross",
+        ),
         pytest.param(
             [
                 FIRST_POSITIVE_ENTRY,

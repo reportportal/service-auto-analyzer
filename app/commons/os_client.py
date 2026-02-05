@@ -17,7 +17,7 @@
 import traceback
 from datetime import datetime, timezone
 from time import time
-from typing import Any, Callable, Iterator, Optional, Iterable
+from typing import Any, Callable, Iterable, Iterator, Optional
 
 import opensearchpy.helpers
 import urllib3

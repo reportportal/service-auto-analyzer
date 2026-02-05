@@ -55,6 +55,127 @@ SPECIAL_FIELDS_BOOST_SCORES = [
 ]
 
 
+def _create_similarity_dict(
+    prediction_results: list[PredictionResult],
+) -> dict[str, dict[tuple[str, str], SimilarityResult]]:
+    """Create a similarity dictionary for comparing prediction results."""
+    _similarity_calculator = similarity_calculator.SimilarityCalculator()
+    all_pairs_to_check = []
+    for i, result_first in enumerate(prediction_results):
+        for j in range(i + 1, len(prediction_results)):
+            result_second = prediction_results[j]
+            issue_type1 = result_first.data["mrHit"].source.issue_type
+            issue_type2 = result_second.data["mrHit"].source.issue_type
+            if issue_type1 != issue_type2:
+                continue
+            items_to_compare = [result_first.data["mrHit"]]
+            all_pairs_to_check.append((result_second.data["mrHit"].source, items_to_compare))
+    sim_dict = _similarity_calculator.find_similarity(
+        all_pairs_to_check, ["detected_message_with_numbers", "stacktrace", "merged_small_logs"]
+    )
+    return sim_dict
+
+
+def _filter_by_similarity(
+    prediction_results: list[PredictionResult],
+    sim_dict: dict[str, dict[tuple[str, str], SimilarityResult]],
+) -> list[PredictionResult]:
+    """Filter prediction results by removing highly similar duplicates."""
+    filtered_results = []
+    deleted_indices = set()
+    for i in range(len(prediction_results)):
+        if i in deleted_indices:
+            continue
+        for j in range(i + 1, len(prediction_results)):
+            result_first = prediction_results[i]
+            result_second = prediction_results[j]
+            group_id = (
+                str(result_first.data["mrHit"].id),
+                str(result_second.data["mrHit"].id),
+            )
+            if group_id not in sim_dict["detected_message_with_numbers"]:
+                continue
+            det_message = sim_dict["detected_message_with_numbers"]
+            detected_message_sim = det_message[group_id]
+            stacktrace_sim = sim_dict["stacktrace"][group_id]
+            merged_logs_sim = sim_dict["merged_small_logs"][group_id]
+            if (
+                (detected_message_sim.both_empty or detected_message_sim.similarity >= 0.98)
+                and (stacktrace_sim.both_empty or stacktrace_sim.similarity >= 0.98)
+                and (merged_logs_sim.both_empty or merged_logs_sim.similarity >= 0.98)
+            ):
+                deleted_indices.add(j)
+        filtered_results.append(prediction_results[i])
+    return filtered_results
+
+
+def deduplicate_results(
+    prediction_results: list[PredictionResult],
+) -> list[PredictionResult]:
+    """Deduplicate prediction results by removing highly similar items."""
+    sim_dict = _create_similarity_dict(prediction_results)
+    filtered_results = _filter_by_similarity(prediction_results, sim_dict)
+    return filtered_results
+
+
+def sort_results(
+    prediction_results: list[PredictionResult],
+) -> list[PredictionResult]:
+    """Sort prediction results by probability and timestamp in descending order."""
+    # Sort by probability (index 1) and start_time, both descending
+    sorted_results = sorted(
+        prediction_results,
+        key=lambda x: (round(x.probability[1], 4), x.data["mrHit"].source.start_time),
+        reverse=True,
+    )
+    return sorted_results
+
+
+def choose_fields_to_filter_suggests(log_lines_num: int) -> list[str]:
+    if log_lines_num == -1:
+        return [
+            "detected_message_extended",
+            "detected_message_without_params_extended",
+            "detected_message_without_params_and_brackets",
+        ]
+    return ["message_extended", "message_without_params_extended", "message_without_params_and_brackets"]
+
+
+def get_query_for_test_item_in_cluster(test_item_info: TestItemInfo) -> dict:
+    return {
+        "_source": ["test_item"],
+        "query": {
+            "bool": {
+                "filter": [
+                    {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
+                    {"exists": {"field": "issue_type"}},
+                    {"term": {"is_merged": False}},
+                ],
+                "should": [],
+                "must": [
+                    {"term": {"launch_id": test_item_info.launchId}},
+                    {"term": {"cluster_id": test_item_info.clusterId}},
+                ],
+            }
+        },
+    }
+
+
+def get_query_for_logs_by_test_item(test_item_id: int) -> dict:
+    return {
+        "query": {
+            "bool": {
+                "filter": [
+                    {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
+                    {"exists": {"field": "issue_type"}},
+                    {"term": {"is_merged": False}},
+                    {"term": {"test_item": test_item_id}},
+                ]
+            }
+        }
+    }
+
+
 class SuggestService(AnalyzerService):
     """The service serves suggestion lists in Make Decision modal."""
 
@@ -77,33 +198,22 @@ class SuggestService(AnalyzerService):
         super().__init__(search_cfg=self.search_cfg)
         self.es_client = es_client or EsClient(app_config=self.app_config)
         self.suggest_threshold = 0.4
-        self.rp_suggest_index_template = "rp_suggestions_info"
-        self.rp_suggest_metrics_index_template = "rp_suggestions_info_metrics"
         self.namespace_finder = NamespaceFinder(app_config)
 
-    def get_config_for_boosting_suggests(self, analyzer_config: AnalyzerConf) -> dict:
+    def _get_config_for_boosting_suggests(self, analyzer_config: AnalyzerConf) -> dict:
         return {
             "max_query_terms": self.search_cfg.MaxQueryTerms,
             "min_should_match": 0.4,
             "min_word_length": self.search_cfg.MinWordLength,
             "filter_min_should_match": [],
-            "filter_min_should_match_any": self.choose_fields_to_filter_suggests(analyzer_config.numberOfLogLines),
+            "filter_min_should_match_any": choose_fields_to_filter_suggests(analyzer_config.numberOfLogLines),
             "number_of_log_lines": analyzer_config.numberOfLogLines,
             "filter_by_test_case_hash": True,
             "boosting_model": self.search_cfg.SuggestBoostModelFolder,
             "time_weight_decay": self.search_cfg.TimeWeightDecay,
         }
 
-    def choose_fields_to_filter_suggests(self, log_lines_num: int) -> list[str]:
-        if log_lines_num == -1:
-            return [
-                "detected_message_extended",
-                "detected_message_without_params_extended",
-                "detected_message_without_params_and_brackets",
-            ]
-        return ["message_extended", "message_without_params_extended", "message_without_params_and_brackets"]
-
-    def build_suggest_query(
+    def _build_suggest_query(
         self,
         test_item_info: TestItemInfo,
         log: dict,
@@ -177,7 +287,7 @@ class SuggestService(AnalyzerService):
 
         return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
-    def query_es_for_suggested_items(self, test_item_info: TestItemInfo, logs: list[dict]) -> list[tuple[dict, dict]]:
+    def _query_es_for_suggested_items(self, test_item_info: TestItemInfo, logs: list[dict]) -> list[tuple[dict, dict]]:
         full_results = []
         index_name = esclient.get_index_name(
             test_item_info.project, self.app_config.esProjectIndexPrefix, "rp_log_item"
@@ -191,21 +301,21 @@ class SuggestService(AnalyzerService):
             queries = []
 
             for query in [
-                self.build_suggest_query(
+                self._build_suggest_query(
                     test_item_info,
                     log,
                     message_field="message_extended",
                     det_mes_field="detected_message_extended",
                     stacktrace_field="stacktrace_extended",
                 ),
-                self.build_suggest_query(
+                self._build_suggest_query(
                     test_item_info,
                     log,
                     message_field="message_without_params_extended",
                     det_mes_field="detected_message_without_params_extended",
                     stacktrace_field="stacktrace_extended",
                 ),
-                self.build_suggest_query(
+                self._build_suggest_query(
                     test_item_info,
                     log,
                     message_field="message_without_params_and_brackets",
@@ -221,82 +331,7 @@ class SuggestService(AnalyzerService):
                 full_results.append((log, partial_res[ind]))
         return full_results
 
-    def __create_similarity_dict(
-        self, prediction_results: list[PredictionResult]
-    ) -> dict[str, dict[tuple[str, str], SimilarityResult]]:
-        """Create a similarity dictionary for comparing prediction results."""
-        _similarity_calculator = similarity_calculator.SimilarityCalculator()
-        all_pairs_to_check = []
-        for i, result_first in enumerate(prediction_results):
-            for j in range(i + 1, len(prediction_results)):
-                result_second = prediction_results[j]
-                issue_type1 = result_first.data["mrHit"].source.issue_type
-                issue_type2 = result_second.data["mrHit"].source.issue_type
-                if issue_type1 != issue_type2:
-                    continue
-                items_to_compare = [result_first.data["mrHit"]]
-                all_pairs_to_check.append((result_second.data["mrHit"].source, items_to_compare))
-        sim_dict = _similarity_calculator.find_similarity(
-            all_pairs_to_check, ["detected_message_with_numbers", "stacktrace", "merged_small_logs"]
-        )
-        return sim_dict
-
-    def __filter_by_similarity(
-        self,
-        prediction_results: list[PredictionResult],
-        sim_dict: dict[str, dict[tuple[str, str], SimilarityResult]],
-    ) -> list[PredictionResult]:
-        """Filter prediction results by removing highly similar duplicates."""
-        filtered_results = []
-        deleted_indices = set()
-        for i in range(len(prediction_results)):
-            if i in deleted_indices:
-                continue
-            for j in range(i + 1, len(prediction_results)):
-                result_first = prediction_results[i]
-                result_second = prediction_results[j]
-                group_id = (
-                    str(result_first.data["mrHit"].id),
-                    str(result_second.data["mrHit"].id),
-                )
-                if group_id not in sim_dict["detected_message_with_numbers"]:
-                    continue
-                det_message = sim_dict["detected_message_with_numbers"]
-                detected_message_sim = det_message[group_id]
-                stacktrace_sim = sim_dict["stacktrace"][group_id]
-                merged_logs_sim = sim_dict["merged_small_logs"][group_id]
-                if (
-                    (detected_message_sim.both_empty or detected_message_sim.similarity >= 0.98)
-                    and (stacktrace_sim.both_empty or stacktrace_sim.similarity >= 0.98)
-                    and (merged_logs_sim.both_empty or merged_logs_sim.similarity >= 0.98)
-                ):
-                    deleted_indices.add(j)
-            filtered_results.append(prediction_results[i])
-        return filtered_results
-
-    def deduplicate_results(
-        self,
-        prediction_results: list[PredictionResult],
-    ) -> list[PredictionResult]:
-        """Deduplicate prediction results by removing highly similar items."""
-        sim_dict = self.__create_similarity_dict(prediction_results)
-        filtered_results = self.__filter_by_similarity(prediction_results, sim_dict)
-        return filtered_results
-
-    def sort_results(
-        self,
-        prediction_results: list[PredictionResult],
-    ) -> list[PredictionResult]:
-        """Sort prediction results by probability and timestamp in descending order."""
-        # Sort by probability (index 1) and start_time, both descending
-        sorted_results = sorted(
-            prediction_results,
-            key=lambda x: (round(x.probability[1], 4), x.data["mrHit"].source.start_time),
-            reverse=True,
-        )
-        return sorted_results
-
-    def prepare_not_found_object_info(
+    def _prepare_not_found_object_info(
         self,
         test_item_info: TestItemInfo,
         processed_time: float,
@@ -329,43 +364,10 @@ class SuggestService(AnalyzerService):
             "clusterId": test_item_info.clusterId,
         }
 
-    def get_query_for_test_item_in_cluster(self, test_item_info: TestItemInfo) -> dict:
-        return {
-            "_source": ["test_item"],
-            "query": {
-                "bool": {
-                    "filter": [
-                        {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
-                        {"exists": {"field": "issue_type"}},
-                        {"term": {"is_merged": False}},
-                    ],
-                    "should": [],
-                    "must": [
-                        {"term": {"launch_id": test_item_info.launchId}},
-                        {"term": {"cluster_id": test_item_info.clusterId}},
-                    ],
-                }
-            },
-        }
-
-    def get_query_for_logs_by_test_item(self, test_item_id: int) -> dict:
-        return {
-            "query": {
-                "bool": {
-                    "filter": [
-                        {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
-                        {"exists": {"field": "issue_type"}},
-                        {"term": {"is_merged": False}},
-                        {"term": {"test_item": test_item_id}},
-                    ]
-                }
-            }
-        }
-
-    def query_logs_for_cluster(self, test_item_info: TestItemInfo, index_name: str) -> tuple[list[dict], int]:
+    def _query_logs_for_cluster(self, test_item_info: TestItemInfo, index_name: str) -> tuple[list[dict], int]:
         test_item_id = None
         test_items = self.es_client.es_client.search(
-            index=index_name, body=self.get_query_for_test_item_in_cluster(test_item_info)
+            index=index_name, body=get_query_for_test_item_in_cluster(test_item_info)
         ) or {"hits": {"hits": []}}
         for res in test_items["hits"]["hits"]:
             test_item_id = int(res["_source"]["test_item"])
@@ -374,7 +376,7 @@ class SuggestService(AnalyzerService):
             return [], 0
         logs = []
         for log in opensearchpy.helpers.scan(
-            self.es_client.es_client, query=self.get_query_for_logs_by_test_item(test_item_id), index=index_name
+            self.es_client.es_client, query=get_query_for_logs_by_test_item(test_item_id), index=index_name
         ):
             # clean test item info not to boost by it
             log["_source"]["test_item"] = 0
@@ -384,10 +386,10 @@ class SuggestService(AnalyzerService):
             logs.append(log)
         return logs, test_item_id
 
-    def prepare_logs_for_suggestions(self, test_item_info: TestItemInfo, index_name: str) -> tuple[list[dict], int]:
+    def _prepare_logs_for_suggestions(self, test_item_info: TestItemInfo, index_name: str) -> tuple[list[dict], int]:
         test_item_id_for_suggest = test_item_info.testItemId
         if test_item_info.clusterId != 0:
-            prepared_logs, test_item_id_for_suggest = self.query_logs_for_cluster(test_item_info, index_name)
+            prepared_logs, test_item_id_for_suggest = self._query_logs_for_cluster(test_item_info, index_name)
         else:
             unique_logs = text_processing.leave_only_unique_logs(test_item_info.logs)
             prepared_logs = [
@@ -416,15 +418,15 @@ class SuggestService(AnalyzerService):
         model_info_tags = []
         feature_names = None
         try:
-            logs, test_item_id_for_suggest = self.prepare_logs_for_suggestions(test_item_info, index_name)
+            logs, test_item_id_for_suggest = self._prepare_logs_for_suggestions(test_item_info, index_name)
             LOGGER.info(f"Number of prepared log search requests for suggestions: {len(logs)}")
             LOGGER.debug(f"Log search requests for suggestions: {json.dumps(logs)}")
-            searched_res = self.query_es_for_suggested_items(test_item_info, logs)
+            searched_res = self._query_es_for_suggested_items(test_item_info, logs)
             res_num = reduce(lambda a, b: a + b, [len(res[1]["hits"]["hits"]) for res in searched_res], 0)
             LOGGER.info(f"Found {res_num} items by FTS (KNN)")
             LOGGER.debug(f"Items for suggestions by FTS (KNN): {json.dumps(searched_res)}")
 
-            boosting_config = self.get_config_for_boosting_suggests(test_item_info.analyzerConfig)
+            boosting_config = self._get_config_for_boosting_suggests(test_item_info.analyzerConfig)
             boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(test_item_info.project)
 
             predictor_class = PREDICTION_CLASSES[self.search_cfg.MlModelForSuggestions]
@@ -443,8 +445,8 @@ class SuggestService(AnalyzerService):
             if prediction_results:
                 # Extract model info tags (same for all results)
                 model_info_tags = prediction_results[0].model_info_tags
-                sorted_results = self.sort_results(prediction_results)
-                unique_results = self.deduplicate_results(sorted_results)
+                sorted_results = sort_results(prediction_results)
+                unique_results = deduplicate_results(sorted_results)
 
                 LOGGER.debug(f"Found {len(unique_results)} results for test items.")
                 for result in unique_results:
@@ -520,18 +522,6 @@ class SuggestService(AnalyzerService):
                 "errors_count": errors_count,
             }
         }
-        if not results:
-            self.es_client.create_index_for_stats_info(self.rp_suggest_metrics_index_template)
-            self.es_client.bulk_index(
-                [
-                    {
-                        "_index": self.rp_suggest_metrics_index_template,
-                        "_source": self.prepare_not_found_object_info(
-                            test_item_info, time() - t_start, feature_names, model_info_tags
-                        ),
-                    }
-                ]
-            )
         if self.app_config.amqpUrl:
             amqp_client = AmqpClient(self.app_config)
             if results:

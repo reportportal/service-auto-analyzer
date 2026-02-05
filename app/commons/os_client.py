@@ -17,7 +17,7 @@
 import traceback
 from datetime import datetime, timezone
 from time import time
-from typing import Any, Callable, Iterator, Optional
+from typing import Any, Callable, Iterator, Optional, Iterable
 
 import opensearchpy.helpers
 import urllib3
@@ -515,6 +515,26 @@ class OsClient:
                 yield Hit[TestItemIndexData].from_dict(doc)
         except Exception as err:
             LOGGER.exception("Error in search", exc_info=err)
+
+    def msearch(self, project_id: str | int, queries: Iterable[dict[str, Any]]) -> Iterator[Hit[TestItemIndexData]]:
+        """Execute several search operations at once.
+
+        :param project_id: The project identifier
+        :param queries: OpenSearch query iterable object
+        :return: Iterator of typed search hits
+        """
+        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
+        if not self._index_exists(index_name, print_error=False):
+            return
+
+        try:
+            results = self._os_client.msearch(body=queries, index=index_name)
+            responses = results["responses"] or []
+            for res in responses:
+                for hit in res.get("hits", {}).get("hits", []):
+                    yield Hit[TestItemIndexData].from_dict(hit)
+        except Exception as err:
+            LOGGER.exception("Error in msearch", exc_info=err)
 
     def get_launch_ids_by_start_time_range(self, project_id: str | int, start_date: str, end_date: str) -> list[str]:
         """Get launch IDs within a start time range.

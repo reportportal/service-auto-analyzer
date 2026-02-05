@@ -186,6 +186,19 @@ def test_search_returns_empty_when_index_missing(os_client_mock, app_config):
     os_client_mock.search.assert_not_called()
 
 
+def test_msearch_returns_empty_when_index_missing(monkeypatch, os_client_mock, app_config):
+    os_client_mock.indices.get.side_effect = Exception("missing index")
+    scan_mock = mock.Mock()
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", scan_mock)
+    client = OsClient(app_config, os_client=os_client_mock)
+
+    results = [hit for hit in client.msearch(PROJECT_ID, [{"query": {"match_all": {}}}])]
+
+    assert results == []
+    os_client_mock.msearch.assert_not_called()
+    scan_mock.assert_not_called()
+
+
 def test_get_test_item_returns_none_when_index_missing(os_client_mock, app_config):
     os_client_mock.indices.get.side_effect = Exception("missing index")
     client = OsClient(app_config, os_client=os_client_mock)
@@ -437,6 +450,38 @@ def test_search_calls_scan_when_scroll_provided(monkeypatch, os_client_mock, app
     assert captured["index"] == get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
     assert captured["query"] == request
     assert captured["scroll"] == "1m"
+
+
+def test_msearch_calls_opensearch_msearch(monkeypatch, os_client_mock, app_config, test_item):
+    os_client_mock.indices.get.return_value = {}
+    scan_mock = mock.Mock()
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", scan_mock)
+    client = OsClient(app_config, os_client=os_client_mock)
+    index_name = get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
+    queries = [{"query": {"match": {"test_item_id": test_item.test_item_id}}}]
+    os_client_mock.msearch.return_value = {
+        "responses": [
+            {
+                "hits": {
+                    "hits": [
+                        {
+                            "_index": index_name,
+                            "_id": test_item.test_item_id,
+                            "_score": 1.0,
+                            "_source": test_item.to_index_dict(),
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+
+    results = [hit for hit in client.msearch(PROJECT_ID, queries)]
+
+    assert len(results) == 1
+    assert results[0].source.test_item_id == test_item.test_item_id
+    os_client_mock.msearch.assert_called_once_with(body=queries, index=index_name)
+    scan_mock.assert_not_called()
 
 
 def test_delete_index_calls_opensearch_delete(os_client_mock, app_config):

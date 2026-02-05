@@ -1,10 +1,10 @@
-#  Copyright 2023 EPAM Systems
+#  Copyright 2025 EPAM Systems
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
 #  You may obtain a copy of the License at
 #
-#  https://www.apache.org/licenses/LICENSE-2.0
+#      https://www.apache.org/licenses/LICENSE-2.0
 #
 #  Unless required by applicable law or agreed to in writing, software
 #  distributed under the License is distributed on an "AS IS" BASIS,
@@ -81,6 +81,19 @@ class Boto3Client(BlobStorage):
             except ClientError as e:
                 LOGGER.warning(f"Failed to delete object {path} from bucket {bucket_name}: {e}")
 
+    def _create_bucket(self, bucket_name: str):
+        LOGGER.debug(f"Creating S3 bucket {bucket_name}")
+        try:
+            bucket_config = {}
+            if self.region != "us-east-1":
+                # us-east-1 doesn't accept LocationConstraint
+                bucket_config["CreateBucketConfiguration"] = {"LocationConstraint": self.region}
+            self.s3_client.create_bucket(Bucket=bucket_name, **bucket_config)
+            LOGGER.debug(f"Created S3 bucket {bucket_name}")
+        except ClientError as e:
+            if e.response["Error"]["Code"] != "BucketAlreadyOwnedByYou":
+                raise
+
     def put_project_object(self, data: Any, bucket: str, object_name: str, using_json=False) -> None:
         bucket_name = self.get_bucket(bucket)
         path = self.get_path(object_name, bucket_name, bucket)
@@ -92,18 +105,7 @@ class Boto3Client(BlobStorage):
             except ClientError as e:
                 if e.response["Error"]["Code"] != "404":
                     raise e
-
-                LOGGER.debug(f"Creating S3 bucket {bucket_name}")
-                try:
-                    bucket_config = {}
-                    if self.region != "us-east-1":
-                        # us-east-1 doesn't accept LocationConstraint
-                        bucket_config["CreateBucketConfiguration"] = {"LocationConstraint": self.region}
-                    self.s3_client.create_bucket(Bucket=bucket_name, **bucket_config)
-                    LOGGER.debug(f"Created S3 bucket {bucket_name}")
-                except ClientError as e:
-                    if e.response["Error"]["Code"] != "BucketAlreadyOwnedByYou":
-                        raise
+                self._create_bucket(bucket_name)
 
         data_to_save, content_type = self.serialize_data(data, using_json)
         data_stream = self.create_data_stream(data_to_save)

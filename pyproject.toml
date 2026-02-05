@@ -1,12 +1,12 @@
 [tool.isort]
 line_length = 119
 profile = "black"
-py_version = 311
+py_version = 312
 force_to_top = ["app.machine_learning.models.ml_model"]
 
 [tool.black]
 line-length = 119
-target-version = ["py311"]
+target-version = ["py312"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"

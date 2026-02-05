@@ -1,5 +1,7 @@
 # Changelog
 ## [Unreleased]
+### Changed
+- Status code detection improved, by @HardNorth
 
 ## [5.15.1]
 ### Changed

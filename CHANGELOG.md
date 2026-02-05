@@ -1,7 +1,7 @@
 # Changelog
 ## [Unreleased]
 ### Changed
-- Status code detection improved, by @HardNorth
+- Base image update, by @HardNorth
 
 ## [5.15.0]
 ### Added

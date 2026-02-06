@@ -99,6 +99,46 @@ def _get_log_text(log_item: LogItemIndexData) -> str:
     return " ".join([part.strip() for part in parts if part and part.strip()])
 
 
+def extract_inner_hit_logs(hits: list[Hit[TestItemIndexData]]) -> list[Hit[LogItemIndexData]]:
+    """Extract nested inner hit logs from test item hits and convert to log-centric model.
+
+    :param hits: Test item hits with inner_hits containing matched logs
+    :return: Flat list of log-centric hits extracted from inner_hits
+    """
+    extracted_hits: list[Hit[LogItemIndexData]] = []
+    for hit in hits:
+        inner_hits = hit.inner_hits or {}
+        inner_hits_logs = inner_hits.get("logs", {})
+        raw_inner_hits = inner_hits_logs.get("hits", {}).get("hits", [])
+        issue_type = normalize_issue_type(hit.source.issue_type)
+        for raw_inner_hit in raw_inner_hits:
+            inner_hit = Hit[LogData].from_dict(raw_inner_hit)
+            log_item = convert_test_item_log(hit.source, inner_hit.source, issue_type=issue_type)
+            extracted_hits.append(
+                Hit[LogItemIndexData].from_dict(
+                    {
+                        "_id": inner_hit.id or log_item.log_id,
+                        "_score": inner_hit.score or 0.0,
+                        "_source": log_item,
+                    }
+                )
+            )
+    return extracted_hits
+
+
+def build_search_results(
+    request_logs: list[LogItemIndexData],
+    buckets: list[list[Hit[LogItemIndexData]]],
+) -> list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]:
+    """Build search result pairs from request logs and their aligned buckets.
+
+    :param request_logs: Log items used as search requests
+    :param buckets: Buckets of found hits aligned with request logs
+    :return: List of (request_log, found_hits) tuples, excluding empty buckets
+    """
+    return [(log_item, bucket) for log_item, bucket in zip(request_logs, buckets) if bucket]
+
+
 def bucket_sort_logs_by_similarity(
     request_logs: list[LogItemIndexData],
     found_hits: list[Hit[LogItemIndexData]],

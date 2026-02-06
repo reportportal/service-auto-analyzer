@@ -29,7 +29,7 @@ from app.commons.model.db import Hit
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.log_item_index import LogItemIndexData
 from app.commons.model.ml import ModelType, TrainInfo
-from app.commons.model.test_item_index import LogData, TestItemIndexData
+from app.commons.model.test_item_index import TestItemIndexData
 from app.commons.model_chooser import ModelChooser
 from app.commons.os_client import OsClient
 from app.ml.boosting_featurizer import BoostingFeaturizer
@@ -38,7 +38,12 @@ from app.ml.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.ml.training import select_history_negative_types, validate_proportions
 from app.utils import text_processing, utils
 from app.utils.defaultdict import DefaultDict
-from app.utils.os_migration import bucket_sort_logs_by_similarity, convert_test_item_log, get_request_logs
+from app.utils.os_migration import (
+    bucket_sort_logs_by_similarity,
+    build_search_results,
+    extract_inner_hit_logs,
+    get_request_logs,
+)
 from app.utils.utils import _safe_int, normalize_issue_type
 
 LOGGER = logging.getLogger("analyzerApp.trainingAnalysisModel")
@@ -227,28 +232,6 @@ def _make_synthetic_test_item_id(base_id: int, index: int) -> int:
     return base * 10 + index + 1
 
 
-def extract_inner_hit_logs(hits: list[Hit[TestItemIndexData]]) -> list[Hit[LogItemIndexData]]:
-    extracted_hits: list[Hit[LogItemIndexData]] = []
-    for hit in hits:
-        inner_hits = hit.inner_hits or {}
-        inner_hits_logs = inner_hits.get("logs", {})
-        raw_inner_hits = inner_hits_logs.get("hits", {}).get("hits", [])
-        issue_type = normalize_issue_type(hit.source.issue_type)
-        for raw_inner_hit in raw_inner_hits:
-            inner_hit = Hit[LogData].from_dict(raw_inner_hit)
-            log_item = convert_test_item_log(hit.source, inner_hit.source, issue_type=issue_type)
-            extracted_hits.append(
-                Hit[LogItemIndexData].from_dict(
-                    {
-                        "_id": inner_hit.id or log_item.log_id,
-                        "_score": inner_hit.score or 0.0,
-                        "_source": log_item,
-                    }
-                )
-            )
-    return extracted_hits
-
-
 def build_history_negative_hits(
     request_logs: list[LogItemIndexData],
     history_negative_types: list[str],
@@ -275,13 +258,6 @@ def build_history_negative_hits(
                 Hit[LogItemIndexData].from_dict({"_id": synthetic_log.log_id, "_score": 0.0, "_source": synthetic_log})
             )
     return synthetic_hits
-
-
-def build_search_results(
-    request_logs: list[LogItemIndexData],
-    buckets: list[list[Hit[LogItemIndexData]]],
-) -> list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]:
-    return [(log_item, bucket) for log_item, bucket in zip(request_logs, buckets) if bucket]
 
 
 class AnalysisModelTraining:

@@ -35,8 +35,9 @@ from app.commons.model_chooser import ModelChooser
 from app.commons.os_client import OsClient
 from app.ml.models import CustomDefectTypeModel, DefectTypeModel
 from app.ml.models.defect_type_model import DATA_FIELD
-from app.ml.training import normalize_issue_type, select_history_negative_types, validate_proportions
+from app.ml.training import select_history_negative_types, validate_proportions
 from app.utils.defaultdict import DefaultDict
+from app.utils.utils import normalize_issue_type
 
 LOGGER = logging.getLogger("analyzerApp.trainingDefectTypeModel")
 DEFAULT_RANDOM_SEED = 1257

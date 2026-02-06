@@ -14,27 +14,15 @@
 
 """Common package for ML Model training code."""
 import logging
-from typing import Any
 
 from app.commons.model.test_item_index import TestItemHistoryData
 from app.utils import utils
+from app.utils.utils import normalize_issue_type
 
 LOGGER = logging.getLogger("analyzerApp.training")
 
 MAX_HISTORY_NEGATIVES = 2
 DUE_PROPORTION = 0.2
-
-
-def normalize_issue_type(issue_type: Any) -> str:
-    """
-    Normalize issue type to lowercase string.
-
-    :param issue_type: Raw issue type
-    :return: Normalized issue type
-    """
-    if issue_type is None:
-        return ""
-    return str(issue_type).strip().lower()
 
 
 def select_history_negative_types(

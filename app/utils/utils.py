@@ -396,3 +396,28 @@ def append_aa_ma_boosts(query: dict[str, Any], search_cfg: launch_objects.Search
 def strip_path(path: str) -> str:
     """Strip trailing slashes from a path."""
     return path.strip().rstrip("/").rstrip("\\")
+
+
+def normalize_issue_type(issue_type: Any) -> str:
+    """
+    Normalize issue type to lowercase string.
+
+    :param issue_type: Raw issue type
+    :return: Normalized issue type
+    """
+    if issue_type is None:
+        return ""
+    return str(issue_type).strip().lower()
+
+
+def _safe_int(value: Any) -> int:
+    """
+    Safely cast a value to integer.
+
+    :param value: Value to cast
+    :return: Integer value or 0 on failure
+    """
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0

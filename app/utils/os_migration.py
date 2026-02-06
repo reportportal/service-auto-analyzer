@@ -11,25 +11,11 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from typing import Any
 
-from commons.model import LogData, LogItemIndexData, TestItemIndexData
-from commons.model.db import Hit
-from ml.training import normalize_issue_type
-from utils import text_processing
-
-
-def _safe_int(value: Any) -> int:
-    """
-    Safely cast a value to integer.
-
-    :param value: Value to cast
-    :return: Integer value or 0 on failure
-    """
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return 0
+from app.commons.model import LogData, LogItemIndexData, TestItemIndexData
+from app.commons.model.db import Hit
+from app.utils import text_processing
+from app.utils.utils import _safe_int, normalize_issue_type
 
 
 def convert_test_item_log(

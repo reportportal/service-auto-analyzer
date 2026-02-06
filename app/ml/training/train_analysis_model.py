@@ -35,10 +35,11 @@ from app.commons.os_client import OsClient
 from app.ml.boosting_featurizer import BoostingFeaturizer
 from app.ml.models import BoostingDecisionMaker, CustomBoostingDecisionMaker, DefectTypeModel
 from app.ml.suggest_boosting_featurizer import SuggestBoostingFeaturizer
-from app.ml.training import normalize_issue_type, select_history_negative_types, validate_proportions
+from app.ml.training import select_history_negative_types, validate_proportions
 from app.utils import text_processing, utils
 from app.utils.defaultdict import DefaultDict
 from app.utils.os_migration import bucket_sort_logs_by_similarity, convert_test_item_log, get_request_logs
+from app.utils.utils import _safe_int, normalize_issue_type
 
 LOGGER = logging.getLogger("analyzerApp.trainingAnalysisModel")
 TRAIN_DATA_RANDOM_STATES = [1257, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029, 2137]
@@ -246,19 +247,6 @@ def extract_inner_hit_logs(hits: list[Hit[TestItemIndexData]]) -> list[Hit[LogIt
                 )
             )
     return extracted_hits
-
-
-def _safe_int(value: Any) -> int:
-    """
-    Safely cast a value to integer.
-
-    :param value: Value to cast
-    :return: Integer value or 0 on failure
-    """
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return 0
 
 
 def build_history_negative_hits(

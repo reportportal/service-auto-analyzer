@@ -222,17 +222,17 @@ class ServiceProcessor:
             "prepare_response_data": prepare_index_response_data,
         },
         "index_suggest_info": {
-            "handler": log_suggest_info_index_warning,
+            "handler": lambda s: log_suggest_info_index_warning,
             "prepare_data_func": prepare_suggest_info_list,
             "prepare_response_data": prepare_index_response_data,
         },
         "remove_suggest_info": {
-            "handler": log_suggest_info_remove_warning,
+            "handler": lambda s: log_suggest_info_remove_warning,
             "prepare_data_func": to_int,
             "prepare_response_data": to_str,
         },
         "update_suggest_info": {
-            "handler": log_suggest_info_update_warning,
+            "handler": lambda s: log_suggest_info_update_warning,
             "prepare_data_func": same_data,
             "prepare_response_data": to_json,
         },

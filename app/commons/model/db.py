@@ -13,7 +13,7 @@
 #  limitations under the License.
 from typing import Any, Generic, Optional, TypeVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, AliasChoices
 
 T = TypeVar("T")
 
@@ -23,8 +23,8 @@ class Hit(BaseModel, Generic[T]):
 
     index: Optional[str] = Field(default=None, validation_alias="_index")
     id: Optional[str] = Field(default=None, validation_alias="_id")
-    score: Optional[float] = Field(default=None, validation_alias="_score")
-    source: T = Field(validation_alias="_source")
+    score: Optional[float] = Field(default=None, validation_alias=AliasChoices("score", "_score"))
+    source: T = Field(validation_alias=AliasChoices("source", "_source"))
     normalized_score: float = 0.0
     sort: Optional[list[Any]] = None
     highlight: Optional[dict[str, Any]] = None

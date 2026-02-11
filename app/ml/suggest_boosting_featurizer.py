@@ -46,7 +46,10 @@ class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
         if self.scores_by_type is not None:
             return self.scores_by_type
         scores_by_type: dict[str, dict[str, Any]] = defaultdict(
-            lambda: {"mrHit": Hit[LogItemIndexData](score=-1, source=LogItemIndexData()), "score": 0}
+            lambda: {
+                "mrHit": Hit[LogItemIndexData](score=-1, source=LogItemIndexData(), normalized_score=-1.0),
+                "score": 0,
+            }
         )
         for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):

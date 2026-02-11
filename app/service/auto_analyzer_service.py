@@ -92,6 +92,86 @@ def _prepare_logs(launch: Launch, test_item: TestItem, index_name: str) -> list[
     return results
 
 
+def choose_fields_to_filter_strict(log_lines: int, min_should_match: float) -> list[str]:
+    fields = ["detected_message", "message"] if log_lines == -1 else ["message"]
+    if min_should_match > 0.99:
+        fields.append("found_tests_and_methods")
+    return fields
+
+
+def leave_only_similar_logs(
+    candidates_with_no_defect: list[tuple[dict[str, Any], dict[str, Any]]], boosting_config: dict[str, Any]
+) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    new_results = []
+    for log_info, search_res in candidates_with_no_defect:
+        no_defect_candidate_exists = False
+        for log in search_res["hits"]["hits"]:
+            if log["_source"]["issue_type"][:2].lower() in ["nd", "ti"]:
+                no_defect_candidate_exists = True
+        new_search_res = []
+        _similarity_calculator = SimilarityCalculator()
+        if no_defect_candidate_exists:
+            sim_dict = _similarity_calculator.find_similarity(
+                [(log_info, search_res)], ["message", "merged_small_logs"]
+            )
+            for obj in search_res["hits"]["hits"]:
+                group_id = (str(obj["_id"]), str(log_info["_id"]))
+                if group_id in sim_dict["message"]:
+                    sim_val = sim_dict["message"][group_id]
+                    if sim_val.both_empty:
+                        sim_val = sim_dict["merged_small_logs"][group_id]
+                    threshold = boosting_config["min_should_match"]
+                    if not sim_val.both_empty and sim_val.similarity >= threshold:
+                        new_search_res.append(obj)
+        new_results.append((log_info, {"hits": {"hits": new_search_res}}))
+    return new_results
+
+
+def filter_by_all_logs_should_be_similar(
+    candidates_with_no_defect: list[tuple[dict[str, Any], dict[str, Any]]], boosting_config: dict[str, Any]
+) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    if boosting_config["filter_by_all_logs_should_be_similar"]:
+        test_item_stats = {}
+        for log_info, search_res in candidates_with_no_defect:
+            for log in search_res["hits"]["hits"]:
+                if log["_source"]["test_item"] not in test_item_stats:
+                    test_item_stats[log["_source"]["test_item"]] = 0
+                test_item_stats[log["_source"]["test_item"]] += 1
+        new_results = []
+        for log_info, search_res in candidates_with_no_defect:
+            new_search_res = []
+            for log in search_res["hits"]["hits"]:
+                if log["_source"]["test_item"] in test_item_stats:
+                    if test_item_stats[log["_source"]["test_item"]] == len(candidates_with_no_defect):
+                        new_search_res.append(log)
+            new_results.append((log_info, {"hits": {"hits": new_search_res}}))
+        return new_results
+    return candidates_with_no_defect
+
+
+def find_relevant_with_no_defect(
+    candidates_with_no_defect: list[tuple[dict[str, Any], dict[str, Any]]], boosting_config: dict[str, Any]
+) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    candidates_with_no_defect = leave_only_similar_logs(candidates_with_no_defect, boosting_config)
+    candidates_with_no_defect = filter_by_all_logs_should_be_similar(candidates_with_no_defect, boosting_config)
+    for log_info, search_res in candidates_with_no_defect:
+        latest_type = None
+        latest_item = None
+        latest_date = None
+        for obj in search_res["hits"]["hits"]:
+            LOGGER.debug(
+                "%s %s %s", obj["_source"]["start_time"], obj["_source"]["issue_type"], obj["_source"]["test_item"]
+            )
+            start_time = datetime.strptime(obj["_source"]["start_time"], "%Y-%m-%d %H:%M:%S")
+            if latest_date is None or latest_date < start_time:
+                latest_type = obj["_source"]["issue_type"]
+                latest_item = obj
+                latest_date = start_time
+        if latest_type and latest_type[:2].lower() in ["nd", "ti"]:
+            return [(log_info, {"hits": {"hits": [latest_item]}})]
+    return []
+
+
 class AutoAnalyzerService(AnalyzerService):
     app_config: ApplicationConfig
     es_client: EsClient
@@ -111,14 +191,14 @@ class AutoAnalyzerService(AnalyzerService):
         self.es_client = es_client or EsClient(app_config=self.app_config)
         self.namespace_finder = NamespaceFinder(app_config)
 
-    def get_config_for_boosting(self, analyzer_config: AnalyzerConf) -> dict[str, Any]:
+    def _get_config_for_boosting(self, analyzer_config: AnalyzerConf) -> dict[str, Any]:
         min_should_match = self.find_min_should_match_threshold(analyzer_config) / 100
         return {
             "max_query_terms": self.search_cfg.MaxQueryTerms,
             "min_should_match": min_should_match,
             "min_word_length": self.search_cfg.MinWordLength,
             "filter_min_should_match_any": [],
-            "filter_min_should_match": self.choose_fields_to_filter_strict(
+            "filter_min_should_match": choose_fields_to_filter_strict(
                 analyzer_config.numberOfLogLines, min_should_match
             ),
             "number_of_log_lines": analyzer_config.numberOfLogLines,
@@ -128,25 +208,19 @@ class AutoAnalyzerService(AnalyzerService):
             "time_weight_decay": self.search_cfg.TimeWeightDecay,
         }
 
-    def choose_fields_to_filter_strict(self, log_lines: int, min_should_match: float) -> list[str]:
-        fields = ["detected_message", "message"] if log_lines == -1 else ["message"]
-        if min_should_match > 0.99:
-            fields.append("found_tests_and_methods")
-        return fields
-
-    def get_min_should_match_setting(self, launch: Launch) -> str:
+    def _get_min_should_match_setting(self, launch: Launch) -> str:
         if launch.analyzerConfig.minShouldMatch > 0:
             return f"{launch.analyzerConfig.minShouldMatch}%"
         return self.search_cfg.MinShouldMatch
 
-    def build_analyze_query(self, launch: Launch, log: dict[str, Any], size: int = 10) -> dict[str, Any]:
+    def _build_analyze_query(self, launch: Launch, log: dict[str, Any], size: int = 10) -> dict[str, Any]:
         """Build query to get similar log entries for the given log entry.
 
         This query is used to find similar log entries for the given log entry, the results of this query then will be
         used to find the most relevant log entry with the issue type, and then in the Gradient Boosting model to
         predict the issue type for the given log entry.
         """
-        min_should_match = self.get_min_should_match_setting(launch)
+        min_should_match = self._get_min_should_match_setting(launch)
 
         query = self.build_common_query(log, size=size)
         query = self.add_constraints_for_launches_into_query(query, launch)
@@ -222,8 +296,8 @@ class AutoAnalyzerService(AnalyzerService):
 
         return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
 
-    def build_query_with_no_defect(self, launch: Launch, log: dict[str, Any], size: int = 10) -> dict[str, Any]:
-        min_should_match = self.get_min_should_match_setting(launch)
+    def _build_query_with_no_defect(self, launch: Launch, log: dict[str, Any], size: int = 10) -> dict[str, Any]:
+        min_should_match = self._get_min_should_match_setting(launch)
         query: dict[str, Any] = {
             "size": size,
             "sort": ["_score", {"start_time": "desc"}],
@@ -268,78 +342,6 @@ class AutoAnalyzerService(AnalyzerService):
             )
         utils.append_potential_status_codes(query, log, max_query_terms=self.search_cfg.MaxQueryTerms)
         return self.add_query_with_start_time_decay(query, log["_source"]["start_time"])
-
-    def leave_only_similar_logs(
-        self, candidates_with_no_defect: list[tuple[dict[str, Any], dict[str, Any]]], boosting_config: dict[str, Any]
-    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
-        new_results = []
-        for log_info, search_res in candidates_with_no_defect:
-            no_defect_candidate_exists = False
-            for log in search_res["hits"]["hits"]:
-                if log["_source"]["issue_type"][:2].lower() in ["nd", "ti"]:
-                    no_defect_candidate_exists = True
-            new_search_res = []
-            _similarity_calculator = SimilarityCalculator()
-            if no_defect_candidate_exists:
-                sim_dict = _similarity_calculator.find_similarity(
-                    [(log_info, search_res)], ["message", "merged_small_logs"]
-                )
-                for obj in search_res["hits"]["hits"]:
-                    group_id = (str(obj["_id"]), str(log_info["_id"]))
-                    if group_id in sim_dict["message"]:
-                        sim_val = sim_dict["message"][group_id]
-                        if sim_val.both_empty:
-                            sim_val = sim_dict["merged_small_logs"][group_id]
-                        threshold = boosting_config["min_should_match"]
-                        if not sim_val.both_empty and sim_val.similarity >= threshold:
-                            new_search_res.append(obj)
-            new_results.append((log_info, {"hits": {"hits": new_search_res}}))
-        return new_results
-
-    def filter_by_all_logs_should_be_similar(
-        self, candidates_with_no_defect: list[tuple[dict[str, Any], dict[str, Any]]], boosting_config: dict[str, Any]
-    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
-        if boosting_config["filter_by_all_logs_should_be_similar"]:
-            test_item_stats = {}
-            for log_info, search_res in candidates_with_no_defect:
-                for log in search_res["hits"]["hits"]:
-                    if log["_source"]["test_item"] not in test_item_stats:
-                        test_item_stats[log["_source"]["test_item"]] = 0
-                    test_item_stats[log["_source"]["test_item"]] += 1
-            new_results = []
-            for log_info, search_res in candidates_with_no_defect:
-                new_search_res = []
-                for log in search_res["hits"]["hits"]:
-                    if log["_source"]["test_item"] in test_item_stats:
-                        if test_item_stats[log["_source"]["test_item"]] == len(candidates_with_no_defect):
-                            new_search_res.append(log)
-                new_results.append((log_info, {"hits": {"hits": new_search_res}}))
-            return new_results
-        return candidates_with_no_defect
-
-    def find_relevant_with_no_defect(
-        self, candidates_with_no_defect: list[tuple[dict[str, Any], dict[str, Any]]], boosting_config: dict[str, Any]
-    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
-        candidates_with_no_defect = self.leave_only_similar_logs(candidates_with_no_defect, boosting_config)
-        candidates_with_no_defect = self.filter_by_all_logs_should_be_similar(
-            candidates_with_no_defect, boosting_config
-        )
-        for log_info, search_res in candidates_with_no_defect:
-            latest_type = None
-            latest_item = None
-            latest_date = None
-            for obj in search_res["hits"]["hits"]:
-                LOGGER.debug(
-                    "%s %s %s", obj["_source"]["start_time"], obj["_source"]["issue_type"], obj["_source"]["test_item"]
-                )
-                start_time = datetime.strptime(obj["_source"]["start_time"], "%Y-%m-%d %H:%M:%S")
-                if latest_date is None or latest_date < start_time:
-                    latest_type = obj["_source"]["issue_type"]
-                    latest_item = obj
-                    latest_date = start_time
-            if latest_type and latest_type[:2].lower() in ["nd", "ti"]:
-                return [(log_info, {"hits": {"hits": [latest_item]}})]
-        return []
 
     def _process_batch(
         self,
@@ -428,8 +430,8 @@ class AutoAnalyzerService(AnalyzerService):
                         if log["_source"]["log_level"] < ERROR_LOGGING_LEVEL or (not message and not merged_logs):
                             continue
                         for query_type, query in [
-                            ("without no defect", self.build_analyze_query(launch, log)),
-                            ("with no defect", self.build_query_with_no_defect(launch, log)),
+                            ("without no defect", self._build_analyze_query(launch, log)),
+                            ("with no defect", self._build_query_with_no_defect(launch, log)),
                         ]:
                             full_query = "{}\n{}".format(json.dumps({"index": index_name}), json.dumps(query))
                             batches.append(full_query)
@@ -499,7 +501,7 @@ class AutoAnalyzerService(AnalyzerService):
 
                 # Create predictor for auto analysis
                 analyzer_config = analyzer_candidates[0].analyzerConfig  # Same for all candidates in the launch
-                boosting_config = self.get_config_for_boosting(analyzer_config)
+                boosting_config = self._get_config_for_boosting(analyzer_config)
                 predictor = AutoAnalysisPredictor(
                     model_chooser=self.model_chooser,
                     project_id=project_id,
@@ -540,7 +542,7 @@ class AutoAnalyzerService(AnalyzerService):
                             chosen_namespaces[project_id] = self.namespace_finder.get_chosen_namespaces(project_id)
                         boosting_config["chosen_namespaces"] = chosen_namespaces[project_id]
 
-                        relevant_with_no_defect_candidate = self.find_relevant_with_no_defect(
+                        relevant_with_no_defect_candidate = find_relevant_with_no_defect(
                             analyzer_candidate.candidatesWithNoDefect, boosting_config
                         )
 

@@ -285,13 +285,7 @@ def deduplicate_results(
 
 
 def choose_fields_to_filter_suggests(log_lines_num: int) -> list[str]:
-    if log_lines_num == -1:
-        return [
-            "detected_message_extended",
-            "detected_message_without_params_extended",
-            "detected_message_without_params_and_brackets",
-        ]
-    return ["message_extended", "message_without_params_extended", "message_without_params_and_brackets"]
+    return UNSHORTENED_MESSAGE_FIELDS if log_lines_num == -1 else SHORTENED_MESSAGE_FIELDS
 
 
 class SuggestService(AnalyzerService):
@@ -356,7 +350,7 @@ class SuggestService(AnalyzerService):
         nested_should: list[dict[str, Any]] = []
 
         # Build more_like_this clauses for all 3 field variants
-        message_fields = UNSHORTENED_MESSAGE_FIELDS if log_lines == -1 else SHORTENED_MESSAGE_FIELDS
+        message_fields = choose_fields_to_filter_suggests(log_lines)
 
         for message_field in message_fields:
             message_text = getattr(request_log, message_field, "").strip()

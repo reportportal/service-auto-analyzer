@@ -13,7 +13,7 @@
 #  limitations under the License.
 from typing import Any, Generic, Optional, TypeVar
 
-from pydantic import BaseModel, Field, AliasChoices
+from pydantic import AliasChoices, BaseModel, Field
 
 T = TypeVar("T")
 

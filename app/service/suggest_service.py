@@ -50,8 +50,9 @@ from app.utils.os_migration import (
 LOGGER = logging.getLogger("analyzerApp.suggestService")
 
 ERROR_LEVEL = 40000
+SIMILARITY_THRESHOLD = 0.98
 
-SPECIAL_FIELDS_BOOST_SCORES = [
+LOG_FIELDS_BOOST_SCORES = [
     ("detected_message_without_params_extended", 2.0),
     ("only_numbers", 2.0),
     ("message_params", 2.0),
@@ -59,6 +60,9 @@ SPECIAL_FIELDS_BOOST_SCORES = [
     ("paths", 2.0),
     ("found_exceptions_extended", 8.0),
     ("found_tests_and_methods", 2.0),
+]
+
+TEST_ITEM_FIELDS_BOOST_SCORES = [
     ("test_item_name", 2.0),
 ]
 
@@ -90,6 +94,18 @@ INNER_HITS_SOURCE = [
     "logs.paths",
     "logs.message_params",
     "logs.whole_message",
+]
+
+UNSHORTENED_MESSAGE_FIELDS = [
+    "detected_message_extended",
+    "detected_message_without_params_extended",
+    "detected_message_without_params_and_brackets",
+]
+
+SHORTENED_MESSAGE_FIELDS = [
+    "message_extended",
+    "message_without_params_extended",
+    "message_without_params_and_brackets",
 ]
 
 TEST_ITEM_SOURCE_FIELDS = [
@@ -250,9 +266,9 @@ def _filter_by_similarity(
             stacktrace_sim = sim_dict["stacktrace"][group_id]
             whole_message_sim = sim_dict["whole_message"][group_id]
             if (
-                (detected_message_sim.both_empty or detected_message_sim.similarity >= 0.98)
-                and (stacktrace_sim.both_empty or stacktrace_sim.similarity >= 0.98)
-                and (whole_message_sim.both_empty or whole_message_sim.similarity >= 0.98)
+                (detected_message_sim.both_empty or detected_message_sim.similarity >= SIMILARITY_THRESHOLD)
+                and (stacktrace_sim.both_empty or stacktrace_sim.similarity >= SIMILARITY_THRESHOLD)
+                and (whole_message_sim.both_empty or whole_message_sim.similarity >= SIMILARITY_THRESHOLD)
             ):
                 deleted_indices.add(j)
         filtered_results.append(prediction_results[i])
@@ -339,24 +355,11 @@ class SuggestService(AnalyzerService):
 
         nested_should: list[dict[str, Any]] = []
 
-        # Build MLT clauses for all 3 field variants
-        if log_lines == -1:
-            field_sets = [
-                ("detected_message_extended", "stacktrace_extended"),
-                ("detected_message_without_params_extended", "stacktrace_extended"),
-                ("detected_message_without_params_and_brackets", "stacktrace_extended"),
-            ]
-        else:
-            field_sets = [
-                ("message_extended", "stacktrace_extended"),
-                ("message_without_params_extended", "stacktrace_extended"),
-                ("message_without_params_and_brackets", "stacktrace_extended"),
-            ]
+        # Build more_like_this clauses for all 3 field variants
+        message_fields = UNSHORTENED_MESSAGE_FIELDS if log_lines == -1 else SHORTENED_MESSAGE_FIELDS
 
-        for message_field, stacktrace_field in field_sets:
+        for message_field in message_fields:
             message_text = getattr(request_log, message_field, "").strip()
-            stacktrace_text = getattr(request_log, stacktrace_field, "").strip()
-
             if message_text:
                 nested_should.append(
                     utils.build_more_like_this_query(
@@ -367,23 +370,22 @@ class SuggestService(AnalyzerService):
                         max_query_terms=self.search_cfg.MaxQueryTerms,
                     )
                 )
-            if stacktrace_text:
-                boost = 2.0 if log_lines == -1 else 1.0
-                nested_should.append(
-                    utils.build_more_like_this_query(
-                        min_should_match,
-                        stacktrace_text,
-                        field_name=f"logs.{stacktrace_field}",
-                        boost=boost,
-                        max_query_terms=self.search_cfg.MaxQueryTerms,
-                    )
-                )
 
-        # Add special field boosts
-        for field, boost_score in SPECIAL_FIELDS_BOOST_SCORES:
-            if field == "test_item_name":
-                # test_item_name is a top-level field, not nested
-                continue
+        stacktrace_text = request_log.stacktrace_extended.strip()
+        if stacktrace_text:
+            stacktrace_boost = 2.0 if log_lines == -1 else 1.0
+            nested_should.append(
+                utils.build_more_like_this_query(
+                    min_should_match,
+                    stacktrace_text,
+                    field_name="logs.stacktrace_extended",
+                    boost=stacktrace_boost,
+                    max_query_terms=self.search_cfg.MaxQueryTerms,
+                )
+            )
+
+        # Add special log field boosts
+        for field, boost_score in LOG_FIELDS_BOOST_SCORES:
             field_value = getattr(request_log, field, "").strip()
             if field_value:
                 nested_should.append(
@@ -441,19 +443,20 @@ class SuggestService(AnalyzerService):
             },
         ]
 
-        # test_item_name boost at the top level
-        test_item_name_value = request_log.test_item_name.strip()
-        if test_item_name_value:
-            outer_should.append(
-                utils.build_more_like_this_query(
-                    "1",
-                    test_item_name_value,
-                    field_name="test_item_name",
-                    boost=2.0,
-                    override_min_should_match="1",
-                    max_query_terms=self.search_cfg.MaxQueryTerms,
+        # Add special test item field boosts
+        for field, boost_score in TEST_ITEM_FIELDS_BOOST_SCORES:
+            field_value = getattr(request_log, field, "").strip()
+            if field_value:
+                outer_should.append(
+                    utils.build_more_like_this_query(
+                        "1",
+                        field_value,
+                        field_name=field,
+                        boost=boost_score,
+                        override_min_should_match="1",
+                        max_query_terms=self.search_cfg.MaxQueryTerms,
+                    )
                 )
-            )
 
         query: dict[str, Any] = {
             "size": size,

@@ -27,6 +27,7 @@ from requests import RequestException
 
 from app.commons import logging
 from app.commons.model import launch_objects
+from app.ml.predictor import PredictionResult
 from app.utils.text_processing import remove_credentials_from_url, split_words
 
 logger = logging.getLogger("analyzerApp.utils")
@@ -117,6 +118,7 @@ def extract_all_exceptions(bodies):
 
 
 MINIMAL_VALUE_FOR_GOOD_PROPORTION = 2
+ERROR_LOG_LEVEL = 40000
 
 
 def calculate_proportions_for_labels(labels: list[int]) -> float:
@@ -127,6 +129,22 @@ def calculate_proportions_for_labels(labels: list[int]) -> float:
         if min_val > MINIMAL_VALUE_FOR_GOOD_PROPORTION:
             return np.round(min_val / max_val, 3)
     return 0.0
+
+
+def calculate_log_weight(log_level: int, message_length: int, max_message_length: int) -> float:
+    """Calculate log contribution weight for central-weighted scoring.
+
+    ERROR log level (40000) has level weight 1.0; other levels are scaled relatively.
+    The longest message has length weight 1.0; shorter messages are scaled relatively.
+
+    :param log_level: Numeric log level
+    :param message_length: Length of the current log message
+    :param max_message_length: Maximum message length within the compared group
+    :return: Combined weight
+    """
+    level_weight = log_level / ERROR_LOG_LEVEL if ERROR_LOG_LEVEL > 0 else 0.0
+    length_weight = message_length / max_message_length if max_message_length > 0 else 0.0
+    return level_weight * length_weight
 
 
 def balance_data(
@@ -421,3 +439,69 @@ def _safe_int(value: Any) -> int:
         return int(value)
     except (TypeError, ValueError):
         return 0
+
+
+def group_predictions_by_test_item(
+    prediction_results: list[PredictionResult],
+) -> dict[int, list[PredictionResult]]:
+    """Group prediction results by the found test item ID.
+
+    :param prediction_results: List of prediction results from the Predictor
+    :return: Dictionary mapping test item ID to its prediction results
+    """
+    groups: dict[int, list[PredictionResult]] = {}
+    for result in prediction_results:
+        test_item_id = result.data["mrHit"].source.test_item
+        if test_item_id not in groups:
+            groups[test_item_id] = []
+        groups[test_item_id].append(result)
+    return groups
+
+
+def score_and_rank_test_items(
+    grouped_predictions: dict[int, list[PredictionResult]],
+) -> list[tuple[float, PredictionResult]]:
+    """Calculate central-weighted score per test item and rank them.
+
+    For each test item group:
+    1. Find max message length across all logs
+    2. Compute weight and weighted score for each prediction
+    3. Compute weighted average score
+    4. Pick the most significant log (highest weight)
+
+    :param grouped_predictions: Predictions grouped by test item ID
+    :return: List of (weighted_avg, most_significant_result) sorted descending
+    """
+    ranked: list[tuple[float, PredictionResult]] = []
+    for _test_item_id, results in grouped_predictions.items():
+        max_message_length = max(len(r.data["mrHit"].source.message) for r in results)
+        if max_message_length <= 0:
+            max_message_length = 1
+
+        weighted_sum = 0.0
+        weight_sum = 0.0
+        best_weight = -1.0
+        best_result = results[0]
+
+        for result in results:
+            log_level = result.data["mrHit"].source.log_level
+            msg_len = len(result.data["mrHit"].source.message)
+            weight = calculate_log_weight(log_level, msg_len, max_message_length)
+            prob = result.probability[1]
+            weighted_sum += prob * weight
+            weight_sum += weight
+            if weight > best_weight:
+                best_weight = weight
+                best_result = result
+
+        weighted_avg = weighted_sum / weight_sum if weight_sum > 0 else 0.0
+        ranked.append((weighted_avg, best_result))
+
+    ranked.sort(key=lambda item: item[0], reverse=True)
+    return ranked
+
+
+def prepare_restrictions_by_issue_type(filter_no_defect: bool = True) -> list[dict]:
+    if filter_no_defect:
+        return [{"wildcard": {"issue_type": "ti*"}}, {"wildcard": {"issue_type": "nd*"}}]
+    return [{"term": {"issue_type": "ti001"}}]

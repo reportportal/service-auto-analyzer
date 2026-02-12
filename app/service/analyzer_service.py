@@ -12,10 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Any, Optional
-
 from app.commons import logging
-from app.commons.model.launch_objects import ERROR_LOGGING_LEVEL, AnalyzerConf, Launch, SearchConfig, TestItemInfo
+from app.commons.model.launch_objects import AnalyzerConf, Launch, SearchConfig, TestItemInfo
 from app.utils import utils
 
 LOGGER = logging.getLogger("analyzerApp.analyzerService")
@@ -115,62 +113,6 @@ class AnalyzerService:
 
     def add_constraints_for_launches_into_query_suggest(self, query: dict, test_item_info: TestItemInfo) -> dict:
         return add_constraints_for_launches_into_query_suggest(query, test_item_info, self.launch_boost)
-
-    def build_more_like_this_query(
-        self,
-        min_should_match: str,
-        log_message: str,
-        field_name: str = "message",
-        boost: float = 1.0,
-        override_min_should_match: Optional[str] = None,
-    ) -> dict:
-        """Build more like this query"""
-        return utils.build_more_like_this_query(
-            min_should_match=min_should_match,
-            log_message=log_message,
-            field_name=field_name,
-            boost=boost,
-            override_min_should_match=override_min_should_match,
-            max_query_terms=self.search_cfg.MaxQueryTerms,
-        )
-
-    @staticmethod
-    def prepare_restrictions_by_issue_type(filter_no_defect: bool = True) -> list[dict]:
-        if filter_no_defect:
-            return [{"wildcard": {"issue_type": "ti*"}}, {"wildcard": {"issue_type": "nd*"}}]
-        return [{"term": {"issue_type": "ti001"}}]
-
-    def build_common_query(self, log: dict[str, Any], size=10, filter_no_defect=True) -> dict[str, Any]:
-        issue_type_conditions = self.prepare_restrictions_by_issue_type(filter_no_defect=filter_no_defect)
-        common_query = {
-            "size": size,
-            "sort": [
-                "_score",
-                {"start_time": "desc"},
-            ],
-            "query": {
-                "bool": {
-                    "filter": [
-                        {"range": {"log_level": {"gte": ERROR_LOGGING_LEVEL}}},
-                        {"exists": {"field": "issue_type"}},
-                    ],
-                    "must_not": issue_type_conditions + [{"term": {"test_item": log["_source"]["test_item"]}}],
-                    "should": [
-                        {
-                            "term": {
-                                "test_case_hash": {
-                                    "value": log["_source"]["test_case_hash"],
-                                    "boost": abs(self.search_cfg.BoostTestCaseHash),
-                                }
-                            }
-                        },
-                    ],
-                }
-            },
-        }
-
-        utils.append_aa_ma_boosts(common_query, self.search_cfg)
-        return common_query
 
     def add_query_with_start_time_decay(self, main_query: dict, start_time: str) -> dict:
         return {

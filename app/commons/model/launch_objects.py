@@ -17,6 +17,8 @@ from typing import Any, Optional, Union
 
 from pydantic import BaseModel
 
+from app.commons.model import LogItemIndexData
+from app.commons.model.db import Hit
 from app.commons.model.ml import ModelType
 
 ERROR_LOGGING_LEVEL: int = 40000
@@ -346,7 +348,7 @@ class AnalysisCandidate(BaseModel):
     analyzerConfig: AnalyzerConf
     testItemId: int
     timeProcessed: float
-    candidates: list[tuple]
+    candidates: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]
     candidatesWithNoDefect: list[tuple[dict[str, Any], dict[str, Any]]]
     project: int
     launchId: int

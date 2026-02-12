@@ -1,10 +1,10 @@
-#  Copyright 2023 EPAM Systems
+#  Copyright 2026 EPAM Systems
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
 #  You may obtain a copy of the License at
 #
-#  https://www.apache.org/licenses/LICENSE-2.0
+#      https://www.apache.org/licenses/LICENSE-2.0
 #
 #  Unless required by applicable law or agreed to in writing, software
 #  distributed under the License is distributed on an "AS IS" BASIS,
@@ -49,7 +49,6 @@ from app.utils.os_migration import (
 
 LOGGER = logging.getLogger("analyzerApp.suggestService")
 
-ERROR_LEVEL = 40000
 SIMILARITY_THRESHOLD = 0.98
 
 LOG_FIELDS_BOOST_SCORES = [
@@ -143,82 +142,6 @@ def _build_launch_from_test_item_info(test_item_info: TestItemInfo) -> Launch:
         analyzerConfig=test_item_info.analyzerConfig,
         testItems=[test_item],
     )
-
-
-def _calculate_log_weight(log_level: int, message_length: int, max_message_length: int) -> float:
-    """Calculate the weight of a log entry based on its level and message length.
-
-    ERROR (40000) produces level weight 1.0; other levels scale proportionally.
-    The longest message produces length weight 1.0; shorter messages scale proportionally.
-
-    :param log_level: Log level value (e.g. 40000 for ERROR)
-    :param message_length: Length of the log message
-    :param max_message_length: Maximum message length across the group
-    :return: Combined weight as float
-    """
-    level_weight = log_level / ERROR_LEVEL if ERROR_LEVEL > 0 else 0.0
-    length_weight = message_length / max_message_length if max_message_length > 0 else 0.0
-    return level_weight * length_weight
-
-
-def _group_predictions_by_test_item(
-    prediction_results: list[PredictionResult],
-) -> dict[int, list[PredictionResult]]:
-    """Group prediction results by the found test item ID.
-
-    :param prediction_results: List of prediction results from the Predictor
-    :return: Dictionary mapping test item ID to its prediction results
-    """
-    groups: dict[int, list[PredictionResult]] = {}
-    for result in prediction_results:
-        test_item_id = result.data["mrHit"].source.test_item
-        if test_item_id not in groups:
-            groups[test_item_id] = []
-        groups[test_item_id].append(result)
-    return groups
-
-
-def _score_and_rank_test_items(
-    grouped_predictions: dict[int, list[PredictionResult]],
-) -> list[tuple[float, PredictionResult]]:
-    """Calculate central-weighted score per test item and rank them.
-
-    For each test item group:
-    1. Find max message length across all logs
-    2. Compute weight and weighted score for each prediction
-    3. Compute weighted average score
-    4. Pick the most significant log (highest weight)
-
-    :param grouped_predictions: Predictions grouped by test item ID
-    :return: List of (weighted_avg, most_significant_result) sorted descending
-    """
-    ranked: list[tuple[float, PredictionResult]] = []
-    for _test_item_id, results in grouped_predictions.items():
-        max_message_length = max(len(r.data["mrHit"].source.message) for r in results)
-        if max_message_length == 0:
-            max_message_length = 1
-
-        weighted_sum = 0.0
-        weight_sum = 0.0
-        best_weight = -1.0
-        best_result = results[0]
-
-        for result in results:
-            log_level = result.data["mrHit"].source.log_level
-            msg_len = len(result.data["mrHit"].source.message)
-            weight = _calculate_log_weight(log_level, msg_len, max_message_length)
-            prob = result.probability[1]
-            weighted_sum += prob * weight
-            weight_sum += weight
-            if weight > best_weight:
-                best_weight = weight
-                best_result = result
-
-        weighted_avg = weighted_sum / weight_sum if weight_sum > 0 else 0.0
-        ranked.append((weighted_avg, best_result))
-
-    ranked.sort(key=lambda x: x[0], reverse=True)
-    return ranked
 
 
 def _create_similarity_dict(
@@ -414,7 +337,7 @@ class SuggestService(AnalyzerService):
         nested_query: dict[str, Any] = {
             "nested": {
                 "path": "logs",
-                "score_mode": "max",
+                "score_mode": test_item_info.analyzerConfig.searchScoreMode,
                 "query": {"bool": {"should": nested_should}},
                 "inner_hits": {
                     "size": 5,
@@ -423,8 +346,8 @@ class SuggestService(AnalyzerService):
             }
         }
 
-        # Issue type restrictions for suggestions (filter_no_defect=False)
-        issue_type_conditions = self.prepare_restrictions_by_issue_type(filter_no_defect=False)
+        # Issue type restrictions for suggestions: do not include TI
+        issue_type_conditions = utils.prepare_restrictions_by_issue_type(filter_no_defect=False)
 
         outer_should: list[dict[str, Any]] = [
             {
@@ -662,8 +585,8 @@ class SuggestService(AnalyzerService):
                 model_info_tags = prediction_results[0].model_info_tags
 
                 # Group predictions by test item and calculate central-weighted scores
-                grouped = _group_predictions_by_test_item(prediction_results)
-                ranked = _score_and_rank_test_items(grouped)
+                grouped = utils.group_predictions_by_test_item(prediction_results)
+                ranked = utils.score_and_rank_test_items(grouped)
 
                 # Extract the most significant results (one per test item)
                 representative_results = [result for _, result in ranked]

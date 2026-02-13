@@ -14,7 +14,7 @@
 
 from collections import defaultdict, deque
 from datetime import datetime
-from typing import Any, Callable, Optional, cast
+from typing import Any, Callable, Optional
 
 import numpy as np
 
@@ -29,6 +29,41 @@ logger = logging.getLogger("analyzerApp.boosting_featurizer")
 
 def count_hits(results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]) -> int:
     return sum(len(res) for _, res in results)
+
+
+def get_test_case_hash_dict(res: list[Hit[LogItemIndexData]]) -> dict[Any, list[tuple[str, int, datetime]]]:
+    test_case_hash_dict: dict[Any, list[tuple[str, int, datetime]]] = {}
+    for hit in res:
+        test_case_hash = hit.source.test_case_hash
+        if test_case_hash not in test_case_hash_dict:
+            test_case_hash_dict[test_case_hash] = []
+        hit_id = hit.id or ""
+        hit_score = int(hit.score)
+        start_time = datetime.strptime(hit.source.start_time, "%Y-%m-%d %H:%M:%S")
+        test_case_hash_dict[test_case_hash].append((hit_id, hit_score, start_time))
+    return test_case_hash_dict
+
+
+def filter_by_test_case_hash(
+    all_results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]],
+) -> list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]:
+    new_results = []
+    for log, res in all_results:
+        test_case_hash_dict = get_test_case_hash_dict(res)
+        log_ids_to_take = set()
+        for id_scores_time in test_case_hash_dict.values():
+            sorted_id_scores_time_list = sorted(id_scores_time, key=lambda x: (x[1], x[2]), reverse=True)
+            scores_used = set()
+            for sorted_score in sorted_id_scores_time_list:
+                if sorted_score[1] not in scores_used:
+                    log_ids_to_take.add(sorted_score[0])
+                    scores_used.add(sorted_score[1])
+        new_elastic_res = []
+        for elastic_res in res:
+            if (elastic_res.id or "") in log_ids_to_take:
+                new_elastic_res.append(elastic_res)
+        new_results.append((log, new_elastic_res))
+    return new_results
 
 
 class BoostingFeaturizer:
@@ -183,9 +218,9 @@ class BoostingFeaturizer:
     def filter_by_test_case_hash(
         self, processed_results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]
     ) -> list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]:
-        filter_by_test_case_hash: Optional[bool] = self.config.get("filter_by_test_case_hash", None)
-        if filter_by_test_case_hash:
-            filtered_processed_results = self._filter_by_test_case_hash(processed_results)
+        is_hash_filter: Optional[bool] = self.config.get("filter_by_test_case_hash", None)
+        if is_hash_filter:
+            filtered_processed_results = filter_by_test_case_hash(processed_results)
             removed = count_hits(processed_results) - count_hits(filtered_processed_results)
             if removed > 0:
                 logger.debug(
@@ -359,38 +394,6 @@ class BoostingFeaturizer:
                 test_item = str(hit.source.test_item)
                 if test_item in self.test_item_log_stats and self.test_item_log_stats[test_item] > 0.99:
                     new_elastic_res.append(hit)
-            new_results.append((log, new_elastic_res))
-        return new_results
-
-    @staticmethod
-    def _filter_by_test_case_hash(
-        all_results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]],
-    ) -> list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]:
-        new_results = []
-        for log, res in all_results:
-            test_case_hash_dict: dict[Any, list[tuple[str, int, datetime]]] = {}
-            for hit in res:
-                test_case_hash = hit.source.test_case_hash
-                if test_case_hash not in test_case_hash_dict:
-                    test_case_hash_dict[test_case_hash] = []
-                hit_id = hit.id or ""
-                hit_score = int(cast(float, hit.score))
-                start_time = datetime.strptime(hit.source.start_time, "%Y-%m-%d %H:%M:%S")
-                test_case_hash_dict[test_case_hash].append((hit_id, hit_score, start_time))
-            log_ids_to_take = set()
-            for test_case_hash in test_case_hash_dict:
-                test_case_hash_dict[test_case_hash] = sorted(
-                    test_case_hash_dict[test_case_hash], key=lambda x: (x[1], x[2]), reverse=True
-                )
-                scores_used = set()
-                for sorted_score in test_case_hash_dict[test_case_hash]:
-                    if sorted_score[1] not in scores_used:
-                        log_ids_to_take.add(sorted_score[0])
-                        scores_used.add(sorted_score[1])
-            new_elastic_res = []
-            for elastic_res in res:
-                if (elastic_res.id or "") in log_ids_to_take:
-                    new_elastic_res.append(elastic_res)
             new_results.append((log, new_elastic_res))
         return new_results
 
@@ -678,13 +681,13 @@ class BoostingFeaturizer:
             my_hits = []
             for hit in es_results:
                 my_hit = hit.model_copy(deep=True)
-                hit_score = cast(float, my_hit.score)
+                hit_score = my_hit.score
                 max_score = max(max_score, hit_score)
                 my_hits.append(my_hit)
             all_results.append((query_log, my_hits))
         for query_log, es_hits in all_results:
             for hit in es_hits:
-                hit.normalized_score = cast(float, hit.score) / max_score
+                hit.normalized_score = hit.score / max_score
                 self.total_normalized_score += hit.normalized_score
         return all_results
 
@@ -736,34 +739,31 @@ class BoostingFeaturizer:
 
     def gather_features_info(self) -> tuple[list[list[float]], list[str]]:
         """Gather all features from feature_ids for a test item"""
-        gathered_data = []
-        gathered_data_dict: dict[int, list[list[float]]] = {}
+        gathered_data_dict: dict[int, list[list[float]]] = defaultdict(list)
         issue_type_names: list[str] = []
         issue_type_by_index: dict[int, str] = {}
-        try:
-            scores_by_types = self.find_most_relevant_by_type()
-            for idx, issue_type in enumerate(scores_by_types):
-                issue_type_by_index[idx] = issue_type
-                issue_type_names.append(issue_type)
+        scores_by_types = self.find_most_relevant_by_type()
+        for idx, issue_type in enumerate(scores_by_types):
+            issue_type_by_index[idx] = issue_type
+            issue_type_names.append(issue_type)
 
-            for feature in self.get_ordered_features_to_process():
-                if feature in self.previously_gathered_features and feature not in self.features_to_recalculate_always:
-                    gathered_data_dict[feature] = self.previously_gathered_features[feature]
-                else:
-                    func, args, _ = self.feature_functions[feature]
-                    result = func(**args)
-                    if type(result) is list:
-                        gathered_data_dict[feature] = result
-                    else:
-                        gathered_data_dict[feature] = []
-                        for idx in sorted(issue_type_by_index.keys()):
-                            issue_type = issue_type_by_index[idx]
-                            if isinstance(result[issue_type], list):
-                                gathered_data_dict[feature].append(result[issue_type])
-                            else:
-                                gathered_data_dict[feature].append([round(result[issue_type], 2)])
-                    self.previously_gathered_features[feature] = gathered_data_dict[feature]
-            gathered_data = utils.gather_feature_list(gathered_data_dict, self.feature_ids)
-        except Exception as err:
-            logger.exception("Errors in boosting features calculation", exc_info=err)
+        for feature in self.get_ordered_features_to_process():
+            if feature in self.previously_gathered_features and feature not in self.features_to_recalculate_always:
+                gathered_data_dict[feature] = self.previously_gathered_features[feature]
+                continue
+
+            func, args, _ = self.feature_functions[feature]
+            result = func(**args)
+            if type(result) is list:
+                gathered_data_dict[feature] = result
+                continue
+
+            for idx in sorted(issue_type_by_index.keys()):
+                issue_type = issue_type_by_index[idx]
+                data = result[issue_type]
+                if not isinstance(data, list):
+                    data = [round(data, 2)]
+                gathered_data_dict[feature].append(data)
+                self.previously_gathered_features[feature] = gathered_data_dict[feature]
+        gathered_data = utils.gather_feature_list(gathered_data_dict, self.feature_ids)
         return gathered_data, issue_type_names

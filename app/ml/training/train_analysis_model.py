@@ -44,7 +44,7 @@ from app.utils.os_migration import (
     extract_inner_hit_logs,
     get_request_logs,
 )
-from app.utils.utils import _safe_int, normalize_issue_type
+from app.utils.utils import safe_int, normalize_issue_type
 
 LOGGER = logging.getLogger("analyzerApp.trainingAnalysisModel")
 TRAIN_DATA_RANDOM_STATES = [1257, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029, 2137]
@@ -245,7 +245,7 @@ def build_history_negative_hits(
     :param base_test_item_id: Test item identifier from the request item
     :return: Synthetic log hits labeled with history issue types
     """
-    base_id = _safe_int(base_test_item_id)
+    base_id = safe_int(base_test_item_id)
     synthetic_hits: list[Hit[LogItemIndexData]] = []
     for idx, issue_type in enumerate(history_negative_types):
         synthetic_test_item_id = _make_synthetic_test_item_id(base_id, idx)
@@ -322,7 +322,7 @@ class AnalysisModelTraining:
         if self.baseline_folder:
             self.baseline_model = BoostingDecisionMaker(object_saving.create_filesystem(self.baseline_folder))
             self.baseline_model.load_model()
-            # Take features from baseline model if this is retrain
+            # Take features from baseline model if this is retraining
             if use_baseline_features:
                 self.features = self.baseline_model.feature_ids
                 self.monotonous_features = list(self.baseline_model.monotonous_features)

@@ -192,7 +192,7 @@ def test_msearch_returns_empty_when_index_missing(monkeypatch, os_client_mock, a
     monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", scan_mock)
     client = OsClient(app_config, os_client=os_client_mock)
 
-    results = [hit for hit in client.msearch(PROJECT_ID, [{"query": {"match_all": {}}}])]
+    results = list(client.msearch(PROJECT_ID, [{"query": {"match_all": {}}}]))
 
     assert results == []
     os_client_mock.msearch.assert_not_called()
@@ -413,7 +413,7 @@ def test_search_without_scroll_calls_scan(monkeypatch, os_client_mock, app_confi
     client = OsClient(app_config, os_client=os_client_mock)
     request = {"query": {"match": {"test_item_id": test_item.test_item_id}}}
 
-    results = [hit for hit in client.search(PROJECT_ID, request)]
+    results = list(client.search(PROJECT_ID, request))
 
     assert len(results) == 1
     assert results[0].source.test_item_id == test_item.test_item_id
@@ -442,7 +442,7 @@ def test_search_calls_scan_when_scroll_provided(monkeypatch, os_client_mock, app
 
     client = OsClient(app_config, os_client=os_client_mock)
     request = {"query": {"match": {"test_item_id": test_item.test_item_id}}}
-    results = [hit for hit in client.search(PROJECT_ID, request, scroll="1m")]
+    results = list(client.search(PROJECT_ID, request, scroll="1m"))
 
     assert len(results) == 1
     assert results[0].source.test_item_id == test_item.test_item_id
@@ -476,7 +476,7 @@ def test_msearch_calls_opensearch_msearch(monkeypatch, os_client_mock, app_confi
         ]
     }
 
-    results = [hit for hit in client.msearch(PROJECT_ID, queries)]
+    results = list(client.msearch(PROJECT_ID, queries))
 
     assert len(results) == 1
     assert results[0].source.test_item_id == test_item.test_item_id

@@ -60,18 +60,16 @@ def __similarity_grouping(
     global_ind = 0
     for idx in range(num_of_blocks):
         for jdx in range((idx + 1 if num_of_blocks > 1 else idx), num_of_blocks):
-            _count_vector = CountVectorizer(binary=True, analyzer=lambda x: x)
-
             block_i = messages[idx * block_size : (idx + 1) * block_size]
             block_j = messages[jdx * block_size : (jdx + 1) * block_size] if num_of_blocks > 1 else []
-
-            vectors: csr_matrix = _count_vector.fit_transform(block_i + block_j).astype(np.int8)
-            vectors_count_words = np.asarray(np.sum(vectors, axis=1))
-            similarities = sklearn.metrics.pairwise.cosine_similarity(vectors)
-
             indices_looked = list(range(idx * block_size, idx * block_size + len(block_i))) + list(
                 range(jdx * block_size, jdx * block_size + len(block_j))
             )
+
+            _count_vector = CountVectorizer(binary=True, analyzer=lambda x: x)
+            vectors: csr_matrix = _count_vector.fit_transform(block_i + block_j).astype(np.int8)
+            vectors_count_words = np.asarray(np.sum(vectors, axis=1))
+            similarities = sklearn.metrics.pairwise.cosine_similarity(vectors)
 
             for seq_num_i in range(len(indices_looked)):
                 i = indices_looked[seq_num_i]

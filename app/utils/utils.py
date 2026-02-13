@@ -29,6 +29,7 @@ from app.commons import logging
 from app.commons.model import launch_objects
 from app.ml.predictor import PredictionResult
 from app.utils.text_processing import remove_credentials_from_url, split_words
+from commons.model.launch_objects import SimilarityResult
 
 logger = logging.getLogger("analyzerApp.utils")
 
@@ -428,7 +429,7 @@ def normalize_issue_type(issue_type: Any) -> str:
     return str(issue_type).strip().lower()
 
 
-def _safe_int(value: Any) -> int:
+def safe_int(value: Any) -> int:
     """
     Safely cast a value to integer.
 
@@ -505,3 +506,13 @@ def prepare_restrictions_by_issue_type(filter_no_defect: bool = True) -> list[di
     if filter_no_defect:
         return [{"wildcard": {"issue_type": "ti*"}}, {"wildcard": {"issue_type": "nd*"}}]
     return [{"term": {"issue_type": "ti001"}}]
+
+
+def get_max_similarity_idx(per_log_similarity: list[SimilarityResult]) -> int:
+    max_similarity = 0.0
+    best_log_idx = 0
+    for log_idx, sim_obj in enumerate(per_log_similarity):
+        if max_similarity < sim_obj.similarity:
+            max_similarity = sim_obj.similarity
+            best_log_idx = log_idx
+    return best_log_idx

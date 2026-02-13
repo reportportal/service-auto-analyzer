@@ -1130,7 +1130,7 @@ def find_last_unique_texts(
                 use_index = i + 1 + si
         result.add(use_index)
     result.add(len(texts) - 1)
-    return sorted(list(result)), my_vectorizer
+    return sorted(result), my_vectorizer
 
 
 def calculate_similarity_by_values(first_field: str, second_field: str) -> float:

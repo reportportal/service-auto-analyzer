@@ -15,7 +15,7 @@
 from app.commons.model import LogData, LogItemIndexData, TestItemIndexData
 from app.commons.model.db import Hit
 from app.utils import text_processing
-from app.utils.utils import _safe_int, normalize_issue_type
+from app.utils.utils import safe_int, normalize_issue_type, get_max_similarity_idx
 
 
 def convert_test_item_log(
@@ -34,11 +34,11 @@ def convert_test_item_log(
     resolved_issue_type = issue_type or normalize_issue_type(test_item.issue_type)
     return LogItemIndexData(
         log_id=str(log_data.log_id or ""),
-        test_item=_safe_int(test_item.test_item_id),
+        test_item=safe_int(test_item.test_item_id),
         test_item_name=test_item.test_item_name or "",
-        test_case_hash=_safe_int(test_item.test_case_hash),
+        test_case_hash=safe_int(test_item.test_case_hash),
         unique_id=test_item.unique_id or "",
-        launch_id=_safe_int(test_item.launch_id),
+        launch_id=safe_int(test_item.launch_id),
         launch_name=test_item.launch_name or "",
         issue_type=resolved_issue_type,
         is_auto_analyzed=bool(test_item.is_auto_analyzed),
@@ -78,7 +78,7 @@ def get_request_logs(test_item: TestItemIndexData, issue_type: str) -> list[LogI
         return []
     logs_sorted = sorted(
         logs,
-        key=lambda log: log.log_order if log.log_order is not None else _safe_int(log.log_id),
+        key=lambda log: log.log_order if log.log_order is not None else safe_int(log.log_id),
     )
     return [convert_test_item_log(test_item, log_data, issue_type=issue_type) for log_data in logs_sorted]
 
@@ -164,6 +164,5 @@ def bucket_sort_logs_by_similarity(
         )
         if not similarities:
             continue
-        best_idx = max(range(len(similarities)), key=lambda idx: similarities[idx].similarity)
-        buckets[best_idx].append(hit)
+        buckets[get_max_similarity_idx(similarities)].append(hit)
     return buckets

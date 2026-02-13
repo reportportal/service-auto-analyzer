@@ -302,7 +302,7 @@ class OsClient:
         if not bodies:
             return BulkResponse(took=0, errors=False)
 
-        index_names = set(body["_index"] for body in bodies)
+        index_names = {body["_index"] for body in bodies}
 
         for index_name in index_names:
             if not self._ensure_index_exists(index_name):

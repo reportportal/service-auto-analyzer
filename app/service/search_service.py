@@ -171,11 +171,7 @@ class SearchService:
             per_log_similarity, _ = text_processing.calculate_text_similarity(
                 joined_request_messages, log_messages_sorted
             )
-            best_log_idx = max(
-                range(len(per_log_similarity)),
-                key=lambda idx: per_log_similarity[idx].similarity,
-            )
-            best_log = logs_with_messages[best_log_idx][0]
+            best_log = logs_with_messages[utils.get_max_similarity_idx(per_log_similarity)][0]
 
             request_similarity, _ = text_processing.calculate_text_similarity(best_log.message, log_messages)
             best_request_similarity = 0.0

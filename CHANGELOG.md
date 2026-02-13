@@ -1,5 +1,7 @@
 # Changelog
 ## [Unreleased]
+### Changed
+- Status code detection improved, by @HardNorth
 
 ## [5.15.1]
 ### Changed
@@ -44,7 +46,7 @@
 
 ## [5.14.3]
 ### Fixed
-* Base URL generation with credentials for ES/OS healthcheck and indices endpoints, by @HardNorth in https://github.com/reportportal/service-auto-analyzer/pull/216
+* Base URL generation with credentials for ES/OS health check and indices endpoints, by @HardNorth in https://github.com/reportportal/service-auto-analyzer/pull/216
 
 ## [5.14.2]
 ### Added
@@ -53,13 +55,14 @@
 ### Changed
 - Handling of AMQP messages now moved to separate processes: "train" (only for model training) and "main" (for all other messages), by @HardNorth
 - Handling of AMQP messages now performed in two separate queues: `train` and `all`, by @HardNorth
-- Handling of AMQP messages now performed in in strict order, by @HardNorth
+- Handling of AMQP messages now performed in strict order, by @HardNorth
 - Analyzer exchange type is changed to `fanout`, by @HardNorth
 - Many logging messages were refactored and improved, by @HardNorth
 - Choosing custom/global ML model now performed by Launch ID hash only, by @HardNorth
 ### Fixed
 - 11 Sonar issues, by @HardNorth
 ### Removed
+- `ANALYZER_ENABLE_MEMORY_DUMP` environment variable due to security reasons, by @HardNorth
 - `analyzer-train` service, as it is no longer needed, by @HardNorth
 
 ## [5.14.1]
@@ -76,7 +79,7 @@
 ## [5.14.0]
 ### Added:
 - `AMQP_MAX_RETRY_TIME`, `AMQP_INITIAL_RETRY_INTERVAL`, `AMQP_BACKOFF_FACTOR`, `AMQP_HEARTBEAT_INTERVAL` environment variables to configure AMQP client, by @HardNorth
-- `ANALYZER_ENABLE_MEMORY_DUMP` environment variable to print memory dump on healthcheck calls for debugging purpose, by @HardNorth
+- `ANALYZER_ENABLE_MEMORY_DUMP` environment variable to print memory dump on health check calls for debugging purpose, by @HardNorth
 ### Changed
 - AMQP client was rewritten to better handle connection issues, by @HardNorth
 - `uWSGI` version updated to `2.0.29`, by @HardNorth
@@ -107,7 +110,7 @@
 
 ### Updated:
 - Refactoring: data-preparation logic joined and put into common place, by @HardNorth
-- Refactoring: model train logic standardised and prepared for future join, by @HardNorth
+- Refactoring: model train logic standardized and prepared for future join, by @HardNorth
 - Lots of type annotations added, by @HardNorth
 
 ### Fixed

@@ -46,7 +46,7 @@ def create_test_es_client():
 )
 def test_get_base_url_variations(host, use_ssl, expected):
     es_mock = mock.Mock()
-    config = DEFAULT_ES_CONFIG.copy(
+    config = DEFAULT_ES_CONFIG.model_copy(
         update={
             "esHost": host,
             "esUseSsl": use_ssl,

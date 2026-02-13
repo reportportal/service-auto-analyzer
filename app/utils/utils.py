@@ -27,10 +27,11 @@ from requests import RequestException
 
 from app.commons import logging
 from app.commons.model import launch_objects
+from app.commons.model.launch_objects import SimilarityResult
+from app.ml.predictor import PredictionResult
 from app.utils.text_processing import remove_credentials_from_url, split_words
 
 logger = logging.getLogger("analyzerApp.utils")
-ERROR_LOGGING_LEVEL = 40000
 
 
 def ignore_warnings(func):
@@ -58,14 +59,19 @@ def read_json_file(folder: str, filename: str, to_json: bool = False) -> Any:
     return content if not to_json else json.loads(content)
 
 
+def read_resource_file(filename: str, to_json: bool = False) -> Any:
+    """Read fixture from file."""
+    return read_json_file("res", filename, to_json)
+
+
 def validate_folder(folder_path: str) -> bool:
     """Check that passed path points to a directory and it exists."""
-    return folder_path and folder_path.strip() and os.path.exists(folder_path) and os.path.isdir(folder_path)
+    return bool(folder_path and folder_path.strip() and os.path.exists(folder_path) and os.path.isdir(folder_path))
 
 
 def validate_file(file_path: str) -> bool:
     """Check that passed path points to a file and it exists."""
-    return file_path and file_path.strip() and os.path.exists(file_path) and os.path.isfile(file_path)
+    return bool(file_path and file_path.strip() and os.path.exists(file_path) and os.path.isfile(file_path))
 
 
 def extract_real_id(elastic_id):
@@ -84,7 +90,7 @@ def send_request(
 ) -> Optional[Any]:
     """Send request with specified url and http method"""
 
-    kwargs = {}
+    kwargs: dict[str, Any] = {}
     if username:
         kwargs["auth"] = (username, password)
 
@@ -113,6 +119,7 @@ def extract_all_exceptions(bodies):
 
 
 MINIMAL_VALUE_FOR_GOOD_PROPORTION = 2
+ERROR_LOG_LEVEL = 40000
 
 
 def calculate_proportions_for_labels(labels: list[int]) -> float:
@@ -123,6 +130,22 @@ def calculate_proportions_for_labels(labels: list[int]) -> float:
         if min_val > MINIMAL_VALUE_FOR_GOOD_PROPORTION:
             return np.round(min_val / max_val, 3)
     return 0.0
+
+
+def calculate_log_weight(log_level: int, message_length: int, max_message_length: int) -> float:
+    """Calculate log contribution weight for central-weighted scoring.
+
+    ERROR log level (40000) has level weight 1.0; other levels are scaled relatively.
+    The longest message has length weight 1.0; shorter messages are scaled relatively.
+
+    :param log_level: Numeric log level
+    :param message_length: Length of the current log message
+    :param max_message_length: Maximum message length within the compared group
+    :return: Combined weight
+    """
+    level_weight = log_level / ERROR_LOG_LEVEL if ERROR_LOG_LEVEL > 0 else 0.0
+    length_weight = message_length / max_message_length if max_message_length > 0 else 0.0
+    return level_weight * length_weight
 
 
 def balance_data(
@@ -215,7 +238,7 @@ def to_float_list(features_list: str) -> list[float]:
 def fill_previously_gathered_features(
     feature_list: list[list[float]], feature_ids: list[int]
 ) -> dict[int, list[list[float]]]:
-    previously_gathered_features = {}
+    previously_gathered_features: dict[int, list[list[float]]] = {}
     try:
         for i in range(len(feature_list)):
             for idx, feature in enumerate(feature_ids):
@@ -230,24 +253,28 @@ def fill_previously_gathered_features(
 
 
 def gather_feature_list(gathered_data_dict: dict[int, list[list[float]]], feature_ids: list[int]) -> list[list[float]]:
-    features_array: Optional[np.array] = None
     axis_x_size = max([len(x) for x in gathered_data_dict.values()])
     if axis_x_size <= 0:
         return []
-    for idx, feature in enumerate(feature_ids):
+
+    # Initialize result list with empty lists for each row
+    result: list[list[float]] = [[] for _ in range(axis_x_size)]
+
+    for feature in feature_ids:
         if feature not in gathered_data_dict or len(gathered_data_dict[feature]) == 0:
             gathered_data_dict[feature] = [[0.0] for _ in range(axis_x_size)]
-        if features_array is None:
-            features_array = np.asarray(gathered_data_dict[feature])
-        else:
-            features_array = np.concatenate([features_array, gathered_data_dict[feature]], axis=1)
-    return features_array.tolist()
+
+        # Append features from this feature ID to each row
+        for row_idx, row in enumerate(gathered_data_dict[feature]):
+            result[row_idx].extend(row)
+
+    return result
 
 
 def extract_exception(err: Exception) -> str:
-    err_message = traceback.format_exception_only(type(err), err)
-    if len(err_message):
-        err_message = err_message[-1]
+    err_message_list = traceback.format_exception_only(type(err), err)
+    if len(err_message_list):
+        err_message = err_message_list[-1]
     else:
         err_message = ""
     return err_message
@@ -263,7 +290,7 @@ def get_allowed_number_of_missed(cur_threshold: float) -> int:
     return 0
 
 
-def calculate_threshold(text_size, cur_threshold, min_recalculated_threshold=0.8):
+def calculate_threshold(text_size: int, cur_threshold: float, min_recalculated_threshold: float = 0.8) -> float:
     if not text_size:
         return cur_threshold
     allowed_words_missed = get_allowed_number_of_missed(cur_threshold)
@@ -271,12 +298,12 @@ def calculate_threshold(text_size, cur_threshold, min_recalculated_threshold=0.8
     for _ in range(allowed_words_missed, 0, -1):
         threshold = (text_size - allowed_words_missed) / text_size
         if threshold >= min_recalculated_threshold:
-            new_threshold = round(threshold, 2)
+            new_threshold = round(threshold, 4)
             break
     return min(new_threshold, cur_threshold)
 
 
-def calculate_threshold_for_text(text, cur_threshold, min_recalculated_threshold=0.8):
+def calculate_threshold_for_text(text: str, cur_threshold: float, min_recalculated_threshold: float = 0.8):
     text_size = len(split_words(text))
     return calculate_threshold(text_size, cur_threshold, min_recalculated_threshold=min_recalculated_threshold)
 
@@ -388,3 +415,104 @@ def append_aa_ma_boosts(query: dict[str, Any], search_cfg: launch_objects.Search
 def strip_path(path: str) -> str:
     """Strip trailing slashes from a path."""
     return path.strip().rstrip("/").rstrip("\\")
+
+
+def normalize_issue_type(issue_type: Any) -> str:
+    """
+    Normalize issue type to lowercase string.
+
+    :param issue_type: Raw issue type
+    :return: Normalized issue type
+    """
+    if issue_type is None:
+        return ""
+    return str(issue_type).strip().lower()
+
+
+def safe_int(value: Any) -> int:
+    """
+    Safely cast a value to integer.
+
+    :param value: Value to cast
+    :return: Integer value or 0 on failure
+    """
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def group_predictions_by_test_item(
+    prediction_results: list[PredictionResult],
+) -> dict[int, list[PredictionResult]]:
+    """Group prediction results by the found test item ID.
+
+    :param prediction_results: List of prediction results from the Predictor
+    :return: Dictionary mapping test item ID to its prediction results
+    """
+    groups: dict[int, list[PredictionResult]] = {}
+    for result in prediction_results:
+        test_item_id = result.data["mrHit"].source.test_item
+        if test_item_id not in groups:
+            groups[test_item_id] = []
+        groups[test_item_id].append(result)
+    return groups
+
+
+def score_and_rank_test_items(
+    grouped_predictions: dict[int, list[PredictionResult]],
+) -> list[tuple[float, PredictionResult]]:
+    """Calculate central-weighted score per test item and rank them.
+
+    For each test item group:
+    1. Find max message length across all logs
+    2. Compute weight and weighted score for each prediction
+    3. Compute weighted average score
+    4. Pick the most significant log (highest weight)
+
+    :param grouped_predictions: Predictions grouped by test item ID
+    :return: List of (weighted_avg, most_significant_result) sorted descending
+    """
+    ranked: list[tuple[float, PredictionResult]] = []
+    for _test_item_id, results in grouped_predictions.items():
+        max_message_length = max(len(r.data["mrHit"].source.message) for r in results)
+        if max_message_length <= 0:
+            max_message_length = 1
+
+        weighted_sum = 0.0
+        weight_sum = 0.0
+        best_weight = -1.0
+        best_result = results[0]
+
+        for result in results:
+            log_level = result.data["mrHit"].source.log_level
+            msg_len = len(result.data["mrHit"].source.message)
+            weight = calculate_log_weight(log_level, msg_len, max_message_length)
+            prob = result.probability[1]
+            weighted_sum += prob * weight
+            weight_sum += weight
+            if weight > best_weight:
+                best_weight = weight
+                best_result = result
+
+        weighted_avg = weighted_sum / weight_sum if weight_sum > 0 else 0.0
+        ranked.append((weighted_avg, best_result))
+
+    ranked.sort(key=lambda item: item[0], reverse=True)
+    return ranked
+
+
+def prepare_restrictions_by_issue_type(filter_no_defect: bool = True) -> list[dict]:
+    if filter_no_defect:
+        return [{"wildcard": {"issue_type": "ti*"}}, {"wildcard": {"issue_type": "nd*"}}]
+    return [{"term": {"issue_type": "ti001"}}]
+
+
+def get_max_similarity_idx(per_log_similarity: list[SimilarityResult]) -> int:
+    max_similarity = 0.0
+    best_log_idx = 0
+    for log_idx, sim_obj in enumerate(per_log_similarity):
+        if max_similarity < sim_obj.similarity:
+            max_similarity = sim_obj.similarity
+            best_log_idx = log_idx
+    return best_log_idx

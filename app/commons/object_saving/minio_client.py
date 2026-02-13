@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Any
+from typing import Any, Optional
 
 from minio import Minio
 from minio.error import MinioException, S3Error
@@ -25,7 +25,7 @@ LOGGER = logging.getLogger("analyzerApp.minioClient")
 
 
 class MinioClient(BlobStorage):
-    region: str
+    region: Optional[str]
     minio_client: Minio
 
     def __init__(self, app_config: ApplicationConfig) -> None:

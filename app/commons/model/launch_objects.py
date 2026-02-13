@@ -13,11 +13,15 @@
 #  limitations under the License.
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel
 
+from app.commons.model import LogItemIndexData
+from app.commons.model.db import Hit
 from app.commons.model.ml import ModelType
+
+ERROR_LOGGING_LEVEL: int = 40000
 
 
 class AnalyzerConf(BaseModel):
@@ -31,9 +35,14 @@ class AnalyzerConf(BaseModel):
     allMessagesShouldMatch: bool = False
     searchLogsMinShouldMatch: int = 95
     uniqueErrorsMinShouldMatch: int = 95
+    numberOfLogsToIndex: int = 20
+    minimumLogLevel: int = ERROR_LOGGING_LEVEL
+    similarityThresholdToDrop: float = 0.95
+    searchScoreMode: str = "avg"
 
 
 class ApplicationConfig(BaseModel):
+    """General application config object"""
 
     esHost: str = ""
     esUser: str = ""
@@ -82,9 +91,8 @@ class ApplicationConfig(BaseModel):
 
 
 class SearchConfig(BaseModel):
-    """Search config object"""
+    """Configuration object for full-text search engine and auto-analysis."""
 
-    SearchLogsMinSimilarity: float = 0.95
     MinShouldMatch: str = "80%"
     BoostAA: float = 0.0
     BoostMA: float = 5.0
@@ -192,6 +200,19 @@ class Launch(BaseModel):
     clusters: dict = {}
 
 
+class ItemUpdate(BaseModel):
+    timestamp: list[int] = list(datetime.now().timetuple())[:7]
+    issueType: str
+    issueComment: str = ""
+
+
+class DefectUpdate(BaseModel):
+    """Item update object"""
+
+    project: int | str
+    itemsToUpdate: dict[int | str, Union[str, ItemUpdate]]
+
+
 class LaunchInfoForClustering(BaseModel):
     launch: Launch
     project: int
@@ -249,13 +270,6 @@ class SuggestAnalysisResult(BaseModel):
     userChoice: int = 0
     methodName: str
     clusterId: int = 0
-
-
-class CleanIndex(BaseModel):
-    """Clean index object"""
-
-    ids: list[int]
-    project: int
 
 
 class CleanIndexStrIds(BaseModel):
@@ -334,9 +348,38 @@ class AnalysisCandidate(BaseModel):
     analyzerConfig: AnalyzerConf
     testItemId: int
     timeProcessed: float
-    candidates: list[tuple]
+    candidates: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]
     candidatesWithNoDefect: list[tuple[dict[str, Any], dict[str, Any]]]
     project: int
     launchId: int
     launchName: str
     launchNumber: int = 0
+
+
+class DeleteLogsRequest(BaseModel):
+    """Clean index object"""
+
+    ids: list[int]
+    project: int
+
+
+class DeleteTestItemsRequest(BaseModel):
+    """Request payload for deleting Test Items."""
+
+    project: int | str
+    itemsToDelete: list[int | str]
+
+
+class DeleteLaunchesRequest(BaseModel):
+    """Request payload for deleting launches."""
+
+    project: int | str
+    launch_ids: list[int | str]
+
+
+class RemoveByDatesRequest(BaseModel):
+    """Request payload for removing logs by launch start time."""
+
+    project: int | str
+    interval_start_date: str
+    interval_end_date: str

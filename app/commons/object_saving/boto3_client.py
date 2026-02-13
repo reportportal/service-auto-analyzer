@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Any, Generator
+from typing import Any, Generator, Optional, TypedDict
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
@@ -24,6 +24,13 @@ from app.commons.object_saving.blob_storage import BlobStorage
 LOGGER = logging.getLogger("analyzerApp.boto3Client")
 
 
+class _AwsOption(TypedDict, total=False):
+    region_name: Optional[str]
+    aws_access_key_id: Optional[str]
+    aws_secret_access_key: Optional[str]
+    endpoint_url: Optional[str]
+
+
 class Boto3Client(BlobStorage):
     region: str
     s3_client: Any
@@ -33,7 +40,7 @@ class Boto3Client(BlobStorage):
         self.region = app_config.datastoreRegion or "us-east-1"
 
         # Build boto3 client configuration
-        config_params = {
+        config_params: _AwsOption = {
             "region_name": self.region,
         }
 

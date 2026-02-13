@@ -22,7 +22,7 @@ from app.commons import logging, object_saving
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType
 from app.commons.object_saving.object_saver import ObjectSaver
-from app.machine_learning.models import (
+from app.ml.models import (
     MlModel,
     boosting_decision_maker,
     custom_boosting_decision_maker,

@@ -1,0 +1,180 @@
+{
+  "properties": {
+    "test_item_id": {
+      "type": "keyword"
+    },
+    "test_item_name": {
+      "type": "text",
+      "analyzer": "standard_english_analyzer"
+    },
+    "unique_id": {
+      "type": "keyword"
+    },
+    "test_case_hash": {
+      "type": "keyword"
+    },
+    "launch_id": {
+      "type": "keyword"
+    },
+    "launch_name": {
+      "type": "text",
+      "analyzer": "standard_english_analyzer"
+    },
+    "launch_number": {
+      "type": "keyword"
+    },
+    "launch_start_time": {
+      "type": "date",
+      "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+    },
+    "start_time": {
+      "type": "date",
+      "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+    },
+    "log_count": {
+      "type": "integer"
+    },
+    "issue_type": {
+        "type": "keyword"
+    },
+    "is_auto_analyzed": {
+        "type": "boolean"
+    },
+    "logs": {
+      "type": "nested",
+      "properties": {
+        "log_id": {
+          "type": "keyword"
+        },
+        "log_order": {
+          "type": "integer"
+        },
+        "log_time": {
+          "type": "date",
+          "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        },
+        "log_level": {
+          "type": "integer"
+        },
+        "cluster_id": {
+          "type": "keyword"
+        },
+        "cluster_message": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "cluster_with_numbers": {
+          "type": "boolean"
+        },
+        "original_message": {
+          "type": "text",
+          "index": false
+        },
+        "message": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "message_lines": {
+          "type": "integer"
+        },
+        "message_words_number": {
+          "type": "integer"
+        },
+        "message_extended": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "message_without_params_extended": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "message_without_params_and_brackets": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "detected_message": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "detected_message_with_numbers": {
+          "type": "text",
+          "index": false
+        },
+        "detected_message_extended": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "detected_message_without_params_extended": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "detected_message_without_params_and_brackets": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "stacktrace": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "stacktrace_extended": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "only_numbers": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "potential_status_codes": {
+          "type": "keyword"
+        },
+        "found_exceptions": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "found_exceptions_extended": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "found_tests_and_methods": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "urls": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "paths": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "message_params": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "whole_message": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        }
+      }
+    },
+    "issue_history": {
+      "type": "nested",
+      "properties": {
+        "is_auto_analyzed": {
+          "type": "boolean"
+        },
+        "issue_type": {
+          "type": "keyword"
+        },
+        "timestamp": {
+          "type": "date",
+          "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+        },
+        "issue_comment": {
+          "type": "text",
+          "index": false
+        }
+      }
+    }
+  }
+}

@@ -15,7 +15,7 @@
 from app.commons.model import LogData, LogItemIndexData, TestItemIndexData
 from app.commons.model.db import Hit
 from app.utils import text_processing
-from app.utils.utils import safe_int, normalize_issue_type, get_max_similarity_idx
+from app.utils.utils import get_max_similarity_idx, normalize_issue_type, safe_int
 
 
 def convert_test_item_log(

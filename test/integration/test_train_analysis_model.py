@@ -53,30 +53,6 @@ def _make_log_data(log_id: str, log_order: int, message: str) -> LogData:
     )
 
 
-def _make_hit(item: TestItemIndexData, log_data: LogData, score: float) -> Hit[TestItemIndexData]:
-    return Hit[TestItemIndexData].from_dict(
-        {
-            "_index": "rp_123",
-            "_id": item.test_item_id,
-            "_score": score,
-            "_source": item.model_dump(),
-            "inner_hits": {
-                "logs": {
-                    "hits": {
-                        "hits": [
-                            {
-                                "_id": log_data.log_id,
-                                "_score": score,
-                                "_source": log_data.model_dump(),
-                            }
-                        ]
-                    }
-                }
-            },
-        }
-    )
-
-
 def _make_search_config():
     return DEFAULT_SEARCH_CONFIG.model_copy(
         update={
@@ -144,6 +120,16 @@ def test_train_uses_os_client_and_issue_history(model_type: ModelType) -> None:
         issue_type="pb001",
         is_auto_analyzed=False,
         start_time="2025-01-01 00:00:00",
+        logs=[_make_log_data("201", 0, "auth failed while reading account")],
+        issue_history=[
+            TestItemHistoryData(
+                test_item_id="2001",
+                is_auto_analyzed=False,
+                issue_type="pb001",
+                timestamp="2025-01-02 00:00:00",
+                issue_comment="",
+            )
+        ],
     )
     candidate_ab = TestItemIndexData(
         test_item_id="2002",
@@ -155,6 +141,16 @@ def test_train_uses_os_client_and_issue_history(model_type: ModelType) -> None:
         issue_type="ab001",
         is_auto_analyzed=True,
         start_time="2025-01-01 00:00:00",
+        logs=[_make_log_data("202", 0, "serialization error")],
+        issue_history=[
+            TestItemHistoryData(
+                test_item_id="2002",
+                is_auto_analyzed=True,
+                issue_type="ab001",
+                timestamp="2025-01-02 00:00:00",
+                issue_comment="",
+            )
+        ],
     )
     candidate_si = TestItemIndexData(
         test_item_id="2003",
@@ -166,14 +162,25 @@ def test_train_uses_os_client_and_issue_history(model_type: ModelType) -> None:
         issue_type="si001",
         is_auto_analyzed=False,
         start_time="2025-01-01 00:00:00",
+        logs=[_make_log_data("203", 0, "network timeout")],
+        issue_history=[
+            TestItemHistoryData(
+                test_item_id="2003",
+                is_auto_analyzed=False,
+                issue_type="si001",
+                timestamp="2025-01-02 00:00:00",
+                issue_comment="",
+            )
+        ],
     )
-    candidate_hits = [
-        _make_hit(candidate_pb, _make_log_data("201", 0, "auth failed while reading account"), 1.2),
-        _make_hit(candidate_ab, _make_log_data("202", 0, "serialization error"), 1.0),
-        _make_hit(candidate_si, _make_log_data("203", 0, "network timeout"), 0.9),
+    project_hits = [
+        request_hit,
+        Hit[TestItemIndexData].from_dict({"_index": "rp_123", "_id": "2001", "_source": candidate_pb.model_dump()}),
+        Hit[TestItemIndexData].from_dict({"_index": "rp_123", "_id": "2002", "_source": candidate_ab.model_dump()}),
+        Hit[TestItemIndexData].from_dict({"_index": "rp_123", "_id": "2003", "_source": candidate_si.model_dump()}),
     ]
 
-    os_client.search = mock.Mock(side_effect=[iter([request_hit]), iter(candidate_hits)])
+    os_client.search = mock.Mock(return_value=iter(project_hits))
 
     def fake_gather_features_info(self):  # noqa: ANN001
         issue_type_names = list(self.find_most_relevant_by_type().keys())
@@ -218,14 +225,8 @@ def test_train_uses_os_client_and_issue_history(model_type: ModelType) -> None:
 
     choose_model_mock.assert_called_once_with(123, ModelType.defect_type)
     training.namespace_finder.get_chosen_namespaces.assert_called_once_with(123)
-    assert os_client.search.call_count == 2
+    assert os_client.search.call_count == 1
     assert os_client.search.call_args_list[0][0][0] == 123
-    assert os_client.search.call_args_list[1][0][0] == 123
 
     issue_history_query = os_client.search.call_args_list[0][0][1]
     assert issue_history_query["query"]["nested"]["path"] == "issue_history"
-
-    similar_query = os_client.search.call_args_list[1][0][1]
-    nested_query = similar_query["query"]["bool"]["must"][0]["nested"]
-    assert nested_query["path"] == "logs"
-    assert "inner_hits" in nested_query

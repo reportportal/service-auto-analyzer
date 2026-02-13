@@ -14,6 +14,8 @@
 
 """Common package for ML Model training code."""
 import logging
+from dataclasses import dataclass
+from typing import Any, Generic, TypeVar
 
 from app.commons.model.test_item_index import TestItemHistoryData
 from app.utils import utils
@@ -23,6 +25,15 @@ LOGGER = logging.getLogger("analyzerApp.training")
 
 MAX_HISTORY_NEGATIVES = 2
 DUE_PROPORTION = 0.2
+
+T = TypeVar("T")
+
+
+@dataclass(frozen=True)
+class TrainingEntry(Generic[T]):
+    data: T
+    issue_type: str
+    is_positive: bool
 
 
 def select_history_negative_types(
@@ -61,3 +72,20 @@ def validate_proportions(labels: list[int]) -> tuple[bool, float]:
         LOGGER.debug("Train data has a bad proportion: %.3f", data_proportion)
         bad_data = True
     return bad_data, data_proportion
+
+
+def build_issue_history_query(chunk_number: int, fields_to_retrieve: list[str]) -> dict[str, Any]:
+    return {
+        "_source": fields_to_retrieve,
+        "size": chunk_number,
+        "query": {
+            "nested": {
+                "path": "issue_history",
+                "query": {"exists": {"field": "issue_history.issue_type"}},
+            }
+        },
+    }
+
+
+DEFAULT_RANDOM_SEED = 1257
+TRAIN_DATA_RANDOM_STATES = [DEFAULT_RANDOM_SEED, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029, 2137]

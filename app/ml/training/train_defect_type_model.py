@@ -18,10 +18,9 @@ import os
 import random
 import re
 from collections import defaultdict
-from dataclasses import dataclass
 from datetime import datetime
 from time import time
-from typing import Any, Optional, Type
+from typing import Any, Optional, Type, TypeVar
 
 import numpy as np
 import scipy.stats as stats
@@ -35,13 +34,18 @@ from app.commons.model_chooser import ModelChooser
 from app.commons.os_client import OsClient
 from app.ml.models import CustomDefectTypeModel, DefectTypeModel
 from app.ml.models.defect_type_model import DATA_FIELD
-from app.ml.training import select_history_negative_types, validate_proportions
+from app.ml.training import (
+    DEFAULT_RANDOM_SEED,
+    TRAIN_DATA_RANDOM_STATES,
+    TrainingEntry,
+    build_issue_history_query,
+    select_history_negative_types,
+    validate_proportions,
+)
 from app.utils.defaultdict import DefaultDict
 from app.utils.utils import normalize_issue_type
 
 LOGGER = logging.getLogger("analyzerApp.trainingDefectTypeModel")
-DEFAULT_RANDOM_SEED = 1257
-TRAIN_DATA_RANDOM_STATES = [DEFAULT_RANDOM_SEED, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029, 2137]
 NEGATIVE_RATIO_MIN = 2
 NEGATIVE_RATIO_MAX = 4
 MINIMAL_LABEL_PROPORTION = 0.25
@@ -49,12 +53,9 @@ TEST_DATA_PROPORTION = 0.1
 MINIMAL_DATA_LENGTH_FOR_TRAIN = 50
 MIN_P_VALUE = 0.05
 
+ITEM_FIELDS_TO_RETRIEVE = ["test_item_id", "issue_history", "logs"]
 
-@dataclass(frozen=True)
-class TrainingEntry:
-    message: str
-    issue_type: str
-    is_positive: bool
+T = TypeVar("T")
 
 
 def _get_issue_type(issue_type: str) -> str:
@@ -79,8 +80,8 @@ def split_train_test(
 
 
 def balance_data(
-    train_data: list[TrainingEntry],
-) -> list[TrainingEntry]:
+    train_data: list[TrainingEntry[T]],
+) -> list[TrainingEntry[T]]:
     """Make existing train data balanced for the given label.
 
     This function shorten the amount of negative cases if there are to many of them and extend them out of existing
@@ -88,7 +89,7 @@ def balance_data(
 
     :param train_data: Existing train data based on item history.
     """
-    cases: dict[str, list[TrainingEntry]] = defaultdict(list)
+    cases: dict[str, list[TrainingEntry[T]]] = defaultdict(list)
     for entry in train_data:
         cases[entry.issue_type].append(entry)
 
@@ -103,12 +104,12 @@ def balance_data(
             cases_num[entry.issue_type] = current[0], current[1] + 1
 
     rnd = random.Random(DEFAULT_RANDOM_SEED)
-    results: list[TrainingEntry] = train_data.copy()
+    results: list[TrainingEntry[T]] = train_data.copy()
     for issue_type, (positive, negative) in cases_num.items():
         if positive <= 0:
             continue
         max_negative_cases = positive * NEGATIVE_RATIO_MAX
-        additional_negative_cases: list[TrainingEntry] = []
+        additional_negative_cases: list[TrainingEntry[T]] = []
         for issue, case_list in cases.items():
             if issue_type == issue:
                 continue
@@ -150,14 +151,16 @@ def balance_data(
     return results
 
 
-def create_binary_target_data(label: str, data: list[TrainingEntry]) -> tuple[list[str], list[int]]:
+def create_binary_target_data(label: str, data: list[TrainingEntry[str]]) -> tuple[list[str], list[int]]:
     labels_filtered = []
+    messages: list[str] = []
     for entry in data:
+        messages.append(entry.data)
         if label == entry.issue_type:
             labels_filtered.append(1 if entry.is_positive else 0)
         else:
             labels_filtered.append(0)
-    return [entry.message for entry in data], labels_filtered
+    return messages, labels_filtered
 
 
 def _get_log_message(log_data: LogData) -> Optional[str]:
@@ -172,7 +175,7 @@ def _get_log_message(log_data: LogData) -> Optional[str]:
 def train_several_times(
     new_model: DefectTypeModel,
     label: str,
-    data: list[TrainingEntry],
+    data: list[TrainingEntry[str]],
     random_states: Optional[list[int]] = None,
     baseline_model: Optional[DefectTypeModel] = None,
 ) -> tuple[list[float], list[float], bool, float]:
@@ -238,7 +241,7 @@ def _is_supported_issue_type(issue_type: str) -> bool:
     return _get_base_issue_type(issue_type) != "ti"
 
 
-def build_entries_from_item(test_item: TestItemIndexData) -> list[TrainingEntry]:
+def build_entries_from_item(test_item: TestItemIndexData) -> list[TrainingEntry[str]]:
     issue_history = list(test_item.issue_history or [])
     if not issue_history:
         return []
@@ -253,22 +256,22 @@ def build_entries_from_item(test_item: TestItemIndexData) -> list[TrainingEntry]
     if not logs:
         return []
 
-    entries: list[TrainingEntry] = []
+    entries: list[TrainingEntry[str]] = []
     for log_data in logs:
         log_message = _get_log_message(log_data)
         if not log_message:
             continue
         entries.append(
-            TrainingEntry(
-                message=log_message,
+            TrainingEntry[str](
+                data=log_message,
                 issue_type=_get_issue_type(positive_issue_type),
                 is_positive=True,
             )
         )
         for negative_issue_type in negative_issue_types:
             entries.append(
-                TrainingEntry(
-                    message=log_message,
+                TrainingEntry[str](
+                    data=log_message,
                     issue_type=_get_issue_type(negative_issue_type),
                     is_positive=False,
                 )
@@ -304,24 +307,12 @@ class DefectTypeModelTraining:
         self.model_chooser = model_chooser
         self.model_class = model_class if model_class else CustomDefectTypeModel
 
-    def _build_issue_history_query(self) -> dict[str, Any]:
-        return {
-            "_source": ["test_item_id", "issue_history", "logs"],
-            "size": self.app_config.esChunkNumber,
-            "query": {
-                "nested": {
-                    "path": "issue_history",
-                    "query": {"exists": {"field": "issue_history.issue_type"}},
-                }
-            },
-        }
-
     def _query_data(
         self, projects: list[int], stat_data_storage: Optional[DefaultDict[str, dict[str, Any]]]
-    ) -> list[TrainingEntry]:
-        data: list[TrainingEntry] = []
+    ) -> list[TrainingEntry[str]]:
+        data: list[TrainingEntry[str]] = []
         start_time = time()
-        query = self._build_issue_history_query()
+        query = build_issue_history_query(self.app_config.esChunkNumber, ITEM_FIELDS_TO_RETRIEVE)
 
         for project in projects:
             for hit in self.os_client.search(project, query) or []:
@@ -343,7 +334,7 @@ class DefectTypeModelTraining:
         self,
         new_model: DefectTypeModel,
         label: str,
-        data: list[TrainingEntry],
+        data: list[TrainingEntry[str]],
         random_states: Optional[list[int]] = None,
     ) -> tuple[list[float], list[float], bool, float]:
         return train_several_times(new_model, label, data, random_states, self.baseline_model)

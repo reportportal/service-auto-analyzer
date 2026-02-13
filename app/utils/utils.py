@@ -27,9 +27,9 @@ from requests import RequestException
 
 from app.commons import logging
 from app.commons.model import launch_objects
+from app.commons.model.launch_objects import SimilarityResult
 from app.ml.predictor import PredictionResult
 from app.utils.text_processing import remove_credentials_from_url, split_words
-from commons.model.launch_objects import SimilarityResult
 
 logger = logging.getLogger("analyzerApp.utils")
 

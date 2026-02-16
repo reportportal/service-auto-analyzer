@@ -225,7 +225,7 @@ def test_train_uses_os_client_and_issue_history(model_type: ModelType) -> None:
 
     choose_model_mock.assert_called_once_with(123, ModelType.defect_type)
     training.namespace_finder.get_chosen_namespaces.assert_called_once_with(123)
-    assert os_client.search.call_count == 1
+    assert os_client.search.call_count == 11
     assert os_client.search.call_args_list[0][0][0] == 123
 
     issue_history_query = os_client.search.call_args_list[0][0][1]

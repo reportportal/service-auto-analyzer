@@ -31,16 +31,15 @@ def count_hits(results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]
     return sum(len(res) for _, res in results)
 
 
-def get_test_case_hash_dict(res: list[Hit[LogItemIndexData]]) -> dict[Any, list[tuple[str, int, datetime]]]:
-    test_case_hash_dict: dict[Any, list[tuple[str, int, datetime]]] = {}
+def get_test_case_hash_dict(res: list[Hit[LogItemIndexData]]) -> dict[Any, list[tuple[str, float, datetime]]]:
+    test_case_hash_dict: dict[Any, list[tuple[str, float, datetime]]] = {}
     for hit in res:
         test_case_hash = hit.source.test_case_hash
         if test_case_hash not in test_case_hash_dict:
             test_case_hash_dict[test_case_hash] = []
         hit_id = hit.id or ""
-        hit_score = int(hit.score)
         start_time = datetime.strptime(hit.source.start_time, "%Y-%m-%d %H:%M:%S")
-        test_case_hash_dict[test_case_hash].append((hit_id, hit_score, start_time))
+        test_case_hash_dict[test_case_hash].append((hit_id, hit.score or 0.0, start_time))
     return test_case_hash_dict
 
 
@@ -681,13 +680,13 @@ class BoostingFeaturizer:
             my_hits = []
             for hit in es_results:
                 my_hit = hit.model_copy(deep=True)
-                hit_score = my_hit.score
+                hit_score = my_hit.score or 0.0
                 max_score = max(max_score, hit_score)
                 my_hits.append(my_hit)
             all_results.append((query_log, my_hits))
         for query_log, es_hits in all_results:
             for hit in es_hits:
-                hit.normalized_score = hit.score / max_score
+                hit.normalized_score = hit.score or 0.0 / max_score if max_score != 0.0 else 1.0
                 self.total_normalized_score += hit.normalized_score
         return all_results
 

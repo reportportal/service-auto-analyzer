@@ -19,7 +19,7 @@ import random
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, Optional, TypeVar
 
 from app.commons.model.test_item_index import TestItemHistoryData
 from app.utils import utils
@@ -29,7 +29,7 @@ LOGGER = logging.getLogger("analyzerApp.training")
 
 DEFAULT_RANDOM_SEED = 1257
 TRAIN_DATA_RANDOM_STATES = [DEFAULT_RANDOM_SEED, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029, 2137]
-
+NEGATIVE_RATIO_MIN = 2
 NEGATIVE_RATIO_MAX = 4
 MAX_HISTORY_NEGATIVES = 2
 DUE_PROPORTION = 0.2
@@ -40,6 +40,7 @@ T = TypeVar("T")
 @dataclass(frozen=True)
 class TrainingEntry(Generic[T]):
     data: T
+    project_id: Optional[int]
     issue_type: str
     is_positive: bool
 

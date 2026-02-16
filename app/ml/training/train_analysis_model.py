@@ -38,28 +38,30 @@ from app.ml.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.ml.training import (
     DEFAULT_RANDOM_SEED,
     TRAIN_DATA_RANDOM_STATES,
+    TrainingEntry,
     build_issue_history_query,
+    get_issue_type,
+    is_supported_issue_type,
     select_history_negative_types,
     validate_proportions,
+    NEGATIVE_RATIO_MAX,
+    NEGATIVE_RATIO_MIN,
 )
 from app.utils import text_processing, utils
 from app.utils.defaultdict import DefaultDict
 from app.utils.os_migration import (
     bucket_sort_logs_by_similarity,
     build_search_results,
-    convert_test_item_log,
+    extract_inner_hit_logs,
     get_request_logs,
 )
 from app.utils.utils import normalize_issue_type, safe_int
 
 LOGGER = logging.getLogger("analyzerApp.trainingAnalysisModel")
 SMOTE_PROPORTION = 0.4
-NEGATIVE_RATIO_MIN = 2
-NEGATIVE_RATIO_MAX = 4
 MIN_POSITIVE_CASES_FOR_SMOTE = 5
 MIN_P_VALUE = 0.05
 METRIC = "F1"
-
 
 ITEM_FIELDS_TO_RETRIEVE = [
     "test_item_id",
@@ -282,6 +284,46 @@ def build_history_negative_hits(
     return synthetic_hits
 
 
+def build_entries_from_item(project_id: int, test_item: TestItemIndexData) -> list[TrainingEntry[TestItemIndexData]]:
+    issue_history = list(test_item.issue_history or [])
+    if not issue_history:
+        return []
+    positive_issue_type = normalize_issue_type(issue_history[-1].issue_type)
+    if not positive_issue_type or not is_supported_issue_type(positive_issue_type):
+        return []
+
+    negative_issue_types = select_history_negative_types(issue_history, positive_issue_type)
+    negative_issue_types = [issue_type for issue_type in negative_issue_types if is_supported_issue_type(issue_type)]
+
+    logs = list(test_item.logs or [])
+    if not logs:
+        return []
+
+    entries: list[TrainingEntry[TestItemIndexData]] = [
+        TrainingEntry[TestItemIndexData](
+            data=test_item,
+            project_id=project_id,
+            issue_type=get_issue_type(positive_issue_type),
+            is_positive=True,
+        )
+    ]
+    for negative_issue_type in negative_issue_types:
+        entries.append(
+            TrainingEntry[TestItemIndexData](
+                data=test_item,
+                project_id=project_id,
+                issue_type=get_issue_type(negative_issue_type),
+                is_positive=False,
+            )
+        )
+    return entries
+
+
+def has_inner_hits(hit: Hit[TestItemIndexData]) -> bool:
+    inner_hits = hit.inner_hits or {}
+    return bool(inner_hits.get("logs", {}).get("hits", {}).get("hits", []))
+
+
 class AnalysisModelTraining:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
@@ -369,59 +411,162 @@ class AnalysisModelTraining:
             "time_weight_decay": self.search_cfg.TimeWeightDecay,
         }
 
-    @staticmethod
-    def _build_found_hits_from_project_items(
+    def _build_similar_items_query(
+        self,
+        request_logs: list[LogItemIndexData],
         request_test_item_id: str,
-        project_items: list[TestItemIndexData],
-    ) -> list[Hit[LogItemIndexData]]:
-        found_hits: list[Hit[LogItemIndexData]] = []
-        for candidate_item in project_items:
-            if str(candidate_item.test_item_id) == request_test_item_id:
-                continue
-            issue_type = normalize_issue_type(candidate_item.issue_type)
-            if not issue_type:
-                continue
-            for log_data in candidate_item.logs or []:
-                converted_log = convert_test_item_log(candidate_item, log_data, issue_type=issue_type)
-                found_hits.append(
-                    Hit[LogItemIndexData].from_dict(
-                        {"_id": converted_log.log_id, "_score": 1.0, "_source": converted_log}
-                    )
-                )
-        return found_hits
+        min_should_match: float,
+        exclude_issue_type: str = "",
+    ) -> dict[str, Any]:
+        log_messages = [
+            log_item.whole_message
+            for log_item in request_logs
+            if log_item.whole_message and log_item.whole_message.strip()
+        ]
+        if not log_messages:
+            return {}
 
-    def _query_data(self, projects: list[int], features: list[int]) -> tuple[list[list[float]], list[int]]:
-        full_data_features, labels = [], []
+        min_should_match_str = text_processing.prepare_es_min_should_match(min_should_match)
+        nested_should = [
+            utils.build_more_like_this_query(
+                min_should_match_str,
+                message,
+                field_name="logs.whole_message",
+                boost=1.0,
+                max_query_terms=self.search_cfg.MaxQueryTerms,
+            )
+            for message in log_messages
+        ]
+        inner_hits_source = [
+            "logs.log_id",
+            "logs.log_time",
+            "logs.log_level",
+            "logs.cluster_id",
+            "logs.cluster_message",
+            "logs.cluster_with_numbers",
+            "logs.original_message",
+            "logs.message",
+            "logs.message_extended",
+            "logs.message_without_params_extended",
+            "logs.message_without_params_and_brackets",
+            "logs.detected_message",
+            "logs.detected_message_with_numbers",
+            "logs.detected_message_extended",
+            "logs.detected_message_without_params_extended",
+            "logs.detected_message_without_params_and_brackets",
+            "logs.stacktrace",
+            "logs.stacktrace_extended",
+            "logs.only_numbers",
+            "logs.potential_status_codes",
+            "logs.found_exceptions",
+            "logs.found_tests_and_methods",
+            "logs.urls",
+            "logs.message_params",
+            "logs.whole_message",
+        ]
+        nested_query = {
+            "nested": {
+                "path": "logs",
+                "score_mode": "max",
+                "query": {"bool": {"should": nested_should}},
+                "inner_hits": {
+                    "size": max(5, len(log_messages)),
+                    "_source": inner_hits_source,
+                },
+            }
+        }
+        query: dict[str, Any] = {
+            "_source": [
+                "test_item_id",
+                "test_item_name",
+                "unique_id",
+                "test_case_hash",
+                "launch_id",
+                "launch_name",
+                "issue_type",
+                "is_auto_analyzed",
+                "start_time",
+            ],
+            "size": self.app_config.esChunkNumber,
+            "query": {
+                "bool": {
+                    "filter": [{"exists": {"field": "issue_type"}}],
+                    "must_not": [{"term": {"test_item_id": str(request_test_item_id)}}],
+                    "must": [nested_query],
+                }
+            },
+        }
+        if exclude_issue_type:
+            query["query"]["bool"]["must_not"].append({"term": {"issue_type": exclude_issue_type}})
+        utils.append_aa_ma_boosts(query, self.search_cfg)
+        return query
+
+    def _collect_similar_hits(
+        self,
+        project_id: int,
+        request_logs: list[LogItemIndexData],
+        request_test_item_id: str,
+        positive_issue_type: str,
+    ) -> list[Hit[TestItemIndexData]]:
+        query = self._build_similar_items_query(request_logs, request_test_item_id, 0.4)
+        if not query:
+            return []
+        hits = [hit for hit in self.os_client.search(project_id, query) or [] if has_inner_hits(hit)]
+        issue_types = {normalize_issue_type(hit.source.issue_type) for hit in hits if hit.source.issue_type}
+        if positive_issue_type and (not issue_types or issue_types == {positive_issue_type}):
+            extra_query = self._build_similar_items_query(
+                request_logs, request_test_item_id, 0.4, exclude_issue_type=positive_issue_type
+            )
+            extra_hits = [hit for hit in self.os_client.search(project_id, extra_query) or [] if has_inner_hits(hit)]
+            hits_by_id: dict[str, Hit[TestItemIndexData]] = {}
+            for hit in hits + extra_hits:
+                hits_by_id[str(hit.source.test_item_id)] = hit
+            hits = list(hits_by_id.values())
+        return hits
+
+    def _query_data(self, projects: list[int]) -> list[TrainingEntry[TestItemIndexData]]:
+        data: list[TrainingEntry[TestItemIndexData]] = []
+        query = build_issue_history_query(self.app_config.esChunkNumber, ITEM_FIELDS_TO_RETRIEVE)
+
         for project_id in projects:
+            for hit in self.os_client.search(project_id, query) or []:
+                data.extend(build_entries_from_item(project_id, hit.source))
+        return data
+
+    def _featurize_data(
+        self, test_item: list[TrainingEntry[TestItemIndexData]], features: list[int]
+    ) -> tuple[list[list[float]], list[int]]:
+        full_data_features, labels = [], []
+        project_to_entry: dict[int, list[TrainingEntry[TestItemIndexData]]] = defaultdict(list)
+        for entry in test_item:
+            project_to_entry[entry.project_id].append(entry)
+
+        for project_id, entries in project_to_entry.items():
             namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
             defect_type_model = cast(
                 DefectTypeModel, self.model_chooser.choose_model(project_id, ModelType.defect_type)
             )
-            project_hits = list(
-                self.os_client.search(
-                    project_id, build_issue_history_query(self.app_config.esChunkNumber, ITEM_FIELDS_TO_RETRIEVE)
-                )
-                or []
-            )
-            project_items = [project_hit.source for project_hit in project_hits]
-            for hit in project_hits:
-                test_item = hit.source
+            for entry in entries:
+                test_item = entry.data
                 issue_history = list(test_item.issue_history or [])
                 if not issue_history:
                     continue
-                if not test_item.logs:
-                    continue
-
                 positive_issue_type = normalize_issue_type(issue_history[-1].issue_type or test_item.issue_type)
                 if not positive_issue_type:
                     continue
                 history_negative_types = select_history_negative_types(issue_history, positive_issue_type)
 
-                request_logs = get_request_logs(test_item, positive_issue_type)
+                request_logs = get_request_logs(test_item, entry.issue_type)
                 if not request_logs:
                     continue
 
-                found_hits = self._build_found_hits_from_project_items(str(test_item.test_item_id), project_items)
+                similar_hits = self._collect_similar_hits(
+                    project_id, request_logs, str(test_item.test_item_id), positive_issue_type
+                )
+                if not similar_hits:
+                    continue
+
+                found_hits = extract_inner_hit_logs(similar_hits)
                 if history_negative_types:
                     found_hits = [
                         hit
@@ -515,7 +660,8 @@ class AnalysisModelTraining:
         projects = [project_info.project]
         if project_info.additional_projects:
             projects.extend(project_info.additional_projects)
-        train_data, labels = self._query_data(projects, new_model.feature_ids)
+        raw_train_data = self._query_data(projects)
+        train_data, labels = self._featurize_data(raw_train_data, new_model.feature_ids)
         LOGGER.debug(f"Loaded data for model training {self.model_type.name}")
 
         baseline_model_results, new_model_results, bad_data, data_proportion = self._train_several_times(

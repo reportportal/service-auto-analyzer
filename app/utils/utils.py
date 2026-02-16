@@ -14,7 +14,6 @@
 
 import json
 import os
-import random
 import traceback
 import warnings
 from collections import Counter
@@ -64,11 +63,6 @@ def read_resource_file(filename: str, to_json: bool = False) -> Any:
     return read_json_file("res", filename, to_json)
 
 
-def validate_folder(folder_path: str) -> bool:
-    """Check that passed path points to a directory and it exists."""
-    return bool(folder_path and folder_path.strip() and os.path.exists(folder_path) and os.path.isdir(folder_path))
-
-
 def validate_file(file_path: str) -> bool:
     """Check that passed path points to a file and it exists."""
     return bool(file_path and file_path.strip() and os.path.exists(file_path) and os.path.isfile(file_path))
@@ -79,10 +73,6 @@ def extract_real_id(elastic_id):
     if real_id.endswith("_m"):
         return int(real_id[:-2])
     return int(real_id)
-
-
-def jaccard_similarity(s1, s2):
-    return len(s1.intersection(s2)) / len(s1.union(s2)) if len(s1.union(s2)) > 0 else 0
 
 
 def send_request(
@@ -106,16 +96,6 @@ def send_request(
     except RequestException as err:
         logger.exception(f"Error sending {method} request to URL: {remove_credentials_from_url(url)}", exc_info=err)
     return None
-
-
-def extract_all_exceptions(bodies):
-    logs_with_exceptions = []
-    for log_body in bodies:
-        exceptions = [exc.strip() for exc in log_body["_source"]["found_exceptions"].split()]
-        logs_with_exceptions.append(
-            launch_objects.LogExceptionResult(logId=int(log_body["_id"]), foundExceptions=exceptions)
-        )
-    return logs_with_exceptions
 
 
 MINIMAL_VALUE_FOR_GOOD_PROPORTION = 2
@@ -148,50 +128,6 @@ def calculate_log_weight(log_level: int, message_length: int, max_message_length
     return level_weight * length_weight
 
 
-def balance_data(
-    train_data_indexes: list[int], train_labels: list[int], due_proportion: float
-) -> tuple[list[int], list[int], float]:
-    one_data = [train_data_indexes[i] for i in range(len(train_data_indexes)) if train_labels[i] == 1]
-    zero_data = [train_data_indexes[i] for i in range(len(train_data_indexes)) if train_labels[i] == 0]
-    zero_count = len(zero_data)
-    one_count = len(one_data)
-    min_count = min(zero_count, one_count)
-    max_count = max(zero_count, one_count)
-    if zero_count > one_count:
-        min_data = one_data
-        max_data = zero_data
-        min_label = 1
-        max_label = 0
-    else:
-        min_data = zero_data
-        max_data = one_data
-        min_label = 0
-        max_label = 1
-
-    all_data = []
-    all_data_labels = []
-    real_proportion = 0.0
-    if min_count > MINIMAL_VALUE_FOR_GOOD_PROPORTION:
-        real_proportion = np.round(min_count / max_count, 3)
-    if min_count > 0 and real_proportion < due_proportion:
-        all_data.extend(min_data)
-        all_data_labels.extend([min_label] * len(min_data))
-        random.seed(1763)
-        random.shuffle(max_data)
-        max_size = int(min_count * (1 / due_proportion) - 1)
-        all_data.extend(max_data[:max_size])
-        all_data_labels.extend([max_label] * max_size)
-        real_proportion = calculate_proportions_for_labels(all_data_labels)
-        if real_proportion / due_proportion >= 0.9:
-            real_proportion = due_proportion
-
-    random.seed(1257)
-    random.shuffle(all_data)
-    random.seed(1257)
-    random.shuffle(all_data_labels)
-    return all_data, all_data_labels, real_proportion
-
-
 def topological_sort(feature_graph: dict[int, list[int]]) -> list[int]:
     visited = {}
     for key_ in feature_graph:
@@ -217,22 +153,6 @@ def topological_sort(feature_graph: dict[int, list[int]]) -> list[int]:
                         if visited[key_i] == 0:
                             stack_vertices.append(key_i)
     return stack
-
-
-def to_int_list(features_list: str) -> list[int]:
-    feature_numbers_list = []
-    for feature_name in features_list.split(";"):
-        feature_name = feature_name.split("_")[0]
-        feature_numbers_list.append(int(feature_name))
-    return feature_numbers_list
-
-
-def to_float_list(features_list: str) -> list[float]:
-    feature_numbers_list = []
-    for feature_name in features_list.split(";"):
-        feature_name = feature_name.split("_")[0]
-        feature_numbers_list.append(float(feature_name))
-    return feature_numbers_list
 
 
 def fill_previously_gathered_features(
@@ -327,24 +247,6 @@ def build_more_like_this_query(
             "boost": boost,
         }
     }
-
-
-def append_potential_status_codes(
-    query: dict[str, Any], log: dict[str, Any], *, boost: float = 8.0, max_query_terms: int = 50
-) -> None:
-    potential_status_codes = log["_source"]["potential_status_codes"].strip()
-    if potential_status_codes:
-        number_of_status_codes = str(len(set(potential_status_codes.split())))
-        query["query"]["bool"]["must"].append(
-            build_more_like_this_query(
-                "1",
-                potential_status_codes,
-                field_name="potential_status_codes",
-                boost=boost,
-                override_min_should_match=number_of_status_codes,
-                max_query_terms=max_query_terms,
-            )
-        )
 
 
 def extract_clustering_setting(cluster_id):

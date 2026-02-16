@@ -152,7 +152,7 @@ def get_info_template(project_info: TrainInfo, baseline_model: str, model_name: 
 
 
 def build_entries_from_item(test_item: TestItemIndexData) -> list[TrainingEntry[str]]:
-    issue_history = list(test_item.issue_history or [])
+    issue_history = test_item.issue_history or []
     if not issue_history:
         return []
     positive_issue_type = normalize_issue_type(issue_history[-1].issue_type)

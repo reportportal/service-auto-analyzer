@@ -285,7 +285,7 @@ def build_history_negative_hits(
 
 
 def build_entries_from_item(project_id: int, test_item: TestItemIndexData) -> list[TrainingEntry[TestItemIndexData]]:
-    issue_history = list(test_item.issue_history or [])
+    issue_history = test_item.issue_history or []
     if not issue_history:
         return []
     positive_issue_type = normalize_issue_type(issue_history[-1].issue_type)

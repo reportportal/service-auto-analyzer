@@ -13,7 +13,10 @@
 #  limitations under the License.
 
 """Common package for ML Model training code."""
+import dataclasses
 import logging
+import random
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
@@ -23,6 +26,10 @@ from app.utils.utils import normalize_issue_type
 
 LOGGER = logging.getLogger("analyzerApp.training")
 
+DEFAULT_RANDOM_SEED = 1257
+TRAIN_DATA_RANDOM_STATES = [DEFAULT_RANDOM_SEED, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029, 2137]
+
+NEGATIVE_RATIO_MAX = 4
 MAX_HISTORY_NEGATIVES = 2
 DUE_PROPORTION = 0.2
 
@@ -87,5 +94,73 @@ def build_issue_history_query(chunk_number: int, fields_to_retrieve: list[str]) 
     }
 
 
-DEFAULT_RANDOM_SEED = 1257
-TRAIN_DATA_RANDOM_STATES = [DEFAULT_RANDOM_SEED, 1873, 1917, 2477, 3449, 353, 4561, 5417, 6427, 2029, 2137]
+def balance_data(
+    train_data: list[TrainingEntry[T]],
+) -> list[TrainingEntry[T]]:
+    """Make existing train data balanced for the given label.
+
+    This function shorten the amount of negative cases if there are to many of them and extend them out of existing
+    data if there are too few of them.
+
+    :param train_data: Existing train data based on item history.
+    """
+    cases: dict[str, list[TrainingEntry[T]]] = defaultdict(list)
+    for entry in train_data:
+        cases[entry.issue_type].append(entry)
+
+    cases_num: dict[str, tuple[int, int]] = defaultdict(lambda: (0, 0))
+    negative_cases: dict[str, list[int]] = defaultdict(list)
+    for i, entry in enumerate(train_data):
+        current = cases_num[entry.issue_type]
+        if entry.is_positive:
+            cases_num[entry.issue_type] = current[0] + 1, current[1]
+        else:
+            negative_cases[entry.issue_type].append(i)
+            cases_num[entry.issue_type] = current[0], current[1] + 1
+
+    rnd = random.Random(DEFAULT_RANDOM_SEED)
+    results: list[TrainingEntry[T]] = train_data.copy()
+    for issue_type, (positive, negative) in cases_num.items():
+        if positive <= 0:
+            continue
+        max_negative_cases = positive * NEGATIVE_RATIO_MAX
+        additional_negative_cases: list[TrainingEntry[T]] = []
+        for issue, case_list in cases.items():
+            if issue_type == issue:
+                continue
+            for case in case_list:
+                if not case.is_positive:
+                    continue  # ignore uncertainty
+                additional_negative_cases.append(dataclasses.replace(case, issue_type=issue_type, is_positive=False))
+        if not additional_negative_cases:
+            continue
+        rnd.shuffle(additional_negative_cases)
+        if negative + len(additional_negative_cases) <= max_negative_cases:
+            # We can append all additional negative cases
+            results.extend(additional_negative_cases)
+        else:
+            # Need to balance negative cases
+            negative_indexes = negative_cases[issue_type]
+            rnd.shuffle(negative_indexes)
+            case_num_to_remove = negative + len(additional_negative_cases) - max_negative_cases
+            if negative <= positive:
+                remove_history_cases_num = 0
+            else:
+                possible_to_remove = negative - positive
+                remove_history_cases_num = (
+                    possible_to_remove if possible_to_remove < case_num_to_remove else case_num_to_remove
+                )
+            if remove_history_cases_num < case_num_to_remove:
+                remove_additional_cases_num = case_num_to_remove - remove_history_cases_num
+            else:
+                remove_additional_cases_num = 0
+            additional_negative_cases = additional_negative_cases[
+                : len(additional_negative_cases) - remove_additional_cases_num
+            ]
+            cases_to_remove = negative_indexes[:remove_history_cases_num]
+            i = 0
+            for i, case_idx in enumerate(cases_to_remove):
+                results[case_idx] = additional_negative_cases[i]
+            if i + 1 < len(additional_negative_cases):
+                results.extend(additional_negative_cases[i + 1 :])
+    return results

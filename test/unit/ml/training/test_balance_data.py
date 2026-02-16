@@ -16,15 +16,15 @@ from collections import Counter
 
 import pytest
 
-from app.ml.training.train_defect_type_model import TrainingEntry, balance_data
+from app.ml.training import TrainingEntry, balance_data
 
 
 def _entry(message: str, issue_type: str, is_positive: bool) -> TrainingEntry:
-    return TrainingEntry(message=message, issue_type=issue_type, is_positive=is_positive)
+    return TrainingEntry(data=message, issue_type=issue_type, is_positive=is_positive)
 
 
-def _entry_counter(entries: list[TrainingEntry]) -> Counter[tuple[str, str, bool]]:
-    return Counter((entry.message, entry.issue_type, entry.is_positive) for entry in entries)
+def _entry_counter(entries: list[TrainingEntry[str]]) -> Counter[tuple[str, str, bool]]:
+    return Counter((entry.data, entry.issue_type, entry.is_positive) for entry in entries)
 
 
 FIRST_POSITIVE_ENTRY = _entry("msg-a", "pb001", True)

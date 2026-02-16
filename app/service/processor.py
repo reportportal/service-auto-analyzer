@@ -16,6 +16,8 @@ import json
 import time
 from typing import Any, Optional
 
+from pydantic import BaseModel
+
 from app.commons import logging, model_chooser
 from app.commons.model import launch_objects, ml
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
@@ -125,8 +127,8 @@ def raise_exception(message: str) -> None:
     raise RuntimeError(message)
 
 
-def log_suggest_info_index_warning(s: Any) -> Any:
-    LOGGER.warning(f"Deprecated 'index_suggest_info' route called with: {json.dumps(s)}")
+def log_suggest_info_index_warning(s: BaseModel) -> Any:
+    LOGGER.warning(f"Deprecated 'index_suggest_info' route called with: {s.model_dump_json()}")
     return {}
 
 

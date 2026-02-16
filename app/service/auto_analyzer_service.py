@@ -110,7 +110,7 @@ SHORTENED_MESSAGE_FIELDS = [
 
 
 def choose_fields_to_filter_strict(log_lines: int, min_should_match: float) -> list[str]:
-    fields = UNSHORTENED_MESSAGE_FIELDS if log_lines == -1 else SHORTENED_MESSAGE_FIELDS
+    fields = list(UNSHORTENED_MESSAGE_FIELDS if log_lines == -1 else SHORTENED_MESSAGE_FIELDS)
     if min_should_match > 0.99:
         fields.append("found_tests_and_methods")
     return fields

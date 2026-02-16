@@ -982,29 +982,23 @@ def preprocess_text_for_similarity(text: str) -> list[str]:
     return processed_words
 
 
-def __calculate_tfidf_matrix(
-    all_texts: list[str], *, vectorizer: Optional[TfidfVectorizer] = None, use_idf: bool = False
-) -> tuple[csr_matrix, TfidfVectorizer]:
-    my_vectorizer = vectorizer
-    if not my_vectorizer:
-        # Use TF-IDF vectorization and cosine similarity for efficient computation
-        my_vectorizer = TfidfVectorizer(
-            lowercase=False,  # Already lowercased in preprocessing
-            token_pattern=r"\b\w+\b",  # Simple word tokenization
-            min_df=1,  # Include all terms
-            max_df=1.0,  # Include all terms
-            ngram_range=(1, 2),  # Use unigrams and bigrams
-            use_idf=use_idf,
-        )
+def __calculate_tfidf_matrix(all_texts: list[str], *, use_idf: bool = False) -> csr_matrix:
+    # Use TF-IDF vectorization and cosine similarity for efficient computation
+    vectorizer = TfidfVectorizer(
+        lowercase=False,  # Already lowercased in preprocessing
+        token_pattern=r"\b\w+\b",  # Simple word tokenization
+        min_df=1,  # Include all terms
+        max_df=1.0,  # Include all terms
+        ngram_range=(1, 2),  # Use unigrams and bigrams
+        use_idf=use_idf,
+    )
 
     # Fit and transform all texts at once
-    tf_matrix: csr_matrix = my_vectorizer.fit_transform(all_texts)
-    return tf_matrix, my_vectorizer
+    tf_matrix: csr_matrix = vectorizer.fit_transform(all_texts)
+    return tf_matrix
 
 
-def calculate_text_similarity(
-    base_text: Optional[str], other_texts: list[str], *, vectorizer: Optional[TfidfVectorizer] = None
-) -> tuple[list[SimilarityResult], Optional[TfidfVectorizer]]:
+def calculate_text_similarity(base_text: Optional[str], other_texts: list[str]) -> list[SimilarityResult]:
     """
     Calculate similarity between a base text and multiple other texts using TF-IDF vectorization and cosine similarity.
 
@@ -1013,14 +1007,12 @@ def calculate_text_similarity(
 
     :param base_text:   Base text to compare against
     :param other_texts: Variable number of texts to compare with the base text
-    :param vectorizer:  Optional TF-IDF vectorizer instance to reuse for efficiency. If None, a new
-                        vectorizer will be created.
 
     :return: List of SimilarityResult objects where `similarity` is in [0.0, 1.0]
              and `both_empty` indicates both texts were empty
     """
     if base_text is None or not other_texts:
-        return [], None
+        return []
 
     # Preprocess the base text
     processed_base_text = " ".join(preprocess_text_for_similarity(base_text))
@@ -1059,13 +1051,13 @@ def calculate_text_similarity(
             similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=False))
 
     if not valid_texts:
-        return similarity_scores, None
+        return similarity_scores
 
     # If we have valid texts to process, use single TF-IDF vectorizer
     # Create all texts list: base text + all valid other texts
     all_texts = [processed_base_text] + valid_texts
 
-    tfidf_matrix, my_vectorizer = __calculate_tfidf_matrix(all_texts, vectorizer=vectorizer)
+    tfidf_matrix = __calculate_tfidf_matrix(all_texts)
 
     # Calculate cosine similarity between base text (index 0) and all other texts
     base_vector = tfidf_matrix[0:1]  # Base text vector
@@ -1080,12 +1072,10 @@ def calculate_text_similarity(
             both_empty=False,
         )
 
-    return similarity_scores, my_vectorizer
+    return similarity_scores
 
 
-def find_last_unique_texts(
-    threshold: float, texts: list[str], *, vectorizer: Optional[TfidfVectorizer] = None
-) -> tuple[list[int], TfidfVectorizer]:
+def find_last_unique_texts(threshold: float, texts: list[str]) -> list[int]:
     """Find the last occurrence indices of unique texts using similarity-based deduplication.
 
     This function identifies duplicate or highly similar texts within a list and returns the indices
@@ -1116,7 +1106,7 @@ def find_last_unique_texts(
     if not texts:
         raise ValueError("Input texts cannot be empty")
 
-    matrix, my_vectorizer = __calculate_tfidf_matrix(texts, vectorizer=vectorizer, use_idf=True)
+    matrix = __calculate_tfidf_matrix(texts, use_idf=True)
     result = set()
     for i in range(len(texts) - 1):
         if i in result:
@@ -1130,7 +1120,7 @@ def find_last_unique_texts(
                 use_index = i + 1 + si
         result.add(use_index)
     result.add(len(texts) - 1)
-    return sorted(result), my_vectorizer
+    return sorted(result)
 
 
 def calculate_similarity_by_values(first_field: str, second_field: str) -> float:

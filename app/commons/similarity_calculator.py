@@ -40,7 +40,7 @@ class SimilarityCalculator:
                 group_ids = [(str(obj["_id"]), str(request["_id"])) for obj in result["hits"]["hits"]]
                 request_field = request["_source"].get(field, "")
                 result_fields = [obj["_source"].get(field, "") for obj in result["hits"]["hits"]]
-            similarity_results, _ = text_processing.calculate_text_similarity(request_field, result_fields)
+            similarity_results = text_processing.calculate_text_similarity(request_field, result_fields)
             for group_id, sim_result in zip(group_ids, similarity_results):
                 all_results_similarity[group_id] = sim_result
         return all_results_similarity

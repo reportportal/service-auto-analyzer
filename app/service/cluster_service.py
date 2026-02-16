@@ -430,8 +430,8 @@ class ClusterService:
 
                 equal = True
                 for column in ["found_exceptions", "potential_status_codes"]:
-                    candidate_text = " ".join(sorted(getattr(inner_log.data, column, "").split())).strip()
-                    text_to_compare = " ".join(sorted(getattr(log.data, column, "").split())).strip()
+                    candidate_text = " ".join(sorted((getattr(inner_log.data, column, None) or "").split())).strip()
+                    text_to_compare = " ".join(sorted((getattr(log.data, column, None) or "").split())).strip()
                     if candidate_text != text_to_compare:
                         equal = False
                         break

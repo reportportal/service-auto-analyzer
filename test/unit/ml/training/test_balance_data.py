@@ -20,7 +20,7 @@ from app.ml.training import TrainingEntry, balance_data
 
 
 def _entry(message: str, issue_type: str, is_positive: bool) -> TrainingEntry:
-    return TrainingEntry(data=message, issue_type=issue_type, is_positive=is_positive)
+    return TrainingEntry(data=message, project_id=None, issue_type=issue_type, is_positive=is_positive)
 
 
 def _entry_counter(entries: list[TrainingEntry[str]]) -> Counter[tuple[str, str, bool]]:

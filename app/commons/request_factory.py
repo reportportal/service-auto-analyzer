@@ -340,7 +340,6 @@ def prepare_test_items(
     :return: a list of TestItemIndexData objects ready for OpenSearch indexing
     """
     results = []
-    vectorizer = None
     for test_item in launch.testItems:
         # Prepare test item level fields
         launch_time = datetime(*launch.launchStartTime[:6]).strftime("%Y-%m-%d %H:%M:%S")  # type: ignore[arg-type]
@@ -354,9 +353,7 @@ def prepare_test_items(
         log_messages = [log.message for log in logs]
         logs_to_take: list[int] = []
         if log_messages:
-            logs_to_take, vectorizer = text_processing.find_last_unique_texts(
-                similarity_threshold_to_drop, log_messages, vectorizer=vectorizer
-            )
+            logs_to_take = text_processing.find_last_unique_texts(similarity_threshold_to_drop, log_messages)
         prepared_logs = []
         for log_order, log_idx in enumerate(logs_to_take[-number_of_logs_to_index:]):
             log_data = _prepare_log_data(logs[log_idx], log_order, number_of_lines)

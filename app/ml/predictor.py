@@ -353,7 +353,7 @@ class SimilarityPredictor(Predictor):
         hit_texts: list[str],
     ) -> list[PredictionResult]:
         # Calculate similarities for all hits at once
-        similarity_scores, _ = calculate_text_similarity(query_text, hit_texts)
+        similarity_scores = calculate_text_similarity(query_text, hit_texts)
 
         # Group results by test_item to find most relevant for each
         results_by_test_item: dict[str, dict[str, Any]] = {}

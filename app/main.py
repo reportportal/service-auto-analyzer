@@ -28,9 +28,9 @@ from flask_wtf.csrf import CSRFProtect
 from app.amqp.amqp import AmqpClient
 from app.amqp.amqp_handler import AmqpRequestHandler, DirectAmqpRequestHandler, ProcessAmqpRequestHandler
 from app.commons import logging as my_logging
-from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType
+from app.commons.os_client import OsClient
 from app.utils import utils
 
 
@@ -374,7 +374,7 @@ def read_model_settings():
 my_logging.setup(APP_CONFIG)
 logger = my_logging.getLogger("analyzerApp")
 APP_CONFIG.appVersion = read_version()
-es_client = EsClient(APP_CONFIG)
+os_client = OsClient(APP_CONFIG)
 read_model_settings()
 
 application = create_application()
@@ -385,7 +385,7 @@ THREADS: list[tuple[str, threading.Thread, AmqpRequestHandler]] = []
 def get_health_status():
     status: dict[str, Any] = {"status": "healthy"}
     status_code = 200
-    if not es_client.is_healthy():
+    if not os_client.is_healthy():
         logger.error("Analyzer health check status failed: %s", status)
         status["status"] = "OpenSearch is not healthy"
         status_code = 503

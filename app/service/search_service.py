@@ -53,7 +53,7 @@ class SearchService:
             return []
 
         try:
-            logs_to_take, _ = text_processing.find_last_unique_texts(
+            logs_to_take = text_processing.find_last_unique_texts(
                 search_req.analyzerConfig.similarityThresholdToDrop, log_messages
             )
         except ValueError:
@@ -158,7 +158,7 @@ class SearchService:
         if not candidates:
             return []
 
-        cumulative_similarities, _ = text_processing.calculate_text_similarity(
+        cumulative_similarities = text_processing.calculate_text_similarity(
             joined_request_messages, joined_item_messages_list
         )
 
@@ -168,12 +168,12 @@ class SearchService:
             if cumulative_similarity.similarity < min_similarity:
                 continue
 
-            per_log_similarity, _ = text_processing.calculate_text_similarity(
+            per_log_similarity = text_processing.calculate_text_similarity(
                 joined_request_messages, log_messages_sorted
             )
             best_log = logs_with_messages[utils.get_max_similarity_idx(per_log_similarity)][0]
 
-            request_similarity, _ = text_processing.calculate_text_similarity(best_log.message, log_messages)
+            request_similarity = text_processing.calculate_text_similarity(best_log.message, log_messages)
             best_request_similarity = 0.0
             best_request_index = 0
             if request_similarity:
@@ -188,7 +188,7 @@ class SearchService:
             if search_req.analyzerConfig.allMessagesShouldMatch:
                 all_messages_match = True
                 for request_message in log_messages:
-                    per_request_similarity, _ = text_processing.calculate_text_similarity(
+                    per_request_similarity = text_processing.calculate_text_similarity(
                         request_message, log_messages_sorted
                     )
                     if not per_request_similarity:

@@ -15,7 +15,7 @@
 from collections import defaultdict
 from datetime import datetime
 from time import time
-from typing import Optional, Union, cast
+from typing import Optional, Union
 
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory
@@ -120,8 +120,7 @@ class IndexService:
             if isinstance(raw_value, ItemUpdate):
                 issue_type = raw_value.issueType
                 issue_comment = raw_value.issueComment
-                timestamp_values = cast(tuple[int, int, int, int, int, int, int], tuple(raw_value.timestamp))
-                timestamp = format_timestamp(datetime(*timestamp_values))
+                timestamp = format_timestamp(datetime(*raw_value.timestamp))
             else:
                 issue_type = raw_value
                 timestamp = current_timestamp()

@@ -61,6 +61,7 @@ class LogData(BaseModel):
     only_numbers: Optional[str] = Field(default=None, description="Extracted numeric values")
     potential_status_codes: Optional[str] = Field(default=None, description="Detected status/error codes")
     found_exceptions: Optional[str] = Field(default=None, description="Exception type names found")
+    # TODO: the following field is barely used, subject to remove
     found_exceptions_extended: Optional[str] = Field(default=None, description="Enriched exception names")
     found_tests_and_methods: Optional[str] = Field(default=None, description="Test method references")
     urls: Optional[str] = Field(default=None, description="URLs found in message")

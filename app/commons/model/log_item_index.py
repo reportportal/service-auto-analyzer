@@ -58,6 +58,8 @@ class LogItemIndexData(BaseModel):
     message_params: str = Field(default="", description="Message parameters")
     only_numbers: str = Field(default="", description="Only numbers extracted from message")
     found_exceptions: str = Field(default="", description="Found exceptions")
+    # TODO: the following field is barely used, subject to remove
+    found_exceptions_extended: str = Field(default="", description="Found exceptions")
     found_tests_and_methods: str = Field(default="", description="Found tests and methods")
     potential_status_codes: str = Field(default="", description="Potential status codes")
     urls: str = Field(default="", description="URLs extracted from message")

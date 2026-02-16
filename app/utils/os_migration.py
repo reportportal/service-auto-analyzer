@@ -61,6 +61,7 @@ def convert_test_item_log(
         message_params=log_data.message_params or "",
         only_numbers=log_data.only_numbers or "",
         found_exceptions=log_data.found_exceptions or "",
+        found_exceptions_extended=log_data.found_exceptions_extended or "",
         found_tests_and_methods=log_data.found_tests_and_methods or "",
         potential_status_codes=log_data.potential_status_codes or "",
         urls=log_data.urls or "",
@@ -154,14 +155,11 @@ def bucket_sort_logs_by_similarity(
     request_texts = [_get_log_text(log_item) for log_item in request_logs]
     if not request_texts:
         return buckets
-    my_vectorizer = None
     for hit in found_hits:
         hit_text = _get_log_text(hit.source)
         if not hit_text.strip():
             continue
-        similarities, my_vectorizer = text_processing.calculate_text_similarity(
-            hit_text, request_texts, vectorizer=my_vectorizer
-        )
+        similarities = text_processing.calculate_text_similarity(hit_text, request_texts)
         if not similarities:
             continue
         buckets[get_max_similarity_idx(similarities)].append(hit)

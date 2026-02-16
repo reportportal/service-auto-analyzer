@@ -15,13 +15,18 @@
 from datetime import datetime
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.commons.model import LogItemIndexData
 from app.commons.model.db import Hit
 from app.commons.model.ml import ModelType
 
 ERROR_LOGGING_LEVEL: int = 40000
+
+
+def timestamp_factory() -> tuple[int, int, int, int, int, int, int]:
+    now = datetime.now().timetuple()
+    return now[0], now[1], now[2], now[3], now[4], now[5], now[6]
 
 
 class AnalyzerConf(BaseModel):
@@ -144,7 +149,7 @@ class Log(BaseModel):
 
     logId: int
     logLevel: int = 0
-    logTime: list[int] = list(datetime.now().timetuple())[:7]
+    logTime: tuple[int, int, int, int, int, int, int] = Field(default_factory=timestamp_factory)
     message: str
     clusterId: int = 0
     clusterMessage: str = ""
@@ -159,7 +164,7 @@ class TestItem(BaseModel):
     issueType: str = ""
     issueDescription: str = ""
     originalIssueType: str = ""
-    startTime: list[int] = list(datetime.now().timetuple())[:7]
+    startTime: tuple[int, int, int, int, int, int, int] = Field(default_factory=timestamp_factory)
     endTime: Optional[list[int]] = None
     lastModified: Optional[list[int]] = None
     testCaseHash: int = 0
@@ -194,14 +199,14 @@ class Launch(BaseModel):
     launchName: str = ""
     launchNumber: int = 0
     previousLaunchId: int = 0
-    launchStartTime: list[int] = list(datetime.now().timetuple())[:7]
+    launchStartTime: tuple[int, int, int, int, int, int, int] = Field(default_factory=timestamp_factory)
     analyzerConfig: AnalyzerConf = AnalyzerConf()
     testItems: list[TestItem] = []
     clusters: dict = {}
 
 
 class ItemUpdate(BaseModel):
-    timestamp: list[int] = list(datetime.now().timetuple())[:7]
+    timestamp: tuple[int, int, int, int, int, int, int] = Field(default_factory=timestamp_factory)
     issueType: str
     issueComment: str = ""
 

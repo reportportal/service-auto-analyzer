@@ -37,6 +37,8 @@ from app.ml.models import BoostingDecisionMaker, CustomBoostingDecisionMaker, De
 from app.ml.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 from app.ml.training import (
     DEFAULT_RANDOM_SEED,
+    NEGATIVE_RATIO_MAX,
+    NEGATIVE_RATIO_MIN,
     TRAIN_DATA_RANDOM_STATES,
     TrainingEntry,
     build_issue_history_query,
@@ -44,8 +46,6 @@ from app.ml.training import (
     is_supported_issue_type,
     select_history_negative_types,
     validate_proportions,
-    NEGATIVE_RATIO_MAX,
-    NEGATIVE_RATIO_MIN,
 )
 from app.utils import text_processing, utils
 from app.utils.defaultdict import DefaultDict
@@ -534,20 +534,22 @@ class AnalysisModelTraining:
         return data
 
     def _featurize_data(
-        self, test_item: list[TrainingEntry[TestItemIndexData]], features: list[int]
+        self, test_items: list[TrainingEntry[TestItemIndexData]], features: list[int]
     ) -> tuple[list[list[float]], list[int]]:
         full_data_features, labels = [], []
-        project_to_entry: dict[int, list[TrainingEntry[TestItemIndexData]]] = defaultdict(list)
-        for entry in test_item:
-            project_to_entry[entry.project_id].append(entry)
+        project_to_entries: dict[int, list[TrainingEntry[TestItemIndexData]]] = defaultdict(list)
+        for item in test_items:
+            if not item.project_id:
+                continue
+            project_to_entries[item.project_id].append(item)
 
-        for project_id, entries in project_to_entry.items():
+        for project_id, entries in project_to_entries.items():
             namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
             defect_type_model = cast(
                 DefectTypeModel, self.model_chooser.choose_model(project_id, ModelType.defect_type)
             )
             for entry in entries:
-                test_item = entry.data
+                test_item: TestItemIndexData = entry.data
                 issue_history = list(test_item.issue_history or [])
                 if not issue_history:
                     continue

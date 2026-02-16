@@ -174,6 +174,7 @@ def build_entries_from_item(test_item: TestItemIndexData) -> list[TrainingEntry[
         entries.append(
             TrainingEntry[str](
                 data=log_message,
+                project_id=None,
                 issue_type=get_issue_type(positive_issue_type),
                 is_positive=True,
             )
@@ -182,6 +183,7 @@ def build_entries_from_item(test_item: TestItemIndexData) -> list[TrainingEntry[
             entries.append(
                 TrainingEntry[str](
                     data=log_message,
+                    project_id=None,
                     issue_type=get_issue_type(negative_issue_type),
                     is_positive=False,
                 )

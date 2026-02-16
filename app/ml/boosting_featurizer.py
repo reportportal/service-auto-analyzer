@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import math
 from collections import defaultdict, deque
 from datetime import datetime
 from typing import Any, Callable, Optional
@@ -31,15 +32,13 @@ def count_hits(results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]
     return sum(len(res) for _, res in results)
 
 
-def get_test_case_hash_dict(res: list[Hit[LogItemIndexData]]) -> dict[Any, list[tuple[str, float, datetime]]]:
-    test_case_hash_dict: dict[Any, list[tuple[str, float, datetime]]] = {}
+def get_test_case_hash_dict(res: list[Hit[LogItemIndexData]]) -> dict[int, list[tuple[str, int, datetime]]]:
+    test_case_hash_dict: dict[int, list[tuple[str, int, datetime]]] = defaultdict(list)
     for hit in res:
         test_case_hash = hit.source.test_case_hash
-        if test_case_hash not in test_case_hash_dict:
-            test_case_hash_dict[test_case_hash] = []
         hit_id = hit.id or ""
         start_time = datetime.strptime(hit.source.start_time, "%Y-%m-%d %H:%M:%S")
-        test_case_hash_dict[test_case_hash].append((hit_id, hit.score or 0.0, start_time))
+        test_case_hash_dict[test_case_hash].append((hit_id, math.floor(hit.score or 0.0), start_time))
     return test_case_hash_dict
 
 
@@ -49,7 +48,7 @@ def filter_by_test_case_hash(
     new_results = []
     for log, res in all_results:
         test_case_hash_dict = get_test_case_hash_dict(res)
-        log_ids_to_take = set()
+        log_ids_to_take: set[str] = set()
         for id_scores_time in test_case_hash_dict.values():
             sorted_id_scores_time_list = sorted(id_scores_time, key=lambda x: (x[1], x[2]), reverse=True)
             scores_used = set()
@@ -57,10 +56,7 @@ def filter_by_test_case_hash(
                 if sorted_score[1] not in scores_used:
                     log_ids_to_take.add(sorted_score[0])
                     scores_used.add(sorted_score[1])
-        new_elastic_res = []
-        for elastic_res in res:
-            if (elastic_res.id or "") in log_ids_to_take:
-                new_elastic_res.append(elastic_res)
+        new_elastic_res = [elastic_res for elastic_res in res if elastic_res.id in log_ids_to_take]
         new_results.append((log, new_elastic_res))
     return new_results
 

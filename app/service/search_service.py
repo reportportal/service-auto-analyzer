@@ -28,6 +28,26 @@ from app.utils import text_processing, utils
 LOGGER = logging.getLogger("analyzerApp.searchService")
 
 
+def prepare_log_messages_for_search(search_req: SearchLogs) -> list[str]:
+    """Prepare and deduplicate log messages for search."""
+    log_messages = [message for message in search_req.logMessages if message.strip()]
+    if not log_messages:
+        return []
+
+    try:
+        logs_to_take = text_processing.find_last_unique_texts(
+            search_req.analyzerConfig.similarityThresholdToDrop, log_messages
+        )
+    except ValueError:
+        return []
+
+    number_of_logs_to_index = search_req.analyzerConfig.numberOfLogsToIndex
+    if number_of_logs_to_index > 0:
+        logs_to_take = logs_to_take[-number_of_logs_to_index:]
+
+    return [log_messages[idx] for idx in logs_to_take]
+
+
 class SearchService:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
@@ -45,25 +65,6 @@ class SearchService:
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.os_client = os_client or OsClient(app_config=self.app_config)
-
-    def _prepare_log_messages_for_search(self, search_req: SearchLogs) -> list[str]:
-        """Prepare and deduplicate log messages for search."""
-        log_messages = [message for message in search_req.logMessages if message.strip()]
-        if not log_messages:
-            return []
-
-        try:
-            logs_to_take = text_processing.find_last_unique_texts(
-                search_req.analyzerConfig.similarityThresholdToDrop, log_messages
-            )
-        except ValueError:
-            return []
-
-        number_of_logs_to_index = search_req.analyzerConfig.numberOfLogsToIndex
-        if number_of_logs_to_index > 0:
-            logs_to_take = logs_to_take[-number_of_logs_to_index:]
-
-        return [log_messages[idx] for idx in logs_to_take]
 
     def _build_search_query(self, search_req: SearchLogs, log_messages: list[str]) -> dict[str, Any]:
         """Build search query for Test Item-centric index."""
@@ -124,7 +125,7 @@ class SearchService:
         LOGGER.info(f"Started searching for test item with id: {search_req.itemId}")
         LOGGER.debug(f"Started searching by request: {search_req.model_dump_json()}")
         t_start = time()
-        log_messages = self._prepare_log_messages_for_search(search_req)
+        log_messages = prepare_log_messages_for_search(search_req)
         if not log_messages:
             return []
 

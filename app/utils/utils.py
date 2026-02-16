@@ -173,6 +173,8 @@ def fill_previously_gathered_features(
 
 
 def gather_feature_list(gathered_data_dict: dict[int, list[list[float]]], feature_ids: list[int]) -> list[list[float]]:
+    if not gathered_data_dict:
+        return []
     axis_x_size = max([len(x) for x in gathered_data_dict.values()])
     if axis_x_size <= 0:
         return []

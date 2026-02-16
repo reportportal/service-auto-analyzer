@@ -181,7 +181,9 @@ class SearchService:
                     range(len(request_similarity)),
                     key=lambda idx: request_similarity[idx].similarity,
                 )
-                best_request_similarity = request_similarity[best_request_index].similarity
+                best_request_similarity = request_similarity[
+                    utils.get_max_similarity_idx(request_similarity)
+                ].similarity
 
             request_codes = request_status_codes[best_request_index] if request_status_codes else ""
             log_codes = " ".join(sorted((best_log.potential_status_codes or "").split()))

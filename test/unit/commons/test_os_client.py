@@ -180,7 +180,7 @@ def test_search_returns_empty_when_index_missing(os_client_mock, app_config):
     os_client_mock.indices.get.side_effect = Exception("missing index")
     client = OsClient(app_config, os_client=os_client_mock)
 
-    results = [hit for hit in client.search(PROJECT_ID, {"query": {"match_all": {}}})]
+    results = list(client.search(PROJECT_ID, {"query": {"match_all": {}}}))
 
     assert results == []
     os_client_mock.search.assert_not_called()

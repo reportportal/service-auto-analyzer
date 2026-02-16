@@ -14,7 +14,6 @@
 
 import math
 import os
-import re
 from datetime import datetime
 from time import time
 from typing import Any, Optional, Type, TypeVar
@@ -36,6 +35,8 @@ from app.ml.training import (
     TrainingEntry,
     balance_data,
     build_issue_history_query,
+    get_issue_type,
+    is_supported_issue_type,
     select_history_negative_types,
     validate_proportions,
 )
@@ -51,12 +52,6 @@ MIN_P_VALUE = 0.05
 ITEM_FIELDS_TO_RETRIEVE = ["test_item_id", "issue_history", "logs"]
 
 T = TypeVar("T")
-
-
-def _get_issue_type(issue_type: str) -> str:
-    if not issue_type:
-        return issue_type
-    return _get_base_issue_type(issue_type) if re.match(r"^[a-z]{2}\d{,3}$", issue_type) else issue_type
 
 
 def split_train_test(
@@ -156,24 +151,16 @@ def get_info_template(project_info: TrainInfo, baseline_model: str, model_name: 
     }
 
 
-def _get_base_issue_type(issue_type: str) -> str:
-    return issue_type[:2] if issue_type else ""
-
-
-def _is_supported_issue_type(issue_type: str) -> bool:
-    return _get_base_issue_type(issue_type) != "ti"
-
-
 def build_entries_from_item(test_item: TestItemIndexData) -> list[TrainingEntry[str]]:
     issue_history = list(test_item.issue_history or [])
     if not issue_history:
         return []
     positive_issue_type = normalize_issue_type(issue_history[-1].issue_type)
-    if not positive_issue_type or not _is_supported_issue_type(positive_issue_type):
+    if not positive_issue_type or not is_supported_issue_type(positive_issue_type):
         return []
 
     negative_issue_types = select_history_negative_types(issue_history, positive_issue_type)
-    negative_issue_types = [issue_type for issue_type in negative_issue_types if _is_supported_issue_type(issue_type)]
+    negative_issue_types = [issue_type for issue_type in negative_issue_types if is_supported_issue_type(issue_type)]
 
     logs = list(test_item.logs or [])
     if not logs:
@@ -187,7 +174,7 @@ def build_entries_from_item(test_item: TestItemIndexData) -> list[TrainingEntry[
         entries.append(
             TrainingEntry[str](
                 data=log_message,
-                issue_type=_get_issue_type(positive_issue_type),
+                issue_type=get_issue_type(positive_issue_type),
                 is_positive=True,
             )
         )
@@ -195,7 +182,7 @@ def build_entries_from_item(test_item: TestItemIndexData) -> list[TrainingEntry[
             entries.append(
                 TrainingEntry[str](
                     data=log_message,
-                    issue_type=_get_issue_type(negative_issue_type),
+                    issue_type=get_issue_type(negative_issue_type),
                     is_positive=False,
                 )
             )

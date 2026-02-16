@@ -2,7 +2,7 @@
 line_length = 119
 profile = "black"
 py_version = 312
-force_to_top = ["app.ml.models.ml_model"]  # This import sholud be on top to avoid circular import in "app.ml.models"
+force_to_top = ["app.ml.models.ml_model"]  # This import should be on top to avoid circular import in "app.ml.models"
 
 [tool.black]
 line-length = 119

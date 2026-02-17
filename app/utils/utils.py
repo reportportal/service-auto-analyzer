@@ -363,6 +363,27 @@ def group_predictions_by_test_item(
     return groups
 
 
+def _get_source(msg_source: dict[str, Any]) -> Optional[Any]:
+    hit = msg_source.get("mrHit", None)
+    if hit is None:
+        return None
+    return getattr(hit, "source", None)
+
+
+def _get_message(msg_source: dict[str, Any]) -> str:
+    source = _get_source(msg_source)
+    if source is None:
+        return ""
+    return str(getattr(source, "message", ""))
+
+
+def _get_log_level(msg_source: dict[str, Any]) -> int:
+    source = _get_source(msg_source)
+    if source is None:
+        return 0
+    return int(getattr(source, "log_level", 0))
+
+
 def score_and_rank_test_items(
     grouped_predictions: dict[int, list[PredictionResult]],
 ) -> list[tuple[float, PredictionResult]]:
@@ -379,7 +400,7 @@ def score_and_rank_test_items(
     """
     ranked: list[tuple[float, PredictionResult]] = []
     for _test_item_id, results in grouped_predictions.items():
-        max_message_length = max(len(r.data["mrHit"].source.message) for r in results)
+        max_message_length = max(len(_get_message(r.data)) for r in results)
         if max_message_length <= 0:
             max_message_length = 1
 
@@ -389,8 +410,8 @@ def score_and_rank_test_items(
         best_result = results[0]
 
         for result in results:
-            log_level = result.data["mrHit"].source.log_level
-            msg_len = len(result.data["mrHit"].source.message)
+            log_level = _get_log_level(result.data)
+            msg_len = len(_get_message(result.data))
             weight = calculate_log_weight(log_level, msg_len, max_message_length)
             prob = result.probability[1]
             weighted_sum += prob * weight
@@ -399,7 +420,7 @@ def score_and_rank_test_items(
                 best_weight = weight
                 best_result = result
 
-        weighted_avg = weighted_sum / weight_sum if weight_sum > 0 else 0.0
+        weighted_avg = weighted_sum / weight_sum if weight_sum > 0 else 1.0
         ranked.append((weighted_avg, best_result))
 
     ranked.sort(key=lambda item: item[0], reverse=True)

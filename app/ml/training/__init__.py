@@ -160,7 +160,7 @@ def balance_data(
                 : len(additional_negative_cases) - remove_additional_cases_num
             ]
             cases_to_remove = negative_indexes[:remove_history_cases_num]
-            i = 0
+            i = -1
             for i, case_idx in enumerate(cases_to_remove):
                 results[case_idx] = additional_negative_cases[i]
             if i + 1 < len(additional_negative_cases):

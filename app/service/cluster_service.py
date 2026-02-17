@@ -479,7 +479,6 @@ class ClusterService:
         t_start = time()
         errors_found = []
         errors_count = 0
-        cluster_num = 0
         common_clusters: list[ClusterInfo] = []
         unique_log_ids: set[str] = set()
         try:
@@ -555,7 +554,7 @@ class ClusterService:
 
         LOGGER.debug(f"Stats info: {json.dumps(results_to_share)}")
         LOGGER.info("Processed the launch. It took %.2f sec.", time() - t_start)
-        LOGGER.info("Finished clustering for the launch with %d clusters.", cluster_num)
+        LOGGER.info("Finished clustering for the launch with %d clusters.", len(common_clusters))
         for cluster in common_clusters:
             # Put readable text instead of tokens
             cluster.clusterMessage = text_processing.replace_tokens_with_readable_text(cluster.clusterMessage)

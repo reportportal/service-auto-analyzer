@@ -18,9 +18,9 @@ from collections import defaultdict
 from time import time
 
 import numpy as np
-import sklearn
 from scipy.sparse import csr_matrix
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 from app.commons import logging
 from app.utils import text_processing, utils
@@ -69,7 +69,7 @@ def __similarity_grouping(
             _count_vector = CountVectorizer(binary=True, analyzer=lambda x: x)
             vectors: csr_matrix = _count_vector.fit_transform(block_i + block_j).astype(np.int8)
             vectors_count_words = np.asarray(np.sum(vectors, axis=1))
-            similarities = sklearn.metrics.pairwise.cosine_similarity(vectors)
+            similarities = cosine_similarity(vectors)
 
             for seq_num_i in range(len(indices_looked)):
                 i = indices_looked[seq_num_i]

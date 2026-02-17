@@ -155,7 +155,7 @@ class BoostingFeaturizer:
         processed_results = self.filter_by_test_case_hash(processed_results)
 
         self.raw_results = processed_results
-        self.total_normalized_score = 0.0
+        self.total_normalized_score = 1.0
         self.all_results = self.normalize_results(processed_results)
         self.scores_by_type = None
         self.defect_type_predict_model = None
@@ -235,16 +235,18 @@ class BoostingFeaturizer:
         scores_by_issue_type: dict[str, dict[str, Any]] = defaultdict(
             lambda: {"mrHit": Hit[LogItemIndexData](score=-1, source=LogItemIndexData()), "score": 0.0}
         )
+        total_normalized_score = self.total_normalized_score if self.total_normalized_score > 0.0 else 1.0
         for log, es_results in self.all_results:
             for idx, hit in enumerate(es_results):
                 issue_type = hit.source.issue_type
 
                 issue_type_item = scores_by_issue_type[issue_type]
-                if hit.score > issue_type_item["mrHit"].score:
+                hit_score = hit.score or 0.0
+                if hit_score > issue_type_item["mrHit"].score:
                     issue_type_item["mrHit"] = hit
                     issue_type_item["compared_log"] = log
                     issue_type_item["original_position"] = idx
-                issue_type_item["score"] += hit.normalized_score / self.total_normalized_score
+                issue_type_item["score"] += hit.normalized_score / total_normalized_score
         self.scores_by_type = dict(scores_by_issue_type)
         return self.scores_by_type
 
@@ -332,7 +334,7 @@ class BoostingFeaturizer:
     def fill_previously_gathered_features(self, feature_list: list[list[float]], feature_ids: list[int]) -> None:
         self.previously_gathered_features = utils.fill_previously_gathered_features(feature_list, feature_ids)
 
-    def set_defect_type_model(self, defect_type_model: DefectTypeModel):
+    def set_defect_type_model(self, defect_type_model: Optional[DefectTypeModel]):
         self.defect_type_predict_model = defect_type_model
 
     def get_used_model_info(self):
@@ -682,7 +684,8 @@ class BoostingFeaturizer:
             all_results.append((query_log, my_hits))
         for query_log, es_hits in all_results:
             for hit in es_hits:
-                hit.normalized_score = hit.score or 0.0 / max_score if max_score <= 0.0 else 1.0
+                hit_score = hit.score or 0.0
+                hit.normalized_score = hit_score / max_score if max_score > 0.0 else 1.0
                 self.total_normalized_score += hit.normalized_score
         return all_results
 
@@ -755,7 +758,7 @@ class BoostingFeaturizer:
 
             for idx in sorted(issue_type_by_index.keys()):
                 issue_type = issue_type_by_index[idx]
-                data = result[issue_type]
+                data = result.get(issue_type, [0.0])
                 if not isinstance(data, list):
                     data = [round(data, 2)]
                 gathered_data_dict[feature].append(data)

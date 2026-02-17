@@ -390,6 +390,8 @@ class AnalysisModelTraining:
             if use_baseline_features:
                 self.features = self.baseline_model.feature_ids
                 self.monotonous_features = list(self.baseline_model.monotonous_features)
+        else:
+            self.baseline_model = None
 
         if not self.features:
             raise ValueError('No feature config found, please either correct values in "search_cfg" parameter')
@@ -545,9 +547,8 @@ class AnalysisModelTraining:
 
         for project_id, entries in project_to_entries.items():
             namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
-            defect_type_model = cast(
-                DefectTypeModel, self.model_chooser.choose_model(project_id, ModelType.defect_type)
-            )
+            raw_defect_type_model = self.model_chooser.choose_model(project_id, ModelType.defect_type)
+            defect_type_model = cast(DefectTypeModel, raw_defect_type_model) if raw_defect_type_model else None
             for entry in entries:
                 test_item: TestItemIndexData = entry.data
                 issue_history = list(test_item.issue_history or [])

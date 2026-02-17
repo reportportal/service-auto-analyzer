@@ -254,7 +254,10 @@ class DefectTypeModelTraining:
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, dict[str, Any]]]:
         start_time = time()
         model_name = f'{project_info.model_type.name}_model_{datetime.now().strftime("%Y-%m-%d")}'
-        baseline_model_folder = os.path.basename(self.search_cfg.GlobalDefectTypeModelFolder)
+        if self.search_cfg.GlobalDefectTypeModelFolder:
+            baseline_model_folder = os.path.basename(self.search_cfg.GlobalDefectTypeModelFolder)
+        else:
+            baseline_model_folder = ""
         new_model_folder = f"{project_info.model_type.name}_model/{model_name}/"
 
         LOGGER.info(f'Train "{ModelType.defect_type.name}" model using class: {self.model_class}')

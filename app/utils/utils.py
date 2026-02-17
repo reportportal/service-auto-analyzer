@@ -406,10 +406,11 @@ def score_and_rank_test_items(
     return ranked
 
 
-def prepare_restrictions_by_issue_type(filter_no_defect: bool = True) -> list[dict]:
+def prepare_restrictions_by_issue_type(filter_no_defect: bool = True) -> list[dict[str, Any]]:
+    issue_type_filter = [{"wildcard": {"issue_type": {"value": "ti*", "case_insensitive": True}}}]
     if filter_no_defect:
-        return [{"wildcard": {"issue_type": "ti*"}}, {"wildcard": {"issue_type": "nd*"}}]
-    return [{"term": {"issue_type": "ti001"}}]
+        issue_type_filter.append({"wildcard": {"issue_type": {"value": "nd*", "case_insensitive": True}}})
+    return issue_type_filter
 
 
 def get_max_similarity_idx(per_log_similarity: list[SimilarityResult]) -> int:

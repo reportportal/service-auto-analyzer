@@ -19,6 +19,7 @@ from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig, SuggestPattern, SuggestPatternLabel
 from app.commons.os_client import OsClient
 from app.utils import text_processing
+from app.utils.utils import ALL_BASE_ISSUE_TYPES
 
 LOGGER = logging.getLogger("analyzerApp.suggestPatternsService")
 
@@ -92,7 +93,7 @@ class SuggestPatternsService:
         t_start = time()
         exceptions_with_labels: dict[str, dict[str, int]] = {}
         all_exceptions = {}
-        query = self._build_query(["ab", "pb", "si", "ti"])
+        query = self._build_query([ALL_BASE_ISSUE_TYPES])
         for hit in self.os_client.search(project_id, query):
             issue_type = (hit.source.issue_type or "").strip()
             if not issue_type:

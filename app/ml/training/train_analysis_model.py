@@ -42,8 +42,6 @@ from app.ml.training import (
     TRAIN_DATA_RANDOM_STATES,
     TrainingEntry,
     build_issue_history_query,
-    get_issue_type,
-    is_supported_issue_type,
     select_history_negative_types,
     validate_proportions,
 )
@@ -55,7 +53,7 @@ from app.utils.os_migration import (
     extract_inner_hit_logs,
     get_request_logs,
 )
-from app.utils.utils import normalize_issue_type, safe_int
+from app.utils.utils import get_issue_type, is_supported_issue_type, normalize_issue_type, safe_int
 
 LOGGER = logging.getLogger("analyzerApp.trainingAnalysisModel")
 SMOTE_PROPORTION = 0.4
@@ -677,6 +675,7 @@ class AnalysisModelTraining:
 
         use_custom_model = False
         mean_metric_results: list[float] = []
+        mean_metric_count: dict[int, int] = defaultdict(lambda: 1)
         if not bad_data:
             LOGGER.debug(f"Baseline test results {baseline_model_results}")
             LOGGER.debug(f"New model test results {new_model_results}")
@@ -696,7 +695,12 @@ class AnalysisModelTraining:
                 )
                 if mean_metric_results:
                     for i in range(len(metric_results)):
-                        mean_metric_results[i] = mean_metric_results[i] * metric_results[i]
+                        metric_count = mean_metric_count[i] + 1
+                        mean_metric_result = mean_metric_results[i]
+                        mean_metric_results[i] = mean_metric_result + (
+                            (mean_metric_result - metric_results[i]) / metric_count
+                        )
+                        mean_metric_count[i] = metric_count
                 else:
                     mean_metric_results = metric_results.copy()
 

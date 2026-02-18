@@ -172,14 +172,20 @@ class SearchService:
             per_log_similarity = text_processing.calculate_text_similarity(
                 joined_request_messages, log_messages_sorted
             )
-            best_log = logs_with_messages[utils.get_max_similarity_idx(per_log_similarity)][0]
+            sim_idx = utils.get_max_similarity_idx(per_log_similarity)
+            if not sim_idx:
+                continue
+            best_log = logs_with_messages[sim_idx][0]
 
             request_similarity = text_processing.calculate_text_similarity(best_log.message, log_messages)
             best_request_similarity = 0.0
-            best_request_index = 0
+            best_request_index = None
             if request_similarity:
                 best_request_index = utils.get_max_similarity_idx(request_similarity)
-                best_request_similarity = request_similarity[best_request_index].similarity
+                if best_request_index is not None:
+                    best_request_similarity = request_similarity[best_request_index].similarity
+            if best_request_index is None:
+                continue
 
             request_codes = request_status_codes[best_request_index] if request_status_codes else ""
             log_codes = " ".join(sorted((best_log.potential_status_codes or "").split()))

@@ -162,5 +162,7 @@ def bucket_sort_logs_by_similarity(
         similarities = text_processing.calculate_text_similarity(hit_text, request_texts)
         if not similarities:
             continue
-        buckets[get_max_similarity_idx(similarities)].append(hit)
+        sim_idx = get_max_similarity_idx(similarities)
+        if sim_idx is not None:
+            buckets[sim_idx].append(hit)
     return buckets

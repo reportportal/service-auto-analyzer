@@ -16,7 +16,6 @@
 import dataclasses
 import logging
 import random
-import re
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Generic, Optional, TypeVar
@@ -166,17 +165,3 @@ def balance_data(
             if i + 1 < len(additional_negative_cases):
                 results.extend(additional_negative_cases[i + 1 :])
     return results
-
-
-def _get_base_issue_type(issue_type: str) -> str:
-    return issue_type[:2] if issue_type else ""
-
-
-def is_supported_issue_type(issue_type: str) -> bool:
-    return _get_base_issue_type(issue_type) != "ti"
-
-
-def get_issue_type(issue_type: str) -> str:
-    if not issue_type:
-        return issue_type
-    return _get_base_issue_type(issue_type) if re.match(r"^[a-z]{2}\d{,3}$", issue_type) else issue_type

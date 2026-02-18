@@ -14,6 +14,7 @@
 
 import json
 import os
+import re
 import traceback
 import warnings
 from collections import Counter
@@ -31,6 +32,11 @@ from app.ml.predictor import PredictionResult
 from app.utils.text_processing import remove_credentials_from_url, split_words
 
 logger = logging.getLogger("analyzerApp.utils")
+
+NOT_CLASSIFIED_BASE_ISSUE_TYPE = "ti"
+CERTAIN_BASE_ISSUE_TYPES = {"ab", "pb", "si", "ti"}
+CLASSIFIED_BASE_ISSUE_TYPES = set(list(CERTAIN_BASE_ISSUE_TYPES) + ["nd"])
+ALL_BASE_ISSUE_TYPES = set(list(CLASSIFIED_BASE_ISSUE_TYPES) + [NOT_CLASSIFIED_BASE_ISSUE_TYPE])
 
 
 def ignore_warnings(func):
@@ -346,6 +352,20 @@ def safe_int(value: Any) -> int:
         return 0
 
 
+def _get_source(msg_source: dict[str, Any]) -> Optional[Any]:
+    hit = msg_source.get("mrHit", None)
+    if hit is None:
+        return None
+    return getattr(hit, "source", None)
+
+
+def _get_test_item(msg_source: dict[str, Any]) -> int:
+    source = _get_source(msg_source)
+    if source is None:
+        return -1
+    return int(getattr(source, "test_item", -1))
+
+
 def group_predictions_by_test_item(
     prediction_results: list[PredictionResult],
 ) -> dict[int, list[PredictionResult]]:
@@ -356,18 +376,13 @@ def group_predictions_by_test_item(
     """
     groups: dict[int, list[PredictionResult]] = {}
     for result in prediction_results:
-        test_item_id = result.data["mrHit"].source.test_item
+        test_item_id = _get_test_item(result.data)
+        if test_item_id < 0:
+            continue
         if test_item_id not in groups:
             groups[test_item_id] = []
         groups[test_item_id].append(result)
     return groups
-
-
-def _get_source(msg_source: dict[str, Any]) -> Optional[Any]:
-    hit = msg_source.get("mrHit", None)
-    if hit is None:
-        return None
-    return getattr(hit, "source", None)
 
 
 def _get_message(msg_source: dict[str, Any]) -> str:
@@ -434,11 +449,30 @@ def prepare_restrictions_by_issue_type(filter_no_defect: bool = True) -> list[di
     return issue_type_filter
 
 
-def get_max_similarity_idx(per_log_similarity: list[SimilarityResult]) -> int:
+def get_max_similarity_idx(per_log_similarity: list[SimilarityResult]) -> Optional[int]:
+    if not per_log_similarity:
+        return None
     max_similarity = 0.0
-    best_log_idx = 0
+    best_log_idx = None
     for log_idx, sim_obj in enumerate(per_log_similarity):
         if max_similarity < sim_obj.similarity:
             max_similarity = sim_obj.similarity
             best_log_idx = log_idx
     return best_log_idx
+
+
+def _get_base_issue_type(issue_type: str) -> str:
+    return issue_type[:2].lower() if issue_type else ""
+
+
+def is_supported_issue_type(issue_type: str) -> bool:
+    if not issue_type:
+        return False
+    base_type = _get_base_issue_type(issue_type)
+    return base_type in CLASSIFIED_BASE_ISSUE_TYPES and base_type != NOT_CLASSIFIED_BASE_ISSUE_TYPE
+
+
+def get_issue_type(issue_type: str) -> str:
+    if not issue_type:
+        return issue_type
+    return _get_base_issue_type(issue_type) if re.match(r"^[a-z]{2}\d{,3}$", issue_type) else issue_type

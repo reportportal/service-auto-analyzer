@@ -685,7 +685,7 @@ class BoostingFeaturizer:
         for query_log, es_hits in all_results:
             for hit in es_hits:
                 hit_score = hit.score or 0.0
-                hit.normalized_score = hit_score / max_score if max_score > 0.0 else 1.0
+                hit.normalized_score = hit_score / (max_score if max_score > 0.0 else 1.0)
                 self.total_normalized_score += hit.normalized_score
         return all_results
 

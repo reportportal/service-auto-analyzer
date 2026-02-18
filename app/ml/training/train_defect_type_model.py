@@ -35,13 +35,11 @@ from app.ml.training import (
     TrainingEntry,
     balance_data,
     build_issue_history_query,
-    get_issue_type,
-    is_supported_issue_type,
     select_history_negative_types,
     validate_proportions,
 )
 from app.utils.defaultdict import DefaultDict
-from app.utils.utils import normalize_issue_type
+from app.utils.utils import get_issue_type, is_supported_issue_type, normalize_issue_type
 
 LOGGER = logging.getLogger("analyzerApp.trainingDefectTypeModel")
 MINIMAL_LABEL_PROPORTION = 0.25

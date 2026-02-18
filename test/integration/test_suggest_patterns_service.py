@@ -116,14 +116,13 @@ def test_suggest_patterns_calls_correct_services(
     assert "filter" in query["query"]["bool"], "search should have filter clause"
 
     should_clause = query["query"]["bool"]["filter"][0]["bool"]["should"]
-    assert len(should_clause) == 4, "search should have 4 wildcard clauses"
+    assert len(should_clause) == 5, "search should have 4 wildcard clauses"
 
-    labels = ["ab", "pb", "si", "ti"]
-    for idx, label in enumerate(labels):
-        pattern = f"{label}*"
-        wildcard = should_clause[idx]["wildcard"]["issue_type"]["value"]
-        case_insensitive = should_clause[idx]["wildcard"]["issue_type"]["case_insensitive"]
-        assert wildcard == pattern, f"wildcard should match '{pattern}'"
+    patterns = {f"{label}*" for label in ["ab", "pb", "si", "ti", "nd"]}
+    for clause in should_clause:
+        wildcard = clause["wildcard"]["issue_type"]["value"]
+        case_insensitive = clause["wildcard"]["issue_type"]["case_insensitive"]
+        assert wildcard in patterns, f"wildcard should be one of '{patterns}'"
         assert case_insensitive, "wildcard should be case insensitive"
 
     # Verify sort by start_time

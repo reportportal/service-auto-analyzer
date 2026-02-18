@@ -173,7 +173,7 @@ class SearchService:
                 joined_request_messages, log_messages_sorted
             )
             sim_idx = utils.get_max_similarity_idx(per_log_similarity)
-            if not sim_idx:
+            if sim_idx is None:
                 continue
             best_log = logs_with_messages[sim_idx][0]
 

@@ -450,7 +450,7 @@ class ClusterService:
         launch_info: LaunchInfoForClustering,
         min_match_threshold: float,
     ) -> dict[int, ClusterInfo]:
-        new_clusters: dict[int, ClusterInfo] = {}
+        additional_clusters: dict[int, ClusterInfo] = {}
         for global_group_idx, global_group in groups.items():
             first_item_ind = global_group[0]
             log = logs[first_item_ind]
@@ -464,14 +464,7 @@ class ClusterService:
                     f"Found cluster Id: '{new_cluster.clusterId}'; Log IDs: {new_cluster.logIds}; Cluster message: "
                     + new_cluster.clusterMessage,
                 )
-                new_clusters[global_group_idx] = new_cluster
-        additional_clusters: dict[int, ClusterInfo] = {}
-        for local_group_idx in new_clusters:
-            if local_group_idx in additional_clusters:
-                additional_clusters[local_group_idx].logIds.extend(new_clusters[local_group_idx].logIds)
-                additional_clusters[local_group_idx].itemIds.extend(new_clusters[local_group_idx].itemIds)
-            else:
-                additional_clusters[local_group_idx] = new_clusters[local_group_idx]
+                additional_clusters[global_group_idx] = new_cluster
         return additional_clusters
 
     def find_clusters(self, launch_info: LaunchInfoForClustering) -> ClusterResult:

@@ -21,7 +21,7 @@ from typing import Any, Callable, Iterable, Iterator, Optional
 
 import opensearchpy.helpers
 import urllib3
-from opensearchpy import OpenSearch, RequestsHttpConnection
+from opensearchpy import OpenSearch, RequestsHttpConnection, TransportError
 from urllib3.exceptions import InsecureRequestWarning
 
 from app.commons import logging
@@ -259,7 +259,7 @@ class OsClient:
                     request_timeout=30,
                     refresh=refresh,
                 )
-            except Exception:
+            except TransportError:
                 formatted_exception = traceback.format_exc()
                 LOGGER.warning(f"Bulk indexing failed, retrying: {formatted_exception}")
                 self._update_settings_after_read_only()

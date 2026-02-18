@@ -472,7 +472,7 @@ def is_supported_issue_type(issue_type: str) -> bool:
     return base_type in CLASSIFIED_BASE_ISSUE_TYPES and base_type != NOT_CLASSIFIED_BASE_ISSUE_TYPE
 
 
-def get_issue_type(issue_type: str) -> str:
+def normalize_base_issue_type(issue_type: str) -> str:
     if not issue_type:
         return issue_type
     return _get_base_issue_type(issue_type) if re.match(r"^[a-z]{2}\d{,3}$", issue_type) else issue_type

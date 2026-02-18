@@ -53,7 +53,7 @@ from app.utils.os_migration import (
     extract_inner_hit_logs,
     get_request_logs,
 )
-from app.utils.utils import get_issue_type, is_supported_issue_type, normalize_issue_type, safe_int
+from app.utils.utils import is_supported_issue_type, normalize_base_issue_type, normalize_issue_type, safe_int
 
 LOGGER = logging.getLogger("analyzerApp.trainingAnalysisModel")
 SMOTE_PROPORTION = 0.4
@@ -301,7 +301,7 @@ def build_entries_from_item(project_id: int, test_item: TestItemIndexData) -> li
         TrainingEntry[TestItemIndexData](
             data=test_item,
             project_id=project_id,
-            issue_type=get_issue_type(positive_issue_type),
+            issue_type=normalize_base_issue_type(positive_issue_type),
             is_positive=True,
         )
     ]
@@ -310,7 +310,7 @@ def build_entries_from_item(project_id: int, test_item: TestItemIndexData) -> li
             TrainingEntry[TestItemIndexData](
                 data=test_item,
                 project_id=project_id,
-                issue_type=get_issue_type(negative_issue_type),
+                issue_type=normalize_base_issue_type(negative_issue_type),
                 is_positive=False,
             )
         )

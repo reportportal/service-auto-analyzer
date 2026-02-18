@@ -1091,8 +1091,6 @@ def find_last_unique_texts(threshold: float, texts: list[str]) -> list[int]:
     :param texts: List of text strings to analyze for uniqueness. Texts should ideally be
         preprocessed (e.g., using preprocess_text_for_similarity) before passing to this function
         for optimal results.
-    :param vectorizer: Optional TF-IDF vectorizer instance to reuse for efficiency. If None, a new
-        vectorizer will be created.
 
     :return: A tuple containing:
         - TfidfVectorizer: The vectorizer used (either the input vectorizer or newly created one).

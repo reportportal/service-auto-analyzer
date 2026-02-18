@@ -39,7 +39,7 @@ from app.ml.training import (
     validate_proportions,
 )
 from app.utils.defaultdict import DefaultDict
-from app.utils.utils import get_issue_type, is_supported_issue_type, normalize_issue_type
+from app.utils.utils import is_supported_issue_type, normalize_base_issue_type, normalize_issue_type
 
 LOGGER = logging.getLogger("analyzerApp.trainingDefectTypeModel")
 MINIMAL_LABEL_PROPORTION = 0.25
@@ -173,7 +173,7 @@ def build_entries_from_item(test_item: TestItemIndexData) -> list[TrainingEntry[
             TrainingEntry[str](
                 data=log_message,
                 project_id=None,
-                issue_type=get_issue_type(positive_issue_type),
+                issue_type=normalize_base_issue_type(positive_issue_type),
                 is_positive=True,
             )
         )
@@ -182,7 +182,7 @@ def build_entries_from_item(test_item: TestItemIndexData) -> list[TrainingEntry[
                 TrainingEntry[str](
                     data=log_message,
                     project_id=None,
-                    issue_type=get_issue_type(negative_issue_type),
+                    issue_type=normalize_base_issue_type(negative_issue_type),
                     is_positive=False,
                 )
             )

@@ -182,12 +182,12 @@ def test_train_uses_os_client_and_issue_history(model_type: ModelType) -> None:
 
     os_client.search = mock.Mock(return_value=iter(project_hits))
 
-    def fake_gather_features_info(self):  # noqa: ANN001
+    def fake_gather_features_info(self):
         issue_type_names = list(self.find_most_relevant_by_type().keys())
         feature_vector = [0.1 for _ in self.feature_ids]
         return [feature_vector for _ in issue_type_names], issue_type_names
 
-    def fake_find_most_relevant_by_type(self):  # noqa: ANN001
+    def fake_find_most_relevant_by_type(_self):
         def make_hit(issue_type: str) -> Hit[LogItemIndexData]:
             return Hit[LogItemIndexData].from_dict({"_score": 1.0, "_source": LogItemIndexData(issue_type=issue_type)})
 

@@ -95,12 +95,7 @@ def __similarity_grouping(
 def __unite_groups_by_hashes(messages: list[list[str]], threshold: float = 0.95) -> dict[int, list[int]]:
     start_time = time()
     hash_prints = __calculate_hashes(messages)
-    has_no_empty = False
-    for hash_print in hash_prints:
-        if len(hash_print):
-            has_no_empty = True
-            break
-    if not has_no_empty:
+    if not any(hash_prints):
         return {}
     hash_groups: dict[int, int] = __similarity_grouping(hash_prints, threshold=threshold)
     rearranged_groups: dict[int, list[int]] = defaultdict(list)
@@ -117,14 +112,14 @@ def __find_groups_by_similarity(messages: list[list[str]], threshold: float = 0.
     group_id = 0
     start_time = time()
     rearranged_groups: dict[int, list[int]] = {}
-    for key_word, group in groups_to_check.items():
+    for hash_cluster_id, group in groups_to_check.items():
         selected_texts: list[list[str]] = [messages[i] for i in group]
         text_groups = __similarity_grouping(selected_texts, threshold=threshold)
         new_group_id = group_id
         for key, value in text_groups.items():
             cluster = value + group_id
             new_group_id = max(group_id, cluster)
-            real_id = groups_to_check[key_word][key]
+            real_id = groups_to_check[hash_cluster_id][key]
             if cluster not in rearranged_groups:
                 rearranged_groups[cluster] = []
             rearranged_groups[cluster].append(real_id)

@@ -164,7 +164,7 @@ class SearchService:
         )
 
         for (source, logs_with_messages, log_messages_sorted), cumulative_similarity in zip(
-            candidates, cumulative_similarities
+            candidates, cumulative_similarities, strict=True
         ):
             if cumulative_similarity.similarity < min_similarity:
                 continue

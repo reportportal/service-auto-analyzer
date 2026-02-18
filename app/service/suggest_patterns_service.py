@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 from time import time
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig, SuggestPattern, SuggestPatternLabel
@@ -40,7 +40,7 @@ class SuggestPatternsService:
         self.search_cfg = search_cfg
         self.os_client = os_client or OsClient(app_config=self.app_config)
 
-    def _build_query(self, labels: list[str]) -> dict[str, Any]:
+    def _build_query(self, labels: Iterable[str]) -> dict[str, Any]:
         label_filters = [
             {
                 "wildcard": {
@@ -93,7 +93,7 @@ class SuggestPatternsService:
         t_start = time()
         exceptions_with_labels: dict[str, dict[str, int]] = {}
         all_exceptions = {}
-        query = self._build_query([ALL_BASE_ISSUE_TYPES])
+        query = self._build_query(ALL_BASE_ISSUE_TYPES)
         for hit in self.os_client.search(project_id, query):
             issue_type = (hit.source.issue_type or "").strip()
             if not issue_type:

@@ -137,7 +137,7 @@ def build_search_results(
     :param buckets: Buckets of found hits aligned with request logs
     :return: List of (request_log, found_hits) tuples, excluding empty buckets
     """
-    return [(log_item, bucket) for log_item, bucket in zip(request_logs, buckets) if bucket]
+    return [(log_item, bucket) for log_item, bucket in zip(request_logs, buckets, strict=True) if bucket]
 
 
 def bucket_sort_logs_by_similarity(

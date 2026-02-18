@@ -513,7 +513,7 @@ class SuggestService(AnalyzerService):
             found_test_item: Optional[TestItemIndexData] = None
             for hit in self.os_client.search(test_item_info.project, query):
                 found_test_item = hit.source
-                test_item_id_for_suggest = int(found_test_item.test_item_id)
+                test_item_id_for_suggest = utils.safe_int(found_test_item.test_item_id)
                 break
             if found_test_item is None:
                 return [], 0
@@ -631,7 +631,7 @@ class SuggestService(AnalyzerService):
                             relevantItem=test_item_id,
                             relevantLogId=relevant_log_id,
                             isMergedLog=False,
-                            matchScore=round(weighted_score, 2) * 100,
+                            matchScore=round(weighted_score * 100, 2),
                             esScore=round(result.data["mrHit"].score, 2),
                             esPosition=result.original_position,
                             modelFeatureNames=feature_names,

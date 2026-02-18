@@ -32,9 +32,3 @@ class ModelInfo(BaseModel):
 class TrainInfo(ModelInfo):
     additional_projects: Optional[Iterable[int]] = None
     gathered_metric_total: int = 0
-
-
-class QueryResult(BaseModel):
-    result: list[tuple[str, str, str]]
-    error_count: int
-    errors: list[str]

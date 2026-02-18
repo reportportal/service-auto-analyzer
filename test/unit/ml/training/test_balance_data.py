@@ -23,10 +23,6 @@ def _entry(message: str, issue_type: str, is_positive: bool) -> TrainingEntry:
     return TrainingEntry(data=message, project_id=None, issue_type=issue_type, is_positive=is_positive)
 
 
-def _entry_counter(entries: list[TrainingEntry[str]]) -> Counter[tuple[str, str, bool]]:
-    return Counter((entry.data, entry.issue_type, entry.is_positive) for entry in entries)
-
-
 FIRST_POSITIVE_ENTRY = _entry("msg-a", "pb001", True)
 FIRST_CROSS_NEGATIVE_ENTRY = _entry("msg-a", "ab001", False)
 SECOND_POSITIVE_ENTRY = _entry("msg-b", "ab001", True)

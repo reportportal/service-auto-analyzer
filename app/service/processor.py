@@ -224,45 +224,45 @@ class ServiceProcessor:
             "prepare_response_data": prepare_index_response_data,
         },
         "index_suggest_info": {
-            "handler": lambda s: log_suggest_info_index_warning,
+            "handler": lambda _: log_suggest_info_index_warning,
             "prepare_data_func": prepare_suggest_info_list,
             "prepare_response_data": prepare_index_response_data,
         },
         "remove_suggest_info": {
-            "handler": lambda s: log_suggest_info_remove_warning,
+            "handler": lambda _: log_suggest_info_remove_warning,
             "prepare_data_func": to_int,
             "prepare_response_data": to_str,
         },
         "update_suggest_info": {
-            "handler": lambda s: log_suggest_info_update_warning,
+            "handler": lambda _: log_suggest_info_update_warning,
             "prepare_data_func": same_data,
             "prepare_response_data": to_json,
         },
         "remove_models": {
-            "handler": lambda s: lambda x: LOGGER.warning(
+            "handler": lambda _: lambda x: LOGGER.warning(
                 f"Deprecated 'remove_models' route called with {json.dumps(x)}"
             ),
             "prepare_data_func": same_data,
             "prepare_response_data": to_str,
         },
         "get_model_info": {
-            "handler": lambda s: lambda x: LOGGER.warning(
+            "handler": lambda _: lambda x: LOGGER.warning(
                 f"Deprecated 'get_model_info' route called with {json.dumps(x)}"
             ),
             "prepare_data_func": same_data,
             "prepare_response_data": to_json,
         },
         "noop_sleep": {
-            "handler": lambda s: lambda x: time.sleep(x),
+            "handler": lambda _: lambda x: time.sleep(x),
             "prepare_data_func": same_data,
         },
         "noop_echo": {
-            "handler": lambda s: lambda x: x,
+            "handler": lambda _: lambda x: x,
             "prepare_data_func": same_data,
             "prepare_response_data": to_str,
         },
         "noop_fail": {
-            "handler": lambda s: lambda x: raise_exception("Intentional failure for testing purposes: " + str(x)),
+            "handler": lambda _: lambda x: raise_exception("Intentional failure for testing purposes: " + str(x)),
             "prepare_data_func": same_data,
         },
     }

@@ -146,7 +146,7 @@ class TestItemIndexData(BaseModel):
 
         :return: Dictionary representation ready for indexing
         """
-        return self.model_dump()
+        return self.model_dump(exclude_none=True)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TestItemIndexData":

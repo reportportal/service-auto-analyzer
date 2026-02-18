@@ -89,7 +89,7 @@ class ModelChooser:
         hash_source: Optional[Any] = None,
     ) -> MlModel:
         use_for_hash = str(hash_source if hash_source is not None else project_id).encode("utf-8")
-        hash_code = hashlib.md5(use_for_hash).digest()
+        hash_code = hashlib.md5(use_for_hash, usedforsecurity=False).digest()
         test_value = int.from_bytes(hash_code) % 100
         if test_value <= int(custom_model_prob * 100):
             folders = self.object_saver.get_folder_objects(f"{model_type.name}_model/", project_id)

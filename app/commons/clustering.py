@@ -41,7 +41,9 @@ def __calculate_hashes(messages: list[list[str]], n_gram_length: int = 2, n_perm
             else:
                 ngram_num = 1
         for i in range(ngram_num):
-            hash_print.add(hashlib.md5(" ".join(words[i : i + n_gram_length]).encode("utf-8")).hexdigest())
+            hash_print.add(
+                hashlib.md5(" ".join(words[i : i + n_gram_length]).encode("utf-8"), usedforsecurity=False).hexdigest()
+            )
         hashes.append(list(heapq.nlargest(n_permutations, hash_print)))
     return hashes
 

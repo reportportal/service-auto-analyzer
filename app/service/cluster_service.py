@@ -137,7 +137,9 @@ def calculate_hash(
     for i, feature_name in enumerate(_cnt_vectorizer.get_feature_names_out()):
         if res_bitwise[i] == 1:
             bigrams_list.append(feature_name)
-    hash_message = int(hashlib.sha1(" ".join(bigrams_list).encode("utf-8")).hexdigest(), 16) % (10**16)
+    hash_message = int(hashlib.sha1(" ".join(bigrams_list).encode("utf-8"), usedforsecurity=False).hexdigest(), 16) % (
+        10**16
+    )
     hash_message = hash_message * 10 + int(not launch_info.cleanNumbers)
     return hash_message, log_message
 

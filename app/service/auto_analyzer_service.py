@@ -18,8 +18,6 @@ from datetime import datetime
 from time import time
 from typing import Any, Optional
 
-from utils.os_migration import construct_analysis_query
-
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory
 from app.commons.model import LogItemIndexData
@@ -43,6 +41,7 @@ from app.utils import utils
 from app.utils.os_migration import (
     bucket_sort_logs_by_similarity,
     build_search_results,
+    construct_analysis_query,
     extract_inner_hit_logs,
     get_request_logs,
 )

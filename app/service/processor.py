@@ -16,11 +16,9 @@ import json
 import time
 from typing import Any, Optional
 
-from pydantic import BaseModel
-
 from app.commons import logging, model_chooser
 from app.commons.model import launch_objects, ml
-from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
+from app.commons.model.launch_objects import ApplicationConfig, SearchConfig, SuggestAnalysisResult
 from app.service.auto_analyzer_service import AutoAnalyzerService
 from app.service.clean_index_service import CleanIndexService
 from app.service.cluster_service import ClusterService
@@ -127,8 +125,9 @@ def raise_exception(message: str) -> None:
     raise RuntimeError(message)
 
 
-def log_suggest_info_index_warning(s: BaseModel) -> Any:
-    LOGGER.warning(f"Deprecated 'index_suggest_info' route called with: {s.model_dump_json()}")
+def log_suggest_info_index_warning(s: list[SuggestAnalysisResult]) -> Any:
+    json_str = json.dumps([j.model_dump() for j in s])
+    LOGGER.warning("Deprecated 'index_suggest_info' route called with: " + json_str)
     return {}
 
 
@@ -226,7 +225,7 @@ class ServiceProcessor:
         "index_suggest_info": {
             "handler": lambda _: log_suggest_info_index_warning,
             "prepare_data_func": prepare_suggest_info_list,
-            "prepare_response_data": prepare_index_response_data,
+            "prepare_response_data": to_json,
         },
         "remove_suggest_info": {
             "handler": lambda _: log_suggest_info_remove_warning,

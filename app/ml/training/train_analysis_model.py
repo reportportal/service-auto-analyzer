@@ -176,6 +176,13 @@ def get_info_template(
     }
 
 
+def get_candidates_by_type(candidate_issue_types: list[str]) -> dict[str, list[int]]:
+    candidates_by_type: dict[str, list[int]] = defaultdict(list)
+    for idx, issue_type in enumerate(candidate_issue_types):
+        candidates_by_type[issue_type].append(idx)
+    return candidates_by_type
+
+
 def select_candidate_entries(
     candidate_issue_types: list[str],
     positive_issue_type: str,
@@ -189,15 +196,12 @@ def select_candidate_entries(
     :param history_negative_types: Negative issue types from history (max 2)
     :return: List of (index, label) tuples
     """
-    candidates_by_type: dict[str, list[int]] = defaultdict(list)
-    for idx, issue_type in enumerate(candidate_issue_types):
-        candidates_by_type[issue_type].append(idx)
+    candidates_by_type = get_candidates_by_type(candidate_issue_types)
 
     positive_indices = candidates_by_type.get(positive_issue_type, [])
     if not positive_indices:
         return []
 
-    selected_negatives: list[int] = []
     history_indices: list[int] = []
     for issue_type in history_negative_types:
         indices = candidates_by_type.get(issue_type, [])
@@ -212,6 +216,7 @@ def select_candidate_entries(
 
     rng = random.Random(DEFAULT_RANDOM_SEED)
     rng.shuffle(other_negatives)
+    selected_negatives: list[int] = []
     if other_negatives:
         selected_negatives.append(other_negatives.pop(0))
 
@@ -219,7 +224,6 @@ def select_candidate_entries(
 
     remaining_negatives = [idx for idx in other_negatives if idx not in selected_negatives]
     max_negatives = len(positive_indices) * NEGATIVE_RATIO_MAX
-    min_negatives = len(positive_indices) * NEGATIVE_RATIO_MIN
     rng.shuffle(remaining_negatives)
     for idx in remaining_negatives:
         if len(selected_negatives) >= max_negatives:
@@ -227,6 +231,7 @@ def select_candidate_entries(
         selected_negatives.append(idx)
 
     selected_positive_indices = list(positive_indices)
+    min_negatives = len(positive_indices) * NEGATIVE_RATIO_MIN
     if len(selected_negatives) < min_negatives:
         max_positives = max(1, len(selected_negatives) // NEGATIVE_RATIO_MIN)
         if max_positives < len(selected_positive_indices):

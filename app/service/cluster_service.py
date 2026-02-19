@@ -187,6 +187,22 @@ def generate_clustering_messages(
     return logs
 
 
+def compile_results(
+    cluster_message_by_id: dict[Any, Any], clusters_found: dict[int, tuple[list[int], list[int]]]
+) -> list[Any]:
+    results_to_return = []
+    for cluster_id in clusters_found:
+        results_to_return.append(
+            ClusterInfo(
+                clusterId=cluster_id,
+                clusterMessage=cluster_message_by_id[cluster_id],
+                logIds=clusters_found[cluster_id][0],
+                itemIds=list(set(clusters_found[cluster_id][1])),
+            )
+        )
+    return results_to_return
+
+
 def gather_cluster_results(
     initial_clusters: dict[int, list[int]],
     additional_clusters: dict[int, ClusterInfo],
@@ -242,16 +258,7 @@ def gather_cluster_results(
             cluster_test_items.extend(test_item_ids)
             clusters_found[cluster_id] = (cluster_log_ids, cluster_test_items)
         cluster_message_by_id[cluster_id] = cluster_message
-    results_to_return = []
-    for cluster_id in clusters_found:
-        results_to_return.append(
-            ClusterInfo(
-                clusterId=cluster_id,
-                clusterMessage=cluster_message_by_id[cluster_id],
-                logIds=clusters_found[cluster_id][0],
-                itemIds=list(set(clusters_found[cluster_id][1])),
-            )
-        )
+    results_to_return = compile_results(cluster_message_by_id, clusters_found)
     return results_to_return, updates
 
 

@@ -18,7 +18,6 @@ from datetime import datetime
 from time import time
 from typing import Any, Optional
 
-from commons.model.launch_objects import TestItem
 from utils.os_migration import construct_analysis_query
 
 from app.amqp.amqp import AmqpClient
@@ -33,6 +32,7 @@ from app.commons.model.launch_objects import (
     Launch,
     SearchConfig,
     SuggestAnalysisResult,
+    TestItem,
 )
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder

@@ -13,11 +13,20 @@
 #  limitations under the License.
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from app.commons.model import LogItemIndexData
+from app.commons.model.db import Hit
 from app.commons.model.ml import ModelType
+
+ERROR_LOGGING_LEVEL: int = 40000
+
+
+def timestamp_factory() -> tuple[int, int, int, int, int, int, int]:
+    now = datetime.now().timetuple()
+    return now[0], now[1], now[2], now[3], now[4], now[5], now[6]
 
 
 class AnalyzerConf(BaseModel):
@@ -31,9 +40,14 @@ class AnalyzerConf(BaseModel):
     allMessagesShouldMatch: bool = False
     searchLogsMinShouldMatch: int = 95
     uniqueErrorsMinShouldMatch: int = 95
+    numberOfLogsToIndex: int = 20
+    minimumLogLevel: int = ERROR_LOGGING_LEVEL
+    similarityThresholdToDrop: float = 0.95
+    searchScoreMode: str = "avg"
 
 
 class ApplicationConfig(BaseModel):
+    """General application config object"""
 
     esHost: str = ""
     esUser: str = ""
@@ -82,9 +96,8 @@ class ApplicationConfig(BaseModel):
 
 
 class SearchConfig(BaseModel):
-    """Search config object"""
+    """Configuration object for full-text search engine and auto-analysis."""
 
-    SearchLogsMinSimilarity: float = 0.95
     MinShouldMatch: str = "80%"
     BoostAA: float = 0.0
     BoostMA: float = 5.0
@@ -136,7 +149,7 @@ class Log(BaseModel):
 
     logId: int
     logLevel: int = 0
-    logTime: list[int] = list(datetime.now().timetuple())[:7]
+    logTime: tuple[int, int, int, int, int, int, int] = Field(default_factory=timestamp_factory)
     message: str
     clusterId: int = 0
     clusterMessage: str = ""
@@ -151,7 +164,7 @@ class TestItem(BaseModel):
     issueType: str = ""
     issueDescription: str = ""
     originalIssueType: str = ""
-    startTime: list[int] = list(datetime.now().timetuple())[:7]
+    startTime: tuple[int, int, int, int, int, int, int] = Field(default_factory=timestamp_factory)
     endTime: Optional[list[int]] = None
     lastModified: Optional[list[int]] = None
     testCaseHash: int = 0
@@ -186,10 +199,23 @@ class Launch(BaseModel):
     launchName: str = ""
     launchNumber: int = 0
     previousLaunchId: int = 0
-    launchStartTime: list[int] = list(datetime.now().timetuple())[:7]
+    launchStartTime: tuple[int, int, int, int, int, int, int] = Field(default_factory=timestamp_factory)
     analyzerConfig: AnalyzerConf = AnalyzerConf()
     testItems: list[TestItem] = []
     clusters: dict = {}
+
+
+class ItemUpdate(BaseModel):
+    timestamp: tuple[int, int, int, int, int, int, int] = Field(default_factory=timestamp_factory)
+    issueType: str
+    issueComment: str = ""
+
+
+class DefectUpdate(BaseModel):
+    """Item update object"""
+
+    project: int | str
+    itemsToUpdate: dict[int | str, Union[str, ItemUpdate]]
 
 
 class LaunchInfoForClustering(BaseModel):
@@ -249,13 +275,6 @@ class SuggestAnalysisResult(BaseModel):
     userChoice: int = 0
     methodName: str
     clusterId: int = 0
-
-
-class CleanIndex(BaseModel):
-    """Clean index object"""
-
-    ids: list[int]
-    project: int
 
 
 class CleanIndexStrIds(BaseModel):
@@ -334,9 +353,38 @@ class AnalysisCandidate(BaseModel):
     analyzerConfig: AnalyzerConf
     testItemId: int
     timeProcessed: float
-    candidates: list[tuple]
+    candidates: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]
     candidatesWithNoDefect: list[tuple[dict[str, Any], dict[str, Any]]]
     project: int
     launchId: int
     launchName: str
     launchNumber: int = 0
+
+
+class DeleteLogsRequest(BaseModel):
+    """Clean index object"""
+
+    ids: list[int]
+    project: int
+
+
+class DeleteTestItemsRequest(BaseModel):
+    """Request payload for deleting Test Items."""
+
+    project: int | str
+    itemsToDelete: list[int | str]
+
+
+class DeleteLaunchesRequest(BaseModel):
+    """Request payload for deleting launches."""
+
+    project: int | str
+    launch_ids: list[int | str]
+
+
+class RemoveByDatesRequest(BaseModel):
+    """Request payload for removing logs by launch start time."""
+
+    project: int | str
+    interval_start_date: str
+    interval_end_date: str

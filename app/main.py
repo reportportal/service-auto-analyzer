@@ -19,7 +19,7 @@ import threading
 import warnings
 from signal import SIGINT, signal
 from sys import exit
-from typing import Any, Optional
+from typing import Any
 
 from flask import Flask, Response
 from flask_cors import CORS
@@ -28,21 +28,19 @@ from flask_wtf.csrf import CSRFProtect
 from app.amqp.amqp import AmqpClient
 from app.amqp.amqp_handler import AmqpRequestHandler, DirectAmqpRequestHandler, ProcessAmqpRequestHandler
 from app.commons import logging as my_logging
-from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType
+from app.commons.os_client import OsClient
 from app.utils import utils
 
 
-def to_bool(value: Optional[Any]) -> Optional[bool]:
+def to_bool(value: Any) -> bool:
     """Convert value of any type to boolean or raise ValueError.
 
     :param value: value to convert
     :return: boolean value
     :raises ValueError: if value is not boolean
     """
-    if value is None or value == "":
-        return None
     if value in {"TRUE", "True", "true", "1", "Y", "y", True}:
         return True
     if value in {"FALSE", "False", "false", "0", "N", "n", False}:
@@ -92,7 +90,7 @@ if minio_use_tls:
         stacklevel=2,
     )
 if not datastore_endpoint and minio_short_host:
-    use_tls = to_bool(minio_use_tls)
+    use_tls = to_bool(minio_use_tls) if minio_use_tls else False
     datastore_endpoint = f"http{'s' if use_tls else ''}://{minio_short_host}"
 
 # Handle all datastore region settings, old and new
@@ -226,7 +224,6 @@ APP_CONFIG = ApplicationConfig(
 )
 
 SEARCH_CONFIG = SearchConfig(
-    SearchLogsMinSimilarity=float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.95")),
     MinShouldMatch=os.getenv("ES_MIN_SHOULD_MATCH", "80%"),
     BoostAA=float(os.getenv("ES_BOOST_AA", "0.0")),
     BoostMA=float(os.getenv("ES_BOOST_MA", "10.0")),
@@ -299,7 +296,6 @@ def init_amqp_queues():
             "search",
             "suggest",
             "cluster",
-            "stats_info",
             "namespace_finder",
             "suggest_patterns",
             "index_suggest_info",
@@ -366,7 +362,7 @@ def read_version():
 
 def read_model_settings():
     """Reads paths to models"""
-    model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
+    model_settings = utils.read_resource_file("model_settings.json", to_json=True)
     if not model_settings or not isinstance(model_settings, dict):
         raise RuntimeError("Failed to read model settings")
 
@@ -378,7 +374,7 @@ def read_model_settings():
 my_logging.setup(APP_CONFIG)
 logger = my_logging.getLogger("analyzerApp")
 APP_CONFIG.appVersion = read_version()
-es_client = EsClient(APP_CONFIG)
+os_client = OsClient(APP_CONFIG)
 read_model_settings()
 
 application = create_application()
@@ -389,7 +385,7 @@ THREADS: list[tuple[str, threading.Thread, AmqpRequestHandler]] = []
 def get_health_status():
     status: dict[str, Any] = {"status": "healthy"}
     status_code = 200
-    if not es_client.is_healthy():
+    if not os_client.is_healthy():
         logger.error("Analyzer health check status failed: %s", status)
         status["status"] = "OpenSearch is not healthy"
         status_code = 503

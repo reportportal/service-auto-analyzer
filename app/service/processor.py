@@ -11,23 +11,21 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
 import json
 import time
 from typing import Any, Optional
 
 from app.commons import logging, model_chooser
 from app.commons.model import launch_objects, ml
-from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
-from app.service.analyzer_service import AnalyzerService
+from app.commons.model.launch_objects import ApplicationConfig, SearchConfig, SuggestAnalysisResult
 from app.service.auto_analyzer_service import AutoAnalyzerService
 from app.service.clean_index_service import CleanIndexService
 from app.service.cluster_service import ClusterService
-from app.service.delete_index_service import DeleteIndexService
 from app.service.index_service import IndexService
 from app.service.namespace_finder_service import NamespaceFinderService
 from app.service.retraining_service import RetrainingService
 from app.service.search_service import SearchService
-from app.service.suggest_info_service import SuggestInfoService
 from app.service.suggest_patterns_service import SuggestPatternsService
 from app.service.suggest_service import SuggestService
 
@@ -38,6 +36,10 @@ LOGGER = logging.getLogger("analyzerApp.processor")
 def prepare_launches(launches: list) -> list[launch_objects.Launch]:
     """Function for deserializing array of launches"""
     return [launch_objects.Launch(**launch) for launch in launches]
+
+
+def prepare_update(update_data: dict) -> launch_objects.DefectUpdate:
+    return launch_objects.DefectUpdate(**update_data)
 
 
 def prepare_suggest_info_list(suggest_info_list: list) -> list[launch_objects.SuggestAnalysisResult]:
@@ -55,9 +57,26 @@ def prepare_launch_info(launch_info: dict) -> launch_objects.LaunchInfoForCluste
     return launch_objects.LaunchInfoForClustering(**launch_info)
 
 
-def prepare_clean_index(clean_index: dict) -> launch_objects.CleanIndex:
+def prepare_clean_index(clean_index: dict) -> launch_objects.DeleteLogsRequest:
     """Function for deserializing clean index object"""
-    return launch_objects.CleanIndex(**clean_index)
+    return launch_objects.DeleteLogsRequest(**clean_index)
+
+
+def prepare_delete_test_items(remove_items_info: dict) -> launch_objects.DeleteTestItemsRequest:
+    """Function for deserializing delete test items payload"""
+    return launch_objects.DeleteTestItemsRequest(**remove_items_info)
+
+
+def prepare_delete_launches(launch_remove_info: dict) -> launch_objects.DeleteLaunchesRequest:
+    """Function for deserializing delete launches payload"""
+    return launch_objects.DeleteLaunchesRequest(**launch_remove_info)
+
+
+def prepare_remove_by_dates(
+    remove_by_dates: dict,
+) -> launch_objects.RemoveByDatesRequest:
+    """Function for deserializing remove by launch start time payload"""
+    return launch_objects.RemoveByDatesRequest(**remove_by_dates)
 
 
 def to_int(body: Any) -> int:
@@ -82,13 +101,13 @@ def to_json(response: list | dict) -> str:
 
 def prepare_analyze_response_data(response: list) -> str:
     """Function for serializing response from analyze request"""
-    return to_json([resp.dict() for resp in response])
+    return to_json([resp.model_dump() for resp in response])
 
 
 def prepare_index_response_data(response: Any) -> str:
     """Function for serializing response from index request
     and other objects, which are pydantic objects"""
-    return response.json()
+    return response.model_dump_json()
 
 
 def to_str(response: Any) -> str:
@@ -106,14 +125,28 @@ def raise_exception(message: str) -> None:
     raise RuntimeError(message)
 
 
+def log_suggest_info_index_warning(s: list[SuggestAnalysisResult]) -> Any:
+    json_str = json.dumps([j.model_dump() for j in s])
+    LOGGER.warning("Deprecated 'index_suggest_info' route called with: " + json_str)
+    return {}
+
+
+def log_suggest_info_remove_warning(s: int) -> int:
+    LOGGER.warning(f"Deprecated 'remove_suggest_info' route called with: {s}")
+    return s
+
+
+def log_suggest_info_update_warning(s: Any) -> int:
+    LOGGER.warning(f"Deprecated 'update_suggest_info' route called with: {json.dumps(s)}")
+    return 1
+
+
 class ServiceProcessor:
     """Class for processing requests based on routing key and routing configuration"""
 
     _model_chooser: Optional[model_chooser.ModelChooser] = None
     _index_service: Optional[IndexService] = None
     _clean_index_service: Optional[CleanIndexService] = None
-    _analyzer_service: Optional[AnalyzerService] = None
-    _suggest_info_service: Optional[SuggestInfoService] = None
 
     __configs: dict[str, dict[str, Any]] = {
         "train_models": {
@@ -125,19 +158,44 @@ class ServiceProcessor:
             "prepare_data_func": prepare_launches,
             "prepare_response_data": prepare_index_response_data,
         },
+        "defect_update": {
+            "handler": lambda s: s.index_service.defect_update,
+            "prepare_data_func": prepare_update,
+            "prepare_response_data": to_json,
+        },
         "analyze": {
             "handler": lambda s: AutoAnalyzerService(s.model_chooser, s.app_config, s.search_config).analyze_logs,
             "prepare_data_func": prepare_launches,
             "prepare_response_data": prepare_analyze_response_data,
         },
         "delete": {
-            "handler": lambda s: DeleteIndexService(s.model_chooser, s.app_config, s.search_config).delete_index,
+            "handler": lambda s: s.clean_index_service.delete_index,
             "prepare_data_func": to_int,
             "prepare_response_data": to_str,
         },
         "clean": {
             "handler": lambda s: s.clean_index_service.delete_logs,
             "prepare_data_func": prepare_clean_index,
+            "prepare_response_data": to_str,
+        },
+        "item_remove": {
+            "handler": lambda s: s.clean_index_service.delete_test_items,
+            "prepare_data_func": prepare_delete_test_items,
+            "prepare_response_data": to_str,
+        },
+        "launch_remove": {
+            "handler": lambda s: s.clean_index_service.delete_launches,
+            "prepare_data_func": prepare_delete_launches,
+            "prepare_response_data": to_str,
+        },
+        "remove_by_launch_start_time": {
+            "handler": lambda s: s.clean_index_service.remove_by_launch_start_time,
+            "prepare_data_func": prepare_remove_by_dates,
+            "prepare_response_data": to_str,
+        },
+        "remove_by_log_time": {
+            "handler": lambda s: s.clean_index_service.remove_by_log_time,
+            "prepare_data_func": prepare_remove_by_dates,
             "prepare_response_data": to_str,
         },
         "search": {
@@ -155,9 +213,6 @@ class ServiceProcessor:
             "prepare_data_func": prepare_launch_info,
             "prepare_response_data": prepare_index_response_data,
         },
-        "stats_info": {
-            "handler": lambda s: s.index_service.send_stats_info,
-        },
         "namespace_finder": {
             "handler": lambda s: NamespaceFinderService(s.app_config).update_chosen_namespaces,
             "prepare_data_func": prepare_launches,
@@ -168,66 +223,45 @@ class ServiceProcessor:
             "prepare_response_data": prepare_index_response_data,
         },
         "index_suggest_info": {
-            "handler": lambda s: s.suggest_info_service.index_suggest_info,
+            "handler": lambda _: log_suggest_info_index_warning,
             "prepare_data_func": prepare_suggest_info_list,
-            "prepare_response_data": prepare_index_response_data,
+            "prepare_response_data": to_json,
         },
         "remove_suggest_info": {
-            "handler": lambda s: s.suggest_info_service.remove_suggest_info,
+            "handler": lambda _: log_suggest_info_remove_warning,
             "prepare_data_func": to_int,
             "prepare_response_data": to_str,
         },
         "update_suggest_info": {
-            "handler": lambda s: s.suggest_info_service.update_suggest_info,
+            "handler": lambda _: log_suggest_info_update_warning,
             "prepare_data_func": same_data,
             "prepare_response_data": to_json,
         },
         "remove_models": {
-            "handler": lambda s: s.analyzer_service.remove_models,
+            "handler": lambda _: lambda x: LOGGER.warning(
+                f"Deprecated 'remove_models' route called with {json.dumps(x)}"
+            ),
             "prepare_data_func": same_data,
             "prepare_response_data": to_str,
         },
         "get_model_info": {
-            "handler": lambda s: s.analyzer_service.get_model_info,
+            "handler": lambda _: lambda x: LOGGER.warning(
+                f"Deprecated 'get_model_info' route called with {json.dumps(x)}"
+            ),
             "prepare_data_func": same_data,
             "prepare_response_data": to_json,
-        },
-        "defect_update": {
-            "handler": lambda s: s.index_service.defect_update,
-            "prepare_data_func": same_data,
-            "prepare_response_data": to_json,
-        },
-        "item_remove": {
-            "handler": lambda s: s.clean_index_service.delete_test_items,
-            "prepare_data_func": same_data,
-            "prepare_response_data": to_str,
-        },
-        "launch_remove": {
-            "handler": lambda s: s.clean_index_service.delete_launches,
-            "prepare_data_func": same_data,
-            "prepare_response_data": to_str,
-        },
-        "remove_by_launch_start_time": {
-            "handler": lambda s: s.clean_index_service.remove_by_launch_start_time,
-            "prepare_data_func": same_data,
-            "prepare_response_data": to_str,
-        },
-        "remove_by_log_time": {
-            "handler": lambda s: s.clean_index_service.remove_by_log_time,
-            "prepare_data_func": same_data,
-            "prepare_response_data": to_str,
         },
         "noop_sleep": {
-            "handler": lambda s: lambda x: time.sleep(x),
+            "handler": lambda _: lambda x: time.sleep(x),
             "prepare_data_func": same_data,
         },
         "noop_echo": {
-            "handler": lambda s: lambda x: x,
+            "handler": lambda _: lambda x: x,
             "prepare_data_func": same_data,
             "prepare_response_data": to_str,
         },
         "noop_fail": {
-            "handler": lambda s: lambda x: raise_exception("Intentional failure for testing purposes: " + str(x)),
+            "handler": lambda _: lambda x: raise_exception("Intentional failure for testing purposes: " + str(x)),
             "prepare_data_func": same_data,
         },
     }
@@ -256,7 +290,7 @@ class ServiceProcessor:
     @property
     def clean_index_service(self) -> CleanIndexService:
         if not self._clean_index_service:
-            self._clean_index_service = CleanIndexService(self.app_config)
+            self._clean_index_service = CleanIndexService(self.model_chooser, self.app_config, self.search_config)
         return self._clean_index_service
 
     @property
@@ -264,18 +298,6 @@ class ServiceProcessor:
         if not self._index_service:
             self._index_service = IndexService(self.app_config)
         return self._index_service
-
-    @property
-    def analyzer_service(self) -> AnalyzerService:
-        if not self._analyzer_service:
-            self._analyzer_service = AnalyzerService(self.model_chooser, self.search_config)
-        return self._analyzer_service
-
-    @property
-    def suggest_info_service(self) -> SuggestInfoService:
-        if not self._suggest_info_service:
-            self._suggest_info_service = SuggestInfoService(self.app_config)
-        return self._suggest_info_service
 
     def _build_routing_config(self, routing_keys: Optional[set[str]]) -> dict:
         """Build routing configuration for different routing keys"""

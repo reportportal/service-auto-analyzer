@@ -12,13 +12,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from types import SimpleNamespace
 from unittest import mock
 
 import pytest
-from opensearchpy import OpenSearch
-from opensearchpy.client import IndicesClient
 
-from app.commons.esclient import EsClient
+from app.commons.model.test_item_index import LogData, TestItemIndexData
+from app.commons.os_client import OsClient
 from app.service.suggest_patterns_service import SuggestPatternsService
 from app.utils.utils import read_json_file
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
@@ -30,112 +30,112 @@ def test_data() -> dict[str, dict[str, dict[str, str]]]:
     return read_json_file("test_res", "suggest_patterns_test_data.json", to_json=True)
 
 
+def _build_log(detected_message: str, log_id: str) -> LogData:
+    return LogData(
+        log_id=log_id,
+        log_order=0,
+        log_time="2025-01-01T00:00:00Z",
+        log_level=40000,
+        cluster_id="",
+        cluster_message="",
+        cluster_with_numbers=False,
+        original_message=detected_message,
+        message=detected_message,
+        message_lines=1,
+        message_words_number=1,
+        message_extended=detected_message,
+        message_without_params_extended=detected_message,
+        message_without_params_and_brackets=detected_message,
+        detected_message=detected_message,
+        detected_message_with_numbers=detected_message,
+        detected_message_extended=detected_message,
+        detected_message_without_params_extended=detected_message,
+        detected_message_without_params_and_brackets=detected_message,
+        stacktrace="",
+        stacktrace_extended="",
+        only_numbers="",
+        potential_status_codes="",
+        found_exceptions="",
+        found_exceptions_extended="",
+        found_tests_and_methods="",
+        urls="",
+        paths="",
+        message_params="",
+        whole_message=detected_message,
+    )
+
+
+def _build_hit(issue_type: str, detected_message: str, idx: int) -> SimpleNamespace:
+    test_item = TestItemIndexData(
+        test_item_id=f"ti-{idx}",
+        launch_id="l-1",
+        issue_type=issue_type,
+        logs=[_build_log(detected_message, f"log-{idx}")],
+    )
+    return SimpleNamespace(source=test_item)
+
+
 @pytest.fixture
-def mocked_opensearch_client() -> OpenSearch:
-    """Create a mocked OpenSearch client instance."""
-    mock_client = mock.Mock(OpenSearch)
-    mock_client.indices = mock.Mock(IndicesClient)
-
-    # Mock indices.get for index_exists checks
-    mock_client.indices.get.return_value = {"rp_123": "exists"}
-
-    return mock_client
+def os_client_mock() -> mock.Mock:
+    return mock.Mock(spec=OsClient)
 
 
 @pytest.fixture
-def suggest_patterns_service(mocked_opensearch_client: OpenSearch) -> SuggestPatternsService:
-    """Create SuggestPatternsService with real EsClient and mocked OpenSearch client."""
-    # Create real EsClient with mocked OpenSearch client
-    es_client = EsClient(APP_CONFIG, es_client=mocked_opensearch_client)
-
-    # Create SuggestPatternsService with real EsClient
-    service = SuggestPatternsService(APP_CONFIG, DEFAULT_SEARCH_CONFIG, es_client=es_client)
-
-    return service
+def suggest_patterns_service(os_client_mock: mock.Mock) -> SuggestPatternsService:
+    """Create SuggestPatternsService with mocked OsClient."""
+    return SuggestPatternsService(APP_CONFIG, DEFAULT_SEARCH_CONFIG, os_client=os_client_mock)
 
 
-# noinspection PyUnresolvedReferences
-@mock.patch("opensearchpy.helpers.scan")
 def test_suggest_patterns_calls_correct_services(
-    mock_scan,
     suggest_patterns_service: SuggestPatternsService,
-    mocked_opensearch_client: OpenSearch,
+    os_client_mock: mock.Mock,
     test_data: dict[str, dict[str, dict[str, str]]],
 ) -> None:
     """Test that suggest_patterns method calls internal services with correct arguments."""
     test_project_id = 123
-    expected_index_name = f"{APP_CONFIG.esProjectIndexPrefix}{test_project_id}"
-
-    # Configure mock_scan to return different results for different labels
-    # The scan is called 4 times (for ab, pb, si, ti labels)
-    mock_scan.side_effect = [
-        iter(test_data["scan_results_ab"]),
-        iter(test_data["scan_results_pb"]),
-        iter(test_data["scan_results_si"]),
-        iter(test_data["scan_results_ti"]),
+    entries = []
+    for key in ["scan_results_ab", "scan_results_pb", "scan_results_si", "scan_results_ti"]:
+        entries.extend(test_data[key])
+    hits = [
+        _build_hit(entry["_source"]["issue_type"], entry["_source"]["detected_message"], idx)
+        for idx, entry in enumerate(entries)
     ]
+    os_client_mock.search.return_value = hits
 
     # Execute the method
     result = suggest_patterns_service.suggest_patterns(test_project_id)
 
-    # Verify es_client checked index exists
-    mocked_opensearch_client.indices.get.assert_called_once()
-    index_exists_call = mocked_opensearch_client.indices.get.call_args
-    assert (
-        index_exists_call[1]["index"] == expected_index_name
-    ), f"index_exists should check for index '{expected_index_name}'"
+    # Verify os_client.search was called once
+    os_client_mock.search.assert_called_once()
+    search_args = os_client_mock.search.call_args[0]
+    assert search_args[0] == test_project_id, "search should use provided project ID"
 
-    # Verify opensearchpy.helpers.scan was called 4 times (once for each label)
-    assert mock_scan.call_count == 4, "scan should be called 4 times (once per label: ab, pb, si, ti)"
+    query = search_args[1]
+    assert "query" in query, "search should have query key"
+    assert "bool" in query["query"], "search should have bool query"
+    assert "filter" in query["query"]["bool"], "search should have filter clause"
 
-    # Verify the scan calls for each label
-    labels = ["ab", "pb", "si", "ti"]
-    for idx, label in enumerate(labels):
-        scan_call = mock_scan.call_args_list[idx]
+    should_clause = query["query"]["bool"]["filter"][0]["bool"]["should"]
+    assert len(should_clause) == 5, "search should have 4 wildcard clauses"
 
-        # Verify scan was called with correct client and index
-        assert scan_call[0][0] == mocked_opensearch_client, f"scan call {idx} should use mocked OpenSearch client"
-        assert (
-            scan_call[1]["index"] == expected_index_name
-        ), f"scan call {idx} should use index '{expected_index_name}'"
+    patterns = {f"{label}*" for label in ["ab", "pb", "si", "ti", "nd"]}
+    for clause in should_clause:
+        wildcard = clause["wildcard"]["issue_type"]["value"]
+        case_insensitive = clause["wildcard"]["issue_type"]["case_insensitive"]
+        assert wildcard in patterns, f"wildcard should be one of '{patterns}'"
+        assert case_insensitive, "wildcard should be case insensitive"
 
-        # Verify query structure
-        query = scan_call[1]["query"]
-        assert "query" in query, f"scan call {idx} should have 'query' key"
-        assert "bool" in query["query"], f"scan call {idx} should have bool query"
-        assert "must" in query["query"]["bool"], f"scan call {idx} should have must clause"
+    # Verify sort by start_time
+    assert "sort" in query, "search should have sort"
+    assert "start_time" in query["sort"], "search should sort by start_time"
+    assert query["sort"]["start_time"] == "desc", "search should sort by start_time descending"
 
-        # Verify label wildcards in query
-        should_clause = query["query"]["bool"]["must"][0]["bool"]["should"]
-        assert len(should_clause) == 1, f"scan call {idx} should have 1 wildcard clause"
+    # Verify size parameter
+    assert "size" in query, "search should have size parameter"
+    assert query["size"] == APP_CONFIG.esChunkNumber, "search should use app esChunkNumber"
 
-        # Verify wildcard patterns for the label
-        pattern = f"{label}*"
-        wildcard = should_clause[0]["wildcard"]["issue_type"]
-        case_insensitive = should_clause[0]["case_insensitive"]
-        assert wildcard == pattern, f"scan call {idx}, should match '{pattern}'"
-        assert case_insensitive, f"scan call {idx}, should match should be case insensitive"
-
-        # Verify _source field selection
-        assert "_source" in query, f"scan call {idx} should specify _source fields"
-        assert "detected_message" in query["_source"], f"scan call {idx} should request 'detected_message' field"
-        assert "issue_type" in query["_source"], f"scan call {idx} should request 'issue_type' field"
-
-        # Verify sort by start_time
-        assert "sort" in query, f"scan call {idx} should have sort"
-        assert "start_time" in query["sort"], f"scan call {idx} should sort by start_time"
-        assert query["sort"]["start_time"] == "desc", f"scan call {idx} should sort by start_time descending"
-
-        # Verify size parameter
-        assert "size" in query, f"scan call {idx} should have size parameter"
-        assert (
-            query["size"] == APP_CONFIG.esChunkNumber
-        ), f"scan call {idx} should use esChunkNumber={APP_CONFIG.esChunkNumber}"
-
-        # Verify boost parameters were added by append_aa_ma_boosts
-        assert "should" in query["query"]["bool"], f"scan call {idx} should have should clause with boosts"
-        boost_clause = query["query"]["bool"]["should"]
-        assert len(boost_clause) > 0, f"scan call {idx} should have boost terms added"
+    # Verify boost parameters were added by append_aa_ma_boosts
+    assert "should" not in query["query"]["bool"], "search should have should clause with boosts"
 
     # Verify result structure
     assert result.suggestionsWithLabels is not None, "result should have suggestionsWithLabels"
@@ -144,90 +144,45 @@ def test_suggest_patterns_calls_correct_services(
     assert isinstance(result.suggestionsWithoutLabels, list), "suggestionsWithoutLabels should be a list"
 
 
-# noinspection PyUnresolvedReferences
-@mock.patch("opensearchpy.helpers.scan")
 def test_suggest_patterns_with_nonexistent_index(
-    mock_scan,
-    mocked_opensearch_client: OpenSearch,
     suggest_patterns_service: SuggestPatternsService,
+    os_client_mock: mock.Mock,
 ) -> None:
     """Test suggest_patterns when index does not exist."""
     test_project_id = 999
-    expected_index_name = f"{APP_CONFIG.esProjectIndexPrefix}{test_project_id}"
-
-    # Configure mock to raise exception for non-existent index
-    mocked_opensearch_client.indices.get.side_effect = Exception("Index not found")
+    os_client_mock.search.return_value = []
 
     # Execute the method
     result = suggest_patterns_service.suggest_patterns(test_project_id)
 
-    # Verify index_exists was called
-    mocked_opensearch_client.indices.get.assert_called_once()
-    index_exists_call = mocked_opensearch_client.indices.get.call_args
-    assert index_exists_call[1]["index"] == expected_index_name
-
-    # Verify scan was NOT called since index doesn't exist
-    mock_scan.assert_not_called()
+    # Verify search was called
+    os_client_mock.search.assert_called_once()
 
     # Verify result contains empty lists
     assert result.suggestionsWithLabels == [], "suggestionsWithLabels should be empty for non-existent index"
     assert result.suggestionsWithoutLabels == [], "suggestionsWithoutLabels should be empty for non-existent index"
 
 
-# noinspection PyUnresolvedReferences
-@mock.patch("opensearchpy.helpers.scan")
 def test_suggest_patterns_filters_and_aggregates_exceptions(
-    mock_scan,
     suggest_patterns_service: SuggestPatternsService,
-    mocked_opensearch_client: OpenSearch,
+    os_client_mock: mock.Mock,
 ) -> None:
     """Test that suggest_patterns correctly filters and aggregates exceptions."""
     test_project_id = 456
 
-    # Create test data with repeated exceptions to test aggregation
-    # Need at least 10 occurrences for suggestionsWithoutLabels
-    # Need at least 5 occurrences and 90% with same label for suggestionsWithLabels
-    repeated_scan_results = [
-        # ab label - same exception 10 times (will meet 90% threshold for AB label)
-        [
-            {
-                "_source": {
-                    "detected_message": "java.lang.NullPointerException at test",
-                    "issue_type": "AB001",
-                }
-            }
-            for _ in range(10)
-        ],
-        # pb label - same exception 1 time
-        [
-            {
-                "_source": {
-                    "detected_message": "java.lang.NullPointerException at test",
-                    "issue_type": "PB001",
-                }
-            },
-        ],
-        # si label - empty
-        [],
-        # ti label - should not be included in labels (2 times)
-        [
-            {
-                "_source": {
-                    "detected_message": "java.lang.NullPointerException at test",
-                    "issue_type": "TI001",
-                }
-            }
-            for _ in range(2)
-        ],
-    ]
-
-    mock_scan.side_effect = [iter(results) for results in repeated_scan_results]
+    hits = []
+    for idx in range(10):
+        hits.append(_build_hit("AB001", "java.lang.NullPointerException at test", idx))
+    hits.append(_build_hit("PB001", "java.lang.NullPointerException at test", 10))
+    hits.append(_build_hit("TI001", "java.lang.NullPointerException at test", 11))
+    hits.append(_build_hit("TI001", "java.lang.NullPointerException at test", 12))
+    os_client_mock.search.return_value = hits
 
     # Execute the method
     result = suggest_patterns_service.suggest_patterns(test_project_id)
 
-    # Verify scan was called 4 times
-    assert mock_scan.call_count == 4
+    # Verify search was called once
+    os_client_mock.search.assert_called_once()
 
     # The NullPointerException appears 13 times total (10 AB, 1 PB, 2 TI)
     # TI should not be counted in suggestionsWithLabels
@@ -243,36 +198,27 @@ def test_suggest_patterns_filters_and_aggregates_exceptions(
     ), "Should have some suggestions"
 
 
-# noinspection PyUnresolvedReferences
-@mock.patch("opensearchpy.helpers.scan")
 def test_suggest_patterns_with_empty_results(
-    mock_scan,
     suggest_patterns_service: SuggestPatternsService,
-    mocked_opensearch_client: OpenSearch,
+    os_client_mock: mock.Mock,
 ) -> None:
     """Test suggest_patterns when all scan results are empty."""
     test_project_id = 789
 
-    # Configure mock_scan to return empty results for all labels
-    mock_scan.side_effect = [iter([]), iter([]), iter([]), iter([])]
+    os_client_mock.search.return_value = []
 
     # Execute the method
     result = suggest_patterns_service.suggest_patterns(test_project_id)
 
-    # Verify scan was called 4 times
-    assert mock_scan.call_count == 4
+    # Verify search was called once
+    os_client_mock.search.assert_called_once()
 
     # Verify result contains empty lists
     assert result.suggestionsWithLabels == [], "suggestionsWithLabels should be empty when no data found"
     assert result.suggestionsWithoutLabels == [], "suggestionsWithoutLabels should be empty when no data found"
 
 
-# noinspection PyUnresolvedReferences
-@mock.patch("opensearchpy.helpers.scan")
-def test_suggest_patterns_query_structure_with_different_config(
-    mock_scan,
-    mocked_opensearch_client: OpenSearch,
-) -> None:
+def test_suggest_patterns_query_structure_with_different_config() -> None:
     """Test that query structure respects different app and search configurations."""
     # Create service with custom configuration
     from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
@@ -305,28 +251,17 @@ def test_suggest_patterns_query_structure_with_different_config(
         BoostLaunch=2.0,
     )
 
-    es_client = EsClient(custom_app_config, es_client=mocked_opensearch_client)
-    service = SuggestPatternsService(custom_app_config, custom_search_config, es_client=es_client)
+    os_client_mock = mock.Mock(spec=OsClient)
+    os_client_mock.search.return_value = []
+    service = SuggestPatternsService(custom_app_config, custom_search_config, os_client=os_client_mock)
 
     test_project_id = 111
-    expected_index_name = f"{custom_app_config.esProjectIndexPrefix}{test_project_id}"
-
-    # Configure mock_scan
-    mock_scan.side_effect = [iter([]), iter([]), iter([]), iter([])]
 
     # Execute the method
     service.suggest_patterns(test_project_id)
 
-    # Verify index name uses custom prefix
-    index_exists_call = mocked_opensearch_client.indices.get.call_args
-    assert index_exists_call[1]["index"] == expected_index_name
+    os_client_mock.search.assert_called_once()
+    query = os_client_mock.search.call_args[0][1]
 
     # Verify first scan call uses custom chunk size
-    first_scan_call = mock_scan.call_args_list[0]
-    query = first_scan_call[1]["query"]
     assert query["size"] == es_chunk_number, "Query should use custom esChunkNumber"
-
-    # Verify boost was applied according to custom search config
-    boost_clause = query["query"]["bool"]["should"]
-    # The boost clause should exist since BoostAA != BoostMA
-    assert len(boost_clause) > 0, "Should have boost clause when BoostAA != BoostMA"

@@ -12,13 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import re
-from typing import Any
-
 from app.commons import logging
 from app.commons.model.launch_objects import AnalyzerConf, Launch, SearchConfig, TestItemInfo
-from app.commons.model.ml import ModelInfo
-from app.commons.model_chooser import ModelChooser
 from app.utils import utils
 
 LOGGER = logging.getLogger("analyzerApp.analyzerService")
@@ -103,19 +98,15 @@ def add_constraints_for_launches_into_query_suggest(
 class AnalyzerService:
     search_cfg: SearchConfig
     launch_boost: float
-    model_chooser: ModelChooser
 
-    def __init__(self, model_chooser: ModelChooser, search_cfg: SearchConfig):
+    def __init__(self, search_cfg: SearchConfig):
         self.search_cfg = search_cfg
         self.launch_boost = abs(self.search_cfg.BoostLaunch)
-        self.model_chooser = model_chooser
 
     def find_min_should_match_threshold(self, analyzer_config: AnalyzerConf) -> int:
-        return (
-            analyzer_config.minShouldMatch
-            if analyzer_config.minShouldMatch > 0
-            else int(re.search(r"\d+", self.search_cfg.MinShouldMatch).group(0))
-        )
+        if analyzer_config.minShouldMatch > 0:
+            return analyzer_config.minShouldMatch
+        return int(self.search_cfg.MinShouldMatch.rstrip("%"))
 
     def add_constraints_for_launches_into_query(self, query: dict, launch: Launch) -> dict:
         return add_constraints_for_launches_into_query(query, launch, self.launch_boost)
@@ -123,63 +114,7 @@ class AnalyzerService:
     def add_constraints_for_launches_into_query_suggest(self, query: dict, test_item_info: TestItemInfo) -> dict:
         return add_constraints_for_launches_into_query_suggest(query, test_item_info, self.launch_boost)
 
-    def build_more_like_this_query(
-        self,
-        min_should_match: str,
-        log_message: str,
-        field_name: str = "message",
-        boost: float = 1.0,
-        override_min_should_match: str = None,
-    ) -> dict:
-        """Build more like this query"""
-        return utils.build_more_like_this_query(
-            min_should_match=min_should_match,
-            log_message=log_message,
-            field_name=field_name,
-            boost=boost,
-            override_min_should_match=override_min_should_match,
-            max_query_terms=self.search_cfg.MaxQueryTerms,
-        )
-
-    @staticmethod
-    def prepare_restrictions_by_issue_type(filter_no_defect: bool = True) -> list[dict]:
-        if filter_no_defect:
-            return [{"wildcard": {"issue_type": "ti*"}}, {"wildcard": {"issue_type": "nd*"}}]
-        return [{"term": {"issue_type": "ti001"}}]
-
-    def build_common_query(self, log: dict[str, Any], size=10, filter_no_defect=True) -> dict[str, Any]:
-        issue_type_conditions = self.prepare_restrictions_by_issue_type(filter_no_defect=filter_no_defect)
-        common_query = {
-            "size": size,
-            "sort": [
-                "_score",
-                {"start_time": "desc"},
-            ],
-            "query": {
-                "bool": {
-                    "filter": [
-                        {"range": {"log_level": {"gte": utils.ERROR_LOGGING_LEVEL}}},
-                        {"exists": {"field": "issue_type"}},
-                    ],
-                    "must_not": issue_type_conditions + [{"term": {"test_item": log["_source"]["test_item"]}}],
-                    "should": [
-                        {
-                            "term": {
-                                "test_case_hash": {
-                                    "value": log["_source"]["test_case_hash"],
-                                    "boost": abs(self.search_cfg.BoostTestCaseHash),
-                                }
-                            }
-                        },
-                    ],
-                }
-            },
-        }
-
-        utils.append_aa_ma_boosts(common_query, self.search_cfg)
-        return common_query
-
-    def add_query_with_start_time_decay(self, main_query: dict, start_time: int) -> dict:
+    def add_query_with_start_time_decay(self, main_query: dict, start_time: str) -> dict:
         return {
             "size": main_query["size"],
             "sort": main_query["sort"],
@@ -204,27 +139,3 @@ class AnalyzerService:
                 }
             },
         }
-
-    def remove_models(self, model_info: ModelInfo) -> int:
-        try:
-            LOGGER.info("Started removing %s models from project %d", model_info.model_type.name, model_info.project)
-            deleted_models = self.model_chooser.delete_old_model(model_info.model_type, model_info.project)
-            LOGGER.info("Finished removing %s models from project %d", model_info.model_type.name, model_info.project)
-            return deleted_models
-        except Exception as err:
-            LOGGER.exception("Error while removing models.", exc_info=err)
-            return 0
-
-    def get_model_info(self, model_info: ModelInfo) -> dict:
-        try:
-            LOGGER.info(
-                "Started getting info for %s model from project %d", model_info.model_type.name, model_info.project
-            )
-            model_folder = self.model_chooser.get_model_info(model_info.model_type, model_info.project)
-            LOGGER.info(
-                "Finished getting info for %s model from project %d", model_info.model_type.name, model_info.project
-            )
-            return {"model_folder": model_folder}
-        except Exception as err:
-            LOGGER.exception("Error while getting info for models.", exc_info=err)
-            return {}

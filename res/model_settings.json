@@ -1,5 +1,5 @@
 {
-	"BOOST_MODEL_FOLDER": "res/model/auto_analysis_model_2025-08-18",
-	"SUGGEST_BOOST_MODEL_FOLDER": "res/model/suggestion_model_2025-09-04",
-	"GLOBAL_DEFECT_TYPE_MODEL_FOLDER": "res/model/defect_type_model_2025-08-12"
+  "BOOST_MODEL_FOLDER": "res/model/auto_analysis_model_2025-08-18",
+  "SUGGEST_BOOST_MODEL_FOLDER": "res/model/suggestion_model_2025-09-04",
+  "GLOBAL_DEFECT_TYPE_MODEL_FOLDER": "res/model/defect_type_model_2025-08-12"
 }

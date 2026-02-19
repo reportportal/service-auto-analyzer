@@ -15,11 +15,12 @@
 import re
 import string
 import urllib.parse
-from typing import Iterable
+from typing import Iterable, Optional
 from urllib.parse import urlparse
 
 import nltk
 from nltk.stem import WordNetLemmatizer
+from scipy.sparse import csr_matrix
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -28,7 +29,7 @@ from app.commons.model.launch_objects import Log, SimilarityResult
 try:
     from app.commons import logging
 except ImportError:
-    import logging
+    import logging  # type: ignore
 
 logger = logging.getLogger("analyzerApp.utils.textProcessing")
 
@@ -37,8 +38,8 @@ STOPWORDS_ALL = set(STOPWORDS)
 FILE_EXTENSIONS = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
 
 
-def create_punctuation_map(split_urls) -> dict[str, str]:
-    translate_map = {}
+def create_punctuation_map(split_urls: bool) -> dict[str, str | int | None]:
+    translate_map: dict[str, str | int | None] = {}
     for punct in string.punctuation + "<>{}[];=()'\"":
         if punct != "." and (split_urls or punct not in ["/", "\\"]):
             translate_map[punct] = " "
@@ -152,8 +153,10 @@ def is_starting_message_pattern(text):
     return False
 
 
-def get_found_exceptions(text: str, to_lower: bool = False) -> str:
+def get_found_exceptions(text: Optional[str], to_lower: bool = False) -> list[str]:
     """Extract exception and errors from logs"""
+    if not text:
+        return []
     unique_exceptions = set()
     found_exceptions = []
     for word in split_words(text, to_lower=to_lower):
@@ -163,7 +166,7 @@ def get_found_exceptions(text: str, to_lower: bool = False) -> str:
                     found_exceptions.append(word)
                     unique_exceptions.add(word)
                 break
-    return " ".join(found_exceptions)
+    return found_exceptions
 
 
 def detect_log_parts_python(message, default_log_number=1):
@@ -263,26 +266,42 @@ def clean_special_chars(text: str) -> str:
 
 
 # Mute Sonar's "Group parts of the regex together to make the intended operator precedence explicit." which is invalid
+HTTP_CODE = r"[1-5]\d{2}"
 STATUS_CODES_PATTERNS = [
-    re.compile(r"\bcode[^\w.]+(\d+)\D*(\d*)|\bcode[^\w.]+(\d*)$", flags=re.IGNORECASE),  # NOSONAR
-    re.compile(r"\w+_code[^\w.]+(\d+)\D*(\d*)|\w+_code[^\w.]+(\d*)$", flags=re.IGNORECASE),  # NOSONAR
-    re.compile(r"\bstatus[^\w.]+(\d+)\D*(\d*)|\bstatus[^\w.]+(\d*)$", flags=re.IGNORECASE),  # NOSONAR
-    re.compile(r"\w+_status[^\w.]+(\d+)\D*(\d*)|\w+_status[^\w.]+(\d*)$", flags=re.IGNORECASE),  # NOSONAR
+    re.compile(
+        r"\bcode[^\w.]+({0})\D*({0})?|\bcode[^\w.]+({0})?$".format(HTTP_CODE),
+        flags=re.IGNORECASE,
+    ),
+    re.compile(r"\w+_code[^\w.]+({0})\D*({0})?|\w+_code[^\w.]+({0})?$".format(HTTP_CODE), flags=re.IGNORECASE),
+    re.compile(r"\bstatus[^\w.]+({0})\D*({0})?|\bstatus[^\w.]+({0})?$".format(HTTP_CODE), flags=re.IGNORECASE),
+    re.compile(r"\w+_status[^\w.]+({0})\D*({0})?|\w+_status[^\w.]+({0})?$".format(HTTP_CODE), flags=re.IGNORECASE),
+    re.compile(
+        r"\bcode\W+expected[:.\s-]+[\"'`]?({0})\D*({0})?|\bcode\W+expected[:.\s-]+[\"'`]?({0})[\"'`]?$".format(
+            HTTP_CODE
+        ),
+        flags=re.IGNORECASE,
+    ),
+    re.compile(
+        r"\"(?:statusCode|status_code|httpCode|http_code|responseCode|response_code)\":\s*\"?({0})\b".format(
+            HTTP_CODE
+        ),
+        flags=re.IGNORECASE,
+    ),
 ]
 
 
 def get_potential_status_codes(text: str) -> list[str]:
     potential_codes_list = []
     for line in text.split("\n"):
-        line = clean_from_brackets(line)
         for pattern in STATUS_CODES_PATTERNS:
             result = pattern.search(line)
             if not result:
                 continue
-            for i in range(1, 4):
-                found_code = (result.group(i) or "").strip()
+            for found_code in result.groups():
                 if found_code:
-                    potential_codes_list.append(found_code)
+                    strip_code = found_code.strip()
+                    if strip_code:
+                        potential_codes_list.append(strip_code)
     return potential_codes_list
 
 
@@ -326,8 +345,10 @@ def first_lines(log_str: str, n_lines: int) -> str:
 
 
 def prepare_message_for_clustering(
-    message: str, number_of_log_lines: int, clean_numbers: bool, leave_log_structure: bool = False
-) -> str:
+    message: Optional[str], number_of_log_lines: int, clean_numbers: bool, leave_log_structure: bool = False
+) -> Optional[str]:
+    if not message:
+        return None
     potential_status_codes = get_unique_potential_status_codes(message)
     message = remove_starting_datetime(message)
     if clean_numbers:
@@ -343,7 +364,7 @@ def prepare_message_for_clustering(
     message = first_lines(message, number_of_log_lines)
     if leave_log_structure:
         return message
-    words = split_words(message, min_word_length=2, only_unique=False)
+    words = split_words(message, min_word_length=2, only_unique=False, to_lower=False)
     if len(words) == 1:
         return " ".join(words) + " error"
     return " ".join(words)
@@ -417,9 +438,9 @@ def split_words(
         return []
 
     if split_urls:
-        result = text.translate(text.maketrans(PUNCTUATION_MAP_SPLIT_URLS))
+        result = text.translate(str.maketrans(PUNCTUATION_MAP_SPLIT_URLS))
     else:
-        result = text.translate(text.maketrans(PUNCTUATION_MAP_NO_SPLIT_URLS))
+        result = text.translate(str.maketrans(PUNCTUATION_MAP_NO_SPLIT_URLS))
     result = result.strip().strip(".").strip()
     if to_lower:
         result = result.lower()
@@ -782,10 +803,6 @@ def transform_string_feature_range_into_list(text: str) -> list[int]:
     return values
 
 
-def unite_project_name(project_id: str | int, prefix: str) -> str:
-    return f"{prefix}{project_id}"
-
-
 def replace_text_pieces(text: str, text_pieces: Iterable[str]) -> str:
     result = text
     for w in sorted(text_pieces, key=lambda x: len(x), reverse=True):
@@ -920,7 +937,7 @@ CAMEL_CASE_PATTERN = re.compile(r"([a-z])([A-Z])")
 UPPER_LOWER_CASE_PATTERN = re.compile(r"([A-Z])([A-Z][a-z])")
 
 
-def preprocess_text_for_similarity(text: str) -> str:
+def preprocess_text_for_similarity(text: str) -> list[str]:
     """
     Preprocess text for similarity calculation following the specified requirements.
 
@@ -928,7 +945,7 @@ def preprocess_text_for_similarity(text: str) -> str:
     :return: Preprocessed text ready for similarity calculation
     """
     if not text:
-        return ""
+        return []
 
     result = text
 
@@ -962,29 +979,47 @@ def preprocess_text_for_similarity(text: str) -> str:
         lemmatized_word = lemmatizer.lemmatize(word)
         processed_words.append(lemmatized_word)
 
-    return " ".join(processed_words)
+    return processed_words
 
 
-def calculate_text_similarity(base_text: str, *other_texts: str) -> list[SimilarityResult]:
+def __calculate_tfidf_matrix(all_texts: list[str], *, use_idf: bool = False) -> csr_matrix:
+    # Use TF-IDF vectorization and cosine similarity for efficient computation
+    vectorizer = TfidfVectorizer(
+        lowercase=False,  # Already lowercased in preprocessing
+        token_pattern=r"\b\w+\b",  # Simple word tokenization
+        min_df=1,  # Include all terms
+        max_df=1.0,  # Include all terms
+        ngram_range=(1, 2),  # Use unigrams and bigrams
+        use_idf=use_idf,
+    )
+
+    # Fit and transform all texts at once
+    tf_matrix: csr_matrix = vectorizer.fit_transform(all_texts)
+    return tf_matrix
+
+
+def calculate_text_similarity(base_text: Optional[str], other_texts: list[str]) -> list[SimilarityResult]:
     """
     Calculate similarity between a base text and multiple other texts using TF-IDF vectorization and cosine similarity.
 
     This function preprocesses all texts according to specified requirements and then
     computes their similarity using computationally efficient methods.
 
-    :param base_text: Base text to compare against
+    :param base_text:   Base text to compare against
     :param other_texts: Variable number of texts to compare with the base text
+
     :return: List of SimilarityResult objects where `similarity` is in [0.0, 1.0]
              and `both_empty` indicates both texts were empty
     """
-    if not other_texts:
+    if base_text is None or not other_texts:
         return []
 
     # Preprocess the base text
-    processed_base_text = preprocess_text_for_similarity(base_text)
+    processed_base_text = " ".join(preprocess_text_for_similarity(base_text))
+    base_text_is_valid = bool(processed_base_text.strip())
 
     # Preprocess all other texts
-    processed_other_texts = [preprocess_text_for_similarity(text) for text in other_texts]
+    processed_other_texts = [" ".join(preprocess_text_for_similarity(text)) for text in other_texts]
 
     # Handle empty texts and identical texts first
     similarity_scores: list[SimilarityResult] = []
@@ -992,8 +1027,8 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[Similar
     valid_indices = []
 
     for i, processed_other_text in enumerate(processed_other_texts):
-        both_empty = not processed_base_text.strip() and not processed_other_text.strip()
-        if both_empty:
+        processed_other_text_strip = processed_other_text.strip()
+        if not base_text_is_valid and not processed_other_text_strip:
             # The next variable will be False if base texts contain only stop words
             base_both_empty = not base_text.strip() and not other_texts[i].strip()
             similarity_scores.append(
@@ -1002,39 +1037,27 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[Similar
                     both_empty=base_both_empty,
                 )
             )
-        elif not processed_base_text.strip() or not processed_other_text.strip():
+        elif not base_text_is_valid or not processed_other_text_strip:
             # If one of the texts is empty after preprocessing, append 0
-            similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=both_empty))
+            similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=False))
         elif processed_base_text == processed_other_text:
             # If both texts are identical after preprocessing, append 1
-            similarity_scores.append(SimilarityResult(similarity=1.0, both_empty=both_empty))
+            similarity_scores.append(SimilarityResult(similarity=1.0, both_empty=False))
         else:
             # Store valid texts for batch processing
             valid_texts.append(processed_other_text)
             valid_indices.append(i)
             # Placeholder, will be replaced
-            similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=both_empty))
+            similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=False))
 
     if not valid_texts:
         return similarity_scores
 
     # If we have valid texts to process, use single TF-IDF vectorizer
-
     # Create all texts list: base text + all valid other texts
     all_texts = [processed_base_text] + valid_texts
 
-    # Use TF-IDF vectorization and cosine similarity for efficient computation
-    vectorizer = TfidfVectorizer(
-        lowercase=False,  # Already lowercased in preprocessing
-        token_pattern=r"\b\w+\b",  # Simple word tokenization
-        min_df=1,  # Include all terms
-        max_df=1.0,  # Include all terms
-        ngram_range=(1, 2),  # Use unigrams and bigrams
-        use_idf=False,
-    )
-
-    # Fit and transform all texts at once
-    tfidf_matrix = vectorizer.fit_transform(all_texts)
+    tfidf_matrix = __calculate_tfidf_matrix(all_texts)
 
     # Calculate cosine similarity between base text (index 0) and all other texts
     base_vector = tfidf_matrix[0:1]  # Base text vector
@@ -1050,6 +1073,52 @@ def calculate_text_similarity(base_text: str, *other_texts: str) -> list[Similar
         )
 
     return similarity_scores
+
+
+def find_last_unique_texts(threshold: float, texts: list[str]) -> list[int]:
+    """Find the last occurrence indices of unique texts using similarity-based deduplication.
+
+    This function identifies duplicate or highly similar texts within a list and returns the indices
+    of the last occurrences of each unique text group. It uses TF-IDF vectorization and cosine
+    similarity to compare texts, making it efficient for processing large text collections.
+
+    The algorithm works by comparing each text with all subsequent texts in the list. When texts are
+    found to be similar above the given threshold, only the index of the last similar text is kept.
+    This is useful for deduplicating test logs, error messages, or any text collections where you
+    want to preserve the most recent occurrence of similar content while removing earlier duplicates.
+
+    :param threshold: Similarity threshold in the range [0.0, 1.0].
+    :param texts: List of text strings to analyze for uniqueness. Texts should ideally be
+        preprocessed (e.g., using preprocess_text_for_similarity) before passing to this function
+        for optimal results.
+
+    :return: A tuple containing:
+        - TfidfVectorizer: The vectorizer used (either the input vectorizer or newly created one).
+          This can be cached and reused in subsequent calls for better performance.
+        - list[int]: Sorted list of indices representing the last occurrence of each unique text
+          group.
+
+    :raises: ValueError in case of empty input text list, since it's not possible to initialize vectorizer in this
+        case.
+    """
+    if not texts:
+        raise ValueError("Input texts cannot be empty")
+
+    matrix = __calculate_tfidf_matrix(texts, use_idf=True)
+    result = set()
+    for i in range(len(texts) - 1):
+        if i in result:
+            continue
+        first_vector = matrix[i]
+        other_vectors = matrix[i + 1 :]
+        similarity_vector = cosine_similarity(first_vector, other_vectors)[0]
+        use_index = i
+        for si, s in enumerate(similarity_vector):
+            if s >= threshold:
+                use_index = i + 1 + si
+        result.add(use_index)
+    result.add(len(texts) - 1)
+    return sorted(result)
 
 
 def calculate_similarity_by_values(first_field: str, second_field: str) -> float:

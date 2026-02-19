@@ -494,13 +494,13 @@ class OsClient:
             return 0
 
     def search(
-        self, project_id: str | int, query: dict[str, Any], scroll: Optional[str] = None
+        self, project_id: str | int, query: dict[str, Any], *, size: Optional[int] = None
     ) -> Iterator[Hit[TestItemIndexData]]:
         """Execute a search query and yield results as a generator.
 
         :param project_id: The project identifier
         :param query: OpenSearch query
-        :param scroll: Optional custom scroll timeout for large result sets
+        :param size: Optional custom size limit for the search request
         :return: Iterator of typed search hits
         """
         index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
@@ -509,8 +509,8 @@ class OsClient:
 
         try:
             kwargs: dict[str, Any] = {}
-            if scroll:
-                kwargs["scroll"] = scroll
+            if size:
+                kwargs["size"] = size
             for doc in opensearchpy.helpers.scan(self._os_client, query=query, index=index_name, **kwargs):
                 yield Hit[TestItemIndexData].from_dict(doc)
         except Exception as err:

@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 """Log entry-centric index data model for OpenSearch storage."""
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -32,6 +32,7 @@ class LogItemIndexData(BaseModel):
     test_case_hash: int = Field(default=0, description="Test case hash")
     unique_id: str = Field(default="", description="Unique ID from ReportPortal")
     launch_id: int = Field(default=0, description="Launch identifier")
+    launch_number: Optional[str] = Field(default=None, description="Launch execution number")
     launch_name: str = Field(default="", description="Launch name")
     issue_type: str = Field(default="", description="Issue type label")
     is_auto_analyzed: bool = Field(default=False, description="Whether assigned by auto-analysis")
@@ -63,6 +64,7 @@ class LogItemIndexData(BaseModel):
     found_tests_and_methods: str = Field(default="", description="Found tests and methods")
     potential_status_codes: str = Field(default="", description="Potential status codes")
     urls: str = Field(default="", description="URLs extracted from message")
+    paths: Optional[str] = Field(default=None, description="File paths found in message")
     original_message: str = Field(default="", description="Original raw message")
     whole_message: str = Field(default="", description="Combined exception message and stacktrace")
     cluster_id: str = Field(default="", description="Cluster identifier")

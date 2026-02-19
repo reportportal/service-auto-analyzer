@@ -18,12 +18,14 @@ from datetime import datetime
 from time import time
 from typing import Any, Optional
 
+from commons.model.launch_objects import TestItem
+from utils.os_migration import construct_analysis_query
+
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory
 from app.commons.model import LogItemIndexData
 from app.commons.model.db import Hit
 from app.commons.model.launch_objects import (
-    ERROR_LOGGING_LEVEL,
     AnalysisCandidate,
     AnalysisResult,
     AnalyzerConf,
@@ -31,7 +33,6 @@ from app.commons.model.launch_objects import (
     Launch,
     SearchConfig,
     SuggestAnalysisResult,
-    TestItem,
 )
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
@@ -48,7 +49,7 @@ from app.utils.os_migration import (
 
 LOGGER = logging.getLogger("analyzerApp.autoAnalyzerService")
 
-SPECIAL_FIELDS_BOOST_SCORES = [
+LOG_FIELDS_BOOST_SCORES = [
     ("detected_message_without_params_extended", 2.0),
     ("only_numbers", 2.0),
     ("potential_status_codes", 8.0),
@@ -56,47 +57,6 @@ SPECIAL_FIELDS_BOOST_SCORES = [
     ("test_item_name", 2.0),
 ]
 
-INNER_HITS_SOURCE = [
-    "logs.log_id",
-    "logs.log_time",
-    "logs.log_level",
-    "logs.cluster_id",
-    "logs.cluster_message",
-    "logs.cluster_with_numbers",
-    "logs.original_message",
-    "logs.message",
-    "logs.message_extended",
-    "logs.message_without_params_extended",
-    "logs.message_without_params_and_brackets",
-    "logs.detected_message",
-    "logs.detected_message_with_numbers",
-    "logs.detected_message_extended",
-    "logs.detected_message_without_params_extended",
-    "logs.detected_message_without_params_and_brackets",
-    "logs.stacktrace",
-    "logs.stacktrace_extended",
-    "logs.only_numbers",
-    "logs.potential_status_codes",
-    "logs.found_exceptions",
-    "logs.found_exceptions_extended",
-    "logs.found_tests_and_methods",
-    "logs.urls",
-    "logs.paths",
-    "logs.message_params",
-    "logs.whole_message",
-]
-
-TEST_ITEM_SOURCE_FIELDS = [
-    "test_item_id",
-    "test_item_name",
-    "unique_id",
-    "test_case_hash",
-    "launch_id",
-    "launch_name",
-    "issue_type",
-    "is_auto_analyzed",
-    "start_time",
-]
 
 UNSHORTENED_MESSAGE_FIELDS = [
     "detected_message_without_params_extended",
@@ -118,7 +78,7 @@ def choose_fields_to_filter_strict(log_lines: int, min_should_match: float) -> l
 
 def prepare_request_logs_for_launch(
     launch: Launch,
-) -> list[tuple[TestItem, list]]:
+) -> list[tuple[TestItem, list[LogItemIndexData]]]:
     prepared = request_factory.prepare_test_items(
         launch,
         number_of_logs_to_index=launch.analyzerConfig.numberOfLogsToIndex,
@@ -126,7 +86,7 @@ def prepare_request_logs_for_launch(
         similarity_threshold_to_drop=launch.analyzerConfig.similarityThresholdToDrop,
     )
     source_test_items = {item.testItemId: item for item in launch.testItems}
-    request_logs_by_test_item: list[tuple[TestItem, list]] = []
+    request_logs_by_test_item: list[tuple[TestItem, list[LogItemIndexData]]] = []
 
     for prepared_item in prepared:
         try:
@@ -188,7 +148,7 @@ class AutoAnalyzerService(AnalyzerService):
     def _build_nested_analyze_query(
         self,
         launch: Launch,
-        request_log,
+        request_log: LogItemIndexData,
         size: int = 10,
     ) -> dict[str, Any]:
         min_should_match = self._get_min_should_match_setting(launch)
@@ -250,15 +210,14 @@ class AutoAnalyzerService(AnalyzerService):
                 )
             )
 
-        for field_name, boost_score in SPECIAL_FIELDS_BOOST_SCORES:
+        for field_name, boost_score in LOG_FIELDS_BOOST_SCORES:
             field_value = getattr(request_log, field_name, "").strip()
             if field_value:
-                target_field = field_name if field_name == "test_item_name" else f"logs.{field_name}"
                 nested_should.append(
                     utils.build_more_like_this_query(
                         "1",
                         field_value,
-                        field_name=target_field,
+                        field_name=f"logs.{field_name}",
                         boost=boost_score,
                         override_min_should_match="1",
                         max_query_terms=self.search_cfg.MaxQueryTerms,
@@ -268,43 +227,15 @@ class AutoAnalyzerService(AnalyzerService):
         if not nested_should:
             return {}
 
-        nested_query = {
-            "nested": {
-                "path": "logs",
-                "score_mode": launch.analyzerConfig.searchScoreMode,
-                "query": {"bool": {"should": nested_should}},
-                "inner_hits": {
-                    "size": 5,
-                    "_source": INNER_HITS_SOURCE,
-                },
-            }
-        }
-
-        # Issue type restrictions for analysis: do not include TI and ND
-        issue_type_conditions = utils.prepare_restrictions_by_issue_type(filter_no_defect=True)
-
-        query: dict[str, Any] = {
-            "size": size,
-            "sort": ["_score", {"start_time": "desc"}],
-            "_source": TEST_ITEM_SOURCE_FIELDS,
-            "query": {
-                "bool": {
-                    "filter": [{"exists": {"field": "issue_type"}}],
-                    "must_not": issue_type_conditions + [{"term": {"test_item_id": str(request_log.test_item)}}],
-                    "must": [nested_query],
-                    "should": [
-                        {
-                            "term": {
-                                "test_case_hash": {
-                                    "value": request_log.test_case_hash,
-                                    "boost": abs(self.search_cfg.BoostTestCaseHash),
-                                }
-                            }
-                        },
-                    ],
-                }
-            },
-        }
+        query = construct_analysis_query(
+            request_log,
+            nested_should,
+            launch.analyzerConfig.searchScoreMode,
+            size,
+            self.search_cfg.BoostTestCaseHash,
+            self.search_cfg.MaxQueryTerms,
+            True,
+        )
         utils.append_aa_ma_boosts(query, self.search_cfg)
         query = self.add_constraints_for_launches_into_query(query, launch)
         return self.add_query_with_start_time_decay(query, request_log.start_time)
@@ -312,13 +243,11 @@ class AutoAnalyzerService(AnalyzerService):
     def _query_candidates_for_test_item(
         self,
         launch: Launch,
-        request_logs: list,
+        request_logs: list[LogItemIndexData],
     ) -> list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]:
         all_queries: list[dict[str, Any]] = []
         query_request_logs = []
         for request_log in request_logs:
-            if request_log.log_level < ERROR_LOGGING_LEVEL:
-                continue
             if not request_log.message.strip():
                 continue
             query = self._build_nested_analyze_query(launch, request_log)

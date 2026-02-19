@@ -43,6 +43,7 @@ from app.utils import utils
 from app.utils.os_migration import (
     bucket_sort_logs_by_similarity,
     build_search_results,
+    construct_analysis_query,
     extract_inner_hit_logs,
     get_request_logs,
 )
@@ -334,60 +335,15 @@ class SuggestService(AnalyzerService):
         if not nested_should:
             return {}
 
-        nested_query: dict[str, Any] = {
-            "nested": {
-                "path": "logs",
-                "score_mode": test_item_info.analyzerConfig.searchScoreMode,
-                "query": {"bool": {"should": nested_should}},
-                "inner_hits": {
-                    "size": 5,
-                    "_source": INNER_HITS_SOURCE,
-                },
-            }
-        }
-
-        # Issue type restrictions for suggestions: do not include TI
-        issue_type_conditions = utils.prepare_restrictions_by_issue_type(filter_no_defect=False)
-
-        outer_should: list[dict[str, Any]] = [
-            {
-                "term": {
-                    "test_case_hash": {
-                        "value": test_item_info.testCaseHash,
-                        "boost": abs(self.search_cfg.BoostTestCaseHash),
-                    }
-                }
-            },
-        ]
-
-        # Add special test item field boosts
-        for field, boost_score in TEST_ITEM_FIELDS_BOOST_SCORES:
-            field_value = getattr(request_log, field, "").strip()
-            if field_value:
-                outer_should.append(
-                    utils.build_more_like_this_query(
-                        "1",
-                        field_value,
-                        field_name=field,
-                        boost=boost_score,
-                        override_min_should_match="1",
-                        max_query_terms=self.search_cfg.MaxQueryTerms,
-                    )
-                )
-
-        query: dict[str, Any] = {
-            "size": size,
-            "sort": ["_score", {"start_time": "desc"}],
-            "_source": TEST_ITEM_SOURCE_FIELDS,
-            "query": {
-                "bool": {
-                    "filter": [{"exists": {"field": "issue_type"}}],
-                    "must_not": issue_type_conditions + [{"term": {"test_item_id": str(test_item_info.testItemId)}}],
-                    "must": [nested_query],
-                    "should": outer_should,
-                }
-            },
-        }
+        query = construct_analysis_query(
+            request_log,
+            nested_should,
+            test_item_info.analyzerConfig.searchScoreMode,
+            size,
+            self.search_cfg.BoostTestCaseHash,
+            self.search_cfg.MaxQueryTerms,
+            False,
+        )
 
         utils.append_aa_ma_boosts(query, self.search_cfg)
         query = self.add_constraints_for_launches_into_query_suggest(query, test_item_info)

@@ -11,11 +11,64 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from typing import Any
 
 from app.commons.model import LogData, LogItemIndexData, TestItemIndexData
 from app.commons.model.db import Hit
 from app.utils import text_processing
-from app.utils.utils import get_max_similarity_idx, normalize_issue_type, safe_int
+from app.utils.utils import (
+    build_more_like_this_query,
+    get_max_similarity_idx,
+    normalize_issue_type,
+    prepare_restrictions_by_issue_type,
+    safe_int,
+)
+
+TEST_ITEM_FIELDS_BOOST_SCORES = [
+    ("test_item_name", 2.0),
+]
+
+TEST_ITEM_SOURCE_FIELDS = [
+    "test_item_id",
+    "test_item_name",
+    "unique_id",
+    "test_case_hash",
+    "launch_id",
+    "launch_name",
+    "issue_type",
+    "is_auto_analyzed",
+    "start_time",
+]
+
+INNER_HITS_SOURCE = [
+    "logs.log_id",
+    "logs.log_time",
+    "logs.log_level",
+    "logs.cluster_id",
+    "logs.cluster_message",
+    "logs.cluster_with_numbers",
+    "logs.original_message",
+    "logs.message",
+    "logs.message_extended",
+    "logs.message_without_params_extended",
+    "logs.message_without_params_and_brackets",
+    "logs.detected_message",
+    "logs.detected_message_with_numbers",
+    "logs.detected_message_extended",
+    "logs.detected_message_without_params_extended",
+    "logs.detected_message_without_params_and_brackets",
+    "logs.stacktrace",
+    "logs.stacktrace_extended",
+    "logs.only_numbers",
+    "logs.potential_status_codes",
+    "logs.found_exceptions",
+    "logs.found_exceptions_extended",
+    "logs.found_tests_and_methods",
+    "logs.urls",
+    "logs.paths",
+    "logs.message_params",
+    "logs.whole_message",
+]
 
 
 def convert_test_item_log(
@@ -39,6 +92,7 @@ def convert_test_item_log(
         test_case_hash=safe_int(test_item.test_case_hash),
         unique_id=test_item.unique_id or "",
         launch_id=safe_int(test_item.launch_id),
+        launch_number=test_item.launch_number,
         launch_name=test_item.launch_name or "",
         issue_type=resolved_issue_type,
         is_auto_analyzed=bool(test_item.is_auto_analyzed),
@@ -65,6 +119,7 @@ def convert_test_item_log(
         found_tests_and_methods=log_data.found_tests_and_methods or "",
         potential_status_codes=log_data.potential_status_codes or "",
         urls=log_data.urls or "",
+        paths=log_data.paths,
         original_message=log_data.original_message or "",
         whole_message=log_data.whole_message or "",
         cluster_id=log_data.cluster_id or "",
@@ -166,3 +221,69 @@ def bucket_sort_logs_by_similarity(
         if sim_idx is not None:
             buckets[sim_idx].append(hit)
     return buckets
+
+
+def construct_analysis_query(
+    request_log: LogItemIndexData,
+    nested_should: list[dict[str, Any]],
+    search_mode: str,
+    size: int,
+    boost_test_case_hash: float,
+    max_query_terms: int,
+    filter_no_defect: bool,
+) -> dict[str, Any]:
+    nested_query = {
+        "nested": {
+            "path": "logs",
+            "score_mode": search_mode,
+            "query": {"bool": {"should": nested_should}},
+            "inner_hits": {
+                "size": 5,
+                "_source": INNER_HITS_SOURCE,
+            },
+        }
+    }
+
+    # Issue type restrictions for analysis: do not include TI and ND
+    issue_type_conditions = prepare_restrictions_by_issue_type(filter_no_defect=filter_no_defect)
+
+    outer_should: list[dict[str, Any]] = [
+        {
+            "term": {
+                "test_case_hash": {
+                    "value": request_log.test_case_hash,
+                    "boost": abs(boost_test_case_hash),
+                }
+            }
+        },
+    ]
+
+    # Add special test item field boosts
+    for field, boost_score in TEST_ITEM_FIELDS_BOOST_SCORES:
+        field_value = getattr(request_log, field, "").strip()
+        if field_value:
+            outer_should.append(
+                build_more_like_this_query(
+                    "1",
+                    field_value,
+                    field_name=field,
+                    boost=boost_score,
+                    override_min_should_match="1",
+                    max_query_terms=max_query_terms,
+                )
+            )
+
+    query: dict[str, Any] = {
+        "size": size,
+        "sort": ["_score", {"start_time": "desc"}],
+        "_source": TEST_ITEM_SOURCE_FIELDS,
+        "query": {
+            "bool": {
+                "filter": [{"exists": {"field": "issue_type"}}],
+                "must_not": issue_type_conditions + [{"term": {"test_item_id": str(request_log.test_item)}}],
+                "must": [nested_query],
+                "should": outer_should,
+            }
+        },
+    }
+    return query

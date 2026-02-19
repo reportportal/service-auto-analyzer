@@ -422,15 +422,15 @@ def test_search_without_scroll_calls_scan(monkeypatch, os_client_mock, app_confi
     assert captured["query"] == request
 
 
-def test_search_calls_scan_when_scroll_provided(monkeypatch, os_client_mock, app_config, test_item):
+def test_search_calls_scan_when_size_provided(monkeypatch, os_client_mock, app_config, test_item):
     os_client_mock.indices.get.return_value = {}
     captured: dict[str, object] = {}
 
-    def fake_scan(self, query, index, scroll):
+    def fake_scan(self, query, index, size):
         captured["client"] = self
         captured["query"] = query
         captured["index"] = index
-        captured["scroll"] = scroll
+        captured["size"] = size
         yield {
             "_index": index,
             "_id": test_item.test_item_id,
@@ -442,14 +442,14 @@ def test_search_calls_scan_when_scroll_provided(monkeypatch, os_client_mock, app
 
     client = OsClient(app_config, os_client=os_client_mock)
     request = {"query": {"match": {"test_item_id": test_item.test_item_id}}}
-    results = list(client.search(PROJECT_ID, request, scroll="1m"))
+    results = list(client.search(PROJECT_ID, request, size=100))
 
     assert len(results) == 1
     assert results[0].source.test_item_id == test_item.test_item_id
     assert captured["client"] is os_client_mock
     assert captured["index"] == get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
     assert captured["query"] == request
-    assert captured["scroll"] == "1m"
+    assert captured["size"] == 100
 
 
 def test_msearch_calls_opensearch_msearch(monkeypatch, os_client_mock, app_config, test_item):

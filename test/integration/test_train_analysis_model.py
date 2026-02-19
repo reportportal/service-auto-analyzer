@@ -180,7 +180,7 @@ def test_train_uses_os_client_and_issue_history(model_type: ModelType) -> None:
         Hit[TestItemIndexData].from_dict({"_index": "rp_123", "_id": "2003", "_source": candidate_si.model_dump()}),
     ]
 
-    os_client.search = mock.Mock(return_value=iter(project_hits))
+    os_client.search = mock.Mock(side_effect=lambda _p, _r: iter(project_hits))
 
     def fake_gather_features_info(self):
         issue_type_names = list(self.find_most_relevant_by_type().keys())

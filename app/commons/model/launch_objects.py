@@ -264,11 +264,11 @@ class SuggestAnalysisResult(BaseModel):
     isMergedLog: bool = False
     matchScore: float
     resultPosition: int
-    esScore: Optional[float]
-    esPosition: Optional[int]
-    modelFeatureNames: Optional[str]
-    modelFeatureValues: Optional[str]
-    modelInfo: Optional[str]
+    esScore: Optional[float] = 0.0
+    esPosition: Optional[int] = None
+    modelFeatureNames: Optional[str] = None
+    modelFeatureValues: Optional[str] = None
+    modelInfo: Optional[str] = None
     usedLogLines: int
     minShouldMatch: int
     processedTime: float

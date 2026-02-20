@@ -16,7 +16,7 @@ minio==7.2.11
 
 gensim==4.3.3
 urllib3==2.6.3
-werkzeug==3.1.5 # not directly required, pinned by Snyk to avoid a vulnerability
+werkzeug==3.1.6 # not directly required, pinned by Snyk to avoid a vulnerability
 
 # AWS S3 client
 boto3==1.42.2

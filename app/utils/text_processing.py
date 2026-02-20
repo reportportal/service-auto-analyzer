@@ -620,24 +620,6 @@ def fix_big_encoded_urls(message):
     return message
 
 
-def has_stacktrace_keywords(line):
-    normalized_line = line.lower()
-    for key_word in ["stacktrace", "stack trace", "stack-trace", "traceback"]:
-        if re.search(r"\s*%s\s*:\s*$" % key_word, normalized_line):
-            return True
-        if "end of " in normalized_line and key_word in normalized_line:
-            return True
-    return False
-
-
-def has_more_lines_pattern(line):
-    normalized_line = line.lower().strip()
-    result = re.search(r"^\s*\.+\s*\d+\s+more\s*$", normalized_line)
-    if result and result.group(0) == normalized_line:
-        return True
-    return False
-
-
 INNER_CLASS_EXTERNAL_PATTERN = re.compile(r"\b((?:[a-zA-Z0-9_-]+/|\\)+)([a-zA-Z0-9_-]+)\$([a-zA-Z0-9_-]+\.class)\b")
 INNER_CLASS_INTERNAL_PATTERN = re.compile(r"(?<=[.$])([a-zA-Z0-9_-]+)\$(?=[a-zA-Z0-9_-]+[.$(@])")
 GENERATED_LINE_PATTERN = re.compile(
@@ -673,17 +655,6 @@ def leave_only_unique_lines(message):
             all_unique.add(line.strip())
             all_lines.append(line)
     return "\n".join(all_lines)
-
-
-def leave_only_unique_logs(logs: list[Log]) -> list[Log]:
-    unique_logs = set()
-    all_logs = []
-    for log in logs:
-        stripped_message = log.message.strip()
-        if stripped_message not in unique_logs:
-            all_logs.append(log)
-            unique_logs.add(stripped_message)
-    return all_logs
 
 
 def clean_colon_stacking(text: str) -> str:
@@ -762,16 +733,6 @@ def remove_credentials_from_url(url: str) -> str:
     if parsed_url.netloc == new_netloc:
         return url
     return url.replace(parsed_url.netloc, new_netloc)
-
-
-def does_stacktrace_need_words_reweighting(log: str) -> bool:
-    found_file_extensions = []
-    all_extensions_to_find = "|".join(["py", "java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "scala"])
-    for m in re.findall(r"\.(%s)(?!\.)\b" % all_extensions_to_find, log):
-        found_file_extensions.append(m)
-    if len(found_file_extensions) == 1 and found_file_extensions[0] in {"js", "c", "h", "rb", "cpp"}:
-        return True
-    return False
 
 
 def enrich_found_exceptions(text):

@@ -418,7 +418,7 @@ def get_health_status():
 
 
 # noinspection PyUnusedLocal
-def signal_handler(signal_received, frame):
+def signal_handler(_signal_received, _frame):
     print("The analyzer has stopped")
     exit(0)
 

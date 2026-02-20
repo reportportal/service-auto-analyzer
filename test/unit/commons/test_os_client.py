@@ -139,8 +139,8 @@ def test_bulk_update_issue_history_success(monkeypatch, os_client_mock, app_conf
     captured: dict[str, Any] = {}
 
     # noinspection PyUnusedLocal
-    def fake_bulk(client: Any, request: list, chunk_size: int, request_timeout: int, refresh: bool):
-        captured["client"] = client
+    def fake_bulk(os_client: Any, request: list, chunk_size: int, request_timeout: int, refresh: bool):
+        captured["client"] = os_client
         captured["bodies"] = request
         captured["chunk_size"] = chunk_size
         captured["refresh"] = refresh
@@ -199,16 +199,6 @@ def test_msearch_returns_empty_when_index_missing(monkeypatch, os_client_mock, a
     scan_mock.assert_not_called()
 
 
-def test_get_test_item_returns_none_when_index_missing(os_client_mock, app_config):
-    os_client_mock.indices.get.side_effect = Exception("missing index")
-    client = OsClient(app_config, os_client=os_client_mock)
-
-    result = client.get_test_item(PROJECT_ID, "ti-1")
-
-    assert result is None
-    os_client_mock.get.assert_not_called()
-
-
 def test_delete_test_items_builds_terms_query(os_client_mock, app_config):
     os_client_mock.indices.get.return_value = {}
     os_client_mock.delete_by_query.return_value = {"deleted": 2}
@@ -249,22 +239,6 @@ def test_delete_by_launch_ids_builds_terms_query(os_client_mock, app_config):
         body={"query": {"terms": {"launch_id": ["l1", "l2"]}}},
     )
     assert deleted == 2
-
-
-def test_get_test_item_returns_instance(os_client_mock, app_config, test_item):
-    os_client_mock.indices.get.return_value = {}
-    os_client_mock.get.return_value = {"_source": test_item.to_index_dict()}
-    client = OsClient(app_config, os_client=os_client_mock)
-
-    result = client.get_test_item(PROJECT_ID, test_item.test_item_id)
-
-    os_client_mock.get.assert_called_once_with(
-        index=get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix),
-        id=test_item.test_item_id,
-    )
-    assert result is not None
-    assert result.test_item_id == test_item.test_item_id
-    assert result.launch_id == test_item.launch_id
 
 
 def test_get_test_items_by_ids_returns_empty_when_index_missing(monkeypatch, os_client_mock, app_config):

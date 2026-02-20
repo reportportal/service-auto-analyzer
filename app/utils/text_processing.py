@@ -24,7 +24,7 @@ from scipy.sparse import csr_matrix
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from app.commons.model.launch_objects import Log, SimilarityResult
+from app.commons.model.launch_objects import SimilarityResult
 
 try:
     from app.commons import logging

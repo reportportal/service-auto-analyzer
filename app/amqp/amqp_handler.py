@@ -115,25 +115,6 @@ class AtomicInteger:
             self._value += int(d)
             return self._value
 
-    def dec(self, d: int = 1) -> int:
-        """Atomically decrement the value and return the new value.
-
-        :param int d: Amount to decrement by (default: 1)
-        :return: The new value after decrementing
-        :rtype: int
-        """
-        return self.inc(-d)
-
-    @property
-    def value(self) -> int:
-        """Get the current value in a thread-safe manner.
-
-        :return: Current integer value
-        :rtype: int
-        """
-        with self._lock:
-            return self._value
-
 
 class AmqpRequestHandler(Protocol):
     processor: Processor

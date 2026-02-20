@@ -11,12 +11,12 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
 """Log entry-centric index data model for OpenSearch storage."""
+
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
-
-from app.commons.model.db import Hit
 
 
 class LogItemIndexData(BaseModel):
@@ -80,66 +80,3 @@ class LogItemIndexData(BaseModel):
         :return: LogItemIndexData instance
         """
         return cls.model_validate(data)
-
-
-def _extract_log_id(raw: dict[str, Any]) -> str:
-    log_id = raw.get("_id")
-    if log_id is None:
-        log_id = raw.get("log_id")
-    return "" if log_id is None else str(log_id)
-
-
-def deserialize_log_item_source(raw: dict[str, Any]) -> LogItemIndexData:
-    """
-    Deserialize raw log document or _source payload into LogItemIndexData.
-
-    :param raw: Raw log document or source payload
-    :return: Parsed LogItemIndexData instance
-    """
-    source = raw.get("_source", raw)
-    data = dict(source)
-    log_id = _extract_log_id(raw)
-    if log_id:
-        data["log_id"] = log_id
-    return LogItemIndexData.model_validate(data)
-
-
-def deserialize_log_item_hit(raw_hit: dict[str, Any]) -> Hit[LogItemIndexData]:
-    """
-    Deserialize raw OpenSearch hit into typed Hit[LogItemIndexData].
-
-    :param raw_hit: Raw hit dictionary
-    :return: Parsed hit with LogItemIndexData source
-    """
-    if isinstance(raw_hit, Hit):
-        return raw_hit
-    source = raw_hit.get("_source", {})
-    data = dict(source)
-    log_id = _extract_log_id(raw_hit)
-    if log_id:
-        data["log_id"] = log_id
-    return Hit[LogItemIndexData].model_validate({**raw_hit, "_source": data})
-
-
-def deserialize_log_item_search_results(
-    raw_results: list[tuple[dict[str, Any], dict[str, Any]]],
-) -> list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]:
-    """
-    Deserialize raw search results into typed log item tuples.
-
-    :param raw_results: List of (log_info, search_results) tuples
-    :return: List of (LogItemIndexData, list[Hit[LogItemIndexData]]) tuples
-    """
-    parsed_results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]] = []
-    for log_info, search_result in raw_results:
-        if isinstance(log_info, LogItemIndexData):
-            log_item = log_info
-        else:
-            log_item = deserialize_log_item_source(log_info)
-        if isinstance(search_result, list):
-            raw_hits = search_result
-        else:
-            raw_hits = search_result.get("hits", {}).get("hits", [])
-        parsed_hits = [deserialize_log_item_hit(hit) for hit in raw_hits]
-        parsed_results.append((log_item, parsed_hits))
-    return parsed_results

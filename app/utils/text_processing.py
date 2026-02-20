@@ -448,10 +448,6 @@ def split_words(
     return split_text_on_words(result, min_word_length, only_unique)
 
 
-def normalize_message(message: str) -> str:
-    return " ".join(sorted(split_words(message, to_lower=True)))
-
-
 def find_only_numbers(detected_message_with_numbers: str) -> str:
     """Removes all non digit symbols and concatenates unique numbers"""
     detected_message_only_numbers = re.sub(r"[^\d ._]", "", detected_message_with_numbers)
@@ -532,11 +528,6 @@ def preprocess_found_test_methods(text: str) -> str:
         else:
             all_words.append(w)
     return " ".join(all_words)
-
-
-def compress(text):
-    """compress sentence to consist of only unique words"""
-    return " ".join(split_words(text, to_lower=False))
 
 
 def preprocess_words(text):

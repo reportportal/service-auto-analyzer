@@ -473,26 +473,6 @@ class OsClient:
             LOGGER.exception("Error in delete_by_launch_start_time_range", exc_info=err)
             return 0
 
-    def delete_by_test_item_start_time_range(self, project_id: str | int, start_date: str, end_date: str) -> int:
-        """Delete Test Items by test item start time range.
-
-        :param project_id: The project identifier
-        :param start_date: Start date in 'yyyy-MM-dd HH:mm:ss' or 'yyyy-MM-dd' format
-        :param end_date: End date in 'yyyy-MM-dd HH:mm:ss' or 'yyyy-MM-dd' format
-        :return: Number of deleted documents
-        """
-        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
-        if not self._index_exists(index_name, print_error=False):
-            return 0
-
-        query = self._time_range_query("start_time", start_date, end_date)
-        try:
-            result = self._os_client.delete_by_query(index=index_name, body=query)
-            return result.get("deleted", 0)
-        except Exception as err:
-            LOGGER.exception("Error in delete_by_test_item_start_time_range", exc_info=err)
-            return 0
-
     def search(
         self, project_id: str | int, query: dict[str, Any], *, size: Optional[int] = None
     ) -> Iterator[Hit[TestItemIndexData]]:
@@ -535,38 +515,6 @@ class OsClient:
                     yield Hit[TestItemIndexData].from_dict(hit)
         except Exception as err:
             LOGGER.exception("Error in msearch", exc_info=err)
-
-    def get_launch_ids_by_start_time_range(self, project_id: str | int, start_date: str, end_date: str) -> list[str]:
-        """Get launch IDs within a start time range.
-
-        :param project_id: The project identifier
-        :param start_date: Start date in 'yyyy-MM-dd HH:mm:ss' or 'yyyy-MM-dd' format
-        :param end_date: End date in 'yyyy-MM-dd HH:mm:ss' or 'yyyy-MM-dd' format
-        :return: List of launch IDs
-        """
-        query = self._time_range_query("launch_start_time", start_date, end_date, for_scan=True)
-        query["_source"] = ["launch_id", "test_item_id"]  # Narrow down output to just two required fields
-        launch_ids: set[str] = set()
-        for hit in self.search(project_id, query):
-            launch_ids.add(hit.source.launch_id)
-        return list(launch_ids)
-
-    def get_test_item_ids_by_start_time_range(
-        self, project_id: str | int, start_date: str, end_date: str
-    ) -> list[str]:
-        """Get Test Item IDs within a start time range.
-
-        :param project_id: The project identifier
-        :param start_date: Start date in 'yyyy-MM-dd HH:mm:ss' or 'yyyy-MM-dd' format
-        :param end_date: End date in 'yyyy-MM-dd HH:mm:ss' or 'yyyy-MM-dd' format
-        :return: List of test item IDs
-        """
-        query = self._time_range_query("start_time", start_date, end_date, for_scan=True)
-        query["_source"] = ["launch_id", "test_item_id"]  # Narrow down output to just two required fields
-        test_item_ids: set[str] = set()
-        for hit in self.search(project_id, query):
-            test_item_ids.add(hit.source.test_item_id)
-        return list(test_item_ids)
 
     def bulk_update_issue_history(self, project_id: str | int, updates: list[TestItemHistoryData]) -> BulkResponse:
         """Bulk update issue_history for multiple Test Items.
@@ -656,30 +604,6 @@ class OsClient:
             )
 
         return self._execute_bulk(bodies, refresh=refresh, chunk_size=chunk_size)
-
-    def get_test_item(self, project_id: str | int, test_item_id: str) -> Optional[TestItemIndexData]:
-        """Get a single Test Item by ID.
-
-        :param project_id: The project identifier
-        :param test_item_id: The test item ID
-        :return: Test Item object or None if not found
-        """
-        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
-        if not self._index_exists(index_name, print_error=False):
-            return None
-
-        try:
-            response = self._os_client.get(index=index_name, id=test_item_id)
-            source = response.get("_source")
-            if source is None:
-                return None
-            return TestItemIndexData.from_dict(source)
-        except opensearchpy.exceptions.NotFoundError:
-            LOGGER.debug(f"Test item {test_item_id} not found")
-            return None
-        except Exception as err:
-            LOGGER.exception(f"Error getting test item {test_item_id}", exc_info=err)
-            return None
 
     def get_test_items_by_ids(self, project_id: str | int, test_item_ids: list[str]) -> list[TestItemIndexData]:
         """Get multiple Test Items by their IDs.

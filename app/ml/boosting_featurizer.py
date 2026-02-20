@@ -465,14 +465,6 @@ class BoostingFeaturizer:
             num_of_logs_issue_type[issue_type] = has_the_same_test_case
         return num_of_logs_issue_type
 
-    def find_columns_to_find_similarities_for(self) -> list[str]:
-        fields_to_calc_similarity = set()
-        for feature in self.feature_ids:
-            method_params = self.feature_functions[feature]
-            if "field_name" in method_params[1]:
-                fields_to_calc_similarity.add(method_params[1]["field_name"])
-        return list(fields_to_calc_similarity)
-
     def _calculate_score(self) -> dict[str, float]:
         """Calculate Score for every unique Issue Type from OpenSearch query result, normalized by maximum score in the
         result.

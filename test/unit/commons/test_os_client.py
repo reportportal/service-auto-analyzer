@@ -209,18 +209,6 @@ def test_get_test_item_returns_none_when_index_missing(os_client_mock, app_confi
     os_client_mock.get.assert_not_called()
 
 
-def test_get_launch_ids_returns_empty_when_index_missing(monkeypatch, os_client_mock, app_config):
-    os_client_mock.indices.get.side_effect = Exception("missing index")
-    scan_mock = mock.Mock()
-    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", scan_mock)
-    client = OsClient(app_config, os_client=os_client_mock)
-
-    result = client.get_launch_ids_by_start_time_range(PROJECT_ID, "2025-01-01", "2025-01-02")
-
-    assert result == []
-    scan_mock.assert_not_called()
-
-
 def test_delete_test_items_builds_terms_query(os_client_mock, app_config):
     os_client_mock.indices.get.return_value = {}
     os_client_mock.delete_by_query.return_value = {"deleted": 2}
@@ -249,20 +237,6 @@ def test_delete_by_launch_start_time_range_builds_range_query(os_client_mock, ap
     assert deleted == 3
 
 
-def test_delete_by_test_item_start_time_range_builds_range_query(os_client_mock, app_config):
-    os_client_mock.indices.get.return_value = {}
-    os_client_mock.delete_by_query.return_value = {"deleted": 4}
-    client = OsClient(app_config, os_client=os_client_mock)
-
-    deleted = client.delete_by_test_item_start_time_range(PROJECT_ID, "2025-01-01", "2025-01-02")
-
-    os_client_mock.delete_by_query.assert_called_once_with(
-        index=get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix),
-        body={"query": {"range": {"start_time": {"gte": "2025-01-01", "lte": "2025-01-02"}}}},
-    )
-    assert deleted == 4
-
-
 def test_delete_by_launch_ids_builds_terms_query(os_client_mock, app_config):
     os_client_mock.indices.get.return_value = {}
     os_client_mock.delete_by_query.return_value = {"deleted": 2}
@@ -275,32 +249,6 @@ def test_delete_by_launch_ids_builds_terms_query(os_client_mock, app_config):
         body={"query": {"terms": {"launch_id": ["l1", "l2"]}}},
     )
     assert deleted == 2
-
-
-def test_get_launch_ids_by_start_time_range_builds_query(monkeypatch, os_client_mock, app_config):
-    os_client_mock.indices.get.return_value = {}
-    captured: dict[str, object] = {}
-
-    def fake_scan(self, query, index):
-        captured["client"] = self
-        captured["query"] = query
-        captured["index"] = index
-        yield {"_source": {"launch_id": "l1", "test_item_id": "t1"}, "_index": index, "_id": "t1"}
-        yield {"_source": {"launch_id": "l2", "test_item_id": "t2"}, "_index": index, "_id": "t2"}
-
-    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", fake_scan)
-
-    client = OsClient(app_config, os_client=os_client_mock)
-    result = client.get_launch_ids_by_start_time_range(PROJECT_ID, "2025-01-01", "2025-01-02")
-
-    assert set(result) == {"l1", "l2"}
-    assert captured["client"] is os_client_mock
-    assert captured["index"] == get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
-    assert captured["query"] == {
-        "_source": ["launch_id", "test_item_id"],
-        "query": {"range": {"launch_start_time": {"gte": "2025-01-01", "lte": "2025-01-02"}}},
-        "size": app_config.esChunkNumber,
-    }
 
 
 def test_get_test_item_returns_instance(os_client_mock, app_config, test_item):
@@ -317,44 +265,6 @@ def test_get_test_item_returns_instance(os_client_mock, app_config, test_item):
     assert result is not None
     assert result.test_item_id == test_item.test_item_id
     assert result.launch_id == test_item.launch_id
-
-
-def test_get_test_item_ids_returns_empty_when_index_missing(monkeypatch, os_client_mock, app_config):
-    os_client_mock.indices.get.side_effect = Exception("missing index")
-    scan_mock = mock.Mock()
-    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", scan_mock)
-    client = OsClient(app_config, os_client=os_client_mock)
-
-    result = client.get_test_item_ids_by_start_time_range(PROJECT_ID, "2025-01-01", "2025-01-02")
-
-    assert result == []
-    scan_mock.assert_not_called()
-
-
-def test_get_test_item_ids_by_start_time_range_builds_query(monkeypatch, os_client_mock, app_config):
-    os_client_mock.indices.get.return_value = {}
-    captured: dict[str, object] = {}
-
-    def fake_scan(self, query, index):
-        captured["client"] = self
-        captured["query"] = query
-        captured["index"] = index
-        yield {"_source": {"launch_id": "l1", "test_item_id": "t1"}, "_index": index, "_id": "t1"}
-        yield {"_source": {"launch_id": "l2", "test_item_id": "t2"}, "_index": index, "_id": "t2"}
-
-    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", fake_scan)
-
-    client = OsClient(app_config, os_client=os_client_mock)
-    result = client.get_test_item_ids_by_start_time_range(PROJECT_ID, "2025-01-01", "2025-01-02")
-
-    assert set(result) == {"t1", "t2"}
-    assert captured["client"] is os_client_mock
-    assert captured["index"] == get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
-    assert captured["query"] == {
-        "_source": ["launch_id", "test_item_id"],
-        "query": {"range": {"start_time": {"gte": "2025-01-01", "lte": "2025-01-02"}}},
-        "size": app_config.esChunkNumber,
-    }
 
 
 def test_get_test_items_by_ids_returns_empty_when_index_missing(monkeypatch, os_client_mock, app_config):
@@ -540,30 +450,6 @@ def test_delete_by_launch_ids_returns_zero_when_index_missing(os_client_mock, ap
 
     assert deleted == 0
     os_client_mock.delete_by_query.assert_not_called()
-
-
-def test_delete_by_test_item_start_time_range_returns_zero_when_index_missing(os_client_mock, app_config):
-    os_client_mock.indices.get.side_effect = Exception("missing")
-    client = OsClient(app_config, os_client=os_client_mock)
-
-    deleted = client.delete_by_test_item_start_time_range(PROJECT_ID, "2025-01-01", "2025-01-02")
-
-    assert deleted == 0
-    os_client_mock.delete_by_query.assert_not_called()
-
-
-def test_get_test_item_ids_by_start_time_range_returns_empty_when_index_missing(
-    monkeypatch, os_client_mock, app_config
-):
-    os_client_mock.indices.get.side_effect = Exception("missing")
-    scan_mock = mock.Mock()
-    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", scan_mock)
-    client = OsClient(app_config, os_client=os_client_mock)
-
-    result = client.get_test_item_ids_by_start_time_range(PROJECT_ID, "2025-01-01", "2025-01-02")
-
-    assert result == []
-    scan_mock.assert_not_called()
 
 
 def test_delete_logs_by_ids_removes_logs(monkeypatch, os_client_mock, app_config):

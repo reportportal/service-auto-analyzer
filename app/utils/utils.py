@@ -279,16 +279,6 @@ def create_path(query: dict, path: tuple[str, ...], value: Any) -> Any:
     return current_node[last_element]
 
 
-def compute_if_absent(on: dict[str, Any], key: str, default_value: Any) -> Any:
-    """Compute value for key in dictionary if it is absent.
-
-    It is here just to mute SonarLint warning about possible KeyError.
-    """
-    if key not in on:
-        on[key] = default_value
-    return on[key]
-
-
 def append_aa_ma_boosts(query: dict[str, Any], search_cfg: launch_objects.SearchConfig) -> None:
     """Append boosts for auto-analyzed and manually-analyzed fields to ES/OS query.
 

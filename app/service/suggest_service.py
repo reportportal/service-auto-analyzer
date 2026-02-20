@@ -400,39 +400,6 @@ class SuggestService(AnalyzerService):
         buckets = bucket_sort_logs_by_similarity(request_logs, found_log_hits)
         return build_search_results(request_logs, buckets)
 
-    def _prepare_not_found_object_info(
-        self,
-        test_item_info: TestItemInfo,
-        processed_time: float,
-        model_feature_names: Optional[str],
-        model_info: Optional[list[str]],
-    ) -> dict:
-        return {  # reciprocalRank is not filled for not found results not to count in the metrics dashboard
-            "project": test_item_info.project,
-            "testItem": test_item_info.testItemId,
-            "testItemLogId": "",
-            "launchId": test_item_info.launchId,
-            "launchName": test_item_info.launchName,
-            "issueType": "",
-            "relevantItem": "",
-            "relevantLogId": "",
-            "isMergedLog": False,
-            "matchScore": 0.0,
-            "resultPosition": -1,
-            "modelFeatureNames": model_feature_names,
-            "modelFeatureValues": "",
-            "modelInfo": model_info,
-            "usedLogLines": test_item_info.analyzerConfig.numberOfLogLines,
-            "minShouldMatch": self.find_min_should_match_threshold(test_item_info.analyzerConfig),
-            "userChoice": 0,
-            "processedTime": processed_time,
-            "notFoundResults": 100,
-            "savedDate": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "module_version": [self.app_config.appVersion],
-            "methodName": "suggestion",
-            "clusterId": test_item_info.clusterId,
-        }
-
     def _prepare_request_data(self, test_item_info: TestItemInfo) -> tuple[list[LogItemIndexData], int]:
         """Prepare request logs for suggestion search.
 

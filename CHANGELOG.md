@@ -1,6 +1,7 @@
 # Changelog
 ## [Unreleased]
 ### Changed
+- Log Item-centric storage approach changed to Test Item-centric one, by @HardNorth
 - Status code detection improved, by @HardNorth
 
 ## [5.15.1]

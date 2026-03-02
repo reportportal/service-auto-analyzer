@@ -18,8 +18,8 @@ import pytest
 from opensearchpy import OpenSearch
 from opensearchpy.client import IndicesClient
 
-from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import LaunchInfoForClustering
+from app.commons.os_client import OsClient
 from app.service.cluster_service import ClusterService
 from app.utils.utils import read_json_file
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
@@ -45,12 +45,12 @@ def mocked_opensearch_client() -> OpenSearch:
 
 @pytest.fixture
 def cluster_service(mocked_opensearch_client: OpenSearch) -> ClusterService:
-    """Create ClusterService with real EsClient and mocked OpenSearch client."""
-    # Create real EsClient with mocked OpenSearch client
-    es_client = EsClient(APP_CONFIG, es_client=mocked_opensearch_client)
+    """Create ClusterService with real OsClient and mocked OpenSearch client."""
+    # Create real OsClient with mocked OpenSearch client
+    os_client = OsClient(APP_CONFIG, os_client=mocked_opensearch_client)
 
-    # Create ClusterService with real EsClient and SearchConfig
-    service = ClusterService(APP_CONFIG, DEFAULT_SEARCH_CONFIG, es_client=es_client)
+    # Create ClusterService with real OsClient and SearchConfig
+    service = ClusterService(APP_CONFIG, DEFAULT_SEARCH_CONFIG, os_client=os_client)
 
     return service
 
@@ -67,19 +67,16 @@ def test_find_clusters_calls_correct_services(
     # Prepare test data
     launch_info = LaunchInfoForClustering(**test_data["launch_info_for_clustering"])
     expected_index_name = f"{APP_CONFIG.esProjectIndexPrefix}{launch_info.project}"
-
     # Configure mocked_opensearch_client.search to return similar items
     # The search is called during _find_similar_items_from_es for each group
     mocked_opensearch_client.search.return_value = test_data["search_results_for_similar_items"]
+    mocked_opensearch_client.scroll.return_value = {}
 
     # Configure mock_bulk to return success
     mock_bulk.return_value = (10, [])  # (success_count, errors)
 
     # Execute the method
     result = cluster_service.find_clusters(launch_info)
-
-    # Verify index_exists was called exactly once with correct index name
-    mocked_opensearch_client.indices.get.assert_called_once_with(index=expected_index_name)
 
     # Verify es_client.search was called to find similar items
     # In our test data, after grouping by exception type and then clustering by message similarity:
@@ -112,25 +109,27 @@ def test_find_clusters_calls_correct_services(
         assert "must" in bool_query, "search query should have must clause"
         assert "must_not" in bool_query, "search query should have must_not clause"
 
-        # Verify query filters for log_level >= 40000 (ERROR_LOGGING_LEVEL)
-        filters = bool_query["filter"]
-        log_level_filter = next((f for f in filters if "range" in f and "log_level" in f["range"]), None)
-        assert log_level_filter is not None, "query should filter by log_level"
-        assert log_level_filter["range"]["log_level"]["gte"] == 40000, "query should filter log_level >= 40000"
-
         # Verify query filters for issue_type existence
+        filters = bool_query["filter"]
         issue_type_filter = next((f for f in filters if "exists" in f and f["exists"]["field"] == "issue_type"), None)
         assert issue_type_filter is not None, "query should filter by issue_type existence"
 
         # Verify query must_not clause excludes current test item
         must_not_clause = bool_query["must_not"]
-        test_item_exclude = next((m for m in must_not_clause if "term" in m and "test_item" in m["term"]), None)
-        assert test_item_exclude is not None, "query should exclude current test_item"
+        test_item_exclude = next((m for m in must_not_clause if "term" in m and "test_item_id" in m["term"]), None)
+        assert test_item_exclude is not None, "query should exclude current test_item_id"
 
-        # Verify query must clause contains more_like_this for message
+        # Verify nested query structure for logs
         must_clause = bool_query["must"]
-        mlt_query = next((m for m in must_clause if "more_like_this" in m), None)
-        assert mlt_query is not None, "query should have more_like_this clause"
+        nested_query = next((m.get("nested") for m in must_clause if "nested" in m), None)
+        assert nested_query is not None, "query should include nested logs query"
+        assert nested_query["path"] == "logs", "nested query should target logs path"
+        nested_bool = nested_query["query"]["bool"]
+        nested_filters = nested_bool["filter"]
+        log_level_filter = next((f for f in nested_filters if "range" in f and "logs.log_level" in f["range"]), None)
+        assert log_level_filter is not None, "nested query should filter by logs.log_level"
+        assert log_level_filter["range"]["logs.log_level"]["gte"] == 40000, "query should filter log_level >= 40000"
+        assert any("more_like_this" in m for m in nested_bool["must"]), "nested query should have more_like_this"
 
         # Verify time decay functions
         functions = function_score["functions"]
@@ -148,31 +147,30 @@ def test_find_clusters_calls_correct_services(
 
     # Verify bulk bodies contain cluster updates
     bulk_bodies = bulk_call[0][1]
-    # All 4 logs from test data should be updated with cluster information
-    assert len(bulk_bodies) == 4, f"bulk should have exactly 4 update operations (one per log), got {len(bulk_bodies)}"
+    # All 4 logs from test data plus 1 similar log from same launch should be updated
+    assert len(bulk_bodies) == 5, f"bulk should have exactly 5 update operations, got {len(bulk_bodies)}"
 
     # Verify bulk bodies structure
     for body in bulk_bodies:
         assert "_op_type" in body, "Each body should have _op_type"
         assert body["_op_type"] == "update", "Operation should be update"
         assert "_id" in body, "Update body should have _id"
-        assert "_index" in body, "Update body should have _index"
         assert body["_index"] == expected_index_name, "Update body should use correct index name"
-        assert "doc" in body, "Update body should have doc field"
+        assert "script" in body, "Update body should have script"
 
-        # Verify cluster information in doc
-        doc = body["doc"]
-        assert "cluster_id" in doc, "Doc should have cluster_id"
-        assert "cluster_message" in doc, "Doc should have cluster_message"
-        assert "cluster_with_numbers" in doc, "Doc should have cluster_with_numbers"
+        # Verify cluster information in script params
+        params = body["script"]["params"]
+        assert "cluster_id" in params, "Params should have cluster_id"
+        assert "cluster_message" in params, "Params should have cluster_message"
+        assert "cluster_with_numbers" in params, "Params should have cluster_with_numbers"
         expected_cluster_with_numbers = not launch_info.cleanNumbers
         assert (
-            doc["cluster_with_numbers"] == expected_cluster_with_numbers
+            params["cluster_with_numbers"] == expected_cluster_with_numbers
         ), f"cluster_with_numbers should be {expected_cluster_with_numbers}"
 
         # Verify cluster_id is a non-empty string
-        assert isinstance(doc["cluster_id"], str), "cluster_id should be string"
-        assert doc["cluster_id"], "cluster_id should not be empty"
+        assert isinstance(params["cluster_id"], str), "cluster_id should be string"
+        assert params["cluster_id"], "cluster_id should not be empty"
 
     # Verify result structure
     assert result is not None, "result should not be None"
@@ -198,13 +196,13 @@ def test_find_clusters_calls_correct_services(
         total_item_ids.update(cluster.itemIds)
 
     # Verify total counts match our test data
-    # All 4 logs from our launch should be in the clusters (ES similar items help identify clusters but don't add their
-    # log IDs)
-    assert total_log_ids == 4, f"should have exactly 4 log IDs total (from our test data), got {total_log_ids}"
-    # We have 3 unique test items in our test data: 6001, 6002, 6003
+    # All 4 logs from our launch plus 1 similar same-launch log should be in the clusters
+    assert total_log_ids == 5, "should have exactly 5 log IDs total (including same-launch similar log)"
+    # We have 3 unique test items in our test data: 6001, 6002, 6003; plus 1 similar 6004 same-launch test item from
+    # search
     assert (
-        len(total_item_ids) == 3
-    ), f"should have exactly 3 unique item IDs (6001, 6002, 6003), got {len(total_item_ids)}"
+        len(total_item_ids) == 4
+    ), f"should have exactly 4 unique item IDs (6001, 6002, 6003, 6004), got {len(total_item_ids)}"
 
 
 # noinspection PyUnresolvedReferences
@@ -217,25 +215,21 @@ def test_find_clusters_with_nonexistent_index(
 ) -> None:
     """Test find_clusters when index does not exist."""
     launch_info = LaunchInfoForClustering(**test_data["launch_info_for_clustering"])
-    expected_index_name = f"{APP_CONFIG.esProjectIndexPrefix}{launch_info.project}"
-
     # Configure mock to raise exception for non-existent index
     mocked_opensearch_client.indices.get.side_effect = Exception("Index not found")
+    mocked_opensearch_client.search.return_value = test_data["search_results_no_similar_items"]
 
     # Execute the method
     result = cluster_service.find_clusters(launch_info)
 
-    # Verify index_exists was called with correct index name
-    mocked_opensearch_client.indices.get.assert_called_once_with(index=expected_index_name)
-
     # Verify bulk was NOT called since index doesn't exist
     mock_bulk.assert_not_called()
 
-    # Verify result is empty cluster result
+    # Verify result contains computed clusters even without index
     assert result is not None, "result should not be None"
     assert result.project == launch_info.project, "result should have correct project"
     assert result.launchId == launch_info.launch.launchId, "result should have correct launchId"
-    assert result.clusters == [], "Should return empty clusters list when index doesn't exist"
+    assert result.clusters, "Should return clusters even when index doesn't exist"
 
 
 # noinspection PyUnresolvedReferences
@@ -249,8 +243,6 @@ def test_find_clusters_with_no_similar_items(
     """Test find_clusters when no similar items are found in ES."""
     # Prepare test data
     launch_info = LaunchInfoForClustering(**test_data["launch_info_for_clustering"])
-    expected_index_name = f"{APP_CONFIG.esProjectIndexPrefix}{launch_info.project}"
-
     # Configure mocked_opensearch_client.search to return no similar items
     mocked_opensearch_client.search.return_value = test_data["search_results_no_similar_items"]
 
@@ -259,9 +251,6 @@ def test_find_clusters_with_no_similar_items(
 
     # Execute the method
     result = cluster_service.find_clusters(launch_info)
-
-    # Verify index_exists was called
-    mocked_opensearch_client.indices.get.assert_called_once_with(index=expected_index_name)
 
     # Verify es_client.search was called
     # With the same test data as test_find_clusters_calls_correct_services:
@@ -281,9 +270,9 @@ def test_find_clusters_with_no_similar_items(
 
     # Verify cluster IDs are generated (not from ES)
     for body in bulk_bodies:
-        doc = body["doc"]
-        assert doc["cluster_id"], "cluster_id should be generated even without similar items"
-        assert doc["cluster_message"], "cluster_message should be generated even without similar items"
+        params = body["script"]["params"]
+        assert params["cluster_id"], "cluster_id should be generated even without similar items"
+        assert params["cluster_message"], "cluster_message should be generated even without similar items"
 
     # Verify result structure
     assert result is not None, "result should not be None"
@@ -310,8 +299,6 @@ def test_find_clusters_with_for_update_mode(
     """Test find_clusters with forUpdate=True mode (allows same launch results)."""
     # Prepare test data with forUpdate=True
     launch_info = LaunchInfoForClustering(**test_data["launch_info_for_update"])
-    expected_index_name = f"{APP_CONFIG.esProjectIndexPrefix}{launch_info.project}"
-
     # Configure mocked_opensearch_client.search to return similar items from same launch
     mocked_opensearch_client.search.return_value = test_data["search_results_for_update"]
 
@@ -320,9 +307,6 @@ def test_find_clusters_with_for_update_mode(
 
     # Execute the method
     result = cluster_service.find_clusters(launch_info)
-
-    # Verify index_exists was called
-    mocked_opensearch_client.indices.get.assert_called_once_with(index=expected_index_name)
 
     # Verify es_client.search was called
     # With 1 log (test item 6005 with IOException), there is 1 group, so 1 search call
@@ -367,8 +351,6 @@ def test_find_clusters_with_clean_numbers_mode(
     # Prepare test data with cleanNumbers=True
     launch_info = LaunchInfoForClustering(**test_data["launch_info_for_clustering"])
     launch_info.cleanNumbers = True
-    expected_index_name = f"{APP_CONFIG.esProjectIndexPrefix}{launch_info.project}"
-
     # Configure mocked_opensearch_client.search to return similar items
     mocked_opensearch_client.search.return_value = test_data["search_results_for_similar_items"]
 
@@ -378,13 +360,10 @@ def test_find_clusters_with_clean_numbers_mode(
     # Execute the method
     result = cluster_service.find_clusters(launch_info)
 
-    # Verify index_exists was called
-    mocked_opensearch_client.indices.get.assert_called_once_with(index=expected_index_name)
-
     # Verify es_client.search was called
-    # With cleanNumbers=True, using full test data creates 3 groups (same as without cleanNumbers mode)
+    # With cleanNumbers=True, logs become more similar, reducing the number of groups
     actual_search_call_count = mocked_opensearch_client.search.call_count
-    assert actual_search_call_count == 3, "search should be called exactly 3 times (once per group)"
+    assert actual_search_call_count == 2, "search should be called exactly 2 times (once per group)"
 
     # Verify search query structure for cleanNumbers mode
     search_call = mocked_opensearch_client.search.call_args_list[0]
@@ -394,13 +373,14 @@ def test_find_clusters_with_clean_numbers_mode(
     bool_query = search_query["query"]["function_score"]["query"]["bool"]
 
     # Verify query filters for cluster_with_numbers = False (when cleanNumbers=True)
-    filters = bool_query["filter"]
+    nested_query = next((m.get("nested") for m in bool_query["must"] if "nested" in m), None)
+    nested_filters = nested_query["query"]["bool"]["filter"]
     cluster_with_numbers_filter = next(
-        (f for f in filters if "term" in f and "cluster_with_numbers" in f["term"]), None
+        (f for f in nested_filters if "term" in f and "logs.cluster_with_numbers" in f["term"]), None
     )
     assert cluster_with_numbers_filter is not None, "query should filter by cluster_with_numbers"
     assert (
-        cluster_with_numbers_filter["term"]["cluster_with_numbers"] is False
+        cluster_with_numbers_filter["term"]["logs.cluster_with_numbers"] is False
     ), "cleanNumbers=True should search for cluster_with_numbers=False"
 
     # Verify bulk was called
@@ -410,12 +390,12 @@ def test_find_clusters_with_clean_numbers_mode(
     bulk_call = mock_bulk.call_args
     bulk_bodies = bulk_call[0][1]
     for body in bulk_bodies:
-        doc = body["doc"]
-        assert "cluster_with_numbers" in doc, "Doc should have cluster_with_numbers"
+        params = body["script"]["params"]
+        assert "cluster_with_numbers" in params, "Params should have cluster_with_numbers"
         # cluster_with_numbers = not cleanNumbers, so when cleanNumbers=True, cluster_with_numbers=False
         expected_cluster_with_numbers = not launch_info.cleanNumbers
         assert (
-            doc["cluster_with_numbers"] == expected_cluster_with_numbers
+            params["cluster_with_numbers"] == expected_cluster_with_numbers
         ), f"cluster_with_numbers should be {expected_cluster_with_numbers}"
 
     # Verify result structure

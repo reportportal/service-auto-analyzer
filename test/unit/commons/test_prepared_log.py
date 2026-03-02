@@ -143,3 +143,19 @@ def test_extract_paths_synthetic(message, expected_paths):
     prepared_log._exception_message = message
 
     assert prepared_log.exception_message_paths == " ".join(expected_paths)
+
+
+@pytest.mark.parametrize(
+    "test_file, expected_status_codes",
+    [
+        ["status_codes/expected_but_was.txt", "409 404"],
+        ["status_codes/status_code_in_json.txt", "500"],
+        ["status_codes/graphql_error.txt", "401"],
+        ["status_codes/status_code_in_text_01.txt", "500"],
+        ["status_codes/status_code_in_text_02.txt", "404"],
+    ],
+)
+def test_extract_status_codes(test_file, expected_status_codes):
+    log = read_file("test_res/test_logs", test_file)
+    prepared_log = PreparedLogMessage(log, -1)
+    assert prepared_log.exception_message_potential_status_codes == expected_status_codes

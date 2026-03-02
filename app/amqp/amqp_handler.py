@@ -115,25 +115,6 @@ class AtomicInteger:
             self._value += int(d)
             return self._value
 
-    def dec(self, d: int = 1) -> int:
-        """Atomically decrement the value and return the new value.
-
-        :param int d: Amount to decrement by (default: 1)
-        :return: The new value after decrementing
-        :rtype: int
-        """
-        return self.inc(-d)
-
-    @property
-    def value(self) -> int:
-        """Get the current value in a thread-safe manner.
-
-        :return: Current integer value
-        :rtype: int
-        """
-        with self._lock:
-            return self._value
-
 
 class AmqpRequestHandler(Protocol):
     processor: Processor
@@ -159,7 +140,7 @@ class ProcessAmqpRequestHandler:
     queue_size: int
     routing_key_predicate: Callable[[str], bool]
     counter: AtomicInteger
-    queue: PriorityQueue[ProcessingItem]
+    queue: Queue[ProcessingItem]
     __running_tasks: Queue[ProcessingItem]
     processor: Processor
     _monitor_thread: Optional[threading.Thread]
@@ -167,7 +148,7 @@ class ProcessAmqpRequestHandler:
     _receiver_thread: Optional[threading.Thread]
     _shutdown: bool
     _init_services: set[str]
-    _retry_predicate: Optional[Callable[[ProcessingItem, Exception], bool]]
+    _retry_predicate: Optional[Callable[[ProcessingItem, Optional[Exception]], bool]]
 
     def __init__(
         self,
@@ -213,9 +194,7 @@ class ProcessAmqpRequestHandler:
 
         # Setup process communication
         self.processor = RealProcessor(
-            app_config,
-            search_config,
-            Worker(self._init_services).work,
+            Worker(app_config, search_config, self._init_services).work,
         )
         self._shutdown = False
 
@@ -273,9 +252,7 @@ class ProcessAmqpRequestHandler:
 
         # Create new processor instance
         self.processor = RealProcessor(
-            self.app_config,
-            self.search_config,
-            Worker(self._init_services).work,
+            Worker(self.app_config, self.search_config, self._init_services).work,
         )
         LOGGER.info("Successfully restarted processor process")
 

@@ -1,0 +1,289 @@
+#  Copyright 2026 EPAM Systems
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+from typing import Any
+
+from app.commons.model import LogData, LogItemIndexData, TestItemIndexData
+from app.commons.model.db import Hit
+from app.utils import text_processing
+from app.utils.utils import (
+    build_more_like_this_query,
+    get_max_similarity_idx,
+    normalize_issue_type,
+    prepare_restrictions_by_issue_type,
+    safe_int,
+)
+
+TEST_ITEM_FIELDS_BOOST_SCORES = [
+    ("test_item_name", 2.0),
+]
+
+TEST_ITEM_SOURCE_FIELDS = [
+    "test_item_id",
+    "test_item_name",
+    "unique_id",
+    "test_case_hash",
+    "launch_id",
+    "launch_name",
+    "issue_type",
+    "is_auto_analyzed",
+    "start_time",
+]
+
+INNER_HITS_SOURCE = [
+    "logs.log_id",
+    "logs.log_time",
+    "logs.log_level",
+    "logs.cluster_id",
+    "logs.cluster_message",
+    "logs.cluster_with_numbers",
+    "logs.original_message",
+    "logs.message",
+    "logs.message_extended",
+    "logs.message_without_params_extended",
+    "logs.message_without_params_and_brackets",
+    "logs.detected_message",
+    "logs.detected_message_with_numbers",
+    "logs.detected_message_extended",
+    "logs.detected_message_without_params_extended",
+    "logs.detected_message_without_params_and_brackets",
+    "logs.stacktrace",
+    "logs.stacktrace_extended",
+    "logs.only_numbers",
+    "logs.potential_status_codes",
+    "logs.found_exceptions",
+    "logs.found_exceptions_extended",
+    "logs.found_tests_and_methods",
+    "logs.urls",
+    "logs.paths",
+    "logs.message_params",
+    "logs.whole_message",
+]
+
+
+def convert_test_item_log(
+    test_item: TestItemIndexData,
+    log_data: LogData,
+    issue_type: str = "",
+) -> LogItemIndexData:
+    """
+    Convert Test Item-centric log data to log-centric model for ML featurizers.
+
+    :param test_item: Source Test Item document
+    :param log_data: Nested log entry data
+    :param issue_type: Optional issue type override for the log
+    :return: LogItemIndexData instance
+    """
+    resolved_issue_type = issue_type or normalize_issue_type(test_item.issue_type)
+    return LogItemIndexData(
+        log_id=str(log_data.log_id or ""),
+        test_item=safe_int(test_item.test_item_id),
+        test_item_name=test_item.test_item_name or "",
+        test_case_hash=safe_int(test_item.test_case_hash),
+        unique_id=test_item.unique_id or "",
+        launch_id=safe_int(test_item.launch_id),
+        launch_number=test_item.launch_number,
+        launch_name=test_item.launch_name or "",
+        issue_type=resolved_issue_type,
+        is_auto_analyzed=bool(test_item.is_auto_analyzed),
+        start_time=test_item.start_time or "",
+        log_time=log_data.log_time or "",
+        log_level=log_data.log_level or 0,
+        is_merged=False,
+        merged_small_logs="",
+        message=log_data.message or "",
+        detected_message=log_data.detected_message or "",
+        detected_message_with_numbers=log_data.detected_message_with_numbers or "",
+        detected_message_extended=log_data.detected_message_extended or "",
+        detected_message_without_params_extended=log_data.detected_message_without_params_extended or "",
+        detected_message_without_params_and_brackets=log_data.detected_message_without_params_and_brackets or "",
+        stacktrace=log_data.stacktrace or "",
+        stacktrace_extended=log_data.stacktrace_extended or "",
+        message_extended=log_data.message_extended or "",
+        message_without_params_extended=log_data.message_without_params_extended or "",
+        message_without_params_and_brackets=log_data.message_without_params_and_brackets or "",
+        message_params=log_data.message_params or "",
+        only_numbers=log_data.only_numbers or "",
+        found_exceptions=log_data.found_exceptions or "",
+        found_exceptions_extended=log_data.found_exceptions_extended or "",
+        found_tests_and_methods=log_data.found_tests_and_methods or "",
+        potential_status_codes=log_data.potential_status_codes or "",
+        urls=log_data.urls or "",
+        paths=log_data.paths,
+        original_message=log_data.original_message or "",
+        whole_message=log_data.whole_message or "",
+        cluster_id=log_data.cluster_id or "",
+        cluster_message=log_data.cluster_message or "",
+        cluster_with_numbers=bool(log_data.cluster_with_numbers),
+    )
+
+
+def get_request_logs(test_item: TestItemIndexData, issue_type: str) -> list[LogItemIndexData]:
+    logs = list(test_item.logs or [])
+    if not logs:
+        return []
+    logs_sorted = sorted(
+        logs,
+        key=lambda log: log.log_order if log.log_order is not None else safe_int(log.log_id),
+    )
+    return [convert_test_item_log(test_item, log_data, issue_type=issue_type) for log_data in logs_sorted]
+
+
+def _get_log_text(log_item: LogItemIndexData) -> str:
+    """
+    Build a text payload for similarity comparison.
+
+    :param log_item: Log item to extract text from
+    :return: Combined text for similarity matching
+    """
+    parts = [
+        log_item.whole_message,
+        log_item.message,
+        log_item.detected_message,
+        log_item.stacktrace,
+    ]
+    return " ".join([part.strip() for part in parts if part and part.strip()])
+
+
+def extract_inner_hit_logs(hits: list[Hit[TestItemIndexData]]) -> list[Hit[LogItemIndexData]]:
+    """Extract nested inner hit logs from test item hits and convert to log-centric model.
+
+    :param hits: Test item hits with inner_hits containing matched logs
+    :return: Flat list of log-centric hits extracted from inner_hits
+    """
+    extracted_hits: list[Hit[LogItemIndexData]] = []
+    for hit in hits:
+        inner_hits = hit.inner_hits or {}
+        inner_hits_logs = inner_hits.get("logs", {})
+        raw_inner_hits = inner_hits_logs.get("hits", {}).get("hits", [])
+        issue_type = normalize_issue_type(hit.source.issue_type)
+        for raw_inner_hit in raw_inner_hits:
+            inner_hit = Hit[LogData].from_dict(raw_inner_hit)
+            log_item = convert_test_item_log(hit.source, inner_hit.source, issue_type=issue_type)
+            extracted_hits.append(
+                Hit[LogItemIndexData].from_dict(
+                    {
+                        "_id": inner_hit.id or log_item.log_id,
+                        "_score": inner_hit.score or 0.0,
+                        "_source": log_item,
+                    }
+                )
+            )
+    return extracted_hits
+
+
+def build_search_results(
+    request_logs: list[LogItemIndexData],
+    buckets: list[list[Hit[LogItemIndexData]]],
+) -> list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]:
+    """Build search result pairs from request logs and their aligned buckets.
+
+    :param request_logs: Log items used as search requests
+    :param buckets: Buckets of found hits aligned with request logs
+    :return: List of (request_log, found_hits) tuples, excluding empty buckets
+    """
+    return [(log_item, bucket) for log_item, bucket in zip(request_logs, buckets, strict=True) if bucket]
+
+
+def bucket_sort_logs_by_similarity(
+    request_logs: list[LogItemIndexData],
+    found_hits: list[Hit[LogItemIndexData]],
+) -> list[list[Hit[LogItemIndexData]]]:
+    """
+    Align found logs to the most similar request logs using bucket sorting.
+
+    :param request_logs: Log items used as search requests
+    :param found_hits: Log hits retrieved from OpenSearch
+    :return: Buckets aligned with request logs
+    """
+    buckets: list[list[Hit[LogItemIndexData]]] = [[] for _ in request_logs]
+    request_texts = [_get_log_text(log_item) for log_item in request_logs]
+    if not request_texts:
+        return buckets
+    for hit in found_hits:
+        hit_text = _get_log_text(hit.source)
+        if not hit_text.strip():
+            continue
+        similarities = text_processing.calculate_text_similarity(hit_text, request_texts)
+        if not similarities:
+            continue
+        sim_idx = get_max_similarity_idx(similarities)
+        if sim_idx is not None:
+            buckets[sim_idx].append(hit)
+    return buckets
+
+
+def construct_analysis_query(
+    request_log: LogItemIndexData,
+    nested_should: list[dict[str, Any]],
+    search_mode: str,
+    size: int,
+    boost_test_case_hash: float,
+    max_query_terms: int,
+    filter_no_defect: bool,
+) -> dict[str, Any]:
+    nested_query = {
+        "nested": {
+            "path": "logs",
+            "score_mode": search_mode,
+            "query": {"bool": {"should": nested_should}},
+            "inner_hits": {
+                "size": 5,
+                "_source": INNER_HITS_SOURCE,
+            },
+        }
+    }
+
+    # Issue type restrictions for analysis: do not include TI and ND
+    issue_type_conditions = prepare_restrictions_by_issue_type(filter_no_defect=filter_no_defect)
+
+    outer_should: list[dict[str, Any]] = [
+        {
+            "term": {
+                "test_case_hash": {
+                    "value": request_log.test_case_hash,
+                    "boost": abs(boost_test_case_hash),
+                }
+            }
+        },
+    ]
+
+    # Add special test item field boosts
+    for field, boost_score in TEST_ITEM_FIELDS_BOOST_SCORES:
+        field_value = getattr(request_log, field, "").strip()
+        if field_value:
+            outer_should.append(
+                build_more_like_this_query(
+                    "1",
+                    field_value,
+                    field_name=field,
+                    boost=boost_score,
+                    override_min_should_match="1",
+                    max_query_terms=max_query_terms,
+                )
+            )
+
+    query: dict[str, Any] = {
+        "size": size,
+        "sort": ["_score", {"start_time": "desc"}],
+        "_source": TEST_ITEM_SOURCE_FIELDS,
+        "query": {
+            "bool": {
+                "filter": [{"exists": {"field": "issue_type"}}],
+                "must_not": issue_type_conditions + [{"term": {"test_item_id": str(request_log.test_item)}}],
+                "must": [nested_query],
+                "should": outer_should,
+            }
+        },
+    }
+    return query

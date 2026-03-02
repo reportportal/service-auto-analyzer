@@ -60,7 +60,7 @@ def test_add_constraints_for_launches_into_query(previous_launch_id, launch_mode
     launch.previousLaunchId = previous_launch_id
     launch.launchName = DEFAULT_LAUNCH_NAME
     launch.analyzerConfig.analyzerMode = launch_mode
-    analyzer = AnalyzerService(None, DEFAULT_SEARCH_CONFIG)
+    analyzer = AnalyzerService(DEFAULT_SEARCH_CONFIG)
     result = analyzer.add_constraints_for_launches_into_query({"query": {"bool": {}}}, launch)
     assert result["query"]["bool"] == expected_query
 
@@ -91,6 +91,6 @@ def test_add_constraints_for_launches_into_query_suggest(previous_launch_id, lau
     launch.previousLaunchId = previous_launch_id
     launch.launchName = DEFAULT_LAUNCH_NAME
     launch.analyzerConfig.analyzerMode = launch_mode
-    analyzer = AnalyzerService(None, DEFAULT_SEARCH_CONFIG)
+    analyzer = AnalyzerService(DEFAULT_SEARCH_CONFIG)
     result = analyzer.add_constraints_for_launches_into_query_suggest({"query": {"bool": {}}}, launch)
     assert result["query"]["bool"] == expected_query

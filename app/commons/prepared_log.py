@@ -11,9 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from typing import Optional
-
-from typing_extensions import override
+from typing import Optional, override
 
 from app.utils import text_processing
 from app.utils.log_preparation import (
@@ -35,6 +33,7 @@ class PreparedLogMessage:
     _clean_message: Optional[str] = None
     _test_and_methods: Optional[set[str]] = None
     _message: Optional[str] = None
+    _message_for_clustering: Optional[str] = None
     _message_no_params: Optional[str] = None
     _exception_message: Optional[str] = None
     _stacktrace: Optional[str] = None
@@ -84,6 +83,14 @@ class PreparedLogMessage:
         if not self._message:
             self._message = prepare_message_no_numbers(self.clean_message, self.number_of_lines, self.test_and_methods)
         return self._message
+
+    @property
+    def message_for_clustering(self) -> str:
+        if not self._message_for_clustering:
+            self._message_for_clustering = prepare_message(
+                self.basic_message, self.number_of_lines, self.test_and_methods
+            )
+        return self._message_for_clustering
 
     @property
     def message_no_params(self) -> str:
@@ -164,7 +171,7 @@ class PreparedLogMessage:
     @property
     def exception_found(self) -> str:
         if not self._exception_found:
-            self._exception_found = text_processing.get_found_exceptions(self.exception_message_no_numbers)
+            self._exception_found = " ".join(text_processing.get_found_exceptions(self.exception_message_no_numbers))
         return self._exception_found
 
     @property

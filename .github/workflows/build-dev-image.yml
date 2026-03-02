@@ -26,7 +26,7 @@ jobs:
   call-docker-build:
     name: Call develop Docker build
     needs: variables-setup
-    uses: reportportal/.github/.github/workflows/build-docker-image.yaml@main
+    uses: reportportal/.github/.github/workflows/build-docker-image.yaml@0cfc683f89cee91ccc24f05c728b00f23027e7f2
     with:
       aws-region: ${{ vars.AWS_REGION }}
       aws-role-arn: ${{ vars.AWS_ROLE_ARN }}

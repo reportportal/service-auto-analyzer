@@ -9,7 +9,7 @@ jobs:
     if: >
       github.event.review.state == 'approved'
     # TODO: Pin reusable workflow to a version tag once v1 is released
-    uses: reportportal/.github/.github/workflows/dockerhub-release.yaml@main
+    uses: reportportal/.github/.github/workflows/dockerhub-release.yaml@0cfc683f89cee91ccc24f05c728b00f23027e7f2
     secrets:
       REGESTRY_USERNAME: ${{ secrets.REGESTRY_USERNAME }}
       REGESTRY_PASSWORD: ${{ secrets.REGESTRY_PASSWORD }}

@@ -26,15 +26,16 @@ jobs:
   call-docker-build:
     name: Call develop Docker build
     needs: variables-setup
-    uses: reportportal/.github/.github/workflows/build-docker-image.yaml@0cfc683f89cee91ccc24f05c728b00f23027e7f2
+    uses: reportportal/.github/.github/workflows/build-docker-image.yaml@main
     with:
       aws-region: ${{ vars.AWS_REGION }}
-      aws-role-arn: ${{ vars.AWS_ROLE_ARN }}
+      build-platforms: ${{ vars.BUILD_PLATFORMS || 'linux/amd64,linux/arm64' }}
       image-tag: 'develop-${{ github.run_number }}'
       additional-tag: 'develop-latest'
       version: 'develop-${{ github.run_number }}'
       date: ${{ needs.variables-setup.outputs.date }}
       runs-on: ubuntu-latest
     secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       GH_USER: ${{ secrets.GH_USER }}
       GH_TOKEN: ${{ secrets.GH_TOKEN }}

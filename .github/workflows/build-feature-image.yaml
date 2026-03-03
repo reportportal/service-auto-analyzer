@@ -29,14 +29,14 @@ jobs:
   call-docker-build:
     name: Call feature Docker build
     needs: variables-setup
-    uses: reportportal/.github/.github/workflows/build-docker-image.yaml@19701f281bc74246cf273735cda548050606f017
+    uses: reportportal/.github/.github/workflows/build-docker-image.yaml@0cfc683f89cee91ccc24f05c728b00f23027e7f2
     with:
       aws-region: ${{ vars.AWS_REGION }}
+      aws-role-arn: ${{ vars.AWS_ROLE_ARN }}
       image-tag: ${{ needs.variables-setup.outputs.tag }}
       version: ${{ needs.variables-setup.outputs.tag }}
       branch: ${{ github.head_ref }}
       date: ${{ needs.variables-setup.outputs.date }}
     secrets:
-      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       GH_USER: ${{ secrets.GH_USER }}
       GH_TOKEN: ${{ secrets.GH_TOKEN }}

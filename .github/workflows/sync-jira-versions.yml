@@ -7,7 +7,7 @@ on:
 jobs:
   call-jira-sync:
     name: Call Jira versions update
-    uses: reportportal/.github/.github/workflows/update-jira-versions.yaml@19701f281bc74246cf273735cda548050606f017
+    uses: reportportal/.github/.github/workflows/update-jira-versions.yaml@0cfc683f89cee91ccc24f05c728b00f23027e7f2
     with:
       jira-server: ${{ vars.JIRA_SERVER }}
     secrets:

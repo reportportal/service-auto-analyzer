@@ -18,7 +18,6 @@ from datetime import datetime
 from time import time
 from typing import Any, Optional
 
-from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory
 from app.commons.model import LogItemIndexData
 from app.commons.model.db import Hit

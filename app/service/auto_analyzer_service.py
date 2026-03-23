@@ -28,7 +28,6 @@ from app.commons.model.launch_objects import (
     ApplicationConfig,
     Launch,
     SearchConfig,
-    SuggestAnalysisResult,
     TestItem,
 )
 from app.commons.model_chooser import ModelChooser
@@ -327,7 +326,6 @@ class AutoAnalyzerService(AnalyzerService):
         cnt_launches = len(launches)
         LOGGER.info(f"Started analysis for {cnt_launches} launches")
 
-        analyzed_results_for_index: list[SuggestAnalysisResult] = []
         t_start = time()
         results: list[AnalysisResult] = []
         results_to_share: dict[int, dict[str, Any]] = {}
@@ -422,48 +420,15 @@ class AutoAnalyzerService(AnalyzerService):
                             source_test_item.testItemId if source_test_item else analyzer_candidate.testItemId
                         )
 
-                        feature_names = None
-                        feature_values = None
-                        if best.feature_info:
-                            feature_names = ";".join([str(f_id) for f_id in best.feature_info.feature_ids])
-                            feature_values = ";".join([str(f) for f in best.feature_info.feature_data])
-
                         predicted_issue_type = best.identity
                         relevant_item = chosen_type["mrHit"].source.test_item
-                        relevant_log_id = utils.extract_real_id(chosen_type["mrHit"].id)
-                        test_item_log_id = utils.extract_real_id(compared_log.log_id)
 
                         analysis_result = AnalysisResult(
                             testItem=analyzed_test_item_id,
                             issueType=predicted_issue_type,
                             relevantItem=relevant_item,
                         )
-                        analyzed_results_for_index.append(
-                            SuggestAnalysisResult(
-                                project=analyzer_candidate.project,
-                                testItem=analyzed_test_item_id,
-                                testItemLogId=test_item_log_id,
-                                launchId=analyzer_candidate.launchId,
-                                launchName=analyzer_candidate.launchName,
-                                launchNumber=analyzer_candidate.launchNumber,
-                                issueType=predicted_issue_type,
-                                relevantItem=relevant_item,
-                                relevantLogId=relevant_log_id,
-                                isMergedLog=False,
-                                matchScore=round(weighted_score * 100, 2),
-                                esScore=round(chosen_type["mrHit"].score, 2),
-                                esPosition=best.original_position,
-                                modelFeatureNames=feature_names,
-                                modelFeatureValues=feature_values,
-                                modelInfo=";".join(model_info_tags),
-                                resultPosition=0,
-                                usedLogLines=analyzer_candidate.analyzerConfig.numberOfLogLines,
-                                minShouldMatch=self.find_min_should_match_threshold(analyzer_candidate.analyzerConfig),
-                                processedTime=time() - t_start_item,
-                                methodName="auto_analysis",
-                                userChoice=1,
-                            )
-                        )
+
                         results.append(analysis_result)
                         LOGGER.debug(analysis_result)
                         results_to_share[launch_id]["processed_time"] += time() - t_start_item

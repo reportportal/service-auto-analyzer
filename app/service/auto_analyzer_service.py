@@ -295,10 +295,9 @@ class AutoAnalyzerService(AnalyzerService):
     def _get_analysis_candidates(
         self,
         launches: list[Launch],
-    ) -> tuple[list[AnalysisCandidate], dict[str, TestItem]]:
+    ) -> list[AnalysisCandidate]:
         t_start = time()
         all_candidates: list[AnalysisCandidate] = []
-        request_log_to_test_item: dict[str, TestItem] = {}
         processed_items = 0
 
         for launch in launches:
@@ -307,9 +306,7 @@ class AutoAnalyzerService(AnalyzerService):
                 if self._should_stop_processing(processed_items):
                     LOGGER.info("Collected %d candidates for analysis", len(all_candidates))
                     LOGGER.info("Os queries finished %.2f s.", time() - t_start)
-                    return all_candidates, request_log_to_test_item
-                for request_log in request_logs:
-                    request_log_to_test_item[request_log.log_id] = source_test_item
+                    return all_candidates
 
                 item_start = time()
                 search_results = self._query_candidates_for_test_item(launch, request_logs)
@@ -329,7 +326,7 @@ class AutoAnalyzerService(AnalyzerService):
                 processed_items += 1
 
         LOGGER.info("Os queries finished %.2f s.", time() - t_start)
-        return all_candidates, request_log_to_test_item
+        return all_candidates
 
     @utils.ignore_warnings
     def analyze_logs(self, launches: list[Launch]) -> list[AnalysisResult]:
@@ -344,7 +341,7 @@ class AutoAnalyzerService(AnalyzerService):
         results_per_project: dict[int, int] = defaultdict(lambda: 0)
 
         try:
-            all_candidates, request_log_to_test_item = self._get_analysis_candidates(launches)
+            all_candidates = self._get_analysis_candidates(launches)
             all_candidates_by_launch_and_project: dict[tuple[int, int], list[AnalysisCandidate]] = defaultdict(list)
             for candidate in all_candidates:
                 all_candidates_by_launch_and_project[candidate.project, candidate.launchId].append(candidate)
@@ -423,7 +420,7 @@ class AutoAnalyzerService(AnalyzerService):
                             results_to_share[launch_id]["processed_time"] += time() - t_start_item
                             continue
 
-                        weighted_score, best = ranked_predictions[0]
+                        _, best = ranked_predictions[0]
 
                         results_per_project[project_id] = results_per_project[project_id] + 1
                         analysis_result = to_analysis_result(analyzer_candidate, best)

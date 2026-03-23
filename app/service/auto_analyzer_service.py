@@ -633,7 +633,6 @@ class AutoAnalyzerService(AnalyzerService):
                                 continue
 
                             analysis_result = to_analysis_result(analyzer_candidate, best)
-                            results.append(to_analysis_result(analyzer_candidate, best))
                             results.append(analysis_result)
                             LOGGER.debug(analysis_result)
                             found_result = True

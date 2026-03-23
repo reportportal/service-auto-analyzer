@@ -341,6 +341,7 @@ class AutoAnalyzerService(AnalyzerService):
         results_to_share: dict[int, dict[str, Any]] = {}
         cnt_items_to_process = 0
         chosen_namespaces: dict[int, dict[str, int]] = {}
+        results_per_project: dict[int, int] = defaultdict(lambda: 0)
 
         try:
             all_candidates, request_log_to_test_item = self._get_analysis_candidates(launches)
@@ -424,6 +425,7 @@ class AutoAnalyzerService(AnalyzerService):
 
                         weighted_score, best = ranked_predictions[0]
 
+                        results_per_project[project_id] = results_per_project[project_id] + 1
                         analysis_result = to_analysis_result(analyzer_candidate, best)
                         results.append(analysis_result)
                         LOGGER.debug(analysis_result)
@@ -442,6 +444,7 @@ class AutoAnalyzerService(AnalyzerService):
         except Exception as exc:
             LOGGER.exception("Unable to process analysis candidates", exc_info=exc)
 
+        utils.update_train_list(self.app_config, list(results_per_project.items()))
         LOGGER.debug(f"Stats info: {json.dumps(results_to_share)}")
         LOGGER.info(f"Processed {cnt_items_to_process} test items. It took {time() - t_start:.2f} sec.")
         LOGGER.info(f"Finished analysis for {cnt_launches} launches with {len(results)} results.")

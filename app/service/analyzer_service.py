@@ -13,7 +13,12 @@
 #  limitations under the License.
 
 from app.commons import logging
-from app.commons.model.launch_objects import AnalyzerConf, Launch, SearchConfig, TestItemInfo
+from app.commons.model.launch_objects import (
+    AnalyzerConf,
+    Launch,
+    SearchConfig,
+    TestItemInfo,
+)
 from app.utils import utils
 
 LOGGER = logging.getLogger("analyzerApp.analyzerService")

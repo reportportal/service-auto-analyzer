@@ -18,7 +18,6 @@ from datetime import datetime
 from time import time
 from typing import Any, Optional
 
-from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory, similarity_calculator
 from app.commons.model.db import Hit
 from app.commons.model.launch_objects import (
@@ -32,7 +31,6 @@ from app.commons.model.launch_objects import (
     TestItemInfo,
 )
 from app.commons.model.log_item_index import LogItemIndexData
-from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model.test_item_index import TestItemIndexData
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
@@ -596,17 +594,7 @@ class SuggestService(AnalyzerService):
                 "errors_count": errors_count,
             }
         }
-        if self.app_config.amqpUrl:
-            amqp_client = AmqpClient(self.app_config)
-            if results:
-                for model_type in [ModelType.suggestion, ModelType.auto_analysis]:
-                    amqp_client.send_to_inner_queue(
-                        "train_models",
-                        TrainInfo(
-                            model_type=model_type, project=test_item_info.project, gathered_metric_total=len(results)
-                        ).model_dump_json(),
-                    )
-            amqp_client.close()
+        utils.update_train(self.app_config, test_item_info.project, len(results))
         LOGGER.debug(f"Stats info: {json.dumps(results_to_share)}")
         LOGGER.info(f"Processed the test item. It took {time() - t_start:.2f} sec.")
         LOGGER.info(f"Finished suggesting for test item with {len(results)} results.")

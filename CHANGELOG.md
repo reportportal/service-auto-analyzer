@@ -1,5 +1,7 @@
 # Changelog
 ## [Unreleased]
+### Added
+- `DISABLE_TRAIN` config flag, by @HardNorth
 
 ## [5.15.1]
 ### Changed

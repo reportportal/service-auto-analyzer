@@ -51,6 +51,8 @@ class ApplicationConfig(BaseModel):
     debugMode: bool = False
     logLevel: str = "DEBUG"
 
+    disableTrain: bool = False
+
     amqpUrl: str = ""
     amqpExchangeName: str = "analyzer"
     amqpExchangeType: str = "fanout"

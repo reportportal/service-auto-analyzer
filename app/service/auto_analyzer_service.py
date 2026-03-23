@@ -33,7 +33,7 @@ from app.commons.model.launch_objects import (
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.os_client import OsClient
-from app.ml.predictor import AutoAnalysisPredictor
+from app.ml.predictor import AutoAnalysisPredictor, PredictionResult
 from app.service.analyzer_service import AnalyzerService
 from app.utils import utils
 from app.utils.os_migration import (
@@ -99,6 +99,16 @@ def prepare_request_logs_for_launch(
         request_logs_by_test_item.append((source_test_item, request_logs))
 
     return request_logs_by_test_item
+
+
+def to_analysis_result(candidate: AnalysisCandidate, result: PredictionResult) -> AnalysisResult:
+    relevant_item = result.data["mrHit"]["_source"]["test_item"]
+    analysis_result = AnalysisResult(
+        testItem=candidate.testItemId,
+        issueType=result.identity,
+        relevantItem=relevant_item,
+    )
+    return analysis_result
 
 
 class AutoAnalyzerService(AnalyzerService):
@@ -413,22 +423,8 @@ class AutoAnalyzerService(AnalyzerService):
                             continue
 
                         weighted_score, best = ranked_predictions[0]
-                        chosen_type = best.data
-                        compared_log = chosen_type["compared_log"]
-                        source_test_item = request_log_to_test_item.get(compared_log.log_id)
-                        analyzed_test_item_id = (
-                            source_test_item.testItemId if source_test_item else analyzer_candidate.testItemId
-                        )
 
-                        predicted_issue_type = best.identity
-                        relevant_item = chosen_type["mrHit"].source.test_item
-
-                        analysis_result = AnalysisResult(
-                            testItem=analyzed_test_item_id,
-                            issueType=predicted_issue_type,
-                            relevantItem=relevant_item,
-                        )
-
+                        analysis_result = to_analysis_result(analyzer_candidate, best)
                         results.append(analysis_result)
                         LOGGER.debug(analysis_result)
                         results_to_share[launch_id]["processed_time"] += time() - t_start_item

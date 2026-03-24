@@ -17,12 +17,11 @@ from datetime import datetime
 from time import time
 from typing import Optional, Union
 
-from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory
 from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, DefectUpdate, ItemUpdate, Launch
-from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model.test_item_index import TestItemHistoryData, TestItemIndexData
 from app.commons.os_client import OsClient
+from app.utils.utils import update_train_list
 
 LOGGER = logging.getLogger("analyzerApp.indexService")
 
@@ -63,7 +62,7 @@ class IndexService:
         t_start = time()
 
         project_test_items: dict[int, list[TestItemIndexData]] = defaultdict(list)
-        defect_types_num_per_project: dict[int, int] = defaultdict(int)
+        defects_per_project: dict[int, int] = defaultdict(int)
 
         for launch in launches:
             config = launch.analyzerConfig
@@ -74,35 +73,19 @@ class IndexService:
                 similarity_threshold_to_drop=config.similarityThresholdToDrop,
             )
             project_test_items[launch.project].extend(prepared_items)
-            defect_types_num_per_project[launch.project] += sum(
+            defects_per_project[launch.project] += sum(
                 1 for item in prepared_items if item.issue_type and not item.issue_type.startswith("ti")
             )
 
         total_took = 0
         any_errors = False
-        amqp_client = AmqpClient(self.app_config) if self.app_config.amqpUrl else None
 
         for project_id, test_items in project_test_items.items():
             response = self.os_client.bulk_index(project_id, test_items)
             total_took += response.took
             any_errors = any_errors or response.errors
 
-            if amqp_client:
-                defect_types_num = defect_types_num_per_project.get(project_id, 0)
-                try:
-                    amqp_client.send_to_inner_queue(
-                        "train_models",
-                        TrainInfo(
-                            model_type=ModelType.defect_type,
-                            project=project_id,
-                            gathered_metric_total=defect_types_num,
-                        ).model_dump_json(),
-                    )
-                except Exception as e:
-                    LOGGER.exception(f"Unable to update model train data for project {project_id}", exc_info=e)
-
-        if amqp_client:
-            amqp_client.close()
+        update_train_list(self.app_config, list(defects_per_project.items()))
 
         time_passed = round(time() - t_start, 2)
         LOGGER.info(f"Indexing {len(launch_ids)} launches finished: {launch_ids_str}. It took {time_passed} sec.")
@@ -145,14 +128,15 @@ class IndexService:
         batch_size = self.app_config.esChunkNumber
         found_test_items: set[str] = set()
         history_updates: list[TestItemHistoryData] = []
+        defect_num = 0
 
         for i in range(int(len(test_item_ids) / batch_size) + 1):
             batch_ids = test_item_ids[i * batch_size : (i + 1) * batch_size]
             if not batch_ids:
                 continue
-
             existing_items = self.os_client.get_test_items_by_ids(project_id, batch_ids)
             for item in existing_items:
+                defect_num += 1
                 found_test_items.add(item.test_item_id)
                 update_payload = normalized_updates.get(item.test_item_id)
                 if not update_payload:
@@ -174,7 +158,7 @@ class IndexService:
 
         if history_updates:
             self.os_client.bulk_update_issue_history(project_id, history_updates)
-
+        update_train_list(self.app_config, [(int(project_id), defect_num)])
         items_not_updated = [int(test_item_id) for test_item_id in set(test_item_ids) - set(found_test_items)]
         LOGGER.debug("Not updated test items: %s", items_not_updated)
         LOGGER.info("Finished updating defect types. It took %.2f sec", time() - t_start)

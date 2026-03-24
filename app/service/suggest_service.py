@@ -14,7 +14,6 @@
 
 import json
 import traceback
-from datetime import datetime
 from time import time
 from typing import Any, Optional
 
@@ -469,7 +468,6 @@ class SuggestService(AnalyzerService):
         results: list[SuggestAnalysisResult] = []
         errors_found: list[str] = []
         errors_count = 0
-        model_info_tags: list[str] = []
         feature_names: Optional[str] = None
         try:
             request_logs, test_item_id_for_suggest = self._prepare_request_data(test_item_info)
@@ -502,9 +500,6 @@ class SuggestService(AnalyzerService):
             prediction_results = predictor.predict(searched_res)
 
             if prediction_results:
-                # Extract model info tags (same for all results)
-                model_info_tags = prediction_results[0].model_info_tags
-
                 # Group predictions by test item and calculate central-weighted scores
                 grouped = utils.group_predictions_by_test_item(prediction_results)
                 ranked = utils.score_and_rank_test_items(grouped)
@@ -557,7 +552,7 @@ class SuggestService(AnalyzerService):
                             esPosition=result.original_position,
                             modelFeatureNames=feature_names,
                             modelFeatureValues=feature_values,
-                            modelInfo=";".join(model_info_tags),
+                            modelInfo=";".join(result.model_info_tags),
                             resultPosition=pos_idx,
                             usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
                             minShouldMatch=self.find_min_should_match_threshold(test_item_info.analyzerConfig),
@@ -574,28 +569,8 @@ class SuggestService(AnalyzerService):
             LOGGER.exception(exc)
             errors_found.append(utils.extract_exception(exc))
             errors_count += 1
-        results_to_share = {
-            test_item_info.launchId: {
-                "not_found": int(len(results) == 0),
-                "items_to_process": 1,
-                "processed_time": time() - t_start,
-                "found_items": len(results),
-                "launch_id": test_item_info.launchId,
-                "launch_name": test_item_info.launchName,
-                "project_id": test_item_info.project,
-                "method": "suggest",
-                "gather_date": datetime.now().strftime("%Y-%m-%d"),
-                "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "number_of_log_lines": test_item_info.analyzerConfig.numberOfLogLines,
-                "model_info": model_info_tags,
-                "module_version": [self.app_config.appVersion],
-                "min_should_match": self.find_min_should_match_threshold(test_item_info.analyzerConfig),
-                "errors": errors_found,
-                "errors_count": errors_count,
-            }
-        }
-        utils.update_train(self.app_config, test_item_info.project, len(results))
-        LOGGER.debug(f"Stats info: {json.dumps(results_to_share)}")
+        results_to_share = [res.model_dump(exclude={"modelFeatureNames", "modelFeatureValues"}) for res in results]
+        LOGGER.debug(f"Results: {json.dumps(results_to_share)}")
         LOGGER.info(f"Processed the test item. It took {time() - t_start:.2f} sec.")
         LOGGER.info(f"Finished suggesting for test item with {len(results)} results.")
         return results

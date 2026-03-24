@@ -441,7 +441,6 @@ class AutoAnalyzerService(AnalyzerService):
         except Exception as exc:
             LOGGER.exception("Unable to process analysis candidates", exc_info=exc)
 
-        utils.update_train_list(self.app_config, list(results_per_project.items()))
         LOGGER.debug(f"Stats info: {json.dumps(results_to_share)}")
         LOGGER.info(f"Processed {cnt_items_to_process} test items. It took {time() - t_start:.2f} sec.")
         LOGGER.info(f"Finished analysis for {cnt_launches} launches with {len(results)} results.")

@@ -477,7 +477,7 @@ def update_train_list(app_config: ApplicationConfig, update_list: list[tuple[int
         amqp_client = AmqpClient(app_config)
         for project_id, result_num in update_list:
             if result_num and result_num > 0:
-                for model_type in [ModelType.suggestion, ModelType.auto_analysis]:
+                for model_type in [ModelType.suggestion, ModelType.auto_analysis, ModelType.defect_type]:
                     amqp_client.send_to_inner_queue(
                         "train_models",
                         TrainInfo(

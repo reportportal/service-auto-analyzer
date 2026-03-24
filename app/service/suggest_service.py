@@ -571,6 +571,6 @@ class SuggestService(AnalyzerService):
             errors_count += 1
         results_to_share = [res.model_dump(exclude={"modelFeatureNames", "modelFeatureValues"}) for res in results]
         LOGGER.debug(f"Results: {json.dumps(results_to_share)}")
-        LOGGER.info(f"Processed the test item. It took {time() - t_start:.2f} sec.")
+        LOGGER.info(f"Processed the test item. It took {time() - t_start:.2f} sec. Errors: {errors_count}")
         LOGGER.info(f"Finished suggesting for test item with {len(results)} results.")
         return results

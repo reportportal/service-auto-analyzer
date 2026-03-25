@@ -17,8 +17,7 @@ from datetime import datetime
 from time import time
 from typing import Optional, Union
 
-from amqp.amqp import AmqpClient
-
+from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory
 from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, DefectUpdate, ItemUpdate, Launch
 from app.commons.model.ml import ModelType, TrainInfo

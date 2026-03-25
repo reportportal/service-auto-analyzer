@@ -17,11 +17,13 @@ from datetime import datetime
 from time import time
 from typing import Optional, Union
 
+from amqp.amqp import AmqpClient
+
 from app.commons import logging, request_factory
 from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, DefectUpdate, ItemUpdate, Launch
+from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model.test_item_index import TestItemHistoryData, TestItemIndexData
 from app.commons.os_client import OsClient
-from app.utils.utils import update_train_list
 
 LOGGER = logging.getLogger("analyzerApp.indexService")
 
@@ -34,6 +36,27 @@ def format_timestamp(timestamp: datetime) -> str:
 def current_timestamp() -> str:
     """Return current timestamp in indexing format."""
     return format_timestamp(datetime.now())
+
+
+def update_train_list(app_config: ApplicationConfig, update_list: list[tuple[int, int]]):
+    if not update_list:
+        return
+    if app_config.amqpUrl:
+        amqp_client = AmqpClient(app_config)
+        for project_id, result_num in update_list:
+            if result_num and result_num > 0:
+                for model_type in [ModelType.suggestion, ModelType.auto_analysis, ModelType.defect_type]:
+                    amqp_client.send_to_inner_queue(
+                        "train_models",
+                        TrainInfo(
+                            model_type=model_type, project=project_id, gathered_metric_total=result_num
+                        ).model_dump_json(),
+                    )
+        amqp_client.close()
+
+
+def update_train(app_config: ApplicationConfig, project_id: int, result_num: int):
+    update_train_list(app_config, [(project_id, result_num)])
 
 
 class IndexService:
@@ -158,7 +181,7 @@ class IndexService:
 
         if history_updates:
             self.os_client.bulk_update_issue_history(project_id, history_updates)
-        update_train_list(self.app_config, [(int(project_id), defect_num)])
+        update_train(self.app_config, int(project_id), defect_num)
         items_not_updated = [int(test_item_id) for test_item_id in set(test_item_ids) - set(found_test_items)]
         LOGGER.debug("Not updated test items: %s", items_not_updated)
         LOGGER.info("Finished updating defect types. It took %.2f sec", time() - t_start)

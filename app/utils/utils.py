@@ -25,11 +25,9 @@ import numpy as np
 import requests
 from requests import RequestException
 
-from app.amqp.amqp import AmqpClient
 from app.commons import logging
 from app.commons.model import launch_objects
-from app.commons.model.launch_objects import ApplicationConfig, SimilarityResult
-from app.commons.model.ml import ModelType, TrainInfo
+from app.commons.model.launch_objects import SimilarityResult
 from app.ml.predictor import PredictionResult
 from app.utils.text_processing import remove_credentials_from_url, split_words
 
@@ -468,24 +466,3 @@ def normalize_base_issue_type(issue_type: str) -> str:
     if not issue_type:
         return issue_type
     return _get_base_issue_type(issue_type) if re.match(r"^[a-z]{2}\d{,3}$", issue_type) else issue_type
-
-
-def update_train_list(app_config: ApplicationConfig, update_list: list[tuple[int, int]]):
-    if not update_list:
-        return
-    if app_config.amqpUrl:
-        amqp_client = AmqpClient(app_config)
-        for project_id, result_num in update_list:
-            if result_num and result_num > 0:
-                for model_type in [ModelType.suggestion, ModelType.auto_analysis, ModelType.defect_type]:
-                    amqp_client.send_to_inner_queue(
-                        "train_models",
-                        TrainInfo(
-                            model_type=model_type, project=project_id, gathered_metric_total=result_num
-                        ).model_dump_json(),
-                    )
-        amqp_client.close()
-
-
-def update_train(app_config: ApplicationConfig, project_id: int, result_num: int):
-    update_train_list(app_config, [(project_id, result_num)])

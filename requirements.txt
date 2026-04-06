@@ -4,7 +4,7 @@ Flask-WTF==1.2.1
 pika==1.2.1
 pydantic==2.12.5
 opensearch-py==3.1.0
-requests==2.33.0
+requests==2.33.1
 bump2version==1.0.1
 nltk==3.9.4
 scipy==1.13.1

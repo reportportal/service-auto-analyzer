@@ -5,6 +5,12 @@ on:
     types: [opened, synchronize, reopened]
     branches:
       - 'develop'
+  workflow_dispatch:
+    inputs:
+      image-tag:
+        description: 'Image tag for the Docker build'
+        required: true
+        default: 'feature'
 
 jobs:
   variables-setup:

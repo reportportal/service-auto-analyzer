@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:3de23fb7f53a67937845591d68066d5f075a18826a6291dad2dd700cb1d4290a AS test
+FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:40fd593fb7b2078b73821b869733c880d8dec9bfe5abc45a0d88784a0c79b0ec AS test
 USER root
 RUN microdnf -y upgrade && microdnf -y install make \
     && microdnf clean all \
@@ -19,7 +19,7 @@ RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
 RUN "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir -r requirements-dev.txt
 RUN make test-all
 
-FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:3de23fb7f53a67937845591d68066d5f075a18826a6291dad2dd700cb1d4290a AS builder
+FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:40fd593fb7b2078b73821b869733c880d8dec9bfe5abc45a0d88784a0c79b0ec AS builder
 USER root
 RUN microdnf -y upgrade && microdnf -y install make \
     && microdnf clean all \
@@ -46,7 +46,7 @@ RUN mkdir /backend \
     && cp -r /build/app /backend/ \
     && cp -r /build/res /backend/
 
-FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:3de23fb7f53a67937845591d68066d5f075a18826a6291dad2dd700cb1d4290a
+FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:40fd593fb7b2078b73821b869733c880d8dec9bfe5abc45a0d88784a0c79b0ec
 USER root
 WORKDIR /backend/
 COPY --from=builder /backend ./
@@ -59,6 +59,8 @@ ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend
 RUN microdnf -y upgrade \
     && microdnf clean all \
     && mkdir -p -m 0744 /backend/storage \
+    && rm -rf /opt/app-root/lib64/python3.12/site-packages/pip /opt/app-root/lib64/python3.12/site-packages/pip-24.2.dist-info \
+    && rm -f /opt/app-root/bin/pip /opt/app-root/bin/pip3 /opt/app-root/bin/pip3.12 \
     && source "${VIRTUAL_ENV}/bin/activate"
 
 # Start server

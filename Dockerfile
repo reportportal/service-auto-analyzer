@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:df10cfea920731d904d38bbe1b720d866286611a849f590c9281083b860764ec AS test
+FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:7350725154e3419463f815c5faae915de4dbf191cd4c3183dbc080ac6d1d5e0c AS test
 USER root
 RUN microdnf -y upgrade && microdnf -y install make \
     && microdnf clean all \
@@ -19,7 +19,7 @@ RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
 RUN "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir -r requirements-dev.txt
 RUN make test-all
 
-FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:df10cfea920731d904d38bbe1b720d866286611a849f590c9281083b860764ec AS builder
+FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:7350725154e3419463f815c5faae915de4dbf191cd4c3183dbc080ac6d1d5e0c AS builder
 USER root
 RUN microdnf -y upgrade && microdnf -y install make \
     && microdnf clean all \
@@ -46,7 +46,7 @@ RUN mkdir /backend \
     && cp -r /build/app /backend/ \
     && cp -r /build/res /backend/
 
-FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:df10cfea920731d904d38bbe1b720d866286611a849f590c9281083b860764ec
+FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:7350725154e3419463f815c5faae915de4dbf191cd4c3183dbc080ac6d1d5e0c
 USER root
 WORKDIR /backend/
 COPY --from=builder /backend ./

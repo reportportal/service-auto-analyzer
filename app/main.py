@@ -223,6 +223,8 @@ APP_CONFIG = ApplicationConfig(
     logLevel=os.getenv("LOGGING_LEVEL", "DEBUG").strip(),
     # Debug settings, controls if AMQP handler runs in threaded mode to ease debugging
     debugMode=to_bool(os.getenv("DEBUG_MODE", "false")),
+    # Features
+    disableTrain=to_bool(os.getenv("DISABLE_TRAIN", "false")),
 )
 
 SEARCH_CONFIG = SearchConfig(
@@ -314,13 +316,15 @@ def init_amqp_queues():
             "remove_by_log_time",
         ],
     )
-    _train_amqp_handler = handler_class(
-        APP_CONFIG,
-        SEARCH_CONFIG,
-        routing_key_predicate=only_train,
-        name="train_handler",
-        init_services=["train_models"],
-    )
+    _train_amqp_handler = None
+    if not APP_CONFIG.disableTrain:
+        _train_amqp_handler = handler_class(
+            APP_CONFIG,
+            SEARCH_CONFIG,
+            routing_key_predicate=only_train,
+            name="train_handler",
+            init_services=["train_models"],
+        )
 
     _threads.append(
         (
@@ -337,21 +341,23 @@ def init_amqp_queues():
             _main_amqp_handler,
         )
     )
-    _threads.append(
-        (
-            "train",
-            create_thread(
-                AmqpClient(APP_CONFIG).receive,
-                (
-                    "train",
-                    _train_amqp_handler.handle_amqp_request,
-                    None,
-                ),
+
+    if _train_amqp_handler:
+        _threads.append(
+            (
                 "train",
-            ),
-            _train_amqp_handler,
+                create_thread(
+                    AmqpClient(APP_CONFIG).receive,
+                    (
+                        "train",
+                        _train_amqp_handler.handle_amqp_request,
+                        None,
+                    ),
+                    "train",
+                ),
+                _train_amqp_handler,
+            )
         )
-    )
     return _threads
 
 

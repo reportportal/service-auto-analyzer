@@ -222,7 +222,7 @@ class SuggestInfoService:
         }
 
     def _update_train_data(self, project_id: int, result: BulkResponse) -> None:
-        if self.app_config.amqpUrl:
+        if self.app_config.amqpUrl and not self.app_config.disableTrain:
             amqp_client = AmqpClient(self.app_config)
             for model_type in [ModelType.suggestion, ModelType.auto_analysis]:
                 amqp_client.send_to_inner_queue(

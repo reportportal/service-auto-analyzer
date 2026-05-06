@@ -528,7 +528,7 @@ class SuggestService(AnalyzerService):
         if self.app_config.amqpUrl:
             amqp_client = AmqpClient(self.app_config)
             amqp_client.send_to_inner_queue("stats_info", json.dumps(results_to_share))
-            if results:
+            if results and not self.app_config.disableTrain:
                 for model_type in [ModelType.suggestion, ModelType.auto_analysis]:
                     amqp_client.send_to_inner_queue(
                         "train_models",

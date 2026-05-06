@@ -90,6 +90,16 @@ def _prepare_logs(launch: Launch, test_item: TestItem, index_name: str) -> list[
     return results
 
 
+def to_analysis_result(candidate: AnalysisCandidate, result: PredictionResult) -> AnalysisResult:
+    relevant_item = result.data["mrHit"]["_source"]["test_item"]
+    analysis_result = AnalysisResult(
+        testItem=candidate.testItemId,
+        issueType=result.identity,
+        relevantItem=relevant_item,
+    )
+    return analysis_result
+
+
 class AutoAnalyzerService(AnalyzerService):
     app_config: ApplicationConfig
     search_cfg: SearchConfig
@@ -470,6 +480,47 @@ class AutoAnalyzerService(AnalyzerService):
         LOGGER.info("Es queries finished %.2f s.", time() - t_start)
         return all_candidates
 
+    def to_suggest_analysis_result(
+        self, candidate: AnalysisCandidate, result: PredictionResult, start_time: float
+    ) -> Optional[SuggestAnalysisResult]:
+        if self.app_config.disableTrain:
+            return None
+        feature_names = None
+        feature_values = None
+        if result.feature_info:
+            feature_names = ";".join([str(f_id) for f_id in result.feature_info.feature_ids])
+            feature_values = ";".join([str(f) for f in result.feature_info.feature_data])
+        relevant_item = result.data["mrHit"]["_source"]["test_item"]
+        relevant_log_id = utils.extract_real_id(result.data["mrHit"]["_id"])
+        test_item_log_id = utils.extract_real_id(result.data["compared_log"]["_id"])
+        prob = round(result.probability[1], 4)
+        model_info_tags = result.model_info_tags
+        analysis_result = SuggestAnalysisResult(
+            project=candidate.project,
+            testItem=candidate.testItemId,
+            testItemLogId=test_item_log_id,
+            launchId=candidate.launchId,
+            launchName=candidate.launchName,
+            launchNumber=candidate.launchNumber,
+            issueType=result.identity,
+            relevantItem=relevant_item,
+            relevantLogId=relevant_log_id,
+            isMergedLog=result.data["compared_log"]["_source"]["is_merged"],
+            matchScore=round(prob * 100, 2),
+            esScore=round(result.data["mrHit"]["_score"], 2),
+            esPosition=result.original_position,
+            modelFeatureNames=feature_names,
+            modelFeatureValues=feature_values,
+            modelInfo=";".join(model_info_tags),
+            resultPosition=0,
+            usedLogLines=candidate.analyzerConfig.numberOfLogLines,
+            minShouldMatch=self.find_min_should_match_threshold(candidate.analyzerConfig),
+            processedTime=time() - start_time,
+            methodName="auto_analysis",
+            userChoice=1,
+        )
+        return analysis_result
+
     @utils.ignore_warnings
     def analyze_logs(self, launches: list[Launch]) -> list[AnalysisResult]:
         cnt_launches = len(launches)
@@ -581,55 +632,16 @@ class AutoAnalyzerService(AnalyzerService):
                                 LOGGER.debug(f"Test item {analyzer_candidate.testItemId} has no relevant items")
                                 continue
 
-                            predicted_issue_type = best.identity
-                            prob = round(best.probability[1], 4)
-                            chosen_type = best.data
-                            feature_names = None
-                            feature_values = None
-                            if best.feature_info:
-                                feature_names = ";".join([str(f_id) for f_id in best.feature_info.feature_ids])
-                                feature_values = ";".join([str(f) for f in best.feature_info.feature_data])
-
-                            relevant_item = chosen_type["mrHit"]["_source"]["test_item"]
-                            analysis_result = AnalysisResult(
-                                testItem=analyzer_candidate.testItemId,
-                                issueType=predicted_issue_type,
-                                relevantItem=relevant_item,
-                            )
-                            relevant_log_id = utils.extract_real_id(chosen_type["mrHit"]["_id"])
-                            test_item_log_id = utils.extract_real_id(chosen_type["compared_log"]["_id"])
-                            analyzed_results_for_index.append(
-                                SuggestAnalysisResult(
-                                    project=analyzer_candidate.project,
-                                    testItem=analyzer_candidate.testItemId,
-                                    testItemLogId=test_item_log_id,
-                                    launchId=analyzer_candidate.launchId,
-                                    launchName=analyzer_candidate.launchName,
-                                    launchNumber=analyzer_candidate.launchNumber,
-                                    issueType=predicted_issue_type,
-                                    relevantItem=relevant_item,
-                                    relevantLogId=relevant_log_id,
-                                    isMergedLog=chosen_type["compared_log"]["_source"]["is_merged"],
-                                    matchScore=round(prob * 100, 2),
-                                    esScore=round(chosen_type["mrHit"]["_score"], 2),
-                                    esPosition=best.original_position,
-                                    modelFeatureNames=feature_names,
-                                    modelFeatureValues=feature_values,
-                                    modelInfo=";".join(model_info_tags),
-                                    resultPosition=0,
-                                    usedLogLines=analyzer_candidate.analyzerConfig.numberOfLogLines,
-                                    minShouldMatch=self.find_min_should_match_threshold(
-                                        analyzer_candidate.analyzerConfig
-                                    ),
-                                    processedTime=time() - t_start_item,
-                                    methodName="auto_analysis",
-                                    userChoice=1,
-                                )
-                            )  # default choice in AA, user will change via defect change
-
+                            analysis_result = to_analysis_result(analyzer_candidate, best)
                             results.append(analysis_result)
-                            found_result = True
                             LOGGER.debug(analysis_result)
+                            found_result = True
+
+                            suggest_analysis_result = self.to_suggest_analysis_result(
+                                analyzer_candidate, best, t_start_item
+                            )
+                            if suggest_analysis_result:
+                                analyzed_results_for_index.append(suggest_analysis_result)
 
                             if found_result:
                                 break

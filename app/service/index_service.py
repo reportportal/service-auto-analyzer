@@ -93,7 +93,7 @@ class IndexService:
         result.logResults = logs_with_exceptions
         num_logs_with_defect_types = self.es_client.merge_logs(test_item_ids, project_with_prefix)
 
-        if self.app_config.amqpUrl:
+        if self.app_config.amqpUrl and not self.app_config.disableTrain:
             amqp_client = AmqpClient(self.app_config)
             amqp_client.send_to_inner_queue(
                 "train_models",

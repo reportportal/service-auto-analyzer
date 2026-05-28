@@ -1,0 +1,5 @@
+self = <tests.searching.test_search_something.TestSearchSomething object at 0x7f1d6d9857d0>
+maxe = <tests.searching.base.MAXe object at 0x7f1d6a6bc510>
+test = Test('tests_searching_test_search_something_py__TestSearchSomething__test_verify_individual_search_something_1_')
+form_type = 'supply_1'
+data = {'contact_search_something': "SELECT DISTINCT account\nFROM   contact_search_something\nWHERE  account_id...CDN, Account Number, Member ID'}}

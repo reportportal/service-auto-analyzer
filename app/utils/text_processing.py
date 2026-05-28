@@ -559,6 +559,17 @@ def remove_guid_uuids_from_text(text: str) -> str:
     return replace_patterns(text, GUID_UUID_PATTERNS)
 
 
+HEX_TAG = "SPECIALHEX"
+HEX = r"0x[0-9a-fA-F]{12}"
+HEX_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
+    (re.compile(rf"\b{HEX}\b"), HEX_TAG),
+]
+
+
+def remove_hex_from_text(text: str) -> str:
+    return replace_patterns(text, HEX_PATTERNS)
+
+
 def replace_tabs_for_newlines(message: str) -> str:
     return message.replace("\t", "\n")
 

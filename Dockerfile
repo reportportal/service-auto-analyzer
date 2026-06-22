@@ -53,13 +53,16 @@ WORKDIR /backend/
 COPY --from=builder /backend ./
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
 
-RUN "pip" install --upgrade pip \
-    && "pip" install --upgrade setuptools \
+RUN pip install --upgrade pip \
+    && pip install --upgrade setuptools \
     && LIBRARY_PATH=/lib:/usr/lib pip install --no-cache-dir -r requirements.txt
 
 ENV PYTHONPATH=/backend
 
 RUN mkdir -p -m 0744 /backend/storage
+
+RUN apt-get update && apt-get upgrade -y \
+    && apt-get install -y curl
 
 # Start server
 CMD ["python", "app/main.py"]

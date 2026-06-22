@@ -1,7 +1,8 @@
 FROM dhi.io/python@sha256:c2b0cd3f1b921937d1d15c1cd3a2335fc23d865bba99255127af79821d02042f AS test
 USER root
-RUN microdnf -y upgrade && microdnf -y install make \
-    && microdnf clean all \
+RUN apt-get update && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends make \
+    && rm -rf /var/lib/apt/lists/* \
     && python -m venv /venv \
     && mkdir /build
 ENV VIRTUAL_ENV=/venv
@@ -21,8 +22,9 @@ RUN make test-all
 
 FROM dhi.io/python@sha256:c2b0cd3f1b921937d1d15c1cd3a2335fc23d865bba99255127af79821d02042f AS builder
 USER root
-RUN microdnf -y upgrade && microdnf -y install make \
-    && microdnf clean all \
+RUN apt-get update && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends make \
+    && rm -rf /var/lib/apt/lists/* \
     && python -m venv /venv \
     && mkdir /build
 ENV VIRTUAL_ENV=/venv
@@ -47,7 +49,6 @@ RUN mkdir /backend \
     && cp -r /build/res /backend/
 
 FROM dhi.io/python@sha256:1a211b3861bb85e5fc42397aed8db6ce05b5d0f08611959c9b1577c213705913
-USER root
 WORKDIR /backend/
 COPY --from=builder /backend ./
 COPY --from=builder /venv /venv
@@ -56,10 +57,7 @@ COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
 ENV VIRTUAL_ENV="/venv"
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend
 
-RUN microdnf -y upgrade \
-    && microdnf -y update libarchive \
-    && microdnf clean all \
-    && mkdir -p -m 0744 /backend/storage \
+RUN mkdir -p -m 0744 /backend/storage \
     && source "${VIRTUAL_ENV}/bin/activate"
 
 # Start server

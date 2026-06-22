@@ -51,14 +51,15 @@ RUN mkdir /backend \
 FROM dhi.io/python@sha256:1a211b3861bb85e5fc42397aed8db6ce05b5d0f08611959c9b1577c213705913
 WORKDIR /backend/
 COPY --from=builder /backend ./
-COPY --from=builder /venv /venv
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
 
-ENV VIRTUAL_ENV="/venv"
-ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend
+RUN "pip" install --upgrade pip \
+    && "pip" install --upgrade setuptools \
+    && LIBRARY_PATH=/lib:/usr/lib pip install --no-cache-dir -r requirements.txt
 
-RUN mkdir -p -m 0744 /backend/storage \
-    && source "${VIRTUAL_ENV}/bin/activate"
+ENV PYTHONPATH=/backend
+
+RUN mkdir -p -m 0744 /backend/storage
 
 # Start server
 CMD ["python", "app/main.py"]

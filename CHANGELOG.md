@@ -1,5 +1,9 @@
 # Changelog
 ## [Unreleased]
+### Changed
+- Base image update: switch on DHI Python 3.12, by @HardNorth
+
+## [5.15.1]
 ### Added
 - Removing HEX addresses from on message processing as junk data, by @HardNorth
 - `DISABLE_TRAIN` config flag, by @HardNorth

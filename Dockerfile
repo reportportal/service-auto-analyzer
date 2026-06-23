@@ -22,7 +22,7 @@ RUN make test-all
 
 FROM dhi.io/python@sha256:c2b0cd3f1b921937d1d15c1cd3a2335fc23d865bba99255127af79821d02042f AS builder
 RUN apt-get update && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends make wget \
+    && apt-get install -y --no-install-recommends make \
     && rm -rf /var/lib/apt/lists/* \
     && python -m venv /venv \
     && mkdir /build
@@ -52,12 +52,10 @@ WORKDIR /backend
 COPY --from=builder /backend ./
 COPY --from=builder /venv /venv
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
-COPY --from=builder /usr/bin/wget /usr/bin/wget
-COPY --from=builder //usr/lib/libpcre2-8.so /usr/lib/libpcre2-8.so
 
 ENV VIRTUAL_ENV="/venv"
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend
 
 # Start server
 CMD ["python", "app/main.py"]
-HEALTHCHECK --interval=1m --timeout=5s --retries=2 CMD ["wget", "-q", "--spider", "http://localhost:5001/"]
+HEALTHCHECK --interval=1m --timeout=5s --retries=2 CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/', timeout=5)"]

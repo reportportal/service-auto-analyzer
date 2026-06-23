@@ -22,7 +22,7 @@ RUN make test-all
 
 FROM dhi.io/python@sha256:c2b0cd3f1b921937d1d15c1cd3a2335fc23d865bba99255127af79821d02042f AS builder
 RUN apt-get update && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends make \
+    && apt-get install -y --no-install-recommends make curl \
     && rm -rf /var/lib/apt/lists/* \
     && python -m venv /venv \
     && mkdir /build
@@ -52,12 +52,10 @@ WORKDIR /backend
 COPY --from=builder /backend ./
 COPY --from=builder /venv /venv
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
+COPY --from=builder /usr/bin/curl /usr/bin/curl
 
 ENV VIRTUAL_ENV="/venv"
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend
-
-RUN apt-get update && apt-get upgrade -y \
-    && apt-get install -y curl
 
 # Start server
 CMD ["python", "app/main.py"]

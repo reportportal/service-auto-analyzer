@@ -288,19 +288,21 @@ class AmqpClient:
                 logger.info("Consumer interrupted by user. Exiting.")
                 break
 
-    def reply(self, to: str, correlation_id: str, data: str) -> None:
-        """Publish a reply message with automatic reconnection.
+    def publish_response(self, correlation_id: str, data: str) -> None:
+        """Publish an analyzer response message to the configured response queue.
 
-        :param str to: The routing key to send the message to
         :param str correlation_id: The correlation ID for the message
         :param str data: The data to publish
         """
         while True:
             try:
+                # Ensure exchange exists before publishing
+                self._declare_exchange()
+
                 with self._connection.channel() as channel:
                     channel.basic_publish(
-                        exchange="",
-                        routing_key=to,
+                        exchange=self._config.amqpExchangeName,
+                        routing_key=self._config.analyzerResponseQueue,
                         properties=BasicProperties(correlation_id=correlation_id, content_type="application/json"),
                         mandatory=False,
                         body=bytes(data, "utf-8"),

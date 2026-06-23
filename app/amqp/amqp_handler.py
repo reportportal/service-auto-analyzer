@@ -42,9 +42,11 @@ def log_incoming_message(routing_key: str, correlation_id: str, body: Any) -> No
     )
 
 
-def log_outgoing_message(reply_to: str, correlation_id: str, body: Any) -> None:
+def log_outgoing_message(response_queue: str, correlation_id: str, body: Any) -> None:
     body_str = json.dumps(body)
-    LOGGER.debug(f"Replying message: --To: {reply_to} --Correlation ID: {correlation_id} --Body: {body_str}")
+    LOGGER.debug(
+        f"Publishing response: --Queue: {response_queue} --Correlation ID: {correlation_id} --Body: {body_str}"
+    )
 
 
 def serialize_message(channel: BlockingChannel, delivery_tag: Optional[int], body: bytes) -> Optional[Any]:
@@ -188,7 +190,7 @@ class ProcessAmqpRequestHandler:
         :param int queue_size: Maximum size of the internal priority queue (buffer)
         :param Optional[Callable[[str], bool]] routing_key_predicate: Optional predicate to filter routing keys for
         processing. Should return True for keys to process.
-        :param Optional[AmqpClient] client: Optional AMQP client for sending replies (useful for testing)
+        :param Optional[AmqpClient] client: Optional AMQP client for publishing responses (useful for testing)
         :param Optional[list[str]] init_services: Optional list of routing keys to initialize the processor with
         specific routing keys
         :param Optional[Callable[[ProcessingItem, Exception], bool]] retry_predicate: Optional function to determine
@@ -336,9 +338,8 @@ class ProcessAmqpRequestHandler:
             return None
         logging.set_correlation_id(result.item.log_correlation_id)
         try:
-            if result.item.reply_to:
-                log_outgoing_message(result.item.reply_to, result.item.msg_correlation_id, response_body)
-                self.client.reply(result.item.reply_to, result.item.msg_correlation_id, response_body)
+            log_outgoing_message(self.app_config.analyzerResponseQueue, result.item.msg_correlation_id, response_body)
+            self.client.publish_response(result.item.msg_correlation_id, response_body)
         except Exception as exc:
             LOGGER.exception("Failed to publish result", exc_info=exc)
             return None
@@ -505,7 +506,6 @@ class ProcessAmqpRequestHandler:
             priority=priority,
             number=number,
             routing_key=method.routing_key or "",
-            reply_to=props.reply_to,
             log_correlation_id=logging.get_correlation_id(),
             msg_correlation_id=props.correlation_id or "",
             item=message,
@@ -610,7 +610,6 @@ class DirectAmqpRequestHandler:
                 priority=get_priority(props),
                 number=self.counter,
                 routing_key=routing_key,
-                reply_to=props.reply_to,
                 log_correlation_id=logging.get_correlation_id(),
                 msg_correlation_id=props.correlation_id or "",
                 item=message,
@@ -631,14 +630,13 @@ class DirectAmqpRequestHandler:
             return None
 
         try:
-            if props.reply_to:
-                channel.basic_publish(
-                    exchange="",
-                    routing_key=props.reply_to,
-                    properties=BasicProperties(correlation_id=props.correlation_id, content_type="application/json"),
-                    mandatory=False,
-                    body=bytes(response_body, "utf-8"),
-                )
+            channel.basic_publish(
+                exchange=self.app_config.amqpExchangeName,
+                routing_key=self.app_config.analyzerResponseQueue,
+                properties=BasicProperties(correlation_id=props.correlation_id, content_type="application/json"),
+                mandatory=False,
+                body=bytes(response_body, "utf-8"),
+            )
         except Exception as exc:
             LOGGER.exception("Failed to publish result", exc_info=exc)
             self.__running_tasks.get()

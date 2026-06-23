@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
       - name: Create variables
         id: vars
@@ -26,7 +26,7 @@ jobs:
   call-docker-build:
     name: Call develop Docker build
     needs: variables-setup
-    uses: reportportal/.github/.github/workflows/build-docker-image.yaml@0cfc683f89cee91ccc24f05c728b00f23027e7f2
+    uses: reportportal/.github/.github/workflows/build-docker-image.yaml@0bb0a0c8bc179b34c08b443abba64690dffc32e6c
     with:
       aws-region: ${{ vars.AWS_REGION }}
       aws-role-arn: ${{ vars.AWS_ROLE_ARN }}

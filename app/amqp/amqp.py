@@ -122,9 +122,11 @@ class AmqpClient:
 
         :return: The AMQP connection
         """
-        if self.__connection is None or self.__connection.is_closed:
-            self.__connection = self._connect_with_retry()
-        return self.__connection
+        my_connection = self.__connection
+        if my_connection is None or my_connection:
+            my_connection = self._connect_with_retry()
+            self.__connection = my_connection
+        return my_connection
 
     def _do_declare_exchange(self, channel: BlockingChannel) -> None:
         channel.exchange_declare(

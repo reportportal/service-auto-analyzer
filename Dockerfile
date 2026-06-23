@@ -53,6 +53,7 @@ COPY --from=builder /backend ./
 COPY --from=builder /venv /venv
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
 COPY --from=builder /usr/bin/wget /usr/bin/wget
+COPY --from=builder //usr/lib/libpcre2-8.so /usr/lib/libpcre2-8.so
 
 ENV VIRTUAL_ENV="/venv"
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend

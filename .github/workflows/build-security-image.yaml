@@ -32,7 +32,7 @@ jobs:
   build-security-image:
     name: Build security Docker image
     needs: variables-setup
-    uses: reportportal/.github/.github/workflows/build-docker-image.yaml@main
+    uses: reportportal/.github/.github/workflows/build-docker-image.yaml@5d208acab22207a12d6b204373dc76b97d61bf8c
     with:
       aws-region: ${{ vars.AWS_REGION }}
       build-platforms: ${{ vars.BUILD_PLATFORMS || 'linux/amd64,linux/arm64' }}

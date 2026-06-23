@@ -32,7 +32,7 @@ jobs:
   promote-to-gcr:
     name: Promote ${{ github.event.repository.name }} to GCP Artifact Registry
     needs: extract-image-tag
-    uses: reportportal/.github/.github/workflows/promote-ecr-to-gcr.yaml@main
+    uses: reportportal/.github/.github/workflows/promote-ecr-to-gcr.yaml@5d208acab22207a12d6b204373dc76b97d61bf8c
     with:
       service: ${{ github.event.repository.name }}
       image-tag: ${{ needs.extract-image-tag.outputs.image-tag }}

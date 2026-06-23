@@ -70,9 +70,7 @@ def handler(app_config, search_config, mock_amqp_client) -> Generator[ProcessAmq
     handler.shutdown()
 
 
-def create_test_processing_item(
-    routing_key="noop_echo", item="test_data", priority=1000
-) -> ProcessingItem:
+def create_test_processing_item(routing_key="noop_echo", item="test_data", priority=1000) -> ProcessingItem:
     """Helper to create ProcessingItem for testing"""
     return ProcessingItem(
         priority=priority,
@@ -84,9 +82,7 @@ def create_test_processing_item(
     )
 
 
-def create_amqp_request_mock(
-    routing_key="noop_echo", body: Any = "test_data", correlation_id="test_correlation"
-):
+def create_amqp_request_mock(routing_key="noop_echo", body: Any = "test_data", correlation_id="test_correlation"):
     """Helper to create AMQP request mocks"""
     channel = Mock(spec=BlockingChannel)
     channel.basic_ack = Mock()
@@ -395,9 +391,7 @@ class TestProcessAmqpRequestHandler:
         """Test Case 5: Failed tasks should be processed several times before dropping"""
 
         # Create a task that will fail with noop_fail handler
-        channel, method, props, body = create_amqp_request_mock(
-            routing_key="noop_fail", body="exception_retry"
-        )
+        channel, method, props, body = create_amqp_request_mock(routing_key="noop_fail", body="exception_retry")
 
         # Submit the failing task
         handler.handle_amqp_request(channel, method, props, body)

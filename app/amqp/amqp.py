@@ -301,7 +301,7 @@ class AmqpClient:
 
                 with self._connection.channel() as channel:
                     channel.basic_publish(
-                        exchange=self._config.amqpExchangeName,
+                        exchange=self._config.analyzerResponseExchange,
                         routing_key=self._config.analyzerResponseQueue,
                         properties=BasicProperties(correlation_id=correlation_id, content_type="application/json"),
                         mandatory=False,

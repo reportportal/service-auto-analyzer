@@ -62,6 +62,7 @@ class ApplicationConfig(BaseModel):
     amqpBackoffFactor: int = 2
     amqpHandlerMaxRetries: int = 3
     amqpHandlerTaskTimeout: int = 600
+    analyzerResponseExchange: str = "analyzer-reply"
     analyzerResponseQueue: str = "analysis.matches"
 
     analyzerHttpPort: int = 5001

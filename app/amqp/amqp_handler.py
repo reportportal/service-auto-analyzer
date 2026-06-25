@@ -338,7 +338,7 @@ class ProcessAmqpRequestHandler:
         try:
             if result.item.reply_to:
                 log_outgoing_message(result.item.reply_to, result.item.msg_correlation_id, response_body)
-                self.client.reply(result.item.reply_to, result.item.msg_correlation_id, json.dumps(response_body))
+                self.client.reply(result.item.reply_to, result.item.msg_correlation_id, response_body)
         except Exception as exc:
             LOGGER.exception("Failed to publish result", exc_info=exc)
             return None

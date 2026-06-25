@@ -276,10 +276,10 @@ class AmqpClient:
                 logger.info(f"Consumer interrupted by user. Exiting. {connection_info}")
                 break
 
-    def publish_response(self, data: str) -> None:
+    def publish_response(self, data: Any) -> None:
         """Publish an analyzer response message to the configured response queue.
 
-        :param str data: The data to publish
+        :param Any data: The data to publish
         """
         while True:
             try:
@@ -307,11 +307,11 @@ class AmqpClient:
                 logger.info("Consumer interrupted by user. Exiting.")
                 break
 
-    def send_to_inner_queue(self, queue: str, data: str) -> None:
+    def send_to_inner_queue(self, queue: str, data: Any) -> None:
         """Publish message with automatic reconnection.
 
         :param str queue: Name of the queue to publish to
-        :param str data: Message data to publish
+        :param Any data: Message data to publish
         """
         while True:
             try:
@@ -322,7 +322,7 @@ class AmqpClient:
                     channel.basic_publish(
                         exchange=self._config.amqpExchangeName,
                         routing_key=queue,
-                        body=data.encode("utf‑8"),
+                        body=bytes(data, "utf-8"),
                     )
                 return  # success
             except AMQPConnectionError as exc:
@@ -337,12 +337,12 @@ class AmqpClient:
                 logger.info("Consumer interrupted by user. Exiting.")
                 break
 
-    def reply(self, to: str, correlation_id: str, data: str) -> None:
+    def reply(self, to: str, correlation_id: str, data: Any) -> None:
         """Publish a reply message with automatic reconnection.
 
         :param str to: The routing key to send the message to
         :param str correlation_id: The correlation ID for the message
-        :param str data: The data to publish
+        :param Any data: The data to publish
         """
         while True:
             try:

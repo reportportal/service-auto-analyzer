@@ -35,7 +35,6 @@ def app_config() -> ApplicationConfig:
         amqpUrl="amqp://guest:guest@localhost:5672/",
         amqpExchangeName="test_analyzer",
         appVersion="test",
-        instanceTaskType="test",
         amqpHandlerMaxRetries=2,
         amqpHandlerTaskTimeout=6,
     )
@@ -51,7 +50,7 @@ def search_config() -> SearchConfig:
 def mock_amqp_client() -> Mock:
     """Create mocked AmqpClient"""
     client = Mock()
-    client.publish_response = Mock()
+    client.reply = Mock()
     return client
 
 
@@ -70,19 +69,24 @@ def handler(app_config, search_config, mock_amqp_client) -> Generator[ProcessAmq
     handler.shutdown()
 
 
-def create_test_processing_item(routing_key="noop_echo", item="test_data", priority=1000) -> ProcessingItem:
+def create_test_processing_item(
+    routing_key="noop_echo", item="test_data", reply_to="test_reply", priority=1000
+) -> ProcessingItem:
     """Helper to create ProcessingItem for testing"""
     return ProcessingItem(
         priority=priority,
         number=1,
         routing_key=routing_key,
+        reply_to=reply_to,
         log_correlation_id="test_correlation",
         msg_correlation_id="test_msg_correlation",
         item=item,
     )
 
 
-def create_amqp_request_mock(routing_key="noop_echo", body: Any = "test_data", correlation_id="test_correlation"):
+def create_amqp_request_mock(
+    routing_key="noop_echo", body: Any = "test_data", reply_to="test_reply", correlation_id="test_correlation"
+):
     """Helper to create AMQP request mocks"""
     channel = Mock(spec=BlockingChannel)
     channel.basic_ack = Mock()
@@ -92,6 +96,7 @@ def create_amqp_request_mock(routing_key="noop_echo", body: Any = "test_data", c
     method.delivery_tag = 123
 
     props = Mock(spec=BasicProperties)
+    props.reply_to = reply_to
     props.correlation_id = correlation_id
     props.headers = None
 
@@ -112,7 +117,7 @@ class TestProcessAmqpRequestHandler:
         """Test Case 1: Processing a task - check it appears in running_tasks and then disappears"""
         # Create a task with short sleep to monitor lifecycle
         channel, method, props, body = create_amqp_request_mock(
-            routing_key="noop_sleep", body=1  # Sleep for 1 seconds
+            routing_key="noop_sleep", body=1, reply_to="test_reply"  # Sleep for 1 seconds
         )
 
         # Verify initially no running tasks
@@ -149,6 +154,7 @@ class TestProcessAmqpRequestHandler:
         channel, method, props, body = create_amqp_request_mock(
             routing_key="noop_echo",
             body=test_message,
+            reply_to="test_reply_queue",
             correlation_id="test_correlation_123",
         )
 
@@ -158,20 +164,21 @@ class TestProcessAmqpRequestHandler:
         # Wait for processing to complete
         time.sleep(10)
 
-        # Verify that publish_response was called on the mock client with correct parameters
-        mock_amqp_client.publish_response.assert_called_once()
-        call_args = mock_amqp_client.publish_response.call_args
+        # Verify that reply was called on the mock client with correct parameters
+        mock_amqp_client.reply.assert_called_once()
+        call_args = mock_amqp_client.reply.call_args
 
-        # Check response parameters
-        assert call_args[0][0] == "test_correlation_123", "Correlation ID should match"
-        assert call_args[0][1] == test_message, "Response body should match the echoed input"
+        # Check reply parameters
+        assert call_args[0][0] == "test_reply_queue", "Reply should be sent to correct queue"
+        assert call_args[0][1] == "test_correlation_123", "Correlation ID should match"
+        assert call_args[0][2] == test_message, "Response body should match the echoed input"
 
     # noinspection PyUnresolvedReferences
     def test_killing_processing_process(self, handler, mock_amqp_client):
         """Test Case 3: Kill processing process, check restart and task requeue"""
         # Create a longer-running task
         channel, method, props, body = create_amqp_request_mock(
-            routing_key="noop_sleep", body=2  # Sleep for 2 seconds
+            routing_key="noop_sleep", body=2, reply_to="test_reply"  # Sleep for 2 seconds
         )
 
         # Submit the long-running task
@@ -220,15 +227,15 @@ class TestProcessAmqpRequestHandler:
         # Submit multiple tasks
         for i, task_data in enumerate(tasks_data):
             channel, method, props, body = create_amqp_request_mock(
-                routing_key="noop_echo", body=task_data, correlation_id=f"correlation_{i}"
+                routing_key="noop_echo", body=task_data, reply_to=f"reply_queue_{i}", correlation_id=f"correlation_{i}"
             )
             handler.handle_amqp_request(channel, method, props, body)
 
         # Wait for all tasks to complete
         time.sleep(10)
 
-        # Verify all responses were published
-        assert mock_amqp_client.publish_response.call_count == len(tasks_data)
+        # Verify all replies were sent
+        assert mock_amqp_client.reply.call_count == len(tasks_data)
 
         # Verify no tasks remain in running_tasks
         assert len(handler.running_tasks) == 0
@@ -247,11 +254,11 @@ class TestProcessAmqpRequestHandler:
         time.sleep(10)
 
         # Verify both tasks were processed
-        assert mock_amqp_client.publish_response.call_count == 2
+        assert mock_amqp_client.reply.call_count == 2
 
-        # The first response should be for the high priority task
-        first_call = mock_amqp_client.publish_response.call_args_list[0]
-        assert first_call[0][1] == "high_priority", "Higher priority task should be processed first"
+        # The first reply should be for the high priority task
+        first_call = mock_amqp_client.reply.call_args_list[0]
+        assert first_call[0][2] == "high_priority", "Higher priority task should be processed first"
 
     def test_error_handling_malformed_json(self, handler, mock_amqp_client):
         """Test handling of malformed JSON in message body"""
@@ -264,6 +271,7 @@ class TestProcessAmqpRequestHandler:
         method.delivery_tag = 123
 
         props = Mock(spec=BasicProperties)
+        props.reply_to = "test_reply"
         props.correlation_id = "test_correlation"
         props.headers = None
 
@@ -279,8 +287,8 @@ class TestProcessAmqpRequestHandler:
         # Verify message was nacked due to JSON parsing error
         channel.basic_nack.assert_called_once_with(delivery_tag=123, requeue=False)
 
-        # Verify no response was published for malformed message
-        mock_amqp_client.publish_response.assert_not_called()
+        # Verify no reply was sent for malformed message
+        mock_amqp_client.reply.assert_not_called()
 
     # noinspection PyUnreachableCode,PyTestUnpassedFixture
     def test_shutdown_cleanup(self, app_config, search_config, mock_amqp_client):
@@ -341,7 +349,7 @@ class TestProcessAmqpRequestHandler:
 
             # Verify task was filtered out (not processed)
             assert len(handler.running_tasks) == 0
-            mock_amqp_client.publish_response.assert_not_called()
+            mock_amqp_client.reply.assert_not_called()
         finally:
             handler.shutdown()
 
@@ -351,7 +359,7 @@ class TestProcessAmqpRequestHandler:
         task_timeout = 12
         # Create a task that will run longer than the timeout and shutdown waiting for the processor
         channel, method, props, body = create_amqp_request_mock(
-            routing_key="noop_sleep", body=task_timeout  # Sleep for 6 seconds
+            routing_key="noop_sleep", body=task_timeout, reply_to="test_reply"  # Sleep for 6 seconds
         )
 
         # Submit the long-running task
@@ -391,7 +399,9 @@ class TestProcessAmqpRequestHandler:
         """Test Case 5: Failed tasks should be processed several times before dropping"""
 
         # Create a task that will fail with noop_fail handler
-        channel, method, props, body = create_amqp_request_mock(routing_key="noop_fail", body="exception_retry")
+        channel, method, props, body = create_amqp_request_mock(
+            routing_key="noop_fail", body="exception_retry", reply_to="test_reply"
+        )
 
         # Submit the failing task
         handler.handle_amqp_request(channel, method, props, body)
@@ -419,7 +429,7 @@ class TestProcessAmqpRequestHandler:
         error_calls = [call for call in mock_error.call_args_list if "failed after 2 retries." in str(call)]
         assert len(error_calls) == 1, "Should log error message about failed retries"
 
-        mock_amqp_client.publish_response.assert_not_called()
+        mock_amqp_client.reply.assert_not_called()
         assert handler.processor.is_alive(), "Processor should be alive after handling failed task"
 
     @patch("app.amqp.amqp_handler.LOGGER")
@@ -440,6 +450,7 @@ class TestProcessAmqpRequestHandler:
             channel_retry, method_retry, props_retry, body_retry = create_amqp_request_mock(
                 routing_key="noop_fail",
                 body="should_retry_task",
+                reply_to="test_reply_retry",
                 correlation_id="correlation_retry",
             )
 
@@ -462,6 +473,7 @@ class TestProcessAmqpRequestHandler:
             channel_no_retry, method_no_retry, props_no_retry, body_no_retry = create_amqp_request_mock(
                 routing_key="noop_fail",
                 body="no_retry_task",
+                reply_to="test_reply_no_retry",
                 correlation_id="correlation_no_retry",
             )
 
@@ -481,8 +493,8 @@ class TestProcessAmqpRequestHandler:
             ]
             assert len(no_retry_error_calls) == 1, "Should log info message about retry predicate failure"
 
-            # Verify no responses were published for either failed task
-            mock_amqp_client.publish_response.assert_not_called()
+            # Verify no replies were sent for either failed task
+            mock_amqp_client.reply.assert_not_called()
         finally:
             # Clean up
             handler.shutdown()

@@ -22,7 +22,7 @@ import opensearchpy.helpers
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory
 from app.commons.esclient import EsClient
-from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, Launch, TestItem
+from app.commons.model.launch_objects import ApplicationConfig, Launch, TestItem
 from app.commons.model.ml import ModelType, TrainInfo
 from app.utils import text_processing, utils
 

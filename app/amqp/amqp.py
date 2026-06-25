@@ -17,7 +17,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Callable
 from threading import Lock
-from typing import Final, Optional, Any
+from typing import Any, Final, Optional
 
 import pika
 from pika.adapters.blocking_connection import BlockingChannel, BlockingConnection

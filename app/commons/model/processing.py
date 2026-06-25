@@ -21,6 +21,7 @@ class ProcessingItem:
     priority: int
     number: int
     routing_key: str = field(compare=False)
+    reply_to: Optional[str] = field(compare=False)
     log_correlation_id: str = field(compare=False)
     msg_correlation_id: str = field(compare=False)
     item: Any = field(compare=False)

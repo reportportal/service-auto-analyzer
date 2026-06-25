@@ -105,6 +105,7 @@ class AutoAnalyzerService(AnalyzerService):
     search_cfg: SearchConfig
     es_client: EsClient
     namespace_finder: NamespaceFinder
+    amqp_client: Optional[AmqpClient]
 
     def __init__(
         self,
@@ -118,6 +119,8 @@ class AutoAnalyzerService(AnalyzerService):
         super().__init__(model_chooser, search_cfg=self.search_cfg)
         self.es_client = es_client or EsClient(app_config=self.app_config)
         self.namespace_finder = NamespaceFinder(app_config)
+        if self.app_config.amqpUrl:
+            self.amqp_client = AmqpClient(self.app_config)
 
     def get_config_for_boosting(self, analyzer_config: AnalyzerConf) -> dict[str, Any]:
         min_should_match = self.find_min_should_match_threshold(analyzer_config) / 100
@@ -522,7 +525,7 @@ class AutoAnalyzerService(AnalyzerService):
         return analysis_result
 
     @utils.ignore_warnings
-    def analyze_logs(self, launches: list[Launch]) -> list[AnalysisResult]:
+    def analyze_logs(self, launches: list[Launch]) -> None:
         cnt_launches = len(launches)
         LOGGER.info(f"Started analysis for {cnt_launches} launches")
 
@@ -659,15 +662,13 @@ class AutoAnalyzerService(AnalyzerService):
                             results_to_share[launch_id]["errors_count"] += 1
 
             # Send results to AMQP if configured
-            if self.app_config.amqpUrl and analyzed_results_for_index:
-                amqp_client = AmqpClient(self.app_config)
-                amqp_client.send_to_inner_queue(
+            if self.amqp_client and analyzed_results_for_index:
+                self.amqp_client.send_to_inner_queue(
                     "index_suggest_info", json.dumps([_info.dict() for _info in analyzed_results_for_index])
                 )
                 for launch_id in results_to_share:
                     results_to_share[launch_id]["model_info"] = list(results_to_share[launch_id]["model_info"])
-                amqp_client.send_to_inner_queue("stats_info", json.dumps(results_to_share))
-                amqp_client.close()
+                self.amqp_client.send_to_inner_queue("stats_info", json.dumps(results_to_share))
 
         except Exception as exc:
             LOGGER.exception("Unable to process analysis candidates", exc_info=exc)
@@ -675,4 +676,5 @@ class AutoAnalyzerService(AnalyzerService):
         LOGGER.debug(f"Stats info: {json.dumps(results_to_share)}")
         LOGGER.info(f"Processed {cnt_items_to_process} test items. It took {time() - t_start:.2f} sec.")
         LOGGER.info(f"Finished analysis for {cnt_launches} launches with {len(results)} results.")
-        return results
+        if self.amqp_client:
+            self.amqp_client.publish_response(json.dumps(results))

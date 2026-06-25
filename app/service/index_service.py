@@ -80,6 +80,8 @@ class IndexService:
         launch_ids_str = ", ".join(launch_ids)
         project = launches[0].project if launches else None
         LOGGER.info(f"Indexing {len(launch_ids)} launches of project '{project}': {launch_ids_str}")
+        if project is None:
+            return None
         t_start = time()
         test_item_queue = self._to_launch_test_item_list(launches)
         project_with_prefix = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)

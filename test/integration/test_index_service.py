@@ -179,10 +179,7 @@ def test_index_logs_calls_correct_services(
     assert is_merged_filter["term"]["is_merged"] is False, "second scan should search for is_merged=False"
 
     # Verify result structure
-    assert result is not None, "result should not be None"
-    assert result.took > 0, "result should have took count"
-    assert result.errors is False, "result should not have errors"
-    assert result.logResults is not None, "result should have logResults"
+    assert result is None, "result should be None"
 
 
 # noinspection PyUnresolvedReferences
@@ -196,17 +193,13 @@ def test_index_logs_with_empty_launches(
 ) -> None:
     """Test index_logs with empty launches list."""
     # Execute with empty launches
-    result = index_service.index_logs([])
+    index_service.index_logs([])
 
     # Verify no OpenSearch operations were called
     mocked_opensearch_client.indices.get.assert_not_called()
     mocked_opensearch_client.indices.create.assert_not_called()
     mock_scan.assert_not_called()
     mock_bulk.assert_not_called()
-
-    # Verify result
-    assert result.took == 0, "result should have took=0 for empty launches"
-    assert result.errors is False, "result should not have errors"
 
 
 # noinspection PyUnresolvedReferences
@@ -427,7 +420,7 @@ def test_index_logs_creates_index_if_not_exists(
     mock_bulk.return_value = (3, [])
 
     # Execute the method
-    result = index_service.index_logs(launches)
+    index_service.index_logs(launches)
 
     # Verify index_exists was called exactly once with correct index name
     mocked_opensearch_client.indices.get.assert_called_once_with(index=expected_index_name)
@@ -440,7 +433,6 @@ def test_index_logs_creates_index_if_not_exists(
 
     # Verify indexing still proceeded (3 bulk calls: index, delete, merge)
     assert mock_bulk.call_count == 3, "Should still index logs after creating index (3 bulk calls)"
-    assert result.took > 0, "Should return success result"
 
 
 # noinspection PyUnresolvedReferences

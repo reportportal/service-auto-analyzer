@@ -2,6 +2,7 @@
 ## [Unreleased]
 ### Changed
 - Base image update: switch on DHI Python 3.12, by @HardNorth
+- The service now replies in a separate exchange and queue, by @HardNorth
 
 ## [5.15.1]
 ### Added

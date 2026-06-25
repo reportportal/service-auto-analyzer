@@ -24,6 +24,7 @@ def _make_processing_item(routing_key: str) -> ProcessingItem:
         priority=10,
         number=1,
         routing_key=routing_key,
+        reply_to=None,
         log_correlation_id="log-id",
         msg_correlation_id="msg-id",
         item={"payload": "value"},

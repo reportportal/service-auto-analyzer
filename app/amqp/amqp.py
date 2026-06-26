@@ -276,24 +276,15 @@ class AmqpClient:
                 logger.info(f"Consumer interrupted by user. Exiting. {connection_info}")
                 break
 
-    def publish_response(self, data: Any) -> None:
-        """Publish an analyzer response message to the configured response queue.
-
-        :param Any data: The data to publish
-        """
+    def __send_to_queue(self, exchange_declare_callable: Optional[Callable], **kwargs: Any) -> None:
         while True:
             try:
                 # Ensure exchange exists before publishing
-                self._declare_response_exchange()
+                if exchange_declare_callable:
+                    exchange_declare_callable()
 
                 with self._connection.channel() as channel:
-                    channel.basic_publish(
-                        exchange=self._config.analyzerResponseExchange,
-                        routing_key=self._config.analyzerResponseQueue,
-                        properties=BasicProperties(content_type="application/json"),
-                        mandatory=False,
-                        body=bytes(data, "utf-8"),
-                    )
+                    channel.basic_publish(**kwargs)
                 return  # success
             except AMQPConnectionError as exc:
                 logger.warning(f"Publish failed: {exc}. Reconnecting.", exc_info=exc)
@@ -306,6 +297,20 @@ class AmqpClient:
             except KeyboardInterrupt:
                 logger.info("Consumer interrupted by user. Exiting.")
                 break
+
+    def publish_response(self, data: Any) -> None:
+        """Publish an analyzer response message to the configured response queue.
+
+        :param Any data: The data to publish
+        """
+        self.__send_to_queue(
+            self._declare_response_exchange,
+            exchange=self._config.analyzerResponseExchange,
+            routing_key=self._config.analyzerResponseQueue,
+            properties=BasicProperties(content_type="application/json"),
+            mandatory=False,
+            body=bytes(data, "utf-8"),
+        )
 
     def send_to_inner_queue(self, queue: str, data: Any) -> None:
         """Publish message with automatic reconnection.
@@ -313,29 +318,12 @@ class AmqpClient:
         :param str queue: Name of the queue to publish to
         :param Any data: Message data to publish
         """
-        while True:
-            try:
-                # Ensure exchange exists before publishing
-                self._declare_exchange()
-
-                with self._connection.channel() as channel:
-                    channel.basic_publish(
-                        exchange=self._config.amqpExchangeName,
-                        routing_key=queue,
-                        body=bytes(data, "utf-8"),
-                    )
-                return  # success
-            except AMQPConnectionError as exc:
-                logger.warning(f"Publish failed: {exc}. Reconnecting.", exc_info=exc)
-                self.close()
-            except AmqpClientConnectionException:
-                raise
-            except Exception as exc:  # pylint: disable=broad-except
-                logger.exception("Failed to publish message", exc_info=exc)
-                self.close()
-            except KeyboardInterrupt:
-                logger.info("Consumer interrupted by user. Exiting.")
-                break
+        self.__send_to_queue(
+            self._declare_exchange,
+            exchange=self._config.amqpExchangeName,
+            routing_key=queue,
+            body=bytes(data, "utf-8"),
+        )
 
     def reply(self, to: str, correlation_id: str, data: Any) -> None:
         """Publish a reply message with automatic reconnection.
@@ -344,25 +332,12 @@ class AmqpClient:
         :param str correlation_id: The correlation ID for the message
         :param Any data: The data to publish
         """
-        while True:
-            try:
-                with self._connection.channel() as channel:
-                    channel.basic_publish(
-                        exchange="",
-                        routing_key=to,
-                        properties=BasicProperties(correlation_id=correlation_id, content_type="application/json"),
-                        mandatory=False,
-                        body=bytes(data, "utf-8"),
-                    )
-                return  # success
-            except AMQPConnectionError as exc:
-                logger.warning(f"Publish failed: {exc}. Reconnecting.", exc_info=exc)
-                self.close()
-            except AmqpClientConnectionException:
-                raise
-            except Exception as exc:  # pylint: disable=broad-except
-                logger.exception("Failed to publish message", exc_info=exc)
-                self.close()
-            except KeyboardInterrupt:
-                logger.info("Consumer interrupted by user. Exiting.")
-                break
+
+        self.__send_to_queue(
+            None,
+            exchange="",
+            routing_key=to,
+            properties=BasicProperties(correlation_id=correlation_id, content_type="application/json"),
+            mandatory=False,
+            body=bytes(data, "utf-8"),
+        )

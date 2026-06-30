@@ -636,7 +636,7 @@ class AutoAnalyzerService(AnalyzerService):
                                 continue
 
                             analysis_result = to_analysis_result(analyzer_candidate, best)
-                            results.append(analysis_result)
+                            results.append(analysis_result.dict())
                             LOGGER.debug(analysis_result)
                             found_result = True
 
@@ -677,4 +677,4 @@ class AutoAnalyzerService(AnalyzerService):
         LOGGER.info(f"Processed {cnt_items_to_process} test items. It took {time() - t_start:.2f} sec.")
         LOGGER.info(f"Finished analysis for {cnt_launches} launches with {len(results)} results.")
         if self.amqp_client:
-            self.amqp_client.publish_response(results)
+            self.amqp_client.publish_response(json.dumps(results))

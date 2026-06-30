@@ -298,10 +298,10 @@ class AmqpClient:
                 logger.info("Consumer interrupted by user. Exiting.")
                 break
 
-    def publish_response(self, data: Any) -> None:
+    def publish_response(self, data: str) -> None:
         """Publish an analyzer response message to the configured response queue.
 
-        :param Any data: The data to publish
+        :param str data: The data to publish
         """
         self.__send_to_queue(
             self._declare_response_exchange,
@@ -325,12 +325,12 @@ class AmqpClient:
             body=bytes(data, "utf-8"),
         )
 
-    def reply(self, to: str, correlation_id: str, data: Any) -> None:
+    def reply(self, to: str, correlation_id: str, data: str) -> None:
         """Publish a reply message with automatic reconnection.
 
         :param str to: The routing key to send the message to
         :param str correlation_id: The correlation ID for the message
-        :param Any data: The data to publish
+        :param str data: The data to publish
         """
 
         self.__send_to_queue(

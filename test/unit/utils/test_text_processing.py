@@ -402,3 +402,8 @@ def test_calculate_text_similarity_script_scenarios():
             for i, r in enumerate(previous_similarities):
                 assert result[i].similarity == pytest.approx(r.similarity, abs=0.01)
         previous_similarities = result
+
+
+def test_extract_paths():
+    paths = text_processing.extract_paths(read_file("test_res/test_logs/webdriver", "webdriver_unexpected_output.txt"))
+    assert paths is not None

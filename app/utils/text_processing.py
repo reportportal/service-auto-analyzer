@@ -710,9 +710,9 @@ POSIX_PATHS = r"""
         (?:^|\s|"|'|`)             # start of line, space, quote
         /                          # leading slash
         (?:                        # 0+ "segment/" blocks
-            (?:\\.|[^/\s\r\n])+ /  # seg may contain backslash-escapes
+            (?:\\.|[^/\\\s\r\n])+ /  # seg may contain backslash-escapes
         )*                         # 0+ segments
-        (?:\\.|[^/\s\r\n])+        # final segment
+        (?:\\.|[^/\\\s\r\n])+      # final segment
     """
 PATH_REGEX = re.compile(rf"{WINDOWS_PATHS}|{POSIX_PATHS}", re.VERBOSE)
 

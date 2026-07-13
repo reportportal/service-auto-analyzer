@@ -4,7 +4,11 @@
 - Base image update: switch on DHI Python 3.12, by @HardNorth
 - The service now replies in a separate exchange and queue, by @HardNorth
 
-## [5.15.1]
+## [5.15.3]
+### Fixed
+- A catastrophic backtracking issue in paths extraction RegExes, by @HardNorth
+
+## [5.15.2]
 ### Added
 - Removing HEX addresses from on message processing as junk data, by @HardNorth
 - `DISABLE_TRAIN` config flag, by @HardNorth

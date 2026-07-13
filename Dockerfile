@@ -1,8 +1,7 @@
 FROM dhi.io/python@sha256:c2b0cd3f1b921937d1d15c1cd3a2335fc23d865bba99255127af79821d02042f AS test
 USER root
-RUN apt-get update && apt-get upgrade -y \
+RUN apt-get update \
     && apt-get install -y --no-install-recommends make \
-    && rm -rf /var/lib/apt/lists/* \
     && python -m venv /venv \
     && mkdir /build
 ENV VIRTUAL_ENV=/venv
@@ -21,9 +20,8 @@ RUN "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir -r requirements-dev.txt
 RUN make test-all
 
 FROM dhi.io/python@sha256:c2b0cd3f1b921937d1d15c1cd3a2335fc23d865bba99255127af79821d02042f AS builder
-RUN apt-get update && apt-get upgrade -y \
+RUN apt-get update \
     && apt-get install -y --no-install-recommends make \
-    && rm -rf /var/lib/apt/lists/* \
     && python -m venv /venv \
     && mkdir /build
 ENV VIRTUAL_ENV=/venv

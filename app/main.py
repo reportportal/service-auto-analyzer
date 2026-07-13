@@ -220,7 +220,7 @@ APP_CONFIG = ApplicationConfig(
     analyzerHttpPort=int(os.getenv("ANALYZER_HTTP_PORT", "5001")),
     # Log settings
     analyzerPathToLog=os.getenv("ANALYZER_FILE_LOGGING_PATH", "/tmp/config.log"),
-    logLevel=os.getenv("LOGGING_LEVEL", "DEBUG").strip(),
+    logLevel=os.getenv("LOGGING_LEVEL", "INFO").strip(),
     # Debug settings, controls if AMQP handler runs in threaded mode to ease debugging
     debugMode=to_bool(os.getenv("DEBUG_MODE", "false")),
     # Features

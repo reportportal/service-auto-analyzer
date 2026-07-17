@@ -422,3 +422,8 @@ def test_calculate_text_similarity_script_scenarios():
 def test_find_last_unique_texts(test_texts, expected_result):
     logs_left = text_processing.find_last_unique_texts(0.95, test_texts)
     assert logs_left == expected_result
+
+
+def test_extract_paths():
+    paths = text_processing.extract_paths(read_file("test_res/test_logs/webdriver", "webdriver_unexpected_output.txt"))
+    assert paths is not None

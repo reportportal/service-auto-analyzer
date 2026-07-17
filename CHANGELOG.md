@@ -1,10 +1,17 @@
 # Changelog
 ## [Unreleased]
-### Added
-- Removing HEX addresses from on message processing as junk data, by @HardNorth
 ### Changed
 - Log Item-centric storage approach changed to Test Item-centric one, by @HardNorth
 - Status code detection improved, by @HardNorth
+
+## [5.15.3]
+### Fixed
+- A catastrophic backtracking issue in paths extraction RegExes, by @HardNorth
+
+## [5.15.2]
+### Added
+- Removing HEX addresses from on message processing as junk data, by @HardNorth
+- `DISABLE_TRAIN` config flag, by @HardNorth
 
 ## [5.15.1]
 ### Changed

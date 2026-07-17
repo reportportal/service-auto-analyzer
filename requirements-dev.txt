@@ -6,8 +6,12 @@ mypy==1.19.1
 pre-commit==4.5.0
 vulture==2.14
 
-pytest==9.0.3
+# pytest
+pytest==8.4.2
 pytest-cov==7.0.0
+pytest-timeout==2.4.0
+
+# AWS S3 stub server and clients
 moto[server,s3]==5.1.18
 
 # Types

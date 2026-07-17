@@ -57,6 +57,7 @@ ENV VIRTUAL_ENV="/venv"
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend
 
 RUN microdnf -y upgrade \
+    && microdnf -y update libarchive \
     && microdnf clean all \
     && mkdir -p -m 0744 /backend/storage \
     && source "${VIRTUAL_ENV}/bin/activate"

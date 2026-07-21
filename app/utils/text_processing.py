@@ -560,7 +560,7 @@ def remove_guid_uuids_from_text(text: str) -> str:
 
 
 HEX_TAG = "SPECIALHEX"
-HEX = r"0x[0-9a-fA-F]{12}"
+HEX = r"0x[0-9a-fA-F]{6,}"
 HEX_PATTERNS: Iterable[tuple[re.Pattern, str]] = [
     (re.compile(rf"\b{HEX}\b"), HEX_TAG),
 ]

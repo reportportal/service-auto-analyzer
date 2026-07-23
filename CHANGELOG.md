@@ -4,6 +4,10 @@
 - Log Item-centric storage approach changed to Test Item-centric one, by @HardNorth
 - Status code detection improved, by @HardNorth
 
+## [5.15.4]
+### Changed
+- Adjust HEX detection, by @HardNorth
+
 ## [5.15.3]
 ### Fixed
 - A catastrophic backtracking issue in paths extraction RegExes, by @HardNorth

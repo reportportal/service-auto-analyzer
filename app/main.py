@@ -391,6 +391,7 @@ THREADS: list[tuple[str, threading.Thread, AmqpRequestHandler]] = []
 def get_health_status():
     status: dict[str, Any] = {"status": "healthy"}
     status_code = 200
+    status["version"] = APP_CONFIG.appVersion
     if not os_client.is_healthy():
         logger.error("Analyzer health check status failed: %s", status)
         status["status"] = "OpenSearch is not healthy"

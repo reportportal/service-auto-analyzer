@@ -32,7 +32,9 @@ def test_remove_starting_thread_name():
         ("stacktraces/webdriver_selenide_stacktrace.txt", "stacktraces/webdriver_selenide_stacktrace_prepared.txt"),
         ("stacktraces/log_stacktrace_js.txt", "stacktraces/log_stacktrace_js_prepared.txt"),
         ("webdriver/webdriver_exception_info.txt", "webdriver/webdriver_exception_info_prepared.txt"),
-        ("hex/error_with_hex.txt", "hex/error_with_hex_prepared.txt"),
+        ("hex/error_with_hex_01.txt", "hex/error_with_hex_01_prepared.txt"),
+        ("hex/error_with_hex_02.txt", "hex/error_with_hex_02_prepared.txt"),
+        ("hex/error_with_hex_03.txt", "hex/error_with_hex_03_prepared.txt"),
     ],
 )
 def test_separators_log_prepare(test_file, expected_file):

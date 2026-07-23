@@ -146,6 +146,17 @@ class SimilarityResult(BaseModel):
     both_empty: bool
 
 
+class RelevantItem(BaseModel):
+    """Most relevant log hit found for an issue type or test item, with its comparison metadata"""
+
+    mrHit: Hit[LogItemIndexData] = Field(
+        default_factory=lambda: Hit[LogItemIndexData](score=-1, source=LogItemIndexData())
+    )
+    score: float = 0.0
+    compared_log: Optional[LogItemIndexData] = None
+    original_position: Optional[int] = None
+
+
 class Log(BaseModel):
     """Log object"""
 

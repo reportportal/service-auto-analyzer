@@ -18,6 +18,7 @@ from typing import Any, Optional, Union, override
 
 from app.commons import logging
 from app.commons.model.db import Hit
+from app.commons.model.launch_objects import RelevantItem
 from app.commons.model.log_item_index import LogItemIndexData
 from app.commons.model.ml import ModelType
 from app.commons.model_chooser import ModelChooser
@@ -58,7 +59,7 @@ class PredictionResult:
 
     label: int
     probability: list[float]
-    data: dict[str, Any]
+    data: RelevantItem
     identity: str
     feature_info: Optional[FeatureInfo]
     model_info_tags: list[str]
@@ -191,16 +192,19 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
         # Create list of PredictionResult objects, one for each prediction
         results = []
         for idx, identity in enumerate(identifiers):
+            relevant_item = scores_by_identity[identity]
             result = PredictionResult(
                 label=predicted_labels[idx],
                 probability=predicted_labels_probability[idx],
-                data=scores_by_identity[identity],
+                data=relevant_item,
                 identity=identity,
                 feature_info=FeatureInfo(
                     feature_ids=self.boosting_decision_maker.feature_ids, feature_data=feature_data[idx]
                 ),
                 model_info_tags=model_info_tags,
-                original_position=scores_by_identity[identity].get("original_position", idx),
+                original_position=(
+                    relevant_item.original_position if relevant_item.original_position is not None else idx
+                ),
             )
             results.append(result)
 
@@ -386,7 +390,7 @@ class SimilarityPredictor(Predictor):
             probability = [1.0 - similarity, similarity]
 
             # Create data structure matching expected format
-            data = {"mrHit": result_data["mrHit"], "compared_log": result_data["compared_log"]}
+            data = RelevantItem(mrHit=result_data["mrHit"], compared_log=result_data["compared_log"])
 
             # Create PredictionResult
             prediction_result = PredictionResult(

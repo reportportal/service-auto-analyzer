@@ -610,7 +610,7 @@ class AnalysisModelTraining:
                     if not score_info:
                         candidate_issue_types.append("")
                         continue
-                    candidate_hit = score_info.get("mrHit")
+                    candidate_hit = score_info.mrHit
                     if not candidate_hit:
                         candidate_issue_types.append("")
                         continue

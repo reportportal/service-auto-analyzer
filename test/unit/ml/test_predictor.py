@@ -18,6 +18,7 @@ from unittest.mock import Mock
 import pytest
 
 from app.commons.model.db import Hit
+from app.commons.model.launch_objects import RelevantItem
 from app.commons.model.log_item_index import LogItemIndexData
 from app.commons.model.ml import ModelType
 from app.ml.predictor import (
@@ -53,11 +54,9 @@ def assert_prediction_result_structure(
     assert isinstance(result.probability, list)
     assert len(result.probability) == 2
     assert result.probability[0] + result.probability[1] == pytest.approx(1.0)
-    assert isinstance(result.data, dict)
-    assert "mrHit" in result.data
-    assert "compared_log" in result.data
-    assert isinstance(result.data["mrHit"], Hit)
-    assert isinstance(result.data["compared_log"], LogItemIndexData)
+    assert isinstance(result.data, RelevantItem)
+    assert isinstance(result.data.mrHit, Hit)
+    assert isinstance(result.data.compared_log, LogItemIndexData)
     assert result.identity == expected_identity
     assert result.feature_info is not None
     assert isinstance(result.feature_info, FeatureInfo)
@@ -507,11 +506,11 @@ class TestAutoAnalysisPredictor:
         mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
         mr_hit_source = build_log_item(log_id="log1", message="test", test_item=456)
         mock_featurizer.find_most_relevant_by_type.return_value = {
-            "456": {
-                "mrHit": build_hit(mr_hit_source),
-                "compared_log": build_log_item(log_id="query1", message="test"),
-                "original_position": 0,
-            }
+            "456": RelevantItem(
+                mrHit=build_hit(mr_hit_source),
+                compared_log=build_log_item(log_id="query1", message="test"),
+                original_position=0,
+            )
         }
         predictor.create_featurizer = Mock(return_value=mock_featurizer)
 
@@ -539,11 +538,11 @@ class TestAutoAnalysisPredictor:
         mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
         mr_hit_source = build_log_item(log_id="log1", message="test")
         mock_featurizer.find_most_relevant_by_type.return_value = {
-            "456": {
-                "mrHit": build_hit(mr_hit_source),
-                "compared_log": build_log_item(log_id="query1", message="test"),
-                "original_position": 0,
-            }
+            "456": RelevantItem(
+                mrHit=build_hit(mr_hit_source),
+                compared_log=build_log_item(log_id="query1", message="test"),
+                original_position=0,
+            )
         }
         predictor.create_featurizer = Mock(return_value=mock_featurizer)
 
@@ -570,16 +569,16 @@ class TestAutoAnalysisPredictor:
         mock_featurizer.gather_features_info.return_value = ([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]], ["456", "789"])
         mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
         mock_featurizer.find_most_relevant_by_type.return_value = {
-            "456": {
-                "mrHit": build_hit(build_log_item(log_id="log1", message="test1")),
-                "compared_log": build_log_item(log_id="query1", message="test1"),
-                "original_position": 0,
-            },
-            "789": {
-                "mrHit": build_hit(build_log_item(log_id="log2", message="test2")),
-                "compared_log": build_log_item(log_id="query2", message="test2"),
-                "original_position": 1,
-            },
+            "456": RelevantItem(
+                mrHit=build_hit(build_log_item(log_id="log1", message="test1")),
+                compared_log=build_log_item(log_id="query1", message="test1"),
+                original_position=0,
+            ),
+            "789": RelevantItem(
+                mrHit=build_hit(build_log_item(log_id="log2", message="test2")),
+                compared_log=build_log_item(log_id="query2", message="test2"),
+                original_position=1,
+            ),
         }
         predictor.create_featurizer = Mock(return_value=mock_featurizer)
 
@@ -716,11 +715,11 @@ class TestSuggestionPredictor:
         mock_featurizer.get_used_model_info.return_value = ["suggestion_featurizer_info"]
         mr_hit_source = build_log_item(log_id="log2", message="suggestion_test", test_item=789)
         mock_featurizer.find_most_relevant_by_type.return_value = {
-            "789": {
-                "mrHit": build_hit(mr_hit_source),
-                "compared_log": build_log_item(log_id="query1", message="suggestion_test"),
-                "original_position": 0,
-            }
+            "789": RelevantItem(
+                mrHit=build_hit(mr_hit_source),
+                compared_log=build_log_item(log_id="query1", message="suggestion_test"),
+                original_position=0,
+            )
         }
         predictor.create_featurizer = Mock(return_value=mock_featurizer)
 
@@ -750,11 +749,11 @@ class TestSuggestionPredictor:
         mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
         mr_hit_source = build_log_item(log_id="log2", message="test")
         mock_featurizer.find_most_relevant_by_type.return_value = {
-            "789": {
-                "mrHit": build_hit(mr_hit_source),
-                "compared_log": build_log_item(log_id="query1", message="test"),
-                "original_position": 0,
-            }
+            "789": RelevantItem(
+                mrHit=build_hit(mr_hit_source),
+                compared_log=build_log_item(log_id="query1", message="test"),
+                original_position=0,
+            )
         }
         predictor.create_featurizer = Mock(return_value=mock_featurizer)
 
@@ -781,16 +780,16 @@ class TestSuggestionPredictor:
         mock_featurizer.gather_features_info.return_value = ([[0.7, 0.8, 0.9], [0.1, 0.2, 0.3]], ["789", "101"])
         mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
         mock_featurizer.find_most_relevant_by_type.return_value = {
-            "789": {
-                "mrHit": build_hit(build_log_item(log_id="log2", message="test1")),
-                "compared_log": build_log_item(log_id="query1", message="test1"),
-                "original_position": 0,
-            },
-            "101": {
-                "mrHit": build_hit(build_log_item(log_id="log3", message="test2")),
-                "compared_log": build_log_item(log_id="query2", message="test2"),
-                "original_position": 1,
-            },
+            "789": RelevantItem(
+                mrHit=build_hit(build_log_item(log_id="log2", message="test1")),
+                compared_log=build_log_item(log_id="query1", message="test1"),
+                original_position=0,
+            ),
+            "101": RelevantItem(
+                mrHit=build_hit(build_log_item(log_id="log3", message="test2")),
+                compared_log=build_log_item(log_id="query2", message="test2"),
+                original_position=1,
+            ),
         }
         predictor.create_featurizer = Mock(return_value=mock_featurizer)
 

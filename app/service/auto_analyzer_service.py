@@ -102,7 +102,7 @@ def prepare_request_logs_for_launch(
 
 
 def to_analysis_result(candidate: AnalysisCandidate, result: PredictionResult) -> AnalysisResult:
-    relevant_item = result.data["mrHit"]["_source"]["test_item"]
+    relevant_item = result.data.mrHit.source.test_item
     analysis_result = AnalysisResult(
         testItem=candidate.testItemId,
         issueType=result.identity,

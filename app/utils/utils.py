@@ -27,7 +27,7 @@ from requests import RequestException
 
 from app.commons import logging
 from app.commons.model import launch_objects
-from app.commons.model.launch_objects import SimilarityResult
+from app.commons.model.launch_objects import RelevantItem, SimilarityResult
 from app.ml.predictor import PredictionResult
 from app.utils.text_processing import remove_credentials_from_url, split_words
 
@@ -341,18 +341,8 @@ def safe_int(value: Any) -> int:
     except (TypeError, ValueError):
         return 0
 
-
-def _get_source(msg_source: dict[str, Any]) -> Optional[Any]:
-    hit = msg_source.get("mrHit", None)
-    if hit is None:
-        return None
-    return getattr(hit, "source", None)
-
-
-def _get_test_item(msg_source: dict[str, Any]) -> int:
-    source = _get_source(msg_source)
-    if source is None:
-        return -1
+def _get_test_item(msg_source: RelevantItem) -> int:
+    source = msg_source.mrHit.source
     return int(getattr(source, "test_item", -1))
 
 
@@ -375,17 +365,13 @@ def group_predictions_by_test_item(
     return groups
 
 
-def _get_message(msg_source: dict[str, Any]) -> str:
-    source = _get_source(msg_source)
-    if source is None:
-        return ""
+def _get_message(msg_source: RelevantItem) -> str:
+    source = msg_source.mrHit.source
     return str(getattr(source, "message", ""))
 
 
-def _get_log_level(msg_source: dict[str, Any]) -> int:
-    source = _get_source(msg_source)
-    if source is None:
-        return 0
+def _get_log_level(msg_source: RelevantItem) -> int:
+    source = msg_source.mrHit.source
     return int(getattr(source, "log_level", 0))
 
 

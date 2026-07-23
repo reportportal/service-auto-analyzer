@@ -4,6 +4,7 @@ from unittest import mock
 import pytest
 
 from app.commons.model.db import Hit
+from app.commons.model.launch_objects import RelevantItem
 from app.commons.model.log_item_index import LogItemIndexData
 from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model.test_item_index import LogData, TestItemHistoryData, TestItemIndexData
@@ -192,9 +193,9 @@ def test_train_uses_os_client_and_issue_history(model_type: ModelType) -> None:
             return Hit[LogItemIndexData].from_dict({"_score": 1.0, "_source": LogItemIndexData(issue_type=issue_type)})
 
         return {
-            "pb001": {"mrHit": make_hit("pb001")},
-            "ab001": {"mrHit": make_hit("ab001")},
-            "si001": {"mrHit": make_hit("si001")},
+            "pb001": RelevantItem(mrHit=make_hit("pb001")),
+            "ab001": RelevantItem(mrHit=make_hit("ab001")),
+            "si001": RelevantItem(mrHit=make_hit("si001")),
         }
 
     training = AnalysisModelTraining(

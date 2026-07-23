@@ -1,0 +1,16 @@
+self = <tests.system.index.test_index.TestIndex object at 0x00000257ADBEBED0>
+shared_steps = <automation.shared_steps.shared_steps.SharedSteps object at 0x00000257AF644810>
+
+    @pytest.mark.one_a
+    @pytest.mark.one_b
+    @pytest.mark.demo
+    @pytest.mark.tc_id('SYSTEM-123')
+    def test_navigate_to_index_page(self, shared_steps):
+        index = shared_steps.shared_steps_ui.navigate_to_index_page()
+        outcome, error_msg = index.verify_url_matches()
+
+>       assert outcome, error_msg
+E       AssertionError: The current URL "https://docs.example.com/index.html" does not match any of the page's URLs "['https://docs.example.com/']".
+E       assert False
+
+tests\system\index\test_index.py:17: AssertionError

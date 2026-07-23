@@ -1,5 +1,9 @@
 # Changelog
 ## [Unreleased]
+### Changed
+- Adjust HEX detection, by @HardNorth
+
+## [5.15.3]
 ### Fixed
 - A catastrophic backtracking issue in paths extraction RegExes, by @HardNorth
 

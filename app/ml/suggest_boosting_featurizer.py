@@ -55,7 +55,8 @@ class SuggestBoostingFeaturizer(boosting_featurizer.BoostingFeaturizer):
             for idx, hit in enumerate(es_results):
                 test_item = str(hit.source.test_item)
                 issue_type_item = scores_by_type[test_item]
-                if hit.score > issue_type_item.mrHit.score:
+                hit_score = hit.score or -1.0
+                if hit_score > (issue_type_item.mrHit.score or -1.0):
                     issue_type_item.mrHit = hit
                     issue_type_item.compared_log = log
                     issue_type_item.original_position = idx

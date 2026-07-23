@@ -241,7 +241,7 @@ class BoostingFeaturizer:
 
                 issue_type_item = scores_by_issue_type[issue_type]
                 hit_score = hit.score or 0.0
-                if hit_score > issue_type_item.mrHit.score:
+                if hit_score > (issue_type_item.mrHit.score or -1.0):
                     issue_type_item.mrHit = hit
                     issue_type_item.compared_log = log
                     issue_type_item.original_position = idx

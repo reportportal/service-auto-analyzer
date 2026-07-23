@@ -153,8 +153,8 @@ class RelevantItem(BaseModel):
         default_factory=lambda: Hit[LogItemIndexData](score=-1, source=LogItemIndexData())
     )
     score: float = 0.0
-    compared_log: Optional[LogItemIndexData] = None
-    original_position: Optional[int] = None
+    compared_log: LogItemIndexData = Field(default_factory=LogItemIndexData)
+    original_position: int = -1
 
 
 class Log(BaseModel):

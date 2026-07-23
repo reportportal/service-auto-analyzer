@@ -341,6 +341,7 @@ def safe_int(value: Any) -> int:
     except (TypeError, ValueError):
         return 0
 
+
 def _get_test_item(msg_source: RelevantItem) -> int:
     source = msg_source.mrHit.source
     return int(getattr(source, "test_item", -1))

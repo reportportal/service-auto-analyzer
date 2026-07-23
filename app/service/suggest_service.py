@@ -548,7 +548,7 @@ class SuggestService(AnalyzerService):
                             relevantLogId=relevant_log_id,
                             isMergedLog=False,
                             matchScore=round(weighted_score * 100, 2),
-                            esScore=round(result.data.mrHit.score, 2),
+                            esScore=round(result.data.mrHit.score or 0.0, 2),
                             esPosition=result.original_position,
                             modelFeatureNames=feature_names,
                             modelFeatureValues=feature_values,

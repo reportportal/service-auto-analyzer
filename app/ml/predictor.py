@@ -202,9 +202,7 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
                     feature_ids=self.boosting_decision_maker.feature_ids, feature_data=feature_data[idx]
                 ),
                 model_info_tags=model_info_tags,
-                original_position=(
-                    relevant_item.original_position if relevant_item.original_position is not None else idx
-                ),
+                original_position=(relevant_item.original_position if relevant_item.original_position >= 0 else idx),
             )
             results.append(result)
 

@@ -39,7 +39,7 @@ RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
 ARG APP_VERSION=""
 ARG RELEASE_MODE=false
 ARG GITHUB_TOKEN
-RUN if [ "$RELEASE_MODE" = "true" ]; then make release v=${APP_VERSION} githubtoken=${GITHUB_TOKEN}; else if [ "${APP_VERSION}" != "" ]; then make build-release v=${APP_VERSION}; fi ; fi
+RUN if [ "$RELEASE_MODE" = "true" ]; then make release v=${APP_VERSION} githubtoken=${GITHUB_TOKEN}; elif [ "${APP_VERSION}" != "" ]; then echo "${APP_VERSION}" > VERSION; fi
 RUN mkdir -p -m 0744 /backend/storage \
     && cp /build/VERSION /backend \
     && cp -r /build/app /backend/ \

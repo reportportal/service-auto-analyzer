@@ -111,6 +111,11 @@ def to_analysis_result(candidate: AnalysisCandidate, result: PredictionResult) -
     return analysis_result
 
 
+def log_query_results(start_time: float | int, all_candidates: list[AnalysisCandidate]):
+    LOGGER.info("Collected %d candidates for analysis", len(all_candidates))
+    LOGGER.info("Os queries finished %.2f s.", time() - start_time)
+
+
 class AutoAnalyzerService(AnalyzerService):
     app_config: ApplicationConfig
     os_client: OsClient
@@ -304,8 +309,7 @@ class AutoAnalyzerService(AnalyzerService):
             request_logs_by_test_item = prepare_request_logs_for_launch(launch)
             for source_test_item, request_logs in request_logs_by_test_item:
                 if self._should_stop_processing(processed_items):
-                    LOGGER.info("Collected %d candidates for analysis", len(all_candidates))
-                    LOGGER.info("Os queries finished %.2f s.", time() - t_start)
+                    log_query_results(t_start, all_candidates)
                     return all_candidates
 
                 item_start = time()
@@ -325,7 +329,7 @@ class AutoAnalyzerService(AnalyzerService):
                 )
                 processed_items += 1
 
-        LOGGER.info("Os queries finished %.2f s.", time() - t_start)
+        log_query_results(t_start, all_candidates)
         return all_candidates
 
     @utils.ignore_warnings

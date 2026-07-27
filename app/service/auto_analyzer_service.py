@@ -306,7 +306,13 @@ class AutoAnalyzerService(AnalyzerService):
         processed_items = 0
 
         for launch in launches:
+            preparation_start = time()
             request_logs_by_test_item = prepare_request_logs_for_launch(launch)
+            LOGGER.info(
+                "Finished preparing request logs for launch '%s', took: %.2f s.",
+                str(launch.launchId),
+                time() - preparation_start,
+            )
             for source_test_item, request_logs in request_logs_by_test_item:
                 if self._should_stop_processing(processed_items):
                     log_query_results(t_start, all_candidates)

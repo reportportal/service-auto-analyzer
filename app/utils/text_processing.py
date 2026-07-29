@@ -887,10 +887,17 @@ def remove_webdriver_auxiliary_info(text: str) -> str:
 
 
 READABLE_NUMBER = "[EXCLUDED NUMBER]"
+READABLE_UUID = "[EXCLUDED UUID]"
+READABLE_HEX = "[EXCLUDED HEX]"
+READABLE_TOKEN = "[EXCLUDED TOKEN]"
 
 
 def replace_tokens_with_readable_text(text: str) -> str:
-    return text.replace(NUMBER_TAG, READABLE_NUMBER)
+    updated_text = text.replace(NUMBER_TAG, READABLE_NUMBER)
+    updated_text = updated_text.replace(UUID_TAG, READABLE_UUID)
+    updated_text = updated_text.replace(HEX_TAG, READABLE_HEX)
+    updated_text = updated_text.replace(TOKEN_TAG, READABLE_TOKEN)
+    return updated_text
 
 
 URL_TAG = "SPECIALURL"

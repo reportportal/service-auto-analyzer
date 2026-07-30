@@ -371,18 +371,27 @@ class SuggestService(AnalyzerService):
         for log in opensearchpy.helpers.scan(
             self.es_client.es_client, query=self.get_query_for_logs_by_test_item(test_item_id), index=index_name
         ):
-            # clean test item info not to boost by it
-            log["_source"]["test_item"] = 0
-            log["_source"]["test_case_hash"] = 0
-            log["_source"]["unique_id"] = ""
-            log["_source"]["test_item_name"] = ""
             logs.append(log)
         return logs, test_item_id
+
+    def query_logs_for_test_item(self, test_item_info: TestItemInfo, index_name: str) -> list[dict]:
+        logs = []
+        for log in opensearchpy.helpers.scan(
+            self.es_client.es_client,
+            query=self.get_query_for_logs_by_test_item(test_item_info.testItemId),
+            index=index_name,
+        ):
+            logs.append(log)
+        return logs
 
     def prepare_logs_for_suggestions(self, test_item_info: TestItemInfo, index_name: str) -> tuple[list[dict], int]:
         test_item_id_for_suggest = test_item_info.testItemId
         if test_item_info.clusterId != 0:
             prepared_logs, test_item_id_for_suggest = self.query_logs_for_cluster(test_item_info, index_name)
+            logs = self._select_logs_for_suggestion_query(prepared_logs)
+        elif self.es_client.index_exists(index_name):
+            prepared_logs = self.query_logs_for_test_item(test_item_info, index_name)
+            logs = self._select_logs_for_suggestion_query(prepared_logs)
         else:
             unique_logs = text_processing.leave_only_unique_logs(test_item_info.logs)
             prepared_logs = [
@@ -390,8 +399,16 @@ class SuggestService(AnalyzerService):
                 for log in unique_logs
                 if log.logLevel >= utils.ERROR_LOGGING_LEVEL
             ]
-        logs, _ = log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
+            logs, _ = log_merger.decompose_logs_merged_and_without_duplicates(prepared_logs)
         return logs, test_item_id_for_suggest
+
+    @staticmethod
+    def _select_logs_for_suggestion_query(prepared_logs: list[dict]) -> list[dict]:
+        """Use indexed non-merged logs as-is; re-decomposing indexed logs degrades ML features."""
+        non_merged_logs = [log for log in prepared_logs if not log["_source"].get("is_merged")]
+        if non_merged_logs:
+            return non_merged_logs
+        return prepared_logs
 
     def suggest_items(self, test_item_info: TestItemInfo) -> list[SuggestAnalysisResult]:
         LOGGER.info(f"Started suggesting for test item with id: {test_item_info.testItemId}")

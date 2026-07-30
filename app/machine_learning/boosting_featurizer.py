@@ -359,19 +359,21 @@ class BoostingFeaturizer:
         for log, res in all_results:
             test_case_hash_dict = {}
             for r in res["hits"]["hits"]:
-                test_case_hash = r["_source"]["test_case_hash"]
-                if test_case_hash not in test_case_hash_dict:
-                    test_case_hash_dict[test_case_hash] = []
-                test_case_hash_dict[test_case_hash].append(
+                # Group by test case hash and test item so repeated launches of the same test
+                # remain separate suggestion candidates instead of collapsing to a single hit.
+                group_key = (r["_source"]["test_case_hash"], r["_source"]["test_item"])
+                if group_key not in test_case_hash_dict:
+                    test_case_hash_dict[group_key] = []
+                test_case_hash_dict[group_key].append(
                     (r["_id"], int(r["_score"]), datetime.strptime(r["_source"]["start_time"], "%Y-%m-%d %H:%M:%S"))
                 )
             log_ids_to_take = set()
-            for test_case_hash in test_case_hash_dict:
-                test_case_hash_dict[test_case_hash] = sorted(
-                    test_case_hash_dict[test_case_hash], key=lambda x: (x[1], x[2]), reverse=True
+            for group_key in test_case_hash_dict:
+                test_case_hash_dict[group_key] = sorted(
+                    test_case_hash_dict[group_key], key=lambda x: (x[1], x[2]), reverse=True
                 )
                 scores_used = set()
-                for sorted_score in test_case_hash_dict[test_case_hash]:
+                for sorted_score in test_case_hash_dict[group_key]:
                     if sorted_score[1] not in scores_used:
                         log_ids_to_take.add(sorted_score[0])
                         scores_used.add(sorted_score[1])

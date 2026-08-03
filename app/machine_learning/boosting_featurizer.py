@@ -178,6 +178,7 @@ class BoostingFeaturizer:
     def filter_by_test_case_hash(
         self, processed_results: list[tuple[dict[str, Any], dict[str, Any]]]
     ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+        """Deduplicate results by Test Case Hash to not return all results from one item only, this number limited."""
         filter_by_test_case_hash: Optional[bool] = self.config.get("filter_by_test_case_hash", None)
         if filter_by_test_case_hash:
             filtered_processed_results = self._filter_by_test_case_hash(processed_results)

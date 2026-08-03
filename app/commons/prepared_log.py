@@ -19,6 +19,7 @@ from typing_extensions import override
 from app.utils import text_processing
 from app.utils.log_preparation import (
     basic_prepare,
+    clean_message_clustering,
     prepare_exception_message_and_stacktrace,
     prepare_exception_message_no_params,
     prepare_exception_message_no_params_no_numbers,
@@ -26,7 +27,6 @@ from app.utils.log_preparation import (
     prepare_message_no_numbers,
     prepare_message_no_params,
     unify_message,
-    clean_message_clustering,
 )
 
 

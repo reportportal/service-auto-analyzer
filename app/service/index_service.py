@@ -123,6 +123,7 @@ class IndexService:
         LOGGER.info("Started updating defect types")
         t_start = time()
         test_item_ids = [int(key_) for key_ in defect_update_info["itemsToUpdate"].keys()]
+        is_auto_analyzed = defect_update_info.get("isAutoAnalyzed", False)
         defect_update_info["itemsToUpdate"] = {
             int(key_): val for key_, val in defect_update_info["itemsToUpdate"].items()
         }
@@ -156,7 +157,7 @@ class IndexService:
                             "_op_type": "update",
                             "_id": log["_id"],
                             "_index": index_name,
-                            "doc": {"issue_type": issue_type, "is_auto_analyzed": False},
+                            "doc": {"issue_type": issue_type, "is_auto_analyzed": is_auto_analyzed},
                         }
                     )
         self.es_client.bulk_index(log_update_queries)

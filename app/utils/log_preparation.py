@@ -32,12 +32,14 @@ def basic_prepare(message: str) -> str:
     cleaned_message = text_processing.delete_empty_lines(cleaned_message)
     return cleaned_message
 
+
 def clean_message_clustering(basic_message: str) -> str:
     cleaned_message = text_processing.remove_guid_uuids_from_text(basic_message)
     cleaned_message = text_processing.remove_access_tokens(cleaned_message)
     cleaned_message = text_processing.remove_hex_from_text(cleaned_message)
     cleaned_message = text_processing.delete_empty_lines(cleaned_message)
     return cleaned_message
+
 
 def clean_message(basic_message: str) -> str:
     cleaned_message = text_processing.replace_code_separators(basic_message)

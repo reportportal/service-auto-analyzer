@@ -144,6 +144,7 @@ class IndexService:
         t_start = time()
 
         project_id = defect_update_info.project
+        is_auto_analyzed = defect_update_info.isAutoAnalyzed
         normalized_updates = self._normalize_items_to_update(defect_update_info.itemsToUpdate)
         test_item_ids = list(normalized_updates.keys())
 
@@ -171,7 +172,7 @@ class IndexService:
                 history_updates.append(
                     TestItemHistoryData(
                         test_item_id=item.test_item_id,
-                        is_auto_analyzed=False,
+                        is_auto_analyzed=is_auto_analyzed,
                         issue_type=issue_type,
                         timestamp=timestamp,
                         issue_comment=issue_comment,

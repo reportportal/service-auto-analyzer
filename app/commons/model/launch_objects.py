@@ -228,6 +228,7 @@ class DefectUpdate(BaseModel):
     """Item update object"""
 
     project: int | str
+    isAutoAnalyzed: bool = False
     itemsToUpdate: dict[int | str, Union[str, ItemUpdate]]
 
 

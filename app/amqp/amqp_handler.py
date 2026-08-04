@@ -330,7 +330,7 @@ class ProcessAmqpRequestHandler:
                     return True
         return False
 
-    def __handle_response(self, result: ProcessingResult):
+    def __handle_response(self, result: ProcessingResult) -> None:
         response_body = result.result
         if response_body is None:
             return None
@@ -371,9 +371,10 @@ class ProcessAmqpRequestHandler:
             return
 
         # Handle failed result - check if we should retry
-        should_retry = True
+        should_retry = bool(result.error)
         if self._retry_predicate is not None:
-            should_retry = self._retry_predicate(result.item, result.error)
+            if result.error:
+                should_retry = self._retry_predicate(result.item, result.error)
             if not should_retry:
                 LOGGER.info(
                     f"Retry predicate failed for message {result.item.routing_key} - "

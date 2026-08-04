@@ -1,7 +1,7 @@
-FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:7350725154e3419463f815c5faae915de4dbf191cd4c3183dbc080ac6d1d5e0c AS test
+FROM dhi.io/python@sha256:c2b0cd3f1b921937d1d15c1cd3a2335fc23d865bba99255127af79821d02042f AS test
 USER root
-RUN microdnf -y upgrade && microdnf -y install make \
-    && microdnf clean all \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends make \
     && python -m venv /venv \
     && mkdir /build
 ENV VIRTUAL_ENV=/venv
@@ -19,10 +19,9 @@ RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
 RUN "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir -r requirements-dev.txt
 RUN make test-all
 
-FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:7350725154e3419463f815c5faae915de4dbf191cd4c3183dbc080ac6d1d5e0c AS builder
-USER root
-RUN microdnf -y upgrade && microdnf -y install make \
-    && microdnf clean all \
+FROM dhi.io/python@sha256:c2b0cd3f1b921937d1d15c1cd3a2335fc23d865bba99255127af79821d02042f AS builder
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends make \
     && python -m venv /venv \
     && mkdir /build
 ENV VIRTUAL_ENV=/venv
@@ -40,15 +39,18 @@ RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
 ARG APP_VERSION=""
 ARG RELEASE_MODE=false
 ARG GITHUB_TOKEN
-RUN if [ "$RELEASE_MODE" = "true" ]; then make release v=${APP_VERSION} githubtoken=${GITHUB_TOKEN}; else if [ "${APP_VERSION}" != "" ]; then make build-release v=${APP_VERSION}; fi ; fi
-RUN mkdir /backend \
+RUN if [ "$RELEASE_MODE" = "true" ]; then \
+        make release v=${APP_VERSION} githubtoken=${GITHUB_TOKEN}; \
+    elif [ "${APP_VERSION}" != "" ]; then \
+        echo "${APP_VERSION}" > VERSION; \
+    fi
+RUN mkdir -p -m 0744 /backend/storage \
     && cp /build/VERSION /backend \
     && cp -r /build/app /backend/ \
     && cp -r /build/res /backend/
 
-FROM registry.access.redhat.com/ubi10/python-312-minimal@sha256:7350725154e3419463f815c5faae915de4dbf191cd4c3183dbc080ac6d1d5e0c
-USER root
-WORKDIR /backend/
+FROM dhi.io/python@sha256:1a211b3861bb85e5fc42397aed8db6ce05b5d0f08611959c9b1577c213705913
+WORKDIR /backend
 COPY --from=builder /backend ./
 COPY --from=builder /venv /venv
 COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
@@ -56,12 +58,6 @@ COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
 ENV VIRTUAL_ENV="/venv"
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend
 
-RUN microdnf -y upgrade \
-    && microdnf -y update libarchive \
-    && microdnf clean all \
-    && mkdir -p -m 0744 /backend/storage \
-    && source "${VIRTUAL_ENV}/bin/activate"
-
 # Start server
 CMD ["python", "app/main.py"]
-HEALTHCHECK --interval=1m --timeout=5s --retries=2 CMD ["curl", "-s", "-f", "--show-error", "http://localhost:5001/"]
+HEALTHCHECK --interval=1m --timeout=5s --retries=2 CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/', timeout=5)"]

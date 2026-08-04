@@ -22,7 +22,7 @@ import opensearchpy.helpers
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory
 from app.commons.esclient import EsClient
-from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, Launch, TestItem
+from app.commons.model.launch_objects import ApplicationConfig, Launch, TestItem
 from app.commons.model.ml import ModelType, TrainInfo
 from app.utils import text_processing, utils
 
@@ -74,23 +74,20 @@ class IndexService:
                 test_item_ids.append(str(test_item.testItemId))
         return test_item_ids, bodies
 
-    def index_logs(self, launches: list[Launch]) -> BulkResponse:
+    def index_logs(self, launches: list[Launch]) -> None:
         """Index launches to the index with project name"""
         launch_ids = {str(launch_obj.launchId) for launch_obj in launches}
         launch_ids_str = ", ".join(launch_ids)
         project = launches[0].project if launches else None
         LOGGER.info(f"Indexing {len(launch_ids)} launches of project '{project}': {launch_ids_str}")
+        if project is None:
+            return None
         t_start = time()
         test_item_queue = self._to_launch_test_item_list(launches)
-        if project is None:
-            return BulkResponse(took=0, errors=False)
-
         project_with_prefix = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
         self.es_client.create_index_if_not_exists(project_with_prefix)
         test_item_ids, bodies = self._to_index_bodies(project_with_prefix, test_item_queue)
-        logs_with_exceptions = utils.extract_all_exceptions(bodies)
-        result = self.es_client.bulk_index(bodies)
-        result.logResults = logs_with_exceptions
+        self.es_client.bulk_index(bodies)
         num_logs_with_defect_types = self.es_client.merge_logs(test_item_ids, project_with_prefix)
 
         if self.app_config.amqpUrl and not self.app_config.disableTrain:
@@ -108,7 +105,6 @@ class IndexService:
             f"Indexing {len(launch_ids)} launches of project '{project}' finished: {launch_ids_str}. "
             f"It took {time_passed} sec."
         )
-        return result
 
     def send_stats_info(self, stats_info: dict) -> None:
         LOGGER.info("Started sending stats about analysis")
@@ -127,6 +123,7 @@ class IndexService:
         LOGGER.info("Started updating defect types")
         t_start = time()
         test_item_ids = [int(key_) for key_ in defect_update_info["itemsToUpdate"].keys()]
+        is_auto_analyzed = defect_update_info.get("isAutoAnalyzed", False)
         defect_update_info["itemsToUpdate"] = {
             int(key_): val for key_, val in defect_update_info["itemsToUpdate"].items()
         }
@@ -160,7 +157,7 @@ class IndexService:
                             "_op_type": "update",
                             "_id": log["_id"],
                             "_index": index_name,
-                            "doc": {"issue_type": issue_type, "is_auto_analyzed": False},
+                            "doc": {"issue_type": issue_type, "is_auto_analyzed": is_auto_analyzed},
                         }
                     )
         self.es_client.bulk_index(log_update_queries)

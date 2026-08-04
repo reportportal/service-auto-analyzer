@@ -359,9 +359,8 @@ class SuggestService(AnalyzerService):
 
     def query_logs_for_cluster(self, test_item_info: TestItemInfo, index_name: str) -> tuple[list[dict], int]:
         test_item_id = None
-        test_items = self.es_client.es_client.search(
-            index=index_name, body=self.get_query_for_test_item_in_cluster(test_item_info)
-        ) or {"hits": {"hits": []}}
+        query = self.get_query_for_test_item_in_cluster(test_item_info)
+        test_items = self.es_client.es_client.search(index=index_name, body=query) or {"hits": {"hits": []}}
         for res in test_items["hits"]["hits"]:
             test_item_id = int(res["_source"]["test_item"])
             break

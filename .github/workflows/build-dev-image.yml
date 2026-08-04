@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
       - name: Create variables
         id: vars
@@ -26,15 +26,15 @@ jobs:
   call-docker-build:
     name: Call develop Docker build
     needs: variables-setup
-    uses: reportportal/.github/.github/workflows/build-docker-image.yaml@0cfc683f89cee91ccc24f05c728b00f23027e7f2
+    uses: reportportal/.github/.github/workflows/build-docker-image.yaml@5d208acab22207a12d6b204373dc76b97d61bf8c
     with:
       aws-region: ${{ vars.AWS_REGION }}
-      aws-role-arn: ${{ vars.AWS_ROLE_ARN }}
       image-tag: 'develop-${{ github.run_number }}'
       additional-tag: 'develop-latest'
       version: 'develop-${{ github.run_number }}'
       date: ${{ needs.variables-setup.outputs.date }}
       runs-on: ubuntu-latest
     secrets:
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
       GH_USER: ${{ secrets.GH_USER }}
       GH_TOKEN: ${{ secrets.GH_TOKEN }}

@@ -19,7 +19,7 @@ from typing import Optional, Union
 
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory
-from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, DefectUpdate, ItemUpdate, Launch
+from app.commons.model.launch_objects import ApplicationConfig, DefectUpdate, ItemUpdate, Launch
 from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model.test_item_index import TestItemHistoryData, TestItemIndexData
 from app.commons.os_client import OsClient

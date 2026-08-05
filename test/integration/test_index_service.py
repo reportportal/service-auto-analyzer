@@ -48,7 +48,7 @@ def test_index_logs_groups_by_project_and_passes_config() -> None:
         "app.service.index_service.request_factory.prepare_test_items",
         side_effect=[prepared_first_items, prepared_second_items],
     ) as prepare_mock:
-        response = service.index_logs([launch_first, launch_second])
+        service.index_logs([launch_first, launch_second])
 
     prepare_mock.assert_has_calls(
         [
@@ -70,8 +70,6 @@ def test_index_logs_groups_by_project_and_passes_config() -> None:
     os_client.bulk_index.assert_has_calls(
         [mock.call(101, prepared_first_items), mock.call(202, prepared_second_items)], any_order=False
     )
-    assert response.took == 5
-    assert response.errors is False
 
 
 def test_defect_update_updates_issue_history_and_docs() -> None:

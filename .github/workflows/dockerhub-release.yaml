@@ -10,7 +10,7 @@ jobs:
       github.event.review.state == 'approved' &&
       (startsWith(github.event.pull_request.head.ref, 'rc/') || startsWith(github.event.pull_request.head.ref, 'hotfix/'))
     # TODO: Pin reusable workflow to a version tag once v1 is released
-    uses: reportportal/.github/.github/workflows/dockerhub-release.yaml@main
+    uses: reportportal/.github/.github/workflows/dockerhub-release.yaml@5d208acab22207a12d6b204373dc76b97d61bf8c
     secrets:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}

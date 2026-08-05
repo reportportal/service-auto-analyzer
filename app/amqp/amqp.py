@@ -17,7 +17,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Callable
 from threading import Lock
-from typing import Final, Optional
+from typing import Any, Final, Optional
 
 import pika
 from pika.adapters.blocking_connection import BlockingChannel, BlockingConnection
@@ -42,6 +42,20 @@ CREATED_EXCHANGES: Final[dict[str, set[str]]] = defaultdict(set)
 EXCHANGE_CREATION_TIME: Final[dict[str, float]] = {}
 
 _DEFAULT_ROUTING_KEY: Final[str] = str(uuid.uuid4())
+
+
+def do_declare_exchange(
+    channel: BlockingChannel, exchange_name: str, exchange_type: str, additional_arguments: Optional[dict[str, Any]]
+) -> None:
+    channel.exchange_declare(
+        exchange=exchange_name,
+        exchange_type=exchange_type,
+        durable=False,
+        auto_delete=True,
+        internal=False,
+        arguments=additional_arguments,
+    )
+    logger.info(f"Exchange '{exchange_name}' declared")
 
 
 class AmqpClientConnectionException(Exception):
@@ -122,32 +136,20 @@ class AmqpClient:
 
         :return: The AMQP connection
         """
-        if self.__connection is None or self.__connection.is_closed:
-            self.__connection = self._connect_with_retry()
-        return self.__connection
+        my_connection = self.__connection
+        if my_connection is None or my_connection:
+            my_connection = self._connect_with_retry()
+            self.__connection = my_connection
+        return my_connection
 
-    def _do_declare_exchange(self, channel: BlockingChannel) -> None:
-        channel.exchange_declare(
-            exchange=self._config.amqpExchangeName,
-            exchange_type=self._config.amqpExchangeType,
-            durable=False,
-            auto_delete=True,
-            internal=False,
-            arguments={
-                "analyzer": self._config.amqpExchangeName,
-                "analyzer_index": self._config.analyzerIndex,
-                "analyzer_priority": self._config.analyzerPriority,
-                "analyzer_log_search": self._config.analyzerLogSearch,
-                "analyzer_suggest": self._config.analyzerSuggest,
-                "analyzer_cluster": self._config.analyzerCluster,
-                "version": self._config.appVersion,
-            },
-        )
-        logger.info(f"Exchange '{self._config.amqpExchangeName}' declared")
-
-    def _declare_exchange(self, update_interval: int = ONE_MINUTE) -> None:
+    def _do_declare_exchange(
+        self,
+        exchange_name: str,
+        exchange_type: str,
+        update_interval: int = ONE_MINUTE,
+        additional_arguments: Optional[dict[str, Any]] = None,
+    ) -> None:
         """Declare application exchange on AMQP server."""
-        exchange_name = self._config.amqpExchangeName
         exchange_key = f"{self._amqp_base_url_no_credentials}:{exchange_name}"
         current_time = time.time()
 
@@ -170,7 +172,7 @@ class AmqpClient:
 
             with self._connection.channel() as channel:
                 try:
-                    self._do_declare_exchange(channel)
+                    do_declare_exchange(channel, exchange_name, exchange_type, additional_arguments)
                 except ChannelClosedByBroker as exc:
                     if (
                         exc.reply_code == 406
@@ -179,11 +181,29 @@ class AmqpClient:
                         logger.warning(f"Exchange '{exchange_name}' already exists with a different type.")
                         with self._connection.channel() as channel2:
                             channel2.exchange_delete(exchange_name)
-                            self._do_declare_exchange(channel)
+                            do_declare_exchange(channel, exchange_name, exchange_type, additional_arguments)
 
             # Mark that we're creating this exchange
             CREATED_EXCHANGES[self._amqp_base_url_no_credentials].add(exchange_name)
             EXCHANGE_CREATION_TIME[exchange_key] = time.time()
+
+    def _declare_exchange(self) -> None:
+        self._do_declare_exchange(
+            self._config.amqpExchangeName,
+            self._config.amqpExchangeType,
+            additional_arguments={
+                "analyzer": self._config.amqpExchangeName,
+                "analyzer_index": self._config.analyzerIndex,
+                "analyzer_priority": self._config.analyzerPriority,
+                "analyzer_log_search": self._config.analyzerLogSearch,
+                "analyzer_suggest": self._config.analyzerSuggest,
+                "analyzer_cluster": self._config.analyzerCluster,
+                "version": self._config.appVersion,
+            },
+        )
+
+    def _declare_response_exchange(self) -> None:
+        self._do_declare_exchange(self._config.analyzerResponseExchange, self._config.analyzerResponseExchangeType)
 
     @staticmethod
     def _bind_queue(
@@ -256,23 +276,15 @@ class AmqpClient:
                 logger.info(f"Consumer interrupted by user. Exiting. {connection_info}")
                 break
 
-    def send_to_inner_queue(self, queue: str, data: str) -> None:
-        """Publish message with automatic reconnection.
-
-        :param str queue: Name of the queue to publish to
-        :param str data: Message data to publish
-        """
+    def __send_to_queue(self, exchange_declare_callable: Optional[Callable], **kwargs: Any) -> None:
         while True:
             try:
                 # Ensure exchange exists before publishing
-                self._declare_exchange()
+                if exchange_declare_callable:
+                    exchange_declare_callable()
 
                 with self._connection.channel() as channel:
-                    channel.basic_publish(
-                        exchange=self._config.amqpExchangeName,
-                        routing_key=queue,
-                        body=data.encode("utf‑8"),
-                    )
+                    channel.basic_publish(**kwargs)
                 return  # success
             except AMQPConnectionError as exc:
                 logger.warning(f"Publish failed: {exc}. Reconnecting.", exc_info=exc)
@@ -285,6 +297,33 @@ class AmqpClient:
             except KeyboardInterrupt:
                 logger.info("Consumer interrupted by user. Exiting.")
                 break
+
+    def publish_response(self, data: str) -> None:
+        """Publish an analyzer response message to the configured response queue.
+
+        :param str data: The data to publish
+        """
+        self.__send_to_queue(
+            self._declare_response_exchange,
+            exchange=self._config.analyzerResponseExchange,
+            routing_key=self._config.analyzerResponseQueue,
+            properties=BasicProperties(content_type="application/json"),
+            mandatory=False,
+            body=bytes(data, "utf-8"),
+        )
+
+    def send_to_inner_queue(self, queue: str, data: Any) -> None:
+        """Publish message with automatic reconnection.
+
+        :param str queue: Name of the queue to publish to
+        :param Any data: Message data to publish
+        """
+        self.__send_to_queue(
+            self._declare_exchange,
+            exchange=self._config.amqpExchangeName,
+            routing_key=queue,
+            body=bytes(data, "utf-8"),
+        )
 
     def reply(self, to: str, correlation_id: str, data: str) -> None:
         """Publish a reply message with automatic reconnection.
@@ -293,25 +332,12 @@ class AmqpClient:
         :param str correlation_id: The correlation ID for the message
         :param str data: The data to publish
         """
-        while True:
-            try:
-                with self._connection.channel() as channel:
-                    channel.basic_publish(
-                        exchange="",
-                        routing_key=to,
-                        properties=BasicProperties(correlation_id=correlation_id, content_type="application/json"),
-                        mandatory=False,
-                        body=bytes(data, "utf-8"),
-                    )
-                return  # success
-            except AMQPConnectionError as exc:
-                logger.warning(f"Publish failed: {exc}. Reconnecting.", exc_info=exc)
-                self.close()
-            except AmqpClientConnectionException:
-                raise
-            except Exception as exc:  # pylint: disable=broad-except
-                logger.exception("Failed to publish message", exc_info=exc)
-                self.close()
-            except KeyboardInterrupt:
-                logger.info("Consumer interrupted by user. Exiting.")
-                break
+
+        self.__send_to_queue(
+            None,
+            exchange="",
+            routing_key=to,
+            properties=BasicProperties(correlation_id=correlation_id, content_type="application/json"),
+            mandatory=False,
+            body=bytes(data, "utf-8"),
+        )

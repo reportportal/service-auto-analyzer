@@ -193,6 +193,8 @@ APP_CONFIG = ApplicationConfig(
     # AMQP settings
     amqpUrl=os.getenv("AMQP_URL", "").strip("/").strip("\\") + "/" + os.getenv("AMQP_VIRTUAL_HOST", "analyzer"),
     amqpExchangeName=os.getenv("AMQP_EXCHANGE_NAME", "analyzer"),
+    analyzerResponseExchange=os.getenv("AMQP_RESPONSE_EXCHANGE", "analyzer-reply"),
+    analyzerResponseQueue=os.getenv("ANALYZER_RESPONSE_QUEUE", "analysis.matches"),
     amqpInitialRetryInterval=int(os.getenv("AMQP_INITIAL_RETRY_INTERVAL", "1")),
     amqpMaxRetryTime=int(os.getenv("AMQP_MAX_RETRY_TIME", "300")),
     amqpHeartbeatInterval=int(os.getenv("AMQP_HEARTBEAT_INTERVAL", "30")),

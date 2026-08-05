@@ -121,6 +121,7 @@ class AutoAnalyzerService(AnalyzerService):
     os_client: OsClient
     namespace_finder: NamespaceFinder
     model_chooser: ModelChooser
+    amqp_client: Optional[AmqpClient]
 
     def __init__(
         self,
@@ -134,6 +135,8 @@ class AutoAnalyzerService(AnalyzerService):
         self.app_config = app_config
         self.os_client = os_client or OsClient(app_config=self.app_config)
         self.namespace_finder = NamespaceFinder(app_config)
+        if self.app_config.amqpUrl:
+            self.amqp_client = AmqpClient(self.app_config)
 
     def _get_config_for_boosting(self, analyzer_config: AnalyzerConf) -> dict[str, Any]:
         min_should_match = self.find_min_should_match_threshold(analyzer_config) / 100
@@ -339,7 +342,7 @@ class AutoAnalyzerService(AnalyzerService):
         return all_candidates
 
     @utils.ignore_warnings
-    def analyze_logs(self, launches: list[Launch]) -> list[AnalysisResult]:
+    def analyze_logs(self, launches: list[Launch]) -> None:
         cnt_launches = len(launches)
         LOGGER.info(f"Started analysis for {cnt_launches} launches")
 
@@ -454,4 +457,5 @@ class AutoAnalyzerService(AnalyzerService):
         LOGGER.debug(f"Stats info: {json.dumps(results_to_share)}")
         LOGGER.info(f"Processed {cnt_items_to_process} test items. It took {time() - t_start:.2f} sec.")
         LOGGER.info(f"Finished analysis for {cnt_launches} launches with {len(results)} results.")
-        return results
+        if self.amqp_client:
+            self.amqp_client.publish_response(json.dumps(results))

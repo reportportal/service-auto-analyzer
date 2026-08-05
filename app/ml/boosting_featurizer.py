@@ -214,6 +214,7 @@ class BoostingFeaturizer:
     def filter_by_test_case_hash(
         self, processed_results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]
     ) -> list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]:
+        """Deduplicate results by Test Case Hash to not return all results from one item only, this number limited."""
         is_hash_filter: Optional[bool] = self.config.get("filter_by_test_case_hash", None)
         if is_hash_filter:
             filtered_processed_results = filter_by_test_case_hash(processed_results)

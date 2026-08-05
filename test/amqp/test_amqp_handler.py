@@ -35,7 +35,6 @@ def app_config() -> ApplicationConfig:
         amqpUrl="amqp://guest:guest@localhost:5672/",
         amqpExchangeName="test_analyzer",
         appVersion="test",
-        instanceTaskType="test",
         amqpHandlerMaxRetries=2,
         amqpHandlerTaskTimeout=6,
     )

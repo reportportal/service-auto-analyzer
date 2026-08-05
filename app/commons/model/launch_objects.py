@@ -76,6 +76,9 @@ class ApplicationConfig(BaseModel):
     amqpBackoffFactor: int = 2
     amqpHandlerMaxRetries: int = 3
     amqpHandlerTaskTimeout: int = 600
+    analyzerResponseExchange: str = "analyzer-reply"
+    analyzerResponseExchangeType: str = "direct"
+    analyzerResponseQueue: str = "analysis.matches"
 
     analyzerHttpPort: int = 5001
     analyzerPathToLog: str = "/tmp/config.log"

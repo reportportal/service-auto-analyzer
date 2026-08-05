@@ -73,14 +73,16 @@ class IndexService:
         self.app_config = app_config
         self.os_client = os_client or OsClient(app_config=self.app_config)
 
-    def index_logs(self, launches: list[Launch]) -> BulkResponse:
+    def index_logs(self, launches: list[Launch]) -> None:
         """Index launches grouped by project using Test Item-centric documents."""
         if not launches:
-            return BulkResponse(took=0, errors=False)
+            return
 
         launch_ids = {str(launch_obj.launchId) for launch_obj in launches}
         launch_ids_str = ", ".join(launch_ids)
-        LOGGER.info(f"Indexing {len(launch_ids)} launches: {launch_ids_str}")
+        projects = {str(launch_obj.project) for launch_obj in launches}
+        projects_str = ", ".join(projects)
+        LOGGER.info(f"Indexing {len(launch_ids)} launches of projects '{projects_str}': {launch_ids_str}")
         t_start = time()
 
         project_test_items: dict[int, list[TestItemIndexData]] = defaultdict(list)
@@ -110,8 +112,10 @@ class IndexService:
         update_train_list(self.app_config, list(defects_per_project.items()))
 
         time_passed = round(time() - t_start, 2)
-        LOGGER.info(f"Indexing {len(launch_ids)} launches finished: {launch_ids_str}. It took {time_passed} sec.")
-        return BulkResponse(took=total_took, errors=any_errors)
+        LOGGER.info(
+            f"Indexing {len(launch_ids)} launches of projects '{projects_str}' finished: {launch_ids_str}. "
+            f"It took {time_passed} sec."
+        )
 
     @staticmethod
     def _normalize_items_to_update(

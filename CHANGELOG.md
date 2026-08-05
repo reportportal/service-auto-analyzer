@@ -4,6 +4,11 @@
 - Log Item-centric storage approach changed to Test Item-centric one, by @HardNorth
 - Status code detection improved, by @HardNorth
 
+## [5.15.5]
+### Changed
+- Base image update: switch on DHI Python 3.12, by @HardNorth
+- The service now replies in a separate exchange and queue, by @HardNorth
+
 ## [5.15.4]
 ### Changed
 - Adjust HEX detection, by @HardNorth

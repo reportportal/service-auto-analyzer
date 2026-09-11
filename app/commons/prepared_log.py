@@ -33,7 +33,7 @@ class PreparedLogMessage:
     number_of_lines: int
     _basic_message: Optional[str] = None
     _clean_message: Optional[str] = None
-    _test_and_methods: Optional[set[str]] = None
+    _test_and_methods: Optional[list[str]] = None
     _message: Optional[str] = None
     _message_for_clustering: Optional[str] = None
     _message_no_params: Optional[str] = None
@@ -75,7 +75,7 @@ class PreparedLogMessage:
         return self._clean_message
 
     @property
-    def test_and_methods(self) -> set[str]:
+    def test_and_methods(self) -> list[str]:
         if not self._test_and_methods:
             self._test_and_methods = text_processing.find_test_methods_in_text(self.clean_message)
         return self._test_and_methods

@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from typing import Iterable
+
 from app.utils import text_processing
 
 
@@ -61,13 +63,13 @@ def unify_message(basic_message: str) -> str:
     return cleaned_message
 
 
-def prepare_message(message: str, number_of_lines: int, test_and_methods: set[str]) -> str:
+def prepare_message(message: str, number_of_lines: int, test_and_methods: Iterable[str]) -> str:
     cleaned_message = text_processing.first_lines(message, number_of_lines)
     cleaned_message = text_processing.replace_text_pieces(cleaned_message, test_and_methods)
     return cleaned_message
 
 
-def prepare_message_no_numbers(message: str, number_of_lines: int, test_and_methods: set[str]) -> str:
+def prepare_message_no_numbers(message: str, number_of_lines: int, test_and_methods: Iterable[str]) -> str:
     cleaned_message = prepare_message(message, number_of_lines, test_and_methods)
     cleaned_message = text_processing.delete_empty_lines(text_processing.remove_numbers(cleaned_message))
     return cleaned_message

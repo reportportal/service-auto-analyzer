@@ -120,9 +120,10 @@ class AnalyzerService:
         return add_constraints_for_launches_into_query_suggest(query, test_item_info, self.launch_boost)
 
     def add_query_with_start_time_decay(self, main_query: dict, start_time: str) -> dict:
-        return {
+        result = {
             "size": main_query["size"],
             "sort": main_query["sort"],
+            "track_total_hits": False,
             "query": {
                 "function_score": {
                     "query": main_query["query"],
@@ -144,3 +145,6 @@ class AnalyzerService:
                 }
             },
         }
+        if "_source" in main_query:
+            result["_source"] = main_query["_source"]
+        return result

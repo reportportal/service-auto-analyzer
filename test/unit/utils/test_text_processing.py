@@ -175,7 +175,11 @@ def test_remove_webdriver_auxiliary_info_big(test_file, expected_file):
 def test_find_test_methods_in_text():
     logs = json.loads(read_file("test_res/test_logs", "example_logs.json"))
     for log in logs:
-        assert text_processing.find_test_methods_in_text(log["log"]) == set(log["expected_test_methods"])
+        found = text_processing.find_test_methods_in_text(log["log"])
+        # The order is the order of appearance in the text; the fixtures are unordered, so
+        # compare the contents and assert separately that the result carries no duplicates.
+        assert sorted(found) == sorted(log["expected_test_methods"])
+        assert len(found) == len(set(found))
 
 
 @pytest.mark.parametrize(

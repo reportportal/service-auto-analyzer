@@ -210,11 +210,14 @@ def bucket_sort_logs_by_similarity(
     request_texts = [_get_log_text(log_item) for log_item in request_logs]
     if not request_texts:
         return buckets
-    for hit in found_hits:
-        hit_text = _get_log_text(hit.source)
-        if not hit_text.strip():
-            continue
-        similarities = text_processing.calculate_text_similarity(hit_text, request_texts)
+    scored_hits = [(hit, _get_log_text(hit.source)) for hit in found_hits]
+    scored_hits = [(hit, text) for hit, text in scored_hits if text.strip()]
+    if not scored_hits:
+        return buckets
+    all_similarities = text_processing.calculate_text_similarity_batch(
+        [text for _hit, text in scored_hits], request_texts
+    )
+    for (hit, _text), similarities in zip(scored_hits, all_similarities, strict=True):
         if not similarities:
             continue
         sim_idx = get_max_similarity_idx(similarities)
@@ -225,6 +228,7 @@ def bucket_sort_logs_by_similarity(
 
 def construct_analysis_query(
     request_log: LogItemIndexData,
+    nested_must: list[dict[str, Any]],
     nested_should: list[dict[str, Any]],
     search_mode: str,
     size: int,
@@ -232,11 +236,16 @@ def construct_analysis_query(
     max_query_terms: int,
     filter_no_defect: bool,
 ) -> dict[str, Any]:
+    nested_bool: dict[str, Any] = {}
+    if nested_must:
+        nested_bool["must"] = nested_must
+    if nested_should:
+        nested_bool["should"] = nested_should
     nested_query = {
         "nested": {
             "path": "logs",
             "score_mode": search_mode,
-            "query": {"bool": {"should": nested_should}},
+            "query": {"bool": nested_bool},
             "inner_hits": {
                 "size": 5,
                 "_source": INNER_HITS_SOURCE,

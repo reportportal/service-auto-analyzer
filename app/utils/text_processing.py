@@ -15,6 +15,7 @@
 import re
 import string
 import urllib.parse
+from functools import lru_cache
 from typing import Iterable, Optional
 from urllib.parse import urlparse
 
@@ -35,6 +36,7 @@ logger = logging.getLogger("analyzerApp.utils.textProcessing")
 
 STOPWORDS = nltk.corpus.stopwords.words("english")
 STOPWORDS_ALL = set(STOPWORDS)
+LEMMATIZER = WordNetLemmatizer()
 FILE_EXTENSIONS = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
 
 
@@ -491,8 +493,18 @@ def preprocess_test_item_name(text: str) -> str:
     return " ".join(all_words)
 
 
-def find_test_methods_in_text(text: str) -> set[str]:
-    test_methods = set()
+def find_test_methods_in_text(text: str) -> list[str]:
+    """Find test class and method references in the text.
+
+    Results keep the order they were found in and are de-duplicated, so the same text always
+    produces the same sequence. Callers join this into the indexed `found_tests_and_methods`
+    field and feed it to `replace_text_pieces`, both of which would otherwise vary between
+    processes with string hash randomization.
+
+    :param text: Text to search for test and method references
+    :return: Unique test and method references, in the order they appear
+    """
+    test_methods = []
     residual = text
     while True:
         match = re.search(r"\b[^\s()/\\:]+(?:Test|Step)s?\.", residual)
@@ -504,18 +516,21 @@ def find_test_methods_in_text(text: str) -> set[str]:
         if match:
             match_str += residual[match.start() : match.end()]
             residual = residual[match.end() :]
-        test_methods.add(match_str)
+        test_methods.append(match_str)
 
     for m in re.findall(r"(\b[^\s()/\\:]+\.(?:spec|cy)\.[jt]s\b)", text):
         if m[0].strip():
-            test_methods.add(m[0].strip())
+            test_methods.append(m[0].strip())
         if m[1].strip():
-            test_methods.add(m[1].strip())
-    final_test_methods = set()
+            test_methods.append(m[1].strip())
+
+    final_test_methods = []
+    seen: set[str] = set()
     for method in test_methods:
-        exceptions = get_found_exceptions(method)
-        if not exceptions:
-            final_test_methods.add(method)
+        if method in seen or get_found_exceptions(method):
+            continue
+        seen.add(method)
+        final_test_methods.append(method)
     return final_test_methods
 
 
@@ -934,22 +949,27 @@ def preprocess_text_for_similarity(text: str) -> list[str]:
     # 5. Replace excessive spaces with one space
     result = re.sub(r"\s+", " ", result).strip()
 
-    # 6. Use lemmatizer and text normalization
-    lemmatizer = WordNetLemmatizer()
+    # 6. Remove English stopwords and lemmatize, memoizing per distinct word: log vocabularies
+    # repeat heavily, and WordNet lookups dominate the cost of this function.
+    return [_lemmatize_cached(word) for word in result.split() if word and word not in STOPWORDS_ALL]
 
-    # 7. Remove English stopwords and lemmatize
-    words = result.split()
-    processed_words = []
 
-    for word in words:
-        if not word or word in STOPWORDS_ALL:
-            continue
+@lru_cache(maxsize=200_000)
+def _lemmatize_cached(word: str) -> str:
+    return LEMMATIZER.lemmatize(word)
 
-        # Lemmatize the word
-        lemmatized_word = lemmatizer.lemmatize(word)
-        processed_words.append(lemmatized_word)
 
-    return processed_words
+@lru_cache(maxsize=4096)
+def preprocess_text_for_similarity_joined(text: str) -> str:
+    """Preprocess text for similarity comparison and join it into a single string.
+
+    Memoized: similarity comparison repeatedly preprocesses the same request texts, once per
+    candidate hit, and the result is a pure function of the input.
+
+    :param text: Input text to preprocess
+    :return: Space-joined preprocessed text
+    """
+    return " ".join(preprocess_text_for_similarity(text))
 
 
 def __calculate_tfidf_matrix(all_texts: list[str], *, use_idf: bool = False) -> csr_matrix:
@@ -968,6 +988,64 @@ def __calculate_tfidf_matrix(all_texts: list[str], *, use_idf: bool = False) -> 
     return tf_matrix
 
 
+def calculate_text_similarity_batch(base_texts: list[str], other_texts: list[str]) -> list[list[SimilarityResult]]:
+    """Calculate similarity of every base text against every other text, in one pass.
+
+    A single term-frequency matrix is fitted for all texts rather than one per base text. That is
+    sound because `__calculate_tfidf_matrix` is used with ``use_idf=False``: each row is an
+    L2-normalized term-count vector, so the cosine similarity of two rows does not depend on
+    which other documents were in the fit - vocabulary contributed by other documents is zero in
+    both rows of the pair.
+
+    :param base_texts: Texts to compare from
+    :param other_texts: Texts to compare against
+    :return: One list of results per base text, each aligned with `other_texts`
+    """
+    if not base_texts or not other_texts:
+        return [[] for _ in base_texts]
+
+    processed_bases = [preprocess_text_for_similarity_joined(text) for text in base_texts]
+    processed_others = [preprocess_text_for_similarity_joined(text) for text in other_texts]
+
+    # Only rows that need a real cosine computation go into the matrix.
+    needs_matrix: dict[str, int] = {}
+    for processed in processed_bases + processed_others:
+        if processed.strip() and processed not in needs_matrix:
+            needs_matrix[processed] = len(needs_matrix)
+
+    similarity_matrix = None
+    if needs_matrix:
+        tf_matrix = __calculate_tfidf_matrix(list(needs_matrix))
+        similarity_matrix = cosine_similarity(tf_matrix, tf_matrix)
+
+    all_results: list[list[SimilarityResult]] = []
+    for base_idx, processed_base_text in enumerate(processed_bases):
+        base_text = base_texts[base_idx]
+        base_text_is_valid = bool(processed_base_text.strip())
+        row: list[SimilarityResult] = []
+        for other_idx, processed_other_text in enumerate(processed_others):
+            other_text = other_texts[other_idx]
+            processed_other_text_strip = processed_other_text.strip()
+            if not base_text_is_valid and not processed_other_text_strip:
+                base_both_empty = not base_text.strip() and not other_text.strip()
+                row.append(
+                    SimilarityResult(
+                        similarity=0.0 if base_both_empty else float(base_text == other_text),
+                        both_empty=base_both_empty,
+                    )
+                )
+            elif not base_text_is_valid or not processed_other_text_strip:
+                row.append(SimilarityResult(similarity=0.0, both_empty=False))
+            elif processed_base_text == processed_other_text:
+                row.append(SimilarityResult(similarity=1.0, both_empty=False))
+            else:
+                assert similarity_matrix is not None
+                value = similarity_matrix[needs_matrix[processed_base_text], needs_matrix[processed_other_text]]
+                row.append(SimilarityResult(similarity=float(value), both_empty=False))
+        all_results.append(row)
+    return all_results
+
+
 def calculate_text_similarity(base_text: Optional[str], other_texts: list[str]) -> list[SimilarityResult]:
     """
     Calculate similarity between a base text and multiple other texts using TF-IDF vectorization and cosine similarity.
@@ -983,66 +1061,7 @@ def calculate_text_similarity(base_text: Optional[str], other_texts: list[str]) 
     """
     if base_text is None or not other_texts:
         return []
-
-    # Preprocess the base text
-    processed_base_text = " ".join(preprocess_text_for_similarity(base_text))
-    base_text_is_valid = bool(processed_base_text.strip())
-
-    # Preprocess all other texts
-    processed_other_texts = [" ".join(preprocess_text_for_similarity(text)) for text in other_texts]
-
-    # Handle empty texts and identical texts first
-    similarity_scores: list[SimilarityResult] = []
-    valid_texts = []
-    valid_indices = []
-
-    for i, processed_other_text in enumerate(processed_other_texts):
-        processed_other_text_strip = processed_other_text.strip()
-        if not base_text_is_valid and not processed_other_text_strip:
-            # The next variable will be False if base texts contain only stop words
-            base_both_empty = not base_text.strip() and not other_texts[i].strip()
-            similarity_scores.append(
-                SimilarityResult(
-                    similarity=0.0 if base_both_empty else float(base_text == other_texts[i]),
-                    both_empty=base_both_empty,
-                )
-            )
-        elif not base_text_is_valid or not processed_other_text_strip:
-            # If one of the texts is empty after preprocessing, append 0
-            similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=False))
-        elif processed_base_text == processed_other_text:
-            # If both texts are identical after preprocessing, append 1
-            similarity_scores.append(SimilarityResult(similarity=1.0, both_empty=False))
-        else:
-            # Store valid texts for batch processing
-            valid_texts.append(processed_other_text)
-            valid_indices.append(i)
-            # Placeholder, will be replaced
-            similarity_scores.append(SimilarityResult(similarity=0.0, both_empty=False))
-
-    if not valid_texts:
-        return similarity_scores
-
-    # If we have valid texts to process, use single TF-IDF vectorizer
-    # Create all texts list: base text + all valid other texts
-    all_texts = [processed_base_text] + valid_texts
-
-    tfidf_matrix = __calculate_tfidf_matrix(all_texts)
-
-    # Calculate cosine similarity between base text (index 0) and all other texts
-    base_vector = tfidf_matrix[0:1]  # Base text vector
-    other_vectors = tfidf_matrix[1:]  # All other text vectors
-
-    similarity_matrix = cosine_similarity(base_vector, other_vectors)
-
-    # Update similarity scores for valid texts
-    for i, valid_index in enumerate(valid_indices):
-        similarity_scores[valid_index] = SimilarityResult(
-            similarity=float(similarity_matrix[0][i]),
-            both_empty=False,
-        )
-
-    return similarity_scores
+    return calculate_text_similarity_batch([base_text], other_texts)[0]
 
 
 def find_last_unique_texts(threshold: float, texts: list[str]) -> list[int]:

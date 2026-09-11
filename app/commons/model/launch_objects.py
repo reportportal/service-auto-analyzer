@@ -126,6 +126,9 @@ class SearchConfig(BaseModel):
     AutoBoostModelMonotonousFeatures: str = ""
     MaxSuggestionsNumber: int = 3
     MaxAutoAnalysisItemsToProcess: int = 4000
+    # Queries per msearch request. Each in-flight query holds its whole response in memory
+    # until its group is consumed, so this trades round trips against peak memory.
+    AnalysisQueryBatchSize: int = 20
     DefectTypeModelNumEstimators: int = 5
     SuggestBoostModelNumEstimators: int = 50
     SuggestBoostModelMaxDepth: int = 5

@@ -250,6 +250,7 @@ SEARCH_CONFIG = SearchConfig(
         os.getenv("ANALYZER_MAX_ITEMS_TO_PROCESS", os.getenv("MAX_AUTO_ANALYSIS_ITEMS_TO_PROCESS", "4000"))
     ),
     MlModelForSuggestions=os.getenv("ML_MODEL_FOR_SUGGESTIONS", ModelType.suggestion.name).strip(),
+    AnalysisQueryBatchSize=int(os.getenv("ANALYZER_QUERY_BATCH_SIZE", "20")),
 )
 
 

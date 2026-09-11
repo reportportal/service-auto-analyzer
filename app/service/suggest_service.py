@@ -38,7 +38,6 @@ from app.ml.predictor import PREDICTION_CLASSES, PredictionResult
 from app.service.analyzer_service import AnalyzerService
 from app.utils import utils
 from app.utils.os_migration import (
-    bucket_sort_logs_by_similarity,
     build_search_results,
     construct_analysis_query,
     extract_inner_hit_logs,
@@ -50,47 +49,13 @@ LOGGER = logging.getLogger("analyzerApp.suggestService")
 SIMILARITY_THRESHOLD = 0.98
 
 LOG_FIELDS_BOOST_SCORES = [
-    ("detected_message_without_params_extended", 2.0),
-    ("only_numbers", 2.0),
-    ("message_params", 2.0),
-    ("urls", 2.0),
-    ("paths", 2.0),
-    ("found_exceptions_extended", 8.0),
-    ("found_tests_and_methods", 2.0),
-]
-
-TEST_ITEM_FIELDS_BOOST_SCORES = [
-    ("test_item_name", 2.0),
-]
-
-INNER_HITS_SOURCE = [
-    "logs.log_id",
-    "logs.log_time",
-    "logs.log_level",
-    "logs.cluster_id",
-    "logs.cluster_message",
-    "logs.cluster_with_numbers",
-    "logs.original_message",
-    "logs.message",
-    "logs.message_extended",
-    "logs.message_without_params_extended",
-    "logs.message_without_params_and_brackets",
-    "logs.detected_message",
-    "logs.detected_message_with_numbers",
-    "logs.detected_message_extended",
-    "logs.detected_message_without_params_extended",
-    "logs.detected_message_without_params_and_brackets",
-    "logs.stacktrace",
-    "logs.stacktrace_extended",
-    "logs.only_numbers",
-    "logs.potential_status_codes",
-    "logs.found_exceptions",
-    "logs.found_exceptions_extended",
-    "logs.found_tests_and_methods",
-    "logs.urls",
-    "logs.paths",
-    "logs.message_params",
-    "logs.whole_message",
+    ("detected_message_without_params_extended", utils.BOOST_SUPPORTING),
+    ("only_numbers", utils.BOOST_SUPPORTING),
+    ("message_params", utils.BOOST_SUPPORTING),
+    ("urls", utils.BOOST_SUPPORTING),
+    ("paths", utils.BOOST_SUPPORTING),
+    ("found_exceptions_extended", utils.BOOST_ERROR_IDENTITY),
+    ("found_tests_and_methods", utils.BOOST_SUPPORTING),
 ]
 
 UNSHORTENED_MESSAGE_FIELDS = [
@@ -281,14 +246,14 @@ class SuggestService(AnalyzerService):
                         min_should_match,
                         message_text,
                         field_name=f"logs.{message_field}",
-                        boost=4.0,
+                        boost=utils.BOOST_MESSAGE,
                         max_query_terms=self.search_cfg.MaxQueryTerms,
                     )
                 )
 
         stacktrace_text = request_log.stacktrace_extended.strip()
         if stacktrace_text:
-            stacktrace_boost = 2.0 if log_lines == -1 else 1.0
+            stacktrace_boost = utils.BOOST_SUPPORTING if log_lines == -1 else utils.BOOST_NEUTRAL
             nested_should.append(
                 utils.build_more_like_this_query(
                     min_should_match,
@@ -315,25 +280,20 @@ class SuggestService(AnalyzerService):
                 )
 
         # Add potential status codes
-        potential_status_codes = request_log.potential_status_codes.strip()
-        if potential_status_codes:
-            number_of_codes = str(len(set(potential_status_codes.split())))
-            nested_should.append(
-                utils.build_more_like_this_query(
-                    "1",
-                    potential_status_codes,
-                    field_name="logs.potential_status_codes",
-                    boost=8.0,
-                    override_min_should_match=number_of_codes,
-                    max_query_terms=self.search_cfg.MaxQueryTerms,
-                )
+        nested_should.extend(
+            utils.build_status_codes_queries(
+                request_log.potential_status_codes,
+                field_name="logs.potential_status_codes",
+                boost=utils.BOOST_ERROR_IDENTITY,
             )
+        )
 
         if not nested_should:
             return {}
 
         query = construct_analysis_query(
             request_log,
+            [],
             nested_should,
             test_item_info.analyzerConfig.searchScoreMode,
             size,
@@ -361,6 +321,7 @@ class SuggestService(AnalyzerService):
         :return: Search results as list of (request_log, found_log_hits) tuples
         """
         all_queries: list[dict[str, Any]] = []
+        query_request_logs: list[LogItemIndexData] = []
 
         for request_log in request_logs:
             message = request_log.message.strip()
@@ -371,31 +332,38 @@ class SuggestService(AnalyzerService):
                 continue
             all_queries.append({})
             all_queries.append(query)
+            query_request_logs.append(request_log)
 
         if not all_queries:
             return []
 
-        # Execute msearch and deduplicate by test_item_id
-        seen_test_item_ids: set[str] = set()
-        unique_hits: list[Hit[TestItemIndexData]] = []
-        for hit in self.os_client.msearch(test_item_info.project, all_queries):
-            test_item_id = hit.source.test_item_id
-            if test_item_id not in seen_test_item_ids:
-                seen_test_item_ids.add(test_item_id)
-                unique_hits.append(hit)
+        # One response per submitted query, in submission order: the grouping already tells us
+        # which request log produced which hits, so no similarity re-alignment is needed. Each
+        # group is reduced to its inner-hit logs before the next one is taken.
+        buckets: list[list[Hit[LogItemIndexData]]] = []
+        for hits in self.os_client.msearch_grouped(test_item_info.project, all_queries):
+            seen_test_item_ids: set[str] = set()
+            unique_hits: list[Hit[TestItemIndexData]] = []
+            for hit in hits:
+                test_item_id = hit.source.test_item_id
+                if test_item_id not in seen_test_item_ids:
+                    seen_test_item_ids.add(test_item_id)
+                    unique_hits.append(hit)
+            buckets.append(extract_inner_hit_logs(unique_hits))
 
-        if not unique_hits:
+        if not buckets:
             return []
+        if len(buckets) < len(query_request_logs):
+            LOGGER.warning(
+                "Got %d responses for %d queries in project %s, %d request logs were not analyzed",
+                len(buckets),
+                len(query_request_logs),
+                str(test_item_info.project),
+                len(query_request_logs) - len(buckets),
+            )
+            query_request_logs = query_request_logs[: len(buckets)]
 
-        # Extract inner hit logs (convert nested LogData to LogItemIndexData)
-        found_log_hits = extract_inner_hit_logs(unique_hits)
-
-        if not found_log_hits:
-            return []
-
-        # Align found logs to request logs using bucket sorting
-        buckets = bucket_sort_logs_by_similarity(request_logs, found_log_hits)
-        return build_search_results(request_logs, buckets)
+        return build_search_results(query_request_logs, buckets)
 
     def _prepare_request_data(self, test_item_info: TestItemInfo) -> tuple[list[LogItemIndexData], int]:
         """Prepare request logs for suggestion search.

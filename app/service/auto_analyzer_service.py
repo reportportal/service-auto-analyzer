@@ -38,8 +38,6 @@ from app.ml.predictor import AutoAnalysisPredictor, PredictionResult
 from app.service.analyzer_service import AnalyzerService
 from app.utils import utils
 from app.utils.os_migration import (
-    bucket_sort_logs_by_similarity,
-    build_search_results,
     construct_analysis_query,
     extract_inner_hit_logs,
     get_request_logs,
@@ -48,11 +46,9 @@ from app.utils.os_migration import (
 LOGGER = logging.getLogger("analyzerApp.autoAnalyzerService")
 
 LOG_FIELDS_BOOST_SCORES = [
-    ("detected_message_without_params_extended", 2.0),
-    ("only_numbers", 2.0),
-    ("potential_status_codes", 8.0),
-    ("found_tests_and_methods", 2.0),
-    ("test_item_name", 2.0),
+    ("detected_message_without_params_extended", utils.BOOST_SUPPORTING),
+    ("only_numbers", utils.BOOST_SUPPORTING),
+    ("found_tests_and_methods", utils.BOOST_SUPPORTING),
 ]
 
 
@@ -169,26 +165,29 @@ class AutoAnalyzerService(AnalyzerService):
     ) -> dict[str, Any]:
         min_should_match = self._get_min_should_match_setting(launch)
         log_lines = launch.analyzerConfig.numberOfLogLines
+        nested_must: list[dict[str, Any]] = []
         nested_should: list[dict[str, Any]] = []
 
-        for message_field in choose_fields_to_filter_strict(
+        strict_fields = choose_fields_to_filter_strict(
             log_lines, self.find_min_should_match_threshold(launch.analyzerConfig) / 100
-        ):
+        )
+        for position, message_field in enumerate(strict_fields):
             field_value = getattr(request_log, message_field, "").strip()
             if field_value:
-                nested_should.append(
-                    utils.build_more_like_this_query(
-                        min_should_match,
-                        field_value,
-                        field_name=f"logs.{message_field}",
-                        boost=4.0,
-                        max_query_terms=self.search_cfg.MaxQueryTerms,
-                    )
+                clause = utils.build_more_like_this_query(
+                    min_should_match,
+                    field_value,
+                    field_name=f"logs.{message_field}",
+                    boost=utils.BOOST_MESSAGE,
+                    max_query_terms=self.search_cfg.MaxQueryTerms,
                 )
+                # The primary message field is required: it narrows the child candidate set
+                # instead of leaving the nested query a pure disjunction.
+                (nested_must if position == 0 else nested_should).append(clause)
 
         stacktrace_text = request_log.stacktrace_extended.strip()
         if stacktrace_text:
-            stacktrace_boost = 2.0 if log_lines == -1 else 1.0
+            stacktrace_boost = utils.BOOST_SUPPORTING if log_lines == -1 else utils.BOOST_NEUTRAL
             nested_should.append(
                 utils.build_more_like_this_query(
                     min_should_match,
@@ -206,27 +205,24 @@ class AutoAnalyzerService(AnalyzerService):
                     "1",
                     found_exceptions,
                     field_name="logs.found_exceptions",
-                    boost=8.0,
+                    boost=utils.BOOST_ERROR_IDENTITY,
                     override_min_should_match="1",
                     max_query_terms=self.search_cfg.MaxQueryTerms,
                 )
             )
 
-        potential_status_codes = request_log.potential_status_codes.strip()
-        if potential_status_codes:
-            number_of_codes = str(len(set(potential_status_codes.split())))
-            nested_should.append(
-                utils.build_more_like_this_query(
-                    "1",
-                    potential_status_codes,
-                    field_name="logs.potential_status_codes",
-                    boost=8.0,
-                    override_min_should_match=number_of_codes,
-                    max_query_terms=self.search_cfg.MaxQueryTerms,
-                )
+        nested_should.extend(
+            utils.build_status_codes_queries(
+                request_log.potential_status_codes,
+                field_name="logs.potential_status_codes",
+                boost=utils.BOOST_ERROR_IDENTITY,
             )
+        )
 
         for field_name, boost_score in LOG_FIELDS_BOOST_SCORES:
+            if field_name in strict_fields:
+                # Already added above with a higher boost; a second identical clause is pure cost.
+                continue
             field_value = getattr(request_log, field_name, "").strip()
             if field_value:
                 nested_should.append(
@@ -240,11 +236,12 @@ class AutoAnalyzerService(AnalyzerService):
                     )
                 )
 
-        if not nested_should:
+        if not nested_must and not nested_should:
             return {}
 
         query = construct_analysis_query(
             request_log,
+            nested_must,
             nested_should,
             launch.analyzerConfig.searchScoreMode,
             size,
@@ -256,44 +253,79 @@ class AutoAnalyzerService(AnalyzerService):
         query = self.add_constraints_for_launches_into_query(query, launch)
         return self.add_query_with_start_time_decay(query, request_log.start_time)
 
-    def _query_candidates_for_test_item(
+    def _query_candidates_for_launch(
         self,
         launch: Launch,
-        request_logs: list[LogItemIndexData],
-    ) -> list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]:
+        request_logs_by_test_item: list[tuple[TestItem, list[LogItemIndexData]]],
+        max_batch_size: Optional[int] = None,
+    ) -> list[list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]]:
+        """Query candidates for a whole launch, batching queries across test items.
+
+        One `msearch` per test item leaves OpenSearch with only a handful of queries to run
+        concurrently and pays a full round trip each time. Batching keeps the request count
+        proportional to the query count instead of the test item count.
+
+        Batch size is a memory trade, not just a round-trip one: every query in a batch holds its
+        full response until the batch is consumed, and a Test Item response carries its matched
+        logs. Past roughly 20 queries the round-trip saving flattens while the memory held per
+        request keeps growing linearly, so `AnalysisQueryBatchSize` defaults there.
+
+        :param launch: Launch being analyzed
+        :param request_logs_by_test_item: Prepared request logs grouped by their test item
+        :param max_batch_size: Queries per `msearch`; defaults to `AnalysisQueryBatchSize`
+        :return: Search results per test item, aligned with `request_logs_by_test_item`
+        """
+        if max_batch_size is None:
+            max_batch_size = self.search_cfg.AnalysisQueryBatchSize
+        plan: list[tuple[int, LogItemIndexData]] = []
         all_queries: list[dict[str, Any]] = []
-        query_request_logs = []
-        for request_log in request_logs:
-            if not request_log.message.strip():
-                continue
-            query = self._build_nested_analyze_query(launch, request_log)
-            if not query:
-                continue
-            all_queries.append({})
-            all_queries.append(query)
-            query_request_logs.append(request_log)
+        for item_index, (_test_item, request_logs) in enumerate(request_logs_by_test_item):
+            for request_log in request_logs:
+                if not request_log.message.strip():
+                    continue
+                query = self._build_nested_analyze_query(launch, request_log)
+                if not query:
+                    continue
+                plan.append((item_index, request_log))
+                all_queries.append({})
+                all_queries.append(query)
 
-        if not all_queries:
-            return []
+        results: list[list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]] = [
+            [] for _ in request_logs_by_test_item
+        ]
 
-        seen_test_item_ids: set[str] = set()
-        unique_hits = []
-        for hit in self.os_client.msearch(launch.project, all_queries):
-            test_item_id = hit.source.test_item_id
-            if test_item_id in seen_test_item_ids:
-                continue
-            seen_test_item_ids.add(test_item_id)
-            unique_hits.append(hit)
-
-        if not unique_hits:
-            return []
-
-        found_log_hits = extract_inner_hit_logs(unique_hits)
-        if not found_log_hits:
-            return []
-
-        buckets = bucket_sort_logs_by_similarity(query_request_logs, found_log_hits)
-        return build_search_results(query_request_logs, buckets)
+        # Each query contributes a header and a body to `all_queries`, so a chunk of `chunk`
+        # entries corresponds to `chunk // 2` entries of `plan`. Responses are consumed as they
+        # are yielded and reduced to their inner-hit logs straight away, so only the current
+        # chunk's Test Item models are held at a time.
+        chunk = max_batch_size * 2
+        for offset in range(0, len(all_queries), chunk):
+            planned = plan[offset // 2 : (offset + chunk) // 2]
+            consumed = 0
+            for (item_index, request_log), hits in zip(
+                planned, self.os_client.msearch_grouped(launch.project, all_queries[offset : offset + chunk])
+            ):
+                consumed += 1
+                seen_test_item_ids: set[str] = set()
+                unique_hits = []
+                for hit in hits:
+                    test_item_id = hit.source.test_item_id
+                    if test_item_id in seen_test_item_ids:
+                        continue
+                    seen_test_item_ids.add(test_item_id)
+                    unique_hits.append(hit)
+                found_log_hits = extract_inner_hit_logs(unique_hits)
+                if found_log_hits:
+                    results[item_index].append((request_log, found_log_hits))
+            if consumed < len(planned):
+                LOGGER.warning(
+                    "Got %d responses for %d queries in project %s, %d request logs were not analyzed",
+                    consumed,
+                    len(planned),
+                    str(launch.project),
+                    len(planned) - consumed,
+                )
+        return results
 
     def _should_stop_processing(self, test_items_processed: int) -> bool:
         if test_items_processed >= self.search_cfg.MaxAutoAnalysisItemsToProcess:
@@ -317,13 +349,20 @@ class AutoAnalyzerService(AnalyzerService):
                 str(launch.launchId),
                 time() - preparation_start,
             )
-            for source_test_item, request_logs in request_logs_by_test_item:
-                if self._should_stop_processing(processed_items):
-                    log_query_results(t_start, all_candidates)
-                    return all_candidates
 
-                item_start = time()
-                search_results = self._query_candidates_for_test_item(launch, request_logs)
+            if self._should_stop_processing(processed_items):
+                log_query_results(t_start, all_candidates)
+                return all_candidates
+            remaining = self.search_cfg.MaxAutoAnalysisItemsToProcess - processed_items
+            request_logs_by_test_item = request_logs_by_test_item[:remaining]
+
+            item_start = time()
+            results_per_test_item = self._query_candidates_for_launch(launch, request_logs_by_test_item)
+            mean_processing_time = (time() - item_start) / max(len(request_logs_by_test_item), 1)
+
+            for (source_test_item, request_logs), search_results in zip(
+                request_logs_by_test_item, results_per_test_item, strict=True
+            ):
                 all_candidates.append(
                     AnalysisCandidate(
                         analyzerConfig=launch.analyzerConfig,
@@ -332,7 +371,7 @@ class AutoAnalyzerService(AnalyzerService):
                         launchId=launch.launchId,
                         launchName=launch.launchName,
                         launchNumber=launch.launchNumber,
-                        timeProcessed=time() - item_start,
+                        timeProcessed=mean_processing_time,
                         candidates=search_results,
                         candidatesWithNoDefect=[],
                     )

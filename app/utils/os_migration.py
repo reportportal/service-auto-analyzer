@@ -17,6 +17,7 @@ from app.commons.model import LogData, LogItemIndexData, TestItemIndexData
 from app.commons.model.db import Hit
 from app.utils import text_processing
 from app.utils.utils import (
+    BOOST_SUPPORTING,
     build_more_like_this_query,
     get_max_similarity_idx,
     normalize_issue_type,
@@ -25,7 +26,7 @@ from app.utils.utils import (
 )
 
 TEST_ITEM_FIELDS_BOOST_SCORES = [
-    ("test_item_name", 2.0),
+    ("test_item_name", BOOST_SUPPORTING),
 ]
 
 TEST_ITEM_SOURCE_FIELDS = [

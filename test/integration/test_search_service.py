@@ -193,6 +193,61 @@ def test_search_logs_filters_by_potential_status_codes(
     assert {item.logId for item in result} == {701, 702}
 
 
+def _search_request(messages: list[str]) -> SearchLogs:
+    return SearchLogs(
+        launchId=1001,
+        launchName="Test Launch",
+        itemId=2001,
+        projectId=123,
+        filteredLaunchIds=[1001],
+        logMessages=messages,
+        analyzerConfig=AnalyzerConf(searchLogsMinShouldMatch=30),
+        logLines=5,
+    )
+
+
+def _hit(test_item_id: str, log_id: str, message: str, codes: str) -> "Hit[TestItemIndexData]":
+    item = TestItemIndexData(
+        test_item_id=test_item_id,
+        launch_id="1001",
+        logs=[_make_log_data(log_id, 0, message, potential_status_codes=codes)],
+        issue_type="ti001",
+    )
+    return Hit[TestItemIndexData].from_dict({"_index": "rp_123", "_id": test_item_id, "_source": item.model_dump()})
+
+
+def test_search_logs_rejects_inverted_status_codes(search_service: SearchService, mocked_os_client: OsClient) -> None:
+    """'expected 400, but was 401' is a different failure from its inverse, despite equal codes."""
+    request = _search_request(["expected status code 400, but was 401"])
+    mocked_os_client.search.return_value = iter(
+        [
+            _hit("3001", "701", "expected status code 400, but was 401", "400 401"),
+            _hit("3002", "702", "expected status code 401, but was 400", "401 400"),
+        ]
+    )
+
+    result = search_service.search_logs(request)
+
+    assert {item.testItemId for item in result} == {3001}
+
+
+def test_search_logs_keeps_repeated_status_codes_distinct(
+    search_service: SearchService, mocked_os_client: OsClient
+) -> None:
+    """'expected 400, but was 400' stores two codes and must not match a single one."""
+    request = _search_request(["expected status code 400, but was 400"])
+    mocked_os_client.search.return_value = iter(
+        [
+            _hit("3001", "701", "expected status code 400, but was 400", "400 400"),
+            _hit("3002", "702", "request failed with status 400", "400"),
+        ]
+    )
+
+    result = search_service.search_logs(request)
+
+    assert {item.testItemId for item in result} == {3001}
+
+
 def test_search_logs_all_messages_should_match(search_service: SearchService, mocked_os_client: OsClient) -> None:
     analyzer_config = AnalyzerConf(searchLogsMinShouldMatch=30, allMessagesShouldMatch=True)
     search_request = SearchLogs(

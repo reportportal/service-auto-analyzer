@@ -125,7 +125,12 @@
         },
         "potential_status_codes": {
           "type": "text",
-          "analyzer": "standard_english_analyzer"
+          "analyzer": "standard_english_analyzer",
+          "fields": {
+            "exact": {
+              "type": "keyword"
+            }
+          }
         },
         "found_exceptions": {
           "type": "text",

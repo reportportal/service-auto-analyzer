@@ -83,8 +83,9 @@ def regroup_logs_by_error_and_status_codes(logs: list[Log]) -> list[list[int]]:
     for i, log in enumerate(logs):
         found_exceptions_raw: str = log.data.found_exceptions or ""
         found_exceptions = " ".join(sorted(found_exceptions_raw.split()))
-        potential_status_codes_raw: str = log.data.potential_status_codes or ""
-        potential_status_codes = " ".join(sorted(potential_status_codes_raw.split()))
+        # Status codes are not sorted: they are stored in the order they appeared, and
+        # "expected 400, but was 401" is a different failure from its inverse.
+        potential_status_codes = " ".join((log.data.potential_status_codes or "").split())
         group_key = (found_exceptions, potential_status_codes)
         regrouped_by_error[group_key].append(i)
     return list(regrouped_by_error.values())
@@ -318,7 +319,7 @@ class ClusterService:
                 min_should_match,
                 queried_log.message,
                 field_name="logs.whole_message",
-                boost=1.0,
+                boost=utils.BOOST_NEUTRAL,
                 max_query_terms=self.search_cfg.MaxQueryTerms,
             )
         ]
@@ -329,24 +330,17 @@ class ClusterService:
                     "1",
                     found_exceptions,
                     field_name="logs.found_exceptions",
-                    boost=1.0,
+                    boost=utils.BOOST_NEUTRAL,
                     override_min_should_match="1",
                     max_query_terms=self.search_cfg.MaxQueryTerms,
                 )
             )
-        potential_status_codes = queried_log.data.potential_status_codes
-        if potential_status_codes:
-            number_of_status_codes = str(len(set(potential_status_codes.split())))
-            nested_must.append(
-                utils.build_more_like_this_query(
-                    "1",
-                    potential_status_codes,
-                    field_name="logs.potential_status_codes",
-                    boost=1.0,
-                    override_min_should_match=number_of_status_codes,
-                    max_query_terms=self.search_cfg.MaxQueryTerms,
-                )
-            )
+        # Clustering requires the same codes in the same order, so the exact sequence is matched.
+        status_codes_query = utils.build_status_codes_exact_query(
+            queried_log.data.potential_status_codes or "", field_name="logs.potential_status_codes"
+        )
+        if status_codes_query:
+            nested_must.append(status_codes_query)
 
         nested_query = {
             "nested": {
@@ -438,10 +432,13 @@ class ClusterService:
                     continue
 
                 equal = True
-                for column in ["found_exceptions", "potential_status_codes"]:
-                    candidate_text = " ".join(sorted((getattr(inner_log.data, column, None) or "").split())).strip()
-                    text_to_compare = " ".join(sorted((getattr(log.data, column, None) or "").split())).strip()
-                    if candidate_text != text_to_compare:
+                # `found_exceptions` is compared as a set, `potential_status_codes` in order.
+                for column, keep_order in (("found_exceptions", False), ("potential_status_codes", True)):
+                    candidate_parts = (getattr(inner_log.data, column, None) or "").split()
+                    compare_parts = (getattr(log.data, column, None) or "").split()
+                    if not keep_order:
+                        candidate_parts, compare_parts = sorted(candidate_parts), sorted(compare_parts)
+                    if candidate_parts != compare_parts:
                         equal = False
                         break
                 if not equal:

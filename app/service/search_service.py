@@ -77,7 +77,7 @@ class SearchService:
                 min_should_match,
                 message,
                 field_name="logs.message",
-                boost=1.0,
+                boost=utils.BOOST_NEUTRAL,
                 max_query_terms=self.search_cfg.MaxQueryTerms,
             )
             for message in log_messages
@@ -137,8 +137,11 @@ class SearchService:
         joined_request_messages = "\n".join(log_messages)
         min_similarity = search_req.analyzerConfig.searchLogsMinShouldMatch / 100.0
         filtered_results: list[tuple[SearchLogInfo, float]] = []
+        # Codes are compared as the stored sequence: in order of appearance and without
+        # de-duplication, so "expected 400, but was 401" does not match its inverse and
+        # "expected 400, but was 400" does not match a single 400.
         request_status_codes = [
-            " ".join(sorted(text_processing.get_unique_potential_status_codes(message))) for message in log_messages
+            " ".join(text_processing.get_potential_status_codes(message)) for message in log_messages
         ]
 
         candidates: list[tuple[Any, list[tuple[Any, str]], list[str]]] = []
@@ -188,7 +191,7 @@ class SearchService:
                 continue
 
             request_codes = request_status_codes[best_request_index] if request_status_codes else ""
-            log_codes = " ".join(sorted((best_log.potential_status_codes or "").split()))
+            log_codes = " ".join((best_log.potential_status_codes or "").split())
             if log_codes != request_codes:
                 continue
 

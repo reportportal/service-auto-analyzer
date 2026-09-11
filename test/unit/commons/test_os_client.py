@@ -186,13 +186,13 @@ def test_search_returns_empty_when_index_missing(os_client_mock, app_config):
     os_client_mock.search.assert_not_called()
 
 
-def test_msearch_returns_empty_when_index_missing(monkeypatch, os_client_mock, app_config):
+def test_msearch_grouped_returns_empty_when_index_missing(monkeypatch, os_client_mock, app_config):
     os_client_mock.indices.get.side_effect = Exception("missing index")
     scan_mock = mock.Mock()
     monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", scan_mock)
     client = OsClient(app_config, os_client=os_client_mock)
 
-    results = list(client.msearch(PROJECT_ID, [{"query": {"match_all": {}}}]))
+    results = list(client.msearch_grouped(PROJECT_ID, [{"query": {"match_all": {}}}]))
 
     assert results == []
     os_client_mock.msearch.assert_not_called()
@@ -336,36 +336,80 @@ def test_search_calls_scan_when_size_provided(monkeypatch, os_client_mock, app_c
     assert captured["size"] == 100
 
 
-def test_msearch_calls_opensearch_msearch(monkeypatch, os_client_mock, app_config, test_item):
+def _hit(index_name, test_item):
+    return {
+        "_index": index_name,
+        "_id": test_item.test_item_id,
+        "_score": 1.0,
+        "_source": test_item.to_index_dict(),
+    }
+
+
+def test_msearch_grouped_calls_opensearch_msearch(monkeypatch, os_client_mock, app_config, test_item):
     os_client_mock.indices.get.return_value = {}
     scan_mock = mock.Mock()
     monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", scan_mock)
     client = OsClient(app_config, os_client=os_client_mock)
     index_name = get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
     queries = [{"query": {"match": {"test_item_id": test_item.test_item_id}}}]
+    os_client_mock.msearch.return_value = {"responses": [{"hits": {"hits": [_hit(index_name, test_item)]}}]}
+
+    results = list(client.msearch_grouped(PROJECT_ID, queries))
+
+    assert len(results) == 1
+    assert len(results[0]) == 1
+    assert results[0][0].source.test_item_id == test_item.test_item_id
+    os_client_mock.msearch.assert_called_once_with(body=queries, index=index_name)
+    scan_mock.assert_not_called()
+
+
+def test_msearch_grouped_keeps_alignment_when_one_query_fails(os_client_mock, app_config, test_item):
+    """A query that fails mid-batch must cost its own group only, not the ones after it."""
+    os_client_mock.indices.get.return_value = {}
+    client = OsClient(app_config, os_client=os_client_mock)
+    index_name = get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
     os_client_mock.msearch.return_value = {
         "responses": [
-            {
-                "hits": {
-                    "hits": [
-                        {
-                            "_index": index_name,
-                            "_id": test_item.test_item_id,
-                            "_score": 1.0,
-                            "_source": test_item.to_index_dict(),
-                        }
-                    ]
-                }
-            }
+            {"hits": {"hits": [_hit(index_name, test_item)]}},
+            {"status": 400, "error": {"type": "search_phase_execution_exception", "reason": "boom"}},
+            {"hits": {"hits": [_hit(index_name, test_item)]}},
         ]
     }
 
-    results = list(client.msearch(PROJECT_ID, queries))
+    results = list(client.msearch_grouped(PROJECT_ID, [{}, {}, {}]))
 
-    assert len(results) == 1
-    assert results[0].source.test_item_id == test_item.test_item_id
-    os_client_mock.msearch.assert_called_once_with(body=queries, index=index_name)
-    scan_mock.assert_not_called()
+    assert len(results) == 3, "a failed query must still occupy its position"
+    assert len(results[0]) == 1
+    assert results[1] == []
+    assert len(results[2]) == 1
+
+
+def test_msearch_grouped_keeps_alignment_when_a_hit_is_malformed(os_client_mock, app_config, test_item):
+    """An unreadable response must not abort the responses that follow it."""
+    os_client_mock.indices.get.return_value = {}
+    client = OsClient(app_config, os_client=os_client_mock)
+    index_name = get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
+    os_client_mock.msearch.return_value = {
+        "responses": [
+            {"hits": {"hits": [{"_id": "1", "_score": 1.0}]}},  # no _source -> validation error
+            {"hits": {"hits": [_hit(index_name, test_item)]}},
+        ]
+    }
+
+    results = list(client.msearch_grouped(PROJECT_ID, [{}, {}]))
+
+    assert len(results) == 2
+    assert results[0] == []
+    assert len(results[1]) == 1
+    assert results[1][0].source.test_item_id == test_item.test_item_id
+
+
+def test_msearch_grouped_returns_nothing_when_the_request_fails(os_client_mock, app_config):
+    os_client_mock.indices.get.return_value = {}
+    os_client_mock.msearch.side_effect = Exception("transport blew up")
+    client = OsClient(app_config, os_client=os_client_mock)
+
+    assert list(client.msearch_grouped(PROJECT_ID, [{}, {}])) == []
 
 
 def test_delete_index_calls_opensearch_delete(os_client_mock, app_config):

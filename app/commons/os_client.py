@@ -188,23 +188,42 @@ class OsClient:
                 LOGGER.exception(f"Index '{index_name}' was not found", exc_info=err)
             return False
 
+    def _ensure_index_checked(self, index_name: str) -> bool:
+        """Check whether an index exists, asking OpenSearch at most once per index.
+
+        `_index_exists` issues `indices.get`, which returns the index's whole metadata including
+        its mappings. Callers that guard every request with it pay that round trip per request, so
+        the answer is cached here.
+
+        Only a positive answer is cached: a missing index may be created later in the process
+        lifetime (indexing creates it on demand), so a negative has to be re-checked. An index
+        deleted through this client drops out of the cache in `_delete_index`; one deleted
+        out-of-process stays cached, and the request that follows fails in the caller's own error
+        handling rather than being skipped by the guard.
+
+        :param index_name: The index name to check
+        :return: True if the index exists
+        """
+        if index_name in self._checked_indexes:
+            return True
+        if self._index_exists(index_name, print_error=False):
+            self._checked_indexes.add(index_name)
+            return True
+        return False
+
     def _ensure_index_exists(self, index_name: str) -> bool:
         """Ensure the Test Item index exists, creating it if necessary.
 
-        This method caches checked indexes to avoid repeated existence checks.
-        The cache is cleared on application restart.
+        Existence checks are cached by `_ensure_index_checked`; the cache is cleared on
+        application restart.
 
         :param index_name: The index name to check/create
         :return: True if index exists or was created successfully
         """
-        if index_name in self._checked_indexes:
+        if self._ensure_index_checked(index_name):
             return True
 
         try:
-            if self._index_exists(index_name, print_error=False):
-                self._checked_indexes.add(index_name)
-                return True
-
             response = self._create_index(index_name)
             if response.acknowledged:
                 self._checked_indexes.add(index_name)
@@ -401,7 +420,7 @@ class OsClient:
         LOGGER.info(f"Deleting {len(test_item_ids)} test items from '{index_name}'")
         t_start = time()
 
-        if not self._index_exists(index_name, print_error=False):
+        if not self._ensure_index_checked(index_name):
             return 0
 
         deleted = self._delete_by_query(
@@ -426,7 +445,7 @@ class OsClient:
         LOGGER.info(f"Deleting test items for {len(launch_ids)} launches from '{index_name}'")
         t_start = time()
 
-        if not self._index_exists(index_name, print_error=False):
+        if not self._ensure_index_checked(index_name):
             return 0
 
         deleted = self._delete_by_query(
@@ -462,7 +481,7 @@ class OsClient:
         :return: Number of deleted documents
         """
         index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
-        if not self._index_exists(index_name, print_error=False):
+        if not self._ensure_index_checked(index_name):
             return 0
 
         query = self._time_range_query("launch_start_time", start_date, end_date)
@@ -484,7 +503,7 @@ class OsClient:
         :return: Iterator of typed search hits
         """
         index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
-        if not self._index_exists(index_name, print_error=False):
+        if not self._ensure_index_checked(index_name):
             return
 
         try:
@@ -496,25 +515,59 @@ class OsClient:
         except Exception as err:
             LOGGER.exception("Error in search", exc_info=err)
 
-    def msearch(self, project_id: str | int, queries: Iterable[dict[str, Any]]) -> Iterator[Hit[TestItemIndexData]]:
-        """Execute several search operations at once.
+    def msearch_grouped(
+        self, project_id: str | int, queries: Iterable[dict[str, Any]]
+    ) -> Iterator[list[Hit[TestItemIndexData]]]:
+        """Execute several search operations at once, yielding each query's hits separately.
+
+        One group is yielded per response, in submission order, so a caller matches a group to the
+        query that produced it by position and does not have to re-derive the correspondence. A
+        caller that finishes with a group before taking the next one also holds only that group's
+        models at a time.
 
         :param project_id: The project identifier
-        :param queries: OpenSearch query iterable object
-        :return: Iterator of typed search hits
+        :param queries: OpenSearch query iterable object, alternating header and body per query
+        :return: Iterator of hit lists, one per submitted query, in submission order
         """
         index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
-        if not self._index_exists(index_name, print_error=False):
+        if not self._ensure_index_checked(index_name):
             return
 
         try:
             results = self._os_client.msearch(body=queries, index=index_name)
             responses = results["responses"] or []
-            for res in responses:
-                for hit in res.get("hits", {}).get("hits", []):
-                    yield Hit[TestItemIndexData].from_dict(hit)
         except Exception as err:
             LOGGER.exception("Error in msearch", exc_info=err)
+            return
+
+        # A multi search reports a failed query as an `error` on its own response and still
+        # returns the others, so one bad query must not cost the whole batch. An empty group is
+        # yielded in its place: callers match groups to queries by position, and dropping a group
+        # would shift every later one onto the wrong query.
+        for position, res in enumerate(responses):
+            try:
+                error = res.get("error")
+                if error:
+                    LOGGER.error(
+                        "Query %d of %d in the msearch to '%s' failed: %s",
+                        position + 1,
+                        len(responses),
+                        index_name,
+                        error,
+                    )
+                    group: list[Hit[TestItemIndexData]] = []
+                else:
+                    group = [Hit[TestItemIndexData].from_dict(hit) for hit in res.get("hits", {}).get("hits", [])]
+            except Exception as err:
+                LOGGER.exception(
+                    "Unable to read response %d of %d in the msearch to '%s'",
+                    position + 1,
+                    len(responses),
+                    index_name,
+                    exc_info=err,
+                )
+                group = []
+            yield group
 
     def bulk_update_issue_history(self, project_id: str | int, updates: list[TestItemHistoryData]) -> BulkResponse:
         """Bulk update issue_history for multiple Test Items.
@@ -527,7 +580,7 @@ class OsClient:
             return BulkResponse(took=0, errors=False)
 
         index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
-        if not self._index_exists(index_name, print_error=True):
+        if not self._ensure_index_checked(index_name):
             LOGGER.error(f"Index not exists: {index_name}")
             return BulkResponse(took=0, errors=True)
 
@@ -574,7 +627,7 @@ class OsClient:
             return BulkResponse(took=0, errors=False)
 
         index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
-        if not self._index_exists(index_name, print_error=True):
+        if not self._ensure_index_checked(index_name):
             LOGGER.error(f"Index not exists: {index_name}")
             return BulkResponse(took=0, errors=True)
 

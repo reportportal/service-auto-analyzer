@@ -17,8 +17,7 @@
       "type": "keyword"
     },
     "launch_name": {
-      "type": "text",
-      "analyzer": "standard_english_analyzer"
+      "type": "keyword"
     },
     "launch_number": {
       "type": "keyword"
@@ -125,7 +124,8 @@
           "analyzer": "standard_english_analyzer"
         },
         "potential_status_codes": {
-          "type": "keyword"
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
         },
         "found_exceptions": {
           "type": "text",

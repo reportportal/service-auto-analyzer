@@ -236,11 +236,29 @@ def calculate_threshold_for_text(text: str, cur_threshold: float, min_recalculat
     return calculate_threshold(text_size, cur_threshold, min_recalculated_threshold=min_recalculated_threshold)
 
 
+# Boost ladder for search clauses. Values are relative to each other only: a clause boosted
+# BOOST_ERROR_IDENTITY contributes roughly twice what BOOST_MESSAGE does, and so on.
+BOOST_NEUTRAL = 1.0
+"""No emphasis. For a clause that carries the query on its own, so its weight cannot rank anything."""
+
+BOOST_SUPPORTING = 2.0
+"""A field that corroborates a match without identifying it: numbers, params, URLs, paths."""
+
+BOOST_MESSAGE = 4.0
+"""The primary message field a candidate is matched on."""
+
+BOOST_ERROR_IDENTITY = 8.0
+"""A field that nearly identifies the failure: exception names, status codes."""
+
+CONTAINED_SEQUENCE_BOOST_FACTOR = 0.5
+"""Share of the boost given to a sequence found inside a longer one rather than matched whole."""
+
+
 def build_more_like_this_query(
     min_should_match: str,
     log_message,
     field_name: str = "message",
-    boost: float = 1.0,
+    boost: float = BOOST_NEUTRAL,
     override_min_should_match: Optional[str] = None,
     max_query_terms: int = 50,
 ):
@@ -255,6 +273,49 @@ def build_more_like_this_query(
             "boost": boost,
         }
     }
+
+
+def build_status_codes_exact_query(
+    status_codes: str, field_name: str = "potential_status_codes", boost: float = BOOST_NEUTRAL
+) -> Optional[dict[str, Any]]:
+    """Build a clause matching the exact status code sequence.
+
+    `potential_status_codes` stores the codes as they appeared in the message, in order and
+    without de-duplication, so "expected status code 400, but was 401" is stored as `400 401`
+    while the inverse failure is stored as `401 400`. Those are different failures and must not
+    match each other, which rules out both `more_like_this` and `terms`: they test term overlap
+    and score the two identically.
+
+    :param status_codes: Status codes as stored in the field, whitespace separated
+    :param field_name: Field holding the codes; its `.exact` sub-field is matched
+    :param boost: Boost for the clause
+    :return: A term query on the `.exact` sub-field, or None when there are no codes
+    """
+    codes = status_codes.strip()
+    if not codes:
+        return None
+    return {"term": {f"{field_name}.exact": {"value": codes, "boost": boost}}}
+
+
+def build_status_codes_queries(
+    status_codes: str, field_name: str = "potential_status_codes", boost: float = BOOST_NEUTRAL
+) -> list[dict[str, Any]]:
+    """Build clauses that rank status code sequences by how exactly they match.
+
+    The exact sequence scores highest; the same sequence occurring inside a longer one still
+    matches, at half the boost. Order is preserved in both, unlike `more_like_this`.
+
+    :param status_codes: Status codes as stored in the field, whitespace separated
+    :param field_name: Field holding the codes
+    :param boost: Boost for an exact match; a contained match gets CONTAINED_SEQUENCE_BOOST_FACTOR of it
+    :return: Clauses to add to a `should`, empty when there are no codes
+    """
+    exact = build_status_codes_exact_query(status_codes, field_name=field_name, boost=boost)
+    if not exact:
+        return []
+    codes = status_codes.strip()
+    contained_boost = boost * CONTAINED_SEQUENCE_BOOST_FACTOR
+    return [exact, {"match_phrase": {field_name: {"query": codes, "boost": contained_boost}}}]
 
 
 def extract_clustering_setting(cluster_id):

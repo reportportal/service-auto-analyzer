@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+import json
 from time import time
 from typing import Any, Optional
 
@@ -220,9 +220,13 @@ class SearchService:
         filtered_results.sort(key=lambda entry: entry[1], reverse=True)
         final_results = [entry[0] for entry in filtered_results]
         LOGGER.info(
-            "Finished searching by request %s with %d results. It took %.2f sec.",
-            search_req.model_dump_json(),
+            "Finished searching with %d results. It took %.2f sec.",
             len(final_results),
             time() - t_start,
+        )
+
+        LOGGER.debug(
+            "Finished searching with the following results: %s",
+            json.dumps([res.model_dump() for res in final_results if res]),
         )
         return final_results

@@ -498,4 +498,4 @@ class AutoAnalyzerService(AnalyzerService):
         LOGGER.info(f"Processed {cnt_items_to_process} test items. It took {time() - t_start:.2f} sec.")
         LOGGER.info(f"Finished analysis for {cnt_launches} launches with {len(results)} results.")
         if self.amqp_client:
-            self.amqp_client.publish_response(json.dumps(results))
+            self.amqp_client.publish_response(json.dumps([res.model_dump() for res in results]))

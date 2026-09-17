@@ -15,7 +15,7 @@ COPY ./requirements.txt ./requirements.txt
 COPY ./requirements-dev.txt ./requirements-dev.txt
 RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
     && LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "${VIRTUAL_ENV}/bin/pip install --no-cache-dir -r requirements.txt" \
-    && "${VIRTUAL_ENV}/bin/python3" -m nltk.downloader -d /usr/share/nltk_data stopwords wordnet omw-1.4
+    && "${VIRTUAL_ENV}/bin/python3" -c "import nltk; nltk.download(['stopwords','wordnet','omw-1.4'], '/usr/share/nltk_data')"
 RUN "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir -r requirements-dev.txt
 RUN make test-all
 
@@ -35,7 +35,7 @@ COPY ./Makefile ./Makefile
 RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
     && "${VIRTUAL_ENV}/bin/pip" install --upgrade setuptools \
     && LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "${VIRTUAL_ENV}/bin/pip install --no-cache-dir -r requirements.txt" \
-    && "${VIRTUAL_ENV}/bin/python3" -m nltk.downloader -d /usr/share/nltk_data stopwords wordnet omw-1.4
+    && "${VIRTUAL_ENV}/bin/python3" -c "import nltk; nltk.download(['stopwords','wordnet','omw-1.4'], '/usr/share/nltk_data')"
 ARG APP_VERSION=""
 ARG RELEASE_MODE=false
 ARG GITHUB_TOKEN
@@ -53,10 +53,11 @@ FROM dhi.io/python@sha256:c112eb47edff52874c2d90084eb333bc50f28536ab4d1efcf40122
 WORKDIR /backend
 COPY --from=builder /backend ./
 COPY --from=builder /venv /venv
-COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
 
 ENV VIRTUAL_ENV="/venv"
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend
+
+RUN "${VIRTUAL_ENV}/bin/python3" -c "import nltk; nltk.download(['stopwords','wordnet','omw-1.4'], '/usr/share/nltk_data')"
 
 # Start server
 CMD ["python", "app/main.py"]

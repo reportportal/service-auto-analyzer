@@ -53,11 +53,10 @@ FROM dhi.io/python@sha256:c112eb47edff52874c2d90084eb333bc50f28536ab4d1efcf40122
 WORKDIR /backend
 COPY --from=builder /backend ./
 COPY --from=builder /venv /venv
+COPY --from=builder /usr/share/nltk_data /usr/share/nltk_data/
 
 ENV VIRTUAL_ENV="/venv"
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}" PYTHONPATH=/backend
-
-RUN "${VIRTUAL_ENV}/bin/python3" -c "import nltk; nltk.download(['stopwords','wordnet','omw-1.4'], '/usr/share/nltk_data')"
 
 # Start server
 CMD ["python", "app/main.py"]

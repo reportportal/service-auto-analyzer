@@ -298,7 +298,7 @@ class DefectTypeModelTraining:
                 LOGGER.debug(f"New model test results {new_model_results}")
                 _, p_value = stats.f_oneway(baseline_model_results, new_model_results)
                 if p_value is None or math.isnan(p_value):
-                    p_value = 1.0
+                    p_value = np.float64(1.0)
                 train_log_info[label]["p_value"] = p_value
                 baseline_mean_f1 = np.mean(baseline_model_results)
                 mean_f1 = np.mean(new_model_results)

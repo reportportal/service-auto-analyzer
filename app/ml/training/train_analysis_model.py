@@ -286,8 +286,7 @@ def build_history_negative_hits(
             update={
                 "test_item_id": synthetic_test_item_id,
                 "issue_type": issue_type,
-                "logs": None,
-                "issue_history": None,
+                "issue_history": [],
             },
             deep=True,
         )
@@ -519,10 +518,11 @@ class AnalysisModelTraining:
                     continue
 
                 _boosting_data_gatherer: BoostingFeaturizer = self.featurizer_class(
-                    (test_item, found_hits), self._get_config_for_boosting(-1, namespaces), feature_ids=features
+                    (test_item, found_hits),
+                    self._get_config_for_boosting(-1, namespaces),
+                    feature_ids=features,
+                    defect_type_model=defect_type_model,
                 )
-
-                _boosting_data_gatherer.set_defect_type_model(defect_type_model)
                 feature_data, candidate_names = _boosting_data_gatherer.gather_features_info()
                 if not feature_data or not candidate_names:
                     continue

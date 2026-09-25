@@ -303,6 +303,7 @@ class TestAutoAnalysisPredictor:
         mock_model_chooser = Mock()
         mock_boosting_decision_maker = Mock()
         mock_defect_type_model = Mock()
+        mock_defect_type_model.get_model_info.return_value = ["defect_type_model"]
 
         mock_model_chooser.choose_model.side_effect = lambda project_id, model_type, **kwargs: (
             mock_boosting_decision_maker if model_type == ModelType.auto_analysis else mock_defect_type_model
@@ -369,17 +370,25 @@ class TestAutoAnalysisPredictor:
         predictor.boosting_decision_maker.predict.assert_not_called()
 
     def test_predict_with_real_featurizer(self):
-        """Test that one prediction is made per found Test Item, unsupported features are zeros."""
+        """Test that one prediction is made per issue type, by its top found Test Item."""
         deps = self.create_mock_dependencies()
         predictor = AutoAnalysisPredictor(**deps)
         predictor.boosting_decision_maker.predict = Mock(return_value=([1, 0], [[0.2, 0.8], [0.7, 0.3]]))
         request_item = build_request_item(["Error message"])
-        hits = [build_hit("456", {0: "Error message"}), build_hit("789", {0: "Another error"}, score=0.5)]
+        hits = [
+            build_hit("456", {0: "Error message"}, issue_type="pb001"),
+            build_hit("789", {0: "Another error"}, score=0.5, issue_type="ab001"),
+            build_hit("101", {0: "Error message again"}, score=0.4, issue_type="pb001"),
+        ]
 
         results = predictor.predict((request_item, hits))
 
-        predictor.boosting_decision_maker.predict.assert_called_once_with([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
-        assert [result.identity for result in results] == ["456", "789"]
+        # Features: 0 - unsupported, 1 - inverse position, 3 - share of the issue type
+        predictor.boosting_decision_maker.predict.assert_called_once_with(
+            [[0.0, 1.0, pytest.approx(2 / 3)], [0.0, 0.5, pytest.approx(1 / 3)]]
+        )
+        assert [result.identity for result in results] == ["pb001", "ab001"]
+        assert [result.data.mrHit.source.test_item_id for result in results] == ["456", "789"]
         assert [result.label for result in results] == [1, 0]
         assert [result.original_position for result in results] == [0, 1]
         assert [result.data.mrHit.normalized_score for result in results] == [1.0, pytest.approx(0.5 / 0.95)]
@@ -438,6 +447,7 @@ class TestSuggestionPredictor:
         mock_model_chooser = Mock()
         mock_boosting_decision_maker = Mock()
         mock_defect_type_model = Mock()
+        mock_defect_type_model.get_model_info.return_value = ["defect_type_model"]
 
         mock_model_chooser.choose_model.side_effect = lambda project_id, model_type, **kwargs: (
             mock_boosting_decision_maker if model_type == ModelType.suggestion else mock_defect_type_model

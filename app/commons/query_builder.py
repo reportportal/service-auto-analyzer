@@ -37,6 +37,30 @@ TEST_ITEM_FIELDS_BOOST_SCORES = [
     ("test_item_name", utils.BOOST_SUPPORTING),
 ]
 
+ITEM_LOG_SOURCE_FIELDS = [
+    "logs.log_id",
+    "logs.log_order",
+    "logs.log_level",
+    "logs.message",
+    "logs.message_extended",
+    "logs.message_without_params_extended",
+    "logs.message_without_params_and_brackets",
+    "logs.detected_message",
+    "logs.detected_message_with_numbers",
+    "logs.detected_message_extended",
+    "logs.detected_message_without_params_extended",
+    "logs.detected_message_without_params_and_brackets",
+    "logs.stacktrace",
+    "logs.stacktrace_extended",
+    "logs.only_numbers",
+    "logs.potential_status_codes",
+    "logs.found_exceptions",
+    "logs.found_tests_and_methods",
+    "logs.urls",
+    "logs.message_params",
+    "logs.whole_message",
+]
+
 TEST_ITEM_SOURCE_FIELDS = [
     "test_item_id",
     "test_item_name",
@@ -49,6 +73,8 @@ TEST_ITEM_SOURCE_FIELDS = [
     "is_auto_analyzed",
     "start_time",
     "log_count",
+    "issue_history",
+    *ITEM_LOG_SOURCE_FIELDS,
 ]
 
 INNER_HITS_SOURCE = [

@@ -70,6 +70,15 @@ class LogData(BaseModel):
     whole_message: Optional[str] = Field(default=None, description="Combined exception message and stacktrace")
 
 
+def _get_log_sort_key(log: LogData) -> int:
+    if log.log_order is not None:
+        return log.log_order
+    try:
+        return int(log.log_id)
+    except (TypeError, ValueError):
+        return 0
+
+
 class LogClusterData(BaseModel):
     """Payload for updating cluster data on a nested log."""
 
@@ -139,6 +148,25 @@ class TestItemIndexData(BaseModel):
     log_count: Optional[int] = Field(default=None, description="Number of logs in this Test Item")
     logs: Optional[list[LogData]] = Field(default=None, description="Nested log entries")
     issue_history: Optional[list[TestItemHistoryData]] = Field(default=None, description="Nested issue type history")
+
+    def get_sorted_logs(self) -> list[LogData]:
+        """
+        Get logs sorted by their position within the Test Item, or by log ID if the position is unknown.
+
+        :return: Sorted logs
+        """
+        return sorted(self.logs or [], key=_get_log_sort_key)
+
+    def join_log_field(self, field: str, separator: str = "\n") -> str:
+        """
+        Join non-empty values of the given log field of all logs, in the order of logs.
+
+        :param field: Log field name
+        :param separator: Separator to put between values
+        :return: Joined values
+        """
+        values = [str(getattr(log, field, None) or "").strip() for log in self.get_sorted_logs()]
+        return separator.join(value for value in values if value)
 
     def to_index_dict(self) -> dict[str, Any]:
         """

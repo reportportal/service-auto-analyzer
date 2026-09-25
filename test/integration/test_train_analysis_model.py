@@ -239,4 +239,6 @@ def test_train_uses_os_client_and_issue_history(model_type: ModelType) -> None:
     assert len(labels) == 12
     assert sum(labels) == 4
     assert len(train_data) == 12
-    assert all(row == [0.0] * len(training.features) for row in train_data)
+    for row in train_data:
+        assert len(row) == len(training.features)
+        assert all(isinstance(value, float) and 0.0 <= value <= 1.0 for value in row)

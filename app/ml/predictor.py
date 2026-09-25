@@ -251,11 +251,12 @@ class AutoAnalysisPredictor(MlPredictor):
         :param search_results: Request Test Item and Test Items found for it in OpenSearch
         :return: Configured BoostingFeaturizer instance
         """
-        featurizer = BoostingFeaturizer(
-            search_results, self.boosting_config, feature_ids=self.boosting_decision_maker.feature_ids
+        return BoostingFeaturizer(
+            search_results,
+            self.boosting_config,
+            feature_ids=self.boosting_decision_maker.feature_ids,
+            defect_type_model=self.defect_type_model,
         )
-        featurizer.set_defect_type_model(self.defect_type_model)
-        return featurizer
 
 
 class SuggestionPredictor(MlPredictor):
@@ -303,13 +304,12 @@ class SuggestionPredictor(MlPredictor):
         :param search_results: Request Test Item and Test Items found for it in OpenSearch
         :return: Configured SuggestBoostingFeaturizer instance
         """
-        featurizer = SuggestBoostingFeaturizer(
+        return SuggestBoostingFeaturizer(
             search_results,
             self.boosting_config,
             feature_ids=self.boosting_decision_maker.feature_ids,
+            defect_type_model=self.defect_type_model,
         )
-        featurizer.set_defect_type_model(self.defect_type_model)
-        return featurizer
 
 
 def extract_text_fields_for_comparison(logs: list[LogData]) -> str:

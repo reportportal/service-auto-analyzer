@@ -24,12 +24,11 @@ from app.commons.model.launch_objects import (
     ApplicationConfig,
     Launch,
     SearchConfig,
-    SimilarityResult,
     SuggestAnalysisResult,
     TestItem,
     TestItemInfo,
 )
-from app.commons.model.test_item_index import LogData, TestItemIndexData
+from app.commons.model.test_item_index import TestItemIndexData
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.os_client import OsClient
@@ -68,70 +67,40 @@ def _build_launch_from_test_item_info(test_item_info: TestItemInfo) -> Launch:
     )
 
 
-def _get_best_matched_log(result: PredictionResult) -> Optional[LogData]:
-    log_match = best_log_match(result.data.mrHit)
-    return log_match[1].source if log_match else None
-
-
-def _create_similarity_dict(
-    prediction_results: list[PredictionResult],
-) -> dict[str, dict[tuple[str, str], SimilarityResult]]:
-    """Create a similarity dictionary for comparing best matched logs of prediction results."""
-    _similarity_calculator = similarity_calculator.SimilarityCalculator()
-    matched_logs = [_get_best_matched_log(result) for result in prediction_results]
-    all_pairs_to_check: list[tuple[LogData, list[LogData]]] = []
-    for i, result_first in enumerate(prediction_results):
-        first_log = matched_logs[i]
-        if first_log is None:
-            continue
-        for j in range(i + 1, len(prediction_results)):
-            second_log = matched_logs[j]
-            if second_log is None:
-                continue
-            if result_first.data.mrHit.source.issue_type != prediction_results[j].data.mrHit.source.issue_type:
-                continue
-            all_pairs_to_check.append((second_log, [first_log]))
-    return _similarity_calculator.find_similarity(all_pairs_to_check, SIMILARITY_FIELDS)
-
-
-def _filter_by_similarity(
-    prediction_results: list[PredictionResult],
-    sim_dict: dict[str, dict[tuple[str, str], SimilarityResult]],
-) -> list[PredictionResult]:
-    """Filter prediction results by removing highly similar duplicates."""
-    matched_logs = [_get_best_matched_log(result) for result in prediction_results]
-    filtered_results = []
-    deleted_indices: set[int] = set()
-    for i in range(len(prediction_results)):
-        if i in deleted_indices:
-            continue
-        first_log = matched_logs[i]
-        for j in range(i + 1, len(prediction_results)):
-            second_log = matched_logs[j]
-            if first_log is None or second_log is None:
-                continue
-            group_id = (str(first_log.log_id), str(second_log.log_id))
-            if group_id not in sim_dict["detected_message_with_numbers"]:
-                continue
-            detected_message_sim = sim_dict["detected_message_with_numbers"][group_id]
-            stacktrace_sim = sim_dict["stacktrace"][group_id]
-            whole_message_sim = sim_dict["whole_message"][group_id]
-            if (
-                (detected_message_sim.both_empty or detected_message_sim.similarity >= SIMILARITY_THRESHOLD)
-                and (stacktrace_sim.both_empty or stacktrace_sim.similarity >= SIMILARITY_THRESHOLD)
-                and (whole_message_sim.both_empty or whole_message_sim.similarity >= SIMILARITY_THRESHOLD)
-            ):
-                deleted_indices.add(j)
-        filtered_results.append(prediction_results[i])
-    return filtered_results
+def _is_similar(first_text: str, second_text: str, calculator: similarity_calculator.SimilarityCalculator) -> bool:
+    if not first_text.strip() and not second_text.strip():
+        return True
+    return calculator.find_similarity(first_text, [second_text])[0].similarity >= SIMILARITY_THRESHOLD
 
 
 def deduplicate_results(
     prediction_results: list[PredictionResult],
 ) -> list[PredictionResult]:
-    """Deduplicate prediction results by removing items with highly similar best matched logs."""
-    sim_dict = _create_similarity_dict(prediction_results)
-    filtered_results = _filter_by_similarity(prediction_results, sim_dict)
+    """Deduplicate prediction results by removing found Test Items of the same issue type with highly similar logs.
+
+    :param prediction_results: Ranked predictions
+    :return: Predictions without duplicates, in the same order
+    """
+    calculator = similarity_calculator.SimilarityCalculator()
+    texts = [
+        [result.data.mrHit.source.join_log_field(field) for field in SIMILARITY_FIELDS]
+        for result in prediction_results
+    ]
+    filtered_results = []
+    deleted_indices: set[int] = set()
+    for i, result_first in enumerate(prediction_results):
+        if i in deleted_indices:
+            continue
+        for j in range(i + 1, len(prediction_results)):
+            if j in deleted_indices:
+                continue
+            if result_first.data.mrHit.source.issue_type != prediction_results[j].data.mrHit.source.issue_type:
+                continue
+            if all(
+                _is_similar(first_text, second_text, calculator) for first_text, second_text in zip(texts[i], texts[j])
+            ):
+                deleted_indices.add(j)
+        filtered_results.append(result_first)
     return filtered_results
 
 
@@ -143,13 +112,6 @@ def rank_predictions(prediction_results: list[PredictionResult]) -> list[Predict
     """
     return sorted(
         prediction_results, key=lambda result: (result.probability[1], -result.original_position), reverse=True
-    )
-
-
-def _sort_logs(test_item: TestItemIndexData) -> list[LogData]:
-    return sorted(
-        test_item.logs or [],
-        key=lambda log: log.log_order if log.log_order is not None else utils.safe_int(log.log_id),
     )
 
 
@@ -276,7 +238,7 @@ class SuggestService(AnalyzerService):
                     "test_item_name": None,
                     "test_case_hash": None,
                     "unique_id": None,
-                    "logs": _sort_logs(found_test_item),
+                    "logs": found_test_item.get_sorted_logs(),
                 }
             )
             return request_item, test_item_id_for_suggest

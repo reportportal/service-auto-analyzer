@@ -210,6 +210,16 @@ def test_issue_type_restrictions(filter_no_defect: bool, expected_restrictions: 
     assert len([clause for clause in must_not if "wildcard" in clause]) == expected_restrictions
 
 
+def test_found_items_source_has_logs_and_history():
+    source = build_query(build_request_item([build_log("1", "first error")]))["_source"]
+
+    assert "issue_history" in source
+    assert "logs.log_id" in source
+    assert "logs.log_order" in source
+    assert "logs.message" in source
+    assert "logs" not in source
+
+
 def test_no_logs_to_search_by():
     assert build_query(build_request_item([build_log("1", "  ")])) == {}
     assert build_query(build_request_item([])) == {}

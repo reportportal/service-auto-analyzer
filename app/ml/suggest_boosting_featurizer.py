@@ -12,25 +12,32 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Any, override
+from typing import Any, Optional, override
 
 from app.commons.model.db import Hit
 from app.commons.model.test_item_index import TestItemIndexData
-from app.ml.boosting_featurizer import BoostingFeaturizer, Feature
+from app.ml.boosting_featurizer import BoostingFeaturizer
+from app.ml.models.defect_type_model import DefectTypeModel
 
 
 class SuggestBoostingFeaturizer(BoostingFeaturizer):
-    """Gather Gradient Boosting features for the suggestion model."""
+    """Gather Gradient Boosting features by found Test Items: every found Test Item gets its own row."""
 
     def __init__(
         self,
         results: tuple[TestItemIndexData, list[Hit[TestItemIndexData]]],
         config: dict[str, Any],
         feature_ids: str | list[int],
+        defect_type_model: Optional[DefectTypeModel] = None,
         **_: Any,
     ) -> None:
-        super().__init__(results, config, feature_ids)
+        super().__init__(results, config, feature_ids, defect_type_model)
 
     @override
-    def _create_features(self) -> dict[int, Feature]:
-        return {}
+    def _get_identity(self, hit: Hit[TestItemIndexData]) -> str:
+        """Get the identity a found Test Item represents in the output.
+
+        :param hit: Found Test Item
+        :return: ID of the found Test Item
+        """
+        return str(hit.source.test_item_id)

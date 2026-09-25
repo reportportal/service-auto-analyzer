@@ -47,7 +47,7 @@ TEST_DATA_PROPORTION = 0.1
 MINIMAL_DATA_LENGTH_FOR_TRAIN = 50
 MIN_P_VALUE = 0.05
 
-ITEM_FIELDS_TO_RETRIEVE = ["test_item_id", "issue_history", "logs"]
+ITEM_FIELDS_TO_RETRIEVE = ["test_item_id", "launch_id", "issue_history", "logs"]
 
 T = TypeVar("T")
 

@@ -102,9 +102,13 @@ def test_train_uses_os_client_issue_history_query() -> None:
         logs=logs,
         issue_history=history,
     )
-    raw_hit = {"_index": "rp_123", "_id": "1001", "_source": test_item.model_dump()}
 
-    with mock.patch("opensearchpy.helpers.scan", return_value=[raw_hit]) as scan_mock:
+    def fake_scan(_client, query, **_kwargs):
+        # OpenSearch returns only the requested source fields
+        source = test_item.model_dump()
+        yield {"_index": "rp_123", "_id": "1001", "_source": {field: source[field] for field in query["_source"]}}
+
+    with mock.patch("opensearchpy.helpers.scan", side_effect=fake_scan) as scan_mock:
         training = DefectTypeModelTraining(
             APP_CONFIG,
             search_cfg,
@@ -116,7 +120,10 @@ def test_train_uses_os_client_issue_history_query() -> None:
             "_train_several_times",
             return_value=([0.1], [0.1], True, 0.0),
         ) as train_mock:
-            training.train(TrainInfo(model_type=ModelType.defect_type, project=123))
+            data_size, _ = training.train(TrainInfo(model_type=ModelType.defect_type, project=123))
+
+    # Each of 2 logs gives one positive "pb" entry and one history negative "ab" entry
+    assert data_size == 4
 
     scan_mock.assert_called_once()
     args, kwargs = scan_mock.call_args

@@ -17,9 +17,9 @@ from typing import Any, Optional, Union
 
 from pydantic import BaseModel, Field
 
-from app.commons.model import LogItemIndexData
 from app.commons.model.db import Hit
 from app.commons.model.ml import ModelType
+from app.commons.model.test_item_index import TestItemIndexData
 
 ERROR_LOGGING_LEVEL: int = 40000
 
@@ -129,6 +129,9 @@ class SearchConfig(BaseModel):
     # Queries per msearch request. Each in-flight query holds its whole response in memory
     # until its group is consumed, so this trades round trips against peak memory.
     AnalysisQueryBatchSize: int = 20
+    # Total number of message terms in one Test Item query, shared across its logs. OpenSearch limits
+    # the number of clauses in the whole query (1024 by default), and every term is a clause.
+    ItemQueryTermsBudget: int = 800
     DefectTypeModelNumEstimators: int = 5
     SuggestBoostModelNumEstimators: int = 50
     SuggestBoostModelMaxDepth: int = 5
@@ -153,13 +156,11 @@ class SimilarityResult(BaseModel):
 
 
 class RelevantItem(BaseModel):
-    """Most relevant log hit found for an issue type or test item, with its comparison metadata"""
+    """Found Test Item hit, with the request Test Item it was compared to and its comparison metadata"""
 
-    mrHit: Hit[LogItemIndexData] = Field(
-        default_factory=lambda: Hit[LogItemIndexData](score=-1, source=LogItemIndexData())
-    )
+    mrHit: Hit[TestItemIndexData]
     score: float = 0.0
-    compared_log: LogItemIndexData = Field(default_factory=LogItemIndexData)
+    compared_item: TestItemIndexData
     original_position: int = -1
 
 
@@ -373,7 +374,7 @@ class AnalysisCandidate(BaseModel):
     analyzerConfig: AnalyzerConf
     testItemId: int
     timeProcessed: float
-    candidates: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]
+    candidates: tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]
     candidatesWithNoDefect: list[tuple[dict[str, Any], dict[str, Any]]]
     project: int
     launchId: int

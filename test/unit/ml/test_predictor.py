@@ -19,8 +19,10 @@ import pytest
 
 from app.commons.model.db import Hit
 from app.commons.model.launch_objects import RelevantItem
-from app.commons.model.log_item_index import LogItemIndexData
 from app.commons.model.ml import ModelType
+from app.commons.model.test_item_index import LogData, TestItemIndexData
+from app.commons.query_builder import get_log_inner_hits_name
+from app.ml.boosting_featurizer import BoostingFeaturizer
 from app.ml.predictor import (
     PREDICTION_CLASSES,
     AutoAnalysisPredictor,
@@ -30,6 +32,7 @@ from app.ml.predictor import (
     SuggestionPredictor,
     extract_text_fields_for_comparison,
 )
+from app.ml.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 
 
 def assert_prediction_result_structure(
@@ -56,7 +59,7 @@ def assert_prediction_result_structure(
     assert result.probability[0] + result.probability[1] == pytest.approx(1.0)
     assert isinstance(result.data, RelevantItem)
     assert isinstance(result.data.mrHit, Hit)
-    assert isinstance(result.data.compared_log, LogItemIndexData)
+    assert isinstance(result.data.compared_item, TestItemIndexData)
     assert result.identity == expected_identity
     assert result.feature_info is not None
     assert isinstance(result.feature_info, FeatureInfo)
@@ -67,113 +70,86 @@ def assert_prediction_result_structure(
     assert result.original_position == expected_original_position
 
 
-def build_log_item(
-    *,
-    log_id: str = "log1",
-    message: str = "Error message",
-    merged_small_logs: str = "",
-    test_item: int = 0,
-    issue_type: str = "",
-) -> LogItemIndexData:
-    return LogItemIndexData(
-        log_id=log_id,
-        message=message,
-        merged_small_logs=merged_small_logs,
-        test_item=test_item,
-        issue_type=issue_type,
+def build_log(log_id: str, message: str, log_order: int = 0) -> LogData:
+    return LogData(log_id=log_id, log_order=log_order, log_level=40000, message=message)
+
+
+def build_request_item(messages: list[str], test_item_id: str = "1") -> TestItemIndexData:
+    return TestItemIndexData(
+        test_item_id=test_item_id,
+        launch_id="1",
+        logs=[build_log(f"{test_item_id}{idx}", message, idx) for idx, message in enumerate(messages)],
     )
 
 
-def build_hit(source: LogItemIndexData, score: float = 0.95) -> Hit[LogItemIndexData]:
-    return Hit[LogItemIndexData].from_dict({"_id": source.log_id, "_score": score, "_source": source.model_dump()})
+def build_hit(
+    test_item_id: str = "456",
+    matched_messages: Optional[dict[int, str]] = None,
+    score: float = 0.95,
+    issue_type: str = "pb001",
+) -> Hit[TestItemIndexData]:
+    """Build a found Test Item hit with named inner hits.
+
+    :param test_item_id: Found Test Item ID
+    :param matched_messages: Request log position mapped to the message of the found log matched to it
+    :param score: Hit score
+    :param issue_type: Issue type of the found Test Item
+    :return: Found Test Item hit
+    """
+    inner_hits = {
+        get_log_inner_hits_name(log_index): {
+            "hits": {
+                "hits": [
+                    {
+                        "_id": f"{test_item_id}{log_index}",
+                        "_score": score,
+                        "_source": build_log(f"{test_item_id}{log_index}", message, log_index).model_dump(),
+                    }
+                ]
+            }
+        }
+        for log_index, message in (matched_messages or {}).items()
+    }
+    source = TestItemIndexData(test_item_id=test_item_id, launch_id="2", issue_type=issue_type)
+    return Hit[TestItemIndexData].from_dict(
+        {"_id": test_item_id, "_score": score, "_source": source.model_dump(), "inner_hits": inner_hits}
+    )
+
+
+def build_relevant_item(
+    hit: Hit[TestItemIndexData], request_item: TestItemIndexData, original_position: int = 0
+) -> RelevantItem:
+    return RelevantItem(mrHit=hit, compared_item=request_item, original_position=original_position)
 
 
 def create_test_search_results(
-    message: str = "Error message", log_id: str = "log1", test_item: int = 456, issue_type: str = "pb001"
-) -> list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]:
-    """Helper function to create test search results structure.
-
-    :param message: Message content for both query and hit
-    :param log_id: Log ID for the hit
-    :param test_item: Test item ID
-    :param issue_type: Issue type
-    :return: List of (search_request, hits) tuples
-    """
-    query = build_log_item(log_id="query1", message=message, merged_small_logs="")
-    hit_source = build_log_item(
-        log_id=log_id,
-        message=message,
-        merged_small_logs="",
-        test_item=test_item,
-        issue_type=issue_type,
-    )
-    return [(query, [build_hit(hit_source)])]
-
-
-def build_search_results(
-    query: LogItemIndexData,
-    hits: list[LogItemIndexData],
-    scores: Optional[list[float]] = None,
-) -> list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]:
-    if scores is None:
-        scores = [0.95] * len(hits)
-    hit_items = [build_hit(hit, score) for hit, score in zip(hits, scores)]
-    return [(query, hit_items)]
+    message: str = "Error message", test_item_id: str = "456", issue_type: str = "pb001"
+) -> tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]:
+    return build_request_item([message]), [build_hit(test_item_id, {0: message}, issue_type=issue_type)]
 
 
 class TestExtractTextFieldsForComparison:
     """Test cases for the extract_text_fields_for_comparison function."""
 
     @pytest.mark.parametrize(
-        "search_request, expected_output",
+        "messages, expected_output",
         [
-            # Both fields present
             (
-                build_log_item(
-                    message="Error: Connection timeout",
-                    merged_small_logs="Additional context log",
-                ),
+                ["Error: Connection timeout", "Additional context log"],
                 "Error: Connection timeout Additional context log",
             ),
-            # Only message field present
-            (
-                build_log_item(message="Error: Connection timeout", merged_small_logs=""),
-                "Error: Connection timeout",
-            ),
-            # Only merged_small_logs field present
-            (
-                build_log_item(message="", merged_small_logs="Only merged logs here"),
-                "Only merged logs here",
-            ),
-            # Both fields empty
-            (
-                build_log_item(message="", merged_small_logs=""),
-                "",
-            ),
-            # Fields with None values
-            (
-                build_log_item(message="", merged_small_logs=""),
-                "",
-            ),
-            # Missing _source
-            (build_log_item(message="", merged_small_logs=""), ""),
-            # Missing fields in _source
-            (build_log_item(message="", merged_small_logs=""), ""),
-            # Fields with whitespace only
-            (
-                build_log_item(message="   ", merged_small_logs="\t\n"),
-                "",
-            ),
-            # Mixed whitespace and content
-            (
-                build_log_item(message="  Error message  ", merged_small_logs="  Context log  "),
-                "Error message Context log",
-            ),
+            (["Error: Connection timeout"], "Error: Connection timeout"),
+            (["", "Only second log here"], "Only second log here"),
+            (["", ""], ""),
+            ([], ""),
+            (["   ", "\t\n"], ""),
+            (["  Error message  ", "  Context log  "], "Error message Context log"),
         ],
     )
-    def test_extract_text_fields_for_comparison(self, search_request, expected_output):
-        """Test text field extraction from search request."""
-        result = extract_text_fields_for_comparison(search_request)
+    def test_extract_text_fields_for_comparison(self, messages, expected_output):
+        """Test text extraction from logs."""
+        logs = [build_log(str(idx), message) for idx, message in enumerate(messages)]
+        result = extract_text_fields_for_comparison(logs)
         assert result == expected_output
 
 
@@ -195,66 +171,45 @@ class TestSimilarityPredictor:
         assert "similarity" in PREDICTION_CLASSES
         assert PREDICTION_CLASSES["similarity"] == SimilarityPredictor
 
-    def test_predict_with_empty_input(self):
-        """Test predict method with empty search results."""
-        predictor = SimilarityPredictor()
-        result = predictor.predict([])
-        assert result == []
-
     def test_predict_with_no_hits(self):
         """Test predict method when search results have no hits."""
         predictor = SimilarityPredictor()
-        search_results = [(build_log_item(message="Some message", merged_small_logs=""), [])]
-        result = predictor.predict(search_results)
+        result = predictor.predict((build_request_item(["Some message"]), []))
         assert result == []
 
     def test_predict_with_empty_query_text(self):
-        """Test predict method when query has no meaningful text."""
+        """Test predict method when the request Test Item has no meaningful text."""
         predictor = SimilarityPredictor()
-        query = build_log_item(message="", merged_small_logs="")
-        hit_source = build_log_item(message="Error message", merged_small_logs="", test_item=456)
-        search_results = build_search_results(query, [hit_source])
+        search_results = (build_request_item([""]), [build_hit("456", {0: "Error message"})])
         result = predictor.predict(search_results)
         assert result == []
 
     def test_predict_with_empty_hit_text(self):
-        """Test predict method when hits have no meaningful text."""
+        """Test predict method when found logs have no meaningful text."""
         predictor = SimilarityPredictor()
-        query = build_log_item(message="Query message", merged_small_logs="")
-        hit_source = build_log_item(message="", merged_small_logs="", test_item=456)
-        search_results = build_search_results(query, [hit_source])
+        search_results = (build_request_item(["Query message"]), [build_hit("456", {0: ""})])
+        result = predictor.predict(search_results)
+        assert result == []
+
+    def test_predict_with_no_matched_logs(self):
+        """Test predict method when a found Test Item has no matched logs."""
+        predictor = SimilarityPredictor()
+        search_results = (build_request_item(["Query message"]), [build_hit("456", {})])
         result = predictor.predict(search_results)
         assert result == []
 
     @pytest.mark.parametrize(
         "threshold, expected_label, query_message, hit_message",
         [
-            (
-                0.3,
-                1,
-                "Error: Connection timeout",
-                "Error: Connection timeout",
-            ),  # High similarity, should be above threshold
-            (
-                0.5,
-                1,
-                "Error: Connection timeout",
-                "Error: Connection timeout",
-            ),  # Moderate similarity, should be above threshold
-            (
-                0.8,
-                0,
-                "Connection timeout error",
-                "Connection failed error",
-            ),  # High threshold, should be below threshold
+            (0.3, 1, "Error: Connection timeout", "Error: Connection timeout"),
+            (0.5, 1, "Error: Connection timeout", "Error: Connection timeout"),
+            (0.8, 0, "Connection timeout error", "Connection failed error"),
         ],
     )
     def test_predict_threshold_behavior(self, threshold, expected_label, query_message, hit_message):
         """Test that threshold properly affects binary classification."""
         predictor = SimilarityPredictor(similarity_threshold=threshold)
-        query = build_log_item(message=query_message, merged_small_logs="")
-        hit_source = build_log_item(message=hit_message, merged_small_logs="", test_item=456)
-        search_results = build_search_results(query, [hit_source])
+        search_results = (build_request_item([query_message]), [build_hit("456", {0: hit_message})])
         results = predictor.predict(search_results)
         assert len(results) == 1
         assert results[0].label == expected_label
@@ -262,131 +217,80 @@ class TestSimilarityPredictor:
     def test_predict_identical_texts(self):
         """Test predict method with identical texts."""
         predictor = SimilarityPredictor(similarity_threshold=0.5)
-        query = build_log_item(message="Exact same message", merged_small_logs="")
-        hit_source = build_log_item(message="Exact same message", merged_small_logs="", test_item=456)
-        search_results = build_search_results(query, [hit_source])
+        search_results = (build_request_item(["Exact same message"]), [build_hit("456", {0: "Exact same message"})])
         results = predictor.predict(search_results)
         assert len(results) == 1
         assert results[0].label == 1
         assert 0.999 <= results[0].probability[1] <= 1.001
         assert results[0].identity == "456"
 
-    def test_predict_combined_text_fields(self):
-        """Test predict method when combining message and merged_small_logs fields."""
+    def test_predict_combined_logs(self):
+        """Test predict method when combining several request and found logs."""
         predictor = SimilarityPredictor(similarity_threshold=0.5)
-        query = build_log_item(message="Error: Connection timeout", merged_small_logs="Additional context")
-        hit_source = build_log_item(
-            message="Error: Connection timeout Additional context",
-            merged_small_logs="",
-            test_item=456,
-        )
-        search_results = build_search_results(query, [hit_source])
-        results = predictor.predict(search_results)
+        request_item = build_request_item(["Error: Connection timeout", "Additional context"])
+        hit = build_hit("456", {0: "Error: Connection timeout", 1: "Additional context"})
+        results = predictor.predict((request_item, [hit]))
         assert len(results) == 1
-        assert results[0].label == 1  # Should be high similarity
-        assert 0.999 <= results[0].probability[1] <= 1.001  # Should be identical after combining
+        assert results[0].label == 1
+        assert 0.999 <= results[0].probability[1] <= 1.001
 
     def test_predict_multiple_test_items(self):
-        """Test predict method with multiple test items."""
+        """Test predict method with multiple found Test Items."""
         predictor = SimilarityPredictor(similarity_threshold=0.3)
-        query = build_log_item(message="Error: Connection timeout", merged_small_logs="")
+        request_item = build_request_item(["Error: Connection timeout"])
         hits = [
-            build_log_item(message="Error: Connection timeout", merged_small_logs="", test_item=456),
-            build_log_item(message="Different error message", merged_small_logs="", test_item=789),
+            build_hit("456", {0: "Error: Connection timeout"}),
+            build_hit("789", {0: "Different error message"}),
         ]
-        search_results = build_search_results(query, hits)
-        results = predictor.predict(search_results)
+        results = predictor.predict((request_item, hits))
         assert len(results) == 2
+        assert [result.identity for result in results] == ["456", "789"]
+        assert [result.original_position for result in results] == [0, 1]
+        assert results[0].probability[1] > results[1].probability[1]
 
-        # Results should be for different test items
-        test_items = {result.identity for result in results}
-        assert test_items == {"456", "789"}
-
-        # First result should have higher similarity
-        result_456 = next(r for r in results if r.identity == "456")
-        result_789 = next(r for r in results if r.identity == "789")
-        assert result_456.probability[1] > result_789.probability[1]
+    def test_predict_deduplicates_test_items(self):
+        """Test that one result is returned per found Test Item."""
+        predictor = SimilarityPredictor(similarity_threshold=0.3)
+        request_item = build_request_item(["Error: Connection timeout"])
+        hits = [build_hit("456", {0: "Error: Connection timeout"}), build_hit("456", {0: "Other error"})]
+        results = predictor.predict((request_item, hits))
+        assert len(results) == 1
+        assert results[0].original_position == 0
 
     def test_predict_result_structure(self):
         """Test that PredictionResult objects have correct structure."""
         predictor = SimilarityPredictor(similarity_threshold=0.5)
-        search_results = create_test_search_results()
-        results = predictor.predict(search_results)
+        results = predictor.predict(create_test_search_results())
         assert len(results) == 1
 
         result = results[0]
-        assert_prediction_result_structure(
-            result,
-            "456",
-            [0],
-            [result.probability[1]],
-            ["similarity_predictor"],
-        )
-
-    def test_predict_multiple_search_requests(self):
-        """Test predict method with multiple search requests."""
-        predictor = SimilarityPredictor(similarity_threshold=0.5)
-        first_query = build_log_item(message="First error", merged_small_logs="")
-        second_query = build_log_item(message="Second error", merged_small_logs="")
-        first_hit = build_log_item(message="First error", merged_small_logs="", test_item=456)
-        second_hit = build_log_item(message="Second error", merged_small_logs="", test_item=789)
-        search_results = [
-            (first_query, [build_hit(first_hit)]),
-            (second_query, [build_hit(second_hit)]),
-        ]
-        results = predictor.predict(search_results)
-        assert len(results) == 2
-
-        test_items = {result.identity for result in results}
-        assert test_items == {"456", "789"}
+        assert_prediction_result_structure(result, "456", [0], [result.probability[1]], ["similarity_predictor"])
 
     @pytest.mark.parametrize(
-        "query_message, query_merged_logs, hit_message, hit_merged_logs, expected_similarity_range",
+        "query_messages, hit_messages, expected_similarity_range",
         [
-            # Identical combined texts
-            ("Error", "Context", "Error Context", "", (0.99, 1.01)),
-            # Partially similar texts
-            ("Connection timeout error", "", "Connection failed error", "", (0.3, 0.5)),
-            # Completely different texts
-            ("Database error", "", "Network timeout", "", (0.0, 0.2)),
-            # Empty query with non-empty hit (should be skipped, but test range anyway)
-            ("", "", "Some error", "", (0.0, 0.01)),
+            (["Error", "Context"], {0: "Error Context"}, (0.99, 1.01)),
+            (["Connection timeout error"], {0: "Connection failed error"}, (0.3, 0.5)),
+            (["Database error"], {0: "Network timeout"}, (0.0, 0.2)),
         ],
     )
-    def test_predict_similarity_ranges(
-        self, query_message, query_merged_logs, hit_message, hit_merged_logs, expected_similarity_range
-    ):
+    def test_predict_similarity_ranges(self, query_messages, hit_messages, expected_similarity_range):
         """Test that similarity calculations fall within expected ranges."""
-        predictor = SimilarityPredictor(similarity_threshold=0.1)  # Low threshold to test all cases
-        query = build_log_item(message=query_message, merged_small_logs=query_merged_logs)
-        hit_source = build_log_item(
-            message=hit_message,
-            merged_small_logs=hit_merged_logs,
-            test_item=456,
-        )
-        search_results = build_search_results(query, [hit_source])
-        results = predictor.predict(search_results)
-
-        if query_message or query_merged_logs:  # Only if query has content
-            assert len(results) == 1
-            similarity = results[0].probability[1]
-            min_sim, max_sim = expected_similarity_range
-            assert min_sim <= similarity <= max_sim
-        else:
-            assert len(results) == 0  # Empty query should be skipped
+        predictor = SimilarityPredictor(similarity_threshold=0.1)
+        results = predictor.predict((build_request_item(query_messages), [build_hit("456", hit_messages)]))
+        assert len(results) == 1
+        min_sim, max_sim = expected_similarity_range
+        assert min_sim <= results[0].probability[1] <= max_sim
 
     def test_predict_probability_format(self):
         """Test that probability format matches other predictors."""
         predictor = SimilarityPredictor(similarity_threshold=0.5)
-        query = build_log_item(message="Error message", merged_small_logs="")
-        hit_source = build_log_item(message="Error message", merged_small_logs="", test_item=456)
-        search_results = build_search_results(query, [hit_source])
-        results = predictor.predict(search_results)
+        results = predictor.predict(create_test_search_results())
         assert len(results) == 1
 
         probability = results[0].probability
         assert len(probability) == 2
-        assert 1.0 - probability[1] - 0.001 <= probability[0] <= 1.0 - probability[1] + 0.001
+        assert probability[0] == pytest.approx(1.0 - probability[1])
         assert 0.0 <= probability[0] <= 1.0
         assert 0.0 <= probability[1] <= 1.0
 
@@ -400,12 +304,10 @@ class TestAutoAnalysisPredictor:
         mock_boosting_decision_maker = Mock()
         mock_defect_type_model = Mock()
 
-        # Configure model chooser to return our mocks
         mock_model_chooser.choose_model.side_effect = lambda project_id, model_type, **kwargs: (
             mock_boosting_decision_maker if model_type == ModelType.auto_analysis else mock_defect_type_model
         )
 
-        # Configure basic properties
         mock_boosting_decision_maker.feature_ids = [0, 1, 3]
         mock_boosting_decision_maker.predict.return_value = ([1], [[0.2, 0.8]])
         mock_boosting_decision_maker.get_model_info.return_value = ["auto_analysis_model"]
@@ -422,15 +324,12 @@ class TestAutoAnalysisPredictor:
     def test_predictor_instantiation_with_defaults(self):
         """Test AutoAnalysisPredictor instantiation with default parameters."""
         deps = self.create_mock_dependencies()
-        # Remove optional parameters to test defaults
         del deps["custom_model_prob"]
         del deps["hash_source"]
 
         predictor = AutoAnalysisPredictor(**deps)
 
         assert predictor.boosting_config == {"test": "config"}
-
-        # Verify model chooser was called correctly with defaults
         deps["model_chooser"].choose_model.assert_any_call(
             123, ModelType.auto_analysis, custom_model_prob=0.0, hash_source=None
         )
@@ -442,8 +341,6 @@ class TestAutoAnalysisPredictor:
         predictor = AutoAnalysisPredictor(**deps)
 
         assert predictor.boosting_config == {"test": "config"}
-
-        # Verify model chooser was called with custom parameters
         deps["model_chooser"].choose_model.assert_any_call(
             123, ModelType.auto_analysis, custom_model_prob=0.1, hash_source="test_hash"
         )
@@ -455,149 +352,82 @@ class TestAutoAnalysisPredictor:
 
     def test_model_type_property(self):
         """Test that model_type property returns correct value."""
-        deps = self.create_mock_dependencies()
-        predictor = AutoAnalysisPredictor(**deps)
+        predictor = AutoAnalysisPredictor(**self.create_mock_dependencies())
         assert predictor.model_type == ModelType.auto_analysis
 
     def test_create_featurizer(self):
         """Test create_featurizer method."""
-        deps = self.create_mock_dependencies()
-        predictor = AutoAnalysisPredictor(**deps)
-
-        search_results = [(build_log_item(message="test"), [])]
-
-        featurizer = predictor.create_featurizer(search_results)
-
-        # Verify it's the right type and has expected configuration
-        from app.ml.boosting_featurizer import BoostingFeaturizer
-
-        assert isinstance(featurizer, BoostingFeaturizer)
-
-    def test_predict_with_empty_input(self):
-        """Test predict method with empty search results."""
-        deps = self.create_mock_dependencies()
-        predictor = AutoAnalysisPredictor(**deps)
-        result = predictor.predict([])
-        assert result == []
+        predictor = AutoAnalysisPredictor(**self.create_mock_dependencies())
+        featurizer = predictor.create_featurizer((build_request_item(["test"]), []))
+        assert type(featurizer) is BoostingFeaturizer
 
     def test_predict_with_no_hits(self):
         """Test predict method when search results have no hits."""
+        predictor = AutoAnalysisPredictor(**self.create_mock_dependencies())
+        result = predictor.predict((build_request_item(["Some message"]), []))
+        assert result == []
+        predictor.boosting_decision_maker.predict.assert_not_called()
+
+    def test_predict_with_real_featurizer(self):
+        """Test that one prediction is made per found Test Item, unsupported features are zeros."""
         deps = self.create_mock_dependencies()
         predictor = AutoAnalysisPredictor(**deps)
+        predictor.boosting_decision_maker.predict = Mock(return_value=([1, 0], [[0.2, 0.8], [0.7, 0.3]]))
+        request_item = build_request_item(["Error message"])
+        hits = [build_hit("456", {0: "Error message"}), build_hit("789", {0: "Another error"}, score=0.5)]
 
-        # Mock featurizer to return empty data
-        mock_featurizer = Mock()
-        mock_featurizer.gather_features_info.return_value = ([], [])
-        mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
-        predictor.create_featurizer = Mock(return_value=mock_featurizer)
+        results = predictor.predict((request_item, hits))
 
-        search_results = [(build_log_item(message="Some message", merged_small_logs=""), [])]
-        result = predictor.predict(search_results)
-        assert result == []
+        predictor.boosting_decision_maker.predict.assert_called_once_with([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
+        assert [result.identity for result in results] == ["456", "789"]
+        assert [result.label for result in results] == [1, 0]
+        assert [result.original_position for result in results] == [0, 1]
+        assert [result.data.mrHit.normalized_score for result in results] == [1.0, pytest.approx(0.5 / 0.95)]
 
     def test_predict_result_structure(self):
         """Test that PredictionResult objects have correct structure."""
-        deps = self.create_mock_dependencies()
-        predictor = AutoAnalysisPredictor(**deps)
+        predictor = AutoAnalysisPredictor(**self.create_mock_dependencies())
+        request_item, hits = create_test_search_results()
 
-        # Mock featurizer to return test data
         mock_featurizer = Mock()
         mock_featurizer.gather_features_info.return_value = ([[0.1, 0.2, 0.3]], ["456"])
         mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
-        mr_hit_source = build_log_item(log_id="log1", message="test", test_item=456)
-        mock_featurizer.find_most_relevant_by_type.return_value = {
-            "456": RelevantItem(
-                mrHit=build_hit(mr_hit_source),
-                compared_log=build_log_item(log_id="query1", message="test"),
-                original_position=0,
-            )
-        }
+        mock_featurizer.get_relevant_items.return_value = {"456": build_relevant_item(hits[0], request_item)}
         predictor.create_featurizer = Mock(return_value=mock_featurizer)
 
-        search_results = create_test_search_results()
-        results = predictor.predict(search_results)
+        results = predictor.predict((request_item, hits))
         assert len(results) == 1
-
-        result = results[0]
         assert_prediction_result_structure(
-            result,
-            "456",
-            [0, 1, 3],
-            [0.1, 0.2, 0.3],
-            ["auto_analysis_model", "featurizer_info"],
+            results[0], "456", [0, 1, 3], [0.1, 0.2, 0.3], ["auto_analysis_model", "featurizer_info"]
         )
 
     def test_predict_probability_format(self):
         """Test that probability format is correct."""
-        deps = self.create_mock_dependencies()
-        predictor = AutoAnalysisPredictor(**deps)
-
-        # Mock featurizer to return test data
-        mock_featurizer = Mock()
-        mock_featurizer.gather_features_info.return_value = ([[0.1, 0.2, 0.3]], ["456"])
-        mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
-        mr_hit_source = build_log_item(log_id="log1", message="test")
-        mock_featurizer.find_most_relevant_by_type.return_value = {
-            "456": RelevantItem(
-                mrHit=build_hit(mr_hit_source),
-                compared_log=build_log_item(log_id="query1", message="test"),
-                original_position=0,
-            )
-        }
-        predictor.create_featurizer = Mock(return_value=mock_featurizer)
-
-        query = build_log_item(message="Error message", merged_small_logs="")
-        hit_source = build_log_item(message="Error message", merged_small_logs="", test_item=456)
-        search_results = build_search_results(query, [hit_source])
-        results = predictor.predict(search_results)
+        predictor = AutoAnalysisPredictor(**self.create_mock_dependencies())
+        results = predictor.predict(create_test_search_results())
         assert len(results) == 1
-
-        probability = results[0].probability
-        assert len(probability) == 2
-        assert probability == [0.2, 0.8]  # From our mock
+        assert results[0].probability == [0.2, 0.8]
 
     def test_predict_multiple_predictions(self):
         """Test predict method with multiple predictions."""
-        deps = self.create_mock_dependencies()
-        predictor = AutoAnalysisPredictor(**deps)
-
-        # Configure mocks for multiple results
+        predictor = AutoAnalysisPredictor(**self.create_mock_dependencies())
         predictor.boosting_decision_maker.predict = Mock(return_value=([1, 0], [[0.2, 0.8], [0.7, 0.3]]))
+        request_item = build_request_item(["Error message"])
+        hits = [build_hit("456", {0: "Error message"}), build_hit("789", {0: "Another error"})]
 
-        # Mock featurizer to return multiple items
         mock_featurizer = Mock()
         mock_featurizer.gather_features_info.return_value = ([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]], ["456", "789"])
         mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
-        mock_featurizer.find_most_relevant_by_type.return_value = {
-            "456": RelevantItem(
-                mrHit=build_hit(build_log_item(log_id="log1", message="test1")),
-                compared_log=build_log_item(log_id="query1", message="test1"),
-                original_position=0,
-            ),
-            "789": RelevantItem(
-                mrHit=build_hit(build_log_item(log_id="log2", message="test2")),
-                compared_log=build_log_item(log_id="query2", message="test2"),
-                original_position=1,
-            ),
+        mock_featurizer.get_relevant_items.return_value = {
+            "456": build_relevant_item(hits[0], request_item, 0),
+            "789": build_relevant_item(hits[1], request_item, 1),
         }
         predictor.create_featurizer = Mock(return_value=mock_featurizer)
 
-        query = build_log_item(message="Error message", merged_small_logs="")
-        hits = [
-            build_log_item(message="Error message", merged_small_logs="", test_item=456),
-            build_log_item(message="Another error", merged_small_logs="", test_item=789),
-        ]
-        search_results = build_search_results(query, hits)
-        results = predictor.predict(search_results)
-        assert len(results) == 2
-
-        # Verify both results
-        identities = {result.identity for result in results}
-        assert identities == {"456", "789"}
-
-        # Verify different labels
-        labels = [result.label for result in results]
-        assert 1 in labels and 0 in labels
+        results = predictor.predict((request_item, hits))
+        assert [result.identity for result in results] == ["456", "789"]
+        assert [result.label for result in results] == [1, 0]
+        assert [result.original_position for result in results] == [0, 1]
 
 
 class TestSuggestionPredictor:
@@ -609,12 +439,10 @@ class TestSuggestionPredictor:
         mock_boosting_decision_maker = Mock()
         mock_defect_type_model = Mock()
 
-        # Configure model chooser to return our mocks
         mock_model_chooser.choose_model.side_effect = lambda project_id, model_type, **kwargs: (
             mock_boosting_decision_maker if model_type == ModelType.suggestion else mock_defect_type_model
         )
 
-        # Configure basic properties
         mock_boosting_decision_maker.feature_ids = [0, 1, 3]
         mock_boosting_decision_maker.predict.return_value = ([1], [[0.3, 0.7]])
         mock_boosting_decision_maker.get_model_info.return_value = ["suggestion_model"]
@@ -631,15 +459,12 @@ class TestSuggestionPredictor:
     def test_predictor_instantiation_with_defaults(self):
         """Test SuggestionPredictor instantiation with default parameters."""
         deps = self.create_mock_dependencies()
-        # Remove optional parameters to test defaults
         del deps["custom_model_prob"]
         del deps["hash_source"]
 
         predictor = SuggestionPredictor(**deps)
 
         assert predictor.boosting_config == {"suggestion": "config"}
-
-        # Verify model chooser was called correctly with defaults
         deps["model_chooser"].choose_model.assert_any_call(
             123, ModelType.suggestion, custom_model_prob=0.0, hash_source=None
         )
@@ -651,8 +476,6 @@ class TestSuggestionPredictor:
         predictor = SuggestionPredictor(**deps)
 
         assert predictor.boosting_config == {"suggestion": "config"}
-
-        # Verify model chooser was called with custom parameters
         deps["model_chooser"].choose_model.assert_any_call(
             123, ModelType.suggestion, custom_model_prob=0.2, hash_source="suggestion_hash"
         )
@@ -664,148 +487,53 @@ class TestSuggestionPredictor:
 
     def test_model_type_property(self):
         """Test that model_type property returns correct value."""
-        deps = self.create_mock_dependencies()
-        predictor = SuggestionPredictor(**deps)
+        predictor = SuggestionPredictor(**self.create_mock_dependencies())
         assert predictor.model_type == ModelType.suggestion
 
     def test_create_featurizer(self):
         """Test create_featurizer method."""
-        deps = self.create_mock_dependencies()
-        predictor = SuggestionPredictor(**deps)
-
-        search_results = [(build_log_item(message="test"), [])]
-
-        featurizer = predictor.create_featurizer(search_results)
-
-        # Verify it's the right type and has expected configuration
-        from app.ml.suggest_boosting_featurizer import SuggestBoostingFeaturizer
-
+        predictor = SuggestionPredictor(**self.create_mock_dependencies())
+        featurizer = predictor.create_featurizer((build_request_item(["test"]), []))
         assert isinstance(featurizer, SuggestBoostingFeaturizer)
-
-    def test_predict_with_empty_input(self):
-        """Test predict method with empty search results."""
-        deps = self.create_mock_dependencies()
-        predictor = SuggestionPredictor(**deps)
-        result = predictor.predict([])
-        assert result == []
 
     def test_predict_with_no_hits(self):
         """Test predict method when search results have no hits."""
-        deps = self.create_mock_dependencies()
-        predictor = SuggestionPredictor(**deps)
-
-        # Mock featurizer to return empty data
-        mock_featurizer = Mock()
-        mock_featurizer.gather_features_info.return_value = ([], [])
-        mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
-        predictor.create_featurizer = Mock(return_value=mock_featurizer)
-
-        search_results = [(build_log_item(message="Some message", merged_small_logs=""), [])]
-        result = predictor.predict(search_results)
+        predictor = SuggestionPredictor(**self.create_mock_dependencies())
+        result = predictor.predict((build_request_item(["Some message"]), []))
         assert result == []
+        predictor.boosting_decision_maker.predict.assert_not_called()
 
     def test_predict_result_structure(self):
         """Test that PredictionResult objects have correct structure."""
-        deps = self.create_mock_dependencies()
-        predictor = SuggestionPredictor(**deps)
+        predictor = SuggestionPredictor(**self.create_mock_dependencies())
+        request_item, hits = create_test_search_results(message="Suggestion message", test_item_id="789")
 
-        # Mock featurizer to return test data
         mock_featurizer = Mock()
         mock_featurizer.gather_features_info.return_value = ([[0.4, 0.5, 0.6]], ["789"])
         mock_featurizer.get_used_model_info.return_value = ["suggestion_featurizer_info"]
-        mr_hit_source = build_log_item(log_id="log2", message="suggestion_test", test_item=789)
-        mock_featurizer.find_most_relevant_by_type.return_value = {
-            "789": RelevantItem(
-                mrHit=build_hit(mr_hit_source),
-                compared_log=build_log_item(log_id="query1", message="suggestion_test"),
-                original_position=0,
-            )
-        }
+        mock_featurizer.get_relevant_items.return_value = {"789": build_relevant_item(hits[0], request_item)}
         predictor.create_featurizer = Mock(return_value=mock_featurizer)
 
-        search_results = create_test_search_results(
-            message="Suggestion message", log_id="log2", test_item=789, issue_type="pb002"
-        )
-        results = predictor.predict(search_results)
+        results = predictor.predict((request_item, hits))
         assert len(results) == 1
-
-        result = results[0]
         assert_prediction_result_structure(
-            result,
-            "789",
-            [0, 1, 3],
-            [0.4, 0.5, 0.6],
-            ["suggestion_model", "suggestion_featurizer_info"],
+            results[0], "789", [0, 1, 3], [0.4, 0.5, 0.6], ["suggestion_model", "suggestion_featurizer_info"]
         )
 
     def test_predict_probability_format(self):
         """Test that probability format is correct."""
-        deps = self.create_mock_dependencies()
-        predictor = SuggestionPredictor(**deps)
-
-        # Mock featurizer to return test data
-        mock_featurizer = Mock()
-        mock_featurizer.gather_features_info.return_value = ([[0.4, 0.5, 0.6]], ["789"])
-        mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
-        mr_hit_source = build_log_item(log_id="log2", message="test")
-        mock_featurizer.find_most_relevant_by_type.return_value = {
-            "789": RelevantItem(
-                mrHit=build_hit(mr_hit_source),
-                compared_log=build_log_item(log_id="query1", message="test"),
-                original_position=0,
-            )
-        }
-        predictor.create_featurizer = Mock(return_value=mock_featurizer)
-
-        query = build_log_item(message="Suggestion message", merged_small_logs="")
-        hit_source = build_log_item(message="Suggestion message", merged_small_logs="", test_item=789)
-        search_results = build_search_results(query, [hit_source])
-        results = predictor.predict(search_results)
+        predictor = SuggestionPredictor(**self.create_mock_dependencies())
+        results = predictor.predict(create_test_search_results(message="Suggestion message", test_item_id="789"))
         assert len(results) == 1
-
-        probability = results[0].probability
-        assert len(probability) == 2
-        assert probability == [0.3, 0.7]  # From our mock
+        assert results[0].probability == [0.3, 0.7]
 
     def test_predict_multiple_predictions(self):
         """Test predict method with multiple predictions."""
-        deps = self.create_mock_dependencies()
-        predictor = SuggestionPredictor(**deps)
-
-        # Configure mocks for multiple results
+        predictor = SuggestionPredictor(**self.create_mock_dependencies())
         predictor.boosting_decision_maker.predict = Mock(return_value=([0, 1], [[0.6, 0.4], [0.1, 0.9]]))
+        request_item = build_request_item(["Suggestion message"])
+        hits = [build_hit("789", {0: "Suggestion message"}), build_hit("101", {0: "Other message"})]
 
-        # Mock featurizer to return multiple items
-        mock_featurizer = Mock()
-        mock_featurizer.gather_features_info.return_value = ([[0.7, 0.8, 0.9], [0.1, 0.2, 0.3]], ["789", "101"])
-        mock_featurizer.get_used_model_info.return_value = ["featurizer_info"]
-        mock_featurizer.find_most_relevant_by_type.return_value = {
-            "789": RelevantItem(
-                mrHit=build_hit(build_log_item(log_id="log2", message="test1")),
-                compared_log=build_log_item(log_id="query1", message="test1"),
-                original_position=0,
-            ),
-            "101": RelevantItem(
-                mrHit=build_hit(build_log_item(log_id="log3", message="test2")),
-                compared_log=build_log_item(log_id="query2", message="test2"),
-                original_position=1,
-            ),
-        }
-        predictor.create_featurizer = Mock(return_value=mock_featurizer)
-
-        query = build_log_item(message="Suggestion message", merged_small_logs="")
-        hits = [
-            build_log_item(message="Suggestion message", merged_small_logs="", test_item=789),
-            build_log_item(message="Other message", merged_small_logs="", test_item=101),
-        ]
-        search_results = build_search_results(query, hits)
-        results = predictor.predict(search_results)
-        assert len(results) == 2
-
-        # Verify both results
-        identities = {result.identity for result in results}
-        assert identities == {"789", "101"}
-
-        # Verify different labels
-        labels = [result.label for result in results]
-        assert 1 in labels and 0 in labels
+        results = predictor.predict((request_item, hits))
+        assert [result.identity for result in results] == ["789", "101"]
+        assert [result.label for result in results] == [0, 1]

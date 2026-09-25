@@ -29,58 +29,19 @@ from app.commons.model.launch_objects import (
     TestItem,
     TestItemInfo,
 )
-from app.commons.model.log_item_index import LogItemIndexData
-from app.commons.model.test_item_index import TestItemIndexData
+from app.commons.model.test_item_index import LogData, TestItemIndexData
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.os_client import OsClient
+from app.commons.query_builder import TEST_ITEM_SOURCE_FIELDS, SuggestQueryBuilder, best_log_match
 from app.ml.predictor import PREDICTION_CLASSES, PredictionResult
 from app.service.analyzer_service import AnalyzerService
 from app.utils import utils
-from app.utils.os_migration import (
-    build_search_results,
-    construct_analysis_query,
-    extract_inner_hit_logs,
-    get_request_logs,
-)
 
 LOGGER = logging.getLogger("analyzerApp.suggestService")
 
 SIMILARITY_THRESHOLD = 0.98
-
-LOG_FIELDS_BOOST_SCORES = [
-    ("detected_message_without_params_extended", utils.BOOST_SUPPORTING),
-    ("only_numbers", utils.BOOST_SUPPORTING),
-    ("message_params", utils.BOOST_SUPPORTING),
-    ("urls", utils.BOOST_SUPPORTING),
-    ("paths", utils.BOOST_SUPPORTING),
-    ("found_exceptions_extended", utils.BOOST_ERROR_IDENTITY),
-    ("found_tests_and_methods", utils.BOOST_SUPPORTING),
-]
-
-UNSHORTENED_MESSAGE_FIELDS = [
-    "detected_message_extended",
-    "detected_message_without_params_extended",
-    "detected_message_without_params_and_brackets",
-]
-
-SHORTENED_MESSAGE_FIELDS = [
-    "message_extended",
-    "message_without_params_extended",
-    "message_without_params_and_brackets",
-]
-
-TEST_ITEM_SOURCE_FIELDS = [
-    "test_item_id",
-    "test_item_name",
-    "unique_id",
-    "test_case_hash",
-    "launch_id",
-    "launch_name",
-    "issue_type",
-    "is_auto_analyzed",
-    "start_time",
-]
+SIMILARITY_FIELDS = ["detected_message_with_numbers", "stacktrace", "whole_message"]
 
 
 def _build_launch_from_test_item_info(test_item_info: TestItemInfo) -> Launch:
@@ -107,25 +68,30 @@ def _build_launch_from_test_item_info(test_item_info: TestItemInfo) -> Launch:
     )
 
 
+def _get_best_matched_log(result: PredictionResult) -> Optional[LogData]:
+    log_match = best_log_match(result.data.mrHit)
+    return log_match[1].source if log_match else None
+
+
 def _create_similarity_dict(
     prediction_results: list[PredictionResult],
 ) -> dict[str, dict[tuple[str, str], SimilarityResult]]:
-    """Create a similarity dictionary for comparing prediction results."""
+    """Create a similarity dictionary for comparing best matched logs of prediction results."""
     _similarity_calculator = similarity_calculator.SimilarityCalculator()
-    all_pairs_to_check = []
+    matched_logs = [_get_best_matched_log(result) for result in prediction_results]
+    all_pairs_to_check: list[tuple[LogData, list[LogData]]] = []
     for i, result_first in enumerate(prediction_results):
+        first_log = matched_logs[i]
+        if first_log is None:
+            continue
         for j in range(i + 1, len(prediction_results)):
-            result_second = prediction_results[j]
-            issue_type1 = result_first.data.mrHit.source.issue_type
-            issue_type2 = result_second.data.mrHit.source.issue_type
-            if issue_type1 != issue_type2:
+            second_log = matched_logs[j]
+            if second_log is None:
                 continue
-            items_to_compare = [result_first.data.mrHit]
-            all_pairs_to_check.append((result_second.data.mrHit.source, items_to_compare))
-    sim_dict = _similarity_calculator.find_similarity(
-        all_pairs_to_check, ["detected_message_with_numbers", "stacktrace", "whole_message"]
-    )
-    return sim_dict
+            if result_first.data.mrHit.source.issue_type != prediction_results[j].data.mrHit.source.issue_type:
+                continue
+            all_pairs_to_check.append((second_log, [first_log]))
+    return _similarity_calculator.find_similarity(all_pairs_to_check, SIMILARITY_FIELDS)
 
 
 def _filter_by_similarity(
@@ -133,22 +99,21 @@ def _filter_by_similarity(
     sim_dict: dict[str, dict[tuple[str, str], SimilarityResult]],
 ) -> list[PredictionResult]:
     """Filter prediction results by removing highly similar duplicates."""
+    matched_logs = [_get_best_matched_log(result) for result in prediction_results]
     filtered_results = []
     deleted_indices: set[int] = set()
     for i in range(len(prediction_results)):
         if i in deleted_indices:
             continue
+        first_log = matched_logs[i]
         for j in range(i + 1, len(prediction_results)):
-            result_first = prediction_results[i]
-            result_second = prediction_results[j]
-            group_id = (
-                str(result_first.data.mrHit.id),
-                str(result_second.data.mrHit.id),
-            )
+            second_log = matched_logs[j]
+            if first_log is None or second_log is None:
+                continue
+            group_id = (str(first_log.log_id), str(second_log.log_id))
             if group_id not in sim_dict["detected_message_with_numbers"]:
                 continue
-            det_message = sim_dict["detected_message_with_numbers"]
-            detected_message_sim = det_message[group_id]
+            detected_message_sim = sim_dict["detected_message_with_numbers"][group_id]
             stacktrace_sim = sim_dict["stacktrace"][group_id]
             whole_message_sim = sim_dict["whole_message"][group_id]
             if (
@@ -164,14 +129,28 @@ def _filter_by_similarity(
 def deduplicate_results(
     prediction_results: list[PredictionResult],
 ) -> list[PredictionResult]:
-    """Deduplicate prediction results by removing highly similar items."""
+    """Deduplicate prediction results by removing items with highly similar best matched logs."""
     sim_dict = _create_similarity_dict(prediction_results)
     filtered_results = _filter_by_similarity(prediction_results, sim_dict)
     return filtered_results
 
 
-def choose_fields_to_filter_suggests(log_lines_num: int) -> list[str]:
-    return UNSHORTENED_MESSAGE_FIELDS if log_lines_num == -1 else SHORTENED_MESSAGE_FIELDS
+def rank_predictions(prediction_results: list[PredictionResult]) -> list[PredictionResult]:
+    """Sort predictions by probability descending, keeping the search order on ties.
+
+    :param prediction_results: Predictions for found Test Items
+    :return: Sorted predictions
+    """
+    return sorted(
+        prediction_results, key=lambda result: (result.probability[1], -result.original_position), reverse=True
+    )
+
+
+def _sort_logs(test_item: TestItemIndexData) -> list[LogData]:
+    return sorted(
+        test_item.logs or [],
+        key=lambda log: log.log_order if log.log_order is not None else utils.safe_int(log.log_id),
+    )
 
 
 class SuggestService(AnalyzerService):
@@ -182,6 +161,7 @@ class SuggestService(AnalyzerService):
     os_client: OsClient
     namespace_finder: NamespaceFinder
     model_chooser: ModelChooser
+    query_builder: SuggestQueryBuilder
 
     def __init__(
         self,
@@ -197,183 +177,67 @@ class SuggestService(AnalyzerService):
         self.os_client = os_client or OsClient(app_config=self.app_config)
         self.suggest_threshold = 0.4
         self.namespace_finder = NamespaceFinder(app_config)
+        self.query_builder = SuggestQueryBuilder(self.search_cfg)
 
     def _get_config_for_boosting_suggests(self, analyzer_config: AnalyzerConf) -> dict:
         return {
             "max_query_terms": self.search_cfg.MaxQueryTerms,
             "min_should_match": 0.4,
             "min_word_length": self.search_cfg.MinWordLength,
-            "filter_min_should_match": [],
-            "filter_min_should_match_any": choose_fields_to_filter_suggests(analyzer_config.numberOfLogLines),
             "number_of_log_lines": analyzer_config.numberOfLogLines,
-            "filter_by_test_case_hash": True,
             "boosting_model": self.search_cfg.SuggestBoostModelFolder,
             "time_weight_decay": self.search_cfg.TimeWeightDecay,
         }
 
-    def _build_nested_suggest_query(
-        self,
-        test_item_info: TestItemInfo,
-        request_log: LogItemIndexData,
-        size: int = 10,
-    ) -> dict[str, Any]:
-        """Build a test-item-centric nested query for suggestions.
-
-        Constructs a query with nested log matching using more_like_this on various
-        field variants, special field boosts, inner_hits, and time decay.
+    def _build_item_query(self, test_item_info: TestItemInfo, request_item: TestItemIndexData) -> dict[str, Any]:
+        """Build a query to search for Test Items similar to the request one by all its logs.
 
         :param test_item_info: The test item being analyzed
-        :param request_log: The request log to find similar items for
-        :param size: Maximum number of results per query
+        :param request_item: Request Test Item
         :return: Complete OpenSearch query dictionary, or empty dict if no text to match
         """
         if test_item_info.analyzerConfig.minShouldMatch > 0:
             min_should_match = f"{test_item_info.analyzerConfig.minShouldMatch}%"
         else:
             min_should_match = self.search_cfg.MinShouldMatch
-        log_lines = test_item_info.analyzerConfig.numberOfLogLines
-
-        nested_should: list[dict[str, Any]] = []
-
-        # Build more_like_this clauses for all 3 field variants
-        message_fields = choose_fields_to_filter_suggests(log_lines)
-
-        for message_field in message_fields:
-            message_text = getattr(request_log, message_field, "").strip()
-            if message_text:
-                nested_should.append(
-                    utils.build_more_like_this_query(
-                        min_should_match,
-                        message_text,
-                        field_name=f"logs.{message_field}",
-                        boost=utils.BOOST_MESSAGE,
-                        max_query_terms=self.search_cfg.MaxQueryTerms,
-                    )
-                )
-
-        stacktrace_text = request_log.stacktrace_extended.strip()
-        if stacktrace_text:
-            stacktrace_boost = utils.BOOST_SUPPORTING if log_lines == -1 else utils.BOOST_NEUTRAL
-            nested_should.append(
-                utils.build_more_like_this_query(
-                    min_should_match,
-                    stacktrace_text,
-                    field_name="logs.stacktrace_extended",
-                    boost=stacktrace_boost,
-                    max_query_terms=self.search_cfg.MaxQueryTerms,
-                )
-            )
-
-        # Add special log field boosts
-        for field, boost_score in LOG_FIELDS_BOOST_SCORES:
-            field_value = getattr(request_log, field, "").strip()
-            if field_value:
-                nested_should.append(
-                    utils.build_more_like_this_query(
-                        "1",
-                        field_value,
-                        field_name=f"logs.{field}",
-                        boost=boost_score,
-                        override_min_should_match="1",
-                        max_query_terms=self.search_cfg.MaxQueryTerms,
-                    )
-                )
-
-        # Add potential status codes
-        nested_should.extend(
-            utils.build_status_codes_queries(
-                request_log.potential_status_codes,
-                field_name="logs.potential_status_codes",
-                boost=utils.BOOST_ERROR_IDENTITY,
-            )
+        query = self.query_builder.build(
+            request_item,
+            number_of_log_lines=test_item_info.analyzerConfig.numberOfLogLines,
+            min_should_match=min_should_match,
+            min_logs_to_match="1",
+            filter_no_defect=False,
         )
-
-        if not nested_should:
+        if not query:
             return {}
-
-        query = construct_analysis_query(
-            request_log,
-            [],
-            nested_should,
-            test_item_info.analyzerConfig.searchScoreMode,
-            size,
-            self.search_cfg.BoostTestCaseHash,
-            self.search_cfg.MaxQueryTerms,
-            False,
-        )
-
-        utils.append_aa_ma_boosts(query, self.search_cfg)
         query = self.add_constraints_for_launches_into_query_suggest(query, test_item_info)
-        return self.add_query_with_start_time_decay(query, request_log.start_time)
+        return self.add_query_with_start_time_decay(query, request_item.start_time)
 
     def _query_suggested_items(
         self,
         test_item_info: TestItemInfo,
-        request_logs: list[LogItemIndexData],
-    ) -> list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]:
-        """Query OpenSearch for suggested items using test-item-centric nested queries.
-
-        Builds one nested query per request log, sends them via msearch, extracts
-        inner hit logs, and aligns them to request logs using bucket sorting.
+        request_item: TestItemIndexData,
+    ) -> tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]:
+        """Query OpenSearch for Test Items similar to the request one by all its logs.
 
         :param test_item_info: The test item being analyzed
-        :param request_logs: List of request logs to search for
-        :return: Search results as list of (request_log, found_log_hits) tuples
+        :param request_item: Request Test Item
+        :return: Request Test Item and found Test Items
         """
-        all_queries: list[dict[str, Any]] = []
-        query_request_logs: list[LogItemIndexData] = []
+        query = self._build_item_query(test_item_info, request_item)
+        if not query:
+            return request_item, []
+        for hits in self.os_client.msearch_grouped(test_item_info.project, [{}, query]):
+            return request_item, hits
+        return request_item, []
 
-        for request_log in request_logs:
-            message = request_log.message.strip()
-            if not message:
-                continue
-            query = self._build_nested_suggest_query(test_item_info, request_log)
-            if not query:
-                continue
-            all_queries.append({})
-            all_queries.append(query)
-            query_request_logs.append(request_log)
+    def _prepare_request_data(self, test_item_info: TestItemInfo) -> tuple[Optional[TestItemIndexData], int]:
+        """Prepare request Test Item for suggestion search.
 
-        if not all_queries:
-            return []
-
-        # One response per submitted query, in submission order: the grouping already tells us
-        # which request log produced which hits, so no similarity re-alignment is needed. Each
-        # group is reduced to its inner-hit logs before the next one is taken.
-        buckets: list[list[Hit[LogItemIndexData]]] = []
-        for hits in self.os_client.msearch_grouped(test_item_info.project, all_queries):
-            seen_test_item_ids: set[str] = set()
-            unique_hits: list[Hit[TestItemIndexData]] = []
-            for hit in hits:
-                test_item_id = hit.source.test_item_id
-                if test_item_id not in seen_test_item_ids:
-                    seen_test_item_ids.add(test_item_id)
-                    unique_hits.append(hit)
-            buckets.append(extract_inner_hit_logs(unique_hits))
-
-        if not buckets:
-            return []
-        if len(buckets) < len(query_request_logs):
-            LOGGER.warning(
-                "Got %d responses for %d queries in project %s, %d request logs were not analyzed",
-                len(buckets),
-                len(query_request_logs),
-                str(test_item_info.project),
-                len(query_request_logs) - len(buckets),
-            )
-            query_request_logs = query_request_logs[: len(buckets)]
-
-        return build_search_results(query_request_logs, buckets)
-
-    def _prepare_request_data(self, test_item_info: TestItemInfo) -> tuple[list[LogItemIndexData], int]:
-        """Prepare request logs for suggestion search.
-
-        For normal case: builds a Launch, calls prepare_test_items, and converts to
-        request logs. For cluster case: queries OpenSearch for the test item in the
-        cluster and converts its logs to request logs with identity fields cleared.
+        For normal case: builds a Launch and calls prepare_test_items. For cluster case: queries OpenSearch for the
+        test item in the cluster and uses it with identity fields cleared.
 
         :param test_item_info: The test item to prepare data for
-        :return: Tuple of (request_logs, test_item_id_for_suggest)
+        :return: Tuple of (request Test Item or None if there are no logs to search by, test_item_id_for_suggest)
         """
         test_item_id_for_suggest = test_item_info.testItemId
         if test_item_info.clusterId != 0:
@@ -403,31 +267,32 @@ class SuggestService(AnalyzerService):
                 found_test_item = hit.source
                 test_item_id_for_suggest = utils.safe_int(found_test_item.test_item_id)
                 break
-            if found_test_item is None:
-                return [], 0
-            request_logs = get_request_logs(found_test_item, issue_type="")
+            if found_test_item is None or not found_test_item.logs:
+                return None, 0
             # Clear identity fields to prevent boosting
-            for log in request_logs:
-                log.test_item_name = ""
-                log.test_case_hash = 0
-                log.unique_id = ""
-                log.test_item = 0
-            return request_logs, test_item_id_for_suggest
+            request_item = found_test_item.model_copy(
+                update={
+                    "test_item_id": "0",
+                    "test_item_name": None,
+                    "test_case_hash": None,
+                    "unique_id": None,
+                    "logs": _sort_logs(found_test_item),
+                }
+            )
+            return request_item, test_item_id_for_suggest
         else:
             # Normal case
             launch = _build_launch_from_test_item_info(test_item_info)
             prepared_items = request_factory.prepare_test_items(launch)
-            if not prepared_items:
-                return [], test_item_id_for_suggest
-            test_item = prepared_items[0]
-            request_logs = get_request_logs(test_item, issue_type="")
-            return request_logs, test_item_id_for_suggest
+            if not prepared_items or not prepared_items[0].logs:
+                return None, test_item_id_for_suggest
+            return prepared_items[0], test_item_id_for_suggest
 
     def suggest_items(self, test_item_info: TestItemInfo) -> list[SuggestAnalysisResult]:
         """Suggest issue types for a test item based on similar historical items.
 
         :param test_item_info: The test item to suggest issue types for
-        :return: List of suggestion results sorted by central-weighted score
+        :return: List of suggestion results sorted by probability
         """
         LOGGER.info(f"Started suggesting for test item with id: {test_item_info.testItemId}")
         LOGGER.debug(f"Started suggesting items by request: {test_item_info.model_dump_json()}")
@@ -438,45 +303,42 @@ class SuggestService(AnalyzerService):
         errors_count = 0
         feature_names: Optional[str] = None
         try:
-            request_logs, test_item_id_for_suggest = self._prepare_request_data(test_item_info)
-            LOGGER.info(f"Number of prepared log search requests for suggestions: {len(request_logs)}")
-            LOGGER.debug(
-                f"Log search requests for suggestions: {json.dumps([item.model_dump() for item in request_logs])}"
-            )
-            searched_res = self._query_suggested_items(test_item_info, request_logs)
-            res_num = sum(len(hits) for _, hits in searched_res)
-            LOGGER.info(f"Found {res_num} items by FTS (KNN)")
-            LOGGER.debug(
-                "Items for suggestions by FTS (KNN): "
-                + json.dumps([(item[0].model_dump(), [res.model_dump() for res in item[1]]) for item in searched_res])
-            )
+            request_item, test_item_id_for_suggest = self._prepare_request_data(test_item_info)
+            prediction_results: list[PredictionResult] = []
+            if request_item is None:
+                LOGGER.info(f"There are no logs to search by for test item {test_item_info.testItemId}")
+            else:
+                LOGGER.info(f"Number of prepared logs for suggestion search: {len(request_item.logs or [])}")
+                LOGGER.debug(f"Test item search request for suggestions: {request_item.model_dump_json()}")
+                searched_res = self._query_suggested_items(test_item_info, request_item)
+                LOGGER.info(f"Found {len(searched_res[1])} items by FTS (KNN)")
+                LOGGER.debug(
+                    "Items for suggestions by FTS (KNN): " + json.dumps([hit.model_dump() for hit in searched_res[1]])
+                )
 
-            boosting_config = self._get_config_for_boosting_suggests(test_item_info.analyzerConfig)
-            boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(test_item_info.project)
+                boosting_config = self._get_config_for_boosting_suggests(test_item_info.analyzerConfig)
+                boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(
+                    test_item_info.project
+                )
 
-            predictor_class = PREDICTION_CLASSES[self.search_cfg.MlModelForSuggestions]
-            # Create predictor for suggestions
-            predictor = predictor_class(
-                model_chooser=self.model_chooser,
-                project_id=test_item_info.project,
-                boosting_config=boosting_config,
-                custom_model_prob=self.search_cfg.ProbabilityForCustomModelSuggestions,
-                hash_source=test_item_info.launchId,
-            )
+                predictor_class = PREDICTION_CLASSES[self.search_cfg.MlModelForSuggestions]
+                # Create predictor for suggestions
+                predictor = predictor_class(
+                    model_chooser=self.model_chooser,
+                    project_id=test_item_info.project,
+                    boosting_config=boosting_config,
+                    custom_model_prob=self.search_cfg.ProbabilityForCustomModelSuggestions,
+                    hash_source=test_item_info.launchId,
+                )
 
-            # Use predictor for the complete prediction workflow
-            prediction_results = predictor.predict(searched_res)
+                # Use predictor for the complete prediction workflow
+                prediction_results = predictor.predict(searched_res)
 
-            if prediction_results:
-                # Group predictions by test item and calculate central-weighted scores
-                grouped = utils.group_predictions_by_test_item(prediction_results)
-                ranked = utils.score_and_rank_test_items(grouped)
+            if request_item is not None and prediction_results:
+                ranked = rank_predictions(prediction_results)
 
-                # Extract the most significant results (one per test item)
-                representative_results = [result for _, result in ranked]
-
-                # Deduplicate the representative results
-                unique_results = deduplicate_results(representative_results)
+                # Deduplicate the ranked results
+                unique_results = deduplicate_results(ranked)
 
                 LOGGER.debug(f"Found {len(unique_results)} results for test items.")
                 for result in unique_results:
@@ -487,49 +349,47 @@ class SuggestService(AnalyzerService):
 
                 processed_time = time() - t_start
 
-                # Build a lookup from representative result to its weighted score
-                score_by_identity: dict[str, float] = {}
-                for weighted_avg, result in ranked:
-                    score_by_identity[result.identity] = weighted_avg
-
+                request_logs = request_item.logs or []
                 for pos_idx, result in enumerate(unique_results[: self.search_cfg.MaxSuggestionsNumber]):
-                    weighted_score = score_by_identity.get(result.identity, result.probability[1])
-                    if weighted_score >= self.suggest_threshold:
-                        feature_values = None
-                        if result.feature_info:
-                            feature_names = ";".join([str(f_id) for f_id in result.feature_info.feature_ids])
-                            feature_values = ";".join([str(f) for f in result.feature_info.feature_data])
+                    score = result.probability[1]
+                    if score < self.suggest_threshold:
+                        continue
+                    log_match = best_log_match(result.data.mrHit)
+                    if log_match is None:
+                        LOGGER.debug(f"Test item '{result.identity}' has no matched logs")
+                        continue
+                    request_log_index, relevant_log = log_match
+                    feature_values = None
+                    if result.feature_info:
+                        feature_names = ";".join([str(f_id) for f_id in result.feature_info.feature_ids])
+                        feature_values = ";".join([str(f) for f in result.feature_info.feature_data])
 
-                        issue_type = result.data.mrHit.source.issue_type
-                        relevant_log_id = utils.extract_real_id(result.data.mrHit.id)
-                        test_item_log_id = utils.extract_real_id(result.data.compared_log.log_id)
-                        test_item_id = result.data.mrHit.source.test_item
-                        analysis_result = SuggestAnalysisResult(
-                            project=test_item_info.project,
-                            testItem=test_item_id_for_suggest,
-                            testItemLogId=test_item_log_id,
-                            launchId=test_item_info.launchId,
-                            launchName=test_item_info.launchName,
-                            launchNumber=test_item_info.launchNumber,
-                            issueType=issue_type,
-                            relevantItem=test_item_id,
-                            relevantLogId=relevant_log_id,
-                            isMergedLog=False,
-                            matchScore=round(weighted_score * 100, 2),
-                            esScore=round(result.data.mrHit.score or 0.0, 2),
-                            esPosition=result.original_position,
-                            modelFeatureNames=feature_names,
-                            modelFeatureValues=feature_values,
-                            modelInfo=";".join(result.model_info_tags),
-                            resultPosition=pos_idx,
-                            usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
-                            minShouldMatch=self.find_min_should_match_threshold(test_item_info.analyzerConfig),
-                            processedTime=processed_time,
-                            clusterId=test_item_info.clusterId,
-                            methodName="suggestion",
-                        )
-                        results.append(analysis_result)
-                        LOGGER.debug(analysis_result)
+                    analysis_result = SuggestAnalysisResult(
+                        project=test_item_info.project,
+                        testItem=test_item_id_for_suggest,
+                        testItemLogId=utils.extract_real_id(request_logs[request_log_index].log_id),
+                        launchId=test_item_info.launchId,
+                        launchName=test_item_info.launchName,
+                        launchNumber=test_item_info.launchNumber,
+                        issueType=result.data.mrHit.source.issue_type or "",
+                        relevantItem=int(result.data.mrHit.source.test_item_id),
+                        relevantLogId=utils.extract_real_id(relevant_log.source.log_id),
+                        isMergedLog=False,
+                        matchScore=round(score * 100, 2),
+                        esScore=round(result.data.mrHit.score or 0.0, 2),
+                        esPosition=result.original_position,
+                        modelFeatureNames=feature_names,
+                        modelFeatureValues=feature_values,
+                        modelInfo=";".join(result.model_info_tags),
+                        resultPosition=pos_idx,
+                        usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
+                        minShouldMatch=self.find_min_should_match_threshold(test_item_info.analyzerConfig),
+                        processedTime=processed_time,
+                        clusterId=test_item_info.clusterId,
+                        methodName="suggestion",
+                    )
+                    results.append(analysis_result)
+                    LOGGER.debug(analysis_result)
             else:
                 LOGGER.debug(f"There are no results for test item {test_item_info.testItemId}")
         except Exception as exc:

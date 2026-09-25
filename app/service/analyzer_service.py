@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from typing import Optional
+
 from app.commons import logging
 from app.commons.model.launch_objects import (
     AnalyzerConf,
@@ -19,6 +21,7 @@ from app.commons.model.launch_objects import (
     SearchConfig,
     TestItemInfo,
 )
+from app.commons.query_builder import add_start_time_decay
 from app.utils import utils
 
 LOGGER = logging.getLogger("analyzerApp.analyzerService")
@@ -119,32 +122,5 @@ class AnalyzerService:
     def add_constraints_for_launches_into_query_suggest(self, query: dict, test_item_info: TestItemInfo) -> dict:
         return add_constraints_for_launches_into_query_suggest(query, test_item_info, self.launch_boost)
 
-    def add_query_with_start_time_decay(self, main_query: dict, start_time: str) -> dict:
-        result = {
-            "size": main_query["size"],
-            "sort": main_query["sort"],
-            "track_total_hits": False,
-            "query": {
-                "function_score": {
-                    "query": main_query["query"],
-                    "functions": [
-                        {
-                            "exp": {
-                                "start_time": {
-                                    "origin": start_time,
-                                    "scale": "7d",
-                                    "offset": "1d",
-                                    "decay": self.search_cfg.TimeWeightDecay,
-                                }
-                            }
-                        },
-                        {"script_score": {"script": {"source": "0.6"}}},
-                    ],
-                    "score_mode": "max",
-                    "boost_mode": "multiply",
-                }
-            },
-        }
-        if "_source" in main_query:
-            result["_source"] = main_query["_source"]
-        return result
+    def add_query_with_start_time_decay(self, main_query: dict, start_time: Optional[str]) -> dict:
+        return add_start_time_decay(main_query, start_time, self.search_cfg.TimeWeightDecay)

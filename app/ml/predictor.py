@@ -19,9 +19,10 @@ from typing import Any, Optional, Union, override
 from app.commons import logging
 from app.commons.model.db import Hit
 from app.commons.model.launch_objects import RelevantItem
-from app.commons.model.log_item_index import LogItemIndexData
 from app.commons.model.ml import ModelType
+from app.commons.model.test_item_index import LogData, TestItemIndexData
 from app.commons.model_chooser import ModelChooser
+from app.commons.query_builder import extract_log_matches
 from app.ml.boosting_featurizer import BoostingFeaturizer
 from app.ml.models import BoostingDecisionMaker, DefectTypeModel
 from app.ml.suggest_boosting_featurizer import SuggestBoostingFeaturizer
@@ -50,11 +51,11 @@ class PredictionResult:
     Attributes:
         label: Binary prediction label from the decision maker
         probability: Prediction probability from the decision maker
-        data: Most relevant log and its metadata for the result
-        identity: Identity for the gathered features
+        data: Found Test Item and its metadata for the result
+        identity: Identity for the gathered features, the found Test Item ID
         feature_info: Data about features if any
         model_info_tags: List of model information tags
-        original_position: Original position of the log in the search results
+        original_position: Original position of the found Test Item in the search results
     """
 
     label: int
@@ -76,12 +77,11 @@ class Predictor(metaclass=ABCMeta):
     @abstractmethod
     def predict(
         self,
-        search_results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]],
+        search_results: tuple[TestItemIndexData, list[Hit[TestItemIndexData]]],
     ) -> list[PredictionResult]:
         """Execute the full prediction workflow.
 
-        :param list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]] search_results: List of (log_info, hits)
-                                                                                          tuples from OpenSearch
+        :param search_results: Request Test Item and Test Items found for it in OpenSearch
         :return: List of PredictionResult objects, one for each prediction
         """
         ...
@@ -142,12 +142,11 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
 
     @abstractmethod
     def create_featurizer(
-        self, search_results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]
+        self, search_results: tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]
     ) -> BoostingFeaturizer:
         """Create the appropriate featurizer for this prediction type.
 
-        :param list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]] search_results: List of (log_info, hits)
-                                                                                          tuples
+        :param search_results: Request Test Item and Test Items found for it in OpenSearch
         :return: Configured featurizer instance
         """
         ...
@@ -155,18 +154,17 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
     @override
     def predict(
         self,
-        search_results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]],
+        search_results: tuple[TestItemIndexData, list[Hit[TestItemIndexData]]],
     ) -> list[PredictionResult]:
         """Execute the full prediction workflow.
 
-        :param list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]] search_results: List of (log_info, hits)
-                                                                                          tuples from OpenSearch
+        :param search_results: Request Test Item and Test Items found for it in OpenSearch
         :return: List of PredictionResult objects, one for each prediction
         """
         # Create and configure featurizer
         featurizer = self.create_featurizer(search_results)
 
-        # Extract features and find most relevant items
+        # Extract features, one row per found Test Item
         feature_data, identifiers = featurizer.gather_features_info()
 
         # Get model info tags
@@ -186,13 +184,12 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
             LOGGER.debug("No predictions made, skipping result generation.")
             return []
 
-        # Get scores by identity
-        scores_by_identity = featurizer.find_most_relevant_by_type()
+        relevant_items = featurizer.get_relevant_items()
 
-        # Create list of PredictionResult objects, one for each prediction
+        # Create list of PredictionResult objects, one for each found Test Item
         results = []
         for idx, identity in enumerate(identifiers):
-            relevant_item = scores_by_identity[identity]
+            relevant_item = relevant_items[identity]
             result = PredictionResult(
                 label=predicted_labels[idx],
                 probability=predicted_labels_probability[idx],
@@ -247,12 +244,11 @@ class AutoAnalysisPredictor(MlPredictor):
 
     @override
     def create_featurizer(
-        self, search_results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]
+        self, search_results: tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]
     ) -> BoostingFeaturizer:
         """Create a BoostingFeaturizer for auto analysis.
 
-        :param list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]] search_results: List of (log_info, hits)
-                                                                                          tuples
+        :param search_results: Request Test Item and Test Items found for it in OpenSearch
         :return: Configured BoostingFeaturizer instance
         """
         featurizer = BoostingFeaturizer(
@@ -300,12 +296,11 @@ class SuggestionPredictor(MlPredictor):
 
     @override
     def create_featurizer(
-        self, search_results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]]
+        self, search_results: tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]
     ) -> BoostingFeaturizer:
         """Create a SuggestBoostingFeaturizer for suggestions.
 
-        :param list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]] search_results: List of (log_info, hits)
-                                                                                          tuples
+        :param search_results: Request Test Item and Test Items found for it in OpenSearch
         :return: Configured SuggestBoostingFeaturizer instance
         """
         featurizer = SuggestBoostingFeaturizer(
@@ -317,23 +312,29 @@ class SuggestionPredictor(MlPredictor):
         return featurizer
 
 
-def extract_text_fields_for_comparison(search_request: Any) -> str:
-    if isinstance(search_request, LogItemIndexData):
-        query_message = search_request.message or ""
-        query_merged_logs = search_request.merged_small_logs or ""
-    else:
-        query_message = search_request.get("_source", {}).get("message", "") or ""
-        query_merged_logs = search_request.get("_source", {}).get("merged_small_logs", "") or ""
-    # Combine query text fields
-    query_text = " ".join([text.strip() for text in [query_message, query_merged_logs] if text.strip()])
-    return query_text
+def extract_text_fields_for_comparison(logs: list[LogData]) -> str:
+    """Combine log messages into one text for similarity comparison.
+
+    :param logs: Logs to combine
+    :return: Combined text
+    """
+    return " ".join([message.strip() for message in (log.message or "" for log in logs) if message.strip()])
+
+
+def extract_matched_logs(hit: Hit[TestItemIndexData]) -> list[LogData]:
+    """Get the best matched found log for every request log matched in the found Test Item.
+
+    :param hit: Found Test Item hit
+    :return: Found logs in the order of request logs they matched
+    """
+    return [log_hits[0].source for log_hits in extract_log_matches(hit).values()]
 
 
 class SimilarityPredictor(Predictor):
     """Predictor implementation using text similarity calculation.
 
     Uses `calculate_text_similarity` function to compute similarity scores
-    between the current test item logs and candidate logs from search results.
+    between the request Test Item logs and matched logs of found Test Items.
     """
 
     similarity_threshold: float
@@ -347,110 +348,54 @@ class SimilarityPredictor(Predictor):
         super().__init__()
         self.similarity_threshold = kwargs.get("similarity_threshold", 0.5)
 
-    def __do_prediction_for_request(
-        self,
-        query_text: str,
-        search_request: LogItemIndexData,
-        valid_hits: list[Hit[LogItemIndexData]],
-        hit_texts: list[str],
-    ) -> list[PredictionResult]:
-        # Calculate similarities for all hits at once
-        similarity_scores = calculate_text_similarity(query_text, hit_texts)
-
-        # Group results by test_item to find most relevant for each
-        results_by_test_item: dict[str, dict[str, Any]] = {}
-
-        for idx, (hit, sim_result) in enumerate(zip(valid_hits, similarity_scores)):
-            # Get test_item identifier
-            test_item = str(hit.source.test_item)
-
-            # Track the best hit for each test_item
-            if (
-                test_item not in results_by_test_item
-                or sim_result.similarity > results_by_test_item[test_item]["similarity"]
-            ):
-                results_by_test_item[test_item] = {
-                    "similarity": sim_result.similarity,
-                    "mrHit": hit,
-                    "compared_log": search_request,
-                    "original_position": idx,  # Add position info to hit
-                }
-
-        results = []
-        # Create PredictionResult objects for each test_item
-        for test_item, result_data in results_by_test_item.items():
-            similarity = result_data["similarity"]
-
-            # Binary classification based on threshold
-            label = 1 if similarity >= self.similarity_threshold else 0
-
-            # Probability format: [1-similarity, similarity] to match other predictors
-            probability = [1.0 - similarity, similarity]
-
-            # Create data structure matching expected format
-            data = RelevantItem(mrHit=result_data["mrHit"], compared_log=result_data["compared_log"])
-
-            # Create PredictionResult
-            prediction_result = PredictionResult(
-                label=label,
-                probability=probability,
-                data=data,
-                identity=test_item,
-                feature_info=FeatureInfo(feature_ids=[0], feature_data=[similarity]),
-                model_info_tags=["similarity_predictor"],
-                original_position=result_data["original_position"],
-            )
-            results.append(prediction_result)
-        return results
-
     @override
     def predict(
         self,
-        search_results: list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]],
+        search_results: tuple[TestItemIndexData, list[Hit[TestItemIndexData]]],
     ) -> list[PredictionResult]:
         """Execute similarity-based prediction workflow.
 
-        :param list[tuple[LogItemIndexData, list[Hit[LogItemIndexData]]]] search_results: List of (search_request,
-                                                                                          hits) tuples
-        :return: List of PredictionResult objects, one for each prediction
+        :param search_results: Request Test Item and Test Items found for it in OpenSearch
+        :return: List of PredictionResult objects, one for each found Test Item with matched logs
         """
-        if not search_results:
+        request_item, hits = search_results
+        query_text = extract_text_fields_for_comparison(request_item.logs or [])
+        if not query_text:
             return []
 
+        valid_hits: list[tuple[int, Hit[TestItemIndexData]]] = []
+        hit_texts: list[str] = []
+        seen_test_items: set[str] = set()
+        for position, hit in enumerate(hits):
+            test_item_id = str(hit.source.test_item_id)
+            if test_item_id in seen_test_items:
+                continue
+            hit_text = extract_text_fields_for_comparison(extract_matched_logs(hit))
+            if not hit_text:
+                continue
+            seen_test_items.add(test_item_id)
+            valid_hits.append((position, hit))
+            hit_texts.append(hit_text)
+
+        if not valid_hits:
+            return []
+
+        similarity_scores = calculate_text_similarity(query_text, hit_texts)
         results = []
-
-        for search_request, search_result in search_results:
-            hits = search_result
-
-            if not hits:
-                continue
-
-            # Extract and combine message and merged_small_logs from query log
-            query_text = extract_text_fields_for_comparison(search_request)
-
-            # If query text is empty, skip this search request
-            if not query_text.strip():
-                continue
-
-            # Collect valid hits and their texts for batch processing
-            valid_hits: list[Hit[LogItemIndexData]] = []
-            hit_texts = []
-
-            for idx, hit in enumerate(hits):
-                hit_text = extract_text_fields_for_comparison(hit.source)
-
-                # If hit text is empty, skip this hit
-                if not hit_text.strip():
-                    continue
-
-                valid_hits.append(hit)
-                hit_texts.append(hit_text)
-
-            if not valid_hits:
-                continue
-
-            results.extend(self.__do_prediction_for_request(query_text, search_request, valid_hits, hit_texts))
-
+        for (position, hit), sim_result in zip(valid_hits, similarity_scores):
+            similarity = sim_result.similarity
+            results.append(
+                PredictionResult(
+                    label=1 if similarity >= self.similarity_threshold else 0,
+                    # Probability format: [1-similarity, similarity] to match other predictors
+                    probability=[1.0 - similarity, similarity],
+                    data=RelevantItem(mrHit=hit, compared_item=request_item, original_position=position),
+                    identity=str(hit.source.test_item_id),
+                    feature_info=FeatureInfo(feature_ids=[0], feature_data=[similarity]),
+                    model_info_tags=["similarity_predictor"],
+                    original_position=position,
+                )
+            )
         return results
 
 

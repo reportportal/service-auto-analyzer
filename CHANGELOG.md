@@ -1,8 +1,12 @@
 # Changelog
 ## [Unreleased]
+### Added
+- `ANALYZER_QUERY_TERMS_BUDGET` config parameter to limit the number of message terms in one Test Item query, by @HardNorth
 ### Changed
 - Log Item-centric storage approach changed to Test Item-centric one, by @HardNorth
 - Status code detection improved, by @HardNorth
+- Auto-analysis, suggestions and model training search for similar Test Items by all their logs in one query, by @HardNorth
+- Gradient Boosting featurization and prediction are Test Item-centric now, by @HardNorth
 
 ## [5.15.5]
 ### Changed

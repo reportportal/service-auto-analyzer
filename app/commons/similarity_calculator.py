@@ -12,14 +12,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Any
-
 from app.commons.model.launch_objects import SimilarityResult
-from app.commons.model.log_item_index import LogItemIndexData
+from app.commons.model.test_item_index import LogData
 from app.utils import text_processing
 
 
 class SimilarityCalculator:
+    """Calculate text similarity by log fields between request logs and logs they are compared to.
+
+    Results are cached by field, so one instance should be used for one set of log pairs.
+    """
+
     __similarity_dict: dict[str, dict[tuple[str, str], SimilarityResult]]
 
     def __init__(self):
@@ -27,27 +30,27 @@ class SimilarityCalculator:
 
     @staticmethod
     def _find_similarity_for_field(
-        all_results: list[tuple[Any, Any]], field: str
+        all_results: list[tuple[LogData, list[LogData]]], field: str
     ) -> dict[tuple[str, str], SimilarityResult]:
         all_results_similarity: dict[tuple[str, str], SimilarityResult] = {}
-        for request, result in all_results:
-            if isinstance(request, LogItemIndexData):
-                hits = result if isinstance(result, list) else []
-                group_ids = [(str(hit.id), str(request.log_id)) for hit in hits]
-                request_field = getattr(request, field, "")
-                result_fields = [getattr(hit.source, field, "") for hit in hits]
-            else:
-                group_ids = [(str(obj["_id"]), str(request["_id"])) for obj in result["hits"]["hits"]]
-                request_field = request["_source"].get(field, "")
-                result_fields = [obj["_source"].get(field, "") for obj in result["hits"]["hits"]]
+        for request, results in all_results:
+            group_ids = [(str(result.log_id), str(request.log_id)) for result in results]
+            request_field = getattr(request, field, None) or ""
+            result_fields = [getattr(result, field, None) or "" for result in results]
             similarity_results = text_processing.calculate_text_similarity(request_field, result_fields)
             for group_id, sim_result in zip(group_ids, similarity_results):
                 all_results_similarity[group_id] = sim_result
         return all_results_similarity
 
     def find_similarity(
-        self, all_results: list[tuple[Any, Any]], fields: list[str]
+        self, all_results: list[tuple[LogData, list[LogData]]], fields: list[str]
     ) -> dict[str, dict[tuple[str, str], SimilarityResult]]:
+        """Calculate similarity by the given fields.
+
+        :param all_results: Request logs, each with the logs to compare it to
+        :param fields: Log fields to compare by
+        :return: Field name mapped to (compared log ID, request log ID) pairs mapped to similarity results
+        """
         for field in fields:
             if field in self.__similarity_dict:
                 continue

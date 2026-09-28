@@ -14,6 +14,7 @@
 
 import math
 import os
+import random
 from datetime import datetime
 from time import time
 from typing import Any, Optional, Type, TypeVar
@@ -31,6 +32,8 @@ from app.commons.os_client import OsClient
 from app.ml.models import CustomDefectTypeModel, DefectTypeModel
 from app.ml.models.defect_type_model import DATA_FIELD
 from app.ml.training import (
+    DEFAULT_RANDOM_SEED,
+    NEGATIVE_RATIO_MIN,
     TRAIN_DATA_RANDOM_STATES,
     TrainingEntry,
     balance_data,
@@ -68,15 +71,45 @@ def split_train_test(
 
 
 def create_binary_target_data(label: str, data: list[TrainingEntry[str]]) -> tuple[list[str], list[int]]:
-    labels_filtered = []
+    """Build a one-vs-rest dataset for the given label.
+
+    Every entry of ``data`` is a sample for the label in its ``issue_type`` field, and ``is_positive`` tells whether it
+    is a positive or a negative case for that label (see ``balance_data``). So the dataset is built in two steps:
+
+    1. Take all entries of the label: positives become ``1``, negatives become ``0``.
+    2. If there are fewer than ``NEGATIVE_RATIO_MIN`` negatives per positive, add positives of other labels as extra
+       negatives until that ratio is reached. Messages already present in the label's dataset are skipped, so this
+       never adds a message as both positive and negative, and never repeats a negative ``balance_data`` has already
+       copied from another label.
+
+    Negatives of other labels are never used: "not an X" says nothing about the given label.
+
+    :param label: The label to build the dataset for
+    :param data: Train data in the format of ``balance_data`` output
+    :return: Messages and their binary labels
+    """
     messages: list[str] = []
+    labels: list[int] = []
+    other_label_positives: list[str] = []
     for entry in data:
-        messages.append(entry.data)
-        if label == entry.issue_type:
-            labels_filtered.append(1 if entry.is_positive else 0)
-        else:
-            labels_filtered.append(0)
-    return messages, labels_filtered
+        if entry.issue_type == label:
+            messages.append(entry.data)
+            labels.append(1 if entry.is_positive else 0)
+        elif entry.is_positive:
+            other_label_positives.append(entry.data)
+
+    positives_count = sum(labels)
+    missing_negatives = positives_count * NEGATIVE_RATIO_MIN - (len(labels) - positives_count)
+    if missing_negatives <= 0:
+        return messages, labels
+
+    known_messages = set(messages)
+    additional_negatives = list(dict.fromkeys(m for m in other_label_positives if m not in known_messages))
+    random.Random(DEFAULT_RANDOM_SEED).shuffle(additional_negatives)
+    for message in additional_negatives[:missing_negatives]:
+        messages.append(message)
+        labels.append(0)
+    return messages, labels
 
 
 def _get_log_message(log_data: LogData) -> Optional[str]:

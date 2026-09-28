@@ -18,7 +18,7 @@ from typing import Optional
 import pytest
 
 from app.ml.training import TrainingEntry, balance_data
-from app.ml.training.train_defect_type_model import create_binary_target_data
+from app.ml.training.train_defect_type_model import build_one_vs_rest_data
 
 
 def _entry(message: str, issue_type: str, is_positive: bool) -> TrainingEntry[str]:
@@ -67,8 +67,8 @@ def _entry(message: str, issue_type: str, is_positive: bool) -> TrainingEntry[st
         ),
     ],
 )
-def test_create_binary_target_data(data: list[TrainingEntry[str]], expected: Optional[list[tuple[str, int]]]) -> None:
-    messages, labels = create_binary_target_data("ab", data)
+def test_build_one_vs_rest_data(data: list[TrainingEntry[str]], expected: Optional[list[tuple[str, int]]]) -> None:
+    messages, labels = build_one_vs_rest_data("ab", data)
     if expected is not None:
         assert Counter(zip(messages, labels)) == Counter(expected)
         return
@@ -77,7 +77,7 @@ def test_create_binary_target_data(data: list[TrainingEntry[str]], expected: Opt
     assert all(m.startswith(("ab-neg", "pb-", "si-")) for m, label in zip(messages, labels) if label == 0)
 
 
-def test_create_binary_target_data_after_balance_data() -> None:
+def test_build_one_vs_rest_data_after_balance_data() -> None:
     data = balance_data(
         [
             _entry("ab-1", "ab", True),
@@ -85,5 +85,5 @@ def test_create_binary_target_data_after_balance_data() -> None:
             _entry("si-1", "si", True),
         ]
     )
-    messages, labels = create_binary_target_data("ab", data)
+    messages, labels = build_one_vs_rest_data("ab", data)
     assert Counter(zip(messages, labels)) == Counter([("ab-1", 1), ("pb-1", 0), ("si-1", 0)])

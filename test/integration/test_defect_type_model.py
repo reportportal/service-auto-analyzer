@@ -53,7 +53,7 @@ def _make_log_data(log_id: str, log_order: int, message: str) -> LogData:
 def _make_search_config():
     return DEFAULT_SEARCH_CONFIG.model_copy(
         update={
-            "GlobalDefectTypeModelFolder": str(MODEL_DIR / "defect_type_model_2025-08-12"),
+            "GlobalDefectTypeModelFolder": str(MODEL_DIR / "defect_type_model_2026-09-29"),
         }
     )
 

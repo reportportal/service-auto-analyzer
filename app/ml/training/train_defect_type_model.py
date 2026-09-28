@@ -71,7 +71,7 @@ def split_train_test(
     return x_train, x_test, y_train, y_test
 
 
-def create_binary_target_data(label: str, data: list[TrainingEntry[str]]) -> tuple[list[str], list[int]]:
+def build_one_vs_rest_data(label: str, data: list[TrainingEntry[str]]) -> tuple[list[str], list[int]]:
     """Build a one-vs-rest dataset for the label out of its entries (see ``balance_data``).
 
     If there are fewer than ``NEGATIVE_RATIO_MIN`` negatives per positive, positives of other labels are added as
@@ -160,7 +160,7 @@ def train_several_times(
     new_model_results = []
     baseline_model_results = []
 
-    train_data, labels_filtered = create_binary_target_data(label, data)
+    train_data, labels_filtered = build_one_vs_rest_data(label, data)
     bad_data_proportion, data_proportion = validate_proportions(labels_filtered)
     if not bad_data_proportion:
         for random_state in my_random_states:

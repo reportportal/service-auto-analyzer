@@ -69,7 +69,7 @@ def _make_search_config():
         update={
             "BoostModelFolder": str(MODEL_DIR / "auto_analysis_model_2025-08-18"),
             "SuggestBoostModelFolder": str(MODEL_DIR / "suggestion_model_2025-09-04"),
-            "GlobalDefectTypeModelFolder": str(MODEL_DIR / "defect_type_model_2025-08-12"),
+            "GlobalDefectTypeModelFolder": str(MODEL_DIR / "defect_type_model_2026-09-29"),
         }
     )
 

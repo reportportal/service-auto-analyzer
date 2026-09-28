@@ -31,7 +31,6 @@ from app.utils.defaultdict import DefaultDict
 LOGGER = logging.getLogger("analyzerApp.DefectTypeModel")
 MODEL_FILES: list[str] = ["count_vectorizer_models.pickle", "models.pickle"]
 DATA_FIELD = "detected_message_without_params_extended"
-MINIMAL_LENGTH_TO_ANALYZE = 200
 BASE_DEFECT_TYPE_PATTERN = re.compile(r"^(?:([^_]+)_\S+|(\D+)\d+)$")
 DEFAULT_N_ESTIMATORS = 10
 DEFAULT_MIN_SAMPLES_LEAF = 1

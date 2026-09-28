@@ -209,14 +209,16 @@ class DefectTypeFeature:
         return clamp01(max((probability[1] for probability in probabilities if len(probability) == 2), default=0.0))
 
     def calculate(self, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
-        texts = [str(getattr(log, DATA_FIELD, None) or "").strip() for log in request.get_sorted_logs()]
-        texts = [text for text in texts if text]
+        request_text = request.join_log_field(DATA_FIELD)
         values_by_issue_type: dict[str, float] = {}
         values = []
         for hit in hits:
             issue_type = normalize_issue_type(hit.source.issue_type)
             if issue_type not in values_by_issue_type:
-                values_by_issue_type[issue_type] = self._predict(texts, issue_type)
+                if request_text and request_text.strip():
+                    values_by_issue_type[issue_type] = self._predict([request_text], issue_type)
+                else:
+                    values_by_issue_type[issue_type] = 0.0
             values.append(values_by_issue_type[issue_type])
         return values
 

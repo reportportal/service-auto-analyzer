@@ -30,7 +30,7 @@ from app.commons import logging
 from app.commons.model.db import Hit
 from app.commons.model.test_item_index import TestItemIndexData
 from app.commons.similarity_calculator import SimilarityCalculator
-from app.ml.models.defect_type_model import DATA_FIELD, DefectTypeModel
+from app.ml.models.defect_type_model import DATA_FIELD, MINIMAL_LENGTH_TO_ANALYZE, DefectTypeModel
 from app.utils import text_processing
 from app.utils.utils import normalize_issue_type
 
@@ -210,7 +210,7 @@ class DefectTypeFeature:
 
     def calculate(self, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
         texts = [str(getattr(log, DATA_FIELD, None) or "").strip() for log in request.get_sorted_logs()]
-        texts = [text for text in texts if text]
+        texts = [text for text in texts if text and len(text) > MINIMAL_LENGTH_TO_ANALYZE]
         values_by_issue_type: dict[str, float] = {}
         values = []
         for hit in hits:

@@ -15,6 +15,7 @@
 import math
 import os
 import random
+from collections import Counter, defaultdict
 from datetime import datetime
 from time import time
 from typing import Any, Optional, Type, TypeVar
@@ -110,6 +111,49 @@ def create_binary_target_data(label: str, data: list[TrainingEntry[str]]) -> tup
         messages.append(message)
         labels.append(0)
     return messages, labels
+
+
+def remove_conflicting_entries(data: list[TrainingEntry[str]]) -> list[TrainingEntry[str]]:
+    """Remove all entries of messages which have contradictory labels.
+
+    A message is contradictory if it is a positive case for two or more labels, or both a positive and a negative case
+    for the same label. All entries of such message are removed, since the model can't learn anything from them but
+    noise. Messages repeated with the same label, or being negative cases for several labels, are kept.
+
+    Messages are compared exactly as the model sees them (``DATA_FIELD``). That field has numbers stripped, so messages
+    which differ only in numbers are treated as the same message.
+
+    Must be called before ``balance_data``: it copies positives of each label as negatives of the others, after that
+    every message would look contradictory.
+
+    :param data: Train data where each entry belongs to the label in its ``issue_type`` field
+    :return: Train data without entries of contradictory messages, in the original order
+    """
+    positive_labels: dict[str, set[str]] = defaultdict(set)
+    negative_labels: dict[str, set[str]] = defaultdict(set)
+    for entry in data:
+        (positive_labels if entry.is_positive else negative_labels)[entry.data].add(entry.issue_type)
+
+    conflicting_messages = {
+        message
+        for message, labels in positive_labels.items()
+        if len(labels) > 1 or labels & negative_labels.get(message, set())
+    }
+    if not conflicting_messages:
+        return data
+
+    result: list[TrainingEntry[str]] = []
+    removed_by_label: Counter[str] = Counter()
+    for entry in data:
+        if entry.data in conflicting_messages:
+            removed_by_label[entry.issue_type] += 1
+        else:
+            result.append(entry)
+    LOGGER.info(
+        f"Removed {len(data) - len(result)} entries of {len(conflicting_messages)} messages with contradictory "
+        f"labels: {dict(removed_by_label)}"
+    )
+    return result
 
 
 def _get_log_message(log_data: LogData) -> Optional[str]:
@@ -303,7 +347,7 @@ class DefectTypeModelTraining:
         projects = [project_info.project]
         if project_info.additional_projects:
             projects.extend(project_info.additional_projects)
-        data = self._query_data(projects, train_log_info)
+        data = remove_conflicting_entries(self._query_data(projects, train_log_info))
         train_data = balance_data(data)
 
         LOGGER.debug(f"Loaded data for model training {project_info.model_type.name}")

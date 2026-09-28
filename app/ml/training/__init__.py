@@ -100,14 +100,8 @@ def balance_data(
 ) -> list[TrainingEntry[T]]:
     """Make existing train data balanced for every label in it.
 
-    Every entry is a sample for the label in its ``issue_type`` field, and ``is_positive`` tells whether it is
-    a positive or a negative case for that label. For each label, positives of other labels are copied as its negative
-    cases, and the number of negatives is capped at ``NEGATIVE_RATIO_MAX`` per positive by removing history negatives
-    (not below the positives count) first and then the copied ones.
-
-    Since copies are added for every label, the same message appears once per label it is a sample for. So the result
-    must not be used as a single one-vs-rest dataset as is: take only the entries of the label being trained (see
-    ``create_binary_target_data``).
+    Each entry is a positive or negative case for the label in its ``issue_type``. Positives of other labels are copied
+    as negatives, capped at ``NEGATIVE_RATIO_MAX`` per positive, so use only the entries of the trained label.
 
     :param train_data: Existing train data based on item history.
     :return: Train data with balanced negative cases for every label.

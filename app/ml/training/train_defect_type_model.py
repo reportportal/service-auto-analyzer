@@ -72,18 +72,10 @@ def split_train_test(
 
 
 def create_binary_target_data(label: str, data: list[TrainingEntry[str]]) -> tuple[list[str], list[int]]:
-    """Build a one-vs-rest dataset for the given label.
+    """Build a one-vs-rest dataset for the label out of its entries (see ``balance_data``).
 
-    Every entry of ``data`` is a sample for the label in its ``issue_type`` field, and ``is_positive`` tells whether it
-    is a positive or a negative case for that label (see ``balance_data``). So the dataset is built in two steps:
-
-    1. Take all entries of the label: positives become ``1``, negatives become ``0``.
-    2. If there are fewer than ``NEGATIVE_RATIO_MIN`` negatives per positive, add positives of other labels as extra
-       negatives until that ratio is reached. Messages already present in the label's dataset are skipped, so this
-       never adds a message as both positive and negative, and never repeats a negative ``balance_data`` has already
-       copied from another label.
-
-    Negatives of other labels are never used: "not an X" says nothing about the given label.
+    If there are fewer than ``NEGATIVE_RATIO_MIN`` negatives per positive, positives of other labels are added as
+    negatives up to that ratio, skipping messages already in the dataset.
 
     :param label: The label to build the dataset for
     :param data: Train data in the format of ``balance_data`` output
@@ -114,20 +106,12 @@ def create_binary_target_data(label: str, data: list[TrainingEntry[str]]) -> tup
 
 
 def remove_conflicting_entries(data: list[TrainingEntry[str]]) -> list[TrainingEntry[str]]:
-    """Remove all entries of messages which have contradictory labels.
+    """Remove all entries of messages being positive for several labels, or positive and negative for one label.
 
-    A message is contradictory if it is a positive case for two or more labels, or both a positive and a negative case
-    for the same label. All entries of such message are removed, since the model can't learn anything from them but
-    noise. Messages repeated with the same label, or being negative cases for several labels, are kept.
-
-    Messages are compared exactly as the model sees them (``DATA_FIELD``). That field has numbers stripped, so messages
-    which differ only in numbers are treated as the same message.
-
-    Must be called before ``balance_data``: it copies positives of each label as negatives of the others, after that
-    every message would look contradictory.
+    Must be called before ``balance_data``, which makes every message look contradictory.
 
     :param data: Train data where each entry belongs to the label in its ``issue_type`` field
-    :return: Train data without entries of contradictory messages, in the original order
+    :return: Train data without contradictory messages, in the original order
     """
     positive_labels: dict[str, set[str]] = defaultdict(set)
     negative_labels: dict[str, set[str]] = defaultdict(set)

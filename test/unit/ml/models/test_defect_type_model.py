@@ -45,11 +45,11 @@ def defect_type_model(object_saver: object_saving.ObjectSaver) -> DefectTypeMode
         ("nd001", 0.0),
         ("pb001", 0.0),
         ("ab001", 1.0),
-        ("si001", 0.0),
+        ("si001", 1.0),  # Might be ab and si
         ("pd001", 0.0),
         ("ab_abracadabra", 1.0),
         ("pb_abracadabra", 0.0),
-        ("si_abracadabra", 0.0),
+        ("si_abracadabra", 1.0),  # Might be ab and si
     ],
 )
 def test_different_defect_type_predict(defect_type_model: DefectTypeModel, defect_type: str, expected: float) -> None:

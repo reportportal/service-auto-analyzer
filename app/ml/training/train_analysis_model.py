@@ -15,7 +15,7 @@
 import math
 import os
 import random
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime
 from time import time
 from typing import Any, Optional, Type, cast
@@ -79,6 +79,7 @@ ITEM_FIELDS_TO_RETRIEVE = [
     "logs",
     "issue_history",
 ]
+CONFLICT_LOG_FIELDS = ["detected_message_with_numbers", "stacktrace"]
 
 
 def split_data(
@@ -333,6 +334,75 @@ def build_entry_from_item(project_id: int, test_item: TestItemIndexData) -> Opti
     )
 
 
+def get_positive_issue_type(test_item: TestItemIndexData) -> str:
+    """Get the issue type a Test Item is a positive case for: the last one in its issue history.
+
+    :param test_item: Test Item with issue history
+    :return: Normalized issue type, or an empty string if there is no issue history
+    """
+    issue_history = test_item.issue_history or []
+    if not issue_history:
+        return ""
+    return normalize_issue_type(issue_history[-1].issue_type or test_item.issue_type)
+
+
+def get_conflict_key(test_item: TestItemIndexData) -> tuple[Any, ...]:
+    """Get the key of Test Items which are identical inputs for the model: the same test with the same logs.
+
+    Numbers are kept in the compared log fields: e.g. "expected HTTP code 400, but was 503" and "expected HTTP code
+    401, but was 503" are different failures.
+
+    :param test_item: Test Item
+    :return: Test identity and compared fields of every log, in the order of logs
+    """
+    logs = tuple(
+        tuple((getattr(log, field, None) or "").strip() for field in CONFLICT_LOG_FIELDS)
+        for log in test_item.get_sorted_logs()
+    )
+    return test_item.test_case_hash or test_item.test_item_name, logs
+
+
+def remove_conflicting_entries(
+    data: list[TrainingEntry[TestItemIndexData]],
+) -> tuple[list[TrainingEntry[TestItemIndexData]], dict[Optional[int], set[str]]]:
+    """Remove entries of Test Items which are identical inputs for the model within a project, but positive for
+    different issue types.
+
+    A history negative of a Test Item is a positive for another one, so such pairs are removed as well.
+
+    :param data: Train data, one entry per Test Item
+    :return: Train data without contradictory entries, in the original order, and IDs of the removed Test Items by
+             project, to exclude them from search results too
+    """
+    positive_types: dict[tuple[Any, ...], set[str]] = defaultdict(set)
+    entry_keys: list[tuple[Any, ...]] = []
+    for entry in data:
+        key = (entry.project_id, get_conflict_key(entry.data))
+        entry_keys.append(key)
+        positive_issue_type = get_positive_issue_type(entry.data)
+        if positive_issue_type:
+            positive_types[key].add(positive_issue_type)
+
+    conflicting_keys = {key for key, issue_types in positive_types.items() if len(issue_types) > 1}
+    removed_items: dict[Optional[int], set[str]] = defaultdict(set)
+    if not conflicting_keys:
+        return data, removed_items
+
+    result: list[TrainingEntry[TestItemIndexData]] = []
+    removed_by_type: Counter[str] = Counter()
+    for entry, key in zip(data, entry_keys):
+        if key in conflicting_keys:
+            removed_items[entry.project_id].add(str(entry.data.test_item_id))
+            removed_by_type[get_positive_issue_type(entry.data)] += 1
+        else:
+            result.append(entry)
+    LOGGER.info(
+        f"Removed {len(data) - len(result)} entries of {len(conflicting_keys)} Test Item groups with contradictory "
+        f"issue types: {dict(removed_by_type)}"
+    )
+    return result, removed_items
+
+
 class AnalysisModelTraining:
     app_config: ApplicationConfig
     search_cfg: SearchConfig
@@ -503,6 +573,7 @@ class AnalysisModelTraining:
         self, test_items: list[TrainingEntry[TestItemIndexData]], features: list[int]
     ) -> tuple[list[list[float]], list[int]]:
         full_data_features, labels = [], []
+        test_items, conflicting_items = remove_conflicting_entries(test_items)
         project_to_entries: dict[int, list[TrainingEntry[TestItemIndexData]]] = defaultdict(list)
         for item in test_items:
             if not item.project_id:
@@ -513,20 +584,24 @@ class AnalysisModelTraining:
             namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
             raw_defect_type_model = self.model_chooser.choose_model(project_id, ModelType.defect_type)
             defect_type_model = cast(DefectTypeModel, raw_defect_type_model) if raw_defect_type_model else None
+            project_conflicting_items = conflicting_items.get(project_id, set())
             for entry in entries:
                 test_item: TestItemIndexData = entry.data
-                issue_history = list(test_item.issue_history or [])
-                if not issue_history:
-                    continue
-                positive_issue_type = normalize_issue_type(issue_history[-1].issue_type or test_item.issue_type)
+                positive_issue_type = get_positive_issue_type(test_item)
                 if not positive_issue_type:
                     continue
-                history_negative_types = select_history_negative_types(issue_history, positive_issue_type)
+                history_negative_types = select_history_negative_types(
+                    list(test_item.issue_history or []), positive_issue_type
+                )
 
                 if not test_item.logs:
                     continue
 
-                similar_hits = self._collect_similar_hits(project_id, test_item, positive_issue_type)
+                similar_hits = [
+                    hit
+                    for hit in self._collect_similar_hits(project_id, test_item, positive_issue_type)
+                    if str(hit.source.test_item_id) not in project_conflicting_items
+                ]
                 if not similar_hits:
                     continue
 

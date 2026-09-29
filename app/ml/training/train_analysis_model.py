@@ -36,6 +36,9 @@ from app.commons.query_builder import (
     AutoAnalysisQueryBuilder,
     ItemQueryBuilder,
     SuggestQueryBuilder,
+    add_launch_id_boost,
+    add_launch_name_and_id_boost,
+    add_launch_name_boost,
     add_start_time_decay,
     get_log_inner_hits_name,
 )
@@ -339,6 +342,7 @@ class AnalysisModelTraining:
     featurizer_class: Type[BoostingFeaturizer]
     query_builder: ItemQueryBuilder
     filter_no_defect: bool
+    launch_boost: float
     baseline_folder: Optional[str]
     baseline_model: Optional[BoostingDecisionMaker]
     model_chooser: ModelChooser
@@ -362,6 +366,7 @@ class AnalysisModelTraining:
         self.search_cfg = search_cfg
         self.due_proportion = 0.05
         self.due_proportion_to_smote = 0.4
+        self.launch_boost = abs(search_cfg.BoostLaunch)
         self.os_client = os_client or OsClient(app_config=app_config)
         self.model_type = model_type
         if model_type is ModelType.suggestion:
@@ -437,7 +442,26 @@ class AnalysisModelTraining:
         )
         if not query:
             return {}
+        self._add_launch_boosts(query, request_item)
         return add_start_time_decay(query, request_item.start_time, self.search_cfg.TimeWeightDecay)
+
+    def _add_launch_boosts(self, query: dict[str, Any], request_item: TestItemIndexData) -> None:
+        """Add the launch boosts production search uses, without its launch filtering.
+
+        Whether the current launch is excluded is decided by the analyzer mode at runtime only, so the training data
+        keeps Test Items of all launches.
+
+        :param query: Query to add boosts to
+        :param request_item: Request Test Item
+        """
+        launch_name = request_item.launch_name or ""
+        launch_id = request_item.launch_id
+        if self.model_type is ModelType.suggestion:
+            add_launch_name_boost(query, launch_name, self.launch_boost)
+            if self.launch_boost:
+                add_launch_id_boost(query, launch_id, 1 / self.launch_boost)
+        else:
+            add_launch_name_and_id_boost(query, launch_name, launch_id, self.launch_boost)
 
     def _search_similar_items(self, project_id: int, query: dict[str, Any]) -> list[Hit[TestItemIndexData]]:
         for hits in self.os_client.msearch_grouped(project_id, [{}, query]):

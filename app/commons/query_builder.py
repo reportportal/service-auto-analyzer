@@ -152,6 +152,23 @@ def best_log_match(hit: Hit[TestItemIndexData]) -> Optional[tuple[int, Hit[LogDa
     return best
 
 
+def add_launch_name_boost(query: dict[str, Any], launch_name: str, launch_boost: float) -> None:
+    should = utils.create_path(query, ("query", "bool", "should"), [])
+    should.append({"term": {"launch_name": {"value": launch_name, "boost": launch_boost}}})
+
+
+def add_launch_id_boost(query: dict[str, Any], launch_id: int | str, launch_boost: float) -> None:
+    should = utils.create_path(query, ("query", "bool", "should"), [])
+    should.append({"term": {"launch_id": {"value": launch_id, "boost": launch_boost}}})
+
+
+def add_launch_name_and_id_boost(
+    query: dict[str, Any], launch_name: str, launch_id: int | str, launch_boost: float
+) -> None:
+    add_launch_id_boost(query, launch_id, launch_boost)
+    add_launch_name_boost(query, launch_name, launch_boost)
+
+
 def add_start_time_decay(main_query: dict[str, Any], start_time: Optional[str], decay: float) -> dict[str, Any]:
     """Wrap the query into a function score which decreases scores of Test Items started far from the given time.
 

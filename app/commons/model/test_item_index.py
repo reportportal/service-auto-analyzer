@@ -105,7 +105,9 @@ class LogClusterData(BaseModel):
 class TestItemHistoryData(BaseModel):
     """Payload for updating issue history of a Test Item."""
 
-    test_item_id: str = Field(description="Identifier of the Test Item to update")
+    test_item_id: str = Field(
+        default="", description="Identifier of the Test Item to update, not stored in the issue_history entries"
+    )
     is_auto_analyzed: bool = Field(description="Whether assignment was made by auto-analysis")
     issue_type: str = Field(description="Assigned issue type (e.g., pb001, ab001)")
     timestamp: str = Field(description="Timestamp of the assignment")

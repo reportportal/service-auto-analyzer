@@ -136,8 +136,8 @@ def test_defect_type_feature():
 
     assert values == [0.6, 0.6, 0.6]
     assert model.predict.call_count == 2
-    model.predict.assert_any_call(["first", "second"], "pb001")
-    model.predict.assert_any_call(["first", "second"], "ab001")
+    model.predict.assert_any_call(["first\nsecond"], "pb001")
+    model.predict.assert_any_call(["first\nsecond"], "ab001")
 
 
 def test_defect_type_feature_without_model_or_on_error():

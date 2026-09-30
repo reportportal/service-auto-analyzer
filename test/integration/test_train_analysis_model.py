@@ -67,8 +67,8 @@ def _make_similar_hit(test_item: TestItemIndexData, score: float) -> Hit[TestIte
 def _make_search_config():
     return DEFAULT_SEARCH_CONFIG.model_copy(
         update={
-            "BoostModelFolder": str(MODEL_DIR / "auto_analysis_model_2025-08-18"),
-            "SuggestBoostModelFolder": str(MODEL_DIR / "suggestion_model_2025-09-04"),
+            "BoostModelFolder": str(MODEL_DIR / "auto_analysis_model_2026-09-30"),
+            "SuggestBoostModelFolder": str(MODEL_DIR / "suggestion_model_2026-09-29"),
             "GlobalDefectTypeModelFolder": str(MODEL_DIR / "defect_type_model_2026-09-29"),
         }
     )

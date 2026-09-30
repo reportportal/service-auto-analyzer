@@ -19,6 +19,7 @@ from typing import Any, Optional
 from app.commons import logging, model_chooser
 from app.commons.model import launch_objects, ml
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig, SuggestAnalysisResult
+from app.commons.os_client import OsClient
 from app.service.auto_analyzer_service import AutoAnalyzerService
 from app.service.clean_index_service import CleanIndexService
 from app.service.cluster_service import ClusterService
@@ -145,12 +146,15 @@ class ServiceProcessor:
     """Class for processing requests based on routing key and routing configuration"""
 
     _model_chooser: Optional[model_chooser.ModelChooser] = None
+    _os_client: Optional[OsClient] = None
     _index_service: Optional[IndexService] = None
     _clean_index_service: Optional[CleanIndexService] = None
 
     __configs: dict[str, dict[str, Any]] = {
         "train_models": {
-            "handler": lambda s: RetrainingService(s.model_chooser, s.app_config, s.search_config).train_models,
+            "handler": lambda s: RetrainingService(
+                s.model_chooser, s.app_config, s.search_config, os_client=s.os_client
+            ).train_models,
             "prepare_data_func": prepare_train_info,
         },
         "index": {
@@ -164,7 +168,9 @@ class ServiceProcessor:
             "prepare_response_data": to_json,
         },
         "analyze": {
-            "handler": lambda s: AutoAnalyzerService(s.model_chooser, s.app_config, s.search_config).analyze_logs,
+            "handler": lambda s: AutoAnalyzerService(
+                s.model_chooser, s.app_config, s.search_config, os_client=s.os_client
+            ).analyze_logs,
             "prepare_data_func": prepare_launches,
             "prepare_response_data": prepare_analyze_response_data,
         },
@@ -199,17 +205,19 @@ class ServiceProcessor:
             "prepare_response_data": to_str,
         },
         "search": {
-            "handler": lambda s: SearchService(s.app_config, s.search_config).search_logs,
+            "handler": lambda s: SearchService(s.app_config, s.search_config, os_client=s.os_client).search_logs,
             "prepare_data_func": prepare_search_logs,
             "prepare_response_data": prepare_analyze_response_data,
         },
         "suggest": {
-            "handler": lambda s: SuggestService(s.model_chooser, s.app_config, s.search_config).suggest_items,
+            "handler": lambda s: SuggestService(
+                s.model_chooser, s.app_config, s.search_config, os_client=s.os_client
+            ).suggest_items,
             "prepare_data_func": prepare_test_item_info,
             "prepare_response_data": prepare_analyze_response_data,
         },
         "cluster": {
-            "handler": lambda s: ClusterService(s.app_config, s.search_config).find_clusters,
+            "handler": lambda s: ClusterService(s.app_config, s.search_config, os_client=s.os_client).find_clusters,
             "prepare_data_func": prepare_launch_info,
             "prepare_response_data": prepare_index_response_data,
         },
@@ -218,7 +226,9 @@ class ServiceProcessor:
             "prepare_data_func": prepare_launches,
         },
         "suggest_patterns": {
-            "handler": lambda s: SuggestPatternsService(s.app_config, s.search_config).suggest_patterns,
+            "handler": lambda s: SuggestPatternsService(
+                s.app_config, s.search_config, os_client=s.os_client
+            ).suggest_patterns,
             "prepare_data_func": to_int,
             "prepare_response_data": prepare_index_response_data,
         },
@@ -288,15 +298,25 @@ class ServiceProcessor:
         return self._model_chooser
 
     @property
+    def os_client(self) -> OsClient:
+        """OpenSearch client shared by all services, so an index deleted by one service drops out of the index
+        existence cache for all of them."""
+        if not self._os_client:
+            self._os_client = OsClient(self.app_config)
+        return self._os_client
+
+    @property
     def clean_index_service(self) -> CleanIndexService:
         if not self._clean_index_service:
-            self._clean_index_service = CleanIndexService(self.model_chooser, self.app_config, self.search_config)
+            self._clean_index_service = CleanIndexService(
+                self.model_chooser, self.app_config, self.search_config, os_client=self.os_client
+            )
         return self._clean_index_service
 
     @property
     def index_service(self) -> IndexService:
         if not self._index_service:
-            self._index_service = IndexService(self.app_config)
+            self._index_service = IndexService(self.app_config, os_client=self.os_client)
         return self._index_service
 
     def _build_routing_config(self, routing_keys: Optional[set[str]]) -> dict:

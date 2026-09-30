@@ -33,6 +33,7 @@ from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.os_client import OsClient
 from app.commons.query_builder import TEST_ITEM_SOURCE_FIELDS, SuggestQueryBuilder, best_log_match
+from app.commons.similarity_filter import SimilarityFilter, choose_message_fields
 from app.ml.predictor import PREDICTION_CLASSES, PredictionResult
 from app.service.analyzer_service import AnalyzerService
 from app.utils import utils
@@ -41,6 +42,7 @@ LOGGER = logging.getLogger("analyzerApp.suggestService")
 
 SIMILARITY_THRESHOLD = 0.98
 SIMILARITY_FIELDS = ["detected_message_with_numbers", "stacktrace", "whole_message"]
+MIN_SIMILARITY_TO_SUGGEST = 0.4
 
 
 def _build_launch_from_test_item_info(test_item_info: TestItemInfo) -> Launch:
@@ -144,7 +146,7 @@ class SuggestService(AnalyzerService):
     def _get_config_for_boosting_suggests(self, analyzer_config: AnalyzerConf) -> dict:
         return {
             "max_query_terms": self.search_cfg.MaxQueryTerms,
-            "min_should_match": 0.4,
+            "min_should_match": MIN_SIMILARITY_TO_SUGGEST,
             "min_word_length": self.search_cfg.MinWordLength,
             "number_of_log_lines": analyzer_config.numberOfLogLines,
             "boosting_model": self.search_cfg.SuggestBoostModelFolder,
@@ -191,6 +193,24 @@ class SuggestService(AnalyzerService):
         for hits in self.os_client.msearch_grouped(test_item_info.project, [{}, query]):
             return request_item, hits
         return request_item, []
+
+    @staticmethod
+    def _filter_by_similarity(
+        test_item_info: TestItemInfo,
+        search_results: tuple[TestItemIndexData, list[Hit[TestItemIndexData]]],
+    ) -> tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]:
+        """Remove found Test Items which logs are not similar enough to the request logs by any message field.
+
+        :param test_item_info: The test item being analyzed
+        :param search_results: Request Test Item and found Test Items
+        :return: Request Test Item and found Test Items with similar logs
+        """
+        similarity_filter = SimilarityFilter(
+            choose_message_fields(test_item_info.analyzerConfig.numberOfLogLines),
+            MIN_SIMILARITY_TO_SUGGEST,
+            all_fields=False,
+        )
+        return similarity_filter.filter(search_results)
 
     def _prepare_request_data(self, test_item_info: TestItemInfo) -> tuple[Optional[TestItemIndexData], int]:
         """Prepare request Test Item for suggestion search.
@@ -277,6 +297,8 @@ class SuggestService(AnalyzerService):
                 LOGGER.debug(
                     "Items for suggestions by FTS (KNN): " + json.dumps([hit.model_dump() for hit in searched_res[1]])
                 )
+                searched_res = self._filter_by_similarity(test_item_info, searched_res)
+                LOGGER.info(f"{len(searched_res[1])} items left after filtering by similarity")
 
                 boosting_config = self._get_config_for_boosting_suggests(test_item_info.analyzerConfig)
                 boosting_config["chosen_namespaces"] = self.namespace_finder.get_chosen_namespaces(

@@ -34,11 +34,25 @@ from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.os_client import OsClient
 from app.commons.query_builder import AutoAnalysisQueryBuilder
+from app.commons.similarity_filter import SimilarityFilter, choose_message_fields
 from app.ml.predictor import AutoAnalysisPredictor, PredictionResult
 from app.service.analyzer_service import AnalyzerService
 from app.utils import utils
 
 LOGGER = logging.getLogger("analyzerApp.autoAnalyzerService")
+
+
+def choose_fields_to_filter_strict(number_of_log_lines: int, min_similarity: float) -> list[str]:
+    """Choose log fields every one of which must be similar for a found log to be analyzed by.
+
+    :param number_of_log_lines: Number of log lines to use, -1 means all lines
+    :param min_similarity: Minimum similarity in the range [0.0, 1.0]
+    :return: Log field names
+    """
+    fields = choose_message_fields(number_of_log_lines)
+    if min_similarity > 0.99:
+        fields.append("found_tests_and_methods")
+    return fields
 
 
 def prepare_request_items_for_launch(launch: Launch) -> list[TestItemIndexData]:
@@ -140,6 +154,42 @@ class AutoAnalyzerService(AnalyzerService):
         query = self.add_constraints_for_launches_into_query(query, launch)
         return self.add_query_with_start_time_decay(query, request_item.start_time)
 
+    def _create_similarity_filter(self, analyzer_config: AnalyzerConf) -> SimilarityFilter:
+        min_similarity = self.find_min_should_match_threshold(analyzer_config) / 100
+        return SimilarityFilter(
+            choose_fields_to_filter_strict(analyzer_config.numberOfLogLines, min_similarity),
+            min_similarity,
+            all_fields=True,
+        )
+
+    def _filter_by_similarity(
+        self,
+        launch: Launch,
+        similarity_filter: SimilarityFilter,
+        search_results: tuple[TestItemIndexData, list[Hit[TestItemIndexData]]],
+    ) -> tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]:
+        """Remove found Test Items which logs are not similar enough to the request logs by every message field.
+
+        :param launch: Launch being analyzed
+        :param similarity_filter: Filter configured for the launch
+        :param search_results: Request Test Item and found Test Items
+        :return: Request Test Item and found Test Items with similar logs
+        """
+        request_item, hits = search_results
+        required_log_indices = None
+        if launch.analyzerConfig.allMessagesShouldMatch:
+            required_log_indices = self.query_builder.select_log_indices(
+                request_item, launch.analyzerConfig.numberOfLogLines
+            )
+        filtered_results = similarity_filter.filter(search_results, required_log_indices)
+        removed = len(hits) - len(filtered_results[1])
+        if removed:
+            LOGGER.debug(
+                f"Filtering by similarity removed {removed} of {len(hits)} found items for test item "
+                f"{request_item.test_item_id}"
+            )
+        return filtered_results
+
     def _query_candidates_for_launch(
         self,
         launch: Launch,
@@ -174,6 +224,7 @@ class AutoAnalyzerService(AnalyzerService):
             all_queries.append({})
             all_queries.append(query)
 
+        similarity_filter = self._create_similarity_filter(launch.analyzerConfig)
         results: list[tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]] = [
             (request_item, []) for request_item in request_items
         ]
@@ -188,7 +239,9 @@ class AutoAnalyzerService(AnalyzerService):
                 planned, self.os_client.msearch_grouped(launch.project, all_queries[offset : offset + chunk])
             ):
                 consumed += 1
-                results[item_index] = (request_items[item_index], hits)
+                results[item_index] = self._filter_by_similarity(
+                    launch, similarity_filter, (request_items[item_index], hits)
+                )
             if consumed < len(planned):
                 LOGGER.warning(
                     "Got %d responses for %d queries in project %s, %d test items were not analyzed",

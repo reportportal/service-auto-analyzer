@@ -26,6 +26,7 @@ from app.commons.query_builder import (
     add_start_time_decay,
     best_log_match,
     extract_log_matches,
+    parse_log_inner_hits_name,
 )
 from test import DEFAULT_SEARCH_CONFIG
 
@@ -272,3 +273,30 @@ def test_best_log_match():
 
 def test_best_log_match_without_matches():
     assert best_log_match(build_hit({})) is None
+
+
+@pytest.mark.parametrize("name, expected_index", [("log_0", 0), ("log_12", 12), ("log_", None), ("other", None)])
+def test_parse_log_inner_hits_name(name: str, expected_index: int | None):
+    assert parse_log_inner_hits_name(name) == expected_index
+
+
+@pytest.mark.parametrize(
+    "builder_class, number_of_log_lines, expected_indices",
+    [
+        (AutoAnalysisQueryBuilder, -1, [0, 2]),
+        (AutoAnalysisQueryBuilder, 2, [0, 1, 2]),
+        (SuggestQueryBuilder, -1, [0, 2]),
+    ],
+)
+def test_select_log_indices(builder_class, number_of_log_lines: int, expected_indices: list[int]):
+    request_item = build_request_item(
+        [
+            build_log("1", "first error"),
+            LogData(log_id="2", log_level=40000, message="second error"),
+            build_log("3", "third error"),
+        ]
+    )
+
+    log_indices = builder_class(DEFAULT_SEARCH_CONFIG).select_log_indices(request_item, number_of_log_lines)
+
+    assert log_indices == expected_indices

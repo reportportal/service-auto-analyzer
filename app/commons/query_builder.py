@@ -118,6 +118,20 @@ def get_log_inner_hits_name(log_index: int) -> str:
     return f"{LOG_INNER_HITS_PREFIX}{log_index}"
 
 
+def parse_log_inner_hits_name(name: str) -> Optional[int]:
+    """Get the position of the request log from the name of inner hits which hold found logs matched to it.
+
+    :param name: Inner hits name
+    :return: Position of the request log in `TestItemIndexData.logs`, or None if these are not log inner hits
+    """
+    if not name.startswith(LOG_INNER_HITS_PREFIX):
+        return None
+    log_index = name[len(LOG_INNER_HITS_PREFIX) :]
+    if not log_index.isdigit():
+        return None
+    return int(log_index)
+
+
 def extract_log_matches(hit: Hit[TestItemIndexData]) -> dict[int, list[Hit[LogData]]]:
     """Extract found logs matched to each request log from the named inner hits of a found Test Item.
 
@@ -126,15 +140,13 @@ def extract_log_matches(hit: Hit[TestItemIndexData]) -> dict[int, list[Hit[LogDa
     """
     matches: dict[int, list[Hit[LogData]]] = {}
     for name, group in (hit.inner_hits or {}).items():
-        if not name.startswith(LOG_INNER_HITS_PREFIX):
-            continue
-        log_index = name[len(LOG_INNER_HITS_PREFIX) :]
-        if not log_index.isdigit():
+        log_index = parse_log_inner_hits_name(name)
+        if log_index is None:
             continue
         raw_hits = (group or {}).get("hits", {}).get("hits", [])
         log_hits = [Hit[LogData].from_dict(raw_hit) for raw_hit in raw_hits]
         if log_hits:
-            matches[int(log_index)] = log_hits
+            matches[log_index] = log_hits
     return dict(sorted(matches.items()))
 
 
@@ -234,6 +246,16 @@ class ItemQueryBuilder(metaclass=ABCMeta):
         ]
         max_logs = max(1, self.search_cfg.ItemQueryTermsBudget // MIN_TERMS_PER_LOG)
         return logs[-max_logs:]
+
+    def select_log_indices(self, request_item: TestItemIndexData, number_of_log_lines: int) -> list[int]:
+        """Get positions of the request logs the query searches by.
+
+        :param request_item: Request Test Item with logs
+        :param number_of_log_lines: Number of log lines to use, -1 means all lines
+        :return: Positions of the logs in `TestItemIndexData.logs`
+        """
+        message_field = self.choose_message_field(number_of_log_lines)
+        return [log_index for log_index, _ in self._select_logs(request_item, message_field)]
 
     def _get_terms_per_log(self, logs_number: int) -> int:
         terms_share = self.search_cfg.ItemQueryTermsBudget // max(logs_number, 1)

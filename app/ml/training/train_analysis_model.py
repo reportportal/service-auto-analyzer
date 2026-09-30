@@ -553,6 +553,13 @@ class AnalysisModelTraining:
         else:
             self.baseline_model = None
 
+        supported_features = set(self.featurizer_class.get_supported_feature_ids())
+        unsupported_features = [feature for feature in self.features if feature not in supported_features]
+        if unsupported_features:
+            LOGGER.info(f"Unsupported features are excluded from training: {unsupported_features}")
+        self.features = [feature for feature in self.features if feature in supported_features]
+        self.monotonous_features = [feature for feature in self.monotonous_features if feature in supported_features]
+
         if not self.features:
             raise ValueError('No feature config found, please either correct values in "search_cfg" parameter')
 

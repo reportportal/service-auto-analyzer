@@ -309,7 +309,7 @@ class TestAutoAnalysisPredictor:
             mock_boosting_decision_maker if model_type == ModelType.auto_analysis else mock_defect_type_model
         )
 
-        mock_boosting_decision_maker.feature_ids = [0, 1, 3]
+        mock_boosting_decision_maker.feature_ids = [0, 2, 43]
         mock_boosting_decision_maker.predict.return_value = ([1], [[0.2, 0.8]])
         mock_boosting_decision_maker.get_model_info.return_value = ["auto_analysis_model"]
         mock_boosting_decision_maker.is_custom = False
@@ -383,9 +383,9 @@ class TestAutoAnalysisPredictor:
 
         results = predictor.predict((request_item, hits))
 
-        # Features: 0 - unsupported, 1 - inverse position, 3 - share of the issue type
+        # Features: 0 and 43 - unsupported, 2 - share of the issue type
         predictor.boosting_decision_maker.predict.assert_called_once_with(
-            [[0.0, 1.0, pytest.approx(2 / 3)], [0.0, 0.5, pytest.approx(1 / 3)]]
+            [[0.0, pytest.approx(2 / 3), 0.0], [0.0, pytest.approx(1 / 3), 0.0]]
         )
         assert [result.identity for result in results] == ["pb001", "ab001"]
         assert [result.data.mrHit.source.test_item_id for result in results] == ["456", "789"]
@@ -407,7 +407,7 @@ class TestAutoAnalysisPredictor:
         results = predictor.predict((request_item, hits))
         assert len(results) == 1
         assert_prediction_result_structure(
-            results[0], "456", [0, 1, 3], [0.1, 0.2, 0.3], ["auto_analysis_model", "featurizer_info"]
+            results[0], "456", [0, 2, 43], [0.1, 0.2, 0.3], ["auto_analysis_model", "featurizer_info"]
         )
 
     def test_predict_probability_format(self):
@@ -453,7 +453,7 @@ class TestSuggestionPredictor:
             mock_boosting_decision_maker if model_type == ModelType.suggestion else mock_defect_type_model
         )
 
-        mock_boosting_decision_maker.feature_ids = [0, 1, 3]
+        mock_boosting_decision_maker.feature_ids = [0, 2, 43]
         mock_boosting_decision_maker.predict.return_value = ([1], [[0.3, 0.7]])
         mock_boosting_decision_maker.get_model_info.return_value = ["suggestion_model"]
         mock_boosting_decision_maker.is_custom = False
@@ -527,7 +527,7 @@ class TestSuggestionPredictor:
         results = predictor.predict((request_item, hits))
         assert len(results) == 1
         assert_prediction_result_structure(
-            results[0], "789", [0, 1, 3], [0.4, 0.5, 0.6], ["suggestion_model", "suggestion_featurizer_info"]
+            results[0], "789", [0, 2, 43], [0.4, 0.5, 0.6], ["suggestion_model", "suggestion_featurizer_info"]
         )
 
     def test_predict_probability_format(self):

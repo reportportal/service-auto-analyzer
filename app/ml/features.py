@@ -14,8 +14,8 @@
 
 """Gradient Boosting features, calculated for every found Test Item against the request Test Item.
 
-Features use only Test Item data, never search engine artifacts like scores or inner hits, so trained models do not
-depend on a search engine. Every feature value is a float in the range [0.0, 1.0]. Equality of two empty values
+Features use only Test Item data, never search engine artifacts like scores, inner hits or the order of found Test
+Items, so trained models do not depend on a search engine. Every feature value is a float in the range [0.0, 1.0]. Equality of two empty values
 (None or blank strings) is 0.0: nothing to compare is never a match.
 """
 
@@ -24,7 +24,7 @@ import re
 from collections import defaultdict
 from datetime import datetime
 from statistics import mean
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from app.commons import logging
 from app.commons.model.db import Hit
@@ -80,17 +80,6 @@ def are_equal(first: Any, second: Any, *, lowercase: bool = False) -> float:
         if lowercase:
             first, second = first.lower(), second.lower()
     return float(first == second)
-
-
-def inverse_positions(hits_number: int) -> list[float]:
-    """Calculate inverse relative positions: 1.0 for the top result, 0.0 for the last one.
-
-    :param hits_number: Number of results
-    :return: Inverse relative position of every result
-    """
-    if hits_number == 1:
-        return [1.0]
-    return [1.0 - position / (hits_number - 1) for position in range(hits_number)]
 
 
 def group_by_issue_type(hits: list[Hit[TestItemIndexData]]) -> dict[str, list[int]]:
@@ -183,13 +172,6 @@ def extract_identifier_tokens(text: str) -> set[str]:
     return {token for token in text.split() if IDENTIFIER_TOKEN_PATTERN.search(token)}
 
 
-class PositionFeature:
-    """Inverse relative position of the found Test Item among others: 1.0 - the top one, 0.0 - the last one."""
-
-    def calculate(self, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
-        return inverse_positions(len(hits))
-
-
 class DefectTypeFeature:
     """Maximum probability among request logs to be of the found Test Item's issue type, by the Defect Type model."""
 
@@ -231,30 +213,6 @@ class IssueTypeShareFeature:
         for positions in group_by_issue_type(hits).values():
             for position in positions:
                 values[position] = len(positions) / len(hits)
-        return values
-
-
-class IssueTypePositionFeature:
-    """Aggregated inverse relative position of found Test Items of the same issue type.
-
-    The same value is set for the whole issue type group: "mean" - mean position, "max" - position of the group's top
-    item, "min" - position of the group's last item.
-    """
-
-    AGGREGATIONS: dict[str, Callable[[list[float]], float]] = {"mean": mean, "max": max, "min": min}
-
-    aggregation: Callable[[list[float]], float]
-
-    def __init__(self, aggregation: str) -> None:
-        self.aggregation = self.AGGREGATIONS[aggregation]
-
-    def calculate(self, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
-        positions_values = inverse_positions(len(hits))
-        values = [0.0] * len(hits)
-        for positions in group_by_issue_type(hits).values():
-            value = self.aggregation([positions_values[position] for position in positions])
-            for position in positions:
-                values[position] = value
         return values
 
 

@@ -141,7 +141,7 @@ def test_auto_analysis_all_messages_should_match(all_messages_should_match: bool
 
 def build_suggest_service(hits: list[Hit[TestItemIndexData]]) -> tuple[SuggestService, mock.Mock]:
     boosting_model = mock.Mock()
-    boosting_model.feature_ids = [1, 5]
+    boosting_model.feature_ids = [2, 3]
     boosting_model.is_custom = False
     boosting_model.get_model_info.return_value = ["global boosting model"]
     boosting_model.predict.side_effect = lambda data: ([1] * len(data), [[0.1, 0.9]] * len(data))

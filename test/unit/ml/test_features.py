@@ -29,7 +29,6 @@ from app.ml.features import (
     IdentifierJaccardFeature,
     IssueTypeConsensusFeature,
     IssueTypeGroupEqualityFeature,
-    IssueTypePositionFeature,
     IssueTypeShareFeature,
     ItemFieldEqualityFeature,
     ItemFieldSimilarityFeature,
@@ -39,7 +38,6 @@ from app.ml.features import (
     LogFieldEqualityFeature,
     LogFieldSimilarityFeature,
     ManuallyAnalyzedFeature,
-    PositionFeature,
     RequestFieldPresentFeature,
     RequestIdentifiersPresentFeature,
     SeveralLogsFeature,
@@ -97,11 +95,6 @@ def test_are_equal(first, second, lowercase: bool, expected: float):
     assert features.are_equal(first, second, lowercase=lowercase) == expected
 
 
-@pytest.mark.parametrize("hits_number, expected", [(0, []), (1, [1.0]), (3, [1.0, 0.5, 0.0])])
-def test_inverse_positions(hits_number: int, expected: list[float]):
-    assert features.inverse_positions(hits_number) == expected
-
-
 def test_join_log_field_uses_log_order():
     test_item = build_item(
         logs=[build_log("3", 1, message="second"), build_log("1", 0, message="first"), build_log("2", 2, message=" ")]
@@ -115,10 +108,6 @@ def test_sorted_logs_fall_back_to_log_id():
     test_item = build_item(logs=[build_log("20"), build_log("3")])
 
     assert [log.log_id for log in test_item.get_sorted_logs()] == ["3", "20"]
-
-
-def test_position_feature():
-    assert PositionFeature().calculate(build_item(), build_typed_hits("pb001", "ab001", "si001")) == [1.0, 0.5, 0.0]
 
 
 def test_defect_type_feature():
@@ -154,15 +143,6 @@ def test_issue_type_share_feature():
     values = IssueTypeShareFeature().calculate(build_item(), build_typed_hits("pb001", "ab001", "PB001"))
 
     assert values == [pytest.approx(2 / 3), pytest.approx(1 / 3), pytest.approx(2 / 3)]
-
-
-@pytest.mark.parametrize(
-    "aggregation, expected", [("mean", [0.5, 0.5, 0.5]), ("max", [1.0, 0.5, 1.0]), ("min", [0.0, 0.5, 0.0])]
-)
-def test_issue_type_position_feature(aggregation: str, expected: list[float]):
-    hits = build_typed_hits("pb001", "ab001", "pb001")
-
-    assert IssueTypePositionFeature(aggregation).calculate(build_item(), hits) == expected
 
 
 def test_log_field_similarity_feature():

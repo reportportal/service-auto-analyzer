@@ -242,3 +242,41 @@ def test_train_uses_os_client_and_issue_history(model_type: ModelType) -> None:
     for row in train_data:
         assert len(row) == len(training.features)
         assert all(isinstance(value, float) and 0.0 <= value <= 1.0 for value in row)
+
+
+@pytest.mark.parametrize("model_type", [ModelType.auto_analysis, ModelType.suggestion])
+def test_unsupported_baseline_features_are_excluded(model_type: ModelType) -> None:
+    unsupported_features = {43, 44, 45, 46}
+    training = AnalysisModelTraining(
+        APP_CONFIG,
+        _make_search_config(),
+        model_type,
+        ModelChooser(APP_CONFIG, _make_search_config(), object_saver=mock.Mock()),
+        os_client=mock.Mock(),
+    )
+
+    assert training.baseline_model is not None
+    assert unsupported_features <= set(training.baseline_model.feature_ids)
+    assert training.features == [
+        feature for feature in training.baseline_model.feature_ids if feature not in unsupported_features
+    ]
+    assert training.monotonous_features == [
+        feature for feature in training.baseline_model.monotonous_features if feature not in unsupported_features
+    ]
+
+
+def test_unsupported_configured_features_are_excluded() -> None:
+    search_cfg = DEFAULT_SEARCH_CONFIG.model_copy(
+        update={"SuggestBoostModelFeatures": "40-45", "SuggestBoostModelMonotonousFeatures": "40,43,44"}
+    )
+    training = AnalysisModelTraining(
+        APP_CONFIG,
+        search_cfg,
+        ModelType.suggestion,
+        ModelChooser(APP_CONFIG, search_cfg, object_saver=mock.Mock()),
+        os_client=mock.Mock(),
+    )
+
+    assert training.baseline_model is None
+    assert training.features == [40, 41, 42]
+    assert training.monotonous_features == [40]

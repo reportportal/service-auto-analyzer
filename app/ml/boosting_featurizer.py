@@ -29,7 +29,6 @@ from app.ml.features import (
     IdentifierJaccardFeature,
     IssueTypeConsensusFeature,
     IssueTypeGroupEqualityFeature,
-    IssueTypePositionFeature,
     IssueTypeShareFeature,
     ItemFieldEqualityFeature,
     ItemFieldSimilarityFeature,
@@ -39,7 +38,6 @@ from app.ml.features import (
     LogFieldEqualityFeature,
     LogFieldSimilarityFeature,
     ManuallyAnalyzedFeature,
-    PositionFeature,
     RequestFieldPresentFeature,
     RequestIdentifiersPresentFeature,
     SeveralLogsFeature,
@@ -132,59 +130,76 @@ class BoostingFeaturizer:
     def get_used_model_info(self) -> list[str]:
         return list(self.used_model_info)
 
+    @classmethod
+    def get_supported_feature_ids(cls) -> list[int]:
+        """Get IDs of features supported by the featurizer.
+
+        :return: Sorted feature IDs
+        """
+        return sorted(cls.create_features({}, None, SimilarityCalculator()).keys())
+
     def _create_features(self) -> dict[int, Feature]:
+        return self.create_features(self.config, self.defect_type_predict_model, self.similarity_calculator)
+
+    @staticmethod
+    def create_features(
+        config: dict[str, Any],
+        defect_type_model: Optional[DefectTypeModel],
+        calculator: SimilarityCalculator,
+    ) -> dict[int, Feature]:
         """Create features supported by the featurizer.
 
+        Features depend on the found Test Items only, never on their order in search results: the order is decided by
+        a search engine, and training data can not reproduce it for negative cases.
+
+        :param config: Featurizer configuration
+        :param defect_type_model: Defect Type model for the Defect Type feature
+        :param calculator: Text similarity calculator
         :return: Feature ID mapped to the feature
         """
-        calculator = self.similarity_calculator
         return {
-            1: PositionFeature(),
-            2: DefectTypeFeature(self.defect_type_predict_model),
-            3: IssueTypeShareFeature(),
-            4: IssueTypePositionFeature("mean"),
-            5: LogFieldSimilarityFeature("message", calculator),
-            6: LogFieldSimilarityFeature("detected_message", calculator),
-            7: LogFieldSimilarityFeature("detected_message_with_numbers", calculator),
-            8: LogFieldSimilarityFeature("stacktrace", calculator),
-            9: LogFieldSimilarityFeature("only_numbers", calculator),
-            10: SeveralLogsFeature(of_request=False),
-            11: SeveralLogsFeature(of_request=True),
-            12: ValuesSimilarityFeature("only_numbers"),
-            13: IssueTypePositionFeature("max"),
-            14: IssueTypePositionFeature("min"),
-            15: LogFieldSimilarityFeature("message_params", calculator),
-            16: LogFieldSimilarityFeature("found_exceptions", calculator),
-            17: ManuallyAnalyzedFeature(),
-            18: LogFieldSimilarityFeature("detected_message_extended", calculator),
-            19: LogFieldSimilarityFeature("detected_message_without_params_extended", calculator),
-            20: LogFieldSimilarityFeature("stacktrace_extended", calculator),
-            21: LogFieldSimilarityFeature("message_without_params_extended", calculator),
-            22: LogFieldSimilarityFeature("message_extended", calculator),
-            23: ItemFieldEqualityFeature("test_case_hash"),
-            24: IssueTypeGroupEqualityFeature("test_case_hash"),
-            25: BaseIssueTypeFeature("ab"),
-            26: BaseIssueTypeFeature("pb"),
-            27: BaseIssueTypeFeature("si"),
-            28: LogFieldEqualityFeature("urls"),
-            29: LogFieldSimilarityFeature("detected_message_without_params_and_brackets", calculator),
-            30: LogFieldEqualityFeature("potential_status_codes"),
-            31: ItemFieldEqualityFeature("launch_name", lowercase=True),
-            32: ItemFieldEqualityFeature("launch_id"),
-            33: LogFieldSimilarityFeature("found_tests_and_methods", calculator),
-            34: ItemFieldSimilarityFeature("test_item_name", calculator),
-            35: TimeDecayFeature(self.config.get("time_weight_decay", DEFAULT_TIME_WEIGHT_DECAY)),
-            36: LogCountFeature(),
-            37: LaunchNumberDistanceFeature(),
-            38: HistoryStabilityFeature(),
-            39: StacktraceFeature(),
-            40: HistoryUnchangedFeature(),
-            41: IssueTypeConsensusFeature(),
-            42: IdentifierJaccardFeature("message"),
-            43: RequestIdentifiersPresentFeature("message"),
-            44: RequestFieldPresentFeature("potential_status_codes"),
-            45: LogCoverageFeature("message", reverse=False),
-            46: LogCoverageFeature("message", reverse=True),
+            1: DefectTypeFeature(defect_type_model),
+            2: IssueTypeShareFeature(),
+            3: LogFieldSimilarityFeature("message", calculator),
+            4: LogFieldSimilarityFeature("detected_message", calculator),
+            5: LogFieldSimilarityFeature("detected_message_with_numbers", calculator),
+            6: LogFieldSimilarityFeature("stacktrace", calculator),
+            7: LogFieldSimilarityFeature("only_numbers", calculator),
+            8: SeveralLogsFeature(of_request=False),
+            9: SeveralLogsFeature(of_request=True),
+            10: ValuesSimilarityFeature("only_numbers"),
+            11: LogFieldSimilarityFeature("message_params", calculator),
+            12: LogFieldSimilarityFeature("found_exceptions", calculator),
+            13: ManuallyAnalyzedFeature(),
+            14: LogFieldSimilarityFeature("detected_message_extended", calculator),
+            15: LogFieldSimilarityFeature("detected_message_without_params_extended", calculator),
+            16: LogFieldSimilarityFeature("stacktrace_extended", calculator),
+            17: LogFieldSimilarityFeature("message_without_params_extended", calculator),
+            18: LogFieldSimilarityFeature("message_extended", calculator),
+            19: ItemFieldEqualityFeature("test_case_hash"),
+            20: IssueTypeGroupEqualityFeature("test_case_hash"),
+            21: BaseIssueTypeFeature("ab"),
+            22: BaseIssueTypeFeature("pb"),
+            23: BaseIssueTypeFeature("si"),
+            24: LogFieldEqualityFeature("urls"),
+            25: LogFieldSimilarityFeature("detected_message_without_params_and_brackets", calculator),
+            26: LogFieldEqualityFeature("potential_status_codes"),
+            27: ItemFieldEqualityFeature("launch_name", lowercase=True),
+            28: ItemFieldEqualityFeature("launch_id"),
+            29: LogFieldSimilarityFeature("found_tests_and_methods", calculator),
+            30: ItemFieldSimilarityFeature("test_item_name", calculator),
+            31: TimeDecayFeature(config.get("time_weight_decay", DEFAULT_TIME_WEIGHT_DECAY)),
+            32: LogCountFeature(),
+            33: LaunchNumberDistanceFeature(),
+            34: HistoryStabilityFeature(),
+            35: StacktraceFeature(),
+            36: HistoryUnchangedFeature(),
+            37: IssueTypeConsensusFeature(),
+            38: IdentifierJaccardFeature("message"),
+            39: RequestIdentifiersPresentFeature("message"),
+            40: RequestFieldPresentFeature("potential_status_codes"),
+            41: LogCoverageFeature("message", reverse=False),
+            42: LogCoverageFeature("message", reverse=True),
         }
 
     def _get_features(self) -> dict[int, Feature]:

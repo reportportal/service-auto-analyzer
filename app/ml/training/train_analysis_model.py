@@ -33,6 +33,7 @@ from app.commons.model.test_item_index import TestItemIndexData
 from app.commons.model_chooser import ModelChooser
 from app.commons.os_client import OsClient
 from app.commons.query_builder import (
+    TEST_ITEM_SOURCE_FIELDS,
     AutoAnalysisQueryBuilder,
     ItemQueryBuilder,
     SuggestQueryBuilder,
@@ -73,12 +74,16 @@ ITEM_FIELDS_TO_RETRIEVE = [
     "test_case_hash",
     "launch_id",
     "launch_name",
+    "launch_number",
     "issue_type",
     "is_auto_analyzed",
     "start_time",
+    "log_count",
     "logs",
     "issue_history",
 ]
+HIT_ITEM_FIELDS = {field for field in TEST_ITEM_SOURCE_FIELDS if not field.startswith("logs.")}
+HIT_LOG_FIELDS = {field.removeprefix("logs.") for field in TEST_ITEM_SOURCE_FIELDS if field.startswith("logs.")}
 CONFLICT_LOG_FIELDS = ["detected_message_with_numbers", "stacktrace"]
 
 
@@ -305,6 +310,74 @@ def build_history_negative_hits(
             )
         )
     return synthetic_hits
+
+
+def to_hit_source(test_item: TestItemIndexData) -> TestItemIndexData:
+    """Leave only the fields a search returns for a found Test Item, so features see no difference with found ones.
+
+    :param test_item: Test Item with all its fields
+    :return: Test Item copy with the fields of a found Test Item
+    """
+    source = test_item.model_dump(include=HIT_ITEM_FIELDS)
+    source["logs"] = [log.model_dump(include=HIT_LOG_FIELDS) for log in test_item.logs or []]
+    return TestItemIndexData.model_validate(source)
+
+
+def select_negative_items(
+    entries: list[TrainingEntry[TestItemIndexData]], filter_no_defect: bool
+) -> dict[str, list[TestItemIndexData]]:
+    """Balance train data: choose Test Items of other issue types of the same project as negatives for every entry.
+
+    Every entry gets one random Test Item of every issue type of its project except its positive one, in random order.
+    How many of them are needed is known only after the search, see `build_negative_hits`.
+
+    :param entries: Train data, one entry per Test Item
+    :param filter_no_defect: Whether "No Defect" Test Items are excluded, as they are from search results
+    :return: Test Item ID mapped to its negative candidates with the fields of found Test Items
+    """
+    items_by_type: dict[Optional[int], dict[str, list[TestItemIndexData]]] = defaultdict(lambda: defaultdict(list))
+    for entry in entries:
+        issue_type = normalize_issue_type(entry.data.issue_type)
+        if not issue_type or (filter_no_defect and issue_type.startswith("nd")):
+            continue
+        items_by_type[entry.project_id][issue_type].append(to_hit_source(entry.data))
+
+    rng = random.Random(DEFAULT_RANDOM_SEED)
+    negative_items: dict[str, list[TestItemIndexData]] = {}
+    for entry in entries:
+        test_item_id = str(entry.data.test_item_id)
+        positive_issue_type = get_positive_issue_type(entry.data)
+        project_items = items_by_type[entry.project_id]
+        issue_types = sorted(issue_type for issue_type in project_items if issue_type != positive_issue_type)
+        rng.shuffle(issue_types)
+        candidates = [rng.choice(project_items[issue_type]) for issue_type in issue_types]
+        negative_items[test_item_id] = [item for item in candidates if str(item.test_item_id) != test_item_id]
+    return negative_items
+
+
+def build_negative_hits(
+    found_issue_types: set[str], positive_issue_type: str, negative_items: list[TestItemIndexData]
+) -> list[Hit[TestItemIndexData]]:
+    """Create hits of negative candidates, which issue types were not found, as many as found ones lack to reach
+    `NEGATIVE_RATIO_MIN`.
+
+    Every hit is a Test Item of its own issue type: the Auto-analysis featurizer gives one row per issue type.
+
+    :param found_issue_types: Issue types of found Test Items
+    :param positive_issue_type: Issue type of the request Test Item
+    :param negative_items: Negative candidates of the request Test Item, see `select_negative_items`
+    :return: Hits to add after the found ones
+    """
+    if positive_issue_type not in found_issue_types:
+        return []
+    negatives_number = NEGATIVE_RATIO_MIN - (len(found_issue_types) - 1)
+    if negatives_number <= 0:
+        return []
+    items = [item for item in negative_items if normalize_issue_type(item.issue_type) not in found_issue_types]
+    return [
+        Hit[TestItemIndexData].from_dict({"_id": item.test_item_id, "_score": SYNTHETIC_HIT_SCORE, "_source": item})
+        for item in items[:negatives_number]
+    ]
 
 
 def build_entry_from_item(project_id: int, test_item: TestItemIndexData) -> Optional[TrainingEntry[TestItemIndexData]]:
@@ -569,11 +642,29 @@ class AnalysisModelTraining:
                     data.append(entry)
         return data
 
+    def _balance_data(self, test_items: list[TrainingEntry[TestItemIndexData]]) -> dict[str, list[TestItemIndexData]]:
+        """Choose negative candidates for every entry, see `select_negative_items`.
+
+        Only the Auto-analysis model needs them: its featurizer gives one row per found issue type, so a search
+        seldom finds enough negatives. The Suggestion model gives one row per found Test Item.
+
+        :param test_items: Train data, one entry per Test Item
+        :return: Test Item ID mapped to its negative candidates
+        """
+        if self.model_type is not ModelType.auto_analysis:
+            return {}
+        return select_negative_items(test_items, self.filter_no_defect)
+
     def _featurize_data(
-        self, test_items: list[TrainingEntry[TestItemIndexData]], features: list[int]
+        self,
+        test_items: list[TrainingEntry[TestItemIndexData]],
+        features: list[int],
+        excluded_items: Optional[dict[Optional[int], set[str]]] = None,
+        negative_items: Optional[dict[str, list[TestItemIndexData]]] = None,
     ) -> tuple[list[list[float]], list[int]]:
         full_data_features, labels = [], []
-        test_items, conflicting_items = remove_conflicting_entries(test_items)
+        excluded_items = excluded_items or {}
+        negative_items = negative_items or {}
         project_to_entries: dict[int, list[TrainingEntry[TestItemIndexData]]] = defaultdict(list)
         for item in test_items:
             if not item.project_id:
@@ -584,7 +675,7 @@ class AnalysisModelTraining:
             namespaces = self.namespace_finder.get_chosen_namespaces(project_id)
             raw_defect_type_model = self.model_chooser.choose_model(project_id, ModelType.defect_type)
             defect_type_model = cast(DefectTypeModel, raw_defect_type_model) if raw_defect_type_model else None
-            project_conflicting_items = conflicting_items.get(project_id, set())
+            project_excluded_items = excluded_items.get(project_id, set())
             for entry in entries:
                 test_item: TestItemIndexData = entry.data
                 positive_issue_type = get_positive_issue_type(test_item)
@@ -600,7 +691,7 @@ class AnalysisModelTraining:
                 similar_hits = [
                     hit
                     for hit in self._collect_similar_hits(project_id, test_item, positive_issue_type)
-                    if str(hit.source.test_item_id) not in project_conflicting_items
+                    if str(hit.source.test_item_id) not in project_excluded_items
                 ]
                 if not similar_hits:
                     continue
@@ -613,6 +704,13 @@ class AnalysisModelTraining:
                         if normalize_issue_type(hit.source.issue_type) not in history_negative_types
                     ]
                     found_hits.extend(build_history_negative_hits(test_item, history_negative_types))
+                found_hits.extend(
+                    build_negative_hits(
+                        {normalize_issue_type(hit.source.issue_type) for hit in found_hits},
+                        positive_issue_type,
+                        negative_items.get(str(test_item.test_item_id), []),
+                    )
+                )
                 if not found_hits:
                     continue
 
@@ -686,7 +784,9 @@ class AnalysisModelTraining:
         if project_info.additional_projects:
             projects.extend(project_info.additional_projects)
         raw_train_data = self._query_data(projects)
-        train_data, labels = self._featurize_data(raw_train_data, new_model.feature_ids)
+        train_entries, excluded_items = remove_conflicting_entries(raw_train_data)
+        negative_items = self._balance_data(train_entries)
+        train_data, labels = self._featurize_data(train_entries, new_model.feature_ids, excluded_items, negative_items)
         LOGGER.debug(f"Loaded data for model training {self.model_type.name}")
 
         baseline_model_results, new_model_results, bad_data, data_proportion = self._train_several_times(

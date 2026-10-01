@@ -76,7 +76,7 @@ class Logger:
         my_kwargs = _process_kwargs(kwargs)
         self.__logger.critical(msg, *args, **my_kwargs)
 
-    def isEnabledFor(self, level: int) -> bool:
+    def is_enabled_for(self, level: int) -> bool:
      return self.__logger.isEnabledFor(level)
 
 

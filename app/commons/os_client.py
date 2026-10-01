@@ -536,7 +536,7 @@ class OsClient:
             return
 
         try:
-            if LOGGER.isEnabledFor(DEBUG):
+            if LOGGER.is_enabled_for(DEBUG):
                 LOGGER.debug(f"Executing queries: {json.dumps(queries)}")
             results = self._os_client.msearch(body=queries, index=index_name)
             responses = results["responses"] or []
@@ -571,7 +571,7 @@ class OsClient:
                     exc_info=err,
                 )
                 group = []
-            if LOGGER.isEnabledFor(DEBUG):
+            if LOGGER.is_enabled_for(DEBUG):
                 LOGGER.debug(f"Queries result group: {json.dumps([res.model_dump() for res in group])}")
             yield group
 

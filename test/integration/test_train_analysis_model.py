@@ -8,7 +8,6 @@ from app.commons.model.test_item_index import LogData, TestItemHistoryData, Test
 from app.commons.model_chooser import ModelChooser
 from app.commons.os_client import OsClient
 from app.commons.query_builder import get_log_inner_hits_name
-from app.ml.models import BoostingDecisionMaker
 from app.ml.training.train_analysis_model import METRIC, AnalysisModelTraining
 from app.utils import utils
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
@@ -241,6 +240,7 @@ def test_train_uses_os_client_and_issue_history(model_type: ModelType) -> None:
     for row in train_data:
         assert len(row) == len(training.features)
         assert all(isinstance(value, float) and 0.0 <= value <= 1.0 for value in row)
+
 
 def test_unsupported_configured_features_are_excluded() -> None:
     search_cfg = DEFAULT_SEARCH_CONFIG.model_copy(

@@ -36,8 +36,6 @@ LOG_INNER_HITS_PREFIX = "log_"
 INNER_HITS_SIZE = 3
 DEFAULT_ITEM_QUERY_SIZE = 20
 MIN_TERMS_PER_LOG = 10
-MAX_EXCEPTION_TERMS = 5
-SECONDARY_CLAUSES_PER_LOG = MAX_EXCEPTION_TERMS + 3  # exceptions, status codes, nested bool
 
 TEST_ITEM_FIELDS_BOOST_SCORES = [
     ("test_item_name", utils.BOOST_SUPPORTING),
@@ -264,8 +262,7 @@ class ItemQueryBuilder(metaclass=ABCMeta):
         return [log_index for log_index, _ in self._select_logs(request_item, message_field)]
 
     def _get_terms_per_log(self, logs_number: int) -> int:
-        logs_number = max(logs_number, 1)
-        terms_share = self.search_cfg.ItemQueryTermsBudget // logs_number - SECONDARY_CLAUSES_PER_LOG
+        terms_share = self.search_cfg.ItemQueryTermsBudget // max(logs_number, 1)
         return max(MIN_TERMS_PER_LOG, min(self.search_cfg.MaxQueryTerms, terms_share))
 
     def _build_log_clause(
@@ -295,7 +292,7 @@ class ItemQueryBuilder(metaclass=ABCMeta):
                     field_name=LOGS_FOUND_EXCEPTIONS_FIELD,
                     boost=utils.BOOST_ERROR_IDENTITY,
                     override_min_should_match="1",
-                    max_query_terms=min(max_query_terms, MAX_EXCEPTION_TERMS),
+                    max_query_terms=max_query_terms,
                 )
             )
         nested_should.extend(

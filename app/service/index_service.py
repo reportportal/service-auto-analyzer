@@ -119,7 +119,7 @@ class IndexService:
 
     @staticmethod
     def _normalize_items_to_update(
-        items_to_update: dict[int | str, Union[str, ItemUpdate]],
+        items_to_update: dict[int | str, str | ItemUpdate],
     ) -> dict[str, dict[str, str]]:
         """Normalize incoming itemsToUpdate payload to a uniform structure."""
         normalized: dict[str, dict[str, str]] = {}

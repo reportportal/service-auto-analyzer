@@ -15,7 +15,7 @@
 from collections import defaultdict
 from datetime import datetime
 from time import time
-from typing import Optional, Union
+from typing import Optional
 
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory

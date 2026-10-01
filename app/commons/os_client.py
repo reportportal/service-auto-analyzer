@@ -569,7 +569,7 @@ class OsClient:
                     exc_info=err,
                 )
                 group = []
-            LOGGER.debug(f"Queries result group: {json.dumps(group)}")
+            LOGGER.debug(f"Queries result group: {json.dumps([res.model_dump() for res in group])}")
             yield group
 
     def bulk_update_issue_history(self, project_id: str | int, updates: list[TestItemHistoryData]) -> BulkResponse:

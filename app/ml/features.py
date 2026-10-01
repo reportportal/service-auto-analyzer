@@ -15,8 +15,8 @@
 """Gradient Boosting features, calculated for every found Test Item against the request Test Item.
 
 Features use only Test Item data, never search engine artifacts like scores, inner hits or the order of found Test
-Items, so trained models do not depend on a search engine. Every feature value is a float in the range [0.0, 1.0]. Equality of two empty values
-(None or blank strings) is 0.0: nothing to compare is never a match.
+Items, so trained models do not depend on a search engine. Every feature value is a float in the range [0.0, 1.0].
+Equality of two empty values (None or blank strings) is 0.0: nothing to compare is never a match.
 """
 
 import math

@@ -251,6 +251,7 @@ SEARCH_CONFIG = SearchConfig(
     ),
     MlModelForSuggestions=os.getenv("ML_MODEL_FOR_SUGGESTIONS", ModelType.suggestion.name).strip(),
     AnalysisQueryBatchSize=int(os.getenv("ANALYZER_QUERY_BATCH_SIZE", "20")),
+    ItemQueryTermsBudget=int(os.getenv("ANALYZER_QUERY_TERMS_BUDGET", "800")),
 )
 
 

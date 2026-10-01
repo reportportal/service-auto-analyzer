@@ -14,8 +14,10 @@
 
 """OpenSearch client for Test Item-centric indexing approach."""
 
+import json
 import traceback
 from datetime import datetime, timezone
+from logging import DEBUG
 from time import time
 from typing import Any, Callable, Iterable, Iterator, Optional
 
@@ -534,6 +536,8 @@ class OsClient:
             return
 
         try:
+            if LOGGER.is_enabled_for(DEBUG):
+                LOGGER.debug(f"Executing queries: {json.dumps(queries)}")
             results = self._os_client.msearch(body=queries, index=index_name)
             responses = results["responses"] or []
         except Exception as err:
@@ -567,6 +571,8 @@ class OsClient:
                     exc_info=err,
                 )
                 group = []
+            if LOGGER.is_enabled_for(DEBUG):
+                LOGGER.debug(f"Queries result group: {json.dumps([res.model_dump() for res in group])}")
             yield group
 
     def bulk_update_issue_history(self, project_id: str | int, updates: list[TestItemHistoryData]) -> BulkResponse:

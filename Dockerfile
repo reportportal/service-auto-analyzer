@@ -40,7 +40,7 @@ ARG APP_VERSION=""
 ARG RELEASE_MODE=false
 ARG GITHUB_TOKEN
 RUN if [ "$RELEASE_MODE" = "true" ]; then \
-        make release v=${APP_VERSION} githubtoken=${GITHUB_TOKEN}; \
+        make release v=${APP_VERSION} githubtoken="${GITHUB_TOKEN}"; \
     elif [ "${APP_VERSION}" != "" ]; then \
         echo "${APP_VERSION}" > VERSION; \
     fi

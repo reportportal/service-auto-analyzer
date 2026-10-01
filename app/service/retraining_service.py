@@ -14,11 +14,13 @@
 
 import json
 from time import time
+from typing import Optional
 
 from app.commons import logging, trigger_manager
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import TrainInfo
 from app.commons.model_chooser import ModelChooser
+from app.commons.os_client import OsClient
 from app.utils import utils
 
 LOGGER = logging.getLogger("analyzerApp.retrainingService")
@@ -29,11 +31,18 @@ class RetrainingService:
     search_cfg: SearchConfig
     trigger_manager: trigger_manager.TriggerManager
 
-    def __init__(self, model_chooser: ModelChooser, app_config: ApplicationConfig, search_cfg: SearchConfig):
+    def __init__(
+        self,
+        model_chooser: ModelChooser,
+        app_config: ApplicationConfig,
+        search_cfg: SearchConfig,
+        *,
+        os_client: Optional[OsClient] = None,
+    ):
         self.app_config = app_config
         self.search_cfg = search_cfg
         self.trigger_manager = trigger_manager.TriggerManager(
-            model_chooser, app_config=self.app_config, search_cfg=self.search_cfg
+            model_chooser, app_config=self.app_config, search_cfg=self.search_cfg, os_client=os_client
         )
 
     @utils.ignore_warnings

@@ -35,7 +35,7 @@ class DefaultDict(_defaultdict[_KT, _RT]):
         return value
 
     def __contains__(self, item):
-        if item in self.keys():
+        if item in self.keys():  # NOSONAR
             return True
         if item in self._checked_keys:
             return False

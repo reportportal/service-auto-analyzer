@@ -98,12 +98,13 @@ def build_issue_history_query(chunk_number: int, fields_to_retrieve: list[str]) 
 def balance_data(
     train_data: list[TrainingEntry[T]],
 ) -> list[TrainingEntry[T]]:
-    """Make existing train data balanced for the given label.
+    """Make existing train data balanced for every label in it.
 
-    This function shorten the amount of negative cases if there are to many of them and extend them out of existing
-    data if there are too few of them.
+    Each entry is a positive or negative case for the label in its ``issue_type``. Positives of other labels are copied
+    as negatives, capped at ``NEGATIVE_RATIO_MAX`` per positive, so use only the entries of the trained label.
 
     :param train_data: Existing train data based on item history.
+    :return: Train data with balanced negative cases for every label.
     """
     cases: dict[str, list[TrainingEntry[T]]] = defaultdict(list)
     for entry in train_data:

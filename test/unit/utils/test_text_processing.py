@@ -183,6 +183,17 @@ def test_find_test_methods_in_text():
 
 
 @pytest.mark.parametrize(
+    "text, expected_test_methods",
+    [
+        ("at Object.<anonymous> (/build/tests/login.spec.ts:10:5)", ["login.spec.ts"]),
+        ("at Context.eval (webpack:///./cypress/e2e/cart.cy.js:25:7)", ["cart.cy.js"]),
+    ],
+)
+def test_find_test_methods_in_text_spec_files(text, expected_test_methods):
+    assert text_processing.find_test_methods_in_text(text) == expected_test_methods
+
+
+@pytest.mark.parametrize(
     "url, expected_url",
     [
         (

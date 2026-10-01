@@ -15,7 +15,7 @@
 from collections import defaultdict
 from datetime import datetime
 from time import time
-from typing import Optional, Union
+from typing import Optional
 
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory
@@ -114,12 +114,12 @@ class IndexService:
         time_passed = round(time() - t_start, 2)
         LOGGER.info(
             f"Indexing {len(launch_ids)} launches of projects '{projects_str}' finished: {launch_ids_str}. "
-            f"It took {time_passed} sec."
+            f"It took {time_passed} sec., indexing took {total_took} sec."
         )
 
     @staticmethod
     def _normalize_items_to_update(
-        items_to_update: dict[int | str, Union[str, ItemUpdate]],
+        items_to_update: dict[int | str, str | ItemUpdate],
     ) -> dict[str, dict[str, str]]:
         """Normalize incoming itemsToUpdate payload to a uniform structure."""
         normalized: dict[str, dict[str, str]] = {}

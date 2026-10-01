@@ -1,22 +1,16 @@
-from pathlib import Path
 from unittest import mock
 
 import pytest
 
 from app.commons.model.db import Hit
-from app.commons.model.launch_objects import RelevantItem
-from app.commons.model.log_item_index import LogItemIndexData
 from app.commons.model.ml import ModelType, TrainInfo
 from app.commons.model.test_item_index import LogData, TestItemHistoryData, TestItemIndexData
 from app.commons.model_chooser import ModelChooser
 from app.commons.os_client import OsClient
-from app.ml.boosting_featurizer import BoostingFeaturizer
-from app.ml.suggest_boosting_featurizer import SuggestBoostingFeaturizer
+from app.commons.query_builder import get_log_inner_hits_name
 from app.ml.training.train_analysis_model import METRIC, AnalysisModelTraining
+from app.utils import utils
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
-
-ROOT_DIR = Path(__file__).resolve().parents[2]
-MODEL_DIR = ROOT_DIR / "res" / "model"
 
 
 def _make_log_data(log_id: str, log_order: int, message: str) -> LogData:
@@ -54,12 +48,26 @@ def _make_log_data(log_id: str, log_order: int, message: str) -> LogData:
     )
 
 
+def _make_similar_hit(test_item: TestItemIndexData, score: float) -> Hit[TestItemIndexData]:
+    logs = test_item.logs or []
+    inner_hits = {
+        get_log_inner_hits_name(0): {
+            "hits": {"hits": [{"_id": logs[0].log_id, "_score": score, "_source": logs[0].model_dump()}]}
+        }
+    }
+    source = test_item.model_copy(update={"logs": None, "issue_history": None})
+    return Hit[TestItemIndexData].from_dict(
+        {"_id": test_item.test_item_id, "_score": score, "_source": source.model_dump(), "inner_hits": inner_hits}
+    )
+
+
 def _make_search_config():
+    model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
     return DEFAULT_SEARCH_CONFIG.model_copy(
         update={
-            "BoostModelFolder": str(MODEL_DIR / "auto_analysis_model_2025-08-18"),
-            "SuggestBoostModelFolder": str(MODEL_DIR / "suggestion_model_2025-09-04"),
-            "GlobalDefectTypeModelFolder": str(MODEL_DIR / "defect_type_model_2025-08-12"),
+            "BoostModelFolder": utils.strip_path(model_settings["BOOST_MODEL_FOLDER"]),
+            "SuggestBoostModelFolder": utils.strip_path(model_settings["SUGGEST_BOOST_MODEL_FOLDER"]),
+            "GlobalDefectTypeModelFolder": utils.strip_path(model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]),
         }
     )
 
@@ -181,22 +189,13 @@ def test_train_uses_os_client_and_issue_history(model_type: ModelType) -> None:
         Hit[TestItemIndexData].from_dict({"_index": "rp_123", "_id": "2003", "_source": candidate_si.model_dump()}),
     ]
 
+    similar_hits = [
+        _make_similar_hit(candidate_pb, 3.0),
+        _make_similar_hit(candidate_ab, 2.0),
+        _make_similar_hit(candidate_si, 1.0),
+    ]
     os_client.search = mock.Mock(side_effect=lambda _p, _r: iter(project_hits))
-
-    def fake_gather_features_info(self):
-        issue_type_names = list(self.find_most_relevant_by_type().keys())
-        feature_vector = [0.1 for _ in self.feature_ids]
-        return [feature_vector for _ in issue_type_names], issue_type_names
-
-    def fake_find_most_relevant_by_type(_self):
-        def make_hit(issue_type: str) -> Hit[LogItemIndexData]:
-            return Hit[LogItemIndexData].from_dict({"_score": 1.0, "_source": LogItemIndexData(issue_type=issue_type)})
-
-        return {
-            "pb001": RelevantItem(mrHit=make_hit("pb001")),
-            "ab001": RelevantItem(mrHit=make_hit("ab001")),
-            "si001": RelevantItem(mrHit=make_hit("si001")),
-        }
+    os_client.msearch_grouped = mock.Mock(side_effect=lambda _p, _q: iter([similar_hits]))
 
     training = AnalysisModelTraining(
         APP_CONFIG,
@@ -208,26 +207,53 @@ def test_train_uses_os_client_and_issue_history(model_type: ModelType) -> None:
     training.namespace_finder.get_chosen_namespaces = mock.Mock(return_value={})
 
     with mock.patch.object(model_chooser, "choose_model", wraps=model_chooser.choose_model) as choose_model_mock:
-        with mock.patch.object(BoostingFeaturizer, "gather_features_info", new=fake_gather_features_info):
-            with mock.patch.object(
-                BoostingFeaturizer, "find_most_relevant_by_type", new=fake_find_most_relevant_by_type
-            ):
-                with mock.patch.object(
-                    SuggestBoostingFeaturizer,
-                    "find_most_relevant_by_type",
-                    new=fake_find_most_relevant_by_type,
-                ):
-                    with mock.patch.object(
-                        AnalysisModelTraining,
-                        "_train_several_times",
-                        return_value=({METRIC: [0.1]}, {METRIC: [0.1]}, True, 0.0),
-                    ):
-                        training.train(TrainInfo(model_type=model_type, project=123))
+        with mock.patch.object(
+            AnalysisModelTraining,
+            "_train_several_times",
+            return_value=({METRIC: [0.1]}, {METRIC: [0.1]}, True, 0.0),
+        ) as train_mock:
+            training.train(TrainInfo(model_type=model_type, project=123))
 
     choose_model_mock.assert_called_once_with(123, ModelType.defect_type)
     training.namespace_finder.get_chosen_namespaces.assert_called_once_with(123)
-    assert os_client.search.call_count == 11
+    os_client.search.assert_called_once()
     assert os_client.search.call_args_list[0][0][0] == 123
-
     issue_history_query = os_client.search.call_args_list[0][0][1]
     assert issue_history_query["query"]["nested"]["path"] == "issue_history"
+
+    # One search per Test Item with issue history
+    assert os_client.msearch_grouped.call_count == 4
+    project_id, queries = os_client.msearch_grouped.call_args_list[0][0]
+    assert project_id == 123
+    assert len(queries) == 2
+    item_query = queries[1]["query"]["function_score"]["query"]["bool"]
+    log_clauses = item_query["must"][0]["bool"]["should"]
+    assert [clause["nested"]["inner_hits"]["name"] for clause in log_clauses] == ["log_0", "log_1"]
+    assert {"term": {"test_item_id": "1001"}} in item_query["must_not"]
+
+    train_mock.assert_called_once()
+    _, train_data, labels = train_mock.call_args[0]
+    # Every Test Item gives one positive and two negative rows, one row per found Test Item
+    assert len(labels) == 12
+    assert sum(labels) == 4
+    assert len(train_data) == 12
+    for row in train_data:
+        assert len(row) == len(training.features)
+        assert all(isinstance(value, float) and 0.0 <= value <= 1.0 for value in row)
+
+
+def test_unsupported_configured_features_are_excluded() -> None:
+    search_cfg = DEFAULT_SEARCH_CONFIG.model_copy(
+        update={"SuggestBoostModelFeatures": "40-45", "SuggestBoostModelMonotonousFeatures": "40,43,44"}
+    )
+    training = AnalysisModelTraining(
+        APP_CONFIG,
+        search_cfg,
+        ModelType.suggestion,
+        ModelChooser(APP_CONFIG, search_cfg, object_saver=mock.Mock()),
+        os_client=mock.Mock(),
+    )
+
+    assert training.baseline_model is None
+    assert training.features == [40, 41, 42]
+    assert training.monotonous_features == [40]

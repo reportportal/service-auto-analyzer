@@ -137,11 +137,8 @@ def calculate_line_number(text):
 
 
 def is_python_log(log):
-    """Tries to find whether a log was for the python language"""
-    found_file_extensions = []
-    for m in re.findall(r"\.(%s)(?!\.)\b" % "|".join(FILE_EXTENSIONS), log):
-        found_file_extensions.append(m)
-    found_file_extensions = list(set(found_file_extensions))
+    """Tries to find whether a log was for the Python language"""
+    found_file_extensions = list(set(re.findall(r"\.(%s)(?!\.)\b" % "|".join(FILE_EXTENSIONS), log)))
     if len(found_file_extensions) == 1 and found_file_extensions[0] == "py":
         return True
     return False
@@ -518,11 +515,9 @@ def find_test_methods_in_text(text: str) -> list[str]:
             residual = residual[match.end() :]
         test_methods.append(match_str)
 
-    for m in re.findall(r"(\b[^\s()/\\:]+\.(?:spec|cy)\.[jt]s\b)", text):
-        if m[0].strip():
-            test_methods.append(m[0].strip())
-        if m[1].strip():
-            test_methods.append(m[1].strip())
+    for m in re.findall(r"\b[^\s()/\\:]+\.(?:spec|cy)\.[jt]s\b", text):
+        if m.strip():
+            test_methods.append(m.strip())
 
     final_test_methods = []
     seen: set[str] = set()

@@ -51,10 +51,10 @@ class DummyVectorizer:
 
 # noinspection PyMethodMayBeStatic
 class DummyClassifier:
-    def predict(self, data: np.ndarray) -> np.ndarray:
+    def predict(self, data: csr_matrix[Any] | Any) -> np.ndarray:
         return np.zeros(data.shape[0])
 
-    def predict_proba(self, data: np.ndarray) -> np.ndarray:
+    def predict_proba(self, data: csr_matrix[Any] | Any) -> np.ndarray:
         return np.zeros((data.shape[0], 2))
 
 

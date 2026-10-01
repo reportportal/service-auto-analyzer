@@ -37,6 +37,7 @@ class CleanIndexService:
     namespace_finder: NamespaceFinder
     trigger_manager: TriggerManager
     model_chooser: ModelChooser
+    search_cfg: SearchConfig
 
     def __init__(
         self,
@@ -63,10 +64,8 @@ class CleanIndexService:
         self.os_client = os_client or OsClient(app_config=self.app_config)
         self.namespace_finder = namespace_finder or NamespaceFinder(self.app_config)
         self.trigger_manager = trigger_manager or TriggerManager(
-            model_chooser, app_config=self.app_config, search_cfg=self.search_cfg
+            model_chooser, app_config=self.app_config, search_cfg=self.search_cfg, os_client=self.os_client
         )
-
-    search_cfg: Optional[SearchConfig]
 
     def delete_logs(self, clean_index: DeleteLogsRequest) -> int:
         LOGGER.info("Started cleaning index")

@@ -14,6 +14,8 @@
 
 import math
 import os
+import random
+from collections import Counter, defaultdict
 from datetime import datetime
 from time import time
 from typing import Any, Optional, Type, TypeVar
@@ -31,6 +33,8 @@ from app.commons.os_client import OsClient
 from app.ml.models import CustomDefectTypeModel, DefectTypeModel
 from app.ml.models.defect_type_model import DATA_FIELD
 from app.ml.training import (
+    DEFAULT_RANDOM_SEED,
+    NEGATIVE_RATIO_MIN,
     TRAIN_DATA_RANDOM_STATES,
     TrainingEntry,
     balance_data,
@@ -47,7 +51,7 @@ TEST_DATA_PROPORTION = 0.1
 MINIMAL_DATA_LENGTH_FOR_TRAIN = 50
 MIN_P_VALUE = 0.05
 
-ITEM_FIELDS_TO_RETRIEVE = ["test_item_id", "issue_history", "logs"]
+ITEM_FIELDS_TO_RETRIEVE = ["test_item_id", "launch_id", "issue_history", "logs"]
 
 T = TypeVar("T")
 
@@ -67,16 +71,73 @@ def split_train_test(
     return x_train, x_test, y_train, y_test
 
 
-def create_binary_target_data(label: str, data: list[TrainingEntry[str]]) -> tuple[list[str], list[int]]:
-    labels_filtered = []
+def build_one_vs_rest_data(label: str, data: list[TrainingEntry[str]]) -> tuple[list[str], list[int]]:
+    """Build a one-vs-rest dataset for the label out of its entries (see ``balance_data``).
+
+    If there are fewer than ``NEGATIVE_RATIO_MIN`` negatives per positive, positives of other labels are added as
+    negatives up to that ratio, skipping messages already in the dataset.
+
+    :param label: The label to build the dataset for
+    :param data: Train data in the format of ``balance_data`` output
+    :return: Messages and their binary labels
+    """
     messages: list[str] = []
+    labels: list[int] = []
+    other_label_positives: list[str] = []
     for entry in data:
-        messages.append(entry.data)
-        if label == entry.issue_type:
-            labels_filtered.append(1 if entry.is_positive else 0)
+        if entry.issue_type == label:
+            messages.append(entry.data)
+            labels.append(1 if entry.is_positive else 0)
+        elif entry.is_positive:
+            other_label_positives.append(entry.data)
+
+    positives_count = sum(labels)
+    missing_negatives = positives_count * NEGATIVE_RATIO_MIN - (len(labels) - positives_count)
+    if missing_negatives <= 0:
+        return messages, labels
+
+    known_messages = set(messages)
+    additional_negatives = list(dict.fromkeys(m for m in other_label_positives if m not in known_messages))
+    random.Random(DEFAULT_RANDOM_SEED).shuffle(additional_negatives)
+    for message in additional_negatives[:missing_negatives]:
+        messages.append(message)
+        labels.append(0)
+    return messages, labels
+
+
+def remove_conflicting_entries(data: list[TrainingEntry[str]]) -> list[TrainingEntry[str]]:
+    """Remove all entries of messages being positive for several labels, or positive and negative for one label.
+
+    Must be called before ``balance_data``, which makes every message look contradictory.
+
+    :param data: Train data where each entry belongs to the label in its ``issue_type`` field
+    :return: Train data without contradictory messages, in the original order
+    """
+    positive_labels: dict[str, set[str]] = defaultdict(set)
+    negative_labels: dict[str, set[str]] = defaultdict(set)
+    for entry in data:
+        (positive_labels if entry.is_positive else negative_labels)[entry.data].add(entry.issue_type)
+
+    conflicting_messages = {
+        message
+        for message, labels in positive_labels.items()
+        if len(labels) > 1 or labels & negative_labels.get(message, set())
+    }
+    if not conflicting_messages:
+        return data
+
+    result: list[TrainingEntry[str]] = []
+    removed_by_label: Counter[str] = Counter()
+    for entry in data:
+        if entry.data in conflicting_messages:
+            removed_by_label[entry.issue_type] += 1
         else:
-            labels_filtered.append(0)
-    return messages, labels_filtered
+            result.append(entry)
+    LOGGER.info(
+        f"Removed {len(data) - len(result)} entries of {len(conflicting_messages)} messages with contradictory "
+        f"labels: {dict(removed_by_label)}"
+    )
+    return result
 
 
 def _get_log_message(log_data: LogData) -> Optional[str]:
@@ -99,7 +160,7 @@ def train_several_times(
     new_model_results = []
     baseline_model_results = []
 
-    train_data, labels_filtered = create_binary_target_data(label, data)
+    train_data, labels_filtered = build_one_vs_rest_data(label, data)
     bad_data_proportion, data_proportion = validate_proportions(labels_filtered)
     if not bad_data_proportion:
         for random_state in my_random_states:
@@ -270,7 +331,7 @@ class DefectTypeModelTraining:
         projects = [project_info.project]
         if project_info.additional_projects:
             projects.extend(project_info.additional_projects)
-        data = self._query_data(projects, train_log_info)
+        data = remove_conflicting_entries(self._query_data(projects, train_log_info))
         train_data = balance_data(data)
 
         LOGGER.debug(f"Loaded data for model training {project_info.model_type.name}")
@@ -298,7 +359,7 @@ class DefectTypeModelTraining:
                 LOGGER.debug(f"New model test results {new_model_results}")
                 _, p_value = stats.f_oneway(baseline_model_results, new_model_results)
                 if p_value is None or math.isnan(p_value):
-                    p_value = 1.0
+                    p_value = np.float64(1.0)
                 train_log_info[label]["p_value"] = p_value
                 baseline_mean_f1 = np.mean(baseline_model_results)
                 mean_f1 = np.mean(new_model_results)

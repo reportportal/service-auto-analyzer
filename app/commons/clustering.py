@@ -70,7 +70,7 @@ def __similarity_grouping(
 
             _count_vector = CountVectorizer(binary=True, analyzer=lambda x: x)
             vectors: csr_matrix = _count_vector.fit_transform(block_i + block_j).astype(np.int8)
-            vectors_count_words = np.asarray(np.sum(vectors, axis=1))
+            vectors_count_words = np.asarray(np.sum(vectors, axis=1))  # type: ignore
             similarities = cosine_similarity(vectors)
 
             for seq_num_i in range(len(indices_looked)):

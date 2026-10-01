@@ -19,6 +19,7 @@ from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType
 from app.commons.model_chooser import ModelChooser
 from app.commons.object_saving import ObjectSaver
+from app.commons.os_client import OsClient
 from app.commons.triggering_training.retraining_triggering import RetrainingTriggering
 from app.ml.training.train_analysis_model import AnalysisModelTraining
 from app.ml.training.train_defect_type_model import DefectTypeModelTraining
@@ -37,6 +38,7 @@ class TriggerManager:
         search_cfg: SearchConfig,
         *,
         object_saver: Optional[ObjectSaver] = None,
+        os_client: Optional[OsClient] = None,
     ):
         self.object_saver = object_saver or ObjectSaver(app_config)
         self.model_training_triggering = {
@@ -44,19 +46,23 @@ class TriggerManager:
                 RetrainingTriggering(
                     self.object_saver, "defect_type_trigger_info", start_number=100, accumulated_difference=100
                 ),
-                DefectTypeModelTraining(app_config, search_cfg, model_chooser),
+                DefectTypeModelTraining(app_config, search_cfg, model_chooser, os_client=os_client),
             ),
             ModelType.suggestion: (
                 RetrainingTriggering(
                     self.object_saver, "suggestion_trigger_info", start_number=100, accumulated_difference=50
                 ),
-                AnalysisModelTraining(app_config, search_cfg, ModelType.suggestion, model_chooser),
+                AnalysisModelTraining(
+                    app_config, search_cfg, ModelType.suggestion, model_chooser, os_client=os_client
+                ),
             ),
             ModelType.auto_analysis: (
                 RetrainingTriggering(
                     self.object_saver, "auto_analysis_trigger_info", start_number=300, accumulated_difference=100
                 ),
-                AnalysisModelTraining(app_config, search_cfg, ModelType.auto_analysis, model_chooser),
+                AnalysisModelTraining(
+                    app_config, search_cfg, ModelType.auto_analysis, model_chooser, os_client=os_client
+                ),
             ),
         }
 

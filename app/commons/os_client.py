@@ -18,6 +18,7 @@ import json
 import traceback
 from datetime import datetime, timezone
 from time import time
+from logging import DEBUG
 from typing import Any, Callable, Iterable, Iterator, Optional
 
 import opensearchpy.helpers
@@ -535,7 +536,8 @@ class OsClient:
             return
 
         try:
-            LOGGER.debug(f"Executing queries: {json.dumps(queries)}")
+            if LOGGER.isEnabledFor(DEBUG):
+                LOGGER.debug(f"Executing queries: {json.dumps(queries)}")
             results = self._os_client.msearch(body=queries, index=index_name)
             responses = results["responses"] or []
         except Exception as err:
@@ -569,7 +571,8 @@ class OsClient:
                     exc_info=err,
                 )
                 group = []
-            LOGGER.debug(f"Queries result group: {json.dumps([res.model_dump() for res in group])}")
+            if LOGGER.isEnabledFor(DEBUG):
+                LOGGER.debug(f"Queries result group: {json.dumps([res.model_dump() for res in group])}")
             yield group
 
     def bulk_update_issue_history(self, project_id: str | int, updates: list[TestItemHistoryData]) -> BulkResponse:

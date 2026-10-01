@@ -17,8 +17,8 @@
 import json
 import traceback
 from datetime import datetime, timezone
-from time import time
 from logging import DEBUG
+from time import time
 from typing import Any, Callable, Iterable, Iterator, Optional
 
 import opensearchpy.helpers

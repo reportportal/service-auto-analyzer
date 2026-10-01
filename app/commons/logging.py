@@ -77,7 +77,7 @@ class Logger:
         self.__logger.critical(msg, *args, **my_kwargs)
 
     def is_enabled_for(self, level: int) -> bool:
-     return self.__logger.isEnabledFor(level)
+        return self.__logger.isEnabledFor(level)
 
 
 def new_correlation_id() -> str:

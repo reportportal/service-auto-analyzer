@@ -14,6 +14,7 @@
 
 """OpenSearch client for Test Item-centric indexing approach."""
 
+import json
 import traceback
 from datetime import datetime, timezone
 from time import time
@@ -534,6 +535,7 @@ class OsClient:
             return
 
         try:
+            LOGGER.debug(f"Executing queries: {json.dumps(queries)}")
             results = self._os_client.msearch(body=queries, index=index_name)
             responses = results["responses"] or []
         except Exception as err:
@@ -567,6 +569,7 @@ class OsClient:
                     exc_info=err,
                 )
                 group = []
+            LOGGER.debug(f"Queries result group: {json.dumps(group)}")
             yield group
 
     def bulk_update_issue_history(self, project_id: str | int, updates: list[TestItemHistoryData]) -> BulkResponse:

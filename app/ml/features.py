@@ -208,7 +208,7 @@ class DefectTypeFeature:
 class IssueTypeShareFeature:
     """Share of found Test Items with the same issue type, the same value for the whole issue type group."""
 
-    def calculate(self, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
+    def calculate(self, _: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
         values = [0.0] * len(hits)
         for positions in group_by_issue_type(hits).values():
             for position in positions:
@@ -293,7 +293,7 @@ class ValuesSimilarityFeature:
 class ManuallyAnalyzedFeature:
     """1.0 if the found Test Item was analyzed manually."""
 
-    def calculate(self, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
+    def calculate(self, _: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
         return [float(hit.source.is_auto_analyzed is False) for hit in hits]
 
 
@@ -342,7 +342,7 @@ class BaseIssueTypeFeature:
     def __init__(self, base_issue_type: str) -> None:
         self.base_issue_type = base_issue_type
 
-    def calculate(self, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
+    def calculate(self, _: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
         return [float(get_base_issue_type(hit.source.issue_type) == self.base_issue_type) for hit in hits]
 
 
@@ -383,7 +383,7 @@ class TimeDecayFeature:
 class LogCountFeature:
     """Number of logs relative to the found Test Item with the most logs."""
 
-    def calculate(self, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
+    def calculate(self, _: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
         logs_numbers = [get_logs_number(hit.source) for hit in hits]
         max_logs_number = max(logs_numbers, default=0)
         if max_logs_number <= 0:
@@ -423,7 +423,7 @@ class LaunchNumberDistanceFeature:
 class HistoryStabilityFeature:
     """Stability of the found Test Item's issue history: 1.0 - one issue type, 0.0 - every entry has its own type."""
 
-    def calculate(self, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
+    def calculate(self, _: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
         values = []
         for hit in hits:
             issue_types = get_history_issue_types(hit.source)
@@ -437,14 +437,14 @@ class HistoryStabilityFeature:
 class HistoryUnchangedFeature:
     """1.0 if the issue type never changed in the found Test Item's history."""
 
-    def calculate(self, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
+    def calculate(self, _: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
         return [float(len(set(get_history_issue_types(hit.source))) <= 1) for hit in hits]
 
 
 class StacktraceFeature:
     """1.0 if any log of the found Test Item has a stack trace or a traceback."""
 
-    def calculate(self, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
+    def calculate(self, _: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
         return [
             float(
                 any(
@@ -463,7 +463,7 @@ class IssueTypeConsensusFeature:
     are evenly spread across generic types.
     """
 
-    def calculate(self, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
+    def calculate(self, _: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
         if not hits:
             return []
         counts: dict[str, int] = defaultdict(int)

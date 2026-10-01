@@ -236,7 +236,7 @@ class DefectUpdate(BaseModel):
 
     project: int | str
     isAutoAnalyzed: bool = False
-    itemsToUpdate: dict[int | str, Union[str, ItemUpdate]]
+    itemsToUpdate: dict[int | str, str | ItemUpdate]
 
 
 class LaunchInfoForClustering(BaseModel):

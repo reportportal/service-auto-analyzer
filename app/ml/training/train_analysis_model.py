@@ -60,6 +60,8 @@ from app.utils import text_processing, utils
 from app.utils.defaultdict import DefaultDict
 from app.utils.utils import is_supported_issue_type, normalize_base_issue_type, normalize_issue_type, safe_int
 
+LOGS_FIELD = "logs."
+
 LOGGER = logging.getLogger("analyzerApp.trainingAnalysisModel")
 SMOTE_PROPORTION = 0.4
 MIN_POSITIVE_CASES_FOR_SMOTE = 5
@@ -82,8 +84,8 @@ ITEM_FIELDS_TO_RETRIEVE = [
     "logs",
     "issue_history",
 ]
-HIT_ITEM_FIELDS = {field for field in TEST_ITEM_SOURCE_FIELDS if not field.startswith("logs.")}
-HIT_LOG_FIELDS = {field.removeprefix("logs.") for field in TEST_ITEM_SOURCE_FIELDS if field.startswith("logs.")}
+HIT_ITEM_FIELDS = {field for field in TEST_ITEM_SOURCE_FIELDS if not field.startswith(LOGS_FIELD)}
+HIT_LOG_FIELDS = {field.removeprefix(LOGS_FIELD) for field in TEST_ITEM_SOURCE_FIELDS if field.startswith(LOGS_FIELD)}
 CONFLICT_LOG_FIELDS = ["detected_message_with_numbers", "stacktrace"]
 
 

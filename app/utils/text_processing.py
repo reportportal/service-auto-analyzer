@@ -137,10 +137,8 @@ def calculate_line_number(text):
 
 
 def is_python_log(log):
-    """Tries to find whether a log was for the python language"""
-    found_file_extensions = []
-    for m in re.findall(r"\.(%s)(?!\.)\b" % "|".join(FILE_EXTENSIONS), log):
-        found_file_extensions.append(m)
+    """Tries to find whether a log was for the Python language"""
+    found_file_extensions = [m for m in re.findall(r"\.(%s)(?!\.)\b" % "|".join(FILE_EXTENSIONS), log)]
     found_file_extensions = list(set(found_file_extensions))
     if len(found_file_extensions) == 1 and found_file_extensions[0] == "py":
         return True

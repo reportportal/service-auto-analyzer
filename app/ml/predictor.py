@@ -109,7 +109,7 @@ class MlPredictor(Predictor, metaclass=ABCMeta):
         project_id: int,
         boosting_config: dict[str, Any],
         custom_model_prob: float = 0.0,
-        hash_source: Optional[Union[int, str]] = None,
+        hash_source: int | str | None = None,
     ) -> None:
         """Initialize the predictor with required dependencies.
 
@@ -218,7 +218,7 @@ class AutoAnalysisPredictor(MlPredictor):
         project_id: int,
         boosting_config: dict[str, Any],
         custom_model_prob: float = 0.0,
-        hash_source: Optional[Union[int, str]] = None,
+        hash_source: int | str | None = None,
     ) -> None:
         """Initialize auto analysis predictor.
 
@@ -271,7 +271,7 @@ class SuggestionPredictor(MlPredictor):
         project_id: int,
         boosting_config: dict[str, Any],
         custom_model_prob: float = 0.0,
-        hash_source: Optional[Union[int, str]] = None,
+        hash_source: int | str | None = None,
     ) -> None:
         """Initialize suggestion predictor.
 

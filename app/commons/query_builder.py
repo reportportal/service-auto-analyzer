@@ -28,6 +28,10 @@ from app.commons.model.launch_objects import SearchConfig
 from app.commons.model.test_item_index import LogData, TestItemIndexData
 from app.utils import utils
 
+LOGS_FOUND_EXCEPTIONS_FIELD = "logs.found_exceptions"
+
+POTENTIAL_STATUS_CODES_FIELD = "logs.potential_status_codes"
+
 LOG_INNER_HITS_PREFIX = "log_"
 INNER_HITS_SIZE = 3
 DEFAULT_ITEM_QUERY_SIZE = 20
@@ -53,8 +57,8 @@ ITEM_LOG_SOURCE_FIELDS = [
     "logs.stacktrace",
     "logs.stacktrace_extended",
     "logs.only_numbers",
-    "logs.potential_status_codes",
-    "logs.found_exceptions",
+    POTENTIAL_STATUS_CODES_FIELD,
+    LOGS_FOUND_EXCEPTIONS_FIELD,
     "logs.found_tests_and_methods",
     "logs.urls",
     "logs.message_params",
@@ -98,8 +102,8 @@ INNER_HITS_SOURCE = [
     "logs.stacktrace",
     "logs.stacktrace_extended",
     "logs.only_numbers",
-    "logs.potential_status_codes",
-    "logs.found_exceptions",
+    POTENTIAL_STATUS_CODES_FIELD,
+    LOGS_FOUND_EXCEPTIONS_FIELD,
     "logs.found_exceptions_extended",
     "logs.found_tests_and_methods",
     "logs.urls",
@@ -285,7 +289,7 @@ class ItemQueryBuilder(metaclass=ABCMeta):
                 utils.build_more_like_this_query(
                     "1",
                     found_exceptions,
-                    field_name="logs.found_exceptions",
+                    field_name=LOGS_FOUND_EXCEPTIONS_FIELD,
                     boost=utils.BOOST_ERROR_IDENTITY,
                     override_min_should_match="1",
                     max_query_terms=max_query_terms,
@@ -294,7 +298,7 @@ class ItemQueryBuilder(metaclass=ABCMeta):
         nested_should.extend(
             utils.build_status_codes_queries(
                 log.potential_status_codes or "",
-                field_name="logs.potential_status_codes",
+                field_name=POTENTIAL_STATUS_CODES_FIELD,
                 boost=utils.BOOST_ERROR_IDENTITY,
             )
         )

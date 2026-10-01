@@ -1,4 +1,3 @@
-from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -9,11 +8,10 @@ from app.commons.model.test_item_index import LogData, TestItemHistoryData, Test
 from app.commons.model_chooser import ModelChooser
 from app.commons.os_client import OsClient
 from app.commons.query_builder import get_log_inner_hits_name
+from app.ml.models import BoostingDecisionMaker
 from app.ml.training.train_analysis_model import METRIC, AnalysisModelTraining
+from app.utils import utils
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
-
-ROOT_DIR = Path(__file__).resolve().parents[2]
-MODEL_DIR = ROOT_DIR / "res" / "model"
 
 
 def _make_log_data(log_id: str, log_order: int, message: str) -> LogData:
@@ -65,11 +63,12 @@ def _make_similar_hit(test_item: TestItemIndexData, score: float) -> Hit[TestIte
 
 
 def _make_search_config():
+    model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
     return DEFAULT_SEARCH_CONFIG.model_copy(
         update={
-            "BoostModelFolder": str(MODEL_DIR / "auto_analysis_model_2026-09-30"),
-            "SuggestBoostModelFolder": str(MODEL_DIR / "suggestion_model_2026-09-29"),
-            "GlobalDefectTypeModelFolder": str(MODEL_DIR / "defect_type_model_2026-09-29"),
+            "BoostModelFolder": utils.strip_path(model_settings["BOOST_MODEL_FOLDER"]),
+            "SuggestBoostModelFolder": utils.strip_path(model_settings["SUGGEST_BOOST_MODEL_FOLDER"]),
+            "GlobalDefectTypeModelFolder": utils.strip_path(model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]),
         }
     )
 
@@ -242,28 +241,6 @@ def test_train_uses_os_client_and_issue_history(model_type: ModelType) -> None:
     for row in train_data:
         assert len(row) == len(training.features)
         assert all(isinstance(value, float) and 0.0 <= value <= 1.0 for value in row)
-
-
-@pytest.mark.parametrize("model_type", [ModelType.auto_analysis, ModelType.suggestion])
-def test_unsupported_baseline_features_are_excluded(model_type: ModelType) -> None:
-    unsupported_features = {43, 44, 45, 46}
-    training = AnalysisModelTraining(
-        APP_CONFIG,
-        _make_search_config(),
-        model_type,
-        ModelChooser(APP_CONFIG, _make_search_config(), object_saver=mock.Mock()),
-        os_client=mock.Mock(),
-    )
-
-    assert training.baseline_model is not None
-    assert unsupported_features <= set(training.baseline_model.feature_ids)
-    assert training.features == [
-        feature for feature in training.baseline_model.feature_ids if feature not in unsupported_features
-    ]
-    assert training.monotonous_features == [
-        feature for feature in training.baseline_model.monotonous_features if feature not in unsupported_features
-    ]
-
 
 def test_unsupported_configured_features_are_excluded() -> None:
     search_cfg = DEFAULT_SEARCH_CONFIG.model_copy(

@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from pathlib import Path
 from typing import Any
 from unittest import mock
 
@@ -22,8 +21,8 @@ from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.test_item_index import LogData, TestItemIndexData
 from app.commons.os_client import OsClient
 from app.service.processor import ServiceProcessor
+from app.utils import utils
 
-MODEL_DIR = Path(__file__).resolve().parents[3] / "res" / "model"
 PROJECT_ID = 2
 
 
@@ -38,10 +37,11 @@ def opensearch_mock() -> mock.Mock:
 @pytest.fixture
 def processor(monkeypatch, tmp_path, opensearch_mock) -> ServiceProcessor:
     app_config = ApplicationConfig(esHost="http://localhost:9200", filesystemDefaultPath=str(tmp_path))
+    model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
     search_config = SearchConfig(
-        BoostModelFolder=str(MODEL_DIR / "auto_analysis_model_2026-09-30"),
-        SuggestBoostModelFolder=str(MODEL_DIR / "suggestion_model_2026-09-29"),
-        GlobalDefectTypeModelFolder=str(MODEL_DIR / "defect_type_model_2026-09-29"),
+        BoostModelFolder=utils.strip_path(model_settings["BOOST_MODEL_FOLDER"]),
+        SuggestBoostModelFolder=utils.strip_path(model_settings["SUGGEST_BOOST_MODEL_FOLDER"]),
+        GlobalDefectTypeModelFolder=utils.strip_path(model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]),
     )
     monkeypatch.setattr("app.service.processor.OsClient", lambda config: OsClient(config, os_client=opensearch_mock))
     monkeypatch.setattr("app.commons.os_client.utils.read_resource_file", lambda *args, **kwargs: {})

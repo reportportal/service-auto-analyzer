@@ -32,9 +32,5 @@ def test_detecting_messages():
     example_logs = get_fixture("example_logs.json", to_json=True)
     for idx, example in enumerate(example_logs):
         det_message, stacktrace = text_processing.detect_log_description_and_stacktrace(example["log"])
-
-        try:
-            assert det_message == example["detected_message"]
-            assert stacktrace == example["stacktrace"]
-        except AssertionError as err:
-            raise AssertionError(f"Error in the test case number: {idx}").with_traceback(err.__traceback__)
+        assert det_message == example["detected_message"], f"Error in the test case number: {idx}"
+        assert stacktrace == example["stacktrace"], f"Error in the test case number: {idx}"

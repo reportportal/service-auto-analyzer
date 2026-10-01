@@ -114,7 +114,7 @@ class IndexService:
         time_passed = round(time() - t_start, 2)
         LOGGER.info(
             f"Indexing {len(launch_ids)} launches of projects '{projects_str}' finished: {launch_ids_str}. "
-            f"It took {time_passed} sec."
+            f"It took {time_passed} sec., indexing took {total_took} sec."
         )
 
     @staticmethod

@@ -1,4 +1,4 @@
-FROM dhi.io/python@sha256:c2b0cd3f1b921937d1d15c1cd3a2335fc23d865bba99255127af79821d02042f AS test
+FROM dhi.io/python@sha256:782ea6d552b39ed930bcc86a7f820cc93d5fbb94331aa4860bab400c71c8f628 AS test
 USER root
 RUN apt-get update \
     && apt-get install -y --no-install-recommends make \
@@ -15,11 +15,13 @@ COPY ./requirements.txt ./requirements.txt
 COPY ./requirements-dev.txt ./requirements-dev.txt
 RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
     && LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "${VIRTUAL_ENV}/bin/pip install --no-cache-dir -r requirements.txt" \
-    && "${VIRTUAL_ENV}/bin/python3" -m nltk.downloader -d /usr/share/nltk_data stopwords wordnet omw-1.4
+    && "${VIRTUAL_ENV}/bin/python3" -c "import nltk, os; d = '/usr/share/nltk_data'; \
+        nltk.download(['stopwords', 'wordnet', 'omw-1.4'], d, raise_on_error=True); \
+        [os.chmod(os.path.join(r, f), 0o644) for r, _, fs in os.walk(d) for f in fs]"
 RUN "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir -r requirements-dev.txt
 RUN make test-all
 
-FROM dhi.io/python@sha256:c2b0cd3f1b921937d1d15c1cd3a2335fc23d865bba99255127af79821d02042f AS builder
+FROM dhi.io/python@sha256:782ea6d552b39ed930bcc86a7f820cc93d5fbb94331aa4860bab400c71c8f628 AS builder
 RUN apt-get update \
     && apt-get install -y --no-install-recommends make \
     && python -m venv /venv \
@@ -35,7 +37,9 @@ COPY ./Makefile ./Makefile
 RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
     && "${VIRTUAL_ENV}/bin/pip" install --upgrade setuptools \
     && LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "${VIRTUAL_ENV}/bin/pip install --no-cache-dir -r requirements.txt" \
-    && "${VIRTUAL_ENV}/bin/python3" -m nltk.downloader -d /usr/share/nltk_data stopwords wordnet omw-1.4
+    && "${VIRTUAL_ENV}/bin/python3" -c "import nltk, os; d = '/usr/share/nltk_data'; \
+        nltk.download(['stopwords', 'wordnet', 'omw-1.4'], d, raise_on_error=True); \
+        [os.chmod(os.path.join(r, f), 0o644) for r, _, fs in os.walk(d) for f in fs]"
 ARG APP_VERSION=""
 ARG RELEASE_MODE=false
 ARG GITHUB_TOKEN
@@ -49,7 +53,7 @@ RUN mkdir -p -m 0744 /backend/storage \
     && cp -r /build/app /backend/ \
     && cp -r /build/res /backend/
 
-FROM dhi.io/python@sha256:1a211b3861bb85e5fc42397aed8db6ce05b5d0f08611959c9b1577c213705913
+FROM dhi.io/python@sha256:427f11808afcf4ca06e19afaab9de1fddfd90af0f72c02e53bf1545b76ff5a70
 WORKDIR /backend
 COPY --from=builder /backend ./
 COPY --from=builder /venv /venv

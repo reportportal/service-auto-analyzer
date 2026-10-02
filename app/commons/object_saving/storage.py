@@ -37,25 +37,25 @@ class Storage(metaclass=ABCMeta):
         return self._bucket_prefix + project_id + self._bucket_postfix
 
     @abstractmethod
-    def remove_project_objects(self, path: str, object_names: list[str]) -> None:
+    def remove_project_objects(self, bucket: str, object_names: list[str]) -> None:
         raise NotImplementedError('"remove_project_objects" method is not implemented!')
 
     @abstractmethod
-    def put_project_object(self, data: Any, path: str, object_name: str, using_json: bool = False) -> None:
+    def put_project_object(self, data: Any, bucket: str, object_name: str, using_json: bool = False) -> None:
         raise NotImplementedError('"put_project_object" method is not implemented!')
 
     @abstractmethod
-    def get_project_object(self, path: str, object_name: str, using_json: bool = False) -> object | None:
+    def get_project_object(self, bucket: str, object_name: str, using_json: bool = False) -> object | None:
         raise NotImplementedError('"get_project_object" method is not implemented!')
 
     @abstractmethod
-    def does_object_exists(self, path: str, object_name: str) -> bool:
+    def does_object_exists(self, bucket: str, object_name: str) -> bool:
         raise NotImplementedError('"does_object_exists" method is not implemented!')
 
     @abstractmethod
-    def get_folder_objects(self, path: str, folder: str) -> list[str]:
+    def get_folder_objects(self, bucket: str, folder: str) -> list[str]:
         raise NotImplementedError('"get_folder_objects" method is not implemented!')
 
     @abstractmethod
-    def remove_folder_objects(self, path: str, folder: str) -> bool:
+    def remove_folder_objects(self, bucket: str, folder: str) -> bool:
         raise NotImplementedError('"remove_folder_objects" method is not implemented!')

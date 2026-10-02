@@ -8,6 +8,7 @@
 - Auto-analysis, suggestions and model training search for similar Test Items by all their logs in one query, by @HardNorth
 - Gradient Boosting featurization and prediction are Test Item-centric now, by @HardNorth
 - New Gradient Boosting feature set, independent of search engine specifics, by @HardNorth
+- `nltk` updated to `3.10.3` to address vulnerabilities, by @HardNorth
 
 ## [5.15.5]
 ### Changed

@@ -17,7 +17,6 @@ jobs:
       - name: Create variables
         id: vars
         run: |
-          echo "platforms=${{ vars.BUILD_PLATFORMS }}" >> $GITHUB_OUTPUT
           echo "version=$(echo '${{ github.ref_name }}' | sed -nE 's/.*([0-9]+\.[0-9]+\.[0-9]+).*/\1/p')" >> $GITHUB_OUTPUT
           echo "tag=$(echo ${{ github.ref_name }}-${{ github.run_number }} | tr '/' '-')" >> $GITHUB_OUTPUT
           echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
@@ -30,12 +29,12 @@ jobs:
   call-docker-build:
     name: Call release candidate Docker build
     needs: variables-setup
-    uses: reportportal/.github/.github/workflows/build-docker-image.yaml@5d208acab22207a12d6b204373dc76b97d61bf8c
+    uses: reportportal/.github/.github/workflows/build-docker-image.yaml@main
     with:
       aws-region: ${{ vars.AWS_REGION }}
       image-tag: ${{ needs.variables-setup.outputs.tag }}
       additional-tag: 'latest'
-      build-platforms: ${{ needs.variables-setup.outputs.platforms }}
+      build-platforms: ${{ vars.BUILD_PLATFORMS || 'linux/amd64,linux/arm64' }}
       version: ${{ needs.variables-setup.outputs.version }}
       date: ${{ needs.variables-setup.outputs.date }}
       scan-image: true

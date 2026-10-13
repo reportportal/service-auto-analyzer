@@ -16,7 +16,7 @@ pika==1.4.4
 opensearch-py==3.2.0
 minio==7.2.11
 urllib3==2.8.0
-werkzeug==3.1.8 # not directly required, pinned by Snyk to avoid a vulnerability
+werkzeug==3.1.9 # not directly required, pinned by Snyk to avoid a vulnerability
 
 # AWS S3 client
 boto3==1.42.2

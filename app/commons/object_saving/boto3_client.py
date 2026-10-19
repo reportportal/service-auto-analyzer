@@ -19,7 +19,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig
-from app.commons.object_saving.blob_storage import BlobStorage
+from app.commons.object_saving.blob_storage import PATH_SEPARATOR, BlobStorage
 
 LOGGER = logging.getLogger("analyzerApp.boto3Client")
 
@@ -53,19 +53,24 @@ class Boto3Client(BlobStorage):
         self.s3_client = boto3.client("s3", **config_params)
         LOGGER.debug(f"Boto3 S3 client initialized with region {self.region}")
 
-    def _paginate_objects(self, bucket_name: str, prefix: str) -> Generator[dict, None, None]:
-        """Paginate through S3 objects with a given prefix.
+    def _paginate_objects(self, bucket_name: str, prefix: str, recursive: bool = True) -> Generator[str, None, None]:
+        """Paginate through S3 object keys with a given prefix.
 
         :param bucket_name: Name of the S3 bucket
         :param prefix: Prefix to filter objects
-        :return: Generator yielding S3 object dictionaries from the paginated results
+        :param recursive: If `False`, list only direct children of the prefix: keys of the objects which lie
+            directly in the folder and prefixes of nested folders (with a trailing separator)
+        :return: Generator yielding S3 object keys from the paginated results
         """
         paginator = self.s3_client.get_paginator("list_objects_v2")
-        for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
-            if "Contents" not in page:
-                continue
-            for obj in page["Contents"]:
-                yield obj
+        pagination_params = {"Bucket": bucket_name, "Prefix": prefix}
+        if not recursive:
+            pagination_params["Delimiter"] = PATH_SEPARATOR
+        for page in paginator.paginate(**pagination_params):
+            for common_prefix in page.get("CommonPrefixes", []):
+                yield common_prefix["Prefix"]
+            for obj in page.get("Contents", []):
+                yield obj["Key"]
 
     def remove_project_objects(self, bucket: str, object_names: list[str]) -> None:
         bucket_name = self.get_bucket(bucket)
@@ -161,9 +166,8 @@ class Boto3Client(BlobStorage):
         prefix = self.get_prefix(path)
 
         try:
-            for obj in self._paginate_objects(bucket_name, prefix):
-                object_name = self.extract_object_name(obj["Key"], folder, path)
-                object_names.add(object_name)
+            for key in self._paginate_objects(bucket_name, prefix, recursive=False):
+                object_names.add(self.extract_object_name(key, folder, path))
         except ClientError as e:
             LOGGER.warning(f"Failed to list objects in bucket {bucket_name} with prefix {prefix}: {e}")
             return []
@@ -184,8 +188,8 @@ class Boto3Client(BlobStorage):
         prefix = self.get_prefix(path)
 
         try:
-            for obj in self._paginate_objects(bucket_name, prefix):
-                self.s3_client.delete_object(Bucket=bucket_name, Key=obj["Key"])
+            for key in self._paginate_objects(bucket_name, prefix):
+                self.s3_client.delete_object(Bucket=bucket_name, Key=key)
                 result = True
         except ClientError as e:
             LOGGER.warning(f"Failed to remove folder objects in bucket {bucket_name} with prefix {prefix}: {e}")

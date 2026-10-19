@@ -289,6 +289,27 @@ def test_list_existing_folder(bucket_prefix, bucket, bucket_name, object_name, p
     assert minio_client.get_folder_objects(bucket, path) == [resource]
 
 
+@pytest.mark.parametrize(
+    "bucket_prefix, bucket",
+    [
+        (BUCKET_PREFIX, "10"),
+        (f"test/{BUCKET_PREFIX}", "10"),
+    ],
+)
+def test_list_folder_not_recursive(bucket_prefix, bucket):
+    """Listing a folder should return only its direct children, not objects of nested folders."""
+    path = "suggestion_model/"
+    model_folder = f"{path}suggestion_model_2026-07-01"
+
+    minio_client = create_storage_client(bucket_prefix)
+    minio_client.put_project_object({"test": True}, bucket, f"{model_folder}/boost_model.pickle", using_json=True)
+    minio_client.put_project_object(
+        {"test": True}, bucket, f"{model_folder}/data_features_config.pickle", using_json=True
+    )
+
+    assert minio_client.get_folder_objects(bucket, path) == [model_folder]
+
+
 def test_list_dir_separators():
     bucket = "7"
     object_name = f"{random_alphanumeric(16)}.json"

@@ -1,5 +1,11 @@
 # Changelog
 ## [Unreleased]
+### Fixed
+- `Boto3Client.get_folder_objects` now returns items exactly on the same depth as requested folder (not recursive), by @HardNorth
+### Changed
+- `nltk` updated to `3.10.3` to address vulnerabilities, by @HardNorth
+
+## [5.15.5]
 ### Changed
 - Base image update: switch on DHI Python 3.12, by @HardNorth
 - The service now replies in a separate exchange and queue, by @HardNorth

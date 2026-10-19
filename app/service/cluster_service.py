@@ -23,7 +23,7 @@ from typing import Any, Optional
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 
-from app.commons import clustering, logging, request_factory
+from app.commons import clustering, log_merger, logging, request_factory
 from app.commons.model import TestItemIndexData
 from app.commons.model.db import Hit
 from app.commons.model.launch_objects import (
@@ -33,19 +33,60 @@ from app.commons.model.launch_objects import (
     LaunchInfoForClustering,
     SearchConfig,
 )
-from app.commons.model.test_item_index import LogClusterData, LogData
+from app.commons.model.test_item_index import (
+    ClusterLogData,
+    LogClusterData,
+    LogData,
+    MergedLogData,
+    MergedLogsClusterData,
+)
 from app.commons.os_client import OsClient
 from app.utils import text_processing, utils
 
 LOGGER = logging.getLogger("analyzerApp.clusterService")
+
+LOGS_PATH = "logs"
+MERGED_LOGS_PATH = "merged_small_logs"
+CLUSTER_LOG_FIELDS = [
+    "whole_message",
+    "cluster_id",
+    "cluster_message",
+    "cluster_with_numbers",
+    "found_exceptions",
+    "potential_status_codes",
+    "log_level",
+]
 
 
 @dataclass
 class Log:
     test_item_id: str
     message: str
-    data: LogData
+    data: ClusterLogData
+    log_ids: list[str]
     launch_id: Optional[str] = None
+    merged: bool = False
+
+    @classmethod
+    def create(cls, test_item_id: str, message: str, data: ClusterLogData, launch_id: Optional[str] = None) -> "Log":
+        """Create a log entry for clustering from a single or a merged log entry.
+
+        :param test_item_id: Identifier of the Test Item the log entry belongs to
+        :param message: Message prepared for clustering
+        :param data: Single (`LogData`) or merged (`MergedLogData`) log entry
+        :param launch_id: Identifier of the Launch the log entry belongs to
+        :return: Log entry for clustering
+        """
+        if isinstance(data, MergedLogData):
+            return cls(test_item_id, message, data, list(data.log_ids), launch_id=launch_id, merged=True)
+        if isinstance(data, LogData):
+            return cls(test_item_id, message, data, [data.log_id], launch_id=launch_id)
+        raise ValueError(f"Unsupported log data type: {type(data).__name__}")
+
+
+def get_number_of_log_lines(log: Log, launch_info: LaunchInfoForClustering) -> int:
+    """Get the number of log lines to use in clustering: all lines for merged log entries."""
+    return -1 if log.merged else launch_info.numberOfLogLines
 
 
 def find_non_zero_id_non_empty_message(group: list[int], logs: dict[int, Log]) -> tuple[Optional[int], Optional[str]]:
@@ -73,8 +114,10 @@ def collect_log_and_item_ids(
             continue
         if logs[ind].launch_id != str(launch_info.launch.launchId):
             continue
-        new_group_log_ids.append(int(logs[ind].data.log_id))
-        new_group_test_items.append(int(logs[ind].test_item_id))
+        # Item IDs are repeated for each log ID to keep both lists aligned
+        for log_id in logs[ind].log_ids:
+            new_group_log_ids.append(int(log_id))
+            new_group_test_items.append(int(logs[ind].test_item_id))
     return new_group_log_ids, new_group_test_items
 
 
@@ -125,7 +168,7 @@ def calculate_hash(
             log_message = (
                 text_processing.prepare_message_for_clustering(
                     logs[ind].data.whole_message,
-                    launch_info.numberOfLogLines,
+                    get_number_of_log_lines(logs[ind], launch_info),
                     launch_info.cleanNumbers,
                     leave_log_structure=True,
                 )
@@ -169,22 +212,38 @@ def create_new_cluster(
     return None
 
 
+def _prepare_clustering_message(message: Optional[str], number_of_log_lines: int, clean_numbers: bool) -> str:
+    return (text_processing.prepare_message_for_clustering(message, number_of_log_lines, clean_numbers) or "").strip()
+
+
 def generate_clustering_messages(
     launch_info: LaunchInfoForClustering, prepared_items: list[TestItemIndexData]
 ) -> list[Log]:
-    """Generate messages which will be used for clustering, save their metadata."""
+    """Generate messages which will be used for clustering, save their metadata.
+
+    Small log entries of one log level of a Test Item are merged into one entry, see `log_merger.merge_small_logs`.
+    """
     logs: list[Log] = []
     for item in prepared_items:
-        item_logs: list[LogData] = item.logs or []
-        for log in item_logs:
-            log_message = text_processing.prepare_message_for_clustering(
-                log.message_for_clustering,
-                launch_info.numberOfLogLines,
-                launch_info.cleanNumbers,
+        big_logs, small_log_groups = log_merger.merge_small_logs(item.get_sorted_logs())
+        for log in big_logs:
+            log_message = _prepare_clustering_message(
+                log.message_for_clustering, launch_info.numberOfLogLines, launch_info.cleanNumbers
             )
-            if not log_message or not log_message.strip():
+            if log_message:
+                logs.append(Log.create(item.test_item_id, log_message, log))
+        for small_logs in small_log_groups:
+            small_logs = [
+                log
+                for log in small_logs
+                if _prepare_clustering_message(log.message_for_clustering, -1, launch_info.cleanNumbers)
+            ]
+            if not small_logs:
                 continue
-            logs.append(Log(test_item_id=item.test_item_id, message=log_message.strip(), data=log))
+            log_message = _prepare_clustering_message(
+                "\n".join(log.message_for_clustering or "" for log in small_logs), -1, launch_info.cleanNumbers
+            )
+            logs.append(Log.create(item.test_item_id, log_message, MergedLogData.from_logs(small_logs)))
     return logs
 
 
@@ -209,8 +268,9 @@ def gather_cluster_results(
     additional_clusters: dict[int, ClusterInfo],
     logs: list[Log],
     launch_info: LaunchInfoForClustering,
-) -> tuple[list[ClusterInfo], list[LogClusterData]]:
+) -> tuple[list[ClusterInfo], list[LogClusterData], list[MergedLogsClusterData]]:
     updates: list[LogClusterData] = []
+    merged_logs_by_item: dict[str, list[MergedLogData]] = defaultdict(list)
     clusters_found: dict[int, tuple[list[int], list[int]]] = {}
     cluster_message_by_id = {}
     for cluster_idx, cluster in initial_clusters.items():
@@ -224,18 +284,29 @@ def gather_cluster_results(
         log_ids: list[int] = []
         test_item_ids: list[int] = []
         for ind in cluster:
-            additional_log_id_str = logs[ind].data.log_id
-            log_ids.append(int(additional_log_id_str))
-            test_item_ids.append(int(logs[ind].test_item_id))
-            updates.append(
-                LogClusterData(
-                    log_id=additional_log_id_str,
-                    test_item_id=logs[ind].test_item_id,
-                    cluster_id=str(cluster_id),
-                    cluster_message=cluster_message,
-                    cluster_with_numbers=not launch_info.cleanNumbers,
+            log = logs[ind]
+            for log_id in log.log_ids:
+                log_ids.append(int(log_id))
+                test_item_ids.append(int(log.test_item_id))
+                updates.append(
+                    LogClusterData(
+                        log_id=log_id,
+                        test_item_id=log.test_item_id,
+                        cluster_id=str(cluster_id),
+                        cluster_message=cluster_message,
+                        cluster_with_numbers=not launch_info.cleanNumbers,
+                    )
                 )
-            )
+            if isinstance(log.data, MergedLogData):
+                merged_logs_by_item[log.test_item_id].append(
+                    log.data.model_copy(
+                        update={
+                            "cluster_id": str(cluster_id),
+                            "cluster_message": cluster_message,
+                            "cluster_with_numbers": not launch_info.cleanNumbers,
+                        }
+                    )
+                )
         if cluster_idx in additional_clusters:
             for additional_log_id, additional_item_id in zip(
                 additional_clusters[cluster_idx].logIds, additional_clusters[cluster_idx].itemIds
@@ -260,7 +331,11 @@ def gather_cluster_results(
             clusters_found[cluster_id] = (cluster_log_ids, cluster_test_items)
         cluster_message_by_id[cluster_id] = cluster_message
     results_to_return = compile_results(cluster_message_by_id, clusters_found)
-    return results_to_return, updates
+    merged_updates = [
+        MergedLogsClusterData(test_item_id=test_item_id, merged_small_logs=merged_logs)
+        for test_item_id, merged_logs in merged_logs_by_item.items()
+    ]
+    return results_to_return, updates, merged_updates
 
 
 class ClusterService:
@@ -313,12 +388,17 @@ class ClusterService:
         launch_info: LaunchInfoForClustering,
         min_should_match: str = "95%",
     ) -> dict[str, Any]:
-        """Build search query"""
+        """Build search query.
+
+        Merged log entries are searched among merged log entries only, and single log entries among single ones.
+        """
+        path = MERGED_LOGS_PATH if queried_log.merged else LOGS_PATH
+        log_id_field = "log_ids" if queried_log.merged else "log_id"
         nested_must = [
             utils.build_more_like_this_query(
                 min_should_match,
                 queried_log.message,
-                field_name="logs.whole_message",
+                field_name=f"{path}.whole_message",
                 boost=utils.BOOST_NEUTRAL,
                 max_query_terms=self.search_cfg.MaxQueryTerms,
             )
@@ -329,7 +409,7 @@ class ClusterService:
                 utils.build_more_like_this_query(
                     "1",
                     found_exceptions,
-                    field_name="logs.found_exceptions",
+                    field_name=f"{path}.found_exceptions",
                     boost=utils.BOOST_NEUTRAL,
                     override_min_should_match="1",
                     max_query_terms=self.search_cfg.MaxQueryTerms,
@@ -337,36 +417,31 @@ class ClusterService:
             )
         # Clustering requires the same codes in the same order, so the exact sequence is matched.
         status_codes_query = utils.build_status_codes_exact_query(
-            queried_log.data.potential_status_codes or "", field_name="logs.potential_status_codes"
+            queried_log.data.potential_status_codes or "", field_name=f"{path}.potential_status_codes"
         )
         if status_codes_query:
             nested_must.append(status_codes_query)
 
         nested_query = {
             "nested": {
-                "path": "logs",
+                "path": path,
                 "score_mode": "max",
                 "query": {
                     "bool": {
                         "filter": [
-                            {"range": {"logs.log_level": {"gte": launch_info.launch.analyzerConfig.minimumLogLevel}}},
-                            {"term": {"logs.cluster_with_numbers": not launch_info.cleanNumbers}},
+                            {
+                                "range": {
+                                    f"{path}.log_level": {"gte": launch_info.launch.analyzerConfig.minimumLogLevel}
+                                }
+                            },
+                            {"term": {f"{path}.cluster_with_numbers": not launch_info.cleanNumbers}},
                         ],
-                        "must": [{"wildcard": {"logs.cluster_message": "*"}}, *nested_must],
+                        "must": [{"wildcard": {f"{path}.cluster_message": "*"}}, *nested_must],
                     }
                 },
                 "inner_hits": {
                     "size": 5,
-                    "_source": [
-                        "logs.log_id",
-                        "logs.whole_message",
-                        "logs.cluster_id",
-                        "logs.cluster_message",
-                        "logs.cluster_with_numbers",
-                        "logs.found_exceptions",
-                        "logs.potential_status_codes",
-                        "logs.log_level",
-                    ],
+                    "_source": [f"{path}.{field}" for field in [log_id_field, *CLUSTER_LOG_FIELDS]],
                 },
             }
         }
@@ -399,27 +474,29 @@ class ClusterService:
             launch_info,
             min_should_match=text_processing.prepare_es_min_should_match(min_should_match),
         )
+        path = MERGED_LOGS_PATH if log.merged else LOGS_PATH
+        number_of_log_lines = get_number_of_log_lines(log, launch_info)
         ind = 0
         for hit in self.os_client.search(launch_info.project, query):
             inner_hits = hit.inner_hits
             if not inner_hits:
                 continue
-            inner_hits_logs = inner_hits.get("logs", {})
+            inner_hits_logs = inner_hits.get(path, {})
             if not inner_hits_logs:
                 continue
             for raw_inner_hit in inner_hits_logs.get("hits", {}).get("hits", []):
-                inner_hit = Hit[LogData].from_dict(raw_inner_hit)
-                number_of_log_lines = launch_info.numberOfLogLines
+                inner_log_data: ClusterLogData
+                if log.merged:
+                    inner_log_data = Hit[MergedLogData].from_dict(raw_inner_hit).source
+                else:
+                    inner_log_data = Hit[LogData].from_dict(raw_inner_hit).source
                 log_message = text_processing.prepare_message_for_clustering(
-                    inner_hit.source.whole_message, number_of_log_lines, launch_info.cleanNumbers
+                    inner_log_data.whole_message, number_of_log_lines, launch_info.cleanNumbers
                 )
                 if not log_message or not log_message.strip():
                     continue
-                inner_log = Log(
-                    test_item_id=hit.source.test_item_id,
-                    message=log_message,
-                    data=inner_hit.source,
-                    launch_id=hit.source.launch_id,
+                inner_log = Log.create(
+                    hit.source.test_item_id, log_message, inner_log_data, launch_id=hit.source.launch_id
                 )
                 cluster_message_original = inner_log.data.cluster_message.strip()
                 cluster_message_processed = text_processing.prepare_message_for_clustering(
@@ -507,10 +584,10 @@ class ClusterService:
                 for log_id in cluster.logIds:
                     unique_log_ids.add(str(log_id))
             for log in logs:
-                unique_log_ids.add(log.data.log_id)
+                unique_log_ids.update(log.log_ids)
 
             # Form final clusters (sent + additionally collected)
-            common_clusters, db_updates = gather_cluster_results(
+            common_clusters, db_updates, merged_db_updates = gather_cluster_results(
                 initial_clusters, additional_clusters, logs, launch_info
             )
 
@@ -524,6 +601,7 @@ class ClusterService:
                 self.os_client.bulk_update_cluster_info(
                     launch_info.project,
                     db_updates,
+                    merged_updates=merged_db_updates,
                     refresh=False,
                     chunk_size=self.app_config.esChunkNumberUpdateClusters,
                 )

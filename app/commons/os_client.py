@@ -29,7 +29,13 @@ from urllib3.exceptions import InsecureRequestWarning
 from app.commons import logging
 from app.commons.model.db import Hit
 from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, Response
-from app.commons.model.test_item_index import LogClusterData, LogData, TestItemHistoryData, TestItemIndexData
+from app.commons.model.test_item_index import (
+    LogClusterData,
+    LogData,
+    MergedLogsClusterData,
+    TestItemHistoryData,
+    TestItemIndexData,
+)
 from app.utils import text_processing, utils
 
 INDEX_SETTINGS_FILE = "index_settings.json"
@@ -47,6 +53,26 @@ def get_test_item_index_name(project_id: str | int, prefix: str) -> str:
     :return: Full index name
     """
     return f"{prefix}{project_id}"
+
+
+def build_script_update_body(
+    index_name: str, test_item_id: str, source: str, params: dict[str, Any]
+) -> dict[str, Any]:
+    """
+    Build a bulk operation body, which updates a Test Item document with a Painless script.
+
+    :param index_name: The index name
+    :param test_item_id: The Test Item document ID
+    :param source: The Painless script source
+    :param params: The script parameters
+    :return: Bulk operation body
+    """
+    return {
+        "_op_type": "update",
+        "_index": index_name,
+        "_id": test_item_id,
+        "script": {"source": source, "params": params},
+    }
 
 
 class OsClient:
@@ -618,18 +644,21 @@ class OsClient:
         self,
         project_id: str | int,
         updates: list[LogClusterData],
+        merged_updates: Optional[list[MergedLogsClusterData]] = None,
         refresh: bool = False,
         chunk_size: Optional[int] = None,
     ) -> BulkResponse:
-        """Bulk update cluster information for nested logs.
+        """Bulk update cluster information for nested logs and merged small log entries.
 
         :param project_id: The project identifier
-        :param updates: List of LogClusterData update payloads
+        :param updates: List of LogClusterData update payloads for nested logs
+        :param merged_updates: Optional list of MergedLogsClusterData payloads, which replace merged small log entries
+                               of Test Items, together with their cluster information
         :param refresh: Whether to refresh the index after update
         :param chunk_size: Optional chunk size for bulk operations
         :return: BulkResponse with update results
         """
-        if not updates:
+        if not updates and not merged_updates:
             return BulkResponse(took=0, errors=False)
 
         index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
@@ -648,18 +677,19 @@ class OsClient:
                 }
             }
         """
-        bodies: list[dict[str, Any]] = []
-        for update in updates:
+
+        bodies = [
+            build_script_update_body(index_name, update.test_item_id, script_source, update.to_update_params())
+            for update in updates
+        ]
+        for merged_update in merged_updates or []:
             bodies.append(
-                {
-                    "_op_type": "update",
-                    "_index": index_name,
-                    "_id": update.test_item_id,
-                    "script": {
-                        "source": script_source,
-                        "params": update.to_update_params(),
-                    },
-                }
+                build_script_update_body(
+                    index_name,
+                    merged_update.test_item_id,
+                    "ctx._source.merged_small_logs = params.merged_small_logs;",
+                    merged_update.to_update_params(),
+                )
             )
 
         return self._execute_bulk(bodies, refresh=refresh, chunk_size=chunk_size)
@@ -700,7 +730,7 @@ class OsClient:
         """
         my_query = {
             **query,
-            "_source": ["launch_id", "logs", "test_item_id", "log_count"],
+            "_source": ["launch_id", "logs", "test_item_id", "log_count", "merged_small_logs"],
             "size": self.app_config.esChunkNumber,
         }
         index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
@@ -711,11 +741,13 @@ class OsClient:
             source = hit.source
             logs = list(source.logs or [])
             remaining_logs: list[LogData] = []
+            removed_log_ids: set[str] = set()
             removed_from_item = 0
 
             for log in logs:
                 if predicate(log):
                     removed_from_item += 1
+                    removed_log_ids.add(log.log_id)
                 else:
                     remaining_logs.append(log)
 
@@ -726,15 +758,23 @@ class OsClient:
             if not remaining_logs:
                 bodies.append({"_op_type": "delete", "_index": index_name, "_id": source.test_item_id})
             else:
+                doc: dict[str, Any] = {
+                    "logs": [log.model_dump() for log in remaining_logs],
+                    "log_count": len(remaining_logs),
+                }
+                if source.merged_small_logs:
+                    # Merged entries which contain removed logs are not valid anymore
+                    doc["merged_small_logs"] = [
+                        merged_log.model_dump()
+                        for merged_log in source.merged_small_logs
+                        if removed_log_ids.isdisjoint(merged_log.log_ids)
+                    ]
                 bodies.append(
                     {
                         "_op_type": "update",
                         "_index": index_name,
                         "_id": source.test_item_id,
-                        "doc": {
-                            "logs": [log.model_dump() for log in remaining_logs],
-                            "log_count": len(remaining_logs),
-                        },
+                        "doc": doc,
                     }
                 )
 

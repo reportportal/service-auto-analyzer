@@ -12,13 +12,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from typing import Any
 from unittest import mock
 
 import pytest
 from opensearchpy import OpenSearch
 from opensearchpy.client import IndicesClient
 
-from app.commons.model.launch_objects import LaunchInfoForClustering
+from app.commons.model.launch_objects import Launch, LaunchInfoForClustering, Log, TestItem
 from app.commons.os_client import OsClient
 from app.service.cluster_service import ClusterService
 from app.utils.utils import read_json_file
@@ -437,3 +438,272 @@ def test_find_clusters_verifies_bulk_chunk_size(
     # Verify refresh parameter
     assert "refresh" in bulk_call[1], "bulk should be called with refresh parameter"
     assert bulk_call[1]["refresh"] is False, "refresh should be False for cluster updates (performance)"
+
+
+PROJECT_ID = 555
+LAUNCH_ID = 5001
+ERROR_LEVEL = 40000
+FATAL_LEVEL = 50000
+BIG_LOG_TEXT = (
+    "big error log Error The Group Services daemon is unable to run the deactivation script Standard fields indicate "
+    "that the Group Services daemon is unable to run the script Detailed fields give more information The "
+    "deactivation script might not exist or system resources are not sufficient to run the deactivation script"
+)
+NO_HITS = {"hits": {"total": {"value": 0, "relation": "eq"}, "max_score": None, "hits": []}}
+
+
+def build_test_item(test_item_id: int, logs: list[tuple[int, int, str]]) -> TestItem:
+    return TestItem(
+        testItemId=test_item_id,
+        isAutoAnalyzed=False,
+        uniqueId=f"unique-{test_item_id}",
+        testItemName=f"Test Item {test_item_id}",
+        logs=[Log(logId=log_id, logLevel=log_level, message=message) for log_id, log_level, message in logs],
+    )
+
+
+def build_launch_info(*test_items: TestItem) -> LaunchInfoForClustering:
+    return LaunchInfoForClustering(
+        launch=Launch(launchId=LAUNCH_ID, project=PROJECT_ID, launchName="Launch", testItems=list(test_items)),
+        project=PROJECT_ID,
+        numberOfLogLines=-1,
+    )
+
+
+def get_nested_query(search_call: Any) -> dict[str, Any]:
+    must_clause = search_call[1]["body"]["query"]["function_score"]["query"]["bool"]["must"]
+    return next(clause["nested"] for clause in must_clause if "nested" in clause)
+
+
+def get_bulk_bodies(mock_bulk: mock.Mock) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Split bulk bodies into nested log updates and merged small log updates."""
+    mock_bulk.assert_called_once()
+    bodies = mock_bulk.call_args[0][1]
+    merged_bodies = [body for body in bodies if "merged_small_logs" in body["script"]["params"]]
+    log_bodies = [body for body in bodies if "log_id" in body["script"]["params"]]
+    return log_bodies, merged_bodies
+
+
+# noinspection PyUnresolvedReferences
+@mock.patch("opensearchpy.helpers.bulk")
+def test_find_clusters_merges_small_logs_of_one_level(
+    mock_bulk, cluster_service: ClusterService, mocked_opensearch_client: OpenSearch
+) -> None:
+    """EPMRPP-122245: small logs of one level of a Test Item are united into one cluster."""
+    launch_info = build_launch_info(
+        build_test_item(
+            6001,
+            [
+                (7001, ERROR_LEVEL, "First small error log"),
+                (7002, ERROR_LEVEL, "Second small error log"),
+                (7003, ERROR_LEVEL, "Third small error log"),
+            ],
+        )
+    )
+    mocked_opensearch_client.search.return_value = NO_HITS
+    mock_bulk.return_value = (1, [])
+
+    result = cluster_service.find_clusters(launch_info)
+
+    assert len(result.clusters) == 1, "small logs of one level should give exactly 1 cluster"
+    cluster = result.clusters[0]
+    assert cluster.logIds == [7001, 7002, 7003]
+    assert cluster.itemIds == [6001]
+    assert cluster.clusterMessage == "First small error log\nSecond small error log\nThird small error log"
+
+    mocked_opensearch_client.search.assert_called_once()
+    nested_query = get_nested_query(mocked_opensearch_client.search.call_args)
+    assert nested_query["path"] == "merged_small_logs", "merged log should be searched among merged logs"
+    assert all(field.startswith("merged_small_logs.") for field in nested_query["inner_hits"]["_source"])
+
+    mock_bulk.assert_called_once()
+    log_bodies, merged_bodies = get_bulk_bodies(mock_bulk)
+    assert [body["script"]["params"]["log_id"] for body in log_bodies] == ["7001", "7002", "7003"]
+    assert all(body["script"]["params"]["cluster_id"] == str(cluster.clusterId) for body in log_bodies)
+    assert len(merged_bodies) == 1
+    assert merged_bodies[0]["_id"] == "6001"
+    merged_logs = merged_bodies[0]["script"]["params"]["merged_small_logs"]
+    assert len(merged_logs) == 1
+    assert merged_logs[0]["log_ids"] == ["7001", "7002", "7003"]
+    assert merged_logs[0]["log_level"] == ERROR_LEVEL
+    assert merged_logs[0]["cluster_id"] == str(cluster.clusterId)
+    assert merged_logs[0]["cluster_message"] == cluster.clusterMessage
+    assert merged_logs[0]["cluster_with_numbers"] is True
+
+
+# noinspection PyUnresolvedReferences
+@mock.patch("opensearchpy.helpers.bulk")
+def test_find_clusters_creates_cluster_per_level_for_small_logs(
+    mock_bulk, cluster_service: ClusterService, mocked_opensearch_client: OpenSearch
+) -> None:
+    """EPMRPP-74489: small logs of different levels in one Test Item give a cluster per level."""
+    launch_info = build_launch_info(
+        build_test_item(6001, [(7001, ERROR_LEVEL, "Small error log"), (7002, FATAL_LEVEL, "Small fatal log")])
+    )
+    mocked_opensearch_client.search.return_value = NO_HITS
+    mock_bulk.return_value = (1, [])
+
+    result = cluster_service.find_clusters(launch_info)
+
+    assert len(result.clusters) == 2, "small logs of two levels should give exactly 2 clusters"
+    assert sorted(cluster.logIds for cluster in result.clusters) == [[7001], [7002]]
+    assert mocked_opensearch_client.search.call_count == 2
+    _, merged_bodies = get_bulk_bodies(mock_bulk)
+    assert len(merged_bodies) == 1
+    merged_logs = merged_bodies[0]["script"]["params"]["merged_small_logs"]
+    assert [merged_log["log_level"] for merged_log in merged_logs] == [ERROR_LEVEL, FATAL_LEVEL]
+
+
+# noinspection PyUnresolvedReferences
+@mock.patch("opensearchpy.helpers.bulk")
+def test_find_clusters_drops_small_logs_of_level_with_big_log(
+    mock_bulk, cluster_service: ClusterService, mocked_opensearch_client: OpenSearch
+) -> None:
+    """EPMRPP-74485: a big log has priority over small logs of the same level."""
+    launch_info = build_launch_info(
+        build_test_item(6001, [(7001, ERROR_LEVEL, "First small error log"), (7002, ERROR_LEVEL, BIG_LOG_TEXT)])
+    )
+    mocked_opensearch_client.search.return_value = NO_HITS
+    mock_bulk.return_value = (1, [])
+
+    result = cluster_service.find_clusters(launch_info)
+
+    assert len(result.clusters) == 1, "only the big log should give a cluster"
+    assert result.clusters[0].logIds == [7002]
+    assert result.clusters[0].clusterMessage.startswith("big error log")
+    nested_query = get_nested_query(mocked_opensearch_client.search.call_args)
+    assert nested_query["path"] == "logs"
+    mock_bulk.assert_called_once()
+    log_bodies, merged_bodies = get_bulk_bodies(mock_bulk)
+    assert [body["script"]["params"]["log_id"] for body in log_bodies] == ["7002"]
+    assert merged_bodies == []
+
+
+# noinspection PyUnresolvedReferences
+@mock.patch("opensearchpy.helpers.bulk")
+def test_find_clusters_treats_similar_big_logs_of_one_item_as_one_log(
+    mock_bulk, cluster_service: ClusterService, mocked_opensearch_client: OpenSearch
+) -> None:
+    """Big logs of one Test Item at or above the similarity threshold are deduplicated into the last one."""
+    launch_info = build_launch_info(
+        build_test_item(
+            6001, [(7001, ERROR_LEVEL, f"First {BIG_LOG_TEXT}"), (7002, ERROR_LEVEL, f"Second {BIG_LOG_TEXT}")]
+        )
+    )
+    mocked_opensearch_client.search.return_value = NO_HITS
+    mock_bulk.return_value = (1, [])
+
+    result = cluster_service.find_clusters(launch_info)
+
+    assert len(result.clusters) == 1, "similar big logs should give exactly 1 cluster"
+    assert result.clusters[0].logIds == [7002]
+    assert result.clusters[0].clusterMessage.startswith("Second big error log")
+
+
+# noinspection PyUnresolvedReferences
+@mock.patch("opensearchpy.helpers.bulk")
+def test_find_clusters_keeps_different_big_logs_of_one_item_apart(
+    mock_bulk, cluster_service: ClusterService, mocked_opensearch_client: OpenSearch
+) -> None:
+    """Big logs of one Test Item below the similarity threshold give separate clusters."""
+    other_big_log_text = (
+        "Connection to the database server was refused because the maximum number of client connections was reached "
+        "and the connection pool could not allocate a new connection for the request within the configured timeout"
+    )
+    launch_info = build_launch_info(
+        build_test_item(6001, [(7001, ERROR_LEVEL, BIG_LOG_TEXT), (7002, ERROR_LEVEL, other_big_log_text)])
+    )
+    mocked_opensearch_client.search.return_value = NO_HITS
+    mock_bulk.return_value = (1, [])
+
+    result = cluster_service.find_clusters(launch_info)
+
+    assert len(result.clusters) == 2, "different big logs should give exactly 2 clusters"
+    assert sorted(cluster.logIds for cluster in result.clusters) == [[7001], [7002]]
+
+
+# noinspection PyUnresolvedReferences
+@mock.patch("opensearchpy.helpers.bulk")
+def test_find_clusters_groups_same_logs_of_different_items(
+    mock_bulk, cluster_service: ClusterService, mocked_opensearch_client: OpenSearch
+) -> None:
+    """The same big and small logs in different Test Items give one cluster with all these Test Items."""
+    launch_info = build_launch_info(
+        build_test_item(6001, [(7001, ERROR_LEVEL, BIG_LOG_TEXT)]),
+        build_test_item(6002, [(7002, ERROR_LEVEL, BIG_LOG_TEXT)]),
+        build_test_item(6003, [(7003, ERROR_LEVEL, "Small error log 1"), (7004, ERROR_LEVEL, "Small error log 2")]),
+        build_test_item(6004, [(7005, ERROR_LEVEL, "Small error log 1"), (7006, ERROR_LEVEL, "Small error log 2")]),
+    )
+    mocked_opensearch_client.search.return_value = NO_HITS
+    mock_bulk.return_value = (1, [])
+
+    result = cluster_service.find_clusters(launch_info)
+
+    assert len(result.clusters) == 2, "same logs should give exactly 1 cluster for big and 1 for merged small logs"
+    clusters = sorted(result.clusters, key=lambda cluster: cluster.logIds)
+    assert clusters[0].logIds == [7001, 7002]
+    assert sorted(clusters[0].itemIds) == [6001, 6002]
+    assert clusters[1].logIds == [7003, 7004, 7005, 7006]
+    assert sorted(clusters[1].itemIds) == [6003, 6004]
+
+
+# noinspection PyUnresolvedReferences
+@mock.patch("opensearchpy.helpers.bulk")
+def test_find_clusters_reuses_cluster_of_similar_merged_logs(
+    mock_bulk, cluster_service: ClusterService, mocked_opensearch_client: OpenSearch
+) -> None:
+    """A merged entry found among merged entries of previous launches gives its cluster ID and message."""
+    launch_info = build_launch_info(
+        build_test_item(
+            6001, [(7001, ERROR_LEVEL, "First small error log"), (7002, ERROR_LEVEL, "Second small error log")]
+        )
+    )
+    previous_cluster_message = "First small error log\nSecond small error log"
+    mocked_opensearch_client.search.return_value = {
+        "_scroll_id": "test_scroll_id",
+        "hits": {
+            "total": {"value": 1, "relation": "eq"},
+            "max_score": 9.5,
+            "hits": [
+                {
+                    "_id": "6100",
+                    "_index": f"{APP_CONFIG.esProjectIndexPrefix}{PROJECT_ID}",
+                    "_score": 9.5,
+                    "_source": {"launch_id": "5000", "test_item_id": "6100", "launch_name": "Launch"},
+                    "inner_hits": {
+                        "merged_small_logs": {
+                            "hits": {
+                                "hits": [
+                                    {
+                                        "_source": {
+                                            "log_ids": ["8001", "8002"],
+                                            "log_level": ERROR_LEVEL,
+                                            "whole_message": "First small error log\nSecond small error log",
+                                            "found_exceptions": "",
+                                            "potential_status_codes": "",
+                                            "cluster_id": "12345678901",
+                                            "cluster_message": previous_cluster_message,
+                                            "cluster_with_numbers": True,
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                }
+            ],
+        },
+    }
+    mocked_opensearch_client.scroll.return_value = NO_HITS
+    mock_bulk.return_value = (1, [])
+
+    result = cluster_service.find_clusters(launch_info)
+
+    assert len(result.clusters) == 1
+    cluster = result.clusters[0]
+    assert cluster.clusterId == 12345678901
+    assert cluster.clusterMessage == previous_cluster_message
+    assert cluster.logIds == [7001, 7002], "logs of previous launches should not be returned"
+    _, merged_bodies = get_bulk_bodies(mock_bulk)
+    assert len(merged_bodies) == 1
+    assert merged_bodies[0]["script"]["params"]["merged_small_logs"][0]["cluster_id"] == "12345678901"

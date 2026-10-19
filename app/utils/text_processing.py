@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import math
 import re
 import string
 import urllib.parse
@@ -37,6 +38,8 @@ logger = logging.getLogger("analyzerApp.utils.textProcessing")
 STOPWORDS = nltk.corpus.stopwords.words("english")
 STOPWORDS_ALL = set(STOPWORDS)
 LEMMATIZER = WordNetLemmatizer()
+LINE_LENGTH = 100
+MIN_LINE_LENGTH = 12
 FILE_EXTENSIONS = ["java", "php", "cpp", "cs", "c", "h", "js", "swift", "rb", "py", "scala"]
 
 
@@ -131,9 +134,32 @@ def delete_empty_lines(log: str) -> str:
     return "\n".join(filter_empty_lines(log.split("\n")))
 
 
-def calculate_line_number(text):
-    """Calculate line numbers in the text"""
-    return len([line for line in text.split("\n") if line.strip()])
+def calculate_line_number(text: str, max_line_length: int = 0, min_line_length: int = MIN_LINE_LENGTH) -> int:
+    """Calculate the number of non-empty lines in the text.
+
+    Lines are stripped before counting. A line shorter than `min_line_length` is joined with the next lines until the
+    joined line reaches `min_line_length`, so a sequence of short lines counts as one line.
+
+    :param text: The text to count lines in
+    :param max_line_length: If greater than zero, a line longer than this is counted as several lines, one per every
+                            `max_line_length` characters (or part of it)
+    :param min_line_length: The minimal length of a line, shorter lines are joined with the next ones
+    :return: The number of lines
+    """
+    line_number = 0
+    joined_length = 0
+    for line in text.split("\n"):
+        line_length = len(line.strip())
+        if not line_length:
+            continue
+        joined_length += line_length
+        if joined_length < min_line_length:
+            continue
+        line_number += math.ceil(joined_length / max_line_length) if max_line_length > 0 else 1
+        joined_length = 0
+    if joined_length:
+        line_number += 1
+    return line_number
 
 
 def is_python_log(log):
@@ -225,7 +251,7 @@ def is_line_from_stacktrace(text: str) -> bool:
 
 def detect_log_description_and_stacktrace(message: str) -> tuple[str, str]:
     """Split a log into a log message and stacktrace"""
-    if calculate_line_number(message) > 2:
+    if calculate_line_number(message, min_line_length=0) > 2:
         if is_python_log(message):
             return detect_log_parts_python(message)
         split_lines = message.split("\n")

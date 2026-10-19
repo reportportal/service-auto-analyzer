@@ -162,6 +162,44 @@
         }
       }
     },
+    "merged_small_logs": {
+      "type": "nested",
+      "properties": {
+        "log_ids": {
+          "type": "keyword"
+        },
+        "log_level": {
+          "type": "integer"
+        },
+        "cluster_id": {
+          "type": "keyword"
+        },
+        "cluster_message": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "cluster_with_numbers": {
+          "type": "boolean"
+        },
+        "potential_status_codes": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer",
+          "fields": {
+            "exact": {
+              "type": "keyword"
+            }
+          }
+        },
+        "found_exceptions": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        },
+        "whole_message": {
+          "type": "text",
+          "analyzer": "standard_english_analyzer"
+        }
+      }
+    },
     "issue_history": {
       "type": "nested",
       "properties": {

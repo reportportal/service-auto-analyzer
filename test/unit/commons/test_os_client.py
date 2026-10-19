@@ -3,7 +3,14 @@ from unittest import mock
 
 import pytest
 
-from app.commons.model.test_item_index import LogData, TestItemHistoryData, TestItemIndexData
+from app.commons.model.test_item_index import (
+    LogClusterData,
+    LogData,
+    MergedLogData,
+    MergedLogsClusterData,
+    TestItemHistoryData,
+    TestItemIndexData,
+)
 from app.commons.os_client import OsClient, get_test_item_index_name
 from test import APP_CONFIG, DEFAULT_ES_CONFIG
 
@@ -550,6 +557,104 @@ def test_delete_logs_by_ids_removes_logs(monkeypatch, os_client_mock, app_config
     assert body["_index"] == get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
     assert body["doc"]["log_count"] == 1
     assert body["doc"]["logs"][0]["log_id"] == "keep"
+
+
+def test_bulk_update_cluster_info_updates_logs_and_merged_small_logs(monkeypatch, os_client_mock, app_config):
+    os_client_mock.indices.get.return_value = {}
+    captured: dict[str, Any] = {}
+
+    # noinspection PyUnusedLocal
+    def fake_bulk(os_client: Any, request: list, chunk_size: int, request_timeout: int, refresh: bool):
+        captured["bodies"] = request
+        captured["chunk_size"] = chunk_size
+        return len(request), []
+
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.bulk", fake_bulk)
+
+    client = OsClient(app_config, os_client=os_client_mock)
+    log_update = LogClusterData(
+        log_id="1", test_item_id="ti-1", cluster_id="123", cluster_message="first\nsecond", cluster_with_numbers=True
+    )
+    merged_log = MergedLogData(
+        log_ids=["1", "2"],
+        log_level=40000,
+        whole_message="first\nsecond",
+        cluster_id="123",
+        cluster_message="first\nsecond",
+        cluster_with_numbers=True,
+    )
+    merged_update = MergedLogsClusterData(test_item_id="ti-1", merged_small_logs=[merged_log])
+
+    response = client.bulk_update_cluster_info(PROJECT_ID, [log_update], merged_updates=[merged_update], chunk_size=7)
+
+    assert response.errors is False
+    assert captured["chunk_size"] == 7
+    bodies: list = captured["bodies"]
+    assert len(bodies) == 2
+    index_name = get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
+    for body in bodies:
+        assert body["_op_type"] == "update"
+        assert body["_index"] == index_name
+        assert body["_id"] == "ti-1"
+    assert bodies[0]["script"]["params"] == log_update.to_update_params()
+    assert "ctx._source.merged_small_logs = params.merged_small_logs" in bodies[1]["script"]["source"]
+    assert bodies[1]["script"]["params"]["merged_small_logs"] == [merged_log.model_dump()]
+
+
+def test_bulk_update_cluster_info_skips_empty_updates(monkeypatch, os_client_mock, app_config):
+    bulk_mock = mock.Mock()
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.bulk", bulk_mock)
+
+    client = OsClient(app_config, os_client=os_client_mock)
+    response = client.bulk_update_cluster_info(PROJECT_ID, [], merged_updates=[])
+
+    assert response.errors is False
+    bulk_mock.assert_not_called()
+    os_client_mock.indices.get.assert_not_called()
+
+
+def test_delete_logs_by_ids_removes_merged_small_logs_with_removed_logs(
+    monkeypatch, os_client_mock, app_config, test_item
+):
+    os_client_mock.indices.get.return_value = {}
+    captured: dict[str, Any] = {}
+
+    # noinspection PyUnusedLocal
+    def fake_bulk(client: Any, bodies, chunk_size: int, request_timeout: int, refresh: bool):
+        captured["bodies"] = bodies
+        return len(bodies), []
+
+    base_log = test_item.logs[0]
+    item = test_item.model_copy(
+        update={
+            "logs": [
+                base_log.model_copy(update={"log_id": "remove_me", "log_order": 0}),
+                base_log.model_copy(update={"log_id": "keep", "log_order": 1}),
+                base_log.model_copy(update={"log_id": "keep_fatal", "log_order": 2, "log_level": 50000}),
+            ],
+            "merged_small_logs": [
+                MergedLogData(log_ids=["remove_me", "keep"], log_level=40000, whole_message="a\nb"),
+                MergedLogData(log_ids=["keep_fatal"], log_level=50000, whole_message="c"),
+            ],
+        }
+    )
+
+    # noinspection PyUnusedLocal
+    def fake_scan(client, query, index, **kwargs):
+        return iter([{"_index": index, "_id": item.test_item_id, "_source": item.to_index_dict()}])
+
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", fake_scan)
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.bulk", fake_bulk)
+
+    os_client = OsClient(app_config, os_client=os_client_mock)
+    removed = os_client.delete_logs_by_ids(PROJECT_ID, ["remove_me"])
+
+    assert removed == 1
+    bodies = captured["bodies"]
+    assert len(bodies) == 1
+    doc = bodies[0]["doc"]
+    assert [log["log_id"] for log in doc["logs"]] == ["keep", "keep_fatal"]
+    assert [merged["log_ids"] for merged in doc["merged_small_logs"]] == [["keep_fatal"]]
 
 
 def test_delete_by_log_time_range_deletes_empty_items(monkeypatch, os_client_mock, app_config):

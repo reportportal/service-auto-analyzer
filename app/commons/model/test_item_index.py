@@ -18,7 +18,19 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 
-class LogData(BaseModel):
+class ClusterLogData(BaseModel):
+    """Common fields of a log entry, which are used in log clustering."""
+
+    log_level: int = Field(description="Log level (e.g., 40000 for ERROR)")
+    cluster_id: str = Field(default="", description="Cluster identifier if clustered")
+    cluster_message: str = Field(default="", description="Cluster representative message")
+    cluster_with_numbers: bool = Field(default=False, description="Whether cluster includes numbers")
+    potential_status_codes: Optional[str] = Field(default=None, description="Detected status/error codes")
+    found_exceptions: Optional[str] = Field(default=None, description="Exception type names found")
+    whole_message: Optional[str] = Field(default=None, description="Combined exception message and stacktrace")
+
+
+class LogData(ClusterLogData):
     """
     Nested log entry data for Test Item-centric OpenSearch indexing.
 
@@ -29,16 +41,14 @@ class LogData(BaseModel):
     log_id: str = Field(description="Unique identifier for the log entry")
     log_order: Optional[int] = Field(default=None, description="Position of log within Test Item (0-based)")
     log_time: Optional[str] = Field(default=None, description="Timestamp of the log entry")
-    log_level: int = Field(description="Log level (e.g., 40000 for ERROR)")
-    cluster_id: str = Field(default="", description="Cluster identifier if clustered")
-    cluster_message: str = Field(default="", description="Cluster representative message")
-    cluster_with_numbers: bool = Field(default=False, description="Whether cluster includes numbers")
     original_message: Optional[str] = Field(default=None, description="Raw log message for display")
     message: Optional[str] = Field(default=None, description="Cleaned message (garbage removed)")
     message_for_clustering: Optional[str] = Field(
         default=None, description="Cleaned message for clustering (less removed text)"
     )
-    message_lines: Optional[int] = Field(default=None, description="Number of lines in message")
+    message_lines: Optional[int] = Field(
+        default=None, description="Number of lines in message, long lines are counted in 100 characters chunks"
+    )
     message_words_number: Optional[int] = Field(default=None, description="Word count in message")
     message_extended: Optional[str] = Field(default=None, description="Message with enriched class/method names")
     message_without_params_extended: Optional[str] = Field(
@@ -59,15 +69,39 @@ class LogData(BaseModel):
     stacktrace: Optional[str] = Field(default=None, description="Stack trace portion")
     stacktrace_extended: Optional[str] = Field(default=None, description="Enriched stack trace")
     only_numbers: Optional[str] = Field(default=None, description="Extracted numeric values")
-    potential_status_codes: Optional[str] = Field(default=None, description="Detected status/error codes")
-    found_exceptions: Optional[str] = Field(default=None, description="Exception type names found")
     # TODO: the following field is barely used, subject to remove
     found_exceptions_extended: Optional[str] = Field(default=None, description="Enriched exception names")
     found_tests_and_methods: Optional[str] = Field(default=None, description="Test method references")
     urls: Optional[str] = Field(default=None, description="URLs found in message")
     paths: Optional[str] = Field(default=None, description="File paths found in message")
     message_params: Optional[str] = Field(default=None, description="Extracted parameters")
-    whole_message: Optional[str] = Field(default=None, description="Combined exception message and stacktrace")
+
+
+class MergedLogData(ClusterLogData):
+    """
+    Small log entries of one log level of a Test Item, merged into one entry.
+
+    Used in log clustering only, to put a Test Item with only small log messages into one cluster instead of a
+    cluster per log message.
+    """
+
+    log_ids: list[str] = Field(description="Identifiers of merged log entries, in the order of logs")
+
+    @classmethod
+    def from_logs(cls, logs: list[LogData]) -> "MergedLogData":
+        """
+        Merge given log entries into one entry.
+
+        :param logs: Log entries of one log level to merge, in the order of logs
+        :return: Merged log entry
+        """
+        return cls(
+            log_ids=[log.log_id for log in logs],
+            log_level=logs[0].log_level,
+            whole_message="\n".join((log.whole_message or "").strip() for log in logs),
+            found_exceptions=" ".join(filter(None, (log.found_exceptions for log in logs))),
+            potential_status_codes=" ".join(filter(None, (log.potential_status_codes for log in logs))),
+        )
 
 
 def _get_log_sort_key(log: LogData) -> int:
@@ -100,6 +134,21 @@ class LogClusterData(BaseModel):
             "cluster_message": self.cluster_message,
             "cluster_with_numbers": self.cluster_with_numbers,
         }
+
+
+class MergedLogsClusterData(BaseModel):
+    """Payload for replacing merged small log entries of a Test Item."""
+
+    test_item_id: str = Field(description="Identifier of the Test Item document to update")
+    merged_small_logs: list[MergedLogData] = Field(description="Merged small log entries with cluster data")
+
+    def to_update_params(self) -> dict[str, Any]:
+        """
+        Convert the update data into OpenSearch script parameters.
+
+        :return: Dictionary of painless script params
+        """
+        return {"merged_small_logs": [log.model_dump() for log in self.merged_small_logs]}
 
 
 class TestItemHistoryData(BaseModel):
@@ -149,6 +198,9 @@ class TestItemIndexData(BaseModel):
     start_time: Optional[str] = Field(default=None, description="When the test item started")
     log_count: Optional[int] = Field(default=None, description="Number of logs in this Test Item")
     logs: Optional[list[LogData]] = Field(default=None, description="Nested log entries")
+    merged_small_logs: Optional[list[MergedLogData]] = Field(
+        default=None, description="Nested small log entries merged by log level, used in clustering"
+    )
     issue_history: Optional[list[TestItemHistoryData]] = Field(default=None, description="Nested issue type history")
 
     def get_sorted_logs(self) -> list[LogData]:

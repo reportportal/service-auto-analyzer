@@ -124,7 +124,7 @@ def _prepare_log_data(log: Log, log_order: int, number_of_lines: int) -> LogData
         original_message=log.message,
         message=text_fields["message"],
         message_for_clustering=text_fields["message_for_clustering"],
-        message_lines=text_processing.calculate_line_number(prepared_log.clean_message),
+        message_lines=text_processing.calculate_line_number(prepared_log.clean_message, text_processing.LINE_LENGTH),
         message_words_number=len(text_processing.split_words(prepared_log.clean_message, split_urls=False)),
         message_extended=text_fields["message_extended"],
         message_without_params_extended=text_fields["message_without_params_extended"],

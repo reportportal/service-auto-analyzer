@@ -46,6 +46,37 @@ def test_filter_empty_lines():
     assert text_processing.filter_empty_lines(log) == expected
 
 
+@pytest.mark.parametrize(
+    "text, max_line_length, min_line_length, expected_lines",
+    [
+        ("", 0, 0, 0),
+        ("one line", 0, 0, 1),
+        ("first\n\n  \nsecond", 0, 0, 2),
+        ("a" * 300, 0, 0, 1),
+        ("one line", 100, 0, 1),
+        ("first\n\n  \nsecond", 100, 0, 2),
+        ("a" * 100, 100, 0, 1),
+        ("a" * 101, 100, 0, 2),
+        ("a" * 300, 100, 0, 3),
+        ("a" * 150 + "\n" + "b" * 10, 100, 0, 3),
+        ("\n1\n2\n3", 100, 0, 3),
+        ("\n1\n2\n3", 100, 12, 1),
+        ("first\n\n  \nsecond", 100, 12, 1),
+        ("first line\nsecond line\nthird line", 100, 12, 2),
+        ("first line of error\nsecond line of error", 100, 12, 2),
+        ("Error:\n" + "a" * 100, 100, 12, 2),
+        ("a" * 150 + "\n" + "b" * 10, 100, 12, 3),
+        ("short\n" * 30, 100, 12, 10),
+    ],
+)
+def test_calculate_line_number(text, max_line_length, min_line_length, expected_lines):
+    assert text_processing.calculate_line_number(text, max_line_length, min_line_length) == expected_lines
+
+
+def test_calculate_line_number_default_min_line_length():
+    assert text_processing.calculate_line_number("\n1\n2\n3", text_processing.LINE_LENGTH) == 1
+
+
 def test_remove_starting_datetime():
     log = read_file_lines("test_res/test_logs", "log_line_timestamps.txt")
     expected_log = read_file_lines("test_res/test_logs", "log_line_no_timestamp.txt")

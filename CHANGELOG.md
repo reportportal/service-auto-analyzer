@@ -1,7 +1,5 @@
 # Changelog
 ## [Unreleased]
-
-## [6.0.0]
 ### Added
 - `ANALYZER_QUERY_TERMS_BUDGET` config parameter to limit the number of message terms in one Test Item query, by @HardNorth
 ### Changed
@@ -10,6 +8,12 @@
 - Auto-analysis, suggestions and model training search for similar Test Items by all their logs in one query, by @HardNorth
 - Gradient Boosting featurization and prediction are Test Item-centric now, by @HardNorth
 - New Gradient Boosting feature set, independent of search engine specifics, by @HardNorth
+- `nltk` updated to `3.10.3` to address vulnerabilities, by @HardNorth
+
+## [5.15.6]
+### Fixed
+- `Boto3Client.get_folder_objects` now returns items exactly on the same depth as requested folder (not recursive), by @HardNorth
+### Changed
 - `nltk` updated to `3.10.3` to address vulnerabilities, by @HardNorth
 
 ## [5.15.5]

@@ -142,6 +142,30 @@ def test_list_existing_folder():
     assert file_system.get_folder_objects(bucket, path) == [path]
 
 
+def test_list_folder_not_recursive():
+    """Listing a folder should return only its direct children, not objects of nested folders."""
+    bucket = "10"
+    path = "suggestion_model/"
+    model_folder = f"{path}suggestion_model_2026-07-01"
+    base_path = f"test_{random_alphanumeric(16)}"
+    CREATED_FILES_AND_FOLDERS.append(os.path.join(base_path, f"prj-{bucket}", model_folder, "boost_model.pickle"))
+    CREATED_FILES_AND_FOLDERS.append(
+        os.path.join(base_path, f"prj-{bucket}", model_folder, "data_features_config.pickle")
+    )
+    CREATED_FILES_AND_FOLDERS.append(os.path.join(base_path, f"prj-{bucket}", model_folder))
+    CREATED_FILES_AND_FOLDERS.append(os.path.join(base_path, f"prj-{bucket}", path))
+    CREATED_FILES_AND_FOLDERS.append(os.path.join(base_path, f"prj-{bucket}"))
+    CREATED_FILES_AND_FOLDERS.append(base_path)
+
+    file_system = create_storage_client(base_path)
+    file_system.put_project_object({"test": True}, bucket, f"{model_folder}/boost_model.pickle", using_json=True)
+    file_system.put_project_object(
+        {"test": True}, bucket, f"{model_folder}/data_features_config.pickle", using_json=True
+    )
+
+    assert file_system.get_folder_objects(bucket, path) == [model_folder]
+
+
 def test_list_dir_separators():
     bucket = "7"
     object_name = f"{random_alphanumeric(16)}.json"

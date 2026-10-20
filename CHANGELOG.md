@@ -1,4 +1,5 @@
 # Changelog
+
 ## [Unreleased]
 ### Added
 - `ANALYZER_QUERY_TERMS_BUDGET` config parameter to limit the number of message terms in one Test Item query, by @HardNorth

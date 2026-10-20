@@ -28,11 +28,20 @@ def is_small_log(log: LogData) -> bool:
     return log.message_lines is not None and log.message_lines <= SMALL_LOG_MAX_LINES
 
 
+def _get_chronological_sort_key(log: LogData) -> tuple[str, int]:
+    try:
+        log_id = int(log.log_id)
+    except (TypeError, ValueError):
+        log_id = 0
+    return log.log_time or "", log_id
+
+
 def merge_small_logs(logs: list[LogData]) -> tuple[list[LogData], list[list[LogData]]]:
     """Split log entries of a Test Item into big ones and groups of small ones to merge.
 
     Small log entries are grouped by log level. If there is at least one big log entry of the same log level, small
-    log entries of this level are dropped, since the big one is in priority.
+    log entries of this level are dropped, since the big one is in priority. Small log entries of a group are sorted in
+    chronological order: by log time, then by log ID, since ReportPortal does not guarantee any order of logs.
 
     :param logs: Log entries of a Test Item, in the order of logs
     :return: Big log entries, in the order of logs, and groups of small log entries per log level, in the order of
@@ -47,5 +56,9 @@ def merge_small_logs(logs: list[LogData]) -> tuple[list[LogData], list[list[LogD
         else:
             big_logs.append(log)
             big_log_levels.add(log.log_level)
-    small_log_groups = [group for level, group in small_logs_by_level.items() if level not in big_log_levels]
+    small_log_groups = [
+        sorted(group, key=_get_chronological_sort_key)
+        for level, group in small_logs_by_level.items()
+        if level not in big_log_levels
+    ]
     return big_logs, small_log_groups

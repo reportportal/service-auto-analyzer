@@ -89,6 +89,62 @@ def test_merge_small_logs_keeps_all_big_logs():
     assert small_log_groups == []
 
 
+def test_merge_small_logs_sorts_group_in_chronological_order():
+    logs = [
+        build_log("616", log_time="2026-10-20 09:29:22"),
+        build_log("617", message_lines=7, log_level=FATAL, log_time="2026-10-20 09:29:22"),
+        build_log("615", log_time="2026-10-20 09:29:22"),
+        build_log("614", log_time="2026-10-20 09:29:22"),
+        build_log("620", log_time="2026-10-20 09:29:21"),
+    ]
+
+    big_logs, small_log_groups = log_merger.merge_small_logs(logs)
+
+    assert get_ids(big_logs) == ["617"]
+    assert [get_ids(group) for group in small_log_groups] == [["620", "614", "615", "616"]]
+
+
+@pytest.mark.parametrize(
+    "log_times, expected_ids",
+    [
+        (
+            ["2026-10-20 09:29:22.000003", "2026-10-20 09:29:22.000002", "2026-10-20 09:29:22.000001"],
+            ["3", "2", "1"],
+        ),
+        (
+            ["2026-10-20 09:29:22.000001", "2026-10-20 09:29:21.999999", "2026-10-20 09:29:22.100000"],
+            ["2", "1", "3"],
+        ),
+        (
+            ["2026-10-20 09:29:22.123456", "2026-10-20 09:29:22.5", "2026-10-20 09:29:22"],
+            ["3", "1", "2"],
+        ),
+        (
+            ["2026-10-20 09:29:22.000001", "2026-10-20 09:29:22.000001", "2026-10-20 09:29:22.000001"],
+            ["1", "2", "3"],
+        ),
+        (
+            ["2026-10-20 09:29:22.000001", None, "2026-10-20 09:29:22"],
+            ["2", "3", "1"],
+        ),
+    ],
+    ids=[
+        "microseconds_reverse_to_ids",
+        "microseconds_across_seconds",
+        "mixed_precision",
+        "equal_microseconds_by_id",
+        "missing_time_first",
+    ],
+)
+def test_merge_small_logs_sorts_group_by_microseconds(log_times, expected_ids):
+    logs = [build_log(str(i), log_time=log_time) for i, log_time in enumerate(log_times, start=1)]
+
+    big_logs, small_log_groups = log_merger.merge_small_logs(logs)
+
+    assert big_logs == []
+    assert [get_ids(group) for group in small_log_groups] == [expected_ids]
+
+
 @pytest.mark.parametrize(
     "message, expected_small",
     [

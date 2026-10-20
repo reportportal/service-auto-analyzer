@@ -152,6 +152,58 @@ def test_log_clause_contains_exceptions_and_status_codes():
     assert nested_should[2]["match_phrase"]["logs.potential_status_codes"]["query"] == "400 401"
 
 
+def test_analysis_log_clause_filters_by_status_codes():
+    request_item = build_request_item([build_log("1", "status error", potential_status_codes="400 401")])
+
+    nested_bool = get_log_clauses(build_query(request_item))[0]["nested"]["query"]["bool"]
+
+    assert nested_bool["filter"] == [
+        {"term": {"logs.potential_status_codes.exact": {"value": "400 401", "boost": 1.0}}}
+    ]
+
+
+@pytest.mark.parametrize("potential_status_codes", [None, "", "  "])
+def test_analysis_log_clause_without_status_codes_filters_logs_with_codes(potential_status_codes):
+    """A cut log, which lost its status codes line, must not match the full log with the codes."""
+    request_item = build_request_item([build_log("1", "status error", potential_status_codes=potential_status_codes)])
+
+    nested_bool = get_log_clauses(build_query(request_item))[0]["nested"]["query"]["bool"]
+
+    assert "should" not in nested_bool
+    assert nested_bool["filter"] == [
+        {"bool": {"must_not": [{"wildcard": {"logs.potential_status_codes.exact": {"value": "?*"}}}]}}
+    ]
+
+
+def test_every_analysis_log_clause_filters_by_its_own_status_codes():
+    request_item = build_request_item(
+        [build_log("1", "first error", potential_status_codes="409 404"), build_log("2", "second error")]
+    )
+
+    filters = [clause["nested"]["query"]["bool"]["filter"] for clause in get_log_clauses(build_query(request_item))]
+
+    assert filters == [
+        [{"term": {"logs.potential_status_codes.exact": {"value": "409 404", "boost": 1.0}}}],
+        [{"bool": {"must_not": [{"wildcard": {"logs.potential_status_codes.exact": {"value": "?*"}}}]}}],
+    ]
+
+
+@pytest.mark.parametrize("potential_status_codes", [None, "409 404"])
+def test_suggest_log_clause_does_not_filter_by_status_codes(potential_status_codes):
+    """Suggestions show similar failures with different status codes as well, the codes only rank them."""
+    request_item = build_request_item([build_log("1", "status error", potential_status_codes=potential_status_codes)])
+
+    query = SuggestQueryBuilder(DEFAULT_SEARCH_CONFIG).build(
+        request_item,
+        number_of_log_lines=-1,
+        min_should_match="80%",
+        min_logs_to_match="1",
+        filter_no_defect=True,
+    )
+
+    assert "filter" not in get_log_clauses(query)[0]["nested"]["query"]["bool"]
+
+
 @pytest.mark.parametrize(
     "logs_number, budget, expected_terms, expected_logs_number",
     [

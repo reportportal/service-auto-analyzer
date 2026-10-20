@@ -229,6 +229,8 @@ class ItemQueryBuilder(metaclass=ABCMeta):
     """Base builder of queries which search for Test Items similar to the request one by all its logs."""
 
     search_cfg: SearchConfig
+    filter_by_status_codes: bool = False
+    """Whether found logs must have exactly the same status codes as the request log, not only be boosted by them."""
 
     def __init__(self, search_cfg: SearchConfig) -> None:
         self.search_cfg = search_cfg
@@ -303,6 +305,14 @@ class ItemQueryBuilder(metaclass=ABCMeta):
             )
         )
         nested_bool: dict[str, Any] = {"must": nested_must}
+        if self.filter_by_status_codes:
+            # Logs with different status codes are different failures, however similar their texts are. A found Test
+            # Item which has no logs left after this filter does not match the clause.
+            nested_bool["filter"] = [
+                utils.build_status_codes_filter(
+                    log.potential_status_codes or "", field_name=POTENTIAL_STATUS_CODES_FIELD
+                )
+            ]
         if nested_should:
             nested_bool["should"] = nested_should
         return {
@@ -405,6 +415,8 @@ class ItemQueryBuilder(metaclass=ABCMeta):
 
 class AutoAnalysisQueryBuilder(ItemQueryBuilder):
     """Query builder for Auto-analysis and Auto-analysis model training."""
+
+    filter_by_status_codes = True
 
     def choose_message_field(self, number_of_log_lines: int) -> str:
         return "detected_message_without_params_extended" if number_of_log_lines == -1 else "message"

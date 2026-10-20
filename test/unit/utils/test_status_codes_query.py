@@ -16,6 +16,8 @@ import pytest
 
 from app.utils import utils
 
+NO_CODES_FILTER = {"bool": {"must_not": [{"wildcard": {"potential_status_codes.exact": {"value": "?*"}}}]}}
+
 
 @pytest.mark.parametrize("status_codes", ["", "   ", "\n"])
 def test_no_clauses_without_codes(status_codes):
@@ -54,3 +56,19 @@ def test_queries_use_no_term_overlap_matching():
     clauses = utils.build_status_codes_queries("400 401")
 
     assert not any("more_like_this" in clause or "terms" in clause for clause in clauses)
+
+
+def test_filter_matches_the_exact_sequence():
+    status_filter = utils.build_status_codes_filter(" 400 401 ", field_name="logs.potential_status_codes")
+
+    assert status_filter == {"term": {"logs.potential_status_codes.exact": {"value": "400 401", "boost": 1.0}}}
+
+
+@pytest.mark.parametrize("status_codes", ["", "   ", "\n"])
+def test_filter_without_codes_leaves_only_logs_without_codes(status_codes):
+    assert utils.build_status_codes_filter(status_codes) == NO_CODES_FILTER
+
+
+def test_filter_keeps_the_order_and_repeats_of_the_codes():
+    assert utils.build_status_codes_filter("400 401") != utils.build_status_codes_filter("401 400")
+    assert utils.build_status_codes_filter("400 400") != utils.build_status_codes_filter("400")

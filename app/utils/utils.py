@@ -273,6 +273,23 @@ def build_status_codes_queries(
     return [exact, {"match_phrase": {field_name: {"query": codes, "boost": contained_boost}}}]
 
 
+def build_status_codes_filter(status_codes: str, field_name: str = "potential_status_codes") -> dict[str, Any]:
+    """Build a filter clause which leaves only logs with exactly the same status code sequence.
+
+    The sequence is compared as a whole, see `build_status_codes_exact_query`. A log without codes matches only logs
+    without codes, so a cut log which lost its "expected 409, but was 404" line does not match the full one.
+
+    :param status_codes: Status codes as stored in the field, whitespace separated
+    :param field_name: Field holding the codes; its `.exact` sub-field is matched
+    :return: A term query on the `.exact` sub-field, or a query for logs with no codes when there are no codes
+    """
+    exact = build_status_codes_exact_query(status_codes, field_name=field_name)
+    if exact:
+        return exact
+    # Logs without codes may store an empty string as well as no value at all, "?*" matches only non-empty values.
+    return {"bool": {"must_not": [{"wildcard": {f"{field_name}.exact": {"value": "?*"}}}]}}
+
+
 def extract_clustering_setting(cluster_id):
     if not cluster_id or int(cluster_id) == 0:
         return False

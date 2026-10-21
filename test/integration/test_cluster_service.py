@@ -707,3 +707,83 @@ def test_find_clusters_reuses_cluster_of_similar_merged_logs(
     _, merged_bodies = get_bulk_bodies(mock_bulk)
     assert len(merged_bodies) == 1
     assert merged_bodies[0]["script"]["params"]["merged_small_logs"][0]["cluster_id"] == "12345678901"
+
+
+BIG_LOG_WITH_NUMBERS = (
+    "java.lang.AssertionError: Test 42 has failed with status 7 after 3500 ms\n"
+    "\tat com.epam.ta.Foo.bar(Foo.java:123)\n"
+    "\tat com.epam.ta.Foo.baz(Foo.java:456)"
+)
+
+
+# noinspection PyUnresolvedReferences
+@pytest.mark.parametrize(
+    "clean_numbers, expected_message, expected_stored_message",
+    [
+        (
+            False,
+            "java lang AssertionError Test 42 has failed with status 7 after 3500 ms\n"
+            "\tat com.epam.ta.Foo.bar\n\tat com.epam.ta.Foo.baz",
+            "java lang AssertionError Test 42 has failed with status 7 after 3500 ms\n"
+            "\tat com.epam.ta.Foo.bar\n\tat com.epam.ta.Foo.baz",
+        ),
+        (
+            True,
+            "java lang AssertionError Test [EXCLUDED NUMBER] has failed with status [EXCLUDED NUMBER] after "
+            "[EXCLUDED NUMBER] ms\n\tat com.epam.ta.Foo.bar\n\tat com.epam.ta.Foo.baz",
+            "java lang AssertionError Test SPECIALNUMBER has failed with status SPECIALNUMBER after SPECIALNUMBER ms\n"
+            "\tat com.epam.ta.Foo.bar\n\tat com.epam.ta.Foo.baz",
+        ),
+    ],
+)
+@mock.patch("opensearchpy.helpers.bulk")
+def test_find_clusters_respects_clean_numbers_in_cluster_message(
+    mock_bulk,
+    cluster_service: ClusterService,
+    mocked_opensearch_client: OpenSearch,
+    clean_numbers: bool,
+    expected_message: str,
+    expected_stored_message: str,
+) -> None:
+    """EPMRPP-122273: numbers are left in the cluster message or removed according to the `cleanNumbers` option."""
+    launch_info = build_launch_info(build_test_item(6001, [(7001, ERROR_LEVEL, BIG_LOG_WITH_NUMBERS)]))
+    launch_info.cleanNumbers = clean_numbers
+    mocked_opensearch_client.search.return_value = NO_HITS
+    mock_bulk.return_value = (1, [])
+
+    result = cluster_service.find_clusters(launch_info)
+
+    assert len(result.clusters) == 1
+    assert result.clusters[0].clusterMessage == expected_message
+    assert result.clusters[0].logIds == [7001]
+    log_bodies, merged_bodies = get_bulk_bodies(mock_bulk)
+    assert len(merged_bodies) == 0
+    assert len(log_bodies) == 1
+    assert log_bodies[0]["script"]["params"]["cluster_message"] == expected_stored_message
+    assert log_bodies[0]["script"]["params"]["cluster_with_numbers"] is not clean_numbers
+
+
+# noinspection PyUnresolvedReferences
+@mock.patch("opensearchpy.helpers.bulk")
+def test_find_clusters_keeps_numbers_in_merged_logs_cluster_message(
+    mock_bulk, cluster_service: ClusterService, mocked_opensearch_client: OpenSearch
+) -> None:
+    """EPMRPP-122273: numbers of merged small logs are left in the cluster message if `cleanNumbers` is not set."""
+    launch_info = build_launch_info(
+        build_test_item(
+            6001, [(7001, ERROR_LEVEL, "Order 42 was not found"), (7002, ERROR_LEVEL, "Expected 3 items but was 5")]
+        )
+    )
+    mocked_opensearch_client.search.return_value = NO_HITS
+    mock_bulk.return_value = (1, [])
+
+    result = cluster_service.find_clusters(launch_info)
+
+    expected_message = "Order 42 was not found\nExpected 3 items but was 5"
+    assert len(result.clusters) == 1
+    assert result.clusters[0].clusterMessage == expected_message
+    assert result.clusters[0].logIds == [7001, 7002]
+    log_bodies, merged_bodies = get_bulk_bodies(mock_bulk)
+    assert [body["script"]["params"]["cluster_message"] for body in log_bodies] == [expected_message] * 2
+    assert len(merged_bodies) == 1
+    assert merged_bodies[0]["script"]["params"]["merged_small_logs"][0]["cluster_message"] == expected_message

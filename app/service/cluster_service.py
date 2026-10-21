@@ -41,6 +41,7 @@ from app.commons.model.test_item_index import (
     MergedLogsClusterData,
 )
 from app.commons.os_client import OsClient
+from app.commons.prepared_log import PreparedLogMessageClustering
 from app.utils import text_processing, utils
 
 LOGGER = logging.getLogger("analyzerApp.clusterService")
@@ -66,21 +67,41 @@ class Log:
     log_ids: list[str]
     launch_id: Optional[str] = None
     merged: bool = False
+    # Source of the cluster message, numbers are kept here and removed later according to `cleanNumbers`
+    whole_message: str = ""
 
     @classmethod
-    def create(cls, test_item_id: str, message: str, data: ClusterLogData, launch_id: Optional[str] = None) -> "Log":
+    def create(
+        cls,
+        test_item_id: str,
+        message: str,
+        data: ClusterLogData,
+        launch_id: Optional[str] = None,
+        whole_message: Optional[str] = None,
+    ) -> "Log":
         """Create a log entry for clustering from a single or a merged log entry.
 
         :param test_item_id: Identifier of the Test Item the log entry belongs to
         :param message: Message prepared for clustering
         :param data: Single (`LogData`) or merged (`MergedLogData`) log entry
         :param launch_id: Identifier of the Launch the log entry belongs to
+        :param whole_message: Source of the cluster message, `data.whole_message` is used if not specified
         :return: Log entry for clustering
         """
+        if whole_message is None:
+            whole_message = data.whole_message or ""
         if isinstance(data, MergedLogData):
-            return cls(test_item_id, message, data, list(data.log_ids), launch_id=launch_id, merged=True)
+            return cls(
+                test_item_id,
+                message,
+                data,
+                list(data.log_ids),
+                launch_id=launch_id,
+                merged=True,
+                whole_message=whole_message,
+            )
         if isinstance(data, LogData):
-            return cls(test_item_id, message, data, [data.log_id], launch_id=launch_id)
+            return cls(test_item_id, message, data, [data.log_id], launch_id=launch_id, whole_message=whole_message)
         raise ValueError(f"Unsupported log data type: {type(data).__name__}")
 
 
@@ -167,7 +188,7 @@ def calculate_hash(
         if not log_message:
             log_message = (
                 text_processing.prepare_message_for_clustering(
-                    logs[ind].data.whole_message,
+                    logs[ind].whole_message,
                     get_number_of_log_lines(logs[ind], launch_info),
                     launch_info.cleanNumbers,
                     leave_log_structure=True,
@@ -216,6 +237,21 @@ def _prepare_clustering_message(message: Optional[str], number_of_log_lines: int
     return (text_processing.prepare_message_for_clustering(message, number_of_log_lines, clean_numbers) or "").strip()
 
 
+def _prepare_whole_message_for_clustering(original_message: Optional[str]) -> str:
+    """Prepare combined exception message and stacktrace, which is used as a source of the cluster message.
+
+    Unlike the indexed `whole_message` field, numbers are kept in the exception message, so they can be removed or
+    left in the cluster message according to the `cleanNumbers` option of the request.
+
+    :param original_message: Raw log message
+    :return: Combined exception message and stacktrace
+    """
+    if not original_message:
+        return ""
+    prepared_log = PreparedLogMessageClustering(original_message, -1)
+    return "\n".join([prepared_log.exception_message_no_params, prepared_log.stacktrace])
+
+
 def generate_clustering_messages(
     launch_info: LaunchInfoForClustering, prepared_items: list[TestItemIndexData]
 ) -> list[Log]:
@@ -231,7 +267,8 @@ def generate_clustering_messages(
                 log.message_for_clustering, launch_info.numberOfLogLines, launch_info.cleanNumbers
             )
             if log_message:
-                logs.append(Log.create(item.test_item_id, log_message, log))
+                whole_message = _prepare_whole_message_for_clustering(log.original_message)
+                logs.append(Log.create(item.test_item_id, log_message, log, whole_message=whole_message))
         for small_logs in small_log_groups:
             small_logs = [
                 log
@@ -243,7 +280,14 @@ def generate_clustering_messages(
             log_message = _prepare_clustering_message(
                 "\n".join(log.message_for_clustering or "" for log in small_logs), -1, launch_info.cleanNumbers
             )
-            logs.append(Log.create(item.test_item_id, log_message, MergedLogData.from_logs(small_logs)))
+            whole_message = "\n".join(
+                _prepare_whole_message_for_clustering(log.original_message).strip() for log in small_logs
+            )
+            logs.append(
+                Log.create(
+                    item.test_item_id, log_message, MergedLogData.from_logs(small_logs), whole_message=whole_message
+                )
+            )
     return logs
 
 

@@ -33,13 +33,20 @@ from app.commons.model.test_item_index import TestItemIndexData
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.os_client import OsClient
-from app.commons.query_builder import AutoAnalysisQueryBuilder
+from app.commons.query_builder import DEFAULT_ITEM_QUERY_SIZE, AutoAnalysisQueryBuilder
 from app.commons.similarity_filter import SimilarityFilter, choose_message_fields
 from app.ml.predictor import AutoAnalysisPredictor, PredictionResult
 from app.service.analyzer_service import AnalyzerService
 from app.utils import utils
+from app.utils.utils import normalize_issue_type
 
 LOGGER = logging.getLogger("analyzerApp.autoAnalyzerService")
+
+NO_DEFECT_BASE_ISSUE_TYPE = "nd"
+# "No Defect" Test Items are found along with the regular candidates and take their places in search results
+ANALYSIS_QUERY_SIZE = DEFAULT_ITEM_QUERY_SIZE * 3 // 2
+
+SearchResults = tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]
 
 
 def choose_fields_to_filter_strict(number_of_log_lines: int, min_similarity: float) -> list[str]:
@@ -88,6 +95,35 @@ def choose_best_prediction(prediction_results: list[PredictionResult]) -> Option
     if not positive_predictions:
         return None
     return max(positive_predictions, key=lambda result: (result.probability[1], -result.original_position))
+
+
+def is_no_defect(hit: Hit[TestItemIndexData]) -> bool:
+    return normalize_issue_type(hit.source.issue_type).startswith(NO_DEFECT_BASE_ISSUE_TYPE)
+
+
+def split_no_defect_candidates(search_results: SearchResults) -> tuple[SearchResults, Optional[SearchResults]]:
+    """Split found Test Items into regular candidates and a "No Defect" candidate.
+
+    Regular candidates never contain "No Defect" Test Items, the same way as the train data of the model. A request
+    Test Item has a "No Defect" candidate only if the latest similar run of the same test case is "No Defect".
+
+    :param search_results: Request Test Item and similar Test Items of any issue type except "To Investigate"
+    :return: Request Test Item with regular candidates, and with the latest run of the same test case if it is a
+             "No Defect" one, otherwise None
+    """
+    request_item, hits = search_results
+    regular_results = (request_item, [hit for hit in hits if not is_no_defect(hit)])
+    if not request_item.test_case_hash:
+        return regular_results, None
+    same_test_case_hits = [hit for hit in hits if hit.source.test_case_hash == request_item.test_case_hash]
+    if not same_test_case_hits:
+        return regular_results, None
+    # Start time is stored in "%Y-%m-%d %H:%M:%S" format, so string order is chronological. On ties `max` keeps the
+    # first, i.e. the best scored, Test Item.
+    latest = max(same_test_case_hits, key=lambda hit: hit.source.start_time or "")
+    if not is_no_defect(latest):
+        return regular_results, None
+    return regular_results, (request_item, [latest])
 
 
 def log_query_results(start_time: float | int, all_candidates: list[AnalysisCandidate]):
@@ -147,7 +183,8 @@ class AutoAnalyzerService(AnalyzerService):
             number_of_log_lines=launch.analyzerConfig.numberOfLogLines,
             min_should_match=self._get_min_should_match_setting(launch),
             min_logs_to_match="100%" if launch.analyzerConfig.allMessagesShouldMatch else "1",
-            filter_no_defect=True,
+            filter_no_defect=False,
+            size=ANALYSIS_QUERY_SIZE,
         )
         if not query:
             return {}
@@ -286,6 +323,7 @@ class AutoAnalyzerService(AnalyzerService):
             mean_processing_time = (time() - item_start) / max(len(request_items), 1)
 
             for search_results in results_per_test_item:
+                regular_results, no_defect_results = split_no_defect_candidates(search_results)
                 all_candidates.append(
                     AnalysisCandidate(
                         analyzerConfig=launch.analyzerConfig,
@@ -295,8 +333,8 @@ class AutoAnalyzerService(AnalyzerService):
                         launchName=launch.launchName,
                         launchNumber=launch.launchNumber,
                         timeProcessed=mean_processing_time,
-                        candidates=search_results,
-                        candidatesWithNoDefect=[],
+                        candidates=regular_results,
+                        candidatesWithNoDefect=no_defect_results,
                     )
                 )
                 processed_items += 1
@@ -369,19 +407,28 @@ class AutoAnalyzerService(AnalyzerService):
                             chosen_namespaces[project_id] = self.namespace_finder.get_chosen_namespaces(project_id)
                         boosting_config["chosen_namespaces"] = chosen_namespaces[project_id]
 
-                        prediction_results = predictor.predict(analyzer_candidate.candidates)
-                        if not prediction_results:
-                            LOGGER.debug(f"There are no results for test item {analyzer_candidate.testItemId}")
-                            results_to_share[launch_id]["not_found"] += 1
-                            results_to_share[launch_id]["processed_time"] += time() - t_start_item
-                            continue
+                        # The "No Defect" candidate goes first: it exists only if the latest similar run of the same
+                        # test case is "No Defect", while regular candidates never contain such Test Items
+                        candidates_to_check: list[SearchResults] = []
+                        if analyzer_candidate.candidatesWithNoDefect:
+                            candidates_to_check.append(analyzer_candidate.candidatesWithNoDefect)
+                        candidates_to_check.append(analyzer_candidate.candidates)
 
-                        model_info_tags = prediction_results[0].model_info_tags
-                        new_model_info_tags = set(results_to_share[launch_id]["model_info"])
-                        new_model_info_tags.update(model_info_tags)
-                        results_to_share[launch_id]["model_info"] = list(new_model_info_tags)
+                        best = None
+                        for candidates in candidates_to_check:
+                            prediction_results = predictor.predict(candidates)
+                            if not prediction_results:
+                                continue
 
-                        best = choose_best_prediction(prediction_results)
+                            model_info_tags = prediction_results[0].model_info_tags
+                            new_model_info_tags = set(results_to_share[launch_id]["model_info"])
+                            new_model_info_tags.update(model_info_tags)
+                            results_to_share[launch_id]["model_info"] = list(new_model_info_tags)
+
+                            best = choose_best_prediction(prediction_results)
+                            if best is not None:
+                                break
+
                         if best is None:
                             LOGGER.debug(f"Test item {analyzer_candidate.testItemId} has no positive predictions")
                             results_to_share[launch_id]["not_found"] += 1

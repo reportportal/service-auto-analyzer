@@ -338,6 +338,7 @@ class BulkResponse(BaseModel):
 
     took: int
     errors: bool
+    failed_ids: list[str] = []
     items: list[str] = []
     logResults: list[LogExceptionResult] = []
     status: int = 0

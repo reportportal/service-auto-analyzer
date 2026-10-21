@@ -305,6 +305,7 @@ class OsClient:
                     chunk_size=es_chunk_number,
                     request_timeout=30,
                     refresh=refresh,
+                    raise_on_error=False,
                 )
             except TransportError:
                 formatted_exception = traceback.format_exc()
@@ -316,17 +317,17 @@ class OsClient:
                     chunk_size=es_chunk_number,
                     request_timeout=30,
                     refresh=refresh,
+                    raise_on_error=False,
                 )
 
-            error_str = ""
+            # Each error is a single-key dict: {"<op_type>": {"_id": ..., "status": ..., "error": ...}}
+            failed_ids = [str(next(iter(error.values())).get("_id")) for error in errors]
             if errors:
                 error_str = ", ".join([str(error) for error in errors])
-            LOGGER.debug(
-                f"{success_count} documents were successfully indexed"
-                f"{'. Errors: ' + error_str if error_str else ''}"
-            )
+                LOGGER.error(f"{len(errors)} of {len(bodies)} bulk operations failed: {error_str}")
+            LOGGER.debug(f"{success_count} documents were successfully indexed")
             LOGGER.debug("Finished indexing for %.2f s", time() - start_time)
-            return BulkResponse(took=success_count, errors=len(errors) > 0)
+            return BulkResponse(took=success_count, errors=len(errors) > 0, failed_ids=failed_ids)
         except Exception as exc:
             LOGGER.exception("Error in bulk indexing", exc_info=exc)
             return BulkResponse(took=0, errors=True)
@@ -427,12 +428,30 @@ class OsClient:
             if not batch_ids:
                 continue
             try:
-                result = self._os_client.delete_by_query(index=index_name, body=query_builder(batch_ids))
-                if "deleted" in result:
-                    deleted += result["deleted"]
+                result = self._execute_delete_by_query(index_name, query_builder(batch_ids))
+                deleted += result.get("deleted", 0)
+                if result.get("version_conflicts", 0):
+                    # Conflicting documents were changed while being deleted and are kept, the second pass removes
+                    # them from the fresh index state
+                    LOGGER.warning(
+                        f"{result['version_conflicts']} documents changed during deletion from '{index_name}', retrying"
+                    )
+                    result = self._execute_delete_by_query(index_name, query_builder(batch_ids))
+                    deleted += result.get("deleted", 0)
             except Exception as err:
                 LOGGER.exception("Error in delete_by_query", exc_info=err)
         return deleted
+
+    def _execute_delete_by_query(self, index_name: str, body: dict[str, Any]) -> dict[str, Any]:
+        """Delete documents by query and make the deletion visible to searches immediately.
+
+        Requests, which follow a deletion, such as analysis after the index cleanup, must not find deleted documents.
+
+        :param index_name: Target index name
+        :param body: Deletion query
+        :return: OpenSearch response
+        """
+        return self._os_client.delete_by_query(index=index_name, body=body, refresh=True, conflicts="proceed")
 
     def delete_test_items(self, project_id: str | int, test_item_ids: list[str]) -> int:
         """Delete Test Items by their IDs.
@@ -514,7 +533,7 @@ class OsClient:
 
         query = self._time_range_query("launch_start_time", start_date, end_date)
         try:
-            result = self._os_client.delete_by_query(index=index_name, body=query)
+            result = self._execute_delete_by_query(index_name, query)
             return result.get("deleted", 0)
         except Exception as err:
             LOGGER.exception("Error in delete_by_launch_start_time_range", exc_info=err)

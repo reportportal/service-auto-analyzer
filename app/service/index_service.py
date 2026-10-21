@@ -129,7 +129,8 @@ class IndexService:
             if isinstance(raw_value, ItemUpdate):
                 issue_type = raw_value.issueType
                 issue_comment = raw_value.issueComment
-                timestamp = format_timestamp(datetime(*raw_value.timestamp))
+                # The last element is Java nanoseconds, which do not fit into Python microseconds
+                timestamp = format_timestamp(datetime(*raw_value.timestamp[:6]))
             else:
                 issue_type = raw_value
                 timestamp = current_timestamp()
@@ -183,10 +184,16 @@ class IndexService:
                     )
                 )
 
+        failed_test_items: set[str] = set()
         if history_updates:
-            self.os_client.bulk_update_issue_history(project_id, history_updates)
+            response = self.os_client.bulk_update_issue_history(project_id, history_updates)
+            # Documents can disappear between the search and the update, e.g. if a cleanup request came in between,
+            # ReportPortal re-indexes such Test Items when they are reported as not updated
+            failed_test_items.update(response.failed_ids)
         update_train(self.app_config, int(project_id), defect_num)
-        items_not_updated = [int(test_item_id) for test_item_id in set(test_item_ids) - set(found_test_items)]
+        items_not_updated = [
+            int(test_item_id) for test_item_id in (set(test_item_ids) - found_test_items) | failed_test_items
+        ]
         LOGGER.debug("Not updated test items: %s", items_not_updated)
         LOGGER.info("Finished updating defect types. It took %.2f sec", time() - t_start)
         return items_not_updated

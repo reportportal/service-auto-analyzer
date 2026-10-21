@@ -125,3 +125,37 @@ def test_defect_update_updates_issue_history_and_docs() -> None:
     assert second_entry.is_auto_analyzed is False
 
     assert set(not_updated) == {9999}
+
+
+def test_defect_update_reports_items_which_disappeared_before_update() -> None:
+    os_client = mock.Mock()
+    os_client.get_test_items_by_ids.return_value = [_make_index_item("1001"), _make_index_item("1002")]
+    os_client.bulk_update_issue_history.return_value = BulkResponse(took=1, errors=True, failed_ids=["1002"])
+
+    service = IndexService(APP_CONFIG, os_client=os_client)
+
+    defect_update_info = {"project": 123, "itemsToUpdate": {"1001": "ab001", "1002": "ab001", "9999": "ab001"}}
+    not_updated = service.defect_update(DefectUpdate(**defect_update_info))
+
+    os_client.bulk_update_issue_history.assert_called_once()
+    assert sorted(not_updated) == [1002, 9999]
+
+
+def test_defect_update_accepts_timestamp_with_nanoseconds() -> None:
+    os_client = mock.Mock()
+    os_client.get_test_items_by_ids.return_value = [_make_index_item("1001")]
+    os_client.bulk_update_issue_history.return_value = BulkResponse(took=1, errors=False)
+
+    service = IndexService(APP_CONFIG, os_client=os_client)
+
+    defect_update_info = {
+        "project": 123,
+        "itemsToUpdate": {"1001": {"issueType": "AB001", "timestamp": [2026, 10, 18, 17, 59, 2, 797000000]}},
+    }
+    not_updated = service.defect_update(DefectUpdate(**defect_update_info))
+
+    history_updates: list[TestItemHistoryData] = os_client.bulk_update_issue_history.call_args[0][1]
+    assert len(history_updates) == 1
+    assert history_updates[0].timestamp == "2026-10-18 17:59:02"
+    assert history_updates[0].issue_type == "ab001"
+    assert not_updated == []

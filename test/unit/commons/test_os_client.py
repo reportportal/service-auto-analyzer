@@ -90,7 +90,9 @@ def test_bulk_index_creates_index_and_calls_bulk(monkeypatch, os_client_mock, ap
     monkeypatch.setattr("app.commons.os_client.utils.read_resource_file", lambda *args, **kwargs: {})
 
     # noinspection PyUnusedLocal
-    def fake_bulk(self: Any, request: list, chunk_size: int, request_timeout: int, refresh: bool):
+    def fake_bulk(
+        self: Any, request: list, chunk_size: int, request_timeout: int, refresh: bool, raise_on_error: bool
+    ):
         captured["client"] = self
         captured["bodies"] = request
         captured["chunk_size"] = chunk_size
@@ -146,7 +148,9 @@ def test_bulk_update_issue_history_success(monkeypatch, os_client_mock, app_conf
     captured: dict[str, Any] = {}
 
     # noinspection PyUnusedLocal
-    def fake_bulk(os_client: Any, request: list, chunk_size: int, request_timeout: int, refresh: bool):
+    def fake_bulk(
+        os_client: Any, request: list, chunk_size: int, request_timeout: int, refresh: bool, raise_on_error: bool
+    ):
         captured["client"] = os_client
         captured["bodies"] = request
         captured["chunk_size"] = chunk_size
@@ -183,6 +187,34 @@ def test_bulk_update_issue_history_success(monkeypatch, os_client_mock, app_conf
     assert body["script"]["params"]["entry"]["issue_comment"] == "comment"
 
 
+def test_bulk_update_issue_history_reports_missing_documents(monkeypatch, os_client_mock, app_config):
+    os_client_mock.indices.get.return_value = {}
+    missing_error = {
+        "update": {
+            "_index": PROJECT_ID,
+            "_id": "ti-2",
+            "status": 404,
+            "error": {"type": "document_missing_exception", "reason": "[ti-2]: document missing"},
+        }
+    }
+    bulk_mock = mock.Mock(return_value=(1, [missing_error]))
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.bulk", bulk_mock)
+
+    client = OsClient(app_config, os_client=os_client_mock)
+    updates = [
+        TestItemHistoryData(test_item_id=item_id, is_auto_analyzed=True, issue_type="pb001", timestamp="2025-01-02")
+        for item_id in ["ti-1", "ti-2"]
+    ]
+
+    response = client.bulk_update_issue_history(PROJECT_ID, updates)
+
+    bulk_mock.assert_called_once()
+    assert bulk_mock.call_args.kwargs["raise_on_error"] is False
+    assert response.errors is True
+    assert response.took == 1
+    assert response.failed_ids == ["ti-2"]
+
+
 def test_search_returns_empty_when_index_missing(os_client_mock, app_config):
     os_client_mock.indices.get.side_effect = Exception("missing index")
     client = OsClient(app_config, os_client=os_client_mock)
@@ -216,6 +248,8 @@ def test_delete_test_items_builds_terms_query(os_client_mock, app_config):
     os_client_mock.delete_by_query.assert_called_once_with(
         index=get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix),
         body={"query": {"terms": {"test_item_id": ["t1", "t2"]}}},
+        refresh=True,
+        conflicts="proceed",
     )
     assert deleted == 2
 
@@ -230,8 +264,30 @@ def test_delete_by_launch_start_time_range_builds_range_query(os_client_mock, ap
     os_client_mock.delete_by_query.assert_called_once_with(
         index=get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix),
         body={"query": {"range": {"launch_start_time": {"gte": "2025-01-01", "lte": "2025-01-02"}}}},
+        refresh=True,
+        conflicts="proceed",
     )
     assert deleted == 3
+
+
+def test_delete_test_items_retries_on_version_conflicts(os_client_mock, app_config):
+    os_client_mock.indices.get.return_value = {}
+    os_client_mock.delete_by_query.side_effect = [
+        {"deleted": 1, "version_conflicts": 1},
+        {"deleted": 1, "version_conflicts": 0},
+    ]
+    client = OsClient(app_config, os_client=os_client_mock)
+
+    deleted = client.delete_test_items(PROJECT_ID, ["t1", "t2"])
+
+    expected_call = mock.call(
+        index=get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix),
+        body={"query": {"terms": {"test_item_id": ["t1", "t2"]}}},
+        refresh=True,
+        conflicts="proceed",
+    )
+    assert os_client_mock.delete_by_query.call_args_list == [expected_call, expected_call]
+    assert deleted == 2
 
 
 def test_delete_by_launch_ids_builds_terms_query(os_client_mock, app_config):
@@ -244,6 +300,8 @@ def test_delete_by_launch_ids_builds_terms_query(os_client_mock, app_config):
     os_client_mock.delete_by_query.assert_called_once_with(
         index=get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix),
         body={"query": {"terms": {"launch_id": ["l1", "l2"]}}},
+        refresh=True,
+        conflicts="proceed",
     )
     assert deleted == 2
 
@@ -482,7 +540,7 @@ def test_delete_logs_by_ids_removes_logs(monkeypatch, os_client_mock, app_config
     captured: dict[str, Any] = {}
 
     # noinspection PyUnusedLocal
-    def fake_bulk(client: Any, bodies, chunk_size: int, request_timeout: int, refresh: bool):
+    def fake_bulk(client: Any, bodies, chunk_size: int, request_timeout: int, refresh: bool, raise_on_error: bool):
         captured["client"] = client
         captured["bodies"] = bodies
         captured["chunk_size"] = chunk_size
@@ -564,7 +622,9 @@ def test_bulk_update_cluster_info_updates_logs_and_merged_small_logs(monkeypatch
     captured: dict[str, Any] = {}
 
     # noinspection PyUnusedLocal
-    def fake_bulk(os_client: Any, request: list, chunk_size: int, request_timeout: int, refresh: bool):
+    def fake_bulk(
+        os_client: Any, request: list, chunk_size: int, request_timeout: int, refresh: bool, raise_on_error: bool
+    ):
         captured["bodies"] = request
         captured["chunk_size"] = chunk_size
         return len(request), []
@@ -620,7 +680,7 @@ def test_delete_logs_by_ids_removes_merged_small_logs_with_removed_logs(
     captured: dict[str, Any] = {}
 
     # noinspection PyUnusedLocal
-    def fake_bulk(client: Any, bodies, chunk_size: int, request_timeout: int, refresh: bool):
+    def fake_bulk(client: Any, bodies, chunk_size: int, request_timeout: int, refresh: bool, raise_on_error: bool):
         captured["bodies"] = bodies
         return len(bodies), []
 
@@ -662,7 +722,7 @@ def test_delete_by_log_time_range_deletes_empty_items(monkeypatch, os_client_moc
     captured: dict[str, Any] = {}
 
     # noinspection PyUnusedLocal
-    def fake_bulk(client: Any, bodies, chunk_size: int, request_timeout: int, refresh: bool):
+    def fake_bulk(client: Any, bodies, chunk_size: int, request_timeout: int, refresh: bool, raise_on_error: bool):
         captured["client"] = client
         captured["bodies"] = bodies
         captured["chunk_size"] = chunk_size

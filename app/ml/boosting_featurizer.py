@@ -204,8 +204,11 @@ class BoostingFeaturizer:
 
     def _get_features(self) -> dict[int, Feature]:
         if self._features is None:
-            self._features = self._create_features()
-        return self._features
+            result = self._create_features()
+            self._features = result
+        else:
+            result = self._features
+        return result
 
     def _get_identity(self, hit: Hit[TestItemIndexData]) -> str:
         """Get the identity a found Test Item represents in the output.

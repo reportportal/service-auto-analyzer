@@ -105,9 +105,49 @@ class Log:
         raise ValueError(f"Unsupported log data type: {type(data).__name__}")
 
 
-def get_number_of_log_lines(log: Log, launch_info: LaunchInfoForClustering) -> int:
+def get_number_of_log_lines(merged: bool, launch_info: LaunchInfoForClustering) -> int:
     """Get the number of log lines to use in clustering: all lines for merged log entries."""
-    return -1 if log.merged else launch_info.numberOfLogLines
+    return -1 if merged else launch_info.numberOfLogLines
+
+
+def _prepare_clustering_message(
+    message: Optional[str], launch_info: LaunchInfoForClustering, merged: bool, leave_log_structure: bool = False
+) -> str:
+    """Prepare a message for clustering according to the clustering options of the request.
+
+    :param message: Message to prepare
+    :param launch_info: Clustering request, which defines the number of log lines and the number cleaning
+    :param merged: Whether the message belongs to a merged log entry, all lines are taken for such entries
+    :param leave_log_structure: Leave the message readable (for cluster messages) instead of splitting it into words
+    :return: Prepared message, or an empty string if nothing is left
+    """
+    return (
+        text_processing.prepare_message_for_clustering(
+            message,
+            get_number_of_log_lines(merged, launch_info),
+            launch_info.cleanNumbers,
+            leave_log_structure=leave_log_structure,
+        )
+        or ""
+    ).strip()
+
+
+def _is_cluster_message_compatible(cluster_message: str, launch_info: LaunchInfoForClustering, merged: bool) -> bool:
+    """Check that a stored cluster message is the one which current clustering options would produce.
+
+    E.G. a cluster message with numbers can't be reused if numbers should be cleaned.
+
+    :param cluster_message: Stored cluster message
+    :param launch_info: Clustering request
+    :param merged: Whether the cluster message belongs to a merged log entry
+    :return: True if the cluster message is empty or can be reused as is
+    """
+    cluster_message = cluster_message.strip()
+    if not cluster_message:
+        return True
+    return (
+        _prepare_clustering_message(cluster_message, launch_info, merged, leave_log_structure=True) == cluster_message
+    )
 
 
 def find_non_zero_id_non_empty_message(group: list[int], logs: dict[int, Log]) -> tuple[Optional[int], Optional[str]]:
@@ -186,15 +226,9 @@ def calculate_hash(
         ind = group_ids[i]
         group_logs.append(logs[ind].message)
         if not log_message:
-            log_message = (
-                text_processing.prepare_message_for_clustering(
-                    logs[ind].whole_message,
-                    get_number_of_log_lines(logs[ind], launch_info),
-                    launch_info.cleanNumbers,
-                    leave_log_structure=True,
-                )
-                or ""
-            ).strip()
+            log_message = _prepare_clustering_message(
+                logs[ind].whole_message, launch_info, logs[ind].merged, leave_log_structure=True
+            )
     _cnt_vectorizer = CountVectorizer(binary=True, analyzer="word", token_pattern="[^ ]+", ngram_range=(2, 2))
     group_res = _cnt_vectorizer.fit_transform(group_logs).astype(np.int8)
     res_bitwise = np.bitwise_and.reduce(group_res.toarray(), axis=0)
@@ -233,10 +267,6 @@ def create_new_cluster(
     return None
 
 
-def _prepare_clustering_message(message: Optional[str], number_of_log_lines: int, clean_numbers: bool) -> str:
-    return (text_processing.prepare_message_for_clustering(message, number_of_log_lines, clean_numbers) or "").strip()
-
-
 def _prepare_whole_message_for_clustering(original_message: Optional[str]) -> str:
     """Prepare combined exception message and stacktrace, which is used as a source of the cluster message.
 
@@ -263,9 +293,7 @@ def generate_clustering_messages(
     for item in prepared_items:
         big_logs, small_log_groups = log_merger.merge_small_logs(item.get_sorted_logs())
         for log in big_logs:
-            log_message = _prepare_clustering_message(
-                log.message_for_clustering, launch_info.numberOfLogLines, launch_info.cleanNumbers
-            )
+            log_message = _prepare_clustering_message(log.message_for_clustering, launch_info, merged=False)
             if log_message:
                 whole_message = _prepare_whole_message_for_clustering(log.original_message)
                 logs.append(Log.create(item.test_item_id, log_message, log, whole_message=whole_message))
@@ -273,12 +301,12 @@ def generate_clustering_messages(
             small_logs = [
                 log
                 for log in small_logs
-                if _prepare_clustering_message(log.message_for_clustering, -1, launch_info.cleanNumbers)
+                if _prepare_clustering_message(log.message_for_clustering, launch_info, merged=True)
             ]
             if not small_logs:
                 continue
             log_message = _prepare_clustering_message(
-                "\n".join(log.message_for_clustering or "" for log in small_logs), -1, launch_info.cleanNumbers
+                "\n".join(log.message_for_clustering or "" for log in small_logs), launch_info, merged=True
             )
             whole_message = "\n".join(
                 _prepare_whole_message_for_clustering(log.original_message).strip() for log in small_logs
@@ -519,7 +547,6 @@ class ClusterService:
             min_should_match=text_processing.prepare_es_min_should_match(min_should_match),
         )
         path = MERGED_LOGS_PATH if log.merged else LOGS_PATH
-        number_of_log_lines = get_number_of_log_lines(log, launch_info)
         ind = 0
         for hit in self.os_client.search(launch_info.project, query):
             inner_hits = hit.inner_hits
@@ -534,23 +561,14 @@ class ClusterService:
                     inner_log_data = Hit[MergedLogData].from_dict(raw_inner_hit).source
                 else:
                     inner_log_data = Hit[LogData].from_dict(raw_inner_hit).source
-                log_message = text_processing.prepare_message_for_clustering(
-                    inner_log_data.whole_message, number_of_log_lines, launch_info.cleanNumbers
-                )
-                if not log_message or not log_message.strip():
+                log_message = _prepare_clustering_message(inner_log_data.whole_message, launch_info, log.merged)
+                if not log_message:
+                    continue
+                if not _is_cluster_message_compatible(inner_log_data.cluster_message, launch_info, log.merged):
                     continue
                 inner_log = Log.create(
                     hit.source.test_item_id, log_message, inner_log_data, launch_id=hit.source.launch_id
                 )
-                cluster_message_original = inner_log.data.cluster_message.strip()
-                cluster_message_processed = text_processing.prepare_message_for_clustering(
-                    cluster_message_original,
-                    number_of_log_lines,
-                    launch_info.cleanNumbers,
-                    leave_log_structure=True,
-                )
-                if cluster_message_original and cluster_message_processed != cluster_message_original:
-                    continue
 
                 equal = True
                 # `found_exceptions` is compared as a set, `potential_status_codes` in order.

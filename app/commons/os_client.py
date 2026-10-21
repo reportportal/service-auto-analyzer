@@ -434,7 +434,7 @@ class OsClient:
                     # Conflicting documents were changed while being deleted and are kept, the second pass removes
                     # them from the fresh index state
                     LOGGER.warning(
-                        f"{result['version_conflicts']} documents changed during deletion from '{index_name}', retrying"
+                        f"{result['version_conflicts']} documents changed during deletion in '{index_name}', retrying"
                     )
                     result = self._execute_delete_by_query(index_name, query_builder(batch_ids))
                     deleted += result.get("deleted", 0)

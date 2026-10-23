@@ -179,7 +179,7 @@ class OsClient:
         LOGGER.info(f"Deleting index: {index_name}")
         result = self._delete_index(index_name)
         old_suggest_index = f"{index_name}_suggest"  # for sake of cleanup
-        if self._index_exists(old_suggest_index):
+        if self._index_exists(old_suggest_index, print_error=False):
             result = result and self._delete_index(old_suggest_index)
         return result
 

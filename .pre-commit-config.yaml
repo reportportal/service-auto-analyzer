@@ -10,7 +10,7 @@ repos:
       - id: check-yaml
       - id: check-added-large-files
   - repo: https://github.com/psf/black
-    rev: '782e5605c86aab56be6f905da10dcd3e463fd9c2'
+    rev: '258e7dbf348bc23cb70b8cdf693481c04634ebcc'
     hooks:
       - id: black
         language: system

@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 """Test Item-centric index data model for OpenSearch storage."""
+
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field

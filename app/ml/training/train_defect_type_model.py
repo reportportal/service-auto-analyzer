@@ -348,7 +348,7 @@ class DefectTypeModelTraining:
             time_training = time()
             LOGGER.info(f"Label to train the model {label}")
 
-            (baseline_model_results, new_model_results, bad_data_proportion, proportion_binary_labels) = (
+            baseline_model_results, new_model_results, bad_data_proportion, proportion_binary_labels = (
                 self._train_several_times(new_model, label, train_data, TRAIN_DATA_RANDOM_STATES)
             )
             data_proportion_min = min(proportion_binary_labels, data_proportion_min)

@@ -1,4 +1,4 @@
-FROM dhi.io/python@sha256:0fcab0988969f71b4f9c37bf2aba768b5717d1104a3f24b0222fecd4cc3f5b6d AS test
+FROM dhi.io/python@sha256:822b1117e0c8eb064fef5550383421610e2141fce9876c0a0231579a6a1ec09e AS test
 USER root
 RUN apt-get update \
     && apt-get install -y --no-install-recommends make \
@@ -21,7 +21,7 @@ RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
 RUN "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir -r requirements-dev.txt
 RUN make test-all
 
-FROM dhi.io/python@sha256:0fcab0988969f71b4f9c37bf2aba768b5717d1104a3f24b0222fecd4cc3f5b6d AS builder
+FROM dhi.io/python@sha256:822b1117e0c8eb064fef5550383421610e2141fce9876c0a0231579a6a1ec09e AS builder
 RUN apt-get update \
     && apt-get install -y --no-install-recommends make \
     && python -m venv /venv \
@@ -53,7 +53,7 @@ RUN mkdir -p -m 0744 /backend/storage \
     && cp -r /build/app /backend/ \
     && cp -r /build/res /backend/
 
-FROM dhi.io/python@sha256:3ac6bbf1ebae85cac771d2c1f7a05f8988adda298b0007032dfce2eff1b668ee
+FROM dhi.io/python@sha256:24ac1c7358b8b4416ade5d16af16230d3d003667d10d211d6d8286652e97115c
 WORKDIR /backend
 COPY --from=builder /backend ./
 COPY --from=builder /venv /venv

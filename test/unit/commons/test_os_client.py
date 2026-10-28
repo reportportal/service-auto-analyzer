@@ -2,6 +2,8 @@ from typing import Any
 from unittest import mock
 
 import pytest
+from opensearchpy import ConnectionError as OsConnectionError
+from opensearchpy import TransportError
 
 from app.commons.model.test_item_index import (
     LogClusterData,
@@ -11,8 +13,8 @@ from app.commons.model.test_item_index import (
     TestItemHistoryData,
     TestItemIndexData,
 )
-from app.commons.os_client import OsClient, get_test_item_index_name
-from test import APP_CONFIG, DEFAULT_ES_CONFIG
+from app.commons.os_client import HEALTH_CHECK_TIMEOUT, OsClient, get_test_item_index_name
+from test import APP_CONFIG
 
 PROJECT_ID = "42"
 
@@ -498,24 +500,28 @@ def test_delete_index_returns_false_on_exception(os_client_mock, app_config):
     assert result is False
 
 
-def test_is_healthy_calls_send_request(monkeypatch, os_client_mock, app_config):
-    captured: dict[str, object] = {}
-
-    def fake_send_request(url, method, user, password):
-        captured["url"] = url
-        captured["method"] = method
-        captured["user"] = user
-        captured["password"] = password
-        return {"status": "green"}
-
-    monkeypatch.setattr("app.commons.os_client.utils.send_request", fake_send_request)
+@pytest.mark.parametrize(
+    "cluster_status, expected",
+    [
+        ("green", True),
+        ("yellow", True),
+        ("red", False),
+    ],
+)
+def test_is_healthy_uses_os_client(os_client_mock, app_config, cluster_status, expected):
+    os_client_mock.cluster.health.return_value = {"status": cluster_status}
     client = OsClient(app_config, os_client=os_client_mock)
 
-    assert client.is_healthy() is True
-    assert captured["url"] == "http://localhost:9200/_cluster/health"
-    assert captured["method"] == "GET"
-    assert captured["user"] == app_config.esUser
-    assert captured["password"] == app_config.esPassword
+    assert client.is_healthy() is expected
+    os_client_mock.cluster.health.assert_called_once_with(params={"request_timeout": HEALTH_CHECK_TIMEOUT})
+
+
+def test_is_healthy_returns_false_on_os_client_error(os_client_mock, app_config):
+    os_client_mock.cluster.health.side_effect = OsConnectionError("N/A", "certificate verify failed", Exception())
+    client = OsClient(app_config, os_client=os_client_mock)
+
+    assert client.is_healthy() is False
+    os_client_mock.cluster.health.assert_called_once()
 
 
 def test_is_healthy_returns_false_without_host(os_client_mock, app_config):
@@ -796,32 +802,61 @@ def test_delete_by_log_time_range_deletes_empty_items(monkeypatch, os_client_moc
     assert captured_bodies[0]["_id"] == test_item.test_item_id
 
 
-@pytest.mark.parametrize(
-    "host, use_ssl, expected",
-    [
-        # 1. No protocol specified in the host param
-        ("elastic_host", False, "http://elastic_host"),  # NOSONAR
-        ("elastic_host", True, "https://elastic_host"),  # NOSONAR
-        # 2. http protocol specified in the host parameter
-        ("http://elastic_host", False, "http://elastic_host"),  # NOSONAR
-        ("http://elastic_host", True, "http://elastic_host"),  # NOSONAR
-        # 3. No protocol, but basic HTTP credentials are present in host parameter
-        ("username:password@elastic_host", False, "http://username:password@elastic_host"),  # NOSONAR
-        ("username:password@elastic_host", True, "https://username:password@elastic_host"),  # NOSONAR
-        # 4. Protocol and credentials are present in host parameter -> same URL, no changes
-        ("http://username:password@elastic_host", False, "http://username:password@elastic_host"),  # NOSONAR
-        ("http://username:password@elastic_host", True, "http://username:password@elastic_host"),  # NOSONAR
-    ],
-)
-def test_get_base_url_variations(host, use_ssl, expected):
-    os_mock = mock.Mock()
-    config = DEFAULT_ES_CONFIG.model_copy(
-        update={
-            "esHost": host,
-            "esUseSsl": use_ssl,
-        }
+def test_create_os_client_passes_tls_settings(monkeypatch, app_config):
+    app_config.esUseSsl = True
+    app_config.esVerifyCerts = True
+    app_config.esSslShowWarn = True
+    app_config.esCAcert = "/certs/ca.pem"
+    app_config.esClientCert = "/certs/client.pem"
+    app_config.esClientKey = "/certs/client.key"
+    app_config.esUser = "admin"
+    app_config.esPassword = "secret"
+    app_config.turnOffSslVerification = False
+    opensearch_mock = mock.Mock()
+    monkeypatch.setattr("app.commons.os_client.OpenSearch", opensearch_mock)
+
+    OsClient(app_config)
+
+    opensearch_mock.assert_called_once()
+    args, kwargs = opensearch_mock.call_args
+    assert args == ([app_config.esHost],)
+    assert kwargs["use_ssl"] is True
+    assert kwargs["verify_certs"] is True
+    assert kwargs["ssl_show_warn"] is True
+    assert kwargs["ca_certs"] == "/certs/ca.pem"
+    assert kwargs["client_cert"] == "/certs/client.pem"
+    assert kwargs["client_key"] == "/certs/client.key"
+    assert kwargs["http_auth"] == ("admin", "secret")
+    assert "connection_class" not in kwargs
+
+
+def test_bulk_index_resets_read_only_settings_with_os_client(monkeypatch, os_client_mock, app_config, test_item):
+    os_client_mock.indices.get.return_value = {"index": {}}
+    bulk_mock = mock.Mock(side_effect=[TransportError(403, "cluster_block_exception"), (1, [])])
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.bulk", bulk_mock)
+
+    client = OsClient(app_config, os_client=os_client_mock)
+    response = client.bulk_index(PROJECT_ID, [test_item])
+
+    assert bulk_mock.call_count == 2
+    os_client_mock.indices.put_settings.assert_called_once_with(
+        index="_all", body={"index.blocks.read_only_allow_delete": None}
     )
-    client = OsClient(config, os_client=os_mock)
-    # Accessing name-mangled private method
-    base_url = client._get_base_url()
-    assert base_url == expected
+    assert response.took == 1
+    assert response.errors is False
+
+
+def test_bulk_index_retries_when_read_only_reset_fails(monkeypatch, os_client_mock, app_config, test_item):
+    os_client_mock.indices.get.return_value = {"index": {}}
+    os_client_mock.indices.put_settings.side_effect = OsConnectionError(
+        "N/A", "certificate verify failed", Exception()
+    )
+    bulk_mock = mock.Mock(side_effect=[TransportError(403, "cluster_block_exception"), (1, [])])
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.bulk", bulk_mock)
+
+    client = OsClient(app_config, os_client=os_client_mock)
+    response = client.bulk_index(PROJECT_ID, [test_item])
+
+    os_client_mock.indices.put_settings.assert_called_once()
+    assert bulk_mock.call_count == 2
+    assert response.took == 1

@@ -22,13 +22,11 @@ from functools import wraps
 from typing import Any, Optional
 
 import numpy as np
-import requests
-from requests import RequestException
 
 from app.commons import logging
 from app.commons.model import launch_objects
 from app.commons.model.launch_objects import SimilarityResult
-from app.utils.text_processing import remove_credentials_from_url, split_words
+from app.utils.text_processing import split_words
 
 logger = logging.getLogger("analyzerApp.utils")
 
@@ -78,29 +76,6 @@ def extract_real_id(elastic_id):
     if real_id.endswith("_m"):
         return int(real_id[:-2])
     return int(real_id)
-
-
-def send_request(
-    url: str, method: str, username: Optional[str], password: Optional[str], data: Optional[str] = None
-) -> Optional[Any]:
-    """Send request with specified url and http method"""
-
-    kwargs: dict[str, Any] = {}
-    if username:
-        kwargs["auth"] = (username, password)
-
-    if data:
-        kwargs["data"] = data
-        kwargs["headers"] = {"Content-Type": "application/json"}
-
-    try:
-        response = requests.request(method.lower(), url, **kwargs)
-        response.raise_for_status()
-        if response.content:
-            return json.loads(response.text, strict=False)
-    except RequestException as err:
-        logger.exception(f"Error sending {method} request to URL: {remove_credentials_from_url(url)}", exc_info=err)
-    return None
 
 
 MINIMAL_VALUE_FOR_GOOD_PROPORTION = 2

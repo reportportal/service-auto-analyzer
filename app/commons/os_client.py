@@ -40,6 +40,7 @@ from app.utils import text_processing, utils
 
 INDEX_SETTINGS_FILE = "index_settings.json"
 TEST_ITEM_INDEX_MAPPINGS_FILE = "test_item_index_mappings.json"
+HEALTH_CHECK_TIMEOUT = 10
 
 LOGGER = logging.getLogger("analyzerApp.osClient")
 
@@ -132,31 +133,23 @@ class OsClient:
 
         return OpenSearch([self.host], **kwargs)
 
-    def _get_base_url(self) -> Optional[str]:
-        """Get base URL for OpenSearch.
-
-        :return: Base URL or None if host is not set
-        """
-        if not self.host:
-            LOGGER.error("OpenSearch host is not set")
-            return None
-        url = self.host
-        if not self.host.startswith("http"):
-            protocol = "https" if self.app_config.esUseSsl else "http"
-            url = f"{protocol}://{self.host}"
-        return url
-
     def is_healthy(self) -> bool:
         """Check whether OpenSearch is healthy.
 
+        The request goes through the configured OpenSearch client, so it honors the same TLS and
+        authentication settings as all other requests.
+
         :return: True if cluster status is green or yellow
         """
-        base_url = self._get_base_url()
-        if not base_url:
+        if not self.host:
+            LOGGER.error("OpenSearch host is not set")
             return False
 
-        url = text_processing.build_url(base_url, ["_cluster/health"])
-        res = utils.send_request(url, "GET", self.app_config.esUser, self.app_config.esPassword)
+        try:
+            res = self._os_client.cluster.health(params={"request_timeout": HEALTH_CHECK_TIMEOUT})
+        except Exception as err:
+            LOGGER.exception("Error requesting OpenSearch cluster health", exc_info=err)
+            return False
         return res.get("status", "") in {"green", "yellow"} if res else False
 
     def _delete_index(self, index_name: str) -> bool:
@@ -263,17 +256,10 @@ class OsClient:
 
     def _update_settings_after_read_only(self) -> None:
         """Reset read-only settings on all indices after disk space recovery."""
-        base_url = self._get_base_url()
-        if not base_url:
-            return
-
-        utils.send_request(
-            f"{base_url}/_all/_settings",
-            "PUT",
-            self.app_config.esUser,
-            self.app_config.esPassword,
-            data='{"index.blocks.read_only_allow_delete": null}',
-        )
+        try:
+            self._os_client.indices.put_settings(index="_all", body={"index.blocks.read_only_allow_delete": None})
+        except Exception as err:
+            LOGGER.exception("Failed to reset read-only settings on indices", exc_info=err)
 
     def _execute_bulk(
         self,

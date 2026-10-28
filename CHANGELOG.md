@@ -10,6 +10,8 @@
 - Gradient Boosting featurization and prediction are Test Item-centric now, by @HardNorth
 - New Gradient Boosting feature set, independent of search engine specifics, by @HardNorth
 - `nltk` updated to `3.10.3` to address vulnerabilities, by @HardNorth
+### Fixed
+- [Issue #279](https://github.com/reportportal/service-auto-analyzer/issues/279): Health check and read-only index recovery now use the OpenSearch client and honor `ES_VERIFY_CERTS`, `ES_CA_CERT`, `ES_CLIENT_CERT` and `ES_CLIENT_KEY`, by @HardNorth
 
 ## [5.15.6]
 ### Fixed

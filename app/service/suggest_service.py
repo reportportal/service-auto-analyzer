@@ -32,10 +32,15 @@ from app.commons.model.test_item_index import TestItemIndexData
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.os_client import OsClient
-from app.commons.query_builder import TEST_ITEM_SOURCE_FIELDS, SuggestQueryBuilder, best_log_match
+from app.commons.query_builder import (
+    TEST_ITEM_SOURCE_FIELDS,
+    SuggestQueryBuilder,
+    add_constraints_for_launches_into_query_suggest,
+    add_start_time_decay,
+    best_log_match,
+)
 from app.commons.similarity_filter import SimilarityFilter, choose_message_fields
 from app.ml.predictor import PREDICTION_CLASSES, PredictionResult
-from app.service.analyzer_service import AnalyzerService
 from app.utils import utils
 
 LOGGER = logging.getLogger("analyzerApp.suggestService")
@@ -117,7 +122,7 @@ def rank_predictions(prediction_results: list[PredictionResult]) -> list[Predict
     )
 
 
-class SuggestService(AnalyzerService):
+class SuggestService:
     """The service serves suggestion lists in Make Decision modal."""
 
     app_config: ApplicationConfig
@@ -126,6 +131,7 @@ class SuggestService(AnalyzerService):
     namespace_finder: NamespaceFinder
     model_chooser: ModelChooser
     query_builder: SuggestQueryBuilder
+    launch_boost: float
 
     def __init__(
         self,
@@ -137,7 +143,7 @@ class SuggestService(AnalyzerService):
         self.model_chooser = model_chooser
         self.app_config = app_config
         self.search_cfg = search_cfg
-        super().__init__(search_cfg=self.search_cfg)
+        self.launch_boost = abs(self.search_cfg.BoostLaunch)
         self.os_client = os_client or OsClient(app_config=self.app_config)
         self.suggest_threshold = 0.4
         self.namespace_finder = NamespaceFinder(app_config)
@@ -173,8 +179,8 @@ class SuggestService(AnalyzerService):
         )
         if not query:
             return {}
-        query = self.add_constraints_for_launches_into_query_suggest(query, test_item_info)
-        return self.add_query_with_start_time_decay(query, request_item.start_time)
+        query = add_constraints_for_launches_into_query_suggest(query, test_item_info, self.launch_boost)
+        return add_start_time_decay(query, request_item.start_time, self.search_cfg.TimeWeightDecay)
 
     def _query_suggested_items(
         self,
@@ -367,7 +373,9 @@ class SuggestService(AnalyzerService):
                         modelInfo=";".join(result.model_info_tags),
                         resultPosition=pos_idx,
                         usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
-                        minShouldMatch=self.find_min_should_match_threshold(test_item_info.analyzerConfig),
+                        minShouldMatch=utils.find_min_should_match_threshold(
+                            test_item_info.analyzerConfig, self.search_cfg
+                        ),
                         processedTime=processed_time,
                         clusterId=test_item_info.clusterId,
                         methodName="suggestion",

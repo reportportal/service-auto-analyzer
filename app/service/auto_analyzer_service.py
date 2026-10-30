@@ -13,53 +13,20 @@
 #  limitations under the License.
 
 import json
-from collections import defaultdict
-from datetime import datetime
 from time import time
-from typing import Any, Optional
+from typing import Optional
 
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory
-from app.commons.model.db import Hit
-from app.commons.model.launch_objects import (
-    AnalysisCandidate,
-    AnalysisResult,
-    AnalyzerConf,
-    ApplicationConfig,
-    Launch,
-    SearchConfig,
-)
+from app.commons.model.launch_objects import AnalysisResult, ApplicationConfig, Launch, SearchConfig
 from app.commons.model.test_item_index import TestItemIndexData
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.os_client import OsClient
-from app.commons.query_builder import DEFAULT_ITEM_QUERY_SIZE, AutoAnalysisQueryBuilder
-from app.commons.similarity_filter import SimilarityFilter, choose_message_fields
-from app.ml.predictor import AutoAnalysisPredictor, PredictionResult
-from app.service.analyzer_service import AnalyzerService
+from app.service.analysis import AnalysisContext, AnalysisHandler, BoostingHandler, LaunchAnalysisStats
 from app.utils import utils
-from app.utils.utils import normalize_issue_type
 
 LOGGER = logging.getLogger("analyzerApp.autoAnalyzerService")
-
-NO_DEFECT_BASE_ISSUE_TYPE = "nd"
-# "No Defect" Test Items are found along with the regular candidates and take their places in search results
-ANALYSIS_QUERY_SIZE = DEFAULT_ITEM_QUERY_SIZE * 3 // 2
-
-SearchResults = tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]
-
-
-def choose_fields_to_filter_strict(number_of_log_lines: int, min_similarity: float) -> list[str]:
-    """Choose log fields every one of which must be similar for a found log to be analyzed by.
-
-    :param number_of_log_lines: Number of log lines to use, -1 means all lines
-    :param min_similarity: Minimum similarity in the range [0.0, 1.0]
-    :return: Log field names
-    """
-    fields = choose_message_fields(number_of_log_lines)
-    if min_similarity > 0.99:
-        fields.append("found_tests_and_methods")
-    return fields
 
 
 def prepare_request_items_for_launch(launch: Launch) -> list[TestItemIndexData]:
@@ -77,67 +44,20 @@ def prepare_request_items_for_launch(launch: Launch) -> list[TestItemIndexData]:
     return [prepared_item for prepared_item in prepared if prepared_item.logs]
 
 
-def to_analysis_result(candidate: AnalysisCandidate, result: PredictionResult) -> AnalysisResult:
-    return AnalysisResult(
-        testItem=candidate.testItemId,
-        issueType=result.data.mrHit.source.issue_type or "",
-        relevantItem=int(result.data.mrHit.source.test_item_id),
-    )
+class AutoAnalyzerService:
+    """Analyze launches by a chain of handlers and publish the results.
 
-
-def choose_best_prediction(prediction_results: list[PredictionResult]) -> Optional[PredictionResult]:
-    """Choose the positive prediction with the highest probability, the first found one on ties.
-
-    :param prediction_results: Predictions for found Test Items
-    :return: The best positive prediction, or None if there are no positive predictions
+    The service prepares request Test Items once per launch and passes them to the first handler of the chain. Every
+    handler analyzes what it can and passes the rest on, the results of all handlers are published in one response.
     """
-    positive_predictions = [result for result in prediction_results if result.label == 1]
-    if not positive_predictions:
-        return None
-    return max(positive_predictions, key=lambda result: (result.probability[1], -result.original_position))
 
-
-def is_no_defect(hit: Hit[TestItemIndexData]) -> bool:
-    return normalize_issue_type(hit.source.issue_type).startswith(NO_DEFECT_BASE_ISSUE_TYPE)
-
-
-def split_no_defect_candidates(search_results: SearchResults) -> tuple[SearchResults, Optional[SearchResults]]:
-    """Split found Test Items into regular candidates and a "No Defect" candidate.
-
-    Regular candidates never contain "No Defect" Test Items, the same way as the train data of the model. A request
-    Test Item has a "No Defect" candidate only if the latest similar run of the same test case is "No Defect".
-
-    :param search_results: Request Test Item and similar Test Items of any issue type except "To Investigate"
-    :return: Request Test Item with regular candidates, and with the latest run of the same test case if it is a
-             "No Defect" one, otherwise None
-    """
-    request_item, hits = search_results
-    regular_results = (request_item, [hit for hit in hits if not is_no_defect(hit)])
-    if not request_item.test_case_hash:
-        return regular_results, None
-    same_test_case_hits = [hit for hit in hits if hit.source.test_case_hash == request_item.test_case_hash]
-    if not same_test_case_hits:
-        return regular_results, None
-    # Start time is stored in "%Y-%m-%d %H:%M:%S" format, so string order is chronological. On ties `max` keeps the
-    # first, i.e. the best scored, Test Item.
-    latest = max(same_test_case_hits, key=lambda hit: hit.source.start_time or "")
-    if not is_no_defect(latest):
-        return regular_results, None
-    return regular_results, (request_item, [latest])
-
-
-def log_query_results(start_time: float | int, all_candidates: list[AnalysisCandidate]):
-    LOGGER.info("Collected %d candidates for analysis", len(all_candidates))
-    LOGGER.info("Os queries finished %.2f s.", time() - start_time)
-
-
-class AutoAnalyzerService(AnalyzerService):
     app_config: ApplicationConfig
+    search_cfg: SearchConfig
     os_client: OsClient
     namespace_finder: NamespaceFinder
     model_chooser: ModelChooser
     amqp_client: Optional[AmqpClient]
-    query_builder: AutoAnalysisQueryBuilder
+    chain: AnalysisHandler
 
     def __init__(
         self,
@@ -145,149 +65,26 @@ class AutoAnalyzerService(AnalyzerService):
         app_config: ApplicationConfig,
         search_cfg: SearchConfig,
         os_client: Optional[OsClient] = None,
+        namespace_finder: Optional[NamespaceFinder] = None,
     ) -> None:
-        super().__init__(search_cfg=search_cfg)
+        self.search_cfg = search_cfg
         self.model_chooser = model_chooser
         self.app_config = app_config
         self.os_client = os_client or OsClient(app_config=self.app_config)
-        self.namespace_finder = NamespaceFinder(app_config)
-        self.query_builder = AutoAnalysisQueryBuilder(self.search_cfg)
+        self.namespace_finder = namespace_finder or NamespaceFinder(app_config)
         self.amqp_client = None
         if self.app_config.amqpUrl:
             self.amqp_client = AmqpClient(self.app_config)
+        self.chain = self._build_chain()
 
-    def _get_config_for_boosting(self, analyzer_config: AnalyzerConf) -> dict[str, Any]:
-        return {
-            "max_query_terms": self.search_cfg.MaxQueryTerms,
-            "min_should_match": self.find_min_should_match_threshold(analyzer_config) / 100,
-            "min_word_length": self.search_cfg.MinWordLength,
-            "number_of_log_lines": analyzer_config.numberOfLogLines,
-            "boosting_model": self.search_cfg.BoostModelFolder,
-            "time_weight_decay": self.search_cfg.TimeWeightDecay,
-        }
+    def _build_chain(self) -> AnalysisHandler:
+        """Build the chain of handlers which analyze request Test Items, in the order they are asked.
 
-    def _get_min_should_match_setting(self, launch: Launch) -> str:
-        if launch.analyzerConfig.minShouldMatch > 0:
-            return f"{launch.analyzerConfig.minShouldMatch}%"
-        return self.search_cfg.MinShouldMatch
-
-    def _build_item_query(self, launch: Launch, request_item: TestItemIndexData) -> dict[str, Any]:
-        """Build a query to search for Test Items similar to the request one by all its logs.
-
-        :param launch: Launch being analyzed
-        :param request_item: Request Test Item
-        :return: OpenSearch query, or an empty dict if the request Test Item has no logs to search by
+        :return: The first handler of the chain
         """
-        query = self.query_builder.build(
-            request_item,
-            number_of_log_lines=launch.analyzerConfig.numberOfLogLines,
-            min_should_match=self._get_min_should_match_setting(launch),
-            min_logs_to_match="100%" if launch.analyzerConfig.allMessagesShouldMatch else "1",
-            filter_no_defect=False,
-            size=ANALYSIS_QUERY_SIZE,
+        return BoostingHandler(
+            self.model_chooser, self.app_config, self.search_cfg, self.os_client, self.namespace_finder
         )
-        if not query:
-            return {}
-        query = self.add_constraints_for_launches_into_query(query, launch)
-        return self.add_query_with_start_time_decay(query, request_item.start_time)
-
-    def _create_similarity_filter(self, analyzer_config: AnalyzerConf) -> SimilarityFilter:
-        min_similarity = self.find_min_should_match_threshold(analyzer_config) / 100
-        return SimilarityFilter(
-            choose_fields_to_filter_strict(analyzer_config.numberOfLogLines, min_similarity),
-            min_similarity,
-            all_fields=True,
-        )
-
-    def _filter_by_similarity(
-        self,
-        launch: Launch,
-        similarity_filter: SimilarityFilter,
-        search_results: tuple[TestItemIndexData, list[Hit[TestItemIndexData]]],
-    ) -> tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]:
-        """Remove found Test Items which logs are not similar enough to the request logs by every message field.
-
-        :param launch: Launch being analyzed
-        :param similarity_filter: Filter configured for the launch
-        :param search_results: Request Test Item and found Test Items
-        :return: Request Test Item and found Test Items with similar logs
-        """
-        request_item, hits = search_results
-        required_log_indices = None
-        if launch.analyzerConfig.allMessagesShouldMatch:
-            required_log_indices = self.query_builder.select_log_indices(
-                request_item, launch.analyzerConfig.numberOfLogLines
-            )
-        filtered_results = similarity_filter.filter(search_results, required_log_indices)
-        removed = len(hits) - len(filtered_results[1])
-        if removed:
-            LOGGER.debug(
-                f"Filtering by similarity removed {removed} of {len(hits)} found items for test item "
-                f"{request_item.test_item_id}"
-            )
-        return filtered_results
-
-    def _query_candidates_for_launch(
-        self,
-        launch: Launch,
-        request_items: list[TestItemIndexData],
-        max_batch_size: Optional[int] = None,
-    ) -> list[tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]]:
-        """Query candidates for a whole launch, one query per request Test Item, batching queries across Test Items.
-
-        One `msearch` per test item leaves OpenSearch with only a handful of queries to run
-        concurrently and pays a full round trip each time. Batching keeps the request count
-        proportional to the query count instead of the test item count.
-
-        Batch size is a memory trade, not just a round-trip one: every query in a batch holds its
-        full response until the batch is consumed, and a Test Item response carries its matched
-        logs. Past roughly 20 queries the round-trip saving flattens while the memory held per
-        request keeps growing linearly, so `AnalysisQueryBatchSize` defaults there.
-
-        :param launch: Launch being analyzed
-        :param request_items: Prepared request Test Items
-        :param max_batch_size: Queries per `msearch`; defaults to `AnalysisQueryBatchSize`
-        :return: Request Test Items with the Test Items found for them, aligned with `request_items`
-        """
-        if max_batch_size is None:
-            max_batch_size = self.search_cfg.AnalysisQueryBatchSize
-        plan: list[int] = []
-        all_queries: list[dict[str, Any]] = []
-        for item_index, request_item in enumerate(request_items):
-            query = self._build_item_query(launch, request_item)
-            if not query:
-                continue
-            plan.append(item_index)
-            all_queries.append({})
-            all_queries.append(query)
-
-        similarity_filter = self._create_similarity_filter(launch.analyzerConfig)
-        results: list[tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]] = [
-            (request_item, []) for request_item in request_items
-        ]
-
-        # Each query contributes a header and a body to `all_queries`, so a chunk of `chunk`
-        # entries corresponds to `chunk // 2` entries of `plan`.
-        chunk = max_batch_size * 2
-        for offset in range(0, len(all_queries), chunk):
-            planned = plan[offset // 2 : (offset + chunk) // 2]
-            consumed = 0
-            for item_index, hits in zip(
-                planned, self.os_client.msearch_grouped(launch.project, all_queries[offset : offset + chunk])
-            ):
-                consumed += 1
-                results[item_index] = self._filter_by_similarity(
-                    launch, similarity_filter, (request_items[item_index], hits)
-                )
-            if consumed < len(planned):
-                LOGGER.warning(
-                    "Got %d responses for %d queries in project %s, %d test items were not analyzed",
-                    consumed,
-                    len(planned),
-                    str(launch.project),
-                    len(planned) - consumed,
-                )
-        return results
 
     def _should_stop_processing(self, test_items_processed: int) -> bool:
         if test_items_processed >= self.search_cfg.MaxAutoAnalysisItemsToProcess:
@@ -295,167 +92,59 @@ class AutoAnalyzerService(AnalyzerService):
             return True
         return False
 
-    def _get_analysis_candidates(
-        self,
-        launches: list[Launch],
-    ) -> list[AnalysisCandidate]:
-        t_start = time()
-        all_candidates: list[AnalysisCandidate] = []
-        processed_items = 0
+    def _create_stats(self, launch: Launch) -> LaunchAnalysisStats:
+        return LaunchAnalysisStats(
+            launch_id=launch.launchId,
+            launch_name=launch.launchName,
+            project_id=launch.project,
+            number_of_log_lines=launch.analyzerConfig.numberOfLogLines,
+            min_should_match=utils.find_min_should_match_threshold(launch.analyzerConfig, self.search_cfg),
+            module_version=[self.app_config.appVersion],
+        )
 
-        for launch in launches:
-            preparation_start = time()
-            request_items = prepare_request_items_for_launch(launch)
-            LOGGER.info(
-                "Finished preparing request test items for launch '%s', took: %.2f s.",
-                str(launch.launchId),
-                time() - preparation_start,
-            )
-
-            if self._should_stop_processing(processed_items):
-                log_query_results(t_start, all_candidates)
-                return all_candidates
-            remaining = self.search_cfg.MaxAutoAnalysisItemsToProcess - processed_items
-            request_items = request_items[:remaining]
-
-            item_start = time()
-            results_per_test_item = self._query_candidates_for_launch(launch, request_items)
-            mean_processing_time = (time() - item_start) / max(len(request_items), 1)
-
-            for search_results in results_per_test_item:
-                regular_results, no_defect_results = split_no_defect_candidates(search_results)
-                all_candidates.append(
-                    AnalysisCandidate(
-                        analyzerConfig=launch.analyzerConfig,
-                        testItemId=int(search_results[0].test_item_id),
-                        project=launch.project,
-                        launchId=launch.launchId,
-                        launchName=launch.launchName,
-                        launchNumber=launch.launchNumber,
-                        timeProcessed=mean_processing_time,
-                        candidates=regular_results,
-                        candidatesWithNoDefect=no_defect_results,
-                    )
-                )
-                processed_items += 1
-
-        log_query_results(t_start, all_candidates)
-        return all_candidates
-
-    @utils.ignore_warnings
     def analyze_logs(self, launches: list[Launch]) -> None:
-        cnt_launches = len(launches)
-        LOGGER.info(f"Started analysis for {cnt_launches} launches")
+        """Analyze Test Items of the launches and publish the results.
 
+        :param launches: Launches with request Test Items
+        """
+        LOGGER.info(f"Started analysis for {len(launches)} launches")
         t_start = time()
         results: list[AnalysisResult] = []
-        results_to_share: dict[int, dict[str, Any]] = {}
-        cnt_items_to_process = 0
+        stats_by_launch: dict[int, LaunchAnalysisStats] = {}
         chosen_namespaces: dict[int, dict[str, int]] = {}
-        results_per_project: dict[int, int] = defaultdict(lambda: 0)
+        processed_items = 0
 
         try:
-            all_candidates = self._get_analysis_candidates(launches)
-            all_candidates_by_launch_and_project: dict[tuple[int, int], list[AnalysisCandidate]] = defaultdict(list)
-            for candidate in all_candidates:
-                all_candidates_by_launch_and_project[candidate.project, candidate.launchId].append(candidate)
-
-            for (project_id, launch_id), analyzer_candidates in all_candidates_by_launch_and_project.items():
-                if not analyzer_candidates:
-                    LOGGER.info(f"No candidates found for project {project_id}, launch {launch_id}")
+            for launch in launches:
+                preparation_start = time()
+                request_items = prepare_request_items_for_launch(launch)
+                LOGGER.info(
+                    "Finished preparing request test items for launch '%s', took: %.2f s.",
+                    str(launch.launchId),
+                    time() - preparation_start,
+                )
+                if self._should_stop_processing(processed_items):
+                    break
+                request_items = request_items[: self.search_cfg.MaxAutoAnalysisItemsToProcess - processed_items]
+                processed_items += len(request_items)
+                if not request_items:
+                    LOGGER.info(f"No test items to analyze in project {launch.project}, launch {launch.launchId}")
                     continue
 
-                analyzer_config = analyzer_candidates[0].analyzerConfig
-                boosting_config = self._get_config_for_boosting(analyzer_config)
-                predictor = AutoAnalysisPredictor(
-                    model_chooser=self.model_chooser,
-                    project_id=project_id,
-                    boosting_config=boosting_config,
-                    custom_model_prob=self.search_cfg.ProbabilityForCustomModelAutoAnalysis,
-                    hash_source=launch_id,
-                )
-
-                for analyzer_candidate in analyzer_candidates:
-                    try:
-                        if launch_id not in results_to_share:
-                            results_to_share[launch_id] = {
-                                "not_found": 0,
-                                "items_to_process": 0,
-                                "processed_time": 0,
-                                "launch_id": launch_id,
-                                "launch_name": analyzer_candidate.launchName,
-                                "project_id": project_id,
-                                "method": "auto_analysis",
-                                "gather_date": datetime.now().strftime("%Y-%m-%d"),
-                                "gather_datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                "number_of_log_lines": analyzer_candidate.analyzerConfig.numberOfLogLines,
-                                "min_should_match": self.find_min_should_match_threshold(
-                                    analyzer_candidate.analyzerConfig
-                                ),
-                                "model_info": [],
-                                "module_version": [self.app_config.appVersion],
-                                "errors": [],
-                                "errors_count": 0,
-                            }
-
-                        t_start_item = time()
-                        cnt_items_to_process += 1
-                        results_to_share[launch_id]["items_to_process"] += 1
-                        results_to_share[launch_id]["processed_time"] += analyzer_candidate.timeProcessed
-
-                        if project_id not in chosen_namespaces:
-                            chosen_namespaces[project_id] = self.namespace_finder.get_chosen_namespaces(project_id)
-                        boosting_config["chosen_namespaces"] = chosen_namespaces[project_id]
-
-                        # The "No Defect" candidate goes first: it exists only if the latest similar run of the same
-                        # test case is "No Defect", while regular candidates never contain such Test Items
-                        candidates_to_check: list[SearchResults] = []
-                        if analyzer_candidate.candidatesWithNoDefect:
-                            candidates_to_check.append(analyzer_candidate.candidatesWithNoDefect)
-                        candidates_to_check.append(analyzer_candidate.candidates)
-
-                        best = None
-                        for candidates in candidates_to_check:
-                            prediction_results = predictor.predict(candidates)
-                            if not prediction_results:
-                                continue
-
-                            model_info_tags = prediction_results[0].model_info_tags
-                            new_model_info_tags = set(results_to_share[launch_id]["model_info"])
-                            new_model_info_tags.update(model_info_tags)
-                            results_to_share[launch_id]["model_info"] = list(new_model_info_tags)
-
-                            best = choose_best_prediction(prediction_results)
-                            if best is not None:
-                                break
-
-                        if best is None:
-                            LOGGER.debug(f"Test item {analyzer_candidate.testItemId} has no positive predictions")
-                            results_to_share[launch_id]["not_found"] += 1
-                            results_to_share[launch_id]["processed_time"] += time() - t_start_item
-                            continue
-
-                        results_per_project[project_id] = results_per_project[project_id] + 1
-                        analysis_result = to_analysis_result(analyzer_candidate, best)
-                        results.append(analysis_result)
-                        LOGGER.debug(analysis_result)
-                        results_to_share[launch_id]["processed_time"] += time() - t_start_item
-                    except Exception as exc:
-                        LOGGER.exception(
-                            f"Unable to process candidate for analysis {analyzer_candidate.testItemId}", exc_info=exc
-                        )
-                        if launch_id in results_to_share:
-                            results_to_share[launch_id]["errors"].append(utils.extract_exception(exc))
-                            results_to_share[launch_id]["errors_count"] += 1
-
-            for launch_id in results_to_share:
-                results_to_share[launch_id]["model_info"] = list(results_to_share[launch_id]["model_info"])
-
+                if launch.launchId not in stats_by_launch:
+                    stats_by_launch[launch.launchId] = self._create_stats(launch)
+                stats = stats_by_launch[launch.launchId]
+                stats.items_to_process += len(request_items)
+                context = AnalysisContext(launch=launch, stats=stats, chosen_namespaces=chosen_namespaces)
+                handler_results, not_found = self.chain.handle(context, request_items)
+                stats.not_found += len(not_found)
+                results.extend(handler_result.result for handler_result in handler_results)
         except Exception as exc:
             LOGGER.exception("Unable to process analysis candidates", exc_info=exc)
 
-        LOGGER.debug(f"Stats info: {json.dumps(results_to_share)}")
-        LOGGER.info(f"Processed {cnt_items_to_process} test items. It took {time() - t_start:.2f} sec.")
-        LOGGER.info(f"Finished analysis for {cnt_launches} launches with {len(results)} results.")
+        stats_info = {launch_id: stats.model_dump(mode="json") for launch_id, stats in stats_by_launch.items()}
+        LOGGER.debug(f"Stats info: {json.dumps(stats_info)}")
+        LOGGER.info(f"Processed {processed_items} test items. It took {time() - t_start:.2f} sec.")
+        LOGGER.info(f"Finished analysis for {len(launches)} launches with {len(results)} results.")
         if self.amqp_client:
             self.amqp_client.publish_response(json.dumps([res.model_dump() for res in results]))

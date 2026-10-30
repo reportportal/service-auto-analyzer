@@ -24,8 +24,7 @@ from typing import Any, Optional
 import numpy as np
 
 from app.commons import logging
-from app.commons.model import launch_objects
-from app.commons.model.launch_objects import SimilarityResult
+from app.commons.model.launch_objects import AnalyzerConf, SearchConfig, SimilarityResult
 from app.utils.text_processing import split_words
 
 logger = logging.getLogger("analyzerApp.utils")
@@ -166,103 +165,16 @@ def calculate_threshold_for_text(text: str, cur_threshold: float, min_recalculat
     return calculate_threshold(text_size, cur_threshold, min_recalculated_threshold=min_recalculated_threshold)
 
 
-# Boost ladder for search clauses. Values are relative to each other only: a clause boosted
-# BOOST_ERROR_IDENTITY contributes roughly twice what BOOST_MESSAGE does, and so on.
-BOOST_NEUTRAL = 1.0
-"""No emphasis. For a clause that carries the query on its own, so its weight cannot rank anything."""
+def find_min_should_match_threshold(analyzer_config: AnalyzerConf, search_cfg: SearchConfig) -> int:
+    """Get the minimum share of terms a found log must match, configured for the project or globally.
 
-BOOST_SUPPORTING = 2.0
-"""A field that corroborates a match without identifying it: numbers, params, URLs, paths."""
-
-BOOST_MESSAGE = 4.0
-"""The primary message field a candidate is matched on."""
-
-BOOST_ERROR_IDENTITY = 8.0
-"""A field that nearly identifies the failure: exception names, status codes."""
-
-CONTAINED_SEQUENCE_BOOST_FACTOR = 0.5
-"""Share of the boost given to a sequence found inside a longer one rather than matched whole."""
-
-
-def build_more_like_this_query(
-    min_should_match: str,
-    log_message,
-    field_name: str = "message",
-    boost: float = BOOST_NEUTRAL,
-    override_min_should_match: Optional[str] = None,
-    max_query_terms: int = 50,
-):
-    return {
-        "more_like_this": {
-            "fields": [field_name],
-            "like": log_message,
-            "min_doc_freq": 1,
-            "min_term_freq": 1,
-            "minimum_should_match": override_min_should_match or "5<" + min_should_match,
-            "max_query_terms": max_query_terms,
-            "boost": boost,
-        }
-    }
-
-
-def build_status_codes_exact_query(
-    status_codes: str, field_name: str = "potential_status_codes", boost: float = BOOST_NEUTRAL
-) -> Optional[dict[str, Any]]:
-    """Build a clause matching the exact status code sequence.
-
-    `potential_status_codes` stores the codes as they appeared in the message, in order and
-    without de-duplication, so "expected status code 400, but was 401" is stored as `400 401`
-    while the inverse failure is stored as `401 400`. Those are different failures and must not
-    match each other, which rules out both `more_like_this` and `terms`: they test term overlap
-    and score the two identically.
-
-    :param status_codes: Status codes as stored in the field, whitespace separated
-    :param field_name: Field holding the codes; its `.exact` sub-field is matched
-    :param boost: Boost for the clause
-    :return: A term query on the `.exact` sub-field, or None when there are no codes
+    :param analyzer_config: Project analyzer configuration
+    :param search_cfg: Search configuration with the global default
+    :return: Minimum should match, in percent
     """
-    codes = status_codes.strip()
-    if not codes:
-        return None
-    return {"term": {f"{field_name}.exact": {"value": codes, "boost": boost}}}
-
-
-def build_status_codes_queries(
-    status_codes: str, field_name: str = "potential_status_codes", boost: float = BOOST_NEUTRAL
-) -> list[dict[str, Any]]:
-    """Build clauses that rank status code sequences by how exactly they match.
-
-    The exact sequence scores highest; the same sequence occurring inside a longer one still
-    matches, at half the boost. Order is preserved in both, unlike `more_like_this`.
-
-    :param status_codes: Status codes as stored in the field, whitespace separated
-    :param field_name: Field holding the codes
-    :param boost: Boost for an exact match; a contained match gets CONTAINED_SEQUENCE_BOOST_FACTOR of it
-    :return: Clauses to add to a `should`, empty when there are no codes
-    """
-    exact = build_status_codes_exact_query(status_codes, field_name=field_name, boost=boost)
-    if not exact:
-        return []
-    codes = status_codes.strip()
-    contained_boost = boost * CONTAINED_SEQUENCE_BOOST_FACTOR
-    return [exact, {"match_phrase": {field_name: {"query": codes, "boost": contained_boost}}}]
-
-
-def build_status_codes_filter(status_codes: str, field_name: str = "potential_status_codes") -> dict[str, Any]:
-    """Build a filter clause which leaves only logs with exactly the same status code sequence.
-
-    The sequence is compared as a whole, see `build_status_codes_exact_query`. A log without codes matches only logs
-    without codes, so a cut log which lost its "expected 409, but was 404" line does not match the full one.
-
-    :param status_codes: Status codes as stored in the field, whitespace separated
-    :param field_name: Field holding the codes; its `.exact` sub-field is matched
-    :return: A term query on the `.exact` sub-field, or a query for logs with no codes when there are no codes
-    """
-    exact = build_status_codes_exact_query(status_codes, field_name=field_name)
-    if exact:
-        return exact
-    # Logs without codes may store an empty string as well as no value at all, "?*" matches only non-empty values.
-    return {"bool": {"must_not": [{"wildcard": {f"{field_name}.exact": {"value": "?*"}}}]}}
+    if analyzer_config.minShouldMatch > 0:
+        return analyzer_config.minShouldMatch
+    return int(search_cfg.MinShouldMatch.rstrip("%"))
 
 
 def extract_clustering_setting(cluster_id):
@@ -270,54 +182,6 @@ def extract_clustering_setting(cluster_id):
         return False
     last_bit = cluster_id % 10
     return (last_bit % 2) == 1
-
-
-def create_path(query: dict, path: tuple[str, ...], value: Any) -> Any:
-    """Create path in a dictionary and assign passed value on the last element in path."""
-    path_length = len(path)
-    last_element = path[path_length - 1]
-    current_node = query
-    for i in range(path_length - 1):
-        element = path[i]
-        if element not in current_node:
-            current_node[element] = {}
-        current_node = current_node[element]
-    if last_element not in current_node:
-        current_node[last_element] = value
-    return current_node[last_element]
-
-
-def append_aa_ma_boosts(query: dict[str, Any], search_cfg: launch_objects.SearchConfig) -> None:
-    """Append boosts for auto-analyzed and manually-analyzed fields to ES/OS query.
-
-    :param query: ES/OS query
-    :param search_cfg: Search configuration
-    """
-    should = create_path(query, ("query", "bool", "should"), [])
-    boost_aa = search_cfg.BoostAA
-    boost_ma = search_cfg.BoostMA
-    if boost_aa > boost_ma:
-        should.append(
-            {
-                "term": {
-                    "is_auto_analyzed": {
-                        "value": True,
-                        "boost": boost_aa - boost_ma,
-                    }
-                }
-            }
-        )
-    else:
-        should.append(
-            {
-                "term": {
-                    "is_auto_analyzed": {
-                        "value": False,
-                        "boost": boost_ma - boost_aa,
-                    }
-                }
-            }
-        )
 
 
 def strip_path(path: str) -> str:
@@ -348,13 +212,6 @@ def safe_int(value: Any) -> int:
         return int(value)
     except (TypeError, ValueError):
         return 0
-
-
-def prepare_restrictions_by_issue_type(filter_no_defect: bool = True) -> list[dict[str, Any]]:
-    issue_type_filter = [{"wildcard": {"issue_type": {"value": "ti*", "case_insensitive": True}}}]
-    if filter_no_defect:
-        issue_type_filter.append({"wildcard": {"issue_type": {"value": "nd*", "case_insensitive": True}}})
-    return issue_type_filter
 
 
 def get_max_similarity_idx(per_log_similarity: list[SimilarityResult]) -> Optional[int]:

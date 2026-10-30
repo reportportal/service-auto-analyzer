@@ -42,6 +42,7 @@ from app.commons.model.test_item_index import (
 )
 from app.commons.os_client import OsClient
 from app.commons.prepared_log import PreparedLogMessageClustering
+from app.commons.query_builder import BOOST_NEUTRAL, build_more_like_this_query, build_status_codes_exact_query
 from app.utils import text_processing, utils
 
 LOGGER = logging.getLogger("analyzerApp.clusterService")
@@ -467,28 +468,28 @@ class ClusterService:
         path = MERGED_LOGS_PATH if queried_log.merged else LOGS_PATH
         log_id_field = "log_ids" if queried_log.merged else "log_id"
         nested_must = [
-            utils.build_more_like_this_query(
+            build_more_like_this_query(
                 min_should_match,
                 queried_log.message,
                 field_name=f"{path}.whole_message",
-                boost=utils.BOOST_NEUTRAL,
+                boost=BOOST_NEUTRAL,
                 max_query_terms=self.search_cfg.MaxQueryTerms,
             )
         ]
         found_exceptions = queried_log.data.found_exceptions
         if found_exceptions and found_exceptions.strip():
             nested_must.append(
-                utils.build_more_like_this_query(
+                build_more_like_this_query(
                     "1",
                     found_exceptions,
                     field_name=f"{path}.found_exceptions",
-                    boost=utils.BOOST_NEUTRAL,
+                    boost=BOOST_NEUTRAL,
                     override_min_should_match="1",
                     max_query_terms=self.search_cfg.MaxQueryTerms,
                 )
             )
         # Clustering requires the same codes in the same order, so the exact sequence is matched.
-        status_codes_query = utils.build_status_codes_exact_query(
+        status_codes_query = build_status_codes_exact_query(
             queried_log.data.potential_status_codes or "", field_name=f"{path}.potential_status_codes"
         )
         if status_codes_query:

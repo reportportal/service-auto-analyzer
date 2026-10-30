@@ -3,6 +3,8 @@
 ## [Unreleased]
 ### Added
 - Test Items are indexed with an `error_hash` field, a stateless identity of the failure built from exception messages, exceptions and status codes; the field is added to existing indices automatically, by @HardNorth
+### Changed
+- Auto-analysis runs as a chain of handlers, each of which analyzes the Test Items it can and passes the rest on; Gradient Boosting is the only handler so far, by @HardNorth
 
 ## [6.0.0]
 ### Added

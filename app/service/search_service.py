@@ -23,6 +23,7 @@ from app.commons.model.launch_objects import (
     SearchLogs,
 )
 from app.commons.os_client import OsClient
+from app.commons.query_builder import BOOST_NEUTRAL, append_aa_ma_boosts, build_more_like_this_query
 from app.utils import text_processing, utils
 
 LOGGER = logging.getLogger("analyzerApp.searchService")
@@ -73,11 +74,11 @@ class SearchService:
             search_req.analyzerConfig.searchLogsMinShouldMatch / 100
         )
         nested_should = [
-            utils.build_more_like_this_query(
+            build_more_like_this_query(
                 min_should_match,
                 message,
                 field_name="logs.message",
-                boost=utils.BOOST_NEUTRAL,
+                boost=BOOST_NEUTRAL,
                 max_query_terms=self.search_cfg.MaxQueryTerms,
             )
             for message in log_messages
@@ -117,7 +118,7 @@ class SearchService:
             },
         }
 
-        utils.append_aa_ma_boosts(query, self.search_cfg)
+        append_aa_ma_boosts(query, self.search_cfg)
         return query
 
     def search_logs(self, search_req: SearchLogs) -> list[SearchLogInfo]:

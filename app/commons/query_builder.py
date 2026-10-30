@@ -24,9 +24,8 @@ from abc import ABCMeta, abstractmethod
 from typing import Any, Optional
 
 from app.commons.model.db import Hit
-from app.commons.model.launch_objects import SearchConfig
+from app.commons.model.launch_objects import Launch, SearchConfig, TestItemInfo
 from app.commons.model.test_item_index import LogData, TestItemIndexData
-from app.utils import utils
 
 LOGS_FOUND_EXCEPTIONS_FIELD = "logs.found_exceptions"
 
@@ -37,8 +36,26 @@ INNER_HITS_SIZE = 3
 DEFAULT_ITEM_QUERY_SIZE = 20
 MIN_TERMS_PER_LOG = 10
 
+# Boost ladder for search clauses. Values are relative to each other only: a clause boosted
+# BOOST_ERROR_IDENTITY contributes roughly twice what BOOST_MESSAGE does, and so on.
+BOOST_NEUTRAL = 1.0
+"""No emphasis. For a clause that carries the query on its own, so its weight cannot rank anything."""
+
+BOOST_SUPPORTING = 2.0
+"""A field that corroborates a match without identifying it: numbers, params, URLs, paths."""
+
+BOOST_MESSAGE = 4.0
+"""The primary message field a candidate is matched on."""
+
+BOOST_ERROR_IDENTITY = 8.0
+"""A field that nearly identifies the failure: exception names, status codes."""
+
+CONTAINED_SEQUENCE_BOOST_FACTOR = 0.5
+"""Share of the boost given to a sequence found inside a longer one rather than matched whole."""
+
+
 TEST_ITEM_FIELDS_BOOST_SCORES = [
-    ("test_item_name", utils.BOOST_SUPPORTING),
+    ("test_item_name", BOOST_SUPPORTING),
 ]
 
 ITEM_LOG_SOURCE_FIELDS = [
@@ -168,13 +185,149 @@ def best_log_match(hit: Hit[TestItemIndexData]) -> Optional[tuple[int, Hit[LogDa
     return best
 
 
+def create_path(query: dict, path: tuple[str, ...], value: Any) -> Any:
+    """Create path in a dictionary and assign passed value on the last element in path."""
+    path_length = len(path)
+    last_element = path[path_length - 1]
+    current_node = query
+    for i in range(path_length - 1):
+        element = path[i]
+        if element not in current_node:
+            current_node[element] = {}
+        current_node = current_node[element]
+    if last_element not in current_node:
+        current_node[last_element] = value
+    return current_node[last_element]
+
+
+def append_aa_ma_boosts(query: dict[str, Any], search_cfg: SearchConfig) -> None:
+    """Append boosts for auto-analyzed and manually-analyzed fields to ES/OS query.
+
+    :param query: ES/OS query
+    :param search_cfg: Search configuration
+    """
+    should = create_path(query, ("query", "bool", "should"), [])
+    boost_aa = search_cfg.BoostAA
+    boost_ma = search_cfg.BoostMA
+    if boost_aa > boost_ma:
+        should.append(
+            {
+                "term": {
+                    "is_auto_analyzed": {
+                        "value": True,
+                        "boost": boost_aa - boost_ma,
+                    }
+                }
+            }
+        )
+    else:
+        should.append(
+            {
+                "term": {
+                    "is_auto_analyzed": {
+                        "value": False,
+                        "boost": boost_ma - boost_aa,
+                    }
+                }
+            }
+        )
+
+
+def build_more_like_this_query(
+    min_should_match: str,
+    log_message,
+    field_name: str = "message",
+    boost: float = BOOST_NEUTRAL,
+    override_min_should_match: Optional[str] = None,
+    max_query_terms: int = 50,
+):
+    return {
+        "more_like_this": {
+            "fields": [field_name],
+            "like": log_message,
+            "min_doc_freq": 1,
+            "min_term_freq": 1,
+            "minimum_should_match": override_min_should_match or "5<" + min_should_match,
+            "max_query_terms": max_query_terms,
+            "boost": boost,
+        }
+    }
+
+
+def build_status_codes_exact_query(
+    status_codes: str, field_name: str = "potential_status_codes", boost: float = BOOST_NEUTRAL
+) -> Optional[dict[str, Any]]:
+    """Build a clause matching the exact status code sequence.
+
+    `potential_status_codes` stores the codes as they appeared in the message, in order and
+    without de-duplication, so "expected status code 400, but was 401" is stored as `400 401`
+    while the inverse failure is stored as `401 400`. Those are different failures and must not
+    match each other, which rules out both `more_like_this` and `terms`: they test term overlap
+    and score the two identically.
+
+    :param status_codes: Status codes as stored in the field, whitespace separated
+    :param field_name: Field holding the codes; its `.exact` sub-field is matched
+    :param boost: Boost for the clause
+    :return: A term query on the `.exact` sub-field, or None when there are no codes
+    """
+    codes = status_codes.strip()
+    if not codes:
+        return None
+    return {"term": {f"{field_name}.exact": {"value": codes, "boost": boost}}}
+
+
+def build_status_codes_queries(
+    status_codes: str, field_name: str = "potential_status_codes", boost: float = BOOST_NEUTRAL
+) -> list[dict[str, Any]]:
+    """Build clauses that rank status code sequences by how exactly they match.
+
+    The exact sequence scores highest; the same sequence occurring inside a longer one still
+    matches, at half the boost. Order is preserved in both, unlike `more_like_this`.
+
+    :param status_codes: Status codes as stored in the field, whitespace separated
+    :param field_name: Field holding the codes
+    :param boost: Boost for an exact match; a contained match gets CONTAINED_SEQUENCE_BOOST_FACTOR of it
+    :return: Clauses to add to a `should`, empty when there are no codes
+    """
+    exact = build_status_codes_exact_query(status_codes, field_name=field_name, boost=boost)
+    if not exact:
+        return []
+    codes = status_codes.strip()
+    contained_boost = boost * CONTAINED_SEQUENCE_BOOST_FACTOR
+    return [exact, {"match_phrase": {field_name: {"query": codes, "boost": contained_boost}}}]
+
+
+def build_status_codes_filter(status_codes: str, field_name: str = "potential_status_codes") -> dict[str, Any]:
+    """Build a filter clause which leaves only logs with exactly the same status code sequence.
+
+    The sequence is compared as a whole, see `build_status_codes_exact_query`. A log without codes matches only logs
+    without codes, so a cut log which lost its "expected 409, but was 404" line does not match the full one.
+
+    :param status_codes: Status codes as stored in the field, whitespace separated
+    :param field_name: Field holding the codes; its `.exact` sub-field is matched
+    :return: A term query on the `.exact` sub-field, or a query for logs with no codes when there are no codes
+    """
+    exact = build_status_codes_exact_query(status_codes, field_name=field_name)
+    if exact:
+        return exact
+    # Logs without codes may store an empty string as well as no value at all, "?*" matches only non-empty values.
+    return {"bool": {"must_not": [{"wildcard": {f"{field_name}.exact": {"value": "?*"}}}]}}
+
+
+def prepare_restrictions_by_issue_type(filter_no_defect: bool = True) -> list[dict[str, Any]]:
+    issue_type_filter = [{"wildcard": {"issue_type": {"value": "ti*", "case_insensitive": True}}}]
+    if filter_no_defect:
+        issue_type_filter.append({"wildcard": {"issue_type": {"value": "nd*", "case_insensitive": True}}})
+    return issue_type_filter
+
+
 def add_launch_name_boost(query: dict[str, Any], launch_name: str, launch_boost: float) -> None:
-    should = utils.create_path(query, ("query", "bool", "should"), [])
+    should = create_path(query, ("query", "bool", "should"), [])
     should.append({"term": {"launch_name": {"value": launch_name, "boost": launch_boost}}})
 
 
 def add_launch_id_boost(query: dict[str, Any], launch_id: int | str, launch_boost: float) -> None:
-    should = utils.create_path(query, ("query", "bool", "should"), [])
+    should = create_path(query, ("query", "bool", "should"), [])
     should.append({"term": {"launch_id": {"value": launch_id, "boost": launch_boost}}})
 
 
@@ -183,6 +336,67 @@ def add_launch_name_and_id_boost(
 ) -> None:
     add_launch_id_boost(query, launch_id, launch_boost)
     add_launch_name_boost(query, launch_name, launch_boost)
+
+
+def add_constraints_for_launches_into_query(query: dict, launch: Launch, launch_boost: float) -> dict:
+    previous_launch_id = getattr(launch, "previousLaunchId", 0) or 0
+    previous_launch_id = int(previous_launch_id)
+    analyzer_mode = launch.analyzerConfig.analyzerMode
+    launch_name = launch.launchName
+    launch_id = launch.launchId
+    if analyzer_mode == "LAUNCH_NAME":
+        # Previous launches with the same name
+        must = create_path(query, ("query", "bool", "must"), [])
+        must_not = create_path(query, ("query", "bool", "must_not"), [])
+        must.append({"term": {"launch_name": launch_name}})
+        must_not.append({"term": {"launch_id": launch_id}})
+    elif analyzer_mode == "CURRENT_AND_THE_SAME_NAME":
+        # All launches with the same name
+        must = create_path(query, ("query", "bool", "must"), [])
+        must.append({"term": {"launch_name": launch_name}})
+        add_launch_id_boost(query, launch_id, launch_boost)
+    elif analyzer_mode == "CURRENT_LAUNCH":
+        # Just current launch
+        must = create_path(query, ("query", "bool", "must"), [])
+        must.append({"term": {"launch_id": launch_id}})
+    elif analyzer_mode == "PREVIOUS_LAUNCH":
+        # Just previous launch
+        must = create_path(query, ("query", "bool", "must"), [])
+        must.append({"term": {"launch_id": previous_launch_id}})
+    elif analyzer_mode == "ALL":
+        # All previous launches
+        must_not = create_path(query, ("query", "bool", "must_not"), [])
+        must_not.append({"term": {"launch_id": launch_id}})
+    else:
+        # Boost launches with the same name and ID, but do not ignore any
+        add_launch_name_and_id_boost(query, launch_name, launch_id, launch_boost)
+    return query
+
+
+def add_constraints_for_launches_into_query_suggest(
+    query: dict, test_item_info: TestItemInfo, launch_boost: float
+) -> dict:
+    previous_launch_id = getattr(test_item_info, "previousLaunchId", 0) or 0
+    previous_launch_id = int(previous_launch_id)
+    analyzer_mode = test_item_info.analyzerConfig.analyzerMode
+    launch_name = test_item_info.launchName
+    launch_id = test_item_info.launchId
+    if analyzer_mode in {"LAUNCH_NAME", "ALL"}:
+        # Previous launches with the same name
+        add_launch_name_boost(query, launch_name, launch_boost)
+        should = create_path(query, ("query", "bool", "should"), [])
+        should.append({"term": {"launch_id": {"value": launch_id, "boost": 1 / launch_boost}}})
+    elif analyzer_mode == "PREVIOUS_LAUNCH":
+        # Just previous launch
+        if previous_launch_id:
+            add_launch_id_boost(query, previous_launch_id, launch_boost)
+    else:
+        # For:
+        # * CURRENT_LAUNCH
+        # * CURRENT_AND_THE_SAME_NAME
+        # Boost launches with the same name, but do not ignore any
+        add_launch_name_and_id_boost(query, launch_name, launch_id, launch_boost)
+    return query
 
 
 def add_start_time_decay(main_query: dict[str, Any], start_time: Optional[str], decay: float) -> dict[str, Any]:
@@ -276,11 +490,11 @@ class ItemQueryBuilder(metaclass=ABCMeta):
         max_query_terms: int,
     ) -> dict[str, Any]:
         nested_must = [
-            utils.build_more_like_this_query(
+            build_more_like_this_query(
                 min_should_match,
                 (getattr(log, message_field, None) or "").strip(),
                 field_name=f"logs.{message_field}",
-                boost=utils.BOOST_MESSAGE,
+                boost=BOOST_MESSAGE,
                 max_query_terms=max_query_terms,
             )
         ]
@@ -288,20 +502,20 @@ class ItemQueryBuilder(metaclass=ABCMeta):
         found_exceptions = (log.found_exceptions or "").strip()
         if found_exceptions:
             nested_should.append(
-                utils.build_more_like_this_query(
+                build_more_like_this_query(
                     "1",
                     found_exceptions,
                     field_name=LOGS_FOUND_EXCEPTIONS_FIELD,
-                    boost=utils.BOOST_ERROR_IDENTITY,
+                    boost=BOOST_ERROR_IDENTITY,
                     override_min_should_match="1",
                     max_query_terms=max_query_terms,
                 )
             )
         nested_should.extend(
-            utils.build_status_codes_queries(
+            build_status_codes_queries(
                 log.potential_status_codes or "",
                 field_name=POTENTIAL_STATUS_CODES_FIELD,
-                boost=utils.BOOST_ERROR_IDENTITY,
+                boost=BOOST_ERROR_IDENTITY,
             )
         )
         nested_bool: dict[str, Any] = {"must": nested_must}
@@ -309,9 +523,7 @@ class ItemQueryBuilder(metaclass=ABCMeta):
             # Logs with different status codes are different failures, however similar their texts are. A found Test
             # Item which has no logs left after this filter does not match the clause.
             nested_bool["filter"] = [
-                utils.build_status_codes_filter(
-                    log.potential_status_codes or "", field_name=POTENTIAL_STATUS_CODES_FIELD
-                )
+                build_status_codes_filter(log.potential_status_codes or "", field_name=POTENTIAL_STATUS_CODES_FIELD)
             ]
         if nested_should:
             nested_bool["should"] = nested_should
@@ -345,7 +557,7 @@ class ItemQueryBuilder(metaclass=ABCMeta):
             field_value = (getattr(request_item, field, None) or "").strip()
             if field_value:
                 should.append(
-                    utils.build_more_like_this_query(
+                    build_more_like_this_query(
                         "1",
                         field_value,
                         field_name=field,
@@ -391,7 +603,7 @@ class ItemQueryBuilder(metaclass=ABCMeta):
             for log_index, log in logs
         ]
 
-        must_not = utils.prepare_restrictions_by_issue_type(filter_no_defect=filter_no_defect)
+        must_not = prepare_restrictions_by_issue_type(filter_no_defect=filter_no_defect)
         must_not.append({"term": {"test_item_id": str(request_item.test_item_id)}})
         if exclude_issue_type:
             must_not.append({"term": {"issue_type": exclude_issue_type}})
@@ -409,7 +621,7 @@ class ItemQueryBuilder(metaclass=ABCMeta):
                 }
             },
         }
-        utils.append_aa_ma_boosts(query, self.search_cfg)
+        append_aa_ma_boosts(query, self.search_cfg)
         return query
 
 

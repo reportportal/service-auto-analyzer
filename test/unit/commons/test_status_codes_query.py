@@ -14,38 +14,42 @@
 
 import pytest
 
-from app.utils import utils
+from app.commons.query_builder import (
+    build_status_codes_exact_query,
+    build_status_codes_filter,
+    build_status_codes_queries,
+)
 
 NO_CODES_FILTER = {"bool": {"must_not": [{"wildcard": {"potential_status_codes.exact": {"value": "?*"}}}]}}
 
 
 @pytest.mark.parametrize("status_codes", ["", "   ", "\n"])
 def test_no_clauses_without_codes(status_codes):
-    assert utils.build_status_codes_exact_query(status_codes) is None
-    assert utils.build_status_codes_queries(status_codes) == []
+    assert build_status_codes_exact_query(status_codes) is None
+    assert build_status_codes_queries(status_codes) == []
 
 
 def test_exact_query_matches_the_whole_sequence():
-    query = utils.build_status_codes_exact_query("400 401", field_name="logs.potential_status_codes", boost=8.0)
+    query = build_status_codes_exact_query("400 401", field_name="logs.potential_status_codes", boost=8.0)
 
     assert query == {"term": {"logs.potential_status_codes.exact": {"value": "400 401", "boost": 8.0}}}
 
 
 def test_exact_query_keeps_the_order_of_the_codes():
     """'expected 400, but was 401' must not match the inverse failure."""
-    forward = utils.build_status_codes_exact_query("400 401")
-    inverted = utils.build_status_codes_exact_query("401 400")
+    forward = build_status_codes_exact_query("400 401")
+    inverted = build_status_codes_exact_query("401 400")
 
     assert forward != inverted
 
 
 def test_exact_query_keeps_repeated_codes():
     """'expected 400, but was 400' is stored as two codes and stays distinct from one."""
-    assert utils.build_status_codes_exact_query("400 400") != utils.build_status_codes_exact_query("400")
+    assert build_status_codes_exact_query("400 400") != build_status_codes_exact_query("400")
 
 
 def test_queries_rank_exact_above_contained():
-    exact, phrase = utils.build_status_codes_queries("400 401", boost=8.0)
+    exact, phrase = build_status_codes_queries("400 401", boost=8.0)
 
     assert exact == {"term": {"potential_status_codes.exact": {"value": "400 401", "boost": 8.0}}}
     assert phrase == {"match_phrase": {"potential_status_codes": {"query": "400 401", "boost": 4.0}}}
@@ -53,22 +57,22 @@ def test_queries_rank_exact_above_contained():
 
 def test_queries_use_no_term_overlap_matching():
     """`more_like_this` and `terms` score a code sequence the same as its permutations."""
-    clauses = utils.build_status_codes_queries("400 401")
+    clauses = build_status_codes_queries("400 401")
 
     assert not any("more_like_this" in clause or "terms" in clause for clause in clauses)
 
 
 def test_filter_matches_the_exact_sequence():
-    status_filter = utils.build_status_codes_filter(" 400 401 ", field_name="logs.potential_status_codes")
+    status_filter = build_status_codes_filter(" 400 401 ", field_name="logs.potential_status_codes")
 
     assert status_filter == {"term": {"logs.potential_status_codes.exact": {"value": "400 401", "boost": 1.0}}}
 
 
 @pytest.mark.parametrize("status_codes", ["", "   ", "\n"])
 def test_filter_without_codes_leaves_only_logs_without_codes(status_codes):
-    assert utils.build_status_codes_filter(status_codes) == NO_CODES_FILTER
+    assert build_status_codes_filter(status_codes) == NO_CODES_FILTER
 
 
 def test_filter_keeps_the_order_and_repeats_of_the_codes():
-    assert utils.build_status_codes_filter("400 401") != utils.build_status_codes_filter("401 400")
-    assert utils.build_status_codes_filter("400 400") != utils.build_status_codes_filter("400")
+    assert build_status_codes_filter("400 401") != build_status_codes_filter("401 400")
+    assert build_status_codes_filter("400 400") != build_status_codes_filter("400")

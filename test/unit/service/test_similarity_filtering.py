@@ -21,11 +21,8 @@ from app.commons.model.db import Hit
 from app.commons.model.launch_objects import AnalyzerConf, Launch, Log, TestItem, TestItemInfo
 from app.commons.model.test_item_index import TestItemIndexData
 from app.commons.similarity_filter import SHORTENED_MESSAGE_FIELDS, UNSHORTENED_MESSAGE_FIELDS
-from app.service.auto_analyzer_service import (
-    AutoAnalyzerService,
-    choose_fields_to_filter_strict,
-    prepare_request_items_for_launch,
-)
+from app.service.analysis.boosting_handler import BoostingHandler, choose_fields_to_filter_strict
+from app.service.auto_analyzer_service import prepare_request_items_for_launch
 from app.service.suggest_service import SuggestService
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
 
@@ -111,9 +108,9 @@ def test_auto_analysis_removes_not_similar_found_items(number_of_log_lines: int)
     ]
     os_client = mock.Mock()
     os_client.msearch_grouped.return_value = iter([hits])
-    service = AutoAnalyzerService(mock.Mock(), APP_CONFIG, DEFAULT_SEARCH_CONFIG, os_client=os_client)
+    handler = BoostingHandler(mock.Mock(), APP_CONFIG, DEFAULT_SEARCH_CONFIG, os_client, mock.Mock())
 
-    results = service._query_candidates_for_launch(launch, request_items)
+    results = handler._query_candidates_for_launch(launch, request_items)
 
     os_client.msearch_grouped.assert_called_once()
     assert len(results) == 1
@@ -132,9 +129,9 @@ def test_auto_analysis_all_messages_should_match(all_messages_should_match: bool
     ]
     os_client = mock.Mock()
     os_client.msearch_grouped.return_value = iter([hits])
-    service = AutoAnalyzerService(mock.Mock(), APP_CONFIG, DEFAULT_SEARCH_CONFIG, os_client=os_client)
+    handler = BoostingHandler(mock.Mock(), APP_CONFIG, DEFAULT_SEARCH_CONFIG, os_client, mock.Mock())
 
-    results = service._query_candidates_for_launch(launch, request_items)
+    results = handler._query_candidates_for_launch(launch, request_items)
 
     assert get_ids(results[0][1]) == expected_ids
 

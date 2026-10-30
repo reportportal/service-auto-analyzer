@@ -12,7 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from app.service.analyzer_service import AnalyzerService
 from app.service.auto_analyzer_service import AutoAnalyzerService
 from app.service.clean_index_service import CleanIndexService
 from app.service.cluster_service import ClusterService
@@ -24,7 +23,6 @@ from app.service.suggest_patterns_service import SuggestPatternsService
 from app.service.suggest_service import SuggestService
 
 __all__ = [
-    "AnalyzerService",
     "AutoAnalyzerService",
     "CleanIndexService",
     "ClusterService",

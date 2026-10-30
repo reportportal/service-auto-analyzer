@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 import math
-from typing import Any, Optional, Protocol
+from typing import Any, Optional
 
 from app.commons import logging
 from app.commons.model.db import Hit
@@ -24,6 +24,7 @@ from app.ml.features import (
     DEFAULT_TIME_WEIGHT_DECAY,
     BaseIssueTypeFeature,
     DefectTypeFeature,
+    Feature,
     HistoryStabilityFeature,
     HistoryUnchangedFeature,
     IdentifierJaccardFeature,
@@ -50,19 +51,6 @@ from app.utils import text_processing, utils
 from app.utils.utils import normalize_issue_type
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
-
-
-class Feature(Protocol):
-    """Gradient Boosting feature, calculated for every found Test Item against the request Test Item."""
-
-    def calculate(self, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
-        """Calculate the feature value for every found Test Item.
-
-        :param request: Request Test Item
-        :param hits: Found Test Items
-        :return: Feature values in the range [0.0, 1.0], one per hit, in the order of hits
-        """
-        ...
 
 
 class BoostingFeaturizer:

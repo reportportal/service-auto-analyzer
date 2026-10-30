@@ -198,6 +198,9 @@ class TestItemIndexData(BaseModel):
     issue_type: Optional[str] = Field(default=None, description="Assigned issue type (e.g., pb001, ab001)")
     start_time: Optional[str] = Field(default=None, description="When the test item started")
     log_count: Optional[int] = Field(default=None, description="Number of logs in this Test Item")
+    error_hash: Optional[str] = Field(
+        default=None, description="Stateless identity of the failure, see app.commons.error_hash"
+    )
     logs: Optional[list[LogData]] = Field(default=None, description="Nested log entries")
     merged_small_logs: Optional[list[MergedLogData]] = Field(
         default=None, description="Nested small log entries merged by log level, used in clustering"

@@ -13,7 +13,13 @@ from app.commons.model.test_item_index import (
     TestItemHistoryData,
     TestItemIndexData,
 )
-from app.commons.os_client import HEALTH_CHECK_TIMEOUT, OsClient, get_test_item_index_name
+from app.commons.os_client import (
+    HEALTH_CHECK_TIMEOUT,
+    TEST_ITEM_INDEX_MAPPINGS_FILE,
+    OsClient,
+    get_test_item_index_name,
+)
+from app.utils import utils
 from test import APP_CONFIG
 
 PROJECT_ID = "42"
@@ -860,3 +866,79 @@ def test_bulk_index_retries_when_read_only_reset_fails(monkeypatch, os_client_mo
     os_client_mock.indices.put_settings.assert_called_once()
     assert bulk_mock.call_count == 2
     assert response.took == 1
+
+
+def _index_metadata(index_name: str, properties: dict[str, Any]) -> dict[str, Any]:
+    return {index_name: {"mappings": {"properties": properties}}}
+
+
+def _current_mapping_properties() -> dict[str, Any]:
+    return utils.read_resource_file(TEST_ITEM_INDEX_MAPPINGS_FILE, to_json=True)["properties"]
+
+
+def test_existing_index_gets_missing_mapping_fields_once(os_client_mock, app_config):
+    index_name = get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
+    old_properties = {name: value for name, value in _current_mapping_properties().items() if name != "error_hash"}
+    os_client_mock.indices.get.return_value = _index_metadata(index_name, old_properties)
+    os_client_mock.msearch.return_value = {"responses": []}
+    client = OsClient(app_config, os_client=os_client_mock)
+
+    list(client.msearch_grouped(PROJECT_ID, [{}, {"query": {"match_all": {}}}]))
+    list(client.msearch_grouped(PROJECT_ID, [{}, {"query": {"match_all": {}}}]))
+
+    os_client_mock.indices.get.assert_called_once()
+    os_client_mock.indices.put_mapping.assert_called_once_with(
+        index=index_name, body={"properties": {"error_hash": {"type": "keyword"}}}
+    )
+    assert os_client_mock.msearch.call_count == 2
+
+
+def test_index_with_current_mappings_is_not_updated(os_client_mock, app_config):
+    index_name = get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
+    os_client_mock.indices.get.return_value = _index_metadata(index_name, _current_mapping_properties())
+    os_client_mock.msearch.return_value = {"responses": []}
+    client = OsClient(app_config, os_client=os_client_mock)
+
+    list(client.msearch_grouped(PROJECT_ID, [{}, {"query": {"match_all": {}}}]))
+
+    os_client_mock.indices.put_mapping.assert_not_called()
+    os_client_mock.msearch.assert_called_once()
+
+
+def test_index_metadata_without_the_index_skips_mapping_update(os_client_mock, app_config):
+    os_client_mock.indices.get.return_value = {"some_alias_target": {"mappings": {"properties": {}}}}
+    os_client_mock.msearch.return_value = {"responses": []}
+    client = OsClient(app_config, os_client=os_client_mock)
+
+    list(client.msearch_grouped(PROJECT_ID, [{}, {"query": {"match_all": {}}}]))
+
+    os_client_mock.indices.put_mapping.assert_not_called()
+    os_client_mock.msearch.assert_called_once()
+
+
+def test_failed_mapping_update_does_not_block_requests(os_client_mock, app_config):
+    index_name = get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
+    os_client_mock.indices.get.return_value = _index_metadata(index_name, {})
+    os_client_mock.indices.put_mapping.side_effect = TransportError(400, "illegal_argument_exception")
+    os_client_mock.msearch.return_value = {"responses": []}
+    client = OsClient(app_config, os_client=os_client_mock)
+
+    list(client.msearch_grouped(PROJECT_ID, [{}, {"query": {"match_all": {}}}]))
+    list(client.msearch_grouped(PROJECT_ID, [{}, {"query": {"match_all": {}}}]))
+
+    os_client_mock.indices.put_mapping.assert_called_once()
+    assert os_client_mock.msearch.call_count == 2
+
+
+def test_new_index_is_created_with_error_hash_mapping(monkeypatch, os_client_mock, app_config, test_item):
+    os_client_mock.indices.get.side_effect = Exception("missing index")
+    os_client_mock.indices.create.return_value = {"acknowledged": True}
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.bulk", mock.Mock(return_value=(1, [])))
+    client = OsClient(app_config, os_client=os_client_mock)
+
+    client.bulk_index(PROJECT_ID, [test_item])
+
+    os_client_mock.indices.create.assert_called_once()
+    body = os_client_mock.indices.create.call_args.kwargs["body"]
+    assert body["mappings"]["properties"]["error_hash"] == {"type": "keyword"}
+    os_client_mock.indices.put_mapping.assert_not_called()

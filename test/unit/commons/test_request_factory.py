@@ -217,6 +217,7 @@ class TestPrepareTestItem:
         assert result.test_item_id == "99999"
         assert result.log_count == 0
         assert len(result.logs) == 0
+        assert result.error_hash is None
 
     def test_prepare_test_item_text_processing(self):
         """Test that text processing is applied correctly."""

@@ -194,6 +194,20 @@ class OsClient:
         LOGGER.debug(f"Index '{index_name}' created")
         return Response(**response)
 
+    def _get_index(self, index_name: str, print_error: bool = True) -> Optional[dict[str, Any]]:
+        """Get index metadata, including its mappings.
+
+        :param index_name: The index name to get
+        :param print_error: Whether to log errors
+        :return: Index metadata, or None if the index does not exist
+        """
+        try:
+            return self._os_client.indices.get(index=index_name)
+        except Exception as err:
+            if print_error:
+                LOGGER.exception(f"Index '{index_name}' was not found", exc_info=err)
+            return None
+
     def _index_exists(self, index_name: str, print_error: bool = True) -> bool:
         """Check whether an index exists.
 
@@ -201,20 +215,39 @@ class OsClient:
         :param print_error: Whether to log errors
         :return: True if index exists
         """
+        return self._get_index(index_name, print_error) is not None
+
+    def _add_missing_mappings(self, index_name: str, index: dict[str, Any]) -> None:
+        """Add the top-level fields of the current mappings which an index created by an older version lacks.
+
+        Only new fields are added, OpenSearch does not allow to change existing ones. Documents indexed before keep no
+        value in a new field until they are indexed again.
+
+        :param index_name: The index name
+        :param index: Index metadata, as returned by `indices.get`
+        """
+        metadata = index.get(index_name)
+        mappings = metadata.get("mappings") if isinstance(metadata, dict) else None
+        if not isinstance(mappings, dict):
+            # The metadata does not describe the index (e.g. it was requested by an alias), nothing to compare with
+            return
+        existing = mappings.get("properties") or {}
+        expected = utils.read_resource_file(TEST_ITEM_INDEX_MAPPINGS_FILE, to_json=True)["properties"]
+        missing = {name: definition for name, definition in expected.items() if name not in existing}
+        if not missing:
+            return
         try:
-            index = self._os_client.indices.get(index=index_name)
-            return index is not None
+            self._os_client.indices.put_mapping(index=index_name, body={"properties": missing})
+            LOGGER.info(f"Added fields {', '.join(missing)} to the mappings of index '{index_name}'")
         except Exception as err:
-            if print_error:
-                LOGGER.exception(f"Index '{index_name}' was not found", exc_info=err)
-            return False
+            LOGGER.exception(f"Failed to add fields {', '.join(missing)} to index '{index_name}'", exc_info=err)
 
     def _ensure_index_checked(self, index_name: str) -> bool:
         """Check whether an index exists, asking OpenSearch at most once per index.
 
-        `_index_exists` issues `indices.get`, which returns the index's whole metadata including
-        its mappings. Callers that guard every request with it pay that round trip per request, so
-        the answer is cached here.
+        `indices.get` returns the index's whole metadata including its mappings. Callers that guard
+        every request with it pay that round trip per request, so the answer is cached here. The
+        same metadata is used to add the fields an index created by an older version lacks.
 
         Only a positive answer is cached: a missing index may be created later in the process
         lifetime (indexing creates it on demand), so a negative has to be re-checked. An index
@@ -227,10 +260,12 @@ class OsClient:
         """
         if index_name in self._checked_indexes:
             return True
-        if self._index_exists(index_name, print_error=False):
-            self._checked_indexes.add(index_name)
-            return True
-        return False
+        index = self._get_index(index_name, print_error=False)
+        if index is None:
+            return False
+        self._add_missing_mappings(index_name, index)
+        self._checked_indexes.add(index_name)
+        return True
 
     def _ensure_index_exists(self, index_name: str) -> bool:
         """Ensure the Test Item index exists, creating it if necessary.

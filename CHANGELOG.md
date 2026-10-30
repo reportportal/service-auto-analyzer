@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 ### Added
+- Test Items are indexed with an `error_hash` field, a stateless identity of the failure built from exception messages, exceptions and status codes; the field is added to existing indices automatically, by @HardNorth
+
+## [6.0.0]
+### Added
 - `ANALYZER_QUERY_TERMS_BUDGET` config parameter to limit the number of message terms in one Test Item query, by @HardNorth
 ### Changed
 - Log Item-centric storage approach changed to Test Item-centric one, by @HardNorth

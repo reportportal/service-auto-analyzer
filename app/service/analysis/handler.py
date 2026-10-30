@@ -20,6 +20,7 @@ for a whole launch at once.
 """
 
 from abc import ABC, abstractmethod
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
@@ -44,6 +45,8 @@ class LaunchAnalysisStats(BaseModel):
     not_found: int = 0
     processed_time: float = 0.0
     model_info: set[str] = Field(default_factory=set)
+    # Number of results by the name of the handler which produced them
+    handler_results: Counter[str] = Field(default_factory=Counter)
     errors: list[str] = Field(default_factory=list)
     gathered_at: datetime = Field(default_factory=datetime.now, exclude=True)
 

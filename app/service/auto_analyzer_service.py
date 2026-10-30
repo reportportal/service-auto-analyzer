@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import json
+from collections import Counter
 from time import time
 from typing import Optional
 
@@ -150,13 +151,22 @@ class AutoAnalyzerService:
                 context = AnalysisContext(launch=launch, stats=stats, chosen_namespaces=chosen_namespaces)
                 handler_results, not_found = self.chain.handle(context, request_items)
                 stats.not_found += len(not_found)
-                results.extend(handler_result.result for handler_result in handler_results)
+                for handler_result in handler_results:
+                    stats.handler_results[handler_result.handler] += 1
+                    results.append(handler_result.result)
         except Exception as exc:
             LOGGER.exception("Unable to process analysis candidates", exc_info=exc)
 
         stats_info = {launch_id: stats.model_dump(mode="json") for launch_id, stats in stats_by_launch.items()}
         LOGGER.debug(f"Stats info: {json.dumps(stats_info)}")
         LOGGER.info(f"Processed {processed_items} test items. It took {time() - t_start:.2f} sec.")
-        LOGGER.info(f"Finished analysis for {len(launches)} launches with {len(results)} results.")
+        results_by_handler: Counter[str] = sum(
+            (stats.handler_results for stats in stats_by_launch.values()), Counter()
+        )
+        by_handler = ", ".join(f"{handler} {count}" for handler, count in results_by_handler.most_common())
+        LOGGER.info(
+            f"Finished analysis for {len(launches)} launches with {len(results)} results"
+            + (f": {by_handler}" if by_handler else ".")
+        )
         if self.amqp_client:
             self.amqp_client.publish_response(json.dumps([res.model_dump() for res in results]))

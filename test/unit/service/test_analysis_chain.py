@@ -15,9 +15,12 @@
 """Unit tests for the auto-analysis handler chain and its orchestration by AutoAnalyzerService."""
 
 import json
+import logging
 from datetime import datetime
 from typing import Optional
 from unittest import mock
+
+import pytest
 
 from app.commons.model.launch_objects import AnalysisResult, AnalyzerConf, Launch, Log, TestItem
 from app.commons.model.test_item_index import TestItemIndexData
@@ -222,6 +225,7 @@ def test_launch_stats_report() -> None:
     )
     stats.model_info.update({"global boosting model", "global boosting model", "global defect type model"})
     stats.errors.append("RuntimeError: failure\n")
+    stats.handler_results["hash_same_test"] += 2
 
     report = stats.model_dump(mode="json")
 
@@ -241,10 +245,42 @@ def test_launch_stats_report() -> None:
         "module_version",
         "errors",
         "errors_count",
+        "handler_results",
     }
     assert sorted(report["model_info"]) == ["global boosting model", "global defect type model"]
     assert report["errors_count"] == 1
+    assert report["handler_results"] == {"hash_same_test": 2}
     assert report["gather_date"] == "2026-10-31"
     assert report["gather_datetime"] == "2026-10-31 09:05:07"
     assert report["method"] == "auto_analysis"
     assert json.loads(json.dumps(report)) == report
+
+
+def test_service_counts_results_by_handler(caplog: pytest.LogCaptureFixture) -> None:
+    contexts: list[AnalysisContext] = []
+
+    class RecordingHandler(ResolvingHandler):
+        def _analyze(
+            self, context: AnalysisContext, items: list[TestItemIndexData]
+        ) -> tuple[list[HandlerResult], list[TestItemIndexData]]:
+            contexts.append(context)
+            return super()._analyze(context, items)
+
+    chain = RecordingHandler("first", {1, 3}, next_handler=ResolvingHandler("last", {2}))
+    service, _ = build_service(chain)
+
+    with caplog.at_level(logging.INFO, logger="analyzerApp.autoAnalyzerService"):
+        service.analyze_logs([build_launch(1, [1, 2]), build_launch(2, [3, 4])])
+
+    assert [dict(context.stats.handler_results) for context in contexts] == [{"first": 1, "last": 1}, {"first": 1}]
+    assert [context.stats.not_found for context in contexts] == [0, 1]
+    assert "Finished analysis for 2 launches with 3 results: first 2, last 1" in caplog.messages
+
+
+def test_service_summary_without_results(caplog: pytest.LogCaptureFixture) -> None:
+    service, _ = build_service(ResolvingHandler("only", set()))
+
+    with caplog.at_level(logging.INFO, logger="analyzerApp.autoAnalyzerService"):
+        service.analyze_logs([build_launch(1, [1])])
+
+    assert "Finished analysis for 1 launches with 0 results." in caplog.messages

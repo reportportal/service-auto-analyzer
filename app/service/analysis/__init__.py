@@ -16,5 +16,15 @@
 
 from app.service.analysis.boosting_handler import BoostingHandler
 from app.service.analysis.handler import AnalysisContext, AnalysisHandler, HandlerResult, LaunchAnalysisStats
+from app.service.analysis.hash_handler import AnyTestHashHandler, ErrorHashHandler, SameTestHashHandler
 
-__all__ = ["AnalysisContext", "AnalysisHandler", "BoostingHandler", "HandlerResult", "LaunchAnalysisStats"]
+__all__ = [
+    "AnalysisContext",
+    "AnalysisHandler",
+    "AnyTestHashHandler",
+    "BoostingHandler",
+    "ErrorHashHandler",
+    "HandlerResult",
+    "LaunchAnalysisStats",
+    "SameTestHashHandler",
+]

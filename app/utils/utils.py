@@ -30,6 +30,7 @@ from app.utils.text_processing import split_words
 logger = logging.getLogger("analyzerApp.utils")
 
 NOT_CLASSIFIED_BASE_ISSUE_TYPE = "ti"
+NO_DEFECT_BASE_ISSUE_TYPE = "nd"
 CERTAIN_BASE_ISSUE_TYPES = {"ab", "pb", "si", "ti"}
 CLASSIFIED_BASE_ISSUE_TYPES = set(list(CERTAIN_BASE_ISSUE_TYPES) + ["nd"])
 ALL_BASE_ISSUE_TYPES = set(list(CLASSIFIED_BASE_ISSUE_TYPES) + [NOT_CLASSIFIED_BASE_ISSUE_TYPE])
@@ -199,6 +200,15 @@ def normalize_issue_type(issue_type: Any) -> str:
     if issue_type is None:
         return ""
     return str(issue_type).strip().lower()
+
+
+def is_no_defect(issue_type: Optional[str]) -> bool:
+    """Check whether an issue type is a "No Defect" one, of any subtype.
+
+    :param issue_type: Issue type locator, e.g. `nd001`
+    :return: True for "No Defect" issue types
+    """
+    return normalize_issue_type(issue_type).startswith(NO_DEFECT_BASE_ISSUE_TYPE)
 
 
 def safe_int(value: Any) -> int:

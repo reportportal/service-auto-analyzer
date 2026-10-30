@@ -23,7 +23,14 @@ from app.commons.model.test_item_index import TestItemIndexData
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.os_client import OsClient
-from app.service.analysis import AnalysisContext, AnalysisHandler, BoostingHandler, LaunchAnalysisStats
+from app.service.analysis import (
+    AnalysisContext,
+    AnalysisHandler,
+    AnyTestHashHandler,
+    BoostingHandler,
+    LaunchAnalysisStats,
+    SameTestHashHandler,
+)
 from app.utils import utils
 
 LOGGER = logging.getLogger("analyzerApp.autoAnalyzerService")
@@ -82,9 +89,14 @@ class AutoAnalyzerService:
 
         :return: The first handler of the chain
         """
-        return BoostingHandler(
+        chain: AnalysisHandler = BoostingHandler(
             self.model_chooser, self.app_config, self.search_cfg, self.os_client, self.namespace_finder
         )
+        if self.search_cfg.HashMatchAnyTest:
+            chain = AnyTestHashHandler(self.search_cfg, self.os_client, next_handler=chain)
+        if self.search_cfg.HashMatchSameTest:
+            chain = SameTestHashHandler(self.search_cfg, self.os_client, next_handler=chain)
+        return chain
 
     def _should_stop_processing(self, test_items_processed: int) -> bool:
         if test_items_processed >= self.search_cfg.MaxAutoAnalysisItemsToProcess:

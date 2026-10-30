@@ -132,6 +132,10 @@ class SearchConfig(BaseModel):
     # Total number of message terms in one Test Item query, shared across its logs. OpenSearch limits
     # the number of clauses in the whole query (1024 by default), and every term is a clause.
     ItemQueryTermsBudget: int = 800
+    # Analyze a Test Item by the latest runs of the same test case failed with the same error, before Gradient Boosting
+    HashMatchSameTest: bool = False
+    # Analyze a Test Item by the latest Test Items of any test case failed with the same error, if they all agree
+    HashMatchAnyTest: bool = False
     DefectTypeModelNumEstimators: int = 5
     SuggestBoostModelNumEstimators: int = 50
     SuggestBoostModelMaxDepth: int = 5

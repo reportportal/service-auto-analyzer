@@ -41,11 +41,9 @@ from app.commons.similarity_filter import SimilarityFilter, choose_message_field
 from app.ml.predictor import AutoAnalysisPredictor, PredictionResult
 from app.service.analysis.handler import AnalysisContext, AnalysisHandler, HandlerResult
 from app.utils import utils
-from app.utils.utils import normalize_issue_type
 
 LOGGER = logging.getLogger("analyzerApp.boostingHandler")
 
-NO_DEFECT_BASE_ISSUE_TYPE = "nd"
 # "No Defect" Test Items are found along with the regular candidates and take their places in search results
 ANALYSIS_QUERY_SIZE = DEFAULT_ITEM_QUERY_SIZE * 3 // 2
 
@@ -85,10 +83,6 @@ def choose_best_prediction(prediction_results: list[PredictionResult]) -> Option
     return max(positive_predictions, key=lambda result: (result.probability[1], -result.original_position))
 
 
-def is_no_defect(hit: Hit[TestItemIndexData]) -> bool:
-    return normalize_issue_type(hit.source.issue_type).startswith(NO_DEFECT_BASE_ISSUE_TYPE)
-
-
 def split_no_defect_candidates(search_results: SearchResults) -> tuple[SearchResults, Optional[SearchResults]]:
     """Split found Test Items into regular candidates and a "No Defect" candidate.
 
@@ -100,7 +94,7 @@ def split_no_defect_candidates(search_results: SearchResults) -> tuple[SearchRes
              "No Defect" one, otherwise None
     """
     request_item, hits = search_results
-    regular_results = (request_item, [hit for hit in hits if not is_no_defect(hit)])
+    regular_results = (request_item, [hit for hit in hits if not utils.is_no_defect(hit.source.issue_type)])
     if not request_item.test_case_hash:
         return regular_results, None
     same_test_case_hits = [hit for hit in hits if hit.source.test_case_hash == request_item.test_case_hash]
@@ -109,7 +103,7 @@ def split_no_defect_candidates(search_results: SearchResults) -> tuple[SearchRes
     # Start time is stored in "%Y-%m-%d %H:%M:%S" format, so string order is chronological. On ties `max` keeps the
     # first, i.e. the best scored, Test Item.
     latest = max(same_test_case_hits, key=lambda hit: hit.source.start_time or "")
-    if not is_no_defect(latest):
+    if not utils.is_no_defect(latest.source.issue_type):
         return regular_results, None
     return regular_results, (request_item, [latest])
 

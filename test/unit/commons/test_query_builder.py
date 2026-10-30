@@ -12,16 +12,18 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Any
+from typing import Any, Optional
 
 import pytest
 
 from app.commons.model.db import Hit
+from app.commons.model.launch_objects import AnalyzerConf, Launch
 from app.commons.model.test_item_index import LogData, TestItemIndexData
 from app.commons.query_builder import (
     INNER_HITS_SIZE,
     MIN_TERMS_PER_LOG,
     AutoAnalysisQueryBuilder,
+    ErrorHashQueryBuilder,
     SuggestQueryBuilder,
     add_start_time_decay,
     best_log_match,
@@ -352,3 +354,81 @@ def test_select_log_indices(builder_class, number_of_log_lines: int, expected_in
     log_indices = builder_class(DEFAULT_SEARCH_CONFIG).select_log_indices(request_item, number_of_log_lines)
 
     assert log_indices == expected_indices
+
+
+def build_error_hash_request(
+    error_hash: Optional[str] = "abc", test_case_hash: Optional[int] = 7
+) -> TestItemIndexData:
+    return TestItemIndexData(test_item_id="1", launch_id="10", error_hash=error_hash, test_case_hash=test_case_hash)
+
+
+def build_error_hash_launch(analyzer_mode: str = "ALL", previous_launch_id: int = 0) -> Launch:
+    return Launch(
+        launchId=10,
+        project=1,
+        launchName="Launch",
+        previousLaunchId=previous_launch_id,
+        analyzerConfig=AnalyzerConf(analyzerMode=analyzer_mode),
+    )
+
+
+def test_error_hash_query_for_the_same_test_case() -> None:
+    query = ErrorHashQueryBuilder(DEFAULT_SEARCH_CONFIG).build(
+        build_error_hash_launch(), build_error_hash_request(), 3
+    )
+
+    assert query["size"] == 3
+    assert query["sort"] == [{"start_time": {"order": "desc"}}, {"test_item_id": {"order": "desc"}}]
+    assert set(query["_source"]) >= {"test_item_id", "launch_id", "issue_type", "start_time"}
+    bool_query = query["query"]["bool"]
+    assert bool_query["filter"] == [{"term": {"error_hash": "abc"}}, {"term": {"test_case_hash": 7}}]
+    assert bool_query["must_not"] == [
+        {"wildcard": {"issue_type": {"value": "ti*", "case_insensitive": True}}},
+        {"term": {"launch_id": 10}},
+    ]
+
+
+def test_error_hash_query_for_any_test_case() -> None:
+    query = ErrorHashQueryBuilder(DEFAULT_SEARCH_CONFIG).build(
+        build_error_hash_launch(), build_error_hash_request(test_case_hash=None), 20, same_test_case=False
+    )
+
+    assert query["size"] == 20
+    assert query["query"]["bool"]["filter"] == [{"term": {"error_hash": "abc"}}]
+
+
+@pytest.mark.parametrize(
+    "error_hash, test_case_hash, same_test_case",
+    [(None, 7, True), ("", 7, False), ("abc", None, True), ("abc", 0, True)],
+    ids=["no_hash", "empty_hash_any_test", "no_test_case_hash", "zero_test_case_hash"],
+)
+def test_error_hash_query_is_not_built(
+    error_hash: Optional[str], test_case_hash: Optional[int], same_test_case: bool
+) -> None:
+    query = ErrorHashQueryBuilder(DEFAULT_SEARCH_CONFIG).build(
+        build_error_hash_launch(), build_error_hash_request(error_hash, test_case_hash), 3, same_test_case
+    )
+
+    assert query == {}
+
+
+@pytest.mark.parametrize(
+    "analyzer_mode, expected_must, expected_must_not_launch",
+    [
+        ("LAUNCH_NAME", [{"term": {"launch_name": "Launch"}}], [{"term": {"launch_id": 10}}]),
+        ("CURRENT_LAUNCH", [{"term": {"launch_id": 10}}], []),
+        ("PREVIOUS_LAUNCH", [{"term": {"launch_id": 9}}], []),
+        ("ALL", None, [{"term": {"launch_id": 10}}]),
+    ],
+)
+def test_error_hash_query_respects_analyzer_mode(
+    analyzer_mode: str, expected_must: Optional[list[dict[str, Any]]], expected_must_not_launch: list[dict[str, Any]]
+) -> None:
+    query = ErrorHashQueryBuilder(DEFAULT_SEARCH_CONFIG).build(
+        build_error_hash_launch(analyzer_mode, previous_launch_id=9), build_error_hash_request(), 3
+    )
+
+    bool_query = query["query"]["bool"]
+    assert bool_query.get("must") == expected_must
+    assert bool_query["must_not"][1:] == expected_must_not_launch
+    assert bool_query["filter"] == [{"term": {"error_hash": "abc"}}, {"term": {"test_case_hash": 7}}]

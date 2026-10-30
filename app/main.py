@@ -252,6 +252,8 @@ SEARCH_CONFIG = SearchConfig(
     MlModelForSuggestions=os.getenv("ML_MODEL_FOR_SUGGESTIONS", ModelType.suggestion.name).strip(),
     AnalysisQueryBatchSize=int(os.getenv("ANALYZER_QUERY_BATCH_SIZE", "20")),
     ItemQueryTermsBudget=int(os.getenv("ANALYZER_QUERY_TERMS_BUDGET", "800")),
+    HashMatchSameTest=to_bool(os.getenv("ANALYZER_HASH_MATCH_SAME_TEST", "false")),
+    HashMatchAnyTest=to_bool(os.getenv("ANALYZER_HASH_MATCH_ANY_TEST", "false")),
 )
 
 

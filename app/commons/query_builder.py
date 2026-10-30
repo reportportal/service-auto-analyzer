@@ -31,6 +31,8 @@ LOGS_FOUND_EXCEPTIONS_FIELD = "logs.found_exceptions"
 
 POTENTIAL_STATUS_CODES_FIELD = "logs.potential_status_codes"
 
+ERROR_HASH_FIELD = "error_hash"
+
 LOG_INNER_HITS_PREFIX = "log_"
 INNER_HITS_SIZE = 3
 DEFAULT_ITEM_QUERY_SIZE = 20
@@ -97,6 +99,9 @@ TEST_ITEM_SOURCE_FIELDS = [
     "issue_history",
     *ITEM_LOG_SOURCE_FIELDS,
 ]
+
+# Fields of a Test Item found by its error hash: what an analysis result is made of, plus the required model fields
+ERROR_HASH_SOURCE_FIELDS = ["test_item_id", "launch_id", "issue_type", "test_case_hash", "start_time"]
 
 INNER_HITS_SOURCE = [
     "logs.log_id",
@@ -639,3 +644,55 @@ class SuggestQueryBuilder(ItemQueryBuilder):
 
     def choose_message_field(self, number_of_log_lines: int) -> str:
         return "detected_message_extended" if number_of_log_lines == -1 else "message_extended"
+
+
+class ErrorHashQueryBuilder:
+    """Builder of queries which find the latest analyzed Test Items failed with the same error.
+
+    Test Items are matched by their error hash exactly, see `app.commons.error_hash`, and sorted by start time, newest
+    first. Only analyzed Test Items are found: "To Investigate" ones are skipped, the analyzer mode restricts launches
+    the same way as for the "more like this" query.
+    """
+
+    search_cfg: SearchConfig
+    launch_boost: float
+
+    def __init__(self, search_cfg: SearchConfig) -> None:
+        """Initialize the builder.
+
+        :param search_cfg: Search configuration
+        """
+        self.search_cfg = search_cfg
+        self.launch_boost = abs(search_cfg.BoostLaunch)
+
+    def build(
+        self, launch: Launch, request_item: TestItemIndexData, size: int, same_test_case: bool = True
+    ) -> dict[str, Any]:
+        """Build a query to find Test Items failed with the same error as the request one.
+
+        :param launch: Launch being analyzed
+        :param request_item: Prepared request Test Item
+        :param size: Number of the latest Test Items to find
+        :param same_test_case: Whether to find only runs of the same test case
+        :return: OpenSearch query, or an empty dict if the request Test Item has no error hash, or no test case hash
+                 when runs of the same test case are requested
+        """
+        if not request_item.error_hash:
+            return {}
+        filters: list[dict[str, Any]] = [{"term": {ERROR_HASH_FIELD: request_item.error_hash}}]
+        if same_test_case:
+            if not request_item.test_case_hash:
+                return {}
+            filters.append({"term": {"test_case_hash": request_item.test_case_hash}})
+        query: dict[str, Any] = {
+            "size": size,
+            "_source": ERROR_HASH_SOURCE_FIELDS,
+            "sort": [{"start_time": {"order": "desc"}}, {"test_item_id": {"order": "desc"}}],
+            "query": {
+                "bool": {
+                    "filter": filters,
+                    "must_not": prepare_restrictions_by_issue_type(filter_no_defect=False),
+                }
+            },
+        }
+        return add_constraints_for_launches_into_query(query, launch, self.launch_boost)

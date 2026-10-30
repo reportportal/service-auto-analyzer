@@ -14,10 +14,12 @@
 
 """Unit tests for utils module."""
 
+from typing import Optional
+
 import pytest
 
 from app.commons.model.launch_objects import AnalyzerConf
-from app.utils.utils import find_min_should_match_threshold
+from app.utils.utils import find_min_should_match_threshold, is_no_defect
 from test import DEFAULT_SEARCH_CONFIG
 
 
@@ -33,3 +35,19 @@ def test_find_min_should_match_threshold(project_min_should_match: int, global_m
         find_min_should_match_threshold(AnalyzerConf(minShouldMatch=project_min_should_match), search_config)
         == expected
     )
+
+
+@pytest.mark.parametrize(
+    "issue_type, expected",
+    [
+        ("nd001", True),
+        ("ND001", True),
+        ("nd_flaky", True),
+        ("pb001", False),
+        ("ti001", False),
+        ("", False),
+        (None, False),
+    ],
+)
+def test_is_no_defect(issue_type: Optional[str], expected: bool) -> None:
+    assert is_no_defect(issue_type) is expected

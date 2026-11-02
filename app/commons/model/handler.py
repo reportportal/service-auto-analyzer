@@ -23,9 +23,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional
 
-from commons.model.launch_objects import LaunchAnalysisStats
-
-from app.commons.model.launch_objects import AnalysisResult, Launch
+from app.commons.model.launch_objects import AnalysisResult, Launch, LaunchAnalysisStats
 from app.commons.model.test_item_index import TestItemIndexData
 
 

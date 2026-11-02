@@ -17,10 +17,9 @@
 from time import time
 from typing import Any, Optional
 
-from commons.model.handler import AnalysisContext, AnalysisHandler, HandlerResult
-
 from app.commons import logging
 from app.commons.model.db import Hit
+from app.commons.model.handler import AnalysisContext, AnalysisHandler, HandlerResult
 from app.commons.model.launch_objects import (
     AnalysisCandidate,
     AnalysisResult,

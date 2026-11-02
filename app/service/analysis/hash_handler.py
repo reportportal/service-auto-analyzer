@@ -18,10 +18,9 @@ from abc import abstractmethod
 from time import time
 from typing import Any, Optional
 
-from commons.model.handler import AnalysisContext, AnalysisHandler, HandlerResult
-
 from app.commons import logging
 from app.commons.model.db import Hit
+from app.commons.model.handler import AnalysisContext, AnalysisHandler, HandlerResult
 from app.commons.model.launch_objects import AnalysisResult, Launch, SearchConfig
 from app.commons.model.test_item_index import TestItemIndexData
 from app.commons.os_client import OsClient

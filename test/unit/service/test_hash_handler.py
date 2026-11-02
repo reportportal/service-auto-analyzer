@@ -19,14 +19,13 @@ from typing import Any, Iterator, Optional
 from unittest import mock
 
 from app.commons.model.db import Hit
-from app.commons.model.launch_objects import AnalyzerConf, Launch, Log, TestItem
+from app.commons.model.handler import AnalysisContext
+from app.commons.model.launch_objects import AnalyzerConf, Launch, LaunchAnalysisStats, Log, TestItem
 from app.commons.model.ml import ModelType
 from app.commons.model.test_item_index import TestItemIndexData
 from app.service.analysis import (
-    AnalysisContext,
     AnyTestHashHandler,
     BoostingHandler,
-    LaunchAnalysisStats,
     SameTestHashHandler,
 )
 from app.service.auto_analyzer_service import AutoAnalyzerService, prepare_request_items_for_launch

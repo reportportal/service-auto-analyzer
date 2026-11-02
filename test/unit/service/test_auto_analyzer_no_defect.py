@@ -19,10 +19,10 @@ from unittest import mock
 import pytest
 
 from app.commons.model.db import Hit
-from app.commons.model.launch_objects import AnalyzerConf, Launch, Log, TestItem
+from app.commons.model.handler import AnalysisContext
+from app.commons.model.launch_objects import AnalyzerConf, Launch, LaunchAnalysisStats, Log, TestItem
 from app.commons.model.ml import ModelType
 from app.commons.model.test_item_index import TestItemIndexData
-from app.service.analysis import AnalysisContext, LaunchAnalysisStats
 from app.service.analysis.boosting_handler import ANALYSIS_QUERY_SIZE, BoostingHandler, split_no_defect_candidates
 from app.service.auto_analyzer_service import AutoAnalyzerService, prepare_request_items_for_launch
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG

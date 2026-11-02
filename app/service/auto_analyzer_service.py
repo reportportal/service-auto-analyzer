@@ -19,17 +19,21 @@ from typing import Optional
 
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory
-from app.commons.model.launch_objects import AnalysisResult, ApplicationConfig, Launch, SearchConfig
+from app.commons.model.handler import AnalysisContext, AnalysisHandler
+from app.commons.model.launch_objects import (
+    AnalysisResult,
+    ApplicationConfig,
+    Launch,
+    LaunchAnalysisStats,
+    SearchConfig,
+)
 from app.commons.model.test_item_index import TestItemIndexData
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.os_client import OsClient
 from app.service.analysis import (
-    AnalysisContext,
-    AnalysisHandler,
     AnyTestHashHandler,
     BoostingHandler,
-    LaunchAnalysisStats,
     SameTestHashHandler,
 )
 from app.utils import utils

@@ -22,9 +22,9 @@ from unittest import mock
 
 import pytest
 
-from app.commons.model.launch_objects import AnalysisResult, AnalyzerConf, Launch, Log, TestItem
+from app.commons.model.handler import AnalysisContext, AnalysisHandler, HandlerResult
+from app.commons.model.launch_objects import AnalysisResult, AnalyzerConf, Launch, LaunchAnalysisStats, Log, TestItem
 from app.commons.model.test_item_index import TestItemIndexData
-from app.service.analysis import AnalysisContext, AnalysisHandler, HandlerResult, LaunchAnalysisStats
 from app.service.auto_analyzer_service import AutoAnalyzerService, prepare_request_items_for_launch
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
 

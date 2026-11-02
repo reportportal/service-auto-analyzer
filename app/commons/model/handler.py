@@ -20,50 +20,13 @@ for a whole launch at once.
 """
 
 from abc import ABC, abstractmethod
-from collections import Counter
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, computed_field
+from commons.model.launch_objects import LaunchAnalysisStats
 
 from app.commons.model.launch_objects import AnalysisResult, Launch
 from app.commons.model.test_item_index import TestItemIndexData
-
-
-class LaunchAnalysisStats(BaseModel):
-    """Statistics of the analysis of one launch, reported in the logs as `model_dump(mode="json")`."""
-
-    launch_id: int
-    launch_name: str
-    project_id: int
-    method: str = "auto_analysis"
-    number_of_log_lines: int
-    min_should_match: int
-    module_version: list[str]
-    items_to_process: int = 0
-    not_found: int = 0
-    processed_time: float = 0.0
-    model_info: set[str] = Field(default_factory=set)
-    # Number of results by the name of the handler which produced them
-    handler_results: Counter[str] = Field(default_factory=Counter)
-    errors: list[str] = Field(default_factory=list)
-    gathered_at: datetime = Field(default_factory=datetime.now, exclude=True)
-
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def errors_count(self) -> int:
-        return len(self.errors)
-
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def gather_date(self) -> str:
-        return self.gathered_at.strftime("%Y-%m-%d")
-
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def gather_datetime(self) -> str:
-        return self.gathered_at.strftime("%Y-%m-%d %H:%M:%S")
 
 
 @dataclass

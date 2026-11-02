@@ -17,6 +17,8 @@
 from time import time
 from typing import Any, Optional
 
+from commons.model.handler import AnalysisContext, AnalysisHandler, HandlerResult
+
 from app.commons import logging
 from app.commons.model.db import Hit
 from app.commons.model.launch_objects import (
@@ -39,7 +41,6 @@ from app.commons.query_builder import (
 )
 from app.commons.similarity_filter import SimilarityFilter, choose_message_fields
 from app.ml.predictor import AutoAnalysisPredictor, PredictionResult
-from app.service.analysis.handler import AnalysisContext, AnalysisHandler, HandlerResult
 from app.utils import utils
 
 LOGGER = logging.getLogger("analyzerApp.boostingHandler")

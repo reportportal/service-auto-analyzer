@@ -151,7 +151,8 @@ def test_prepared_items_with_swapped_status_codes_differ() -> None:
     first = prepare_item("expected response to have status code 200 but got 400")
     second = prepare_item("expected response to have status code 400 but got 200")
 
-    assert first.logs is not None and second.logs is not None
+    assert first.logs is not None
+    assert second.logs is not None
     assert first.logs[0].detected_message == second.logs[0].detected_message
     assert first.error_hash != second.error_hash
 

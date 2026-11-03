@@ -34,10 +34,13 @@ from app.utils import utils
 # Test constants for deterministic project IDs
 # Logic: if test_value > custom_model_prob -> use global model, else use custom model
 # For 0.5 probability: hash % 100 > 50 -> global model, hash % 100 <= 50 -> custom model
-PROJECT_ID_CUSTOM_MODEL = 100000  # hash % 100 = 39, <= 50 -> uses custom model
-PROJECT_ID_GLOBAL_MODEL = 100051  # hash % 100 = 55, > 50 -> uses global model
+PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH = 100000  # hash % 100 = 39, <= 50 -> uses custom model
+PROJECT_ID_CUSTOM_MODEL_GLOBAL_HASH = 100051  # hash % 100 = 55, > 50 -> uses global model
 HASH_SOURCE_CUSTOM = "test_hash_2"  # hash % 100 = 10, <= 50 -> uses custom model
 HASH_SOURCE_GLOBAL = "test_hash_1"  # hash % 100 = 90, > 50 -> uses global model
+CUSTOM_DT_MODEL_TAGS = ['defect_type_model/model', 'custom defect type model']
+GLOBAL_DT_MODEL_TAGS = ['global defect type model']
+GLOBAL_AA_MODEL_TAGS = ['auto_analysis_model/model', 'custom boosting model']
 
 
 def get_object_saver(app_config: ApplicationConfig, project_id: int, model_type: ModelType) -> ObjectSaver:
@@ -76,19 +79,19 @@ class TestModelChooserChooseModel:
     @pytest.fixture(scope="session")
     def object_saver_dt_custom(self, app_config: ApplicationConfig) -> ObjectSaver:
         """Create a mock object_saver with a temporary directory."""
-        saver = get_object_saver(app_config, PROJECT_ID_CUSTOM_MODEL, ModelType.defect_type)
+        saver = get_object_saver(app_config, PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.defect_type)
         return saver
 
     @pytest.fixture(scope="session")
-    def object_saver_dt_global(self, app_config: ApplicationConfig) -> ObjectSaver:
+    def object_saver_dt_global_hash(self, app_config: ApplicationConfig) -> ObjectSaver:
         """Create a mock object_saver with a temporary directory."""
-        saver = get_object_saver(app_config, PROJECT_ID_GLOBAL_MODEL, ModelType.defect_type)
+        saver = get_object_saver(app_config, PROJECT_ID_CUSTOM_MODEL_GLOBAL_HASH, ModelType.defect_type)
         return saver
 
     @pytest.fixture(scope="session")
     def object_saver_aa_custom(self, app_config: ApplicationConfig) -> ObjectSaver:
         """Create a mock object_saver with a temporary directory."""
-        saver = get_object_saver(app_config, PROJECT_ID_CUSTOM_MODEL, ModelType.auto_analysis)
+        saver = get_object_saver(app_config, PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.auto_analysis)
         return saver
 
     @pytest.fixture(scope="session")
@@ -99,10 +102,17 @@ class TestModelChooserChooseModel:
         return model
 
     @pytest.fixture(scope="session")
-    def global_dt_model_test(self, object_saver_dt_global: ObjectSaver) -> DefectTypeModel:
+    def custom_dt_global_hash_model_test(self, object_saver_dt_global_hash: ObjectSaver) -> DefectTypeModel:
         """Create a mock custom DefectTypeModel."""
-        model = CustomDefectTypeModel(object_saver_dt_global)
+        model = CustomDefectTypeModel(object_saver_dt_global_hash)
         model.save_model()
+        return model
+
+    @pytest.fixture(scope="session")
+    def global_dt_model_test(self, search_config: SearchConfig) -> DefectTypeModel:
+        """Load the global DefectTypeModel from the configured global model folder."""
+        model = DefectTypeModel(object_saving.create_filesystem(search_config.GlobalDefectTypeModelFolder))
+        model.load_model()
         return model
 
     @pytest.fixture(scope="session")
@@ -127,15 +137,15 @@ class TestModelChooserChooseModel:
         is the same.
         """
         # Call the method multiple times with the same project_id
-        result1: MlModel = model_chooser.choose_model(PROJECT_ID_CUSTOM_MODEL, ModelType.defect_type)
-        result2: MlModel = model_chooser.choose_model(PROJECT_ID_CUSTOM_MODEL, ModelType.defect_type)
+        result1: MlModel = model_chooser.choose_model(PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.defect_type)
+        result2: MlModel = model_chooser.choose_model(PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.defect_type)
 
         # Should return the same model instance
-        assert result1.get_model_info() == custom_dt_model_test.get_model_info()
+        assert result1.get_model_info() == CUSTOM_DT_MODEL_TAGS
         assert result1.get_model_info() == result2.get_model_info()
 
     def test_same_result_with_different_project_id_prob_1_0(
-        self, model_chooser: ModelChooser, custom_dt_model_test: DefectTypeModel, global_dt_model_test: DefectTypeModel
+        self, model_chooser: ModelChooser, custom_dt_model_test, custom_dt_global_hash_model_test
     ):
         """Test 2.
 
@@ -143,11 +153,12 @@ class TestModelChooserChooseModel:
         different.
         """
         # Call with different project IDs but custom_model_prob=1.0 (always try custom)
-        result1 = model_chooser.choose_model(PROJECT_ID_CUSTOM_MODEL, ModelType.defect_type, custom_model_prob=1.0)
-        result2 = model_chooser.choose_model(PROJECT_ID_GLOBAL_MODEL, ModelType.defect_type, custom_model_prob=1.0)
+        result1 = model_chooser.choose_model(PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.defect_type, custom_model_prob=1.0)
+        result2 = model_chooser.choose_model(PROJECT_ID_CUSTOM_MODEL_GLOBAL_HASH, ModelType.defect_type, custom_model_prob=1.0)
 
-        assert result1.get_model_info() == custom_dt_model_test.get_model_info()
-        assert result2.get_model_info() == global_dt_model_test.get_model_info()
+        # Both results should be custom model, since its probability 1.0
+        assert result1.get_model_info() == CUSTOM_DT_MODEL_TAGS
+        assert result2.get_model_info() == CUSTOM_DT_MODEL_TAGS
 
     def test_same_result_with_same_project_id_prob_0_5(
         self, model_chooser: ModelChooser, custom_aa_model_test: BoostingDecisionMaker
@@ -157,11 +168,11 @@ class TestModelChooserChooseModel:
         Method returns the same result if hash_source is not set, custom_model_prob is 0.5, but project_id is the same.
         """
         # Call multiple times with the same project_id and custom_model_prob=0.5
-        result1 = model_chooser.choose_model(PROJECT_ID_CUSTOM_MODEL, ModelType.auto_analysis, custom_model_prob=0.5)
-        result2 = model_chooser.choose_model(PROJECT_ID_CUSTOM_MODEL, ModelType.auto_analysis, custom_model_prob=0.5)
+        result1 = model_chooser.choose_model(PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.auto_analysis, custom_model_prob=0.5)
+        result2 = model_chooser.choose_model(PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.auto_analysis, custom_model_prob=0.5)
 
         # Should return the same model instance due to deterministic hash
-        assert result1.get_model_info() == result2.get_model_info() == custom_aa_model_test.get_model_info()
+        assert result1.get_model_info() == result2.get_model_info() == GLOBAL_AA_MODEL_TAGS
 
     def test_different_results_with_different_project_id_prob_0_5(
         self, model_chooser: ModelChooser, custom_dt_model_test: DefectTypeModel, global_dt_model_test: DefectTypeModel
@@ -172,15 +183,14 @@ class TestModelChooserChooseModel:
         different.
         """
         # Call with different project IDs that should produce different hash results
-        result1 = model_chooser.choose_model(PROJECT_ID_CUSTOM_MODEL, ModelType.defect_type, custom_model_prob=0.5)
-        result2 = model_chooser.choose_model(PROJECT_ID_GLOBAL_MODEL, ModelType.defect_type, custom_model_prob=0.5)
+        result1 = model_chooser.choose_model(PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.defect_type, custom_model_prob=0.5)
+        result2 = model_chooser.choose_model(PROJECT_ID_CUSTOM_MODEL_GLOBAL_HASH, ModelType.defect_type, custom_model_prob=0.5)
 
         # Should return different model types based on hash
         # PROJECT_ID_CUSTOM_MODEL (hash % 100 = 39 <= 50) should use custom model
         # PROJECT_ID_GLOBAL_MODEL (hash % 100 = 55 > 50) should use global model
-        assert result1.get_model_info() == custom_dt_model_test.get_model_info()  # Should be custom model
-        assert result2 != custom_dt_model_test.get_model_info()
-        assert result2 != global_dt_model_test.get_model_info()
+        assert result1.get_model_info() == CUSTOM_DT_MODEL_TAGS
+        assert result2.get_model_info() == GLOBAL_DT_MODEL_TAGS
 
     def test_same_result_with_same_hash_source_default_params(
         self, model_chooser: ModelChooser, custom_dt_model_test: DefectTypeModel
@@ -188,14 +198,14 @@ class TestModelChooserChooseModel:
         """Test 5a: Method returns the same result when hash_source is the same and custom_model_prob is not set."""
         # Call multiple times with the same hash_source
         result1 = model_chooser.choose_model(
-            PROJECT_ID_CUSTOM_MODEL, ModelType.defect_type, hash_source=HASH_SOURCE_CUSTOM
+            PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.defect_type, hash_source=HASH_SOURCE_CUSTOM
         )
         result2 = model_chooser.choose_model(
-            PROJECT_ID_CUSTOM_MODEL, ModelType.defect_type, hash_source=HASH_SOURCE_CUSTOM
+            PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.defect_type, hash_source=HASH_SOURCE_CUSTOM
         )
 
         # Should return the same model instance
-        assert result1.get_model_info() == result2.get_model_info() == custom_dt_model_test.get_model_info()
+        assert result1.get_model_info() == result2.get_model_info() == CUSTOM_DT_MODEL_TAGS
 
     def test_same_result_with_different_hash_source_prob_1_0(
         self, model_chooser: ModelChooser, custom_dt_model_test: DefectTypeModel
@@ -203,14 +213,14 @@ class TestModelChooserChooseModel:
         """Test 5b: Method returns the same result when hash_source is different but custom_model_prob is 1.0."""
         # Call with different hash sources but custom_model_prob=1.0
         result1 = model_chooser.choose_model(
-            PROJECT_ID_CUSTOM_MODEL, ModelType.defect_type, custom_model_prob=1.0, hash_source=HASH_SOURCE_CUSTOM
+            PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.defect_type, custom_model_prob=1.0, hash_source=HASH_SOURCE_CUSTOM
         )
         result2 = model_chooser.choose_model(
-            PROJECT_ID_CUSTOM_MODEL, ModelType.defect_type, custom_model_prob=1.0, hash_source=HASH_SOURCE_GLOBAL
+            PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.defect_type, custom_model_prob=1.0, hash_source=HASH_SOURCE_GLOBAL
         )
 
         # Both should try to use custom model since prob=1.0
-        assert result1.get_model_info() == result2.get_model_info() == custom_dt_model_test.get_model_info()
+        assert result1.get_model_info() == result2.get_model_info() == CUSTOM_DT_MODEL_TAGS
 
     def test_same_result_with_same_hash_source_prob_0_5(
         self, model_chooser: ModelChooser, custom_dt_model_test: DefectTypeModel
@@ -218,14 +228,14 @@ class TestModelChooserChooseModel:
         """Test 5c: Method returns the same result when hash_source is the same and custom_model_prob is 0.5."""
         # Call multiple times with the same hash_source and custom_model_prob=0.5
         result1 = model_chooser.choose_model(
-            PROJECT_ID_CUSTOM_MODEL, ModelType.defect_type, custom_model_prob=0.5, hash_source=HASH_SOURCE_CUSTOM
+            PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.defect_type, custom_model_prob=0.5, hash_source=HASH_SOURCE_CUSTOM
         )
         result2 = model_chooser.choose_model(
-            PROJECT_ID_CUSTOM_MODEL, ModelType.defect_type, custom_model_prob=0.5, hash_source=HASH_SOURCE_CUSTOM
+            PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.defect_type, custom_model_prob=0.5, hash_source=HASH_SOURCE_CUSTOM
         )
 
         # Should return the same model instance
-        assert result1.get_model_info() == result2.get_model_info() == custom_dt_model_test.get_model_info()
+        assert result1.get_model_info() == result2.get_model_info() == CUSTOM_DT_MODEL_TAGS
 
     def test_different_results_with_different_hash_source_prob_0_5(
         self, model_chooser: ModelChooser, custom_dt_model_test: DefectTypeModel, global_dt_model_test: DefectTypeModel
@@ -233,50 +243,44 @@ class TestModelChooserChooseModel:
         """Test 5d: Method returns different results when hash_source is different and custom_model_prob is 0.5."""
         # Call with different hash sources that should produce different hash results
         result1 = model_chooser.choose_model(
-            PROJECT_ID_CUSTOM_MODEL, ModelType.defect_type, custom_model_prob=0.5, hash_source=HASH_SOURCE_CUSTOM
+            PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.defect_type, custom_model_prob=0.5, hash_source=HASH_SOURCE_CUSTOM
         )
         result2 = model_chooser.choose_model(
-            PROJECT_ID_CUSTOM_MODEL, ModelType.defect_type, custom_model_prob=0.5, hash_source=HASH_SOURCE_GLOBAL
+            PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.defect_type, custom_model_prob=0.5, hash_source=HASH_SOURCE_GLOBAL
         )
 
         # Should return different model types based on hash
         # HASH_SOURCE_CUSTOM (hash % 100 = 10 <= 50) should use custom model
         # HASH_SOURCE_GLOBAL (hash % 100 = 90 > 50) should use global model
-        assert result1.get_model_info() == custom_dt_model_test.get_model_info()  # Should be custom model
-        assert (
-            result2.get_model_info() != global_dt_model_test.get_model_info()
-            and result2.get_model_info() != custom_dt_model_test.get_model_info()
-        )  # Should be global model
+        assert result1.get_model_info() == CUSTOM_DT_MODEL_TAGS
+        assert result2.get_model_info() == GLOBAL_DT_MODEL_TAGS
 
     def test_hash_source_overrides_project_id(
         self, model_chooser: ModelChooser, custom_dt_model_test: DefectTypeModel, global_dt_model_test: DefectTypeModel
     ):
         """Test 6: Test when project_id and hash_source are set and hash_source overrides project_id."""
-        # Use PROJECT_ID_GLOBAL_MODEL (would use global) but with HASH_SOURCE_CUSTOM (would use custom)
+        # Use PROJECT_ID_CUSTOM_MODEL but with HASH_SOURCE_CUSTOM (would use custom)
         result1 = model_chooser.choose_model(
-            PROJECT_ID_GLOBAL_MODEL, ModelType.defect_type, custom_model_prob=0.5, hash_source=HASH_SOURCE_CUSTOM
+            PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.defect_type, custom_model_prob=0.5, hash_source=HASH_SOURCE_CUSTOM
         )
 
-        # Use PROJECT_ID_CUSTOM_MODEL (would use custom) but with HASH_SOURCE_GLOBAL (would use global)
+        # Use PROJECT_ID_CUSTOM_MODEL but with HASH_SOURCE_GLOBAL (would use global)
         result2 = model_chooser.choose_model(
-            PROJECT_ID_CUSTOM_MODEL, ModelType.defect_type, custom_model_prob=0.5, hash_source=HASH_SOURCE_GLOBAL
+            PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.defect_type, custom_model_prob=0.5, hash_source=HASH_SOURCE_GLOBAL
         )
 
         # hash_source should override project_id behavior
-        assert result1.get_model_info() == custom_dt_model_test.get_model_info()  # Should be custom model
-        assert (
-            result2.get_model_info() != global_dt_model_test.get_model_info()
-            and result2.get_model_info() != custom_dt_model_test.get_model_info()
-        )  # Should be global model
+        assert result1.get_model_info() == CUSTOM_DT_MODEL_TAGS
+        assert result2.get_model_info() == GLOBAL_DT_MODEL_TAGS
 
     def test_deterministic_behavior(self, model_chooser: ModelChooser, custom_dt_model_test: DefectTypeModel):
         """Test that hash-based selection is deterministic and repeatable."""
         # Test with specific values to ensure deterministic behavior
         test_cases = [
-            (PROJECT_ID_CUSTOM_MODEL, None, 0.5),
-            (PROJECT_ID_GLOBAL_MODEL, None, 0.5),
-            (PROJECT_ID_CUSTOM_MODEL, HASH_SOURCE_CUSTOM, 0.5),
-            (PROJECT_ID_CUSTOM_MODEL, HASH_SOURCE_GLOBAL, 0.5),
+            (PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, None, 0.5),
+            (PROJECT_ID_CUSTOM_MODEL_GLOBAL_HASH, None, 0.5),
+            (PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, HASH_SOURCE_CUSTOM, 0.5),
+            (PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, HASH_SOURCE_GLOBAL, 0.5),
         ]
 
         for project_id, hash_source, prob in test_cases:
@@ -297,14 +301,14 @@ class TestModelChooserChooseModel:
     ):
         """Test edge cases with different probability values."""
         # With probability 0.0, should always return global model
-        result = model_chooser.choose_model(PROJECT_ID_CUSTOM_MODEL, ModelType.defect_type, custom_model_prob=0.0)
-        assert result.get_model_info() != custom_dt_model_test.get_model_info()
+        result = model_chooser.choose_model(PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.defect_type, custom_model_prob=0.0)
+        assert result.get_model_info() == GLOBAL_DT_MODEL_TAGS
 
         # With probability 100.0, should try to use custom model if available
-        result = model_chooser.choose_model(PROJECT_ID_CUSTOM_MODEL, ModelType.defect_type, custom_model_prob=100.0)
-        assert result.get_model_info() == custom_dt_model_test.get_model_info()
+        result = model_chooser.choose_model(PROJECT_ID_CUSTOM_MODEL_CUSTOM_HASH, ModelType.defect_type, custom_model_prob=100.0)
+        assert result.get_model_info() == CUSTOM_DT_MODEL_TAGS
 
         # Use a project ID that has no custom model saved - should fall back to global
         project_id_no_custom = 999999999
         result = model_chooser.choose_model(project_id_no_custom, ModelType.defect_type, custom_model_prob=1.0)
-        assert result.get_model_info() != global_dt_model_test.get_model_info()
+        assert result.get_model_info() == GLOBAL_DT_MODEL_TAGS

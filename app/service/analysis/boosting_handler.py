@@ -14,7 +14,7 @@
 
 """Auto-analysis handler which searches for similar Test Items and chooses one by the Gradient Boosting model."""
 
-from time import time
+from time import monotonic
 from typing import Any, Optional
 
 from app.commons import logging
@@ -331,12 +331,12 @@ class BoostingHandler(AnalysisHandler):
     ) -> tuple[list[HandlerResult], list[TestItemIndexData]]:
         launch = context.launch
         stats = context.stats
-        t_start = time()
+        t_start = monotonic()
         results_per_test_item = self._query_candidates_for_launch(launch, items)
-        mean_processing_time = (time() - t_start) / max(len(items), 1)
+        mean_processing_time = (monotonic() - t_start) / max(len(items), 1)
         candidates = self._to_candidates(launch, results_per_test_item, mean_processing_time)
         LOGGER.info("Collected %d candidates for analysis", len(candidates))
-        LOGGER.info("Os queries finished %.2f s.", time() - t_start)
+        LOGGER.info("Os queries finished %.2f s.", monotonic() - t_start)
 
         boosting_config = self._get_config_for_boosting(launch.analyzerConfig)
         predictor = AutoAnalysisPredictor(
@@ -351,7 +351,7 @@ class BoostingHandler(AnalysisHandler):
         remaining: list[TestItemIndexData] = []
         for item, candidate in zip(items, candidates):
             try:
-                t_start_item = time()
+                t_start_item = monotonic()
                 stats.processed_time += candidate.timeProcessed
                 if launch.project not in context.chosen_namespaces:
                     context.chosen_namespaces[launch.project] = self.namespace_finder.get_chosen_namespaces(
@@ -360,7 +360,7 @@ class BoostingHandler(AnalysisHandler):
                 boosting_config["chosen_namespaces"] = context.chosen_namespaces[launch.project]
 
                 best = self._predict_best(context, predictor, candidate)
-                stats.processed_time += time() - t_start_item
+                stats.processed_time += monotonic() - t_start_item
                 if best is None:
                     LOGGER.debug(f"Test item {candidate.testItemId} has no positive predictions")
                     remaining.append(item)

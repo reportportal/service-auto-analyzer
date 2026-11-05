@@ -14,7 +14,7 @@
 
 from collections import defaultdict
 from datetime import datetime
-from time import time
+from time import monotonic
 from typing import Optional
 
 from app.amqp.amqp import AmqpClient
@@ -83,7 +83,7 @@ class IndexService:
         projects = {str(launch_obj.project) for launch_obj in launches}
         projects_str = ", ".join(projects)
         LOGGER.info(f"Indexing {len(launch_ids)} launches of projects '{projects_str}': {launch_ids_str}")
-        t_start = time()
+        t_start = monotonic()
 
         project_test_items: dict[int, list[TestItemIndexData]] = defaultdict(list)
         defects_per_project: dict[int, int] = defaultdict(int)
@@ -101,20 +101,20 @@ class IndexService:
                 1 for item in prepared_items if item.issue_type and not item.issue_type.startswith("ti")
             )
 
-        total_took = 0
+        indexed_count = 0
         any_errors = False
 
         for project_id, test_items in project_test_items.items():
             response = self.os_client.bulk_index(project_id, test_items)
-            total_took += response.took
+            indexed_count += response.took  # `took` holds the number of indexed documents
             any_errors = any_errors or response.errors
 
         update_train_list(self.app_config, list(defects_per_project.items()))
 
-        time_passed = round(time() - t_start, 2)
+        time_passed = round(monotonic() - t_start, 2)
         LOGGER.info(
             f"Indexing {len(launch_ids)} launches of projects '{projects_str}' finished: {launch_ids_str}. "
-            f"It took {time_passed} sec., indexing took {total_took} sec."
+            f"It took {time_passed} sec., {indexed_count} test items indexed."
         )
 
     @staticmethod
@@ -146,7 +146,7 @@ class IndexService:
     def defect_update(self, defect_update_info: DefectUpdate) -> list[int]:
         """Update defect types and issue history for provided test items."""
         LOGGER.info("Started updating defect types")
-        t_start = time()
+        t_start = monotonic()
 
         project_id = defect_update_info.project
         is_auto_analyzed = defect_update_info.isAutoAnalyzed
@@ -195,5 +195,5 @@ class IndexService:
             int(test_item_id) for test_item_id in (set(test_item_ids) - found_test_items) | failed_test_items
         ]
         LOGGER.debug("Not updated test items: %s", items_not_updated)
-        LOGGER.info("Finished updating defect types. It took %.2f sec", time() - t_start)
+        LOGGER.info("Finished updating defect types. It took %.2f sec", monotonic() - t_start)
         return items_not_updated

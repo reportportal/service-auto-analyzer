@@ -29,7 +29,7 @@ from app.ml.models import (
     DefectTypeModel,
     MlModel,
 )
-from app.utils import utils
+from app.utils import file_utils
 
 # Test constants for deterministic project IDs
 # Logic: if test_value > custom_model_prob -> use global model, else use custom model
@@ -69,11 +69,11 @@ class TestModelChooserChooseModel:
     @pytest.fixture(scope="session")
     def search_config(self, temp_dir: str) -> SearchConfig:
         """Create test SearchConfig with empty global model folders."""
-        model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
+        model_settings = file_utils.read_json_file("res", "model_settings.json", to_json=True)
         return SearchConfig(
-            BoostModelFolder=utils.strip_path(model_settings["BOOST_MODEL_FOLDER"]),
-            SuggestBoostModelFolder=utils.strip_path(model_settings["SUGGEST_BOOST_MODEL_FOLDER"]),
-            GlobalDefectTypeModelFolder=utils.strip_path(model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]),
+            BoostModelFolder=file_utils.strip_path(model_settings["BOOST_MODEL_FOLDER"]),
+            SuggestBoostModelFolder=file_utils.strip_path(model_settings["SUGGEST_BOOST_MODEL_FOLDER"]),
+            GlobalDefectTypeModelFolder=file_utils.strip_path(model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]),
         )
 
     @pytest.fixture(scope="session")

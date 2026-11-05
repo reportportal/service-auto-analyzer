@@ -17,7 +17,7 @@ import json
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
-from time import time
+from time import monotonic
 from typing import Any, Optional
 
 import numpy as np
@@ -615,7 +615,7 @@ class ClusterService:
         LOGGER.info(
             f"Started clusterizing logs for launch {launch_info.launch.launchId} in project {launch_info.project}"
         )
-        t_start = time()
+        t_start = monotonic()
         errors_found = []
         errors_count = 0
         common_clusters: list[ClusterInfo] = []
@@ -677,7 +677,7 @@ class ClusterService:
             launch_info.launch.launchId: {
                 "not_found": int(len(common_clusters) == 0),
                 "items_to_process": len(unique_log_ids),
-                "processed_time": time() - t_start,
+                "processed_time": monotonic() - t_start,
                 "found_clusters": len(common_clusters),
                 "launch_id": launch_info.launch.launchId,
                 "launch_name": launch_info.launch.launchName,
@@ -693,7 +693,7 @@ class ClusterService:
         }
 
         LOGGER.debug(f"Stats info: {json.dumps(results_to_share)}")
-        LOGGER.info("Processed the launch. It took %.2f sec.", time() - t_start)
+        LOGGER.info("Processed the launch. It took %.2f sec.", monotonic() - t_start)
         LOGGER.info("Finished clustering for the launch with %d clusters.", len(common_clusters))
         for cluster in common_clusters:
             # Put readable text instead of tokens

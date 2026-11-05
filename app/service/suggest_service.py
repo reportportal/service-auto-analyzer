@@ -14,7 +14,7 @@
 
 import json
 import traceback
-from time import time
+from time import monotonic
 from typing import Any, Optional
 
 from app.commons import logging, request_factory, similarity_calculator
@@ -285,7 +285,7 @@ class SuggestService:
         LOGGER.info(f"Started suggesting for test item with id: {test_item_info.testItemId}")
         LOGGER.debug(f"Started suggesting items by request: {test_item_info.model_dump_json()}")
 
-        t_start = time()
+        t_start = monotonic()
         results: list[SuggestAnalysisResult] = []
         errors_found: list[str] = []
         errors_count = 0
@@ -337,7 +337,7 @@ class SuggestService:
                     issue_type = result.data.mrHit.source.issue_type
                     LOGGER.debug(f"Test item '{identity}' with issue type '{issue_type}' has probability {prob:.2f}")
 
-                processed_time = time() - t_start
+                processed_time = monotonic() - t_start
 
                 request_logs = request_item.logs or []
                 for pos_idx, result in enumerate(unique_results[: self.search_cfg.MaxSuggestionsNumber]):
@@ -391,6 +391,6 @@ class SuggestService:
             errors_count += 1
         results_to_share = [res.model_dump(exclude={"modelFeatureNames", "modelFeatureValues"}) for res in results]
         LOGGER.debug(f"Results: {json.dumps(results_to_share)}")
-        LOGGER.info(f"Processed the test item. It took {time() - t_start:.2f} sec. Errors: {errors_count}")
+        LOGGER.info(f"Processed the test item. It took {monotonic() - t_start:.2f} sec. Errors: {errors_count}")
         LOGGER.info(f"Finished suggesting for test item with {len(results)} results.")
         return results

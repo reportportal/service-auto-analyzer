@@ -18,7 +18,6 @@ import string
 import urllib.parse
 from functools import lru_cache
 from typing import Iterable, Optional
-from urllib.parse import urlparse
 
 import nltk
 from nltk.stem import WordNetLemmatizer
@@ -763,14 +762,6 @@ def extract_message_params(text: str) -> list[str]:
 def build_url(main_url: str, url_params: list) -> str:
     """Build url by concatenating url and url_params"""
     return main_url + "/" + "/".join(url_params)
-
-
-def remove_credentials_from_url(url: str) -> str:
-    parsed_url = urlparse(url)
-    new_netloc = re.sub("^[^:]+:[^@]*@", "", parsed_url.netloc)
-    if parsed_url.netloc == new_netloc:
-        return url
-    return url.replace(parsed_url.netloc, new_netloc)
 
 
 def enrich_found_exceptions(text):

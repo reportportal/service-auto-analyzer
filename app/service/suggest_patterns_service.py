@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from time import time
+from time import monotonic
 from typing import Any, Iterable, Optional
 
 from app.commons import logging
@@ -90,7 +90,7 @@ class SuggestPatternsService:
 
     def suggest_patterns(self, project_id: int) -> SuggestPattern:
         LOGGER.info(f"Started suggesting patterns for project '{project_id}'")
-        t_start = time()
+        t_start = monotonic()
         exceptions_with_labels: dict[str, dict[str, int]] = {}
         all_exceptions = {}
         query = self._build_query(ALL_BASE_ISSUE_TYPES)
@@ -114,7 +114,7 @@ class SuggestPatternsService:
                             exceptions_with_labels[exception][issue_type] += 1
         suggested_patterns_with_labels = self._get_patterns_with_labels(exceptions_with_labels)
         suggested_patterns_without_labels = self._get_patterns_without_labels(all_exceptions)
-        LOGGER.info("Finished suggesting patterns %.2f s", time() - t_start)
+        LOGGER.info("Finished suggesting patterns %.2f s", monotonic() - t_start)
         return SuggestPattern(
             suggestionsWithLabels=suggested_patterns_with_labels,
             suggestionsWithoutLabels=suggested_patterns_without_labels,

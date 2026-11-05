@@ -19,7 +19,7 @@ from app.commons.os_client import (
     OsClient,
     get_test_item_index_name,
 )
-from app.utils import utils
+from app.utils import file_utils
 from test import APP_CONFIG
 
 PROJECT_ID = "42"
@@ -34,6 +34,7 @@ def app_config():
 def os_client_mock():
     client = mock.Mock()
     client.indices = mock.Mock()
+    client.indices.exists.return_value = True
     return client
 
 
@@ -90,12 +91,13 @@ def test_item():
 
 
 def test_bulk_index_creates_index_and_calls_bulk(monkeypatch, os_client_mock, app_config, test_item):
+    os_client_mock.indices.exists.return_value = False
     os_client_mock.indices.get.side_effect = Exception("missing index")
     os_client_mock.indices.create.return_value = {"acknowledged": True}
 
     captured: dict[str, Any] = {}
 
-    monkeypatch.setattr("app.commons.os_client.utils.read_resource_file", lambda *args, **kwargs: {})
+    monkeypatch.setattr("app.commons.os_client.file_utils.read_resource_file", lambda *args, **kwargs: {})
 
     # noinspection PyUnusedLocal
     def fake_bulk(
@@ -126,6 +128,7 @@ def test_bulk_index_creates_index_and_calls_bulk(monkeypatch, os_client_mock, ap
 
 
 def test_bulk_update_issue_history_not_creates_index_and_return_error(monkeypatch, os_client_mock, app_config):
+    os_client_mock.indices.exists.return_value = False
     os_client_mock.indices.get.side_effect = Exception("missing index")
     scan_mock = mock.Mock()
     monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", scan_mock)
@@ -166,7 +169,7 @@ def test_bulk_update_issue_history_success(monkeypatch, os_client_mock, app_conf
         return len(request), []
 
     monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.bulk", fake_bulk)
-    monkeypatch.setattr("app.commons.os_client.utils.read_resource_file", lambda *args, **kwargs: {})
+    monkeypatch.setattr("app.commons.os_client.file_utils.read_resource_file", lambda *args, **kwargs: {})
 
     client = OsClient(app_config, os_client=os_client_mock)
     updates = [
@@ -873,7 +876,7 @@ def _index_metadata(index_name: str, properties: dict[str, Any]) -> dict[str, An
 
 
 def _current_mapping_properties() -> dict[str, Any]:
-    return utils.read_resource_file(TEST_ITEM_INDEX_MAPPINGS_FILE, to_json=True)["properties"]
+    return file_utils.read_resource_file(TEST_ITEM_INDEX_MAPPINGS_FILE, to_json=True)["properties"]
 
 
 def test_existing_index_gets_missing_mapping_fields_once(os_client_mock, app_config):
@@ -942,3 +945,66 @@ def test_new_index_is_created_with_error_hash_mapping(monkeypatch, os_client_moc
     body = os_client_mock.indices.create.call_args.kwargs["body"]
     assert body["mappings"]["properties"]["error_hash"] == {"type": "keyword"}
     os_client_mock.indices.put_mapping.assert_not_called()
+
+
+def test_bulk_index_recreates_index_deleted_by_another_process(monkeypatch, os_client_mock, app_config, test_item):
+    index_name = get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
+    os_client_mock.indices.get.return_value = _index_metadata(index_name, _current_mapping_properties())
+    os_client_mock.indices.create.return_value = {"acknowledged": True}
+    bulk_mock = mock.Mock(return_value=(1, []))
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.bulk", bulk_mock)
+    client = OsClient(app_config, os_client=os_client_mock)
+    client.bulk_index(PROJECT_ID, [test_item])  # The index exists and is cached
+    os_client_mock.indices.create.assert_not_called()
+
+    # Another worker process deletes the index, this client still has it cached
+    os_client_mock.indices.exists.return_value = False
+    response = client.bulk_index(PROJECT_ID, [test_item])
+
+    # Without the creation OpenSearch would create the index itself, with dynamic mappings
+    os_client_mock.indices.create.assert_called_once()
+    assert os_client_mock.indices.create.call_args.kwargs["index"] == index_name
+    assert bulk_mock.call_count == 2
+    assert response.errors is False
+
+
+def _cached_index_deleted_by_another_process(os_client_mock: mock.Mock, client: OsClient, index_name: str) -> None:
+    os_client_mock.indices.get.return_value = _index_metadata(index_name, _current_mapping_properties())
+    os_client_mock.msearch.return_value = {"responses": []}
+    list(client.msearch_grouped(PROJECT_ID, [{}, {"query": {"match_all": {}}}]))  # A read caches the index
+    os_client_mock.indices.exists.return_value = False
+
+
+def test_bulk_update_issue_history_skips_index_deleted_by_another_process(monkeypatch, os_client_mock, app_config):
+    bulk_mock = mock.Mock(return_value=(1, []))
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.bulk", bulk_mock)
+    client = OsClient(app_config, os_client=os_client_mock)
+    index_name = get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
+    _cached_index_deleted_by_another_process(os_client_mock, client, index_name)
+    update = TestItemHistoryData(
+        test_item_id="ti-1", is_auto_analyzed=True, issue_type="pb001", timestamp="2025-01-02T00:00:00Z"
+    )
+
+    response = client.bulk_update_issue_history(PROJECT_ID, [update])
+
+    # A bulk update to a missing index would make OpenSearch create it with dynamic mappings
+    bulk_mock.assert_not_called()
+    os_client_mock.indices.create.assert_not_called()
+    assert response.errors is True
+
+
+def test_bulk_update_cluster_info_skips_index_deleted_by_another_process(monkeypatch, os_client_mock, app_config):
+    bulk_mock = mock.Mock(return_value=(1, []))
+    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.bulk", bulk_mock)
+    client = OsClient(app_config, os_client=os_client_mock)
+    index_name = get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
+    _cached_index_deleted_by_another_process(os_client_mock, client, index_name)
+    log_update = LogClusterData(
+        log_id="1", test_item_id="ti-1", cluster_id="123", cluster_message="message", cluster_with_numbers=False
+    )
+
+    response = client.bulk_update_cluster_info(PROJECT_ID, [log_update])
+
+    bulk_mock.assert_not_called()
+    os_client_mock.indices.create.assert_not_called()
+    assert response.errors is True

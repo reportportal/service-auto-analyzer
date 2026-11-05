@@ -80,6 +80,11 @@ class ApplicationConfig(BaseModel):
     analyzerResponseExchangeType: str = "direct"
     analyzerResponseQueue: str = "analysis.matches"
 
+    analyzerWorkers: int = 2
+    analyzerTrainWorkers: int = 1
+    analyzerMaxQueuedTasks: int = 50
+    analyzerMaxQueuedBytes: int = 256 * 1024 * 1024
+
     analyzerHttpPort: int = 5001
     analyzerPathToLog: str = "/tmp/config.log"
     analyzerPriority: int = 1

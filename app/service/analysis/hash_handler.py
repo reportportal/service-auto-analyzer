@@ -15,7 +15,7 @@
 """Auto-analysis handlers which take the issue type of earlier Test Items failed with exactly the same error."""
 
 from abc import abstractmethod
-from time import time
+from time import monotonic
 from typing import Any, Optional
 
 from app.commons import logging
@@ -145,7 +145,7 @@ class ErrorHashHandler(AnalysisHandler):
     def _analyze(
         self, context: AnalysisContext, items: list[TestItemIndexData]
     ) -> tuple[list[HandlerResult], list[TestItemIndexData]]:
-        t_start = time()
+        t_start = monotonic()
         results: list[HandlerResult] = []
         remaining: list[TestItemIndexData] = []
         for item, hits in zip(items, self._lookup(context.launch, items)):
@@ -155,7 +155,7 @@ class ErrorHashHandler(AnalysisHandler):
                 continue
             LOGGER.debug(analysis_result)
             results.append(HandlerResult(result=analysis_result, handler=self.name))
-        context.stats.processed_time += time() - t_start
+        context.stats.processed_time += monotonic() - t_start
         LOGGER.info(
             "Handler '%s' analyzed %d of %d test items of launch %s",
             self.name,

@@ -25,11 +25,11 @@ from pika.exceptions import (
     AMQPConnectionError,
     ChannelClosedByBroker,
 )
-from pika.spec import Basic, BasicProperties
+from pika.spec import BasicProperties
 
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig
-from app.utils import text_processing
+from app.utils import url_utils
 
 logger = logging.getLogger("analyzerApp.amqp")
 
@@ -86,7 +86,7 @@ class AmqpClient:
         """
         self._config = config
         self._amqp_base_url = config.amqpUrl.rstrip("\\/")
-        self._amqp_base_url_no_credentials = text_processing.remove_credentials_from_url(self._amqp_base_url)
+        self._amqp_base_url_no_credentials = url_utils.remove_credentials_from_url(self._amqp_base_url)
         self._amqp_url = self._amqp_base_url + f"?heartbeat={config.amqpHeartbeatInterval}"
 
     def close(self) -> None:
@@ -113,7 +113,7 @@ class AmqpClient:
         :raises AmqpClientConnectionException: If connection could not be established after max retry time
         :return: The AMQP connection
         """
-        start_time = time.time()
+        start_time = time.monotonic()
         interval = self._config.amqpInitialRetryInterval
         while True:
             try:
@@ -121,7 +121,7 @@ class AmqpClient:
                 logger.info("AMQP connection established.")
                 return connection
             except Exception as exc:  # pylint: disable=broad-except
-                elapsed = time.time() - start_time
+                elapsed = time.monotonic() - start_time
                 if elapsed >= self._config.amqpMaxRetryTime:
                     logger.error(f"Exceeded max retry time ({self._config.amqpMaxRetryTime} s).")
                     raise AmqpClientConnectionException("Could not establish AMQP connection") from exc
@@ -151,7 +151,7 @@ class AmqpClient:
     ) -> None:
         """Declare application exchange on AMQP server."""
         exchange_key = f"{self._amqp_base_url_no_credentials}:{exchange_name}"
-        current_time = time.time()
+        current_time = time.monotonic()
 
         # Check if exchange was created recently (within 1 minute)
         if (
@@ -185,7 +185,7 @@ class AmqpClient:
 
             # Mark that we're creating this exchange
             CREATED_EXCHANGES[self._amqp_base_url_no_credentials].add(exchange_name)
-            EXCHANGE_CREATION_TIME[exchange_key] = time.time()
+            EXCHANGE_CREATION_TIME[exchange_key] = time.monotonic()
 
     def _declare_exchange(self) -> None:
         self._do_declare_exchange(
@@ -204,77 +204,6 @@ class AmqpClient:
 
     def _declare_response_exchange(self) -> None:
         self._do_declare_exchange(self._config.analyzerResponseExchange, self._config.analyzerResponseExchangeType)
-
-    @staticmethod
-    def _bind_queue(
-        channel: BlockingChannel, exchange_name: str, name: str, routing_key: Optional[str] = None
-    ) -> None:
-        """Bind to a queue and exchange.
-
-        :param BlockingChannel channel: The channel to bind the queue on
-        :param str exchange_name: Name of the exchange
-        :param str name: Name of the queue
-        :param str routing_key: Optional routing key to bind the queue
-        """
-        channel.queue_declare(queue=name, durable=True, exclusive=False, auto_delete=False, arguments=None)
-        channel.queue_bind(exchange=exchange_name, queue=name, routing_key=routing_key)
-
-    @staticmethod
-    def _consume_queue(
-        channel: BlockingChannel,
-        queue: str,
-        auto_ack: bool,
-        exclusive: bool,
-        msg_callback: Callable[[BlockingChannel, Basic.Deliver, BasicProperties, bytes], None],
-    ) -> None:
-        """Signal to consume messages from the queue and bind to message callback.
-
-        :param BlockingChannel channel: The channel to consume from
-        :param str queue: Name of the queue to consume
-        :param bool auto_ack: Whether to automatically acknowledge messages
-        :param bool exclusive: Whether to set exclusive consumer
-        :param callable msg_callback: Callback function to handle received messages
-        """
-        channel.basic_qos(prefetch_count=1, prefetch_size=0)
-        channel.basic_consume(
-            queue=queue,
-            auto_ack=auto_ack,
-            exclusive=exclusive,
-            on_message_callback=msg_callback,
-        )
-
-    def receive(
-        self,
-        queue: str,
-        msg_callback: Callable[[BlockingChannel, Basic.Deliver, BasicProperties, bytes], None],
-        routing_key: Optional[str] = None,
-    ) -> None:
-        """Continuously consume messages, reconnect on failure.
-
-        :param str queue: Name of the queue to consume
-        :param callable msg_callback: Callback function to handle received messages
-        :param str routing_key: Optional routing key to bind the queue
-        """
-        connection_info = f"Exchange: '{self._config.amqpExchangeName}'. Queue: '{queue}'."
-        while True:
-            try:
-                # Ensure exchange exists before consuming
-                self._declare_exchange()
-
-                with self._connection.channel() as channel:
-                    self._bind_queue(channel, self._config.amqpExchangeName, queue, routing_key)
-                    self._consume_queue(channel, queue, False, False, msg_callback)
-                    logger.info(f"Start consuming on queue '{queue}'")
-                    channel.start_consuming()
-            except (AMQPConnectionError, ChannelClosedByBroker) as exc:
-                logger.exception(f"Connection/channel lost. Reconnecting. {connection_info}", exc_info=exc)
-                self.close()
-            except Exception as exc:  # pylint: disable=broad-except
-                logger.exception(f"Unexpected error in consumer. Reconnecting. {connection_info}", exc_info=exc)
-                self.close()
-            except KeyboardInterrupt:
-                logger.info(f"Consumer interrupted by user. Exiting. {connection_info}")
-                break
 
     def __send_to_queue(self, exchange_declare_callable: Optional[Callable], **kwargs: Any) -> None:
         while True:

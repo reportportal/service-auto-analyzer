@@ -14,7 +14,7 @@
 
 import json
 from collections import Counter
-from time import time
+from time import monotonic
 from typing import Optional
 
 from app.amqp.amqp import AmqpClient
@@ -125,7 +125,7 @@ class AutoAnalyzerService:
         :param launches: Launches with request Test Items
         """
         LOGGER.info(f"Started analysis for {len(launches)} launches")
-        t_start = time()
+        t_start = monotonic()
         results: list[AnalysisResult] = []
         stats_by_launch: dict[int, LaunchAnalysisStats] = {}
         chosen_namespaces: dict[int, dict[str, int]] = {}
@@ -133,12 +133,12 @@ class AutoAnalyzerService:
 
         try:
             for launch in launches:
-                preparation_start = time()
+                preparation_start = monotonic()
                 request_items = prepare_request_items_for_launch(launch)
                 LOGGER.info(
                     "Finished preparing request test items for launch '%s', took: %.2f s.",
                     str(launch.launchId),
-                    time() - preparation_start,
+                    monotonic() - preparation_start,
                 )
                 if self._should_stop_processing(processed_items):
                     break
@@ -163,7 +163,7 @@ class AutoAnalyzerService:
 
         stats_info = {launch_id: stats.model_dump(mode="json") for launch_id, stats in stats_by_launch.items()}
         LOGGER.debug(f"Stats info: {json.dumps(stats_info)}")
-        LOGGER.info(f"Processed {processed_items} test items. It took {time() - t_start:.2f} sec.")
+        LOGGER.info(f"Processed {processed_items} test items. It took {monotonic() - t_start:.2f} sec.")
         results_by_handler: Counter[str] = sum(
             (stats.handler_results for stats in stats_by_launch.values()), Counter()
         )

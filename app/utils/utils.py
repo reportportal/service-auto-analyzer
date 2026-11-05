@@ -12,13 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import json
 import os
 import re
 import traceback
-import warnings
 from collections import Counter
-from functools import wraps
 from typing import Any, Optional
 
 import numpy as np
@@ -34,36 +31,6 @@ NO_DEFECT_BASE_ISSUE_TYPE = "nd"
 CERTAIN_BASE_ISSUE_TYPES = {"ab", "pb", "si", "ti"}
 CLASSIFIED_BASE_ISSUE_TYPES = set(list(CERTAIN_BASE_ISSUE_TYPES) + ["nd"])
 ALL_BASE_ISSUE_TYPES = set(list(CLASSIFIED_BASE_ISSUE_TYPES) + [NOT_CLASSIFIED_BASE_ISSUE_TYPE])
-
-
-def ignore_warnings(func):
-    """Decorator for ignoring warnings"""
-
-    @wraps(func)
-    def _inner(*args, **kwargs):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            result = func(*args, **kwargs)
-        return result
-
-    return _inner
-
-
-def read_file(folder: str, filename: str) -> str:
-    """Read file content as string (UTF-8)."""
-    with open(os.path.join(folder, filename), "r") as file:
-        return file.read()
-
-
-def read_json_file(folder: str, filename: str, to_json: bool = False) -> Any:
-    """Read fixture from file."""
-    content = read_file(folder, filename)
-    return content if not to_json else json.loads(content)
-
-
-def read_resource_file(filename: str, to_json: bool = False) -> Any:
-    """Read fixture from file."""
-    return read_json_file("res", filename, to_json)
 
 
 def validate_file(file_path: str) -> bool:
@@ -183,11 +150,6 @@ def extract_clustering_setting(cluster_id):
         return False
     last_bit = cluster_id % 10
     return (last_bit % 2) == 1
-
-
-def strip_path(path: str) -> str:
-    """Strip trailing slashes from a path."""
-    return path.strip().rstrip("/").rstrip("\\")
 
 
 def normalize_issue_type(issue_type: Any) -> str:

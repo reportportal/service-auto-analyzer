@@ -137,7 +137,7 @@ class AmqpClient:
         :return: The AMQP connection
         """
         my_connection = self.__connection
-        if my_connection is None or my_connection:
+        if my_connection is None or my_connection.is_closed:
             my_connection = self._connect_with_retry()
             self.__connection = my_connection
         return my_connection

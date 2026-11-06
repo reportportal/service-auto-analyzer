@@ -118,7 +118,11 @@ class AtomicInteger:
 
 class AmqpRequestHandler(Protocol):
     processor: Processor
-    running_tasks: list[ProcessingItem]
+
+    @property
+    def running_tasks(self) -> list[ProcessingItem]:
+        """Tasks which run now."""
+        ...
 
     def handle_amqp_request(
         self,
@@ -634,3 +638,46 @@ class DirectAmqpRequestHandler:
             if not self.__running_tasks.queue:
                 return []
             return list(self.__running_tasks.queue)
+
+
+class DiscardingAmqpRequestHandler(AmqpRequestHandler):
+    """Handler of the queue of a disabled feature: acks every message and drops it, so the queue doesn't grow.
+
+    The exchange is "fanout", so the queue receives every message published to the analyzer, whatever its routing
+    key. The body is not parsed, malformed messages are dropped the same way.
+    """
+
+    name: str
+    processor: Processor
+    discarded: int
+
+    def __init__(self, *, name: str, **_: Any) -> None:
+        """Create the handler.
+
+        :param name: Name of the handler for logs
+        """
+        self.name = name
+        self.processor = DummyProcessor()
+        self.discarded = 0
+
+    def handle_amqp_request(
+        self,
+        channel: BlockingChannel,
+        method: Basic.Deliver,
+        props: BasicProperties,
+        body: bytes,
+    ) -> None:
+        """Ack a message and drop it."""
+        if method.delivery_tag is not None:
+            channel.basic_ack(delivery_tag=method.delivery_tag)
+        self.discarded += 1
+        LOGGER.debug(f"Handler '{self.name}' discarded a '{method.routing_key}' message")
+
+    @property
+    def running_tasks(self) -> list[ProcessingItem]:
+        """Nothing runs: always empty."""
+        return []
+
+    def shutdown(self) -> None:
+        """Nothing to stop."""
+        LOGGER.info(f"Handler '{self.name}' stopped, {self.discarded} messages discarded")

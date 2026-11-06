@@ -19,14 +19,19 @@ import threading
 import warnings
 from signal import SIGINT, signal
 from sys import exit
-from typing import Any
+from typing import Any, Callable
 
 from flask import Flask, Response
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
 
 from app.amqp.amqp import AmqpClient
-from app.amqp.amqp_handler import AmqpRequestHandler, DirectAmqpRequestHandler, ProcessAmqpRequestHandler
+from app.amqp.amqp_handler import (
+    AmqpRequestHandler,
+    DirectAmqpRequestHandler,
+    DiscardingAmqpRequestHandler,
+    ProcessAmqpRequestHandler,
+)
 from app.commons import logging as my_logging
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType
@@ -280,10 +285,11 @@ def only_train(request: str) -> bool:
     return request == "train_models"
 
 
-def init_amqp_queues():
+def init_amqp_queues() -> list[tuple[str, threading.Thread, AmqpRequestHandler]]:
     """Initialize rabbitmq queues, exchange and starts threads for queue messages processing"""
-    _threads = []
+    _threads: list[tuple[str, threading.Thread, AmqpRequestHandler]] = []
 
+    handler_class: Callable[..., AmqpRequestHandler]
     if APP_CONFIG.debugMode:
         handler_class = DirectAmqpRequestHandler
     else:
@@ -316,8 +322,12 @@ def init_amqp_queues():
             "remove_by_log_time",
         ],
     )
-    _train_amqp_handler = None
-    if not APP_CONFIG.disableTrain:
+    _train_amqp_handler: AmqpRequestHandler
+    if APP_CONFIG.disableTrain:
+        # Consume the "train" queue anyway and drop its messages, otherwise it grows forever
+        logger.info("Model training is disabled, messages of the 'train' queue are discarded.")
+        _train_amqp_handler = DiscardingAmqpRequestHandler(name="train_handler")
+    else:
         _train_amqp_handler = handler_class(
             APP_CONFIG,
             SEARCH_CONFIG,
@@ -342,22 +352,21 @@ def init_amqp_queues():
         )
     )
 
-    if _train_amqp_handler:
-        _threads.append(
-            (
-                "train",
-                create_thread(
-                    AmqpClient(APP_CONFIG).receive,
-                    (
-                        "train",
-                        _train_amqp_handler.handle_amqp_request,
-                        None,
-                    ),
+    _threads.append(
+        (
+            "train",
+            create_thread(
+                AmqpClient(APP_CONFIG).receive,
+                (
                     "train",
+                    _train_amqp_handler.handle_amqp_request,
+                    None,
                 ),
-                _train_amqp_handler,
-            )
+                "train",
+            ),
+            _train_amqp_handler,
         )
+    )
     return _threads
 
 

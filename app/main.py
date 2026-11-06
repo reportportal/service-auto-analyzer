@@ -23,7 +23,7 @@ import os
 import signal
 import warnings
 from sys import exit
-from typing import Any
+from typing import Any, Optional
 
 from app.amqp.async_amqp import AsyncAmqpClient
 from app.commons import logging as my_logging
@@ -98,137 +98,67 @@ def read_model_settings() -> dict[str, Any]:
     return model_settings
 
 
+def deprecation_message(name: str, replacement: str) -> str:
+    """Message of the warning about a deprecated configuration variable.
+
+    :param name: The deprecated variable
+    :param replacement: The variable to use instead
+    :return: The message
+    """
+    return f"'{name}' configuration variable is deprecated, use '{replacement}' instead."
+
+
+def getenv_with_deprecated(name: str, *deprecated_names: str) -> Optional[str]:
+    """Read a configuration variable which has deprecated names: the current name wins, then the deprecated names in
+    the given order. Each deprecated name which is set gives a warning.
+
+    :param name: The current variable name
+    :param deprecated_names: The deprecated variable names
+    :return: The value, or None if no variable is set
+    """
+    value = os.getenv(name)
+    for deprecated_name in deprecated_names:
+        deprecated_value = os.getenv(deprecated_name)
+        if not deprecated_value:
+            continue
+        warnings.warn(deprecation_message(deprecated_name, name), DeprecationWarning, stacklevel=2)
+        if not value:
+            value = deprecated_value
+    return value
+
+
+def read_datastore_endpoint() -> Optional[str]:
+    """Read the datastore endpoint, or build it from the deprecated MinIO host and TLS settings."""
+    for deprecated_name in ("MINIO_SHORT_HOST", "MINIO_USE_TLS"):
+        if os.getenv(deprecated_name):
+            warnings.warn(deprecation_message(deprecated_name, "DATASTORE_ENDPOINT"), DeprecationWarning, stacklevel=2)
+    datastore_endpoint = os.getenv("DATASTORE_ENDPOINT")
+    minio_short_host = os.getenv("MINIO_SHORT_HOST")
+    if datastore_endpoint or not minio_short_host:
+        return datastore_endpoint
+    minio_use_tls = os.getenv("MINIO_USE_TLS")
+    use_tls = to_bool(minio_use_tls) if minio_use_tls else False
+    return f"http{'s' if use_tls else ''}://{minio_short_host}"
+
+
+def read_datastore_bucket_prefix() -> str:
+    """Read the bucket prefix, under the default bucket if one is set."""
+    bucket_prefix = getenv_with_deprecated(
+        "DATASTORE_BUCKETPREFIX", "ANALYZER_BINSTORE_BUCKETPREFIX", "ANALYZER_BINARYSTORE_BUCKETPREFIX"
+    )
+    default_bucket_name = os.getenv("DATASTORE_DEFAULTBUCKETNAME")
+    if not default_bucket_name:
+        return bucket_prefix or "prj-"
+    if bucket_prefix:
+        return f"{default_bucket_name}/{bucket_prefix}"
+    return default_bucket_name
+
+
 def build_app_config() -> ApplicationConfig:
     """Read the application configuration from environment variables, old and new names.
 
     :return: Application configuration
     """
-    # Handle all datastore type settings, old and new
-    datastore_type = os.getenv("DATASTORE_TYPE")
-    old_datastore_type = os.getenv("ANALYZER_BINSTORE_TYPE")
-    if old_datastore_type:
-        warnings.warn(
-            "'ANALYZER_BINSTORE_TYPE' configuration variable is deprecated, use 'DATASTORE_TYPE' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if not datastore_type:
-            datastore_type = os.getenv("DATASTORE_TYPE")
-        old_datastore_type = None
-    old_datastore_type = os.getenv("ANALYZER_BINARYSTORE_TYPE")
-    if old_datastore_type:
-        warnings.warn(
-            "'ANALYZER_BINARYSTORE_TYPE' configuration variable is deprecated, use 'DATASTORE_TYPE' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if not datastore_type:
-            datastore_type = old_datastore_type
-    if not datastore_type:
-        datastore_type = "filesystem"
-
-    # Handle all datastore endpoint settings, old and new
-    datastore_endpoint = os.getenv("DATASTORE_ENDPOINT")
-    minio_short_host = os.getenv("MINIO_SHORT_HOST")
-    if minio_short_host:
-        warnings.warn(
-            "'MINIO_SHORT_HOST' configuration variable is deprecated, use 'DATASTORE_ENDPOINT' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-    minio_use_tls = os.getenv("MINIO_USE_TLS")
-    if minio_use_tls:
-        warnings.warn(
-            "'MINIO_USE_TLS' configuration variable is deprecated, use 'DATASTORE_ENDPOINT' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-    if not datastore_endpoint and minio_short_host:
-        use_tls = to_bool(minio_use_tls) if minio_use_tls else False
-        datastore_endpoint = f"http{'s' if use_tls else ''}://{minio_short_host}"
-
-    # Handle all datastore region settings, old and new
-    datastore_region = os.getenv("DATASTORE_REGION")
-    old_datastore_region = os.getenv("ANALYZER_BINSTORE_MINIO_REGION")
-    if old_datastore_region:
-        warnings.warn(
-            "'ANALYZER_BINSTORE_MINIO_REGION' configuration variable is deprecated, use 'DATASTORE_REGION' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if not datastore_region:
-            datastore_region = old_datastore_region
-        old_datastore_region = None
-    old_datastore_region = os.getenv("ANALYZER_BINARYSTORE_MINIO_REGION")
-    if old_datastore_region:
-        warnings.warn(
-            "'ANALYZER_BINARYSTORE_MINIO_REGION' configuration variable is deprecated, use 'DATASTORE_REGION' "
-            "instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if not datastore_region:
-            datastore_region = old_datastore_region
-
-    # Handle all datastore bucket prefix settings, old and new
-    datastore_default_bucket_name = os.getenv("DATASTORE_DEFAULTBUCKETNAME")
-    datastore_bucket_prefix = os.getenv("DATASTORE_BUCKETPREFIX")
-    old_datastore_bucketprefix = os.getenv("ANALYZER_BINSTORE_BUCKETPREFIX")
-    if old_datastore_bucketprefix:
-        warnings.warn(
-            "'ANALYZER_BINSTORE_BUCKETPREFIX' configuration variable is deprecated, use 'DATASTORE_BUCKETPREFIX' "
-            "instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if not datastore_bucket_prefix:
-            datastore_bucket_prefix = old_datastore_bucketprefix
-        old_datastore_bucketprefix = None
-    old_datastore_bucketprefix = os.getenv("ANALYZER_BINARYSTORE_BUCKETPREFIX")
-    if old_datastore_bucketprefix:
-        warnings.warn(
-            "'ANALYZER_BINARYSTORE_BUCKETPREFIX' configuration variable is deprecated, use 'DATASTORE_BUCKETPREFIX' "
-            "instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if not datastore_bucket_prefix:
-            datastore_bucket_prefix = old_datastore_bucketprefix
-    if datastore_default_bucket_name:
-        if datastore_bucket_prefix:
-            datastore_bucket_prefix = f"{datastore_default_bucket_name}/{datastore_bucket_prefix}"
-        else:
-            datastore_bucket_prefix = datastore_default_bucket_name
-    else:
-        if not datastore_bucket_prefix:
-            datastore_bucket_prefix = "prj-"
-
-    datastore_bucket_postfix = os.getenv("DATASTORE_BUCKETPOSTFIX", "")
-
-    # Handle all datastore access key settings, old and new
-    datastore_access_key = os.getenv("DATASTORE_ACCESSKEY")
-    minio_access_key = os.getenv("MINIO_ACCESS_KEY")
-    if minio_access_key:
-        warnings.warn(
-            "'MINIO_ACCESS_KEY' configuration variable is deprecated, use 'DATASTORE_ACCESSKEY' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if not datastore_access_key:
-            datastore_access_key = minio_access_key
-
-    # Handle all datastore secret key settings, old and new
-    datastore_secret_key = os.getenv("DATASTORE_SECRETKEY")
-    minio_secret_key = os.getenv("MINIO_SECRET_KEY")
-    if minio_secret_key:
-        warnings.warn(
-            "'MINIO_SECRET_KEY' configuration variable is deprecated, use 'DATASTORE_SECRETKEY' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if not datastore_secret_key:
-            datastore_secret_key = minio_secret_key
-
     return ApplicationConfig(
         # ES/OS settings
         # Mute Sonar about hardcoded HTTP URL, since this is a hostname inside a docker-compose file
@@ -263,13 +193,16 @@ def build_app_config() -> ApplicationConfig:
         analyzerCluster=to_bool(os.getenv("ANALYZER_CLUSTER", "true")),
         appVersion=read_version(),
         # Storage settings
-        datastoreType=datastore_type,
-        datastoreEndpoint=datastore_endpoint,
-        datastoreRegion=datastore_region,
-        datastoreBucketPrefix=datastore_bucket_prefix,
-        datastoreBucketPostfix=datastore_bucket_postfix,
-        datastoreAccessKey=datastore_access_key,
-        datastoreSecretKey=datastore_secret_key,
+        datastoreType=getenv_with_deprecated("DATASTORE_TYPE", "ANALYZER_BINSTORE_TYPE", "ANALYZER_BINARYSTORE_TYPE")
+        or "filesystem",
+        datastoreEndpoint=read_datastore_endpoint(),
+        datastoreRegion=getenv_with_deprecated(
+            "DATASTORE_REGION", "ANALYZER_BINSTORE_MINIO_REGION", "ANALYZER_BINARYSTORE_MINIO_REGION"
+        ),
+        datastoreBucketPrefix=read_datastore_bucket_prefix(),
+        datastoreBucketPostfix=os.getenv("DATASTORE_BUCKETPOSTFIX", ""),
+        datastoreAccessKey=getenv_with_deprecated("DATASTORE_ACCESSKEY", "MINIO_ACCESS_KEY"),
+        datastoreSecretKey=getenv_with_deprecated("DATASTORE_SECRETKEY", "MINIO_SECRET_KEY"),
         filesystemDefaultPath=os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
         # HTTP endpoint settings
         analyzerHttpPort=int(os.getenv("ANALYZER_HTTP_PORT", "5001")),

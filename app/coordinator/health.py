@@ -141,7 +141,8 @@ class HealthServer:
         app.router.add_get("/", self.get_health_status)
         return app
 
-    async def get_health_status(self, _: web.Request) -> web.Response:
+    # aiohttp requires coroutine handlers, a bare function is deprecated: nothing to await here, the status is cached
+    async def get_health_status(self, _: web.Request) -> web.Response:  # NOSONAR
         opensearch = self._opensearch.status()
         coordinators = [coordinator.snapshot() for coordinator in self._coordinators]
 

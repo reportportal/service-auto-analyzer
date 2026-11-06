@@ -19,6 +19,7 @@
 ### Fixed
 - With `DISABLE_TRAIN=true` the `train` queue had no consumer and could grow forever, now its messages are discarded, by @HardNorth
 - `namespace_finder` requests with launches of several projects saved namespaces of all of them under the last project, by @HardNorth
+- Deprecated `ANALYZER_BINSTORE_TYPE` config parameter was ignored, now it's used if `DATASTORE_TYPE` is not set, by @HardNorth
 
 ## [6.0.0]
 ### Added

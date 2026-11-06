@@ -68,7 +68,8 @@ class FakePool(TaskPool):
 
     def finish(self, success: bool) -> None:
         slot = self._slots[0]
-        assert slot.item is not None and self.on_result is not None
+        assert slot.item is not None
+        assert self.on_result is not None
         error = None if success else RuntimeError("failure")
         self.on_result(slot, ProcessingResult(slot.item.number, None, success, error))
 
@@ -123,7 +124,8 @@ async def test_lost_worker_charges_only_its_task():
     coordinator = make_coordinator(pool, budget)
     await coordinator.on_message(suggest_message(1))
     slot = pool.slots[0]
-    assert slot.item is not None and pool.on_lost is not None
+    assert slot.item is not None
+    assert pool.on_lost is not None
 
     pool.on_lost(slot)
 

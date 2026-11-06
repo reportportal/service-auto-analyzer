@@ -15,6 +15,8 @@
 """Startup settings which choose the queues an instance consumes."""
 
 import json
+import warnings
+from typing import Any
 from unittest import mock
 
 import pytest
@@ -129,3 +131,175 @@ def test_build_search_config_reads_model_settings():
     assert search_config.GlobalDefectTypeModelFolder == file_utils.strip_path(
         model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]
     )
+
+
+DATASTORE_VARIABLES = [
+    "DATASTORE_TYPE",
+    "ANALYZER_BINSTORE_TYPE",
+    "ANALYZER_BINARYSTORE_TYPE",
+    "DATASTORE_ENDPOINT",
+    "MINIO_SHORT_HOST",
+    "MINIO_USE_TLS",
+    "DATASTORE_REGION",
+    "ANALYZER_BINSTORE_MINIO_REGION",
+    "ANALYZER_BINARYSTORE_MINIO_REGION",
+    "DATASTORE_DEFAULTBUCKETNAME",
+    "DATASTORE_BUCKETPREFIX",
+    "ANALYZER_BINSTORE_BUCKETPREFIX",
+    "ANALYZER_BINARYSTORE_BUCKETPREFIX",
+    "DATASTORE_BUCKETPOSTFIX",
+    "DATASTORE_ACCESSKEY",
+    "MINIO_ACCESS_KEY",
+    "DATASTORE_SECRETKEY",
+    "MINIO_SECRET_KEY",
+]
+
+
+@pytest.fixture
+def datastore_environment(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
+    for name in DATASTORE_VARIABLES:
+        monkeypatch.delenv(name, raising=False)
+    return monkeypatch
+
+
+def datastore_settings(app_config: ApplicationConfig) -> dict[str, Any]:
+    return {
+        "type": app_config.datastoreType,
+        "endpoint": app_config.datastoreEndpoint,
+        "region": app_config.datastoreRegion,
+        "prefix": app_config.datastoreBucketPrefix,
+        "postfix": app_config.datastoreBucketPostfix,
+        "access_key": app_config.datastoreAccessKey,
+        "secret_key": app_config.datastoreSecretKey,
+    }
+
+
+def deprecation(old: str, new: str) -> str:
+    return f"'{old}' configuration variable is deprecated, use '{new}' instead."
+
+
+def test_datastore_defaults(datastore_environment: pytest.MonkeyPatch):
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        app_config = main.build_app_config()
+
+    assert datastore_settings(app_config) == {
+        "type": "filesystem",
+        "endpoint": None,
+        "region": None,
+        "prefix": "prj-",
+        "postfix": "",
+        "access_key": None,
+        "secret_key": None,
+    }
+
+
+def test_datastore_new_variables_win_over_deprecated(datastore_environment: pytest.MonkeyPatch):
+    new_values = {
+        "DATASTORE_TYPE": "s3",
+        "DATASTORE_ENDPOINT": "https://s3.example.com",
+        "DATASTORE_REGION": "eu-west-1",
+        "DATASTORE_BUCKETPREFIX": "new-",
+        "DATASTORE_ACCESSKEY": "new-access",
+        "DATASTORE_SECRETKEY": "new-secret",
+    }
+    old_values = {
+        "ANALYZER_BINSTORE_TYPE": "minio",
+        "ANALYZER_BINARYSTORE_TYPE": "minio",
+        "MINIO_SHORT_HOST": "minio:9000",
+        "MINIO_USE_TLS": "true",
+        "ANALYZER_BINSTORE_MINIO_REGION": "old-region-1",
+        "ANALYZER_BINARYSTORE_MINIO_REGION": "old-region-2",
+        "ANALYZER_BINSTORE_BUCKETPREFIX": "old-1-",
+        "ANALYZER_BINARYSTORE_BUCKETPREFIX": "old-2-",
+        "MINIO_ACCESS_KEY": "old-access",
+        "MINIO_SECRET_KEY": "old-secret",
+    }
+    for name, value in {**new_values, **old_values}.items():
+        datastore_environment.setenv(name, value)
+
+    with pytest.warns(DeprecationWarning) as record:
+        app_config = main.build_app_config()
+
+    assert datastore_settings(app_config) == {
+        "type": "s3",
+        "endpoint": "https://s3.example.com",
+        "region": "eu-west-1",
+        "prefix": "new-",
+        "postfix": "",
+        "access_key": "new-access",
+        "secret_key": "new-secret",
+    }
+    assert [str(warning.message) for warning in record] == [
+        deprecation("ANALYZER_BINSTORE_TYPE", "DATASTORE_TYPE"),
+        deprecation("ANALYZER_BINARYSTORE_TYPE", "DATASTORE_TYPE"),
+        deprecation("MINIO_SHORT_HOST", "DATASTORE_ENDPOINT"),
+        deprecation("MINIO_USE_TLS", "DATASTORE_ENDPOINT"),
+        deprecation("ANALYZER_BINSTORE_MINIO_REGION", "DATASTORE_REGION"),
+        deprecation("ANALYZER_BINARYSTORE_MINIO_REGION", "DATASTORE_REGION"),
+        deprecation("ANALYZER_BINSTORE_BUCKETPREFIX", "DATASTORE_BUCKETPREFIX"),
+        deprecation("ANALYZER_BINARYSTORE_BUCKETPREFIX", "DATASTORE_BUCKETPREFIX"),
+        deprecation("MINIO_ACCESS_KEY", "DATASTORE_ACCESSKEY"),
+        deprecation("MINIO_SECRET_KEY", "DATASTORE_SECRETKEY"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "variables, expected",
+    [
+        ({"ANALYZER_BINSTORE_TYPE": "minio"}, {"type": "minio"}),
+        ({"ANALYZER_BINARYSTORE_TYPE": "minio"}, {"type": "minio"}),
+        ({"ANALYZER_BINSTORE_TYPE": "minio", "ANALYZER_BINARYSTORE_TYPE": "s3"}, {"type": "minio"}),
+        ({"MINIO_SHORT_HOST": "minio:9000"}, {"endpoint": "http://minio:9000"}),
+        ({"MINIO_SHORT_HOST": "minio:9000", "MINIO_USE_TLS": "true"}, {"endpoint": "https://minio:9000"}),
+        ({"MINIO_USE_TLS": "true"}, {}),
+        ({"ANALYZER_BINARYSTORE_MINIO_REGION": "region-2"}, {"region": "region-2"}),
+        (
+            {"ANALYZER_BINSTORE_MINIO_REGION": "region-1", "ANALYZER_BINARYSTORE_MINIO_REGION": "region-2"},
+            {"region": "region-1"},
+        ),
+        ({"ANALYZER_BINARYSTORE_BUCKETPREFIX": "old-2-"}, {"prefix": "old-2-"}),
+        (
+            {"ANALYZER_BINSTORE_BUCKETPREFIX": "old-1-", "ANALYZER_BINARYSTORE_BUCKETPREFIX": "old-2-"},
+            {"prefix": "old-1-"},
+        ),
+        (
+            {"MINIO_ACCESS_KEY": "access", "MINIO_SECRET_KEY": "secret"},
+            {"access_key": "access", "secret_key": "secret"},
+        ),
+    ],
+)
+def test_datastore_deprecated_variables_are_used(
+    datastore_environment: pytest.MonkeyPatch, variables: dict[str, str], expected: dict[str, Any]
+):
+    for name, value in variables.items():
+        datastore_environment.setenv(name, value)
+
+    with pytest.warns(DeprecationWarning):
+        app_config = main.build_app_config()
+
+    settings = datastore_settings(app_config)
+    assert {name: settings[name] for name in expected} == expected
+
+
+@pytest.mark.parametrize(
+    "variables, prefix",
+    [
+        ({"DATASTORE_DEFAULTBUCKETNAME": "bucket"}, "bucket"),
+        ({"DATASTORE_DEFAULTBUCKETNAME": "bucket", "DATASTORE_BUCKETPREFIX": "prj-"}, "bucket/prj-"),
+        ({"DATASTORE_BUCKETPREFIX": "custom-"}, "custom-"),
+    ],
+)
+def test_datastore_default_bucket_name(
+    datastore_environment: pytest.MonkeyPatch, variables: dict[str, str], prefix: str
+):
+    for name, value in variables.items():
+        datastore_environment.setenv(name, value)
+
+    assert main.build_app_config().datastoreBucketPrefix == prefix
+
+
+def test_datastore_bucket_postfix(datastore_environment: pytest.MonkeyPatch):
+    datastore_environment.setenv("DATASTORE_BUCKETPOSTFIX", "-data")
+
+    assert main.build_app_config().datastoreBucketPostfix == "-data"

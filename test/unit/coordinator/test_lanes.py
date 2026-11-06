@@ -37,12 +37,14 @@ def test_lane_runs_one_task_at_a_time_in_order():
         lanes.push(_item(number, "A"))
 
     first = lanes.pop_ready()
-    assert first is not None and first.number == 1
+    assert first is not None
+    assert first.number == 1
     assert lanes.pop_ready() is None
 
     lanes.release("A")
     second = lanes.pop_ready()
-    assert second is not None and second.number == 2
+    assert second is not None
+    assert second.number == 2
 
 
 def test_different_lanes_run_in_parallel_oldest_head_first():
@@ -63,7 +65,8 @@ def test_priority_orders_within_lane():
 
     first = lanes.pop_ready()
 
-    assert first is not None and first.number == 2
+    assert first is not None
+    assert first.number == 2
 
 
 def test_free_tasks_do_not_wait_for_each_other():
@@ -97,6 +100,7 @@ def test_drain_returns_queued_tasks_in_order():
 
     drained = lanes.drain()
 
-    assert running is not None and running.number == 1
+    assert running is not None
+    assert running.number == 1
     assert [item.number for item in drained] == [2, 3]
     assert lanes.queued == 0

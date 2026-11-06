@@ -64,18 +64,20 @@ def test_no_idle_worker():
     pool, _ = started_pool(2)
     pool.submit(item(1))
     pool.submit(item(2))
+    task = item(3)
 
     assert pool.has_idle() is False
     with pytest.raises(RuntimeError):
-        pool.submit(item(3))
+        pool.submit(task)
 
 
 def test_workers_which_are_not_started_are_not_idle():
     pool = WorkerPool(mock.Mock(), 2, "test")
+    task = item(1)
 
     assert pool.has_idle() is False
     with pytest.raises(RuntimeError):
-        pool.submit(item(1))
+        pool.submit(task)
 
 
 def test_send_failure_reports_the_worker_lost_with_its_task():

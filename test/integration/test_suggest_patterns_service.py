@@ -20,7 +20,7 @@ import pytest
 from app.commons.model.test_item_index import LogData, TestItemIndexData
 from app.commons.os_client import OsClient
 from app.service.suggest_patterns_service import SuggestPatternsService
-from app.utils.utils import read_json_file
+from app.utils.file_utils import read_json_file
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
 
 

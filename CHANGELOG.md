@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 ### Added
+- Test Items are indexed with an `error_hash` field, a stateless identity of the failure built from exception messages, exceptions and status codes; the field is added to existing indices automatically, by @HardNorth
+- `ANALYZER_HASH_MATCH_SAME_TEST` config parameter to analyze a Test Item by the latest runs of the same test case failed with the same error before Gradient Boosting, disabled by default, by @HardNorth
+- `ANALYZER_HASH_MATCH_ANY_TEST` config parameter to analyze a Test Item by the latest Test Items of any test case failed with the same error, if they all agree, disabled by default, by @HardNorth
+- Requests of different projects are processed in parallel by a pool of worker processes, while requests of one project are still processed one at a time, in publish order, by @HardNorth
+- `ANALYZER_WORKERS`, `ANALYZER_TRAIN_WORKERS`, `ANALYZER_MAX_QUEUED_TASKS` and `ANALYZER_MAX_QUEUED_BYTES` config parameters, by @HardNorth
+- `ANALYZER_WORKERS=0` or `ANALYZER_TRAIN_WORKERS=0` stops consuming the queue, so two instances can split the `all` and `train` queues between them, by @HardNorth
+### Changed
+- Auto-analysis runs as a chain of handlers, each of which analyzes the Test Items it can and passes the rest on, by @HardNorth
+- AMQP message processing moved to an asyncio coordinator on `aio-pika`: a hung task restarts only the worker which runs it, by @HardNorth
+- `index`, `analyze` and `namespace_finder` requests with launches of several projects are split and processed per project, by @HardNorth
+- Health check endpoint moved to `aiohttp`, it reports workers, queued requests and memory budget, and checks OpenSearch in the background, by @HardNorth
+- The service handles `SIGTERM` and shuts down gracefully, by @HardNorth
+### Removed
+- `flask`, `flask-cors` and `Flask-WTF` dependencies, by @HardNorth
+### Fixed
+- With `DISABLE_TRAIN=true` the `train` queue had no consumer and could grow forever, now its messages are discarded, by @HardNorth
+- `namespace_finder` requests with launches of several projects saved namespaces of all of them under the last project, by @HardNorth
+- Deprecated `ANALYZER_BINSTORE_TYPE` config parameter was ignored, now it's used if `DATASTORE_TYPE` is not set, by @HardNorth
+
+## [6.0.0]
+### Added
 - `ANALYZER_QUERY_TERMS_BUDGET` config parameter to limit the number of message terms in one Test Item query, by @HardNorth
 ### Changed
 - Log Item-centric storage approach changed to Test Item-centric one, by @HardNorth

@@ -18,7 +18,7 @@ import json
 import traceback
 from datetime import datetime, timezone
 from logging import DEBUG
-from time import time
+from time import monotonic
 from typing import Any, Callable, Iterable, Iterator, Optional
 
 import opensearchpy.helpers
@@ -36,11 +36,12 @@ from app.commons.model.test_item_index import (
     TestItemHistoryData,
     TestItemIndexData,
 )
-from app.utils import text_processing, utils
+from app.utils import file_utils, url_utils
 
 INDEX_SETTINGS_FILE = "index_settings.json"
 TEST_ITEM_INDEX_MAPPINGS_FILE = "test_item_index_mappings.json"
 HEALTH_CHECK_TIMEOUT = 10
+DEFAULT_MAX_RETRIES = 5
 
 LOGGER = logging.getLogger("analyzerApp.osClient")
 
@@ -89,11 +90,13 @@ class OsClient:
         app_config: ApplicationConfig,
         *,
         os_client: Optional[OpenSearch] = None,
+        max_retries: int = DEFAULT_MAX_RETRIES,
     ) -> None:
         """Initialize the OpenSearch client.
 
         :param app_config: Application configuration
         :param os_client: Optional pre-configured OpenSearch client for testing
+        :param max_retries: How many times to retry a failed request, including timeouts
         """
         self.app_config = app_config
         self.host = app_config.esHost
@@ -101,21 +104,22 @@ class OsClient:
             LOGGER.debug("Creating service using provided client")
             self._os_client = os_client
         else:
-            LOGGER.debug(f"Creating service using host URL: {text_processing.remove_credentials_from_url(self.host)}")
-            self._os_client = self._create_os_client(app_config)
+            LOGGER.debug(f"Creating service using host URL: {url_utils.remove_credentials_from_url(self.host)}")
+            self._os_client = self._create_os_client(app_config, max_retries)
         self._checked_indexes = set()
 
-    def _create_os_client(self, app_config: ApplicationConfig) -> OpenSearch:
+    def _create_os_client(self, app_config: ApplicationConfig, max_retries: int = DEFAULT_MAX_RETRIES) -> OpenSearch:
         """Create an OpenSearch client with the given configuration.
 
         :param app_config: Application configuration
+        :param max_retries: How many times to retry a failed request, including timeouts
         :return: Configured OpenSearch client
         """
         if not app_config.esVerifyCerts:
             urllib3.disable_warnings(InsecureRequestWarning)
         kwargs: dict[str, Any] = {
             "timeout": 30,
-            "max_retries": 5,
+            "max_retries": max_retries,
             "retry_on_timeout": True,
             "use_ssl": app_config.esUseSsl,
             "verify_certs": app_config.esVerifyCerts,
@@ -187,12 +191,26 @@ class OsClient:
         response = self._os_client.indices.create(
             index=index_name,
             body={
-                "settings": utils.read_resource_file(INDEX_SETTINGS_FILE, to_json=True),
-                "mappings": utils.read_resource_file(TEST_ITEM_INDEX_MAPPINGS_FILE, to_json=True),
+                "settings": file_utils.read_resource_file(INDEX_SETTINGS_FILE, to_json=True),
+                "mappings": file_utils.read_resource_file(TEST_ITEM_INDEX_MAPPINGS_FILE, to_json=True),
             },
         )
         LOGGER.debug(f"Index '{index_name}' created")
         return Response(**response)
+
+    def _get_index(self, index_name: str, print_error: bool = True) -> Optional[dict[str, Any]]:
+        """Get index metadata, including its mappings.
+
+        :param index_name: The index name to get
+        :param print_error: Whether to log errors
+        :return: Index metadata, or None if the index does not exist
+        """
+        try:
+            return self._os_client.indices.get(index=index_name)
+        except Exception as err:
+            if print_error:
+                LOGGER.exception(f"Index '{index_name}' was not found", exc_info=err)
+            return None
 
     def _index_exists(self, index_name: str, print_error: bool = True) -> bool:
         """Check whether an index exists.
@@ -201,47 +219,88 @@ class OsClient:
         :param print_error: Whether to log errors
         :return: True if index exists
         """
+        return self._get_index(index_name, print_error) is not None
+
+    def _add_missing_mappings(self, index_name: str, index: dict[str, Any]) -> None:
+        """Add the top-level fields of the current mappings which an index created by an older version lacks.
+
+        Only new fields are added, OpenSearch does not allow to change existing ones. Documents indexed before keep no
+        value in a new field until they are indexed again.
+
+        :param index_name: The index name
+        :param index: Index metadata, as returned by `indices.get`
+        """
+        metadata = index.get(index_name)
+        mappings = metadata.get("mappings") if isinstance(metadata, dict) else None
+        if not isinstance(mappings, dict):
+            # The metadata does not describe the index (e.g. it was requested by an alias), nothing to compare with
+            return
+        existing = mappings.get("properties") or {}
+        expected = file_utils.read_resource_file(TEST_ITEM_INDEX_MAPPINGS_FILE, to_json=True)["properties"]
+        missing = {name: definition for name, definition in expected.items() if name not in existing}
+        if not missing:
+            return
         try:
-            index = self._os_client.indices.get(index=index_name)
-            return index is not None
+            self._os_client.indices.put_mapping(index=index_name, body={"properties": missing})
+            LOGGER.info(f"Added fields {', '.join(missing)} to the mappings of index '{index_name}'")
         except Exception as err:
-            if print_error:
-                LOGGER.exception(f"Index '{index_name}' was not found", exc_info=err)
-            return False
+            LOGGER.exception(f"Failed to add fields {', '.join(missing)} to index '{index_name}'", exc_info=err)
 
     def _ensure_index_checked(self, index_name: str) -> bool:
         """Check whether an index exists, asking OpenSearch at most once per index.
 
-        `_index_exists` issues `indices.get`, which returns the index's whole metadata including
-        its mappings. Callers that guard every request with it pay that round trip per request, so
-        the answer is cached here.
+        `indices.get` returns the index's whole metadata including its mappings. Callers that guard
+        every request with it pay that round trip per request, so the answer is cached here. The
+        same metadata is used to add the fields an index created by an older version lacks.
 
         Only a positive answer is cached: a missing index may be created later in the process
         lifetime (indexing creates it on demand), so a negative has to be re-checked. An index
-        deleted through this client drops out of the cache in `_delete_index`; one deleted
-        out-of-process stays cached, and the request that follows fails in the caller's own error
-        handling rather than being skipped by the guard.
+        deleted through this client drops out of the cache in `_delete_index`; one deleted by
+        another worker process stays cached, and the read that follows fails in the caller's own
+        error handling rather than being skipped by the guard. Writes must not rely on this cache,
+        they use `_index_exists_for_write`.
 
         :param index_name: The index name to check
         :return: True if the index exists
         """
         if index_name in self._checked_indexes:
             return True
-        if self._index_exists(index_name, print_error=False):
-            self._checked_indexes.add(index_name)
-            return True
-        return False
+        index = self._get_index(index_name, print_error=False)
+        if index is None:
+            return False
+        self._add_missing_mappings(index_name, index)
+        self._checked_indexes.add(index_name)
+        return True
+
+    def _index_exists_for_write(self, index_name: str) -> bool:
+        """Check whether an index exists right before a write, without trusting the cache.
+
+        Worker processes take the tasks of one project in turn, so another worker may have deleted
+        the index after this one cached it. A bulk write to a missing index, even an update, makes
+        OpenSearch create it with dynamic mappings, under which the nested queries fail. So every
+        write asks OpenSearch with a cheap existence request, and only the mappings upgrade of
+        `_ensure_index_checked` runs once per process.
+
+        :param index_name: The index name to check
+        :return: True if the index exists
+        """
+        try:
+            exists = bool(self._os_client.indices.exists(index=index_name))
+        except Exception as err:
+            LOGGER.exception(f"Failed to check whether index exists: {index_name}", exc_info=err)
+            return False
+        if not exists:
+            self._checked_indexes.discard(index_name)
+            return False
+        return self._ensure_index_checked(index_name)
 
     def _ensure_index_exists(self, index_name: str) -> bool:
-        """Ensure the Test Item index exists, creating it if necessary.
-
-        Existence checks are cached by `_ensure_index_checked`; the cache is cleared on
-        application restart.
+        """Ensure the Test Item index exists before a write, creating it if necessary.
 
         :param index_name: The index name to check/create
         :return: True if index exists or was created successfully
         """
-        if self._ensure_index_checked(index_name):
+        if self._index_exists_for_write(index_name):
             return True
 
         try:
@@ -277,7 +336,7 @@ class OsClient:
         if not bodies:
             return BulkResponse(took=0, errors=False)
 
-        start_time = time()
+        start_time = monotonic()
         LOGGER.debug(f"Indexing {len(bodies)} documents")
         es_chunk_number = self.app_config.esChunkNumber
         if chunk_size is not None:
@@ -312,7 +371,7 @@ class OsClient:
                 error_str = ", ".join([str(error) for error in errors])
                 LOGGER.error(f"{len(errors)} of {len(bodies)} bulk operations failed: {error_str}")
             LOGGER.debug(f"{success_count} documents were successfully indexed")
-            LOGGER.debug("Finished indexing for %.2f s", time() - start_time)
+            LOGGER.debug("Finished indexing for %.2f s", monotonic() - start_time)
             return BulkResponse(took=success_count, errors=len(errors) > 0, failed_ids=failed_ids)
         except Exception as exc:
             LOGGER.exception("Error in bulk indexing", exc_info=exc)
@@ -451,7 +510,7 @@ class OsClient:
 
         index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
         LOGGER.info(f"Deleting {len(test_item_ids)} test items from '{index_name}'")
-        t_start = time()
+        t_start = monotonic()
 
         if not self._ensure_index_checked(index_name):
             return 0
@@ -461,7 +520,7 @@ class OsClient:
             test_item_ids,
             lambda ids: {"query": {"terms": {"test_item_id": ids}}},
         )
-        LOGGER.info(f"Deleted {deleted} test items in {round(time() - t_start, 2)} sec")
+        LOGGER.info(f"Deleted {deleted} test items in {round(monotonic() - t_start, 2)} sec")
         return deleted
 
     def delete_by_launch_ids(self, project_id: str | int, launch_ids: list[str]) -> int:
@@ -476,7 +535,7 @@ class OsClient:
 
         index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
         LOGGER.info(f"Deleting test items for {len(launch_ids)} launches from '{index_name}'")
-        t_start = time()
+        t_start = monotonic()
 
         if not self._ensure_index_checked(index_name):
             return 0
@@ -486,7 +545,7 @@ class OsClient:
             launch_ids,
             lambda ids: {"query": {"terms": {"launch_id": ids}}},
         )
-        LOGGER.info(f"Deleted {deleted} test items in {round(time() - t_start, 2)} sec")
+        LOGGER.info(f"Deleted {deleted} test items in {round(monotonic() - t_start, 2)} sec")
         return deleted
 
     def _time_range_query(
@@ -617,7 +676,7 @@ class OsClient:
             return BulkResponse(took=0, errors=False)
 
         index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
-        if not self._ensure_index_checked(index_name):
+        if not self._index_exists_for_write(index_name):
             LOGGER.error(f"Index not exists: {index_name}")
             return BulkResponse(took=0, errors=True)
 
@@ -667,7 +726,7 @@ class OsClient:
             return BulkResponse(took=0, errors=False)
 
         index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
-        if not self._ensure_index_checked(index_name):
+        if not self._index_exists_for_write(index_name):
             LOGGER.error(f"Index not exists: {index_name}")
             return BulkResponse(took=0, errors=True)
 

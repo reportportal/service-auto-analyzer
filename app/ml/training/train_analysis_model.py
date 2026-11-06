@@ -17,7 +17,7 @@ import os
 import random
 from collections import Counter, defaultdict
 from datetime import datetime
-from time import time
+from time import monotonic
 from typing import Any, Optional, Type, cast
 
 import numpy as np
@@ -770,7 +770,7 @@ class AnalysisModelTraining:
         return train_several_times(new_model, data, labels, random_states, self.baseline_model)
 
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, Any]]:
-        time_training = time()
+        time_training = monotonic()
         model_name = f'{project_info.model_type.name}_model_{datetime.now().strftime("%Y-%m-%d")}'
         baseline_model = os.path.basename(self.baseline_folder) if self.baseline_folder else ""
         new_model_folder = f"{project_info.model_type.name}_model/{model_name}/"
@@ -854,7 +854,7 @@ class AnalysisModelTraining:
         else:
             train_log_info[METRIC]["model_saved"] = 0
 
-        time_spent = time() - time_training
+        time_spent = monotonic() - time_training
         train_log_info[METRIC]["time_spent"] = time_spent
         train_log_info[METRIC]["module_version"] = [self.app_config.appVersion]
 

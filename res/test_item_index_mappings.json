@@ -39,6 +39,9 @@
     "is_auto_analyzed": {
         "type": "boolean"
     },
+    "error_hash": {
+      "type": "keyword"
+    },
     "logs": {
       "type": "nested",
       "properties": {

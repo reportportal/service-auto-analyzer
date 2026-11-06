@@ -21,7 +21,7 @@ from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.test_item_index import LogData, TestItemIndexData
 from app.commons.os_client import OsClient
 from app.service.processor import ServiceProcessor
-from app.utils import utils
+from app.utils import file_utils
 
 PROJECT_ID = 2
 
@@ -37,14 +37,14 @@ def opensearch_mock() -> mock.Mock:
 @pytest.fixture
 def processor(monkeypatch, tmp_path, opensearch_mock) -> ServiceProcessor:
     app_config = ApplicationConfig(esHost="http://localhost:9200", filesystemDefaultPath=str(tmp_path))
-    model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
+    model_settings = file_utils.read_json_file("res", "model_settings.json", to_json=True)
     search_config = SearchConfig(
-        BoostModelFolder=utils.strip_path(model_settings["BOOST_MODEL_FOLDER"]),
-        SuggestBoostModelFolder=utils.strip_path(model_settings["SUGGEST_BOOST_MODEL_FOLDER"]),
-        GlobalDefectTypeModelFolder=utils.strip_path(model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]),
+        BoostModelFolder=file_utils.strip_path(model_settings["BOOST_MODEL_FOLDER"]),
+        SuggestBoostModelFolder=file_utils.strip_path(model_settings["SUGGEST_BOOST_MODEL_FOLDER"]),
+        GlobalDefectTypeModelFolder=file_utils.strip_path(model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]),
     )
     monkeypatch.setattr("app.service.processor.OsClient", lambda config: OsClient(config, os_client=opensearch_mock))
-    monkeypatch.setattr("app.commons.os_client.utils.read_resource_file", lambda *args, **kwargs: {})
+    monkeypatch.setattr("app.commons.os_client.file_utils.read_resource_file", lambda *args, **kwargs: {})
     monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.bulk", lambda *args, **kwargs: (1, []))
     return ServiceProcessor(app_config, search_config)
 

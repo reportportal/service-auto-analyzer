@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import json
-from time import time
+from time import monotonic
 from typing import Any, Optional
 
 from app.commons import logging
@@ -23,6 +23,7 @@ from app.commons.model.launch_objects import (
     SearchLogs,
 )
 from app.commons.os_client import OsClient
+from app.commons.query_builder import BOOST_NEUTRAL, append_aa_ma_boosts, build_more_like_this_query
 from app.utils import text_processing, utils
 
 LOGGER = logging.getLogger("analyzerApp.searchService")
@@ -73,11 +74,11 @@ class SearchService:
             search_req.analyzerConfig.searchLogsMinShouldMatch / 100
         )
         nested_should = [
-            utils.build_more_like_this_query(
+            build_more_like_this_query(
                 min_should_match,
                 message,
                 field_name="logs.message",
-                boost=utils.BOOST_NEUTRAL,
+                boost=BOOST_NEUTRAL,
                 max_query_terms=self.search_cfg.MaxQueryTerms,
             )
             for message in log_messages
@@ -117,14 +118,14 @@ class SearchService:
             },
         }
 
-        utils.append_aa_ma_boosts(query, self.search_cfg)
+        append_aa_ma_boosts(query, self.search_cfg)
         return query
 
     def search_logs(self, search_req: SearchLogs) -> list[SearchLogInfo]:
         """Get all logs similar to given logs"""
         LOGGER.info(f"Started searching for test item with id: {search_req.itemId}")
         LOGGER.debug(f"Started searching by request: {search_req.model_dump_json()}")
-        t_start = time()
+        t_start = monotonic()
         log_messages = prepare_log_messages_for_search(search_req)
         if not log_messages:
             return []
@@ -222,7 +223,7 @@ class SearchService:
         LOGGER.info(
             "Finished searching with %d results. It took %.2f sec.",
             len(final_results),
-            time() - t_start,
+            monotonic() - t_start,
         )
 
         LOGGER.debug(

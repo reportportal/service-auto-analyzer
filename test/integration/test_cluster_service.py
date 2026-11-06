@@ -22,7 +22,7 @@ from opensearchpy.client import IndicesClient
 from app.commons.model.launch_objects import Launch, LaunchInfoForClustering, Log, TestItem
 from app.commons.os_client import OsClient
 from app.service.cluster_service import ClusterService
-from app.utils.utils import read_json_file
+from app.utils.file_utils import read_json_file
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
 
 

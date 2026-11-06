@@ -18,20 +18,38 @@ from typing import Any, Optional
 
 @dataclass(order=True)
 class ProcessingItem:
+    """One task to process: a message, or one per-project part of a message.
+
+    Items are ordered by ``priority`` (the publish timestamp) and then by arrival ``number``.
+    """
+
     priority: int
     number: int
     routing_key: str = field(compare=False)
     reply_to: Optional[str] = field(compare=False)
     log_correlation_id: str = field(compare=False)
     msg_correlation_id: str = field(compare=False)
-    item: Any = field(compare=False)
+    # Raw JSON body: the coordinator keeps bytes, not parsed objects, so the byte budget matches the memory it holds
+    item: bytes = field(compare=False)
+    # Project lane of the item, None for items which may run in any order
+    lane: Optional[str] = field(default=None, compare=False)
     send_time: Optional[float] = field(default=None, compare=False)
     retries: int = field(default=0, compare=False)
+
+    @property
+    def size(self) -> int:
+        """Size of the raw body in bytes, as charged to the intake budget."""
+        return len(self.item)
 
 
 @dataclass
 class ProcessingResult:
-    item: ProcessingItem
+    """Result of one task, sent back by a worker process.
+
+    It refers to the task by its arrival ``number`` instead of carrying the item, so the body isn't sent back.
+    """
+
+    number: int
     result: Optional[Any]
     success: bool
     error: Optional[Exception] = None

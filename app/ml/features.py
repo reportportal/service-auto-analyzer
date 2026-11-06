@@ -24,7 +24,7 @@ import re
 from collections import defaultdict
 from datetime import datetime
 from statistics import mean
-from typing import Any, Optional
+from typing import Any, Optional, Protocol
 
 from app.commons import logging
 from app.commons.model.db import Hit
@@ -170,6 +170,21 @@ def extract_identifier_tokens(text: str) -> set[str]:
     :return: Identifier tokens
     """
     return {token for token in text.split() if IDENTIFIER_TOKEN_PATTERN.search(token)}
+
+
+class Feature(Protocol):
+    """Gradient Boosting feature, calculated for every found Test Item against the request Test Item."""
+
+    def calculate(self, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]], /) -> list[float]:
+        """Calculate the feature value for every found Test Item.
+
+        Parameters are positional-only, so implementations are free to name them, e.g. ``_`` for an unused request.
+
+        :param request: Request Test Item
+        :param hits: Found Test Items
+        :return: Feature values in the range [0.0, 1.0], one per hit, in the order of hits
+        """
+        ...
 
 
 class DefectTypeFeature:

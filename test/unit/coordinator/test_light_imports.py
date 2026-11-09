@@ -21,7 +21,6 @@ import sys
 HEAVY_MODULES = ["sklearn", "nltk", "scipy", "numpy", "xgboost", "gensim", "app.service"]
 COORDINATOR_MODULES = [
     "app.main",
-    "app.amqp.amqp",
     "app.amqp.async_amqp",
     "app.commons.os_client",
     "app.commons.processing",

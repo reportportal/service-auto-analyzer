@@ -14,6 +14,7 @@
 - `index`, `analyze` and `namespace_finder` requests with launches of several projects are split and processed per project, by @HardNorth
 - Health check endpoint moved to `aiohttp`, it reports workers, queued requests and memory budget, and checks OpenSearch in the background, by @HardNorth
 - The service handles `SIGTERM` and shuts down gracefully, by @HardNorth
+- Services return replies, which the coordinator publishes: workers don't connect to RabbitMQ, so they don't lose idle connections and don't re-declare exchanges, by @HardNorth
 - The analyzer doesn't declare the `analyzer-reply` exchange before publishing analysis results: ReportPortal owns it, and the declaration with other settings was rejected by the broker, by @HardNorth
 ### Removed
 - `flask`, `flask-cors` and `Flask-WTF` dependencies, by @HardNorth

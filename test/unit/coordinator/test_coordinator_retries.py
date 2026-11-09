@@ -22,7 +22,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.commons.model.launch_objects import ApplicationConfig
-from app.commons.model.processing import ProcessingItem, ProcessingResult
+from app.commons.model.processing import ProcessingItem, ProcessingResult, Reply
 from app.coordinator.budget import IntakeBudget
 from app.coordinator.coordinator import LaneCoordinator
 from app.coordinator.messages import IncomingMessage
@@ -66,12 +66,12 @@ class FakePool(TaskPool):
     async def shutdown(self) -> None:
         pass
 
-    def finish(self, success: bool) -> None:
+    def finish(self, success: bool, replies: Optional[list[Reply]] = None) -> None:
         slot = self._slots[0]
         assert slot.item is not None
         assert self.on_result is not None
         error = None if success else RuntimeError("failure")
-        self.on_result(slot, ProcessingResult(slot.item.number, None, success, error))
+        self.on_result(slot, ProcessingResult(slot.item.number, replies, success, error))
 
 
 def make_coordinator(pool: FakePool, budget: IntakeBudget) -> LaneCoordinator:

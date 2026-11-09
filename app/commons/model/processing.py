@@ -13,7 +13,10 @@
 #  limitations under the License.
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from enum import Enum
+from typing import Iterable, Optional
+
+from pydantic import BaseModel
 
 
 @dataclass(order=True)
@@ -42,6 +45,41 @@ class ProcessingItem:
         return len(self.item)
 
 
+class ReplyType(Enum):
+    """Where a reply goes."""
+
+    DIRECT_REPLY = "direct_reply"
+    """To the "reply_to" queue of the request, with its correlation ID"""
+    ASYNC_REPLY = "async_reply"
+    """To the analyzer response queue, such as the analysis results"""
+    QUEUE_SEND = "queue_send"
+    """To the analyzer exchange with the reply's routing key, such as a model training request"""
+
+
+@dataclass(frozen=True)
+class Reply:
+    """What a service sends: workers don't connect to the broker, the coordinator publishes replies."""
+
+    payload: str
+    type: ReplyType = ReplyType.DIRECT_REPLY
+    routing_key: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if self.type is ReplyType.QUEUE_SEND and not self.routing_key:
+            raise ValueError("A reply of type QUEUE_SEND requires a routing key")
+
+
+def to_json_list(models: Iterable[BaseModel], exclude: Optional[set[str]] = None) -> str:
+    """Serialize models into a JSON list with their `model_dump_json`, such as the payload of a reply with several
+    results.
+
+    :param models: The models
+    :param exclude: Optional fields to leave out
+    :return: The JSON list
+    """
+    return f"[{','.join(model.model_dump_json(exclude=exclude) for model in models)}]"
+
+
 @dataclass
 class ProcessingResult:
     """Result of one task, sent back by a worker process.
@@ -50,6 +88,6 @@ class ProcessingResult:
     """
 
     number: int
-    result: Optional[Any]
+    result: Optional[list[Reply]]
     success: bool
     error: Optional[Exception] = None

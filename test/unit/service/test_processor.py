@@ -18,6 +18,7 @@ from unittest import mock
 import pytest
 
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
+from app.commons.model.processing import Reply, ReplyType
 from app.commons.model.test_item_index import LogData, TestItemIndexData
 from app.commons.os_client import OsClient
 from app.service.processor import ServiceProcessor
@@ -92,3 +93,30 @@ def test_index_deleted_by_clean_service_is_recreated_by_index_service(
 
     assert processor.index_service.os_client.bulk_index(PROJECT_ID, [item]).errors is False
     opensearch_mock.indices.create.assert_called_once()
+
+
+@pytest.fixture
+def test_processor() -> ServiceProcessor:
+    routes = {"noop_echo", "noop_sleep", "index_suggest_info", "remove_suggest_info", "update_suggest_info"}
+    return ServiceProcessor(ApplicationConfig(), SearchConfig(), services_to_init=routes)
+
+
+@pytest.mark.parametrize(
+    "routing_key, body, expected",
+    [
+        ("noop_echo", "A:1", [Reply("A:1")]),
+        ("noop_sleep", 0, None),
+        ("index_suggest_info", [], [Reply("{}")]),
+        ("remove_suggest_info", 5, [Reply("5")]),
+        ("update_suggest_info", {"project": 1}, [Reply("1")]),
+    ],
+)
+def test_route_replies(test_processor: ServiceProcessor, routing_key: str, body: Any, expected: Any) -> None:
+    assert test_processor.process(routing_key, body) == expected
+
+
+def test_replies_of_the_handler_are_returned_as_is(test_processor: ServiceProcessor) -> None:
+    replies = [Reply("[]", ReplyType.ASYNC_REPLY), Reply("{}", ReplyType.QUEUE_SEND, "train_models")]
+    test_processor._routing_config["noop_echo"]["handler"] = lambda _: replies
+
+    assert test_processor.process("noop_echo", "A:1") is replies

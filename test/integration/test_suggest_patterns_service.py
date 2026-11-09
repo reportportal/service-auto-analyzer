@@ -17,11 +17,13 @@ from unittest import mock
 
 import pytest
 
+from app.commons.model.launch_objects import SuggestPattern
 from app.commons.model.test_item_index import LogData, TestItemIndexData
 from app.commons.os_client import OsClient
 from app.service.suggest_patterns_service import SuggestPatternsService
 from app.utils.file_utils import read_json_file
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
+from test.replies import reply_model
 
 
 @pytest.fixture
@@ -103,7 +105,7 @@ def test_suggest_patterns_calls_correct_services(
     os_client_mock.search.return_value = hits
 
     # Execute the method
-    result = suggest_patterns_service.suggest_patterns(test_project_id)
+    result = reply_model(suggest_patterns_service.suggest_patterns(test_project_id), SuggestPattern)
 
     # Verify os_client.search was called once
     os_client_mock.search.assert_called_once()
@@ -153,7 +155,7 @@ def test_suggest_patterns_with_nonexistent_index(
     os_client_mock.search.return_value = []
 
     # Execute the method
-    result = suggest_patterns_service.suggest_patterns(test_project_id)
+    result = reply_model(suggest_patterns_service.suggest_patterns(test_project_id), SuggestPattern)
 
     # Verify search was called
     os_client_mock.search.assert_called_once()
@@ -179,7 +181,7 @@ def test_suggest_patterns_filters_and_aggregates_exceptions(
     os_client_mock.search.return_value = hits
 
     # Execute the method
-    result = suggest_patterns_service.suggest_patterns(test_project_id)
+    result = reply_model(suggest_patterns_service.suggest_patterns(test_project_id), SuggestPattern)
 
     # Verify search was called once
     os_client_mock.search.assert_called_once()
@@ -208,7 +210,7 @@ def test_suggest_patterns_with_empty_results(
     os_client_mock.search.return_value = []
 
     # Execute the method
-    result = suggest_patterns_service.suggest_patterns(test_project_id)
+    result = reply_model(suggest_patterns_service.suggest_patterns(test_project_id), SuggestPattern)
 
     # Verify search was called once
     os_client_mock.search.assert_called_once()

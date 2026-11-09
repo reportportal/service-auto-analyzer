@@ -19,11 +19,12 @@ import pytest
 from opensearchpy import OpenSearch
 from opensearchpy.client import IndicesClient
 
-from app.commons.model.launch_objects import Launch, LaunchInfoForClustering, Log, TestItem
+from app.commons.model.launch_objects import ClusterResult, Launch, LaunchInfoForClustering, Log, TestItem
 from app.commons.os_client import OsClient
 from app.service.cluster_service import ClusterService
 from app.utils.file_utils import read_json_file
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
+from test.replies import reply_model
 
 
 @pytest.fixture
@@ -77,7 +78,7 @@ def test_find_clusters_calls_correct_services(
     mock_bulk.return_value = (10, [])  # (success_count, errors)
 
     # Execute the method
-    result = cluster_service.find_clusters(launch_info)
+    result = reply_model(cluster_service.find_clusters(launch_info), ClusterResult)
 
     # Verify es_client.search was called to find similar items
     # In our test data, after grouping by exception type and then clustering by message similarity:
@@ -221,7 +222,7 @@ def test_find_clusters_with_nonexistent_index(
     mocked_opensearch_client.search.return_value = test_data["search_results_no_similar_items"]
 
     # Execute the method
-    result = cluster_service.find_clusters(launch_info)
+    result = reply_model(cluster_service.find_clusters(launch_info), ClusterResult)
 
     # Verify bulk was NOT called since index doesn't exist
     mock_bulk.assert_not_called()
@@ -251,7 +252,7 @@ def test_find_clusters_with_no_similar_items(
     mock_bulk.return_value = (4, [])  # (success_count, errors)
 
     # Execute the method
-    result = cluster_service.find_clusters(launch_info)
+    result = reply_model(cluster_service.find_clusters(launch_info), ClusterResult)
 
     # Verify es_client.search was called
     # With the same test data as test_find_clusters_calls_correct_services:
@@ -307,7 +308,7 @@ def test_find_clusters_with_for_update_mode(
     mock_bulk.return_value = (2, [])  # (success_count, errors)
 
     # Execute the method
-    result = cluster_service.find_clusters(launch_info)
+    result = reply_model(cluster_service.find_clusters(launch_info), ClusterResult)
 
     # Verify es_client.search was called
     # With 1 log (test item 6005 with IOException), there is 1 group, so 1 search call
@@ -359,7 +360,7 @@ def test_find_clusters_with_clean_numbers_mode(
     mock_bulk.return_value = (2, [])  # (success_count, errors)
 
     # Execute the method
-    result = cluster_service.find_clusters(launch_info)
+    result = reply_model(cluster_service.find_clusters(launch_info), ClusterResult)
 
     # Verify es_client.search was called
     # With cleanNumbers=True, logs become more similar, reducing the number of groups
@@ -503,7 +504,7 @@ def test_find_clusters_merges_small_logs_of_one_level(
     mocked_opensearch_client.search.return_value = NO_HITS
     mock_bulk.return_value = (1, [])
 
-    result = cluster_service.find_clusters(launch_info)
+    result = reply_model(cluster_service.find_clusters(launch_info), ClusterResult)
 
     assert len(result.clusters) == 1, "small logs of one level should give exactly 1 cluster"
     cluster = result.clusters[0]
@@ -543,7 +544,7 @@ def test_find_clusters_creates_cluster_per_level_for_small_logs(
     mocked_opensearch_client.search.return_value = NO_HITS
     mock_bulk.return_value = (1, [])
 
-    result = cluster_service.find_clusters(launch_info)
+    result = reply_model(cluster_service.find_clusters(launch_info), ClusterResult)
 
     assert len(result.clusters) == 2, "small logs of two levels should give exactly 2 clusters"
     assert sorted(cluster.logIds for cluster in result.clusters) == [[7001], [7002]]
@@ -566,7 +567,7 @@ def test_find_clusters_drops_small_logs_of_level_with_big_log(
     mocked_opensearch_client.search.return_value = NO_HITS
     mock_bulk.return_value = (1, [])
 
-    result = cluster_service.find_clusters(launch_info)
+    result = reply_model(cluster_service.find_clusters(launch_info), ClusterResult)
 
     assert len(result.clusters) == 1, "only the big log should give a cluster"
     assert result.clusters[0].logIds == [7002]
@@ -593,7 +594,7 @@ def test_find_clusters_treats_similar_big_logs_of_one_item_as_one_log(
     mocked_opensearch_client.search.return_value = NO_HITS
     mock_bulk.return_value = (1, [])
 
-    result = cluster_service.find_clusters(launch_info)
+    result = reply_model(cluster_service.find_clusters(launch_info), ClusterResult)
 
     assert len(result.clusters) == 1, "similar big logs should give exactly 1 cluster"
     assert result.clusters[0].logIds == [7002]
@@ -616,7 +617,7 @@ def test_find_clusters_keeps_different_big_logs_of_one_item_apart(
     mocked_opensearch_client.search.return_value = NO_HITS
     mock_bulk.return_value = (1, [])
 
-    result = cluster_service.find_clusters(launch_info)
+    result = reply_model(cluster_service.find_clusters(launch_info), ClusterResult)
 
     assert len(result.clusters) == 2, "different big logs should give exactly 2 clusters"
     assert sorted(cluster.logIds for cluster in result.clusters) == [[7001], [7002]]
@@ -637,7 +638,7 @@ def test_find_clusters_groups_same_logs_of_different_items(
     mocked_opensearch_client.search.return_value = NO_HITS
     mock_bulk.return_value = (1, [])
 
-    result = cluster_service.find_clusters(launch_info)
+    result = reply_model(cluster_service.find_clusters(launch_info), ClusterResult)
 
     assert len(result.clusters) == 2, "same logs should give exactly 1 cluster for big and 1 for merged small logs"
     clusters = sorted(result.clusters, key=lambda cluster: cluster.logIds)
@@ -697,7 +698,7 @@ def test_find_clusters_reuses_cluster_of_similar_merged_logs(
     mocked_opensearch_client.scroll.return_value = NO_HITS
     mock_bulk.return_value = (1, [])
 
-    result = cluster_service.find_clusters(launch_info)
+    result = reply_model(cluster_service.find_clusters(launch_info), ClusterResult)
 
     assert len(result.clusters) == 1
     cluster = result.clusters[0]
@@ -751,7 +752,7 @@ def test_find_clusters_respects_clean_numbers_in_cluster_message(
     mocked_opensearch_client.search.return_value = NO_HITS
     mock_bulk.return_value = (1, [])
 
-    result = cluster_service.find_clusters(launch_info)
+    result = reply_model(cluster_service.find_clusters(launch_info), ClusterResult)
 
     assert len(result.clusters) == 1
     assert result.clusters[0].clusterMessage == expected_message
@@ -777,7 +778,7 @@ def test_find_clusters_keeps_numbers_in_merged_logs_cluster_message(
     mocked_opensearch_client.search.return_value = NO_HITS
     mock_bulk.return_value = (1, [])
 
-    result = cluster_service.find_clusters(launch_info)
+    result = reply_model(cluster_service.find_clusters(launch_info), ClusterResult)
 
     expected_message = "Order 42 was not found\nExpected 3 items but was 5"
     assert len(result.clusters) == 1

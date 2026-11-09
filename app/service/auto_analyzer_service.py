@@ -17,7 +17,6 @@ from collections import Counter
 from time import monotonic
 from typing import Optional
 
-from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory
 from app.commons.model.handler import AnalysisContext, AnalysisHandler
 from app.commons.model.launch_objects import (
@@ -27,6 +26,7 @@ from app.commons.model.launch_objects import (
     LaunchAnalysisStats,
     SearchConfig,
 )
+from app.commons.model.processing import Reply, ReplyType, to_json_list
 from app.commons.model.test_item_index import TestItemIndexData
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
@@ -68,7 +68,6 @@ class AutoAnalyzerService:
     os_client: OsClient
     namespace_finder: NamespaceFinder
     model_chooser: ModelChooser
-    amqp_client: Optional[AmqpClient]
     chain: AnalysisHandler
 
     def __init__(
@@ -84,9 +83,6 @@ class AutoAnalyzerService:
         self.app_config = app_config
         self.os_client = os_client or OsClient(app_config=self.app_config)
         self.namespace_finder = namespace_finder or NamespaceFinder(app_config)
-        self.amqp_client = None
-        if self.app_config.amqpUrl:
-            self.amqp_client = AmqpClient(self.app_config)
         self.chain = self._build_chain()
 
     def _build_chain(self) -> AnalysisHandler:
@@ -119,10 +115,11 @@ class AutoAnalyzerService:
             module_version=[self.app_config.appVersion],
         )
 
-    def analyze_logs(self, launches: list[Launch]) -> None:
-        """Analyze Test Items of the launches and publish the results.
+    def analyze_logs(self, launches: list[Launch]) -> list[Reply]:
+        """Analyze Test Items of the launches.
 
         :param launches: Launches with request Test Items
+        :return: The asynchronous reply with the analysis results
         """
         LOGGER.info(f"Started analysis for {len(launches)} launches")
         t_start = monotonic()
@@ -172,5 +169,4 @@ class AutoAnalyzerService:
             f"Finished analysis for {len(launches)} launches with {len(results)} results"
             + (f": {by_handler}" if by_handler else ".")
         )
-        if self.amqp_client:
-            self.amqp_client.publish_response(json.dumps([res.model_dump() for res in results]))
+        return [Reply(to_json_list(results), ReplyType.ASYNC_REPLY)]

@@ -18,13 +18,14 @@ from unittest import mock
 import pytest
 
 from app.commons.model.db import Hit
-from app.commons.model.launch_objects import AnalyzerConf, Launch, Log, TestItem, TestItemInfo
+from app.commons.model.launch_objects import AnalyzerConf, Launch, Log, SuggestAnalysisResult, TestItem, TestItemInfo
 from app.commons.model.test_item_index import TestItemIndexData
 from app.commons.similarity_filter import SHORTENED_MESSAGE_FIELDS, UNSHORTENED_MESSAGE_FIELDS
 from app.service.analysis.boosting_handler import BoostingHandler, choose_fields_to_filter_strict
 from app.service.auto_analyzer_service import prepare_request_items_for_launch
 from app.service.suggest_service import SuggestService
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
+from test.replies import reply_models
 
 REQUEST_MESSAGE = (
     "@pytest.mark.issue(issue_id='ABC-1234', reason='some_bug', issue_type='PB')\n    def test_issue_id():\n"
@@ -169,7 +170,7 @@ def test_suggestions_are_not_made_by_not_similar_found_items(number_of_log_lines
     hits = [build_found_hit(2, [UNRELATED_MESSAGE], analyzer_config, {0: 0})]
     service, boosting_model = build_suggest_service(hits)
 
-    results = service.suggest_items(build_test_item_info(analyzer_config))
+    results = reply_models(service.suggest_items(build_test_item_info(analyzer_config)), SuggestAnalysisResult)
 
     assert results == []
     boosting_model.predict.assert_not_called()
@@ -183,7 +184,7 @@ def test_suggestions_are_made_by_similar_found_items():
     ]
     service, boosting_model = build_suggest_service(hits)
 
-    results = service.suggest_items(build_test_item_info(analyzer_config))
+    results = reply_models(service.suggest_items(build_test_item_info(analyzer_config)), SuggestAnalysisResult)
 
     boosting_model.predict.assert_called_once()
     assert len(boosting_model.predict.call_args.args[0]) == 1

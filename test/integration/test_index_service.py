@@ -1,7 +1,10 @@
 import datetime
+import json
 from unittest import mock
 
 from app.commons.model.launch_objects import AnalyzerConf, BulkResponse, DefectUpdate, Launch
+from app.commons.model.ml import ModelType, TrainInfo
+from app.commons.model.processing import Reply, ReplyType
 from app.commons.model.test_item_index import TestItemHistoryData, TestItemIndexData
 from app.service.index_service import IndexService
 from test import APP_CONFIG
@@ -26,6 +29,21 @@ def _make_index_item(item_id: str, issue_type: str = "pb001") -> TestItemIndexDa
     )
 
 
+def train_replies(project: int, defects: int) -> list[Reply]:
+    return [
+        Reply(
+            TrainInfo(model_type=model_type, project=project, gathered_metric_total=defects).model_dump_json(),
+            ReplyType.QUEUE_SEND,
+            "train_models",
+        )
+        for model_type in (ModelType.suggestion, ModelType.auto_analysis, ModelType.defect_type)
+    ]
+
+
+def test_index_logs_without_launches_replies_nothing() -> None:
+    assert IndexService(APP_CONFIG, os_client=mock.Mock()).index_logs([]) is None
+
+
 def test_index_logs_groups_by_project_and_passes_config() -> None:
     os_client = mock.Mock()
     os_client.bulk_index.side_effect = [
@@ -48,7 +66,7 @@ def test_index_logs_groups_by_project_and_passes_config() -> None:
         "app.service.index_service.request_factory.prepare_test_items",
         side_effect=[prepared_first_items, prepared_second_items],
     ) as prepare_mock:
-        service.index_logs([launch_first, launch_second])
+        replies = service.index_logs([launch_first, launch_second])
 
     prepare_mock.assert_has_calls(
         [
@@ -70,6 +88,8 @@ def test_index_logs_groups_by_project_and_passes_config() -> None:
     os_client.bulk_index.assert_has_calls(
         [mock.call(101, prepared_first_items), mock.call(202, prepared_second_items)], any_order=False
     )
+    # Training is requested only for the project with defect types, "ti" is not one
+    assert replies == train_replies(101, 1)
 
 
 def test_defect_update_updates_issue_history_and_docs() -> None:
@@ -98,7 +118,9 @@ def test_defect_update_updates_issue_history_and_docs() -> None:
         },
     }
 
-    not_updated = service.defect_update(DefectUpdate(**defect_update_info))
+    replies = service.defect_update(DefectUpdate(**defect_update_info))
+    assert replies[0].type is ReplyType.DIRECT_REPLY
+    not_updated = json.loads(replies[0].payload)
 
     os_client.get_test_items_by_ids.assert_called_once_with(123, ["1001", "1002", "9999"])
 
@@ -125,6 +147,7 @@ def test_defect_update_updates_issue_history_and_docs() -> None:
     assert second_entry.is_auto_analyzed is False
 
     assert set(not_updated) == {9999}
+    assert replies[1:] == train_replies(123, 2)
 
 
 def test_defect_update_reports_items_which_disappeared_before_update() -> None:
@@ -135,7 +158,9 @@ def test_defect_update_reports_items_which_disappeared_before_update() -> None:
     service = IndexService(APP_CONFIG, os_client=os_client)
 
     defect_update_info = {"project": 123, "itemsToUpdate": {"1001": "ab001", "1002": "ab001", "9999": "ab001"}}
-    not_updated = service.defect_update(DefectUpdate(**defect_update_info))
+    replies = service.defect_update(DefectUpdate(**defect_update_info))
+    assert replies[0].type is ReplyType.DIRECT_REPLY
+    not_updated = json.loads(replies[0].payload)
 
     os_client.bulk_update_issue_history.assert_called_once()
     assert sorted(not_updated) == [1002, 9999]
@@ -152,7 +177,9 @@ def test_defect_update_accepts_timestamp_with_nanoseconds() -> None:
         "project": 123,
         "itemsToUpdate": {"1001": {"issueType": "AB001", "timestamp": [2026, 10, 18, 17, 59, 2, 797000000]}},
     }
-    not_updated = service.defect_update(DefectUpdate(**defect_update_info))
+    replies = service.defect_update(DefectUpdate(**defect_update_info))
+    assert replies[0].type is ReplyType.DIRECT_REPLY
+    not_updated = json.loads(replies[0].payload)
 
     history_updates: list[TestItemHistoryData] = os_client.bulk_update_issue_history.call_args[0][1]
     assert len(history_updates) == 1

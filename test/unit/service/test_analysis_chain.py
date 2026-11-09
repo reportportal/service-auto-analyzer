@@ -24,9 +24,11 @@ import pytest
 
 from app.commons.model.handler import AnalysisContext, AnalysisHandler, HandlerResult
 from app.commons.model.launch_objects import AnalysisResult, AnalyzerConf, Launch, LaunchAnalysisStats, Log, TestItem
+from app.commons.model.processing import Reply, ReplyType
 from app.commons.model.test_item_index import TestItemIndexData
 from app.service.auto_analyzer_service import AutoAnalyzerService, prepare_request_items_for_launch
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
+from test.replies import payload
 
 
 class ResolvingHandler(AnalysisHandler):
@@ -101,7 +103,7 @@ def get_ids(items: list[TestItemIndexData]) -> list[int]:
     return [int(item.test_item_id) for item in items]
 
 
-def build_service(chain: AnalysisHandler, max_items: Optional[int] = None) -> tuple[AutoAnalyzerService, mock.Mock]:
+def build_service(chain: AnalysisHandler, max_items: Optional[int] = None) -> AutoAnalyzerService:
     search_config = DEFAULT_SEARCH_CONFIG.model_copy()
     if max_items is not None:
         search_config.MaxAutoAnalysisItemsToProcess = max_items
@@ -109,14 +111,11 @@ def build_service(chain: AnalysisHandler, max_items: Optional[int] = None) -> tu
         mock.Mock(), APP_CONFIG, search_config, os_client=mock.Mock(), namespace_finder=mock.Mock()
     )
     service.chain = chain
-    amqp_client = mock.Mock()
-    service.amqp_client = amqp_client
-    return service, amqp_client
+    return service
 
 
-def get_published_item_ids(amqp_client: mock.Mock) -> list[int]:
-    amqp_client.publish_response.assert_called_once()
-    return [result["testItem"] for result in json.loads(amqp_client.publish_response.call_args.args[0])]
+def get_published_item_ids(replies: Optional[list[Reply]]) -> list[int]:
+    return [result["testItem"] for result in json.loads(payload(replies, ReplyType.ASYNC_REPLY))]
 
 
 def test_chain_passes_only_remaining_items_to_the_next_handler() -> None:
@@ -156,40 +155,40 @@ def test_last_handler_returns_its_remaining_items() -> None:
 
 def test_service_publishes_results_of_all_handlers_once() -> None:
     chain = ResolvingHandler("first", {1}, next_handler=ResolvingHandler("last", {3}))
-    service, amqp_client = build_service(chain)
+    service = build_service(chain)
 
-    service.analyze_logs([build_launch(1, [1, 2]), build_launch(2, [3, 4])])
+    replies = service.analyze_logs([build_launch(1, [1, 2]), build_launch(2, [3, 4])])
 
-    assert get_published_item_ids(amqp_client) == [1, 3]
+    assert get_published_item_ids(replies) == [1, 3]
     assert chain.received == [[1, 2], [3, 4]]
 
 
 def test_service_skips_chain_for_launch_without_logs() -> None:
     chain = ResolvingHandler("only", {1})
-    service, amqp_client = build_service(chain)
+    service = build_service(chain)
 
-    service.analyze_logs([build_launch(1, [5], with_logs=False), build_launch(2, [1])])
+    replies = service.analyze_logs([build_launch(1, [5], with_logs=False), build_launch(2, [1])])
 
     assert chain.received == [[1]]
-    assert get_published_item_ids(amqp_client) == [1]
+    assert get_published_item_ids(replies) == [1]
 
 
 def test_service_caps_items_to_process_across_launches() -> None:
     chain = ResolvingHandler("only", {1, 2, 3, 4})
-    service, amqp_client = build_service(chain, max_items=3)
+    service = build_service(chain, max_items=3)
 
-    service.analyze_logs([build_launch(1, [1, 2]), build_launch(2, [3, 4]), build_launch(3, [5])])
+    replies = service.analyze_logs([build_launch(1, [1, 2]), build_launch(2, [3, 4]), build_launch(3, [5])])
 
     assert chain.received == [[1, 2], [3]]
-    assert get_published_item_ids(amqp_client) == [1, 2, 3]
+    assert get_published_item_ids(replies) == [1, 2, 3]
 
 
 def test_service_publishes_empty_results_when_chain_fails() -> None:
-    service, amqp_client = build_service(FailingHandler())
+    service = build_service(FailingHandler())
 
-    service.analyze_logs([build_launch(1, [1])])
+    replies = service.analyze_logs([build_launch(1, [1])])
 
-    assert get_published_item_ids(amqp_client) == []
+    assert get_published_item_ids(replies) == []
 
 
 def test_service_shares_chosen_namespaces_cache_between_launches() -> None:
@@ -202,7 +201,7 @@ def test_service_shares_chosen_namespaces_cache_between_launches() -> None:
             contexts.append(context)
             return super()._analyze(context, items)
 
-    service, _ = build_service(RecordingHandler("only", set()))
+    service = build_service(RecordingHandler("only", set()))
 
     service.analyze_logs([build_launch(1, [1]), build_launch(2, [2])])
 
@@ -267,7 +266,7 @@ def test_service_counts_results_by_handler(caplog: pytest.LogCaptureFixture) -> 
             return super()._analyze(context, items)
 
     chain = RecordingHandler("first", {1, 3}, next_handler=ResolvingHandler("last", {2}))
-    service, _ = build_service(chain)
+    service = build_service(chain)
 
     with caplog.at_level(logging.INFO, logger="analyzerApp.autoAnalyzerService"):
         service.analyze_logs([build_launch(1, [1, 2]), build_launch(2, [3, 4])])
@@ -278,7 +277,7 @@ def test_service_counts_results_by_handler(caplog: pytest.LogCaptureFixture) -> 
 
 
 def test_service_summary_without_results(caplog: pytest.LogCaptureFixture) -> None:
-    service, _ = build_service(ResolvingHandler("only", set()))
+    service = build_service(ResolvingHandler("only", set()))
 
     with caplog.at_level(logging.INFO, logger="analyzerApp.autoAnalyzerService"):
         service.analyze_logs([build_launch(1, [1])])

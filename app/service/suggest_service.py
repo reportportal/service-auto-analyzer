@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import json
 import traceback
 from time import monotonic
 from typing import Any, Optional
@@ -28,6 +27,7 @@ from app.commons.model.launch_objects import (
     TestItem,
     TestItemInfo,
 )
+from app.commons.model.processing import Reply, to_json_list
 from app.commons.model.test_item_index import TestItemIndexData
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
@@ -276,7 +276,15 @@ class SuggestService:
                 return None, test_item_id_for_suggest
             return prepared_items[0], test_item_id_for_suggest
 
-    def suggest_items(self, test_item_info: TestItemInfo) -> list[SuggestAnalysisResult]:
+    def suggest_items(self, test_item_info: TestItemInfo) -> list[Reply]:
+        """Suggest issue types for a test item based on similar historical items.
+
+        :param test_item_info: The test item to suggest issue types for
+        :return: The reply with the suggestion results sorted by probability
+        """
+        return [Reply(to_json_list(self._suggest_items(test_item_info)))]
+
+    def _suggest_items(self, test_item_info: TestItemInfo) -> list[SuggestAnalysisResult]:
         """Suggest issue types for a test item based on similar historical items.
 
         :param test_item_info: The test item to suggest issue types for
@@ -300,9 +308,7 @@ class SuggestService:
                 LOGGER.debug(f"Test item search request for suggestions: {request_item.model_dump_json()}")
                 searched_res = self._query_suggested_items(test_item_info, request_item)
                 LOGGER.info(f"Found {len(searched_res[1])} items by FTS (KNN)")
-                LOGGER.debug(
-                    "Items for suggestions by FTS (KNN): " + json.dumps([hit.model_dump() for hit in searched_res[1]])
-                )
+                LOGGER.debug("Items for suggestions by FTS (KNN): " + to_json_list(searched_res[1]))
                 searched_res = self._filter_by_similarity(test_item_info, searched_res)
                 LOGGER.info(f"{len(searched_res[1])} items left after filtering by similarity")
 
@@ -389,8 +395,7 @@ class SuggestService:
             LOGGER.exception(exc)
             errors_found.append(utils.extract_exception(exc))
             errors_count += 1
-        results_to_share = [res.model_dump(exclude={"modelFeatureNames", "modelFeatureValues"}) for res in results]
-        LOGGER.debug(f"Results: {json.dumps(results_to_share)}")
+        LOGGER.debug(f"Results: {to_json_list(results, exclude={'modelFeatureNames', 'modelFeatureValues'})}")
         LOGGER.info(f"Processed the test item. It took {monotonic() - t_start:.2f} sec. Errors: {errors_count}")
         LOGGER.info(f"Finished suggesting for test item with {len(results)} results.")
         return results

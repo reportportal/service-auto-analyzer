@@ -9,7 +9,6 @@ xgboost==3.4.1
 gensim==4.4.0
 
 pydantic==2.13.5
-pika==1.4.4
 aio-pika==10.1.1
 aiormq==7.2.2 # not directly required, pinned to a release older than two weeks
 aiohttp==3.14.5

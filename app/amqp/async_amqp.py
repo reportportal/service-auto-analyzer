@@ -92,13 +92,18 @@ class ReconnectedLogger(CallbackType[AbstractRobustConnection, [], None]):
 
 
 class AsyncAmqpClient:
-    """AMQP client on aio-pika: one robust connection, which restores its channel, queue and consumer on reconnect."""
+    """AMQP client on aio-pika: one robust connection, which restores its channels, queue and consumer on reconnect.
+
+    Messages are consumed and published on separate channels: publishing to a missing exchange makes the broker close
+    the channel, which must not cancel the consumer and redeliver the message it holds.
+    """
 
     _config: Final[ApplicationConfig]
     _url: Final[str]
     _url_no_credentials: Final[str]
     _connection: Optional[AbstractRobustConnection]
     _channel: Optional[AbstractChannel]
+    _publish_channel: Optional[AbstractChannel]
     _queue: Optional[AbstractQueue]
     _consumer_tag: Optional[ConsumerTag]
     _closing: bool
@@ -114,6 +119,7 @@ class AsyncAmqpClient:
         self._url = f"{base_url}?heartbeat={config.amqpHeartbeatInterval}"
         self._connection = None
         self._channel = None
+        self._publish_channel = None
         self._queue = None
         self._consumer_tag = None
         self._closing = False
@@ -134,6 +140,7 @@ class AsyncAmqpClient:
                 connection.reconnect_callbacks.add(ReconnectedLogger(self._describe))
                 self._connection = connection
                 self._channel = await self._open_channel()
+                self._publish_channel = await connection.channel()
                 LOGGER.info("AMQP connection established.")
                 return
             except Exception as exc:  # pylint: disable=broad-except
@@ -209,6 +216,11 @@ class AsyncAmqpClient:
                 LOGGER.warning(f"Failed to cancel the consumer cleanly: {exc}")
             self._consumer_tag = None
 
+    def _get_publish_channel(self) -> AbstractChannel:
+        if self._publish_channel is None:
+            raise RuntimeError("AMQP client is not connected")
+        return self._publish_channel
+
     async def reply(self, to: str, correlation_id: str, data: str) -> None:
         """Publish a reply to the reply queue of a request.
 
@@ -219,7 +231,19 @@ class AsyncAmqpClient:
         message = aio_pika.Message(
             body=data.encode("utf-8"), correlation_id=correlation_id, content_type=JSON_CONTENT_TYPE
         )
-        await self._get_channel().default_exchange.publish(message, routing_key=to, mandatory=False)
+        await self._get_publish_channel().default_exchange.publish(message, routing_key=to, mandatory=False)
+
+    async def publish(self, exchange_name: str, routing_key: str, data: str) -> None:
+        """Publish a message to an exchange, without declaring it: the analyzer exchange is declared on consume and
+        restored on reconnect, the response exchange is declared by ReportPortal.
+
+        :param exchange_name: Name of the exchange
+        :param routing_key: The routing key of the message
+        :param data: The data to publish
+        """
+        exchange = await self._get_publish_channel().get_exchange(exchange_name, ensure=False)
+        message = aio_pika.Message(body=data.encode("utf-8"), content_type=JSON_CONTENT_TYPE)
+        await exchange.publish(message, routing_key=routing_key, mandatory=False)
 
     async def close(self) -> None:
         """Close the connection."""
@@ -231,3 +255,4 @@ class AsyncAmqpClient:
                 LOGGER.warning(f"Failed to close AMQP connection cleanly: {exc}")
         self._connection = None
         self._channel = None
+        self._publish_channel = None

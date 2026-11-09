@@ -22,6 +22,7 @@ from app.commons.model.db import Hit
 from app.commons.model.handler import AnalysisContext
 from app.commons.model.launch_objects import AnalyzerConf, Launch, LaunchAnalysisStats, Log, TestItem
 from app.commons.model.ml import ModelType
+from app.commons.model.processing import ReplyType
 from app.commons.model.test_item_index import TestItemIndexData
 from app.service.analysis import (
     AnyTestHashHandler,
@@ -30,6 +31,7 @@ from app.service.analysis import (
 )
 from app.service.auto_analyzer_service import AutoAnalyzerService, prepare_request_items_for_launch
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
+from test.replies import payload
 
 LAUNCH_ID = 10
 PROJECT_ID = 1
@@ -221,7 +223,7 @@ def test_lookup_query_asks_for_the_same_test_case_and_error() -> None:
     ]
 
 
-def build_service(hash_match_same_test: bool, os_client: mock.Mock) -> tuple[AutoAnalyzerService, mock.Mock]:
+def build_service(hash_match_same_test: bool, os_client: mock.Mock) -> AutoAnalyzerService:
     boosting_model = mock.Mock()
     boosting_model.feature_ids = [2, 3]
     boosting_model.is_custom = False
@@ -238,19 +240,17 @@ def build_service(hash_match_same_test: bool, os_client: mock.Mock) -> tuple[Aut
     service = AutoAnalyzerService(
         model_chooser, APP_CONFIG, search_config, os_client=os_client, namespace_finder=namespace_finder
     )
-    amqp_client = mock.Mock()
-    service.amqp_client = amqp_client
-    return service, amqp_client
+    return service
 
 
 def test_chain_starts_with_boosting_when_hash_match_is_disabled() -> None:
-    service, _ = build_service(False, mock.Mock())
+    service = build_service(False, mock.Mock())
 
     assert isinstance(service.chain, BoostingHandler)
 
 
 def test_chain_starts_with_same_test_hash_match_when_enabled() -> None:
-    service, _ = build_service(True, mock.Mock())
+    service = build_service(True, mock.Mock())
 
     assert isinstance(service.chain, SameTestHashHandler)
     assert isinstance(service.chain._next, BoostingHandler)
@@ -258,9 +258,9 @@ def test_chain_starts_with_same_test_hash_match_when_enabled() -> None:
 
 def test_hash_matched_items_are_not_searched_by_boosting() -> None:
     os_client = build_os_client([[build_hit(7, "pb001")], []], [[]])
-    service, amqp_client = build_service(True, os_client)
+    service = build_service(True, os_client)
 
-    service.analyze_logs([build_launch([1, 2])])
+    replies = service.analyze_logs([build_launch([1, 2])])
 
     assert os_client.msearch_grouped.call_count == 2
     lookup_queries = os_client.msearch_grouped.call_args_list[0].args[1]
@@ -268,8 +268,7 @@ def test_hash_matched_items_are_not_searched_by_boosting() -> None:
     assert len(lookup_queries) == 4
     assert len(boosting_queries) == 2
     assert "more_like_this" in json.dumps(boosting_queries[1])
-    amqp_client.publish_response.assert_called_once()
-    assert json.loads(amqp_client.publish_response.call_args.args[0]) == [
+    assert json.loads(payload(replies, ReplyType.ASYNC_REPLY)) == [
         {"testItem": 1, "issueType": "pb001", "relevantItem": 7}
     ]
 
@@ -369,10 +368,8 @@ def test_any_test_looks_up_items_without_test_case_hash() -> None:
     assert remaining == []
 
 
-def build_service_with_flags(
-    same_test: bool, any_test: bool, os_client: mock.Mock
-) -> tuple[AutoAnalyzerService, mock.Mock]:
-    service, amqp_client = build_service(same_test, os_client)
+def build_service_with_flags(same_test: bool, any_test: bool, os_client: mock.Mock) -> AutoAnalyzerService:
+    service = build_service(same_test, os_client)
     search_config = service.search_cfg.model_copy(update={"HashMatchAnyTest": any_test})
     service = AutoAnalyzerService(
         service.model_chooser,
@@ -381,12 +378,11 @@ def build_service_with_flags(
         os_client=os_client,
         namespace_finder=service.namespace_finder,
     )
-    service.amqp_client = amqp_client
-    return service, amqp_client
+    return service
 
 
 def test_chain_order_with_both_hash_matches_enabled() -> None:
-    service, _ = build_service_with_flags(True, True, mock.Mock())
+    service = build_service_with_flags(True, True, mock.Mock())
 
     assert isinstance(service.chain, SameTestHashHandler)
     assert isinstance(service.chain._next, AnyTestHashHandler)
@@ -394,7 +390,7 @@ def test_chain_order_with_both_hash_matches_enabled() -> None:
 
 
 def test_chain_with_only_any_test_hash_match_enabled() -> None:
-    service, _ = build_service_with_flags(False, True, mock.Mock())
+    service = build_service_with_flags(False, True, mock.Mock())
 
     assert isinstance(service.chain, AnyTestHashHandler)
     assert isinstance(service.chain._next, BoostingHandler)
@@ -406,14 +402,13 @@ def test_each_link_gets_only_the_items_previous_links_did_not_analyze() -> None:
         [[build_hit(8, "ab001", test_case_hash=OTHER_TEST)], []],
         [[]],
     )
-    service, amqp_client = build_service_with_flags(True, True, os_client)
+    service = build_service_with_flags(True, True, os_client)
 
-    service.analyze_logs([build_launch([1, 2, 3])])
+    replies = service.analyze_logs([build_launch([1, 2, 3])])
 
     assert [len(call.args[1]) for call in os_client.msearch_grouped.call_args_list] == [6, 4, 2]
     assert "more_like_this" in json.dumps(os_client.msearch_grouped.call_args_list[2].args[1][1])
-    amqp_client.publish_response.assert_called_once()
-    assert json.loads(amqp_client.publish_response.call_args.args[0]) == [
+    assert json.loads(payload(replies, ReplyType.ASYNC_REPLY)) == [
         {"testItem": 1, "issueType": "pb001", "relevantItem": 7},
         {"testItem": 2, "issueType": "ab001", "relevantItem": 8},
     ]

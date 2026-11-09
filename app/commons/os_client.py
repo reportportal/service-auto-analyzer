@@ -29,6 +29,7 @@ from urllib3.exceptions import InsecureRequestWarning
 from app.commons import logging
 from app.commons.model.db import Hit
 from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, Response
+from app.commons.model.processing import to_json_list
 from app.commons.model.test_item_index import (
     LogClusterData,
     LogData,
@@ -662,7 +663,7 @@ class OsClient:
                 )
                 group = []
             if LOGGER.is_enabled_for(DEBUG):
-                LOGGER.debug(f"Queries result group: {json.dumps([res.model_dump() for res in group])}")
+                LOGGER.debug(f"Queries result group: {to_json_list(group)}")
             yield group
 
     def bulk_update_issue_history(self, project_id: str | int, updates: list[TestItemHistoryData]) -> BulkResponse:

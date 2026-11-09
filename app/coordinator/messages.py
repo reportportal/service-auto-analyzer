@@ -121,3 +121,8 @@ def log_outgoing_message(reply_to: str, correlation_id: str, body: Any) -> None:
         LOGGER.debug(
             f"Replying message: --To: {reply_to} --Correlation ID: {correlation_id} --Body: {json.dumps(body)}"
         )
+
+
+def log_published_message(exchange: str, routing_key: str, body: str) -> None:
+    if LOGGER.is_enabled_for(DEBUG):
+        LOGGER.debug(f"Publishing message: --Exchange: {exchange} --Routing key: {routing_key} --Body: {body}")

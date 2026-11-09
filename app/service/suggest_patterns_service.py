@@ -17,6 +17,7 @@ from typing import Any, Iterable, Optional
 
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig, SuggestPattern, SuggestPatternLabel
+from app.commons.model.processing import Reply
 from app.commons.os_client import OsClient
 from app.utils import text_processing
 from app.utils.utils import ALL_BASE_ISSUE_TYPES
@@ -88,7 +89,12 @@ class SuggestPatternsService:
                 )
         return suggested_patterns_without_labels
 
-    def suggest_patterns(self, project_id: int) -> SuggestPattern:
+    def suggest_patterns(self, project_id: int) -> list[Reply]:
+        """Suggest patterns of the exceptions of a project.
+
+        :param project_id: ID of the project
+        :return: The reply with the suggested patterns
+        """
         LOGGER.info(f"Started suggesting patterns for project '{project_id}'")
         t_start = monotonic()
         exceptions_with_labels: dict[str, dict[str, int]] = {}
@@ -115,7 +121,8 @@ class SuggestPatternsService:
         suggested_patterns_with_labels = self._get_patterns_with_labels(exceptions_with_labels)
         suggested_patterns_without_labels = self._get_patterns_without_labels(all_exceptions)
         LOGGER.info("Finished suggesting patterns %.2f s", monotonic() - t_start)
-        return SuggestPattern(
+        patterns = SuggestPattern(
             suggestionsWithLabels=suggested_patterns_with_labels,
             suggestionsWithoutLabels=suggested_patterns_without_labels,
         )
+        return [Reply(patterns.model_dump_json())]

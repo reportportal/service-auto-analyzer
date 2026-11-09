@@ -22,10 +22,12 @@ from app.commons.model.db import Hit
 from app.commons.model.handler import AnalysisContext
 from app.commons.model.launch_objects import AnalyzerConf, Launch, LaunchAnalysisStats, Log, TestItem
 from app.commons.model.ml import ModelType
+from app.commons.model.processing import Reply, ReplyType
 from app.commons.model.test_item_index import TestItemIndexData
 from app.service.analysis.boosting_handler import ANALYSIS_QUERY_SIZE, BoostingHandler, split_no_defect_candidates
 from app.service.auto_analyzer_service import AutoAnalyzerService, prepare_request_items_for_launch
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
+from test.replies import payload
 
 TEST_CASE_HASH = 123
 OTHER_TEST_CASE_HASH = 456
@@ -189,14 +191,11 @@ def build_service(
     service = AutoAnalyzerService(
         model_chooser, APP_CONFIG, DEFAULT_SEARCH_CONFIG, os_client=os_client, namespace_finder=namespace_finder
     )
-    amqp_client = mock.Mock()
-    service.amqp_client = amqp_client
-    return service, boosting_model, amqp_client
+    return service, boosting_model
 
 
-def get_published_results(amqp_client: mock.Mock) -> list[dict[str, Any]]:
-    amqp_client.publish_response.assert_called_once()
-    return json.loads(amqp_client.publish_response.call_args.args[0])
+def get_published_results(replies: Optional[list[Reply]]) -> list[dict[str, Any]]:
+    return json.loads(payload(replies, ReplyType.ASYNC_REPLY))
 
 
 ACCEPTED = ([1], [[0.1, 0.9]])
@@ -208,12 +207,12 @@ def test_analysis_chooses_no_defect_candidate():
         build_found_hit(2, "pb001", "2026-10-01 10:00:00"),
         build_found_hit(3, "nd001", "2026-10-02 10:00:00"),
     ]
-    service, boosting_model, amqp_client = build_service(hits, [ACCEPTED])
+    service, boosting_model = build_service(hits, [ACCEPTED])
 
-    service.analyze_logs([build_launch(1)])
+    replies = service.analyze_logs([build_launch(1)])
 
     boosting_model.predict.assert_called_once()
-    assert get_published_results(amqp_client) == [{"testItem": 1, "issueType": "nd001", "relevantItem": 3}]
+    assert get_published_results(replies) == [{"testItem": 1, "issueType": "nd001", "relevantItem": 3}]
 
 
 def test_analysis_falls_back_to_regular_candidates_if_no_defect_is_rejected():
@@ -221,12 +220,12 @@ def test_analysis_falls_back_to_regular_candidates_if_no_defect_is_rejected():
         build_found_hit(2, "pb001", "2026-10-01 10:00:00"),
         build_found_hit(3, "nd001", "2026-10-02 10:00:00"),
     ]
-    service, boosting_model, amqp_client = build_service(hits, [REJECTED, ACCEPTED])
+    service, boosting_model = build_service(hits, [REJECTED, ACCEPTED])
 
-    service.analyze_logs([build_launch(1)])
+    replies = service.analyze_logs([build_launch(1)])
 
     assert boosting_model.predict.call_count == 2
-    assert get_published_results(amqp_client) == [{"testItem": 1, "issueType": "pb001", "relevantItem": 2}]
+    assert get_published_results(replies) == [{"testItem": 1, "issueType": "pb001", "relevantItem": 2}]
 
 
 def test_analysis_without_no_defect_candidate():
@@ -234,13 +233,13 @@ def test_analysis_without_no_defect_candidate():
         build_found_hit(2, "nd001", "2026-10-01 10:00:00"),
         build_found_hit(3, "pb001", "2026-10-02 10:00:00"),
     ]
-    service, boosting_model, amqp_client = build_service(hits, [ACCEPTED])
+    service, boosting_model = build_service(hits, [ACCEPTED])
 
-    service.analyze_logs([build_launch(1)])
+    replies = service.analyze_logs([build_launch(1)])
 
     boosting_model.predict.assert_called_once()
     assert len(boosting_model.predict.call_args.args[0]) == 1
-    assert get_published_results(amqp_client) == [{"testItem": 1, "issueType": "pb001", "relevantItem": 3}]
+    assert get_published_results(replies) == [{"testItem": 1, "issueType": "pb001", "relevantItem": 3}]
 
 
 def build_boosting_context(launch: Launch) -> AnalysisContext:
@@ -257,7 +256,7 @@ def build_boosting_context(launch: Launch) -> AnalysisContext:
 
 def test_boosting_handler_passes_on_items_without_positive_predictions():
     hits = [build_found_hit(2, "pb001", "2026-10-01 10:00:00")]
-    service, _, _ = build_service(hits, [REJECTED])
+    service, _ = build_service(hits, [REJECTED])
     launch = build_launch(1)
     items = prepare_request_items_for_launch(launch)
     context = build_boosting_context(launch)
@@ -271,7 +270,7 @@ def test_boosting_handler_passes_on_items_without_positive_predictions():
 
 def test_boosting_handler_records_prediction_errors_and_drops_the_item():
     hits = [build_found_hit(2, "pb001", "2026-10-01 10:00:00")]
-    service, _, _ = build_service(hits, [RuntimeError("prediction failed")])
+    service, _ = build_service(hits, [RuntimeError("prediction failed")])
     launch = build_launch(1)
     context = build_boosting_context(launch)
 
@@ -285,7 +284,7 @@ def test_boosting_handler_records_prediction_errors_and_drops_the_item():
 
 def test_boosting_handler_reports_its_name_in_results():
     hits = [build_found_hit(2, "pb001", "2026-10-01 10:00:00")]
-    service, _, _ = build_service(hits, [ACCEPTED])
+    service, _ = build_service(hits, [ACCEPTED])
     launch = build_launch(1)
 
     results, _ = service.chain.handle(build_boosting_context(launch), prepare_request_items_for_launch(launch))

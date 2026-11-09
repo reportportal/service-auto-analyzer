@@ -32,7 +32,11 @@ def connection() -> mock.Mock:
     connection = mock.Mock(is_closed=False, close=mock.AsyncMock())
     connection.close_callbacks = CallbackCollection(connection)
     connection.reconnect_callbacks = CallbackCollection(connection)
-    connection.channel = mock.AsyncMock(return_value=mock.Mock(set_qos=mock.AsyncMock()))
+    consume_channel = mock.Mock(name="consume_channel", set_qos=mock.AsyncMock())
+    publish_channel = mock.Mock(name="publish_channel")
+    publish_channel.default_exchange.publish = mock.AsyncMock()
+    publish_channel.get_exchange = mock.AsyncMock(return_value=mock.Mock(publish=mock.AsyncMock()))
+    connection.channel = mock.AsyncMock(side_effect=[consume_channel, publish_channel])
     return connection
 
 
@@ -70,3 +74,28 @@ async def test_own_close_is_not_logged_as_lost(client: AsyncAmqpClient, connecti
 
     connection.close.assert_awaited_once()
     assert caplog.messages == []
+
+
+@pytest.mark.asyncio
+async def test_reply_is_published_on_the_publish_channel(client: AsyncAmqpClient):
+    await client.reply("reply-queue", "corr", "[1]")
+
+    publish_channel = client._get_publish_channel()
+    assert publish_channel is not client._get_channel()
+    publish = publish_channel.default_exchange.publish
+    publish.assert_awaited_once()
+    assert publish.await_args.args[0].body == b"[1]"
+    assert publish.await_args.args[0].correlation_id == "corr"
+    assert publish.await_args.kwargs == {"routing_key": "reply-queue", "mandatory": False}
+
+
+@pytest.mark.asyncio
+async def test_publish_does_not_declare_the_exchange(client: AsyncAmqpClient):
+    await client.publish("analyzer-reply", "analysis.matches", "[]")
+
+    publish_channel = client._get_publish_channel()
+    publish_channel.get_exchange.assert_awaited_once_with("analyzer-reply", ensure=False)
+    publish = publish_channel.get_exchange.return_value.publish
+    publish.assert_awaited_once()
+    assert publish.await_args.args[0].body == b"[]"
+    assert publish.await_args.kwargs == {"routing_key": "analysis.matches", "mandatory": False}

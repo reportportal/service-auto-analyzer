@@ -33,6 +33,7 @@ from app.commons.model.launch_objects import (
     LaunchInfoForClustering,
     SearchConfig,
 )
+from app.commons.model.processing import Reply
 from app.commons.model.test_item_index import (
     ClusterLogData,
     LogClusterData,
@@ -611,7 +612,15 @@ class ClusterService:
                 additional_clusters[global_group_idx] = new_cluster
         return additional_clusters
 
-    def find_clusters(self, launch_info: LaunchInfoForClustering) -> ClusterResult:
+    def find_clusters(self, launch_info: LaunchInfoForClustering) -> list[Reply]:
+        """Find clusters of similar logs in a launch.
+
+        :param launch_info: The launch to clusterize
+        :return: The reply with the found clusters
+        """
+        return [Reply(self._find_clusters(launch_info).model_dump_json())]
+
+    def _find_clusters(self, launch_info: LaunchInfoForClustering) -> ClusterResult:
         LOGGER.info(
             f"Started clusterizing logs for launch {launch_info.launch.launchId} in project {launch_info.project}"
         )

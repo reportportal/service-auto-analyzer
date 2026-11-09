@@ -24,7 +24,7 @@ from typing import Any, Awaitable, Callable, Final, Optional, Protocol
 from app.amqp.async_amqp import AsyncAmqpClient
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig
-from app.commons.model.processing import ProcessingItem, ProcessingResult
+from app.commons.model.processing import ProcessingItem, ProcessingResult, Reply, ReplyType
 from app.coordinator import keys, messages
 from app.coordinator.budget import IntakeBudget
 from app.coordinator.lanes import Lanes
@@ -39,6 +39,7 @@ SHUTDOWN_GRACE_PERIOD: Final[float] = 30.0
 SplitFunc = Callable[[str, bytes], list[tuple[Optional[str], bytes]]]
 RetryPredicate = Callable[[ProcessingItem, Optional[Exception]], bool]
 ReplyFunc = Callable[[str, str, str], Awaitable[None]]
+PublishFunc = Callable[[str, str, str], Awaitable[None]]
 
 
 class Coordinator(Protocol):
@@ -92,6 +93,7 @@ class LaneCoordinator(Coordinator):
     _lanes: Final[Lanes]
     _client: Optional[AsyncAmqpClient]
     _reply: Optional[ReplyFunc]
+    _publish: Optional[PublishFunc]
     _split: Final[SplitFunc]
     _retry_predicate: Final[Optional[RetryPredicate]]
     _numbers: Final[Any]
@@ -111,6 +113,7 @@ class LaneCoordinator(Coordinator):
         budget: IntakeBudget,
         client: Optional[AsyncAmqpClient] = None,
         reply: Optional[ReplyFunc] = None,
+        publish: Optional[PublishFunc] = None,
         split_func: Optional[SplitFunc] = None,
         retry_predicate: Optional[RetryPredicate] = messages.retry,
     ) -> None:
@@ -123,8 +126,10 @@ class LaneCoordinator(Coordinator):
             queue receives every message
         :param pool: Workers to run the tasks on
         :param budget: Intake budget of this coordinator
-        :param client: AMQP client to consume with, and to reply with unless `reply` is given
-        :param reply: Optional function which publishes replies, to replace the client's in tests
+        :param client: AMQP client to consume with, and to send the replies of tasks with unless `reply` and
+            `publish` are given
+        :param reply: Optional function which publishes direct replies, to replace the client's in tests
+        :param publish: Optional function which publishes messages to exchanges, to replace the client's in tests
         :param split_func: Optional function which splits a message into per-project parts, to replace
             `keys.split_by_project` in tests
         :param retry_predicate: Whether a failed task should be retried
@@ -138,6 +143,7 @@ class LaneCoordinator(Coordinator):
         self._lanes = Lanes()
         self._client = client
         self._reply = reply or (client.reply if client else None)
+        self._publish = publish or (client.publish if client else None)
         self._split = split_func or keys.split_by_project
         self._retry_predicate = retry_predicate
         self._numbers = itertools.count(1)
@@ -286,8 +292,8 @@ class LaneCoordinator(Coordinator):
             if item.retries > 0:
                 LOGGER.warning(f"Task {item.routing_key} - {item.msg_correlation_id} was retried {item.retries} times")
             self._finish(item)
-            if result.result is not None and item.reply_to:
-                self._spawn(self._publish_reply(item, result.result))
+            if result.result:
+                self._spawn(self._send(item, result.result))
         else:
             self._handle_failure(item, result.error)
         self._dispatch()
@@ -314,15 +320,35 @@ class LaneCoordinator(Coordinator):
         )
         self._retry_later(item)
 
-    async def _publish_reply(self, item: ProcessingItem, response_body: Any) -> None:
-        if self._reply is None or not item.reply_to:
-            return
+    async def _send(self, item: ProcessingItem, replies: list[Reply]) -> None:
+        """Send the replies of a finished task in order. A failed send is logged and doesn't stop the others.
+
+        :param item: The finished task
+        :param replies: The replies of the task
+        """
         logging.set_correlation_id(item.log_correlation_id)
-        try:
-            messages.log_outgoing_message(item.reply_to, item.msg_correlation_id, response_body)
-            await self._reply(item.reply_to, item.msg_correlation_id, response_body)
-        except Exception as exc:
-            LOGGER.exception("Failed to publish result", exc_info=exc)
+        for reply in replies:
+            try:
+                await self._send_reply(item, reply)
+            except Exception as exc:
+                LOGGER.exception(f"Failed to send the {reply.type.name} reply", exc_info=exc)
+
+    async def _send_reply(self, item: ProcessingItem, reply: Reply) -> None:
+        if reply.type is ReplyType.DIRECT_REPLY:
+            if item.reply_to and self._reply is not None:
+                messages.log_outgoing_message(item.reply_to, item.msg_correlation_id, reply.payload)
+                await self._reply(item.reply_to, item.msg_correlation_id, reply.payload)
+            return
+        if self._publish is None:
+            return
+        if reply.type is ReplyType.ASYNC_REPLY:
+            exchange = self._app_config.analyzerResponseExchange
+            routing_key = self._app_config.analyzerResponseQueue
+        else:
+            exchange = self._app_config.amqpExchangeName
+            routing_key = reply.routing_key or ""
+        messages.log_published_message(exchange, routing_key, reply.payload)
+        await self._publish(exchange, routing_key, reply.payload)
 
     # Hung and dead workers
 

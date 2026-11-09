@@ -11,7 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-import json
 from time import monotonic
 from typing import Any, Optional
 
@@ -22,6 +21,7 @@ from app.commons.model.launch_objects import (
     SearchLogInfo,
     SearchLogs,
 )
+from app.commons.model.processing import Reply, to_json_list
 from app.commons.os_client import OsClient
 from app.commons.query_builder import BOOST_NEUTRAL, append_aa_ma_boosts, build_more_like_this_query
 from app.utils import text_processing, utils
@@ -121,7 +121,15 @@ class SearchService:
         append_aa_ma_boosts(query, self.search_cfg)
         return query
 
-    def search_logs(self, search_req: SearchLogs) -> list[SearchLogInfo]:
+    def search_logs(self, search_req: SearchLogs) -> list[Reply]:
+        """Search for logs similar to the given logs.
+
+        :param search_req: The search request
+        :return: The reply with the found logs
+        """
+        return [Reply(to_json_list(self._search_logs(search_req)))]
+
+    def _search_logs(self, search_req: SearchLogs) -> list[SearchLogInfo]:
         """Get all logs similar to given logs"""
         LOGGER.info(f"Started searching for test item with id: {search_req.itemId}")
         LOGGER.debug(f"Started searching by request: {search_req.model_dump_json()}")
@@ -228,6 +236,6 @@ class SearchService:
 
         LOGGER.debug(
             "Finished searching with the following results: %s",
-            json.dumps([res.model_dump() for res in final_results if res]),
+            to_json_list(res for res in final_results if res),
         )
         return final_results

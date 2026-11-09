@@ -38,6 +38,7 @@ LOGGER = logging.getLogger("analyzerApp.asyncAmqp")
 MAX_RECONNECT_INTERVAL: Final[int] = 60
 PREFETCH_COUNT: Final[int] = 1
 JSON_CONTENT_TYPE: Final[str] = "application/json"
+NOT_CONNECTED_MESSAGE: Final[str] = "AMQP client is not connected"
 
 MessageCallback = Callable[[AbstractIncomingMessage], Awaitable[Any]]
 
@@ -157,14 +158,14 @@ class AsyncAmqpClient:
     async def _open_channel(self) -> AbstractChannel:
         """Open a channel with the prefetch count of the consumer."""
         if self._connection is None:
-            raise RuntimeError("AMQP client is not connected")
+            raise RuntimeError(NOT_CONNECTED_MESSAGE)
         channel = await self._connection.channel()
         await channel.set_qos(prefetch_count=PREFETCH_COUNT)
         return channel
 
     def _get_channel(self) -> AbstractChannel:
         if self._channel is None:
-            raise RuntimeError("AMQP client is not connected")
+            raise RuntimeError(NOT_CONNECTED_MESSAGE)
         return self._channel
 
     async def _declare_exchange(self) -> aio_pika.abc.AbstractExchange:
@@ -218,7 +219,7 @@ class AsyncAmqpClient:
 
     def _get_publish_channel(self) -> AbstractChannel:
         if self._publish_channel is None:
-            raise RuntimeError("AMQP client is not connected")
+            raise RuntimeError(NOT_CONNECTED_MESSAGE)
         return self._publish_channel
 
     async def reply(self, to: str, correlation_id: str, data: str) -> None:

@@ -202,9 +202,6 @@ class AmqpClient:
             },
         )
 
-    def _declare_response_exchange(self) -> None:
-        self._do_declare_exchange(self._config.analyzerResponseExchange, self._config.analyzerResponseExchangeType)
-
     def __send_to_queue(self, exchange_declare_callable: Optional[Callable], **kwargs: Any) -> None:
         while True:
             try:
@@ -230,10 +227,13 @@ class AmqpClient:
     def publish_response(self, data: str) -> None:
         """Publish an analyzer response message to the configured response queue.
 
+        The response exchange is not declared: ReportPortal owns it and declares it with its own settings, so a
+        declaration with other settings is rejected by the broker.
+
         :param str data: The data to publish
         """
         self.__send_to_queue(
-            self._declare_response_exchange,
+            None,
             exchange=self._config.analyzerResponseExchange,
             routing_key=self._config.analyzerResponseQueue,
             properties=BasicProperties(content_type="application/json"),

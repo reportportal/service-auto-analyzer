@@ -146,6 +146,7 @@ class DefectTypeModel(MlModel):
 
     def validate_model(self, name: str, test_data_x: list[str], labels: list[int]) -> float:
         if name not in self.models:
+            LOGGER.debug(f"Model name not found: {name}")
             return NO_MATCH_F1_SCORE
         LOGGER.debug(f"Validation data label distribution: {Counter(labels)}")
         LOGGER.debug(f"Validation model name: {name}")

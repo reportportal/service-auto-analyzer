@@ -18,7 +18,8 @@ import pytest
 
 from app.commons.model.db import Hit
 from app.commons.model.test_item_index import LogData, TestItemIndexData
-from app.ml.boosting_featurizer import BoostingFeaturizer, Feature
+from app.ml.boosting_featurizer import BoostingFeaturizer
+from app.ml.features import Feature
 from app.ml.suggest_boosting_featurizer import SuggestBoostingFeaturizer
 
 

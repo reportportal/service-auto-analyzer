@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from statistics import mean
 from typing import Any, Optional
 from unittest.mock import Mock
 
@@ -34,6 +35,7 @@ from app.ml.features import (
     ItemFieldSimilarityFeature,
     LaunchNumberDistanceFeature,
     LogCountFeature,
+    LogCoverageCalculator,
     LogCoverageFeature,
     LogFieldEqualityFeature,
     LogFieldSimilarityFeature,
@@ -45,6 +47,7 @@ from app.ml.features import (
     TimeDecayFeature,
     ValuesSimilarityFeature,
 )
+from app.utils import text_processing
 
 
 def build_log(log_id: str, log_order: Optional[int] = None, **fields: Any) -> LogData:
@@ -384,3 +387,90 @@ def test_log_coverage_feature(reverse: bool, expected: list[float]):
     ]
 
     assert LogCoverageFeature("message", reverse=reverse).calculate(request, hits) == expected
+
+
+def calculate_coverage_per_hit(
+    request: TestItemIndexData, hits: list[Hit[TestItemIndexData]], reverse: bool
+) -> list[float]:
+    """Log coverage calculated with one similarity call per found Test Item, as a reference."""
+    request_texts = features.get_log_field_texts(request, "message")
+    values = []
+    for hit in hits:
+        hit_texts = features.get_log_field_texts(hit.source, "message")
+        if not request_texts or not hit_texts:
+            values.append(0.0)
+            continue
+        base_texts, other_texts = (hit_texts, request_texts) if reverse else (request_texts, hit_texts)
+        rows = text_processing.calculate_text_similarity_batch(base_texts, other_texts)
+        values.append(features.clamp01(mean(max(result.similarity for result in row) for row in rows)))
+    return values
+
+
+COVERAGE_REQUEST_MESSAGES = (
+    "java.lang.NullPointerException at com.example.Service.call",
+    "Connection refused to database host",
+    "Test failed with assertion error",
+)
+COVERAGE_HIT_MESSAGES = [
+    ("java.lang.NullPointerException at com.example.Service.call",),
+    ("Connection refused to database server", "Timeout waiting for element", "Test failed with assertion error"),
+    (),
+    ("completely unrelated text about weather",),
+    ("Connection refused to database host", "Connection refused to database host"),
+]
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_log_coverage_feature_matches_per_hit_calculation(reverse: bool):
+    request = build_item(logs=logs_with("message", *COVERAGE_REQUEST_MESSAGES))
+    hits = [
+        build_hit(build_item(str(idx), logs=logs_with("message", *messages)))
+        for idx, messages in enumerate(COVERAGE_HIT_MESSAGES)
+    ]
+
+    values = LogCoverageFeature("message", reverse=reverse).calculate(request, hits)
+
+    assert values == pytest.approx(calculate_coverage_per_hit(request, hits, reverse), abs=1e-12)
+    assert values[2] == 0.0, "a found Test Item without logs should have no coverage"
+
+
+def test_log_coverage_features_share_one_similarity_calculation(monkeypatch):
+    request = build_item(logs=logs_with("message", *COVERAGE_REQUEST_MESSAGES))
+    hits = [
+        build_hit(build_item(str(idx), logs=logs_with("message", *messages)))
+        for idx, messages in enumerate(COVERAGE_HIT_MESSAGES)
+    ]
+    similarity_batch = Mock(wraps=text_processing.calculate_text_similarity_batch)
+    monkeypatch.setattr(features.text_processing, "calculate_text_similarity_batch", similarity_batch)
+    calculator = LogCoverageCalculator()
+    forward_feature = LogCoverageFeature("message", reverse=False, coverage_calculator=calculator)
+    reverse_feature = LogCoverageFeature("message", reverse=True, coverage_calculator=calculator)
+
+    forward = forward_feature.calculate(request, hits)
+    reverse = reverse_feature.calculate(request, hits)
+
+    similarity_batch.assert_called_once()
+    request_texts, hit_texts = similarity_batch.call_args.args
+    assert request_texts == list(COVERAGE_REQUEST_MESSAGES)
+    assert hit_texts == [message for messages in COVERAGE_HIT_MESSAGES for message in messages]
+    assert len(forward) == len(hits)
+    assert len(reverse) == len(hits)
+
+
+def test_log_coverage_calculator_recalculates_for_another_request():
+    calculator = LogCoverageCalculator()
+    feature = LogCoverageFeature("message", reverse=False, coverage_calculator=calculator)
+    hits = [build_hit(build_item("1", logs=logs_with("message", "database timeout")))]
+
+    first = feature.calculate(build_item(logs=logs_with("message", "database timeout")), hits)
+    second = feature.calculate(build_item(logs=logs_with("message", "assertion failed")), hits)
+
+    assert first == [1.0]
+    assert second == [0.0]
+
+
+def test_log_coverage_feature_without_request_logs():
+    hits = [build_hit(build_item("1", logs=logs_with("message", "database timeout")))]
+
+    assert LogCoverageFeature("message", reverse=False).calculate(build_item(logs=[]), hits) == [0.0]
+    assert LogCoverageFeature("message", reverse=True).calculate(build_item(logs=[]), hits) == [0.0]

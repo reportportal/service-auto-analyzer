@@ -24,7 +24,7 @@ import re
 from collections import defaultdict
 from datetime import datetime
 from statistics import mean
-from typing import Any, Optional
+from typing import Any, Optional, Protocol
 
 from app.commons import logging
 from app.commons.model.db import Hit
@@ -42,6 +42,19 @@ MIN_LAUNCH_DISTANCE_VALUE = 0.1
 TRACEBACK_MARKER = "Traceback"
 BASE_ISSUE_TYPES = ["ab", "pb", "si", "nd"]
 IDENTIFIER_TOKEN_PATTERN = re.compile(r"\.|::|[a-z][A-Z]")
+
+
+class Feature(Protocol):
+    """Gradient Boosting feature, calculated for every found Test Item against the request Test Item."""
+
+    def calculate(self, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]], /) -> list[float]:
+        """Calculate the feature value for every found Test Item.
+
+        :param request: Request Test Item
+        :param hits: Found Test Items
+        :return: Feature values in the range [0.0, 1.0], one per hit, in the order of hits
+        """
+        ...
 
 
 def clamp01(value: float) -> float:
@@ -520,6 +533,74 @@ class RequestFieldPresentFeature:
         return [float(not is_empty(request.join_log_field(self.field)))] * len(hits)
 
 
+def get_log_field_texts(test_item: TestItemIndexData, field: str) -> list[str]:
+    """Get non-empty values of a log field of every log of a Test Item, in the order of logs.
+
+    :param test_item: Test Item with logs
+    :param field: Log field name
+    :return: Stripped field values, empty ones are skipped
+    """
+    texts = [str(getattr(log, field, None) or "").strip() for log in test_item.get_sorted_logs()]
+    return [text for text in texts if text]
+
+
+class LogCoverageCalculator:
+    """Calculate forward and reverse log coverage of found Test Items in one pass.
+
+    Both directions are taken from one similarity matrix of request logs against logs of all found Test Items, which
+    is calculated with one call, instead of one call per found Test Item and direction. Only the last calculated
+    result is kept: features of one request are calculated together, so a bigger cache would only hold memory.
+    """
+
+    _last_key: Optional[tuple[str, tuple[str, ...], tuple[tuple[str, ...], ...]]]
+    _last_result: tuple[list[float], list[float]]
+
+    def __init__(self) -> None:
+        self._last_key = None
+        self._last_result = ([], [])
+
+    def calculate(
+        self, field: str, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]]
+    ) -> tuple[list[float], list[float]]:
+        """Calculate log coverage of every found Test Item in both directions.
+
+        :param field: Log field to compare logs by
+        :param request: Request Test Item
+        :param hits: Found Test Items
+        :return: Forward and reverse coverage values, each aligned with `hits`
+        """
+        request_texts = get_log_field_texts(request, field)
+        hit_texts = [get_log_field_texts(hit.source, field) for hit in hits]
+        key = (field, tuple(request_texts), tuple(tuple(texts) for texts in hit_texts))
+        if key == self._last_key:
+            return self._last_result
+
+        all_hit_texts = [text for texts in hit_texts for text in texts]
+        similarities: list[list[float]] = []
+        if request_texts and all_hit_texts:
+            similarities = [
+                [result.similarity for result in row]
+                for row in text_processing.calculate_text_similarity_batch(request_texts, all_hit_texts)
+            ]
+        forward: list[float] = []
+        reverse: list[float] = []
+        offset = 0
+        for texts in hit_texts:
+            if not request_texts or not texts:
+                forward.append(0.0)
+                reverse.append(0.0)
+                continue
+            # Rows are request logs, columns are logs of the found Test Item
+            block = [row[offset : offset + len(texts)] for row in similarities]
+            forward.append(clamp01(mean(max(row) for row in block)))
+            reverse.append(clamp01(mean(max(column) for column in zip(*block))))
+            offset += len(texts)
+
+        self._last_key = key
+        self._last_result = (forward, reverse)
+        return self._last_result
+
+
 class LogCoverageFeature:
     """Mean best similarity of logs of one Test Item against logs of the other one, by a log field.
 
@@ -529,24 +610,20 @@ class LogCoverageFeature:
 
     field: str
     reverse: bool
+    coverage_calculator: LogCoverageCalculator
 
-    def __init__(self, field: str, reverse: bool) -> None:
+    def __init__(self, field: str, reverse: bool, coverage_calculator: Optional[LogCoverageCalculator] = None) -> None:
+        """Create the feature.
+
+        :param field: Log field to compare logs by
+        :param reverse: Calculate reverse coverage instead of forward one
+        :param coverage_calculator: Calculator to share with the feature of the other direction, so the similarity
+                                    matrix is calculated once for both
+        """
         self.field = field
         self.reverse = reverse
-
-    def _get_texts(self, test_item: TestItemIndexData) -> list[str]:
-        texts = [str(getattr(log, self.field, None) or "").strip() for log in test_item.get_sorted_logs()]
-        return [text for text in texts if text]
+        self.coverage_calculator = coverage_calculator or LogCoverageCalculator()
 
     def calculate(self, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
-        request_texts = self._get_texts(request)
-        values = []
-        for hit in hits:
-            hit_texts = self._get_texts(hit.source)
-            if not request_texts or not hit_texts:
-                values.append(0.0)
-                continue
-            base_texts, other_texts = (hit_texts, request_texts) if self.reverse else (request_texts, hit_texts)
-            similarities = text_processing.calculate_text_similarity_batch(base_texts, other_texts)
-            values.append(clamp01(mean(max(result.similarity for result in row) for row in similarities)))
-        return values
+        forward, reverse = self.coverage_calculator.calculate(self.field, request, hits)
+        return reverse if self.reverse else forward

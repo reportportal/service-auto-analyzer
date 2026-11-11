@@ -1034,10 +1034,18 @@ def calculate_text_similarity_batch(base_texts: list[str], other_texts: list[str
         if processed.strip() and processed not in needs_matrix:
             needs_matrix[processed] = len(needs_matrix)
 
+    # Only base texts are compared, so the matrix has a row per distinct base text, not per every text: comparing
+    # other texts with each other would grow with the square of their number.
+    base_rows: dict[str, int] = {}
+    for processed in processed_bases:
+        if processed in needs_matrix and processed not in base_rows:
+            base_rows[processed] = len(base_rows)
+
     similarity_matrix = None
-    if needs_matrix:
+    if needs_matrix and base_rows:
         tf_matrix = __calculate_tfidf_matrix(list(needs_matrix))
-        similarity_matrix = cosine_similarity(tf_matrix, tf_matrix)
+        base_matrix = tf_matrix[[needs_matrix[processed] for processed in base_rows]]
+        similarity_matrix = cosine_similarity(base_matrix, tf_matrix)
 
     all_results: list[list[SimilarityResult]] = []
     for base_idx, processed_base_text in enumerate(processed_bases):
@@ -1061,7 +1069,7 @@ def calculate_text_similarity_batch(base_texts: list[str], other_texts: list[str
                 row.append(SimilarityResult(similarity=1.0, both_empty=False))
             else:
                 assert similarity_matrix is not None
-                value = similarity_matrix[needs_matrix[processed_base_text], needs_matrix[processed_other_text]]
+                value = similarity_matrix[base_rows[processed_base_text], needs_matrix[processed_other_text]]
                 row.append(SimilarityResult(similarity=float(value), both_empty=False))
         all_results.append(row)
     return all_results

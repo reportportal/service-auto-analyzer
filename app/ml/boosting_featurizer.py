@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 import math
-from typing import Any, Optional, Protocol
+from typing import Any, Optional
 
 from app.commons import logging
 from app.commons.model.db import Hit
@@ -24,6 +24,7 @@ from app.ml.features import (
     DEFAULT_TIME_WEIGHT_DECAY,
     BaseIssueTypeFeature,
     DefectTypeFeature,
+    Feature,
     HistoryStabilityFeature,
     HistoryUnchangedFeature,
     IdentifierJaccardFeature,
@@ -34,6 +35,7 @@ from app.ml.features import (
     ItemFieldSimilarityFeature,
     LaunchNumberDistanceFeature,
     LogCountFeature,
+    LogCoverageCalculator,
     LogCoverageFeature,
     LogFieldEqualityFeature,
     LogFieldSimilarityFeature,
@@ -50,19 +52,6 @@ from app.utils import text_processing, utils
 from app.utils.utils import normalize_issue_type
 
 logger = logging.getLogger("analyzerApp.boosting_featurizer")
-
-
-class Feature(Protocol):
-    """Gradient Boosting feature, calculated for every found Test Item against the request Test Item."""
-
-    def calculate(self, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]]) -> list[float]:
-        """Calculate the feature value for every found Test Item.
-
-        :param request: Request Test Item
-        :param hits: Found Test Items
-        :return: Feature values in the range [0.0, 1.0], one per hit, in the order of hits
-        """
-        ...
 
 
 class BoostingFeaturizer:
@@ -157,6 +146,8 @@ class BoostingFeaturizer:
         :param calculator: Text similarity calculator
         :return: Feature ID mapped to the feature
         """
+        # Forward and reverse log coverage are two views of one similarity matrix, so they share its calculation
+        coverage_calculator = LogCoverageCalculator()
         return {
             1: DefectTypeFeature(defect_type_model),
             2: IssueTypeShareFeature(),
@@ -198,8 +189,8 @@ class BoostingFeaturizer:
             38: IdentifierJaccardFeature("message"),
             39: RequestIdentifiersPresentFeature("message"),
             40: RequestFieldPresentFeature("potential_status_codes"),
-            41: LogCoverageFeature("message", reverse=False),
-            42: LogCoverageFeature("message", reverse=True),
+            41: LogCoverageFeature("message", reverse=False, coverage_calculator=coverage_calculator),
+            42: LogCoverageFeature("message", reverse=True, coverage_calculator=coverage_calculator),
         }
 
     def _get_features(self) -> dict[int, Feature]:

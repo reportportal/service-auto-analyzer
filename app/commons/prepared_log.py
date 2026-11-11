@@ -88,9 +88,14 @@ class PreparedLogMessage:
 
     @property
     def message_for_clustering(self) -> str:
+        """Message which is compared with other messages to group logs into clusters.
+
+        Access tokens, GUIDs and HEX addresses are excluded: they differ from run to run, and otherwise logs which
+        differ only in them would not join one cluster.
+        """
         if not self._message_for_clustering:
             self._message_for_clustering = prepare_message(
-                self.basic_message, self.number_of_lines, self.test_and_methods
+                clean_message_clustering(self.basic_message), self.number_of_lines, self.test_and_methods
             )
         return self._message_for_clustering
 

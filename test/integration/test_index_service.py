@@ -165,12 +165,11 @@ def test_defect_update_reports_all_items_when_the_update_request_fails() -> None
     service = IndexService(APP_CONFIG, os_client=os_client)
 
     defect_update_info = {"project": 123, "itemsToUpdate": {"1001": "ab001", "1002": "ab001"}}
-    with mock.patch("app.service.index_service.update_train") as update_train_mock:
-        not_updated = service.defect_update(DefectUpdate(**defect_update_info))
+    not_updated = service.defect_update(DefectUpdate(**defect_update_info))
 
     os_client.bulk_update_issue_history.assert_called_once()
-    assert not_updated == [1001, 1002]
-    update_train_mock.assert_called_once_with(APP_CONFIG, 123, 0)
+    assert len(not_updated) == 1
+    assert json.loads(not_updated[0].payload) == [1001, 1002]
 
 
 def test_defect_update_accepts_timestamp_with_nanoseconds() -> None:

@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import json
 from typing import Any
 from unittest import mock
 
@@ -889,3 +890,48 @@ def test_find_clusters_matches_responses_to_groups_across_batches(
     clusters_by_log = {tuple(cluster.logIds): cluster for cluster in result.clusters}
     assert clusters_by_log[(7002,)].clusterId == int(previous_cluster_id), "should join the found cluster"
     assert clusters_by_log[(7001,)].clusterId != int(previous_cluster_id), "should get a new cluster"
+
+
+PYTEST_FAILURE_TEMPLATE = (
+    "self = <test_index.TestIndex object at {}>, shared_steps = <test_index.ParamObject object at {}>, "
+    "another_shared_steps = <test_index.ParamObject object at {}>\n"
+    "\n"
+    "    @pytest.mark.one_a\n"
+    "    @pytest.mark.one_b\n"
+    "    def test_navigate_to_index_page(self, shared_steps: object, another_shared_steps: object):\n"
+    "        outcome = False\n"
+    ">       assert outcome, error_msg\n"
+    'E       AssertionError: The current URL "https://docs.example.com/index.html" is not the expected one'
+)
+
+
+# noinspection PyUnresolvedReferences
+@pytest.mark.parametrize("clean_numbers", [True, False])
+@mock.patch("opensearchpy.helpers.bulk")
+def test_find_clusters_groups_logs_which_differ_only_in_hex_addresses(
+    mock_bulk, cluster_service: ClusterService, mocked_opensearch_client: OpenSearch, clean_numbers: bool
+) -> None:
+    """HEX addresses differ from run to run, so logs which differ only in them should join one cluster."""
+    launch_info = build_launch_info(
+        build_test_item(
+            6001, [(7001, ERROR_LEVEL, PYTEST_FAILURE_TEMPLATE.format("0x104f95730", "0x104ff4280", "0x104ff4a30"))]
+        ),
+        build_test_item(
+            6002, [(7002, ERROR_LEVEL, PYTEST_FAILURE_TEMPLATE.format("0x104f95910", "0x104e0f280", "0x104dfc100"))]
+        ),
+    )
+    launch_info.numberOfLogLines = 2
+    launch_info.cleanNumbers = clean_numbers
+    respond_to_every_query(mocked_opensearch_client, NO_HITS)
+    mock_bulk.return_value = (2, [])
+
+    result = cluster_service.find_clusters(launch_info)
+
+    assert len(result.clusters) == 1, "logs which differ only in HEX addresses should give exactly 1 cluster"
+    cluster = result.clusters[0]
+    assert cluster.logIds == [7001, 7002]
+    assert sorted(cluster.itemIds) == [6001, 6002]
+    assert "0x" not in cluster.clusterMessage
+    search_queries = get_msearch_queries(mocked_opensearch_client)
+    assert len(search_queries) == 1, "one group should be searched with exactly 1 query"
+    assert "0x" not in json.dumps(search_queries[0]), "HEX addresses should not be searched for"

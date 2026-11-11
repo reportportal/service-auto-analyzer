@@ -43,6 +43,7 @@ TRACEBACK_MARKER = "Traceback"
 BASE_ISSUE_TYPES = ["ab", "pb", "si", "nd"]
 IDENTIFIER_TOKEN_PATTERN = re.compile(r"\.|::|[a-z][A-Z]")
 
+
 def clamp01(value: float) -> float:
     """Bring the value into the range [0.0, 1.0], NaN and infinity become 0.0.
 

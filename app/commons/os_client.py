@@ -927,7 +927,7 @@ class OsClient:
 
         index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
         LOGGER.info(f"Deleting {len(log_ids)} logs from '{index_name}'")
-        t_start = time()
+        t_start = monotonic()
 
         if not self._ensure_index_checked(index_name):
             return 0
@@ -957,7 +957,7 @@ class OsClient:
                     LOGGER.error(f"Failed to delete logs from some test items in '{index_name}': {result['failures']}")
             except Exception as err:
                 LOGGER.exception("Error in update_by_query", exc_info=err)
-        LOGGER.info(f"Deleted logs from {changed} test items in {round(time() - t_start, 2)} sec")
+        LOGGER.info(f"Deleted logs from {changed} test items in {round(monotonic() - t_start, 2)} sec")
         return changed
 
     @staticmethod

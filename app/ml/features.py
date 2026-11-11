@@ -43,20 +43,6 @@ TRACEBACK_MARKER = "Traceback"
 BASE_ISSUE_TYPES = ["ab", "pb", "si", "nd"]
 IDENTIFIER_TOKEN_PATTERN = re.compile(r"\.|::|[a-z][A-Z]")
 
-
-class Feature(Protocol):
-    """Gradient Boosting feature, calculated for every found Test Item against the request Test Item."""
-
-    def calculate(self, request: TestItemIndexData, hits: list[Hit[TestItemIndexData]], /) -> list[float]:
-        """Calculate the feature value for every found Test Item.
-
-        :param request: Request Test Item
-        :param hits: Found Test Items
-        :return: Feature values in the range [0.0, 1.0], one per hit, in the order of hits
-        """
-        ...
-
-
 def clamp01(value: float) -> float:
     """Bring the value into the range [0.0, 1.0], NaN and infinity become 0.0.
 

@@ -15,12 +15,12 @@
 """Common package for ML Model training code."""
 
 import dataclasses
-import logging
 import random
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Generic, Optional, TypeVar
 
+from app.commons import logging
 from app.commons.model.test_item_index import TestItemHistoryData
 from app.utils import utils
 from app.utils.utils import normalize_issue_type

@@ -887,10 +887,12 @@ def test_find_clusters_matches_responses_to_groups_across_batches(
         2,
         2,
     ]
-    assert len(result.clusters) == 2
-    clusters_by_log = {tuple(cluster.logIds): cluster for cluster in result.clusters}
-    assert clusters_by_log[(7002,)].clusterId == int(previous_cluster_id), "should join the found cluster"
-    assert clusters_by_log[(7001,)].clusterId != int(previous_cluster_id), "should get a new cluster"
+    assert len(result) == 1
+    payload = json.loads(result[0].payload)
+    assert len(payload["clusters"]) == 2
+    clusters_by_log = {tuple(cluster["logIds"]): cluster for cluster in payload["clusters"]}
+    assert clusters_by_log[(7002,)]["clusterId"] == int(previous_cluster_id), "should join the found cluster"
+    assert clusters_by_log[(7001,)]["clusterId"] != int(previous_cluster_id), "should get a new cluster"
 
 
 PYTEST_FAILURE_TEMPLATE = (
@@ -928,11 +930,13 @@ def test_find_clusters_groups_logs_which_differ_only_in_hex_addresses(
 
     result = cluster_service.find_clusters(launch_info)
 
-    assert len(result.clusters) == 1, "logs which differ only in HEX addresses should give exactly 1 cluster"
-    cluster = result.clusters[0]
-    assert cluster.logIds == [7001, 7002]
-    assert sorted(cluster.itemIds) == [6001, 6002]
-    assert "0x" not in cluster.clusterMessage
+    assert len(result) == 1
+    payload = json.loads(result[0].payload)
+    assert len(payload["clusters"]) == 1, "logs which differ only in HEX addresses should give exactly 1 cluster"
+    cluster = payload["clusters"][0]
+    assert cluster["logIds"] == [7001, 7002]
+    assert sorted(cluster["itemIds"]) == [6001, 6002]
+    assert "0x" not in cluster["clusterMessage"]
     search_queries = get_msearch_queries(mocked_opensearch_client)
     assert len(search_queries) == 1, "one group should be searched with exactly 1 query"
     assert "0x" not in json.dumps(search_queries[0]), "HEX addresses should not be searched for"

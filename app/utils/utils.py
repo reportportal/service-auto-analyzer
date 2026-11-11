@@ -71,6 +71,35 @@ def validate_file(file_path: str) -> bool:
     return bool(file_path and file_path.strip() and os.path.exists(file_path) and os.path.isfile(file_path))
 
 
+def parse_string_map(value: str | None) -> dict[str, str]:
+    """Parse a JSON object into a dictionary with string keys and values.
+
+    :param value: JSON object as a string, empty or `None` values give an empty dictionary
+    :return: the dictionary where all non-string values are converted to their JSON representation
+    :raises ValueError: if the value is not a valid JSON object
+    """
+    if not value or not value.strip():
+        return {}
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Unable to parse JSON object: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError(f"JSON object expected, got: {type(parsed).__name__}")
+    return {str(key): val if isinstance(val, str) else json.dumps(val) for key, val in parsed.items()}
+
+
+def put_if_set(dictionary: dict[str, Any], key: str, value: Any) -> None:
+    """Put the value into the dictionary only if the value is set, I.E. it is not `None` or empty.
+
+    :param dictionary: the dictionary to update
+    :param key: the key to put the value with
+    :param value: the value to put
+    """
+    if value:
+        dictionary[key] = value
+
+
 def extract_real_id(elastic_id):
     real_id = str(elastic_id)
     if real_id.endswith("_m"):

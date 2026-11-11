@@ -96,6 +96,15 @@ class ApplicationConfig(BaseModel):
     datastoreRegion: str | None = None
     datastoreBucketPrefix: str = "prj-"
     datastoreBucketPostfix: str = ""
+    datastoreDefaultBucketName: str = "rp-bucket"
+    datastoreAzureAccountName: str | None = None
+    datastoreAzureAccountKey: str | None = None
+    datastoreAzureEndpoint: str | None = None
+    datastoreAzureContainer: str | None = None
+    datastoreGcsBucket: str | None = None
+    datastoreGcsCredentialsPath: str | None = None
+    datastoreGcsEndpoint: str | None = None
+    datastoreOpendalOptions: dict[str, str] = {}
     filesystemDefaultPath: str = "storage"
 
 

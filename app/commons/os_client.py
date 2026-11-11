@@ -19,7 +19,7 @@ import traceback
 from datetime import datetime, timezone
 from logging import DEBUG
 from time import monotonic
-from typing import Any, Callable, Iterable, Iterator, Optional
+from typing import Any, Callable, Iterable, Iterator, Optional, Sequence
 
 import opensearchpy.helpers
 import urllib3
@@ -43,6 +43,35 @@ INDEX_SETTINGS_FILE = "index_settings.json"
 TEST_ITEM_INDEX_MAPPINGS_FILE = "test_item_index_mappings.json"
 HEALTH_CHECK_TIMEOUT = 10
 DEFAULT_MAX_RETRIES = 5
+# Removes logs with the given IDs from a Test Item, together with merged small log entries which contain them, and
+# deletes the Test Item if no logs remain
+REMOVE_LOGS_SCRIPT = """
+    Set ids = new HashSet(params.log_ids);
+    List logs = ctx._source.logs;
+    if (logs == null || !logs.removeIf(log -> ids.contains(String.valueOf(log.log_id)))) {
+        ctx.op = 'noop';
+        return;
+    }
+    if (logs.isEmpty()) {
+        ctx.op = 'delete';
+        return;
+    }
+    ctx._source.log_count = logs.size();
+    List mergedLogs = ctx._source.merged_small_logs;
+    if (mergedLogs != null) {
+        mergedLogs.removeIf(merged -> {
+            if (merged.log_ids == null) {
+                return false;
+            }
+            for (def mergedId : merged.log_ids) {
+                if (ids.contains(String.valueOf(mergedId))) {
+                    return true;
+                }
+            }
+            return false;
+        });
+    }
+"""
 
 LOGGER = logging.getLogger("analyzerApp.osClient")
 
@@ -588,11 +617,16 @@ class OsClient:
     def search(
         self, project_id: str | int, query: dict[str, Any], *, size: Optional[int] = None
     ) -> Iterator[Hit[TestItemIndexData]]:
-        """Execute a search query and yield results as a generator.
+        """Scroll through all documents matching a query and yield them as a generator.
+
+        This is a scroll (`opensearchpy.helpers.scan`) meant to export every match: the `size` of the query body
+        only sets the page size and is overridden by the `size` argument of the scan, and the `sort` of the query
+        is replaced with `_doc`, so documents are not scored. It also takes at least two requests: the search and
+        the scroll cleanup. To get the top N best scored documents, use `msearch_grouped` or `msearch_batched`.
 
         :param project_id: The project identifier
         :param query: OpenSearch query
-        :param size: Optional custom size limit for the search request
+        :param size: Optional custom page size for the scroll
         :return: Iterator of typed search hits
         """
         index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
@@ -665,6 +699,44 @@ class OsClient:
             if LOGGER.is_enabled_for(DEBUG):
                 LOGGER.debug(f"Queries result group: {to_json_list(group)}")
             yield group
+
+    def msearch_batched(
+        self, project_id: str | int, queries: Sequence[dict[str, Any]], batch_size: int
+    ) -> Iterator[list[Hit[TestItemIndexData]]]:
+        """Execute independent search queries in batches of multi searches, yielding each query's hits separately.
+
+        One multi search takes up to `batch_size` queries, so the request count is proportional to the query count
+        divided by the batch size instead of the query count. A batch is consumed before the next one is sent, so only
+        one batch of responses is held at a time.
+
+        Exactly one group is yielded per query, in submission order: a query, which got no response, e.g. because the
+        index does not exist or the request failed, yields an empty group.
+
+        :param project_id: The project identifier
+        :param queries: Query bodies, without multi search headers
+        :param batch_size: Maximum number of queries in one multi search
+        :return: Iterator of hit lists, one per query, in submission order
+        """
+        batch_size = max(batch_size, 1)
+        for offset in range(0, len(queries), batch_size):
+            batch = queries[offset : offset + batch_size]
+            body: list[dict[str, Any]] = []
+            for query in batch:
+                body.append({})
+                body.append(query)
+            received = 0
+            for group in self.msearch_grouped(project_id, body):
+                received += 1
+                yield group
+            if 0 < received < len(batch):
+                LOGGER.warning(
+                    "Got %d responses for %d queries in the msearch to project %s",
+                    received,
+                    len(batch),
+                    str(project_id),
+                )
+            for _ in range(received, len(batch)):
+                yield []
 
     def bulk_update_issue_history(self, project_id: str | int, updates: list[TestItemHistoryData]) -> BulkResponse:
         """Bulk update issue_history for multiple Test Items.
@@ -759,26 +831,6 @@ class OsClient:
 
         return self._execute_bulk(bodies, refresh=refresh, chunk_size=chunk_size)
 
-    def get_test_items_by_ids(self, project_id: str | int, test_item_ids: list[str]) -> list[TestItemIndexData]:
-        """Get multiple Test Items by their IDs.
-
-        :param project_id: The project identifier
-        :param test_item_ids: List of test item IDs
-        :return: List of Test Item objects
-        """
-        if not test_item_ids:
-            return []
-
-        query = {
-            "size": self.app_config.esChunkNumber,
-            "query": {"terms": {"test_item_id": test_item_ids}},
-        }
-
-        results: list[TestItemIndexData] = []
-        for hit in self.search(project_id, query):
-            results.append(hit.source)
-        return results
-
     def _remove_logs_with_predicate(
         self,
         project_id: str | int,
@@ -851,28 +903,62 @@ class OsClient:
             LOGGER.error("Errors encountered while removing logs for project %s", project_id)
         return removed_logs
 
+    def _execute_update_by_query(self, index_name: str, body: dict[str, Any]) -> dict[str, Any]:
+        """Update documents by query and make the update visible to searches immediately.
+
+        :param index_name: Target index name
+        :param body: Update query with the script
+        :return: OpenSearch response
+        """
+        return self._os_client.update_by_query(index=index_name, body=body, refresh=True, conflicts="proceed")
+
     def delete_logs_by_ids(self, project_id: str | int, log_ids: list[str]) -> int:
         """
         Delete logs by their identifiers and remove Test Items that become empty.
 
+        The logs are removed on the OpenSearch side with an update by query, without fetching Test Items.
+
         :param project_id: Project identifier
         :param log_ids: List of log identifiers to delete
-        :return: Number of deleted logs
+        :return: Number of changed Test Items, updated and deleted ones together
         """
         if not log_ids:
             return 0
 
-        log_id_set = {str(log_id) for log_id in log_ids}
-        query = {
-            "query": {
-                "nested": {
-                    "path": "logs",
-                    "query": {"terms": {"logs.log_id": list(log_id_set)}},
-                }
-            }
-        }
+        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
+        LOGGER.info(f"Deleting {len(log_ids)} logs from '{index_name}'")
+        t_start = time()
 
-        return self._remove_logs_with_predicate(project_id, query, lambda log: log.log_id in log_id_set)
+        if not self._ensure_index_checked(index_name):
+            return 0
+
+        unique_log_ids = list(dict.fromkeys(str(log_id) for log_id in log_ids))
+        batch_size = self.app_config.esChunkNumber
+        changed = 0
+        for i in range(0, len(unique_log_ids), batch_size):
+            batch_ids = unique_log_ids[i : i + batch_size]
+            body = {
+                "query": {"nested": {"path": "logs", "query": {"terms": {"logs.log_id": batch_ids}}}},
+                "script": {"source": REMOVE_LOGS_SCRIPT, "lang": "painless", "params": {"log_ids": batch_ids}},
+            }
+            try:
+                result = self._execute_update_by_query(index_name, body)
+                changed += result.get("updated", 0) + result.get("deleted", 0)
+                if result.get("version_conflicts", 0):
+                    # Conflicting Test Items were changed while being updated and are kept as is, the second pass
+                    # removes the logs from the fresh index state
+                    LOGGER.warning(
+                        f"{result['version_conflicts']} test items changed during log deletion in '{index_name}', "
+                        "retrying"
+                    )
+                    result = self._execute_update_by_query(index_name, body)
+                    changed += result.get("updated", 0) + result.get("deleted", 0)
+                if result.get("failures"):
+                    LOGGER.error(f"Failed to delete logs from some test items in '{index_name}': {result['failures']}")
+            except Exception as err:
+                LOGGER.exception("Error in update_by_query", exc_info=err)
+        LOGGER.info(f"Deleted logs from {changed} test items in {round(time() - t_start, 2)} sec")
+        return changed
 
     @staticmethod
     def _normalize_datetime(value: str) -> Optional[datetime]:

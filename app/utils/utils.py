@@ -38,6 +38,17 @@ def validate_file(file_path: str) -> bool:
     return bool(file_path and file_path.strip() and os.path.exists(file_path) and os.path.isfile(file_path))
 
 
+def put_if_set(dictionary: dict[str, Any], key: str, value: Any) -> None:
+    """Put the value into the dictionary only if the value is set, I.E. it is not `None` or empty.
+
+    :param dictionary: the dictionary to update
+    :param key: the key to put the value with
+    :param value: the value to put
+    """
+    if value:
+        dictionary[key] = value
+
+
 def extract_real_id(elastic_id):
     real_id = str(elastic_id)
     if real_id.endswith("_m"):

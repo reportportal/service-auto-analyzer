@@ -152,7 +152,11 @@ class IndexService:
     def defect_update(self, defect_update_info: DefectUpdate) -> list[Reply]:
         """Update defect types and issue history for provided test items.
 
-        :param defect_update_info: The update request
+        Updates are sent for all requested Test Items without checking first which of them are indexed: a script update
+        of a missing document fails on its own, and such Test Items are reported as not updated, so ReportPortal
+        re-indexes them.
+
+        :param defect_update_info: Defect update request
         :return: The reply with the IDs of Test Items which were not updated, then the model training requests
         """
         LOGGER.info("Started updating defect types")
@@ -161,48 +165,30 @@ class IndexService:
         project_id = defect_update_info.project
         is_auto_analyzed = defect_update_info.isAutoAnalyzed
         normalized_updates = self._normalize_items_to_update(defect_update_info.itemsToUpdate)
-        test_item_ids = list(normalized_updates.keys())
 
-        batch_size = self.app_config.esChunkNumber
-        found_test_items: set[str] = set()
-        history_updates: list[TestItemHistoryData] = []
-        defect_num = 0
-
-        for i in range(int(len(test_item_ids) / batch_size) + 1):
-            batch_ids = test_item_ids[i * batch_size : (i + 1) * batch_size]
-            if not batch_ids:
-                continue
-            existing_items = self.os_client.get_test_items_by_ids(project_id, batch_ids)
-            for item in existing_items:
-                defect_num += 1
-                found_test_items.add(item.test_item_id)
-                update_payload = normalized_updates.get(item.test_item_id)
-                if not update_payload:
-                    continue
-
-                issue_type = request_factory.transform_issue_type_into_lowercase(update_payload["issue_type"])
-                issue_comment = update_payload["issue_comment"]
-                timestamp = update_payload["timestamp"]
-
-                history_updates.append(
-                    TestItemHistoryData(
-                        test_item_id=item.test_item_id,
-                        is_auto_analyzed=is_auto_analyzed,
-                        issue_type=issue_type,
-                        timestamp=timestamp,
-                        issue_comment=issue_comment,
-                    )
-                )
+        history_updates: list[TestItemHistoryData] = [
+            TestItemHistoryData(
+                test_item_id=test_item_id,
+                is_auto_analyzed=is_auto_analyzed,
+                issue_type=request_factory.transform_issue_type_into_lowercase(update_payload["issue_type"]),
+                timestamp=update_payload["timestamp"],
+                issue_comment=update_payload["issue_comment"],
+            )
+            for test_item_id, update_payload in normalized_updates.items()
+        ]
 
         failed_test_items: set[str] = set()
+        defect_num = 0
         if history_updates:
             response = self.os_client.bulk_update_issue_history(project_id, history_updates)
-            # Documents can disappear between the search and the update, e.g. if a cleanup request came in between,
-            # ReportPortal re-indexes such Test Items when they are reported as not updated
-            failed_test_items.update(response.failed_ids)
-        items_not_updated = [
-            int(test_item_id) for test_item_id in (set(test_item_ids) - found_test_items) | failed_test_items
-        ]
+            defect_num = response.took
+            if response.errors and not response.failed_ids:
+                # The whole request failed, e.g. the index does not exist, so nothing was updated
+                failed_test_items.update(normalized_updates.keys())
+            else:
+                # Missing Test Items, e.g. not indexed or removed by a cleanup request, fail individually
+                failed_test_items.update(response.failed_ids)
+        items_not_updated = sorted(int(test_item_id) for test_item_id in failed_test_items)
         LOGGER.debug("Not updated test items: %s", items_not_updated)
         LOGGER.info("Finished updating defect types. It took %.2f sec", monotonic() - t_start)
         return [Reply(json.dumps(items_not_updated))] + train_replies([(int(project_id), defect_num)])

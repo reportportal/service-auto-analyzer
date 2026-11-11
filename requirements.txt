@@ -20,5 +20,8 @@ urllib3==2.8.0
 boto3==1.42.2
 botocore==1.42.2
 
+# OpenDAL storage client, compatible with ReportPortal service-api datastore types
+opendal==0.47.12
+
 # Root SSL certificates
 certifi==2026.10.23

@@ -15,6 +15,7 @@ from app.commons.model.test_item_index import (
 )
 from app.commons.os_client import (
     HEALTH_CHECK_TIMEOUT,
+    REMOVE_LOGS_SCRIPT,
     TEST_ITEM_INDEX_MAPPINGS_FILE,
     OsClient,
     get_test_item_index_name,
@@ -317,43 +318,6 @@ def test_delete_by_launch_ids_builds_terms_query(os_client_mock, app_config):
     assert deleted == 2
 
 
-def test_get_test_items_by_ids_returns_empty_when_index_missing(monkeypatch, os_client_mock, app_config):
-    os_client_mock.indices.get.side_effect = Exception("missing index")
-    scan_mock = mock.Mock()
-    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", scan_mock)
-    client = OsClient(app_config, os_client=os_client_mock)
-
-    result = client.get_test_items_by_ids(PROJECT_ID, ["t1", "t2"])
-
-    assert result == []
-    scan_mock.assert_not_called()
-
-
-def test_get_test_items_by_ids_builds_terms_query(monkeypatch, os_client_mock, app_config, test_item):
-    os_client_mock.indices.get.return_value = {}
-    captured: dict[str, object] = {}
-
-    def fake_scan(self, query, index):
-        captured["client"] = self
-        captured["query"] = query
-        captured["index"] = index
-        yield {"_source": test_item.to_index_dict(), "_id": test_item.test_item_id, "_index": index}
-
-    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", fake_scan)
-    client = OsClient(app_config, os_client=os_client_mock)
-
-    results = client.get_test_items_by_ids(PROJECT_ID, [test_item.test_item_id])
-
-    assert len(results) == 1
-    assert results[0].test_item_id == test_item.test_item_id
-    assert captured["client"] is os_client_mock
-    assert captured["index"] == get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
-    assert captured["query"] == {
-        "size": app_config.esChunkNumber,
-        "query": {"terms": {"test_item_id": [test_item.test_item_id]}},
-    }
-
-
 def test_search_without_scroll_calls_scan(monkeypatch, os_client_mock, app_config, test_item):
     os_client_mock.indices.get.return_value = {}
     captured: dict[str, object] = {}
@@ -488,6 +452,78 @@ def test_msearch_grouped_returns_nothing_when_the_request_fails(os_client_mock, 
     assert list(client.msearch_grouped(PROJECT_ID, [{}, {}])) == []
 
 
+def _respond_per_query(test_item: TestItemIndexData):
+    """Build a multi search response function, which responds to every query with one hit of the given Test Item.
+
+    The hit gets the ID from the `test_item_id` value of the query, so groups can be matched to queries.
+    """
+
+    def respond(body, index):
+        responses = []
+        for query in body[1::2]:
+            found_item = test_item.model_copy(update={"test_item_id": query["test_item_id"]})
+            responses.append({"hits": {"hits": [_hit(index, found_item)]}})
+        return {"responses": responses}
+
+    return respond
+
+
+def test_msearch_batched_splits_queries_into_batches(os_client_mock, app_config, test_item):
+    os_client_mock.indices.get.return_value = {}
+    os_client_mock.msearch.side_effect = _respond_per_query(test_item)
+    client = OsClient(app_config, os_client=os_client_mock)
+    index_name = get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
+    queries = [{"test_item_id": str(i)} for i in range(5)]
+
+    results = list(client.msearch_batched(PROJECT_ID, queries, 2))
+
+    assert [[hit.source.test_item_id for hit in group] for group in results] == [["0"], ["1"], ["2"], ["3"], ["4"]]
+    assert os_client_mock.msearch.call_count == 3
+    assert [msearch_call.kwargs["body"] for msearch_call in os_client_mock.msearch.call_args_list] == [
+        [{}, queries[0], {}, queries[1]],
+        [{}, queries[2], {}, queries[3]],
+        [{}, queries[4]],
+    ]
+    assert all(msearch_call.kwargs["index"] == index_name for msearch_call in os_client_mock.msearch.call_args_list)
+    os_client_mock.search.assert_not_called()
+    os_client_mock.scroll.assert_not_called()
+
+
+def test_msearch_batched_yields_empty_group_per_query_when_index_missing(os_client_mock, app_config):
+    os_client_mock.indices.get.side_effect = Exception("missing index")
+    client = OsClient(app_config, os_client=os_client_mock)
+
+    results = list(client.msearch_batched(PROJECT_ID, [{"test_item_id": "0"}, {"test_item_id": "1"}], 20))
+
+    assert results == [[], []]
+    os_client_mock.msearch.assert_not_called()
+
+
+def test_msearch_batched_keeps_alignment_when_a_batch_fails(os_client_mock, app_config, test_item):
+    """A failed batch must cost its own queries only, not the batches after it."""
+    os_client_mock.indices.get.return_value = {}
+    os_client_mock.msearch.side_effect = [
+        Exception("transport blew up"),
+        _respond_per_query(test_item)([{}, {"test_item_id": "2"}], "rp_42"),
+    ]
+    client = OsClient(app_config, os_client=os_client_mock)
+
+    results = list(client.msearch_batched(PROJECT_ID, [{"test_item_id": str(i)} for i in range(3)], 2))
+
+    assert len(results) == 3, "every query must occupy its position"
+    assert results[0] == []
+    assert results[1] == []
+    assert [hit.source.test_item_id for hit in results[2]] == ["2"]
+    assert os_client_mock.msearch.call_count == 2
+
+
+def test_msearch_batched_does_nothing_without_queries(os_client_mock, app_config):
+    client = OsClient(app_config, os_client=os_client_mock)
+
+    assert list(client.msearch_batched(PROJECT_ID, [], 20)) == []
+    os_client_mock.msearch.assert_not_called()
+
+
 def test_delete_index_calls_opensearch_delete(os_client_mock, app_config):
     os_client_mock.indices.get.side_effect = lambda idx: None if idx.endswith("_suggest") else {}
     client = OsClient(app_config, os_client=os_client_mock)
@@ -550,86 +586,83 @@ def test_delete_by_launch_ids_returns_zero_when_index_missing(os_client_mock, ap
     os_client_mock.delete_by_query.assert_not_called()
 
 
-def test_delete_logs_by_ids_removes_logs(monkeypatch, os_client_mock, app_config):
+def test_delete_logs_by_ids_removes_logs_with_one_update_by_query(os_client_mock, app_config):
     os_client_mock.indices.get.return_value = {}
-    captured: dict[str, Any] = {}
+    os_client_mock.update_by_query.return_value = {"updated": 1, "deleted": 2, "noops": 0}
+    client = OsClient(app_config, os_client=os_client_mock)
 
-    # noinspection PyUnusedLocal
-    def fake_bulk(client: Any, bodies, chunk_size: int, request_timeout: int, refresh: bool, raise_on_error: bool):
-        captured["client"] = client
-        captured["bodies"] = bodies
-        captured["chunk_size"] = chunk_size
-        captured["refresh"] = refresh
-        return len(bodies), []
+    changed = client.delete_logs_by_ids(PROJECT_ID, ["remove_me", 7, "remove_me"])
 
-    base_log = LogData(
-        log_id="remove_me",
-        log_order=0,
-        log_time="2025-01-01T00:00:00Z",
-        log_level=40000,
-        cluster_id="",
-        cluster_message="",
-        cluster_with_numbers=False,
-        original_message="original",
-        message="clean",
-        message_lines=1,
-        message_words_number=1,
-        message_extended="clean",
-        message_without_params_extended="clean",
-        message_without_params_and_brackets="clean",
-        detected_message="clean",
-        detected_message_with_numbers="clean",
-        detected_message_extended="clean",
-        detected_message_without_params_extended="clean",
-        detected_message_without_params_and_brackets="clean",
-        stacktrace="trace",
-        stacktrace_extended="trace",
-        only_numbers="",
-        potential_status_codes="",
-        found_exceptions="",
-        found_exceptions_extended="",
-        found_tests_and_methods="",
-        urls="",
-        paths="",
-        message_params="",
-        whole_message="whole",
-    )
-    keep_log = base_log.model_copy(update={"log_id": "keep", "log_time": "2025-02-01T00:00:00Z"})
-    test_item = TestItemIndexData(
-        test_item_id="ti-1",
-        test_item_name="name",
-        unique_id="uid",
-        test_case_hash=123,
-        launch_id="l-1",
-        launch_name="launch",
-        launch_number="1",
-        launch_start_time="2025-01-01T00:00:00Z",
-        is_auto_analyzed=True,
-        issue_type="ab001",
-        start_time="2025-01-01T00:00:00Z",
-        log_count=2,
-        logs=[base_log, keep_log],
-        issue_history=[],
-    )
+    assert changed == 3
+    os_client_mock.search.assert_not_called()
+    os_client_mock.update_by_query.assert_called_once()
+    kwargs = os_client_mock.update_by_query.call_args.kwargs
+    assert kwargs["index"] == get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
+    assert kwargs["refresh"] is True
+    assert kwargs["conflicts"] == "proceed"
+    body = kwargs["body"]
+    assert body["query"] == {"nested": {"path": "logs", "query": {"terms": {"logs.log_id": ["remove_me", "7"]}}}}
+    assert body["script"]["source"] == REMOVE_LOGS_SCRIPT
+    assert body["script"]["params"] == {"log_ids": ["remove_me", "7"]}
 
-    # noinspection PyUnusedLocal
-    def fake_scan(client, query, index, **kwargs):
-        return iter([{"_index": index, "_id": test_item.test_item_id, "_source": test_item.to_index_dict()}])
 
-    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", fake_scan)
-    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.bulk", fake_bulk)
+def test_delete_logs_by_ids_sends_log_ids_in_chunks(os_client_mock, app_config):
+    os_client_mock.indices.get.return_value = {}
+    os_client_mock.update_by_query.side_effect = [{"updated": 2}, {"deleted": 1}]
+    client = OsClient(app_config.model_copy(update={"esChunkNumber": 2}), os_client=os_client_mock)
 
-    os_client = OsClient(app_config, os_client=os_client_mock)
-    removed = os_client.delete_logs_by_ids(PROJECT_ID, ["remove_me"])
+    changed = client.delete_logs_by_ids(PROJECT_ID, ["1", "2", "3"])
 
-    assert removed == 1
-    captured_bodies = captured["bodies"]
-    assert len(captured_bodies) == 1
-    body = captured_bodies[0]
-    assert body["_op_type"] == "update"
-    assert body["_index"] == get_test_item_index_name(PROJECT_ID, app_config.esProjectIndexPrefix)
-    assert body["doc"]["log_count"] == 1
-    assert body["doc"]["logs"][0]["log_id"] == "keep"
+    assert changed == 3
+    assert os_client_mock.update_by_query.call_count == 2
+    sent_ids = [
+        call.kwargs["body"]["script"]["params"]["log_ids"] for call in os_client_mock.update_by_query.call_args_list
+    ]
+    assert sent_ids == [["1", "2"], ["3"]]
+
+
+def test_delete_logs_by_ids_retries_on_version_conflicts(os_client_mock, app_config):
+    os_client_mock.indices.get.return_value = {}
+    os_client_mock.update_by_query.side_effect = [{"updated": 1, "version_conflicts": 1}, {"deleted": 1}]
+    client = OsClient(app_config, os_client=os_client_mock)
+
+    changed = client.delete_logs_by_ids(PROJECT_ID, ["1", "2"])
+
+    assert changed == 2
+    assert os_client_mock.update_by_query.call_count == 2
+    first_call, second_call = os_client_mock.update_by_query.call_args_list
+    assert first_call.kwargs["body"] == second_call.kwargs["body"]
+
+
+def test_delete_logs_by_ids_skips_missing_index(os_client_mock, app_config):
+    os_client_mock.indices.get.side_effect = Exception("missing")
+    client = OsClient(app_config, os_client=os_client_mock)
+
+    changed = client.delete_logs_by_ids(PROJECT_ID, ["1"])
+
+    assert changed == 0
+    os_client_mock.update_by_query.assert_not_called()
+
+
+def test_delete_logs_by_ids_skips_empty_request(os_client_mock, app_config):
+    client = OsClient(app_config, os_client=os_client_mock)
+
+    changed = client.delete_logs_by_ids(PROJECT_ID, [])
+
+    assert changed == 0
+    os_client_mock.indices.get.assert_not_called()
+    os_client_mock.update_by_query.assert_not_called()
+
+
+def test_delete_logs_by_ids_counts_nothing_when_the_request_fails(os_client_mock, app_config):
+    os_client_mock.indices.get.return_value = {}
+    os_client_mock.update_by_query.side_effect = [TransportError(500, "failure"), {"updated": 1}]
+    client = OsClient(app_config.model_copy(update={"esChunkNumber": 1}), os_client=os_client_mock)
+
+    changed = client.delete_logs_by_ids(PROJECT_ID, ["1", "2"])
+
+    assert changed == 1, "the failed chunk should not stop the next one"
+    assert os_client_mock.update_by_query.call_count == 2
 
 
 def test_bulk_update_cluster_info_updates_logs_and_merged_small_logs(monkeypatch, os_client_mock, app_config):
@@ -686,50 +719,6 @@ def test_bulk_update_cluster_info_skips_empty_updates(monkeypatch, os_client_moc
     assert response.errors is False
     bulk_mock.assert_not_called()
     os_client_mock.indices.get.assert_not_called()
-
-
-def test_delete_logs_by_ids_removes_merged_small_logs_with_removed_logs(
-    monkeypatch, os_client_mock, app_config, test_item
-):
-    os_client_mock.indices.get.return_value = {}
-    captured: dict[str, Any] = {}
-
-    # noinspection PyUnusedLocal
-    def fake_bulk(client: Any, bodies, chunk_size: int, request_timeout: int, refresh: bool, raise_on_error: bool):
-        captured["bodies"] = bodies
-        return len(bodies), []
-
-    base_log = test_item.logs[0]
-    item = test_item.model_copy(
-        update={
-            "logs": [
-                base_log.model_copy(update={"log_id": "remove_me", "log_order": 0}),
-                base_log.model_copy(update={"log_id": "keep", "log_order": 1}),
-                base_log.model_copy(update={"log_id": "keep_fatal", "log_order": 2, "log_level": 50000}),
-            ],
-            "merged_small_logs": [
-                MergedLogData(log_ids=["remove_me", "keep"], log_level=40000, whole_message="a\nb"),
-                MergedLogData(log_ids=["keep_fatal"], log_level=50000, whole_message="c"),
-            ],
-        }
-    )
-
-    # noinspection PyUnusedLocal
-    def fake_scan(client, query, index, **kwargs):
-        return iter([{"_index": index, "_id": item.test_item_id, "_source": item.to_index_dict()}])
-
-    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.scan", fake_scan)
-    monkeypatch.setattr("app.commons.os_client.opensearchpy.helpers.bulk", fake_bulk)
-
-    os_client = OsClient(app_config, os_client=os_client_mock)
-    removed = os_client.delete_logs_by_ids(PROJECT_ID, ["remove_me"])
-
-    assert removed == 1
-    bodies = captured["bodies"]
-    assert len(bodies) == 1
-    doc = bodies[0]["doc"]
-    assert [log["log_id"] for log in doc["logs"]] == ["keep", "keep_fatal"]
-    assert [merged["log_ids"] for merged in doc["merged_small_logs"]] == [["keep_fatal"]]
 
 
 def test_delete_by_log_time_range_deletes_empty_items(monkeypatch, os_client_mock, app_config):

@@ -251,9 +251,11 @@ class SuggestService:
                 },
             }
             found_test_item: Optional[TestItemIndexData] = None
-            for hit in self.os_client.search(test_item_info.project, query):
-                found_test_item = hit.source
-                test_item_id_for_suggest = utils.safe_int(found_test_item.test_item_id)
+            # A plain search, not a scroll: only the first found Test Item is needed
+            for hits in self.os_client.msearch_grouped(test_item_info.project, [{}, query]):
+                if hits:
+                    found_test_item = hits[0].source
+                    test_item_id_for_suggest = utils.safe_int(found_test_item.test_item_id)
                 break
             if found_test_item is None or not found_test_item.logs:
                 return None, 0

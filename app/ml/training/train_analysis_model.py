@@ -615,30 +615,60 @@ class AnalysisModelTraining:
         else:
             add_launch_name_and_id_boost(query, launch_name, launch_id, self.launch_boost)
 
-    def _search_similar_items(self, project_id: int, query: dict[str, Any]) -> list[Hit[TestItemIndexData]]:
-        for hits in self.os_client.msearch_grouped(project_id, [{}, query]):
-            return hits
-        return []
+    def _search_similar_items(
+        self, project_id: int, queries: list[dict[str, Any]]
+    ) -> list[list[Hit[TestItemIndexData]]]:
+        """Search for similar Test Items by several queries in batches of multi searches.
+
+        :param project_id: The project identifier
+        :param queries: Queries, an empty query means there is nothing to search by
+        :return: Found Test Items, one list per query, aligned with `queries`
+        """
+        results: list[list[Hit[TestItemIndexData]]] = [[] for _ in queries]
+        positions = [position for position, query in enumerate(queries) if query]
+        found_hits = self.os_client.msearch_batched(
+            project_id, [queries[position] for position in positions], self.search_cfg.AnalysisQueryBatchSize
+        )
+        for position, hits in zip(positions, found_hits):
+            results[position] = hits
+        return results
 
     def _collect_similar_hits(
         self,
         project_id: int,
-        request_item: TestItemIndexData,
-        positive_issue_type: str,
-    ) -> list[Hit[TestItemIndexData]]:
-        query = self._build_similar_items_query(request_item)
-        if not query:
-            return []
-        hits = self._search_similar_items(project_id, query)
-        issue_types = {normalize_issue_type(hit.source.issue_type) for hit in hits if hit.source.issue_type}
-        if positive_issue_type and (not issue_types or issue_types == {positive_issue_type}):
-            extra_query = self._build_similar_items_query(request_item, exclude_issue_type=positive_issue_type)
-            extra_hits = self._search_similar_items(project_id, extra_query)
+        requests: list[tuple[TestItemIndexData, str]],
+    ) -> list[list[Hit[TestItemIndexData]]]:
+        """Find similar Test Items for several request Test Items.
+
+        If a request Test Item found only Test Items of its positive issue type, or nothing, it is searched once
+        more for Test Items of other issue types, to have negative cases. Such searches depend on the results of the
+        first ones, so they are sent in the second round.
+
+        :param project_id: The project identifier
+        :param requests: Request Test Items with their positive issue types
+        :return: Found Test Items, one list per request Test Item, aligned with `requests`
+        """
+        queries = [self._build_similar_items_query(request_item) for request_item, _ in requests]
+        results = self._search_similar_items(project_id, queries)
+
+        extra_positions: list[int] = []
+        extra_queries: list[dict[str, Any]] = []
+        for position, ((request_item, positive_issue_type), hits) in enumerate(zip(requests, results)):
+            if not queries[position]:
+                continue
+            issue_types = {normalize_issue_type(hit.source.issue_type) for hit in hits if hit.source.issue_type}
+            if positive_issue_type and (not issue_types or issue_types == {positive_issue_type}):
+                extra_positions.append(position)
+                extra_queries.append(
+                    self._build_similar_items_query(request_item, exclude_issue_type=positive_issue_type)
+                )
+
+        for position, extra_hits in zip(extra_positions, self._search_similar_items(project_id, extra_queries)):
             hits_by_id: dict[str, Hit[TestItemIndexData]] = {}
-            for hit in hits + extra_hits:
+            for hit in results[position] + extra_hits:
                 hits_by_id[str(hit.source.test_item_id)] = hit
-            hits = list(hits_by_id.values())
-        return hits
+            results[position] = list(hits_by_id.values())
+        return results
 
     def _query_data(self, projects: list[int]) -> list[TrainingEntry[TestItemIndexData]]:
         data: list[TrainingEntry[TestItemIndexData]] = []
@@ -685,80 +715,108 @@ class AnalysisModelTraining:
             raw_defect_type_model = self.model_chooser.choose_model(project_id, ModelType.defect_type)
             defect_type_model = cast(DefectTypeModel, raw_defect_type_model) if raw_defect_type_model else None
             project_excluded_items = excluded_items.get(project_id, set())
+            requests: list[tuple[TestItemIndexData, str]] = []
             for entry in entries:
                 test_item: TestItemIndexData = entry.data
                 positive_issue_type = get_positive_issue_type(test_item)
-                if not positive_issue_type:
+                if not positive_issue_type or not test_item.logs:
                     continue
-                history_negative_types = select_history_negative_types(
-                    list(test_item.issue_history or []), positive_issue_type
-                )
+                requests.append((test_item, positive_issue_type))
 
-                if not test_item.logs:
-                    continue
-
-                similar_hits = [
-                    hit
-                    for hit in self._collect_similar_hits(project_id, test_item, positive_issue_type)
-                    if str(hit.source.test_item_id) not in project_excluded_items
-                ]
-                if not similar_hits:
-                    continue
-
-                found_hits = similar_hits
-                if history_negative_types:
-                    found_hits = [
-                        hit
-                        for hit in found_hits
-                        if normalize_issue_type(hit.source.issue_type) not in history_negative_types
-                    ]
-                    found_hits.extend(build_history_negative_hits(test_item, history_negative_types))
-                found_hits.extend(
-                    build_negative_hits(
-                        {normalize_issue_type(hit.source.issue_type) for hit in found_hits},
+            # Similar Test Items are searched for a batch of request Test Items at once, and only one batch of found
+            # Test Items is held at a time
+            batch_size = max(self.search_cfg.AnalysisQueryBatchSize, 1)
+            for offset in range(0, len(requests), batch_size):
+                batch = requests[offset : offset + batch_size]
+                for (test_item, positive_issue_type), batch_hits in zip(
+                    batch, self._collect_similar_hits(project_id, batch)
+                ):
+                    entry_features, entry_labels = self._featurize_entry(
+                        test_item,
                         positive_issue_type,
+                        [hit for hit in batch_hits if str(hit.source.test_item_id) not in project_excluded_items],
+                        features,
+                        namespaces,
+                        defect_type_model,
                         negative_items.get(str(test_item.test_item_id), []),
                     )
-                )
-                if not found_hits:
-                    continue
-
-                _boosting_data_gatherer: BoostingFeaturizer = self.featurizer_class(
-                    (test_item, found_hits),
-                    self._get_config_for_boosting(-1, namespaces),
-                    feature_ids=features,
-                    defect_type_model=defect_type_model,
-                )
-                feature_data, candidate_names = _boosting_data_gatherer.gather_features_info()
-                if not feature_data or not candidate_names:
-                    continue
-
-                relevant_items = _boosting_data_gatherer.get_relevant_items()
-                candidate_issue_types: list[str] = []
-                for candidate_name in candidate_names:
-                    relevant_item = relevant_items.get(candidate_name)
-                    if not relevant_item:
-                        candidate_issue_types.append("")
-                        continue
-                    candidate_issue_types.append(normalize_issue_type(relevant_item.mrHit.source.issue_type))
-
-                filtered_features: list[list[float]] = []
-                filtered_issue_types: list[str] = []
-                for idx, issue_type in enumerate(candidate_issue_types):
-                    if not issue_type:
-                        continue
-                    filtered_features.append(feature_data[idx])
-                    filtered_issue_types.append(issue_type)
-
-                selected_entries = select_candidate_entries(
-                    filtered_issue_types, positive_issue_type, history_negative_types
-                )
-                if not selected_entries:
-                    continue
-                for idx, label in selected_entries:
-                    full_data_features.append(filtered_features[idx])
-                    labels.append(label)
+                    full_data_features.extend(entry_features)
+                    labels.extend(entry_labels)
         return full_data_features, labels
+
+    def _featurize_entry(
+        self,
+        test_item: TestItemIndexData,
+        positive_issue_type: str,
+        similar_hits: list[Hit[TestItemIndexData]],
+        features: list[int],
+        namespaces: dict[str, int],
+        defect_type_model: Optional[DefectTypeModel],
+        item_negative_items: list[TestItemIndexData],
+    ) -> tuple[list[list[float]], list[int]]:
+        """Convert a request Test Item and Test Items found for it into train rows.
+
+        :param test_item: Request Test Item
+        :param positive_issue_type: Issue type of the request Test Item, which is the positive label
+        :param similar_hits: Test Items found for the request Test Item, without excluded ones
+        :param features: Feature IDs to gather
+        :param namespaces: Chosen namespaces of the project
+        :param defect_type_model: Defect type model of the project
+        :param item_negative_items: Negative candidates chosen for the request Test Item
+        :return: Train rows and their labels, empty if the request Test Item gives no rows
+        """
+        if not similar_hits:
+            return [], []
+        history_negative_types = select_history_negative_types(
+            list(test_item.issue_history or []), positive_issue_type
+        )
+        found_hits = similar_hits
+        if history_negative_types:
+            found_hits = [
+                hit for hit in found_hits if normalize_issue_type(hit.source.issue_type) not in history_negative_types
+            ]
+            found_hits.extend(build_history_negative_hits(test_item, history_negative_types))
+        found_hits.extend(
+            build_negative_hits(
+                {normalize_issue_type(hit.source.issue_type) for hit in found_hits},
+                positive_issue_type,
+                item_negative_items,
+            )
+        )
+        if not found_hits:
+            return [], []
+
+        _boosting_data_gatherer: BoostingFeaturizer = self.featurizer_class(
+            (test_item, found_hits),
+            self._get_config_for_boosting(-1, namespaces),
+            feature_ids=features,
+            defect_type_model=defect_type_model,
+        )
+        feature_data, candidate_names = _boosting_data_gatherer.gather_features_info()
+        if not feature_data or not candidate_names:
+            return [], []
+
+        relevant_items = _boosting_data_gatherer.get_relevant_items()
+        candidate_issue_types: list[str] = []
+        for candidate_name in candidate_names:
+            relevant_item = relevant_items.get(candidate_name)
+            if not relevant_item:
+                candidate_issue_types.append("")
+                continue
+            candidate_issue_types.append(normalize_issue_type(relevant_item.mrHit.source.issue_type))
+
+        filtered_features: list[list[float]] = []
+        filtered_issue_types: list[str] = []
+        for idx, issue_type in enumerate(candidate_issue_types):
+            if not issue_type:
+                continue
+            filtered_features.append(feature_data[idx])
+            filtered_issue_types.append(issue_type)
+
+        selected_entries = select_candidate_entries(filtered_issue_types, positive_issue_type, history_negative_types)
+        if not selected_entries:
+            return [], []
+        return [filtered_features[idx] for idx, _ in selected_entries], [label for _, label in selected_entries]
 
     def _train_several_times(
         self,

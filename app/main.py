@@ -19,6 +19,7 @@ module again.
 """
 
 import asyncio
+import json
 import os
 import signal
 import warnings
@@ -75,6 +76,24 @@ def to_bool(value: Any) -> bool:
     raise ValueError(f"Invalid boolean value {value}.")
 
 
+def parse_string_map(value: Optional[str]) -> dict[str, str]:
+    """Parse a JSON object into a dictionary with string keys and values.
+
+    :param value: JSON object as a string, empty or `None` values give an empty dictionary
+    :return: The dictionary where all non-string values are converted to their JSON representation
+    :raises ValueError: If the value is not a valid JSON object
+    """
+    if not value or not value.strip():
+        return {}
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Unable to parse JSON object: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError(f"JSON object expected, got: {type(parsed).__name__}")
+    return {str(key): val if isinstance(val, str) else json.dumps(val) for key, val in parsed.items()}
+
+
 def read_version() -> str:
     """Read the application build version.
 
@@ -127,18 +146,39 @@ def getenv_with_deprecated(name: str, *deprecated_names: str) -> Optional[str]:
     return value
 
 
-def read_datastore_endpoint() -> Optional[str]:
-    """Read the datastore endpoint, or build it from the deprecated MinIO host and TLS settings."""
+def read_datastore_endpoint(datastore_type: str) -> Optional[str]:
+    """Read the datastore endpoint, or build it from the deprecated MinIO host and TLS settings.
+
+    :param datastore_type: The datastore type, `s3-compatible` type has a default endpoint
+    :return: The endpoint, or None if it is not set
+    """
     for deprecated_name in ("MINIO_SHORT_HOST", "MINIO_USE_TLS"):
         if os.getenv(deprecated_name):
             warnings.warn(deprecation_message(deprecated_name, "DATASTORE_ENDPOINT"), DeprecationWarning, stacklevel=2)
     datastore_endpoint = os.getenv("DATASTORE_ENDPOINT")
     minio_short_host = os.getenv("MINIO_SHORT_HOST")
-    if datastore_endpoint or not minio_short_host:
-        return datastore_endpoint
-    minio_use_tls = os.getenv("MINIO_USE_TLS")
-    use_tls = to_bool(minio_use_tls) if minio_use_tls else False
-    return f"http{'s' if use_tls else ''}://{minio_short_host}"
+    if not datastore_endpoint and minio_short_host:
+        minio_use_tls = os.getenv("MINIO_USE_TLS")
+        use_tls = to_bool(minio_use_tls) if minio_use_tls else False
+        datastore_endpoint = f"http{'s' if use_tls else ''}://{minio_short_host}"
+    if not datastore_endpoint and datastore_type == "s3-compatible":
+        # Mute Sonar about hardcoded HTTP URL, since this is a hostname inside a docker-compose file
+        datastore_endpoint = "http://minio:9000"  # NOSONAR
+    return datastore_endpoint
+
+
+def read_datastore_region(datastore_type: str) -> Optional[str]:
+    """Read the datastore region.
+
+    :param datastore_type: The datastore type, OpenDAL S3 types have a default region
+    :return: The region, or None if it is not set
+    """
+    datastore_region = getenv_with_deprecated(
+        "DATASTORE_REGION", "ANALYZER_BINSTORE_MINIO_REGION", "ANALYZER_BINARYSTORE_MINIO_REGION"
+    )
+    if not datastore_region and datastore_type in {"s3-compatible", "aws-s3"}:
+        datastore_region = "us-east-1"
+    return datastore_region
 
 
 def read_datastore_bucket_prefix() -> str:
@@ -154,11 +194,35 @@ def read_datastore_bucket_prefix() -> str:
     return default_bucket_name
 
 
+def read_datastore_default_bucket_name(bucket_prefix: str) -> str:
+    """Read the bucket which OpenDAL datastore types are bound to.
+
+    :param bucket_prefix: The bucket prefix, which can hold the bucket as the first part of its path
+    :return: The default bucket, if it is not set: the first part of the prefix path if it has one, otherwise the same
+        default bucket as in ReportPortal API service
+    """
+    default_bucket_name = os.getenv("DATASTORE_DEFAULTBUCKETNAME")
+    if default_bucket_name:
+        return default_bucket_name
+    prefix_path = bucket_prefix.replace("\\", "/").strip("/")
+    if "/" in prefix_path:
+        return prefix_path.split("/")[0]
+    return "rp-bucket"
+
+
 def build_app_config() -> ApplicationConfig:
     """Read the application configuration from environment variables, old and new names.
 
     :return: Application configuration
     """
+    # Datastore settings are read in this order, to give deprecation warnings in the order of the variables
+    datastore_type = (
+        getenv_with_deprecated("DATASTORE_TYPE", "ANALYZER_BINSTORE_TYPE", "ANALYZER_BINARYSTORE_TYPE") or "filesystem"
+    )
+    datastore_endpoint = read_datastore_endpoint(datastore_type)
+    datastore_region = read_datastore_region(datastore_type)
+    datastore_bucket_prefix = read_datastore_bucket_prefix()
+    datastore_default_bucket_name = read_datastore_default_bucket_name(datastore_bucket_prefix)
     return ApplicationConfig(
         # ES/OS settings
         # Mute Sonar about hardcoded HTTP URL, since this is a hostname inside a docker-compose file
@@ -193,16 +257,22 @@ def build_app_config() -> ApplicationConfig:
         analyzerCluster=to_bool(os.getenv("ANALYZER_CLUSTER", "true")),
         appVersion=read_version(),
         # Storage settings
-        datastoreType=getenv_with_deprecated("DATASTORE_TYPE", "ANALYZER_BINSTORE_TYPE", "ANALYZER_BINARYSTORE_TYPE")
-        or "filesystem",
-        datastoreEndpoint=read_datastore_endpoint(),
-        datastoreRegion=getenv_with_deprecated(
-            "DATASTORE_REGION", "ANALYZER_BINSTORE_MINIO_REGION", "ANALYZER_BINARYSTORE_MINIO_REGION"
-        ),
-        datastoreBucketPrefix=read_datastore_bucket_prefix(),
+        datastoreType=datastore_type,
+        datastoreEndpoint=datastore_endpoint,
+        datastoreRegion=datastore_region,
+        datastoreBucketPrefix=datastore_bucket_prefix,
         datastoreBucketPostfix=os.getenv("DATASTORE_BUCKETPOSTFIX", ""),
+        datastoreDefaultBucketName=datastore_default_bucket_name,
         datastoreAccessKey=getenv_with_deprecated("DATASTORE_ACCESSKEY", "MINIO_ACCESS_KEY"),
         datastoreSecretKey=getenv_with_deprecated("DATASTORE_SECRETKEY", "MINIO_SECRET_KEY"),
+        datastoreAzureAccountName=os.getenv("DATASTORE_AZURE_ACCOUNTNAME"),
+        datastoreAzureAccountKey=os.getenv("DATASTORE_AZURE_ACCOUNTKEY"),
+        datastoreAzureEndpoint=os.getenv("DATASTORE_AZURE_ENDPOINT"),
+        datastoreAzureContainer=os.getenv("DATASTORE_AZURE_CONTAINER") or datastore_default_bucket_name,
+        datastoreGcsBucket=os.getenv("DATASTORE_GCS_BUCKET") or datastore_default_bucket_name,
+        datastoreGcsCredentialsPath=os.getenv("DATASTORE_GCS_CREDENTIALSPATH"),
+        datastoreGcsEndpoint=os.getenv("DATASTORE_GCS_ENDPOINT"),
+        datastoreOpendalOptions=parse_string_map(os.getenv("DATASTORE_OPENDAL_OPTIONS")),
         filesystemDefaultPath=os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
         # HTTP endpoint settings
         analyzerHttpPort=int(os.getenv("ANALYZER_HTTP_PORT", "5001")),

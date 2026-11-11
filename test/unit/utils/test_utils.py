@@ -19,7 +19,7 @@ from typing import Optional
 import pytest
 
 from app.commons.model.launch_objects import AnalyzerConf
-from app.utils.utils import find_min_should_match_threshold, is_no_defect
+from app.utils.utils import find_min_should_match_threshold, is_no_defect, put_if_set
 from test import DEFAULT_SEARCH_CONFIG
 
 
@@ -51,3 +51,29 @@ def test_find_min_should_match_threshold(project_min_should_match: int, global_m
 )
 def test_is_no_defect(issue_type: Optional[str], expected: bool) -> None:
     assert is_no_defect(issue_type) is expected
+
+
+@pytest.mark.parametrize("value", [None, "", 0, [], {}])
+def test_put_if_set_skips_unset_value(value):
+    dictionary = {"existing": "value"}
+
+    put_if_set(dictionary, "key", value)
+
+    assert dictionary == {"existing": "value"}
+
+
+@pytest.mark.parametrize("value", ["value", 1, ["item"]])
+def test_put_if_set_puts_set_value(value):
+    dictionary = {"existing": "value"}
+
+    put_if_set(dictionary, "key", value)
+
+    assert dictionary == {"existing": "value", "key": value}
+
+
+def test_put_if_set_overrides_existing_value():
+    dictionary = {"key": "old"}
+
+    put_if_set(dictionary, "key", "new")
+
+    assert dictionary == {"key": "new"}

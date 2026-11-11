@@ -152,6 +152,14 @@ DATASTORE_VARIABLES = [
     "MINIO_ACCESS_KEY",
     "DATASTORE_SECRETKEY",
     "MINIO_SECRET_KEY",
+    "DATASTORE_AZURE_ACCOUNTNAME",
+    "DATASTORE_AZURE_ACCOUNTKEY",
+    "DATASTORE_AZURE_ENDPOINT",
+    "DATASTORE_AZURE_CONTAINER",
+    "DATASTORE_GCS_BUCKET",
+    "DATASTORE_GCS_CREDENTIALSPATH",
+    "DATASTORE_GCS_ENDPOINT",
+    "DATASTORE_OPENDAL_OPTIONS",
 ]
 
 
@@ -283,23 +291,135 @@ def test_datastore_deprecated_variables_are_used(
 
 
 @pytest.mark.parametrize(
-    "variables, prefix",
+    "variables, prefix, default_bucket",
     [
-        ({"DATASTORE_DEFAULTBUCKETNAME": "bucket"}, "bucket"),
-        ({"DATASTORE_DEFAULTBUCKETNAME": "bucket", "DATASTORE_BUCKETPREFIX": "prj-"}, "bucket/prj-"),
-        ({"DATASTORE_BUCKETPREFIX": "custom-"}, "custom-"),
+        ({}, "prj-", "rp-bucket"),
+        ({"DATASTORE_DEFAULTBUCKETNAME": "bucket"}, "bucket", "bucket"),
+        ({"DATASTORE_DEFAULTBUCKETNAME": "bucket", "DATASTORE_BUCKETPREFIX": "prj-"}, "bucket/prj-", "bucket"),
+        ({"DATASTORE_BUCKETPREFIX": "custom-"}, "custom-", "rp-bucket"),
+        ({"DATASTORE_BUCKETPREFIX": "my-bucket/reportportal/prj-"}, "my-bucket/reportportal/prj-", "my-bucket"),
+        ({"DATASTORE_BUCKETPREFIX": "my-bucket\\prj-"}, "my-bucket\\prj-", "my-bucket"),
     ],
 )
 def test_datastore_default_bucket_name(
-    datastore_environment: pytest.MonkeyPatch, variables: dict[str, str], prefix: str
+    datastore_environment: pytest.MonkeyPatch, variables: dict[str, str], prefix: str, default_bucket: str
 ):
     for name, value in variables.items():
         datastore_environment.setenv(name, value)
 
-    assert main.build_app_config().datastoreBucketPrefix == prefix
+    app_config = main.build_app_config()
+
+    assert app_config.datastoreBucketPrefix == prefix
+    assert app_config.datastoreDefaultBucketName == default_bucket
 
 
 def test_datastore_bucket_postfix(datastore_environment: pytest.MonkeyPatch):
     datastore_environment.setenv("DATASTORE_BUCKETPOSTFIX", "-data")
 
     assert main.build_app_config().datastoreBucketPostfix == "-data"
+
+
+@pytest.mark.parametrize(
+    "datastore_type, endpoint, region",
+    [
+        ("filesystem", None, None),
+        ("minio", None, None),
+        ("s3", None, None),
+        ("s3-compatible", "http://minio:9000", "us-east-1"),
+        ("aws-s3", None, "us-east-1"),
+        ("azure", None, None),
+        ("gcs", None, None),
+    ],
+)
+def test_datastore_type_defaults(
+    datastore_environment: pytest.MonkeyPatch, datastore_type: str, endpoint: str | None, region: str | None
+):
+    datastore_environment.setenv("DATASTORE_TYPE", datastore_type)
+
+    app_config = main.build_app_config()
+
+    assert app_config.datastoreEndpoint == endpoint
+    assert app_config.datastoreRegion == region
+
+
+@pytest.mark.parametrize("datastore_type", ["s3-compatible", "aws-s3"])
+def test_datastore_type_defaults_do_not_override_settings(
+    datastore_environment: pytest.MonkeyPatch, datastore_type: str
+):
+    datastore_environment.setenv("DATASTORE_TYPE", datastore_type)
+    datastore_environment.setenv("DATASTORE_ENDPOINT", "https://s3.example.com")
+    datastore_environment.setenv("DATASTORE_REGION", "eu-west-1")
+
+    app_config = main.build_app_config()
+
+    assert app_config.datastoreEndpoint == "https://s3.example.com"
+    assert app_config.datastoreRegion == "eu-west-1"
+
+
+def test_datastore_azure_and_gcs_settings(datastore_environment: pytest.MonkeyPatch):
+    variables = {
+        "DATASTORE_AZURE_ACCOUNTNAME": "account",
+        "DATASTORE_AZURE_ACCOUNTKEY": "key",
+        "DATASTORE_AZURE_ENDPOINT": "https://account.blob.core.windows.net",
+        "DATASTORE_AZURE_CONTAINER": "container",
+        "DATASTORE_GCS_BUCKET": "gcs-bucket",
+        "DATASTORE_GCS_CREDENTIALSPATH": "/etc/gcs/key.json",
+        "DATASTORE_GCS_ENDPOINT": "https://storage.example.com",
+    }
+    for name, value in variables.items():
+        datastore_environment.setenv(name, value)
+
+    app_config = main.build_app_config()
+
+    assert app_config.datastoreAzureAccountName == "account"
+    assert app_config.datastoreAzureAccountKey == "key"
+    assert app_config.datastoreAzureEndpoint == "https://account.blob.core.windows.net"
+    assert app_config.datastoreAzureContainer == "container"
+    assert app_config.datastoreGcsBucket == "gcs-bucket"
+    assert app_config.datastoreGcsCredentialsPath == "/etc/gcs/key.json"
+    assert app_config.datastoreGcsEndpoint == "https://storage.example.com"
+
+
+def test_datastore_azure_container_and_gcs_bucket_default_to_default_bucket(
+    datastore_environment: pytest.MonkeyPatch,
+):
+    datastore_environment.setenv("DATASTORE_DEFAULTBUCKETNAME", "bucket")
+
+    app_config = main.build_app_config()
+
+    assert app_config.datastoreAzureContainer == "bucket"
+    assert app_config.datastoreGcsBucket == "bucket"
+
+
+def test_datastore_opendal_options(datastore_environment: pytest.MonkeyPatch):
+    datastore_environment.setenv("DATASTORE_OPENDAL_OPTIONS", '{"enable_virtual_host_style": true, "root": "/data"}')
+
+    assert main.build_app_config().datastoreOpendalOptions == {"enable_virtual_host_style": "true", "root": "/data"}
+
+
+def test_datastore_opendal_options_invalid(datastore_environment: pytest.MonkeyPatch):
+    datastore_environment.setenv("DATASTORE_OPENDAL_OPTIONS", "not a json")
+
+    with pytest.raises(ValueError):
+        main.build_app_config()
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        (None, {}),
+        ("", {}),
+        ("  ", {}),
+        ("{}", {}),
+        ('{"endpoint": "http://localhost:9000"}', {"endpoint": "http://localhost:9000"}),
+        ('{"enable_virtual_host_style": true, "retries": 3}', {"enable_virtual_host_style": "true", "retries": "3"}),
+    ],
+)
+def test_parse_string_map(value, expected):
+    assert main.parse_string_map(value) == expected
+
+
+@pytest.mark.parametrize("value", ["not a json", '["a", "b"]', '"string"', "{"])
+def test_parse_string_map_invalid(value):
+    with pytest.raises(ValueError):
+        main.parse_string_map(value)

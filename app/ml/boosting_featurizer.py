@@ -35,6 +35,7 @@ from app.ml.features import (
     ItemFieldSimilarityFeature,
     LaunchNumberDistanceFeature,
     LogCountFeature,
+    LogCoverageCalculator,
     LogCoverageFeature,
     LogFieldEqualityFeature,
     LogFieldSimilarityFeature,
@@ -145,6 +146,8 @@ class BoostingFeaturizer:
         :param calculator: Text similarity calculator
         :return: Feature ID mapped to the feature
         """
+        # Forward and reverse log coverage are two views of one similarity matrix, so they share its calculation
+        coverage_calculator = LogCoverageCalculator()
         return {
             1: DefectTypeFeature(defect_type_model),
             2: IssueTypeShareFeature(),
@@ -186,8 +189,8 @@ class BoostingFeaturizer:
             38: IdentifierJaccardFeature("message"),
             39: RequestIdentifiersPresentFeature("message"),
             40: RequestFieldPresentFeature("potential_status_codes"),
-            41: LogCoverageFeature("message", reverse=False),
-            42: LogCoverageFeature("message", reverse=True),
+            41: LogCoverageFeature("message", reverse=False, coverage_calculator=coverage_calculator),
+            42: LogCoverageFeature("message", reverse=True, coverage_calculator=coverage_calculator),
         }
 
     def _get_features(self) -> dict[int, Feature]:

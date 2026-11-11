@@ -35,6 +35,7 @@ BASE_DEFECT_TYPE_PATTERN = re.compile(r"^(?:([^_]+)_\S+|(\D+)\d+)$")
 DEFAULT_N_ESTIMATORS = 10
 DEFAULT_MIN_SAMPLES_LEAF = 1
 DEFAULT_MAX_FEATURES = "sqrt"
+NO_MATCH_F1_SCORE = 0.0
 
 
 # noinspection PyMethodMayBeStatic
@@ -139,18 +140,20 @@ class DefectTypeModel(MlModel):
         res = model.predict(transformed_values)
         f1 = f1_score(y_pred=res, y_true=labels)
         if f1 is None:
-            f1 = 0.0
+            f1 = NO_MATCH_F1_SCORE
         LOGGER.debug(f"Train dataset F1 score: {f1:.5f}")
         return f1
 
     def validate_model(self, name: str, test_data_x: list[str], labels: list[int]) -> float:
-        assert name in self.models
+        if name not in self.models:
+            LOGGER.debug(f"Model name not found: {name}")
+            return NO_MATCH_F1_SCORE
         LOGGER.debug(f"Validation data label distribution: {Counter(labels)}")
         LOGGER.debug(f"Validation model name: {name}")
         res, _ = self.predict(test_data_x, name)
         f1 = f1_score(y_pred=res, y_true=labels)
         if f1 is None:
-            f1 = 0.0
+            f1 = NO_MATCH_F1_SCORE
         LOGGER.debug(f"Valid dataset F1 score: {f1:.5f}")
         LOGGER.debug(f"\n{confusion_matrix(y_pred=res, y_true=labels)}")
         LOGGER.debug(f"\n{classification_report(y_pred=res, y_true=labels)}")

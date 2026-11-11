@@ -44,6 +44,19 @@ def mocked_opensearch_client() -> OpenSearch:
     return mock_client
 
 
+def respond_to_every_query(mocked_client: mock.Mock, response: dict[str, Any]) -> None:
+    """Make the mocked multi search return the given response for every query in the request."""
+    mocked_client.msearch.side_effect = lambda body, index: {"responses": [response] * (len(body) // 2)}
+
+
+def get_msearch_queries(mocked_client: mock.Mock) -> list[dict[str, Any]]:
+    """Get query bodies of all multi search requests, without headers, in the order they were sent."""
+    queries: list[dict[str, Any]] = []
+    for msearch_call in mocked_client.msearch.call_args_list:
+        queries.extend(msearch_call[1]["body"][1::2])
+    return queries
+
+
 @pytest.fixture
 def cluster_service(mocked_opensearch_client: OpenSearch) -> ClusterService:
     """Create ClusterService with real OsClient and mocked OpenSearch client."""
@@ -68,10 +81,8 @@ def test_find_clusters_calls_correct_services(
     # Prepare test data
     launch_info = LaunchInfoForClustering(**test_data["launch_info_for_clustering"])
     expected_index_name = f"{APP_CONFIG.esProjectIndexPrefix}{launch_info.project}"
-    # Configure mocked_opensearch_client.search to return similar items
-    # The search is called during _find_similar_items_from_es for each group
-    mocked_opensearch_client.search.return_value = test_data["search_results_for_similar_items"]
-    mocked_opensearch_client.scroll.return_value = {}
+    # Configure the multi search to return similar items for every group query
+    respond_to_every_query(mocked_opensearch_client, test_data["search_results_for_similar_items"])
 
     # Configure mock_bulk to return success
     mock_bulk.return_value = (10, [])  # (success_count, errors)
@@ -79,23 +90,23 @@ def test_find_clusters_calls_correct_services(
     # Execute the method
     result = cluster_service.find_clusters(launch_info)
 
-    # Verify es_client.search was called to find similar items
+    # Verify similar items were searched with one multi search, which has one query per group.
     # In our test data, after grouping by exception type and then clustering by message similarity:
     # - Logs 7001, 7003: NullPointerException with identical message "Cannot invoke method on null object" -> group 1
     # - Log 7002: NullPointerException with different message "Object reference is null" -> group 2
     # - Log 7004: SQLException "Database connection timeout" -> group 3
-    # Total: 3 groups, so search should be called exactly 3 times
-    actual_search_call_count = mocked_opensearch_client.search.call_count
-    assert actual_search_call_count == 3, "search should be called exactly 3 times (once per group)"
+    # Total: 3 groups, so the multi search should have exactly 3 queries
+    mocked_opensearch_client.msearch.assert_called_once()
+    mocked_opensearch_client.search.assert_not_called()
+    mocked_opensearch_client.scroll.assert_not_called()
+    msearch_call = mocked_opensearch_client.msearch.call_args
+    assert msearch_call[1]["index"] == expected_index_name, f"msearch should use index '{expected_index_name}'"
+    search_queries = get_msearch_queries(mocked_opensearch_client)
+    assert len(search_queries) == 3, "msearch should have exactly 3 queries (one per group)"
 
-    # Verify search call structure
-    search_calls = mocked_opensearch_client.search.call_args_list
-    for search_call in search_calls:
-        # Verify search is called with correct index
-        assert search_call[1]["index"] == expected_index_name, f"search should use index '{expected_index_name}'"
-
-        # Verify search query structure
-        search_query = search_call[1]["body"]
+    for search_query in search_queries:
+        # Verify only the best scored Test Items are requested
+        assert search_query["size"] == 10, "search query should request exactly 10 best scored Test Items"
         assert "query" in search_query, "search query should have 'query' key"
         assert "function_score" in search_query["query"], "search query should have function_score for time decay"
 
@@ -218,12 +229,13 @@ def test_find_clusters_with_nonexistent_index(
     launch_info = LaunchInfoForClustering(**test_data["launch_info_for_clustering"])
     # Configure mock to raise exception for non-existent index
     mocked_opensearch_client.indices.get.side_effect = Exception("Index not found")
-    mocked_opensearch_client.search.return_value = test_data["search_results_no_similar_items"]
+    respond_to_every_query(mocked_opensearch_client, test_data["search_results_no_similar_items"])
 
     # Execute the method
     result = cluster_service.find_clusters(launch_info)
 
-    # Verify bulk was NOT called since index doesn't exist
+    # Verify nothing was searched and bulk was NOT called since index doesn't exist
+    mocked_opensearch_client.msearch.assert_not_called()
     mock_bulk.assert_not_called()
 
     # Verify result contains computed clusters even without index
@@ -244,8 +256,8 @@ def test_find_clusters_with_no_similar_items(
     """Test find_clusters when no similar items are found in ES."""
     # Prepare test data
     launch_info = LaunchInfoForClustering(**test_data["launch_info_for_clustering"])
-    # Configure mocked_opensearch_client.search to return no similar items
-    mocked_opensearch_client.search.return_value = test_data["search_results_no_similar_items"]
+    # Configure the multi search to return no similar items
+    respond_to_every_query(mocked_opensearch_client, test_data["search_results_no_similar_items"])
 
     # Configure mock_bulk to return success
     mock_bulk.return_value = (4, [])  # (success_count, errors)
@@ -253,11 +265,11 @@ def test_find_clusters_with_no_similar_items(
     # Execute the method
     result = cluster_service.find_clusters(launch_info)
 
-    # Verify es_client.search was called
+    # Verify similar items were searched
     # With the same test data as test_find_clusters_calls_correct_services:
-    # 3 groups (2 different NullPointerException message clusters + 1 SQLException), so 3 search calls
-    actual_search_call_count = mocked_opensearch_client.search.call_count
-    assert actual_search_call_count == 3, "search should be called exactly 3 times (once per group)"
+    # 3 groups (2 different NullPointerException message clusters + 1 SQLException), so 3 queries in one msearch
+    mocked_opensearch_client.msearch.assert_called_once()
+    assert len(get_msearch_queries(mocked_opensearch_client)) == 3, "msearch should have exactly 3 queries"
 
     # Verify opensearchpy.helpers.bulk was called to update cluster information
     # Even without similar items, new clusters should be created based on hash calculation
@@ -300,8 +312,8 @@ def test_find_clusters_with_for_update_mode(
     """Test find_clusters with forUpdate=True mode (allows same launch results)."""
     # Prepare test data with forUpdate=True
     launch_info = LaunchInfoForClustering(**test_data["launch_info_for_update"])
-    # Configure mocked_opensearch_client.search to return similar items from same launch
-    mocked_opensearch_client.search.return_value = test_data["search_results_for_update"]
+    # Configure the multi search to return similar items from same launch
+    respond_to_every_query(mocked_opensearch_client, test_data["search_results_for_update"])
 
     # Configure mock_bulk to return success
     mock_bulk.return_value = (2, [])  # (success_count, errors)
@@ -309,14 +321,14 @@ def test_find_clusters_with_for_update_mode(
     # Execute the method
     result = cluster_service.find_clusters(launch_info)
 
-    # Verify es_client.search was called
-    # With 1 log (test item 6005 with IOException), there is 1 group, so 1 search call
-    actual_search_call_count = mocked_opensearch_client.search.call_count
-    assert actual_search_call_count == 1, "search should be called exactly 1 time (once per group)"
+    # Verify similar items were searched
+    # With 1 log (test item 6005 with IOException), there is 1 group, so 1 query
+    mocked_opensearch_client.msearch.assert_called_once()
+    search_queries = get_msearch_queries(mocked_opensearch_client)
+    assert len(search_queries) == 1, "msearch should have exactly 1 query (one per group)"
 
     # Verify search query structure for forUpdate mode
-    search_call = mocked_opensearch_client.search.call_args_list[0]
-    search_query = search_call[1]["body"]
+    search_query = search_queries[0]
 
     # Extract the bool query from function_score
     bool_query = search_query["query"]["function_score"]["query"]["bool"]
@@ -352,8 +364,8 @@ def test_find_clusters_with_clean_numbers_mode(
     # Prepare test data with cleanNumbers=True
     launch_info = LaunchInfoForClustering(**test_data["launch_info_for_clustering"])
     launch_info.cleanNumbers = True
-    # Configure mocked_opensearch_client.search to return similar items
-    mocked_opensearch_client.search.return_value = test_data["search_results_for_similar_items"]
+    # Configure the multi search to return similar items
+    respond_to_every_query(mocked_opensearch_client, test_data["search_results_for_similar_items"])
 
     # Configure mock_bulk to return success
     mock_bulk.return_value = (2, [])  # (success_count, errors)
@@ -361,14 +373,14 @@ def test_find_clusters_with_clean_numbers_mode(
     # Execute the method
     result = cluster_service.find_clusters(launch_info)
 
-    # Verify es_client.search was called
+    # Verify similar items were searched
     # With cleanNumbers=True, logs become more similar, reducing the number of groups
-    actual_search_call_count = mocked_opensearch_client.search.call_count
-    assert actual_search_call_count == 2, "search should be called exactly 2 times (once per group)"
+    mocked_opensearch_client.msearch.assert_called_once()
+    search_queries = get_msearch_queries(mocked_opensearch_client)
+    assert len(search_queries) == 2, "msearch should have exactly 2 queries (one per group)"
 
     # Verify search query structure for cleanNumbers mode
-    search_call = mocked_opensearch_client.search.call_args_list[0]
-    search_query = search_call[1]["body"]
+    search_query = search_queries[0]
 
     # Extract the bool query from function_score
     bool_query = search_query["query"]["function_score"]["query"]["bool"]
@@ -416,8 +428,8 @@ def test_find_clusters_verifies_bulk_chunk_size(
     # Prepare test data
     launch_info = LaunchInfoForClustering(**test_data["launch_info_for_clustering"])
 
-    # Configure mocked_opensearch_client.search to return similar items
-    mocked_opensearch_client.search.return_value = test_data["search_results_for_similar_items"]
+    # Configure the multi search to return similar items
+    respond_to_every_query(mocked_opensearch_client, test_data["search_results_for_similar_items"])
 
     # Configure mock_bulk to return success
     mock_bulk.return_value = (1, [])  # (success_count, errors)
@@ -470,8 +482,8 @@ def build_launch_info(*test_items: TestItem) -> LaunchInfoForClustering:
     )
 
 
-def get_nested_query(search_call: Any) -> dict[str, Any]:
-    must_clause = search_call[1]["body"]["query"]["function_score"]["query"]["bool"]["must"]
+def get_nested_query(search_query: dict[str, Any]) -> dict[str, Any]:
+    must_clause = search_query["query"]["function_score"]["query"]["bool"]["must"]
     return next(clause["nested"] for clause in must_clause if "nested" in clause)
 
 
@@ -500,7 +512,7 @@ def test_find_clusters_merges_small_logs_of_one_level(
             ],
         )
     )
-    mocked_opensearch_client.search.return_value = NO_HITS
+    respond_to_every_query(mocked_opensearch_client, NO_HITS)
     mock_bulk.return_value = (1, [])
 
     result = cluster_service.find_clusters(launch_info)
@@ -511,8 +523,10 @@ def test_find_clusters_merges_small_logs_of_one_level(
     assert cluster.itemIds == [6001]
     assert cluster.clusterMessage == "First small error log\nSecond small error log\nThird small error log"
 
-    mocked_opensearch_client.search.assert_called_once()
-    nested_query = get_nested_query(mocked_opensearch_client.search.call_args)
+    mocked_opensearch_client.msearch.assert_called_once()
+    search_queries = get_msearch_queries(mocked_opensearch_client)
+    assert len(search_queries) == 1, "msearch should have exactly 1 query"
+    nested_query = get_nested_query(search_queries[0])
     assert nested_query["path"] == "merged_small_logs", "merged log should be searched among merged logs"
     assert all(field.startswith("merged_small_logs.") for field in nested_query["inner_hits"]["_source"])
 
@@ -540,14 +554,15 @@ def test_find_clusters_creates_cluster_per_level_for_small_logs(
     launch_info = build_launch_info(
         build_test_item(6001, [(7001, ERROR_LEVEL, "Small error log"), (7002, FATAL_LEVEL, "Small fatal log")])
     )
-    mocked_opensearch_client.search.return_value = NO_HITS
+    respond_to_every_query(mocked_opensearch_client, NO_HITS)
     mock_bulk.return_value = (1, [])
 
     result = cluster_service.find_clusters(launch_info)
 
     assert len(result.clusters) == 2, "small logs of two levels should give exactly 2 clusters"
     assert sorted(cluster.logIds for cluster in result.clusters) == [[7001], [7002]]
-    assert mocked_opensearch_client.search.call_count == 2
+    mocked_opensearch_client.msearch.assert_called_once()
+    assert len(get_msearch_queries(mocked_opensearch_client)) == 2, "msearch should have exactly 2 queries"
     _, merged_bodies = get_bulk_bodies(mock_bulk)
     assert len(merged_bodies) == 1
     merged_logs = merged_bodies[0]["script"]["params"]["merged_small_logs"]
@@ -563,7 +578,7 @@ def test_find_clusters_drops_small_logs_of_level_with_big_log(
     launch_info = build_launch_info(
         build_test_item(6001, [(7001, ERROR_LEVEL, "First small error log"), (7002, ERROR_LEVEL, BIG_LOG_TEXT)])
     )
-    mocked_opensearch_client.search.return_value = NO_HITS
+    respond_to_every_query(mocked_opensearch_client, NO_HITS)
     mock_bulk.return_value = (1, [])
 
     result = cluster_service.find_clusters(launch_info)
@@ -571,7 +586,9 @@ def test_find_clusters_drops_small_logs_of_level_with_big_log(
     assert len(result.clusters) == 1, "only the big log should give a cluster"
     assert result.clusters[0].logIds == [7002]
     assert result.clusters[0].clusterMessage.startswith("big error log")
-    nested_query = get_nested_query(mocked_opensearch_client.search.call_args)
+    search_queries = get_msearch_queries(mocked_opensearch_client)
+    assert len(search_queries) == 1, "msearch should have exactly 1 query"
+    nested_query = get_nested_query(search_queries[0])
     assert nested_query["path"] == "logs"
     mock_bulk.assert_called_once()
     log_bodies, merged_bodies = get_bulk_bodies(mock_bulk)
@@ -590,7 +607,7 @@ def test_find_clusters_treats_similar_big_logs_of_one_item_as_one_log(
             6001, [(7001, ERROR_LEVEL, f"First {BIG_LOG_TEXT}"), (7002, ERROR_LEVEL, f"Second {BIG_LOG_TEXT}")]
         )
     )
-    mocked_opensearch_client.search.return_value = NO_HITS
+    respond_to_every_query(mocked_opensearch_client, NO_HITS)
     mock_bulk.return_value = (1, [])
 
     result = cluster_service.find_clusters(launch_info)
@@ -613,7 +630,7 @@ def test_find_clusters_keeps_different_big_logs_of_one_item_apart(
     launch_info = build_launch_info(
         build_test_item(6001, [(7001, ERROR_LEVEL, BIG_LOG_TEXT), (7002, ERROR_LEVEL, other_big_log_text)])
     )
-    mocked_opensearch_client.search.return_value = NO_HITS
+    respond_to_every_query(mocked_opensearch_client, NO_HITS)
     mock_bulk.return_value = (1, [])
 
     result = cluster_service.find_clusters(launch_info)
@@ -634,7 +651,7 @@ def test_find_clusters_groups_same_logs_of_different_items(
         build_test_item(6003, [(7003, ERROR_LEVEL, "Small error log 1"), (7004, ERROR_LEVEL, "Small error log 2")]),
         build_test_item(6004, [(7005, ERROR_LEVEL, "Small error log 1"), (7006, ERROR_LEVEL, "Small error log 2")]),
     )
-    mocked_opensearch_client.search.return_value = NO_HITS
+    respond_to_every_query(mocked_opensearch_client, NO_HITS)
     mock_bulk.return_value = (1, [])
 
     result = cluster_service.find_clusters(launch_info)
@@ -659,8 +676,7 @@ def test_find_clusters_reuses_cluster_of_similar_merged_logs(
         )
     )
     previous_cluster_message = "First small error log\nSecond small error log"
-    mocked_opensearch_client.search.return_value = {
-        "_scroll_id": "test_scroll_id",
+    found_merged_logs = {
         "hits": {
             "total": {"value": 1, "relation": "eq"},
             "max_score": 9.5,
@@ -694,7 +710,7 @@ def test_find_clusters_reuses_cluster_of_similar_merged_logs(
             ],
         },
     }
-    mocked_opensearch_client.scroll.return_value = NO_HITS
+    respond_to_every_query(mocked_opensearch_client, found_merged_logs)
     mock_bulk.return_value = (1, [])
 
     result = cluster_service.find_clusters(launch_info)
@@ -748,7 +764,7 @@ def test_find_clusters_respects_clean_numbers_in_cluster_message(
     """EPMRPP-122273: numbers are left in the cluster message or removed according to the `cleanNumbers` option."""
     launch_info = build_launch_info(build_test_item(6001, [(7001, ERROR_LEVEL, BIG_LOG_WITH_NUMBERS)]))
     launch_info.cleanNumbers = clean_numbers
-    mocked_opensearch_client.search.return_value = NO_HITS
+    respond_to_every_query(mocked_opensearch_client, NO_HITS)
     mock_bulk.return_value = (1, [])
 
     result = cluster_service.find_clusters(launch_info)
@@ -774,7 +790,7 @@ def test_find_clusters_keeps_numbers_in_merged_logs_cluster_message(
             6001, [(7001, ERROR_LEVEL, "Order 42 was not found"), (7002, ERROR_LEVEL, "Expected 3 items but was 5")]
         )
     )
-    mocked_opensearch_client.search.return_value = NO_HITS
+    respond_to_every_query(mocked_opensearch_client, NO_HITS)
     mock_bulk.return_value = (1, [])
 
     result = cluster_service.find_clusters(launch_info)
@@ -787,3 +803,89 @@ def test_find_clusters_keeps_numbers_in_merged_logs_cluster_message(
     assert [body["script"]["params"]["cluster_message"] for body in log_bodies] == [expected_message] * 2
     assert len(merged_bodies) == 1
     assert merged_bodies[0]["script"]["params"]["merged_small_logs"][0]["cluster_message"] == expected_message
+
+
+OTHER_BIG_LOG_TEXT = (
+    "Connection to the database server was refused because the maximum number of client connections was reached "
+    "and the connection pool could not allocate a new connection for the request within the configured timeout"
+)
+
+
+def build_found_log_response(cluster_id: str, message: str) -> dict[str, Any]:
+    """Build a search response with one Test Item of a previous launch, which log belongs to the given cluster."""
+    return {
+        "hits": {
+            "total": {"value": 1, "relation": "eq"},
+            "max_score": 9.5,
+            "hits": [
+                {
+                    "_id": "6100",
+                    "_index": f"{APP_CONFIG.esProjectIndexPrefix}{PROJECT_ID}",
+                    "_score": 9.5,
+                    "_source": {"launch_id": "5000", "test_item_id": "6100", "launch_name": "Launch"},
+                    "inner_hits": {
+                        "logs": {
+                            "hits": {
+                                "hits": [
+                                    {
+                                        "_source": {
+                                            "log_id": "8001",
+                                            "log_level": ERROR_LEVEL,
+                                            "whole_message": message,
+                                            "found_exceptions": "",
+                                            "potential_status_codes": "",
+                                            "cluster_id": cluster_id,
+                                            "cluster_message": message,
+                                            "cluster_with_numbers": True,
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                }
+            ],
+        }
+    }
+
+
+# noinspection PyUnresolvedReferences
+@mock.patch("opensearchpy.helpers.bulk")
+def test_find_clusters_matches_responses_to_groups_across_batches(
+    mock_bulk, mocked_opensearch_client: OpenSearch
+) -> None:
+    """Group queries are split into batches, and every group gets the response to its own query."""
+    search_cfg = DEFAULT_SEARCH_CONFIG.model_copy(update={"AnalysisQueryBatchSize": 1})
+    service = ClusterService(
+        APP_CONFIG, search_cfg, os_client=OsClient(APP_CONFIG, os_client=mocked_opensearch_client)
+    )
+    launch_info = build_launch_info(
+        build_test_item(6001, [(7001, ERROR_LEVEL, BIG_LOG_TEXT)]),
+        build_test_item(6002, [(7002, ERROR_LEVEL, OTHER_BIG_LOG_TEXT)]),
+    )
+    previous_cluster_id = "98765432101"
+
+    def respond(body: list[dict[str, Any]], index: str) -> dict[str, Any]:
+        responses = []
+        for query in body[1::2]:
+            like_text = get_nested_query(query)["query"]["bool"]["must"][1]["more_like_this"]["like"]
+            if like_text.startswith("Connection"):
+                responses.append(build_found_log_response(previous_cluster_id, like_text))
+            else:
+                responses.append(NO_HITS)
+        return {"responses": responses}
+
+    mocked_opensearch_client.msearch.side_effect = respond
+    mock_bulk.return_value = (1, [])
+
+    result = service.find_clusters(launch_info)
+
+    assert mocked_opensearch_client.msearch.call_count == 2, "each of 2 group queries should be in its own batch"
+    assert [len(msearch_call[1]["body"]) for msearch_call in mocked_opensearch_client.msearch.call_args_list] == [
+        2,
+        2,
+    ]
+    assert len(result.clusters) == 2
+    clusters_by_log = {tuple(cluster.logIds): cluster for cluster in result.clusters}
+    assert clusters_by_log[(7002,)].clusterId == int(previous_cluster_id), "should join the found cluster"
+    assert clusters_by_log[(7001,)].clusterId != int(previous_cluster_id), "should get a new cluster"

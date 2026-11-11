@@ -11,7 +11,10 @@
 - New Gradient Boosting feature set, independent of search engine specifics, by @HardNorth
 - `nltk` updated to `3.10.3` to address vulnerabilities, by @HardNorth
 - The analyzer doesn't declare the `analyzer-reply` exchange before publishing analysis results: ReportPortal owns it, and the declaration with other settings was rejected by the broker, by @HardNorth
+- Model training searches for similar Test Items in batches of `ANALYZER_QUERY_BATCH_SIZE` queries instead of one request per Test Item, by @HardNorth
+- Log deletion by IDs removes logs on the OpenSearch side with an update by query instead of fetching Test Items with a scroll and rewriting them, and returns the number of changed Test Items, by @HardNorth
 ### Fixed
+- The indexing log message reported the number of indexed Test Items as seconds, by @HardNorth
 - With `DISABLE_TRAIN=true` the `train` queue had no consumer and could grow forever, now its messages are discarded, by @HardNorth
 - [Issue #279](https://github.com/reportportal/service-auto-analyzer/issues/279): Health check and read-only index recovery now use the OpenSearch client and honor `ES_VERIFY_CERTS`, `ES_CA_CERT`, `ES_CLIENT_CERT` and `ES_CLIENT_KEY`, by @HardNorth
 

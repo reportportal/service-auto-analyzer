@@ -101,20 +101,18 @@ class IndexService:
                 1 for item in prepared_items if item.issue_type and not item.issue_type.startswith("ti")
             )
 
-        total_took = 0
-        any_errors = False
-
+        indexed_items = 0
         for project_id, test_items in project_test_items.items():
             response = self.os_client.bulk_index(project_id, test_items)
-            total_took += response.took
-            any_errors = any_errors or response.errors
+            # `took` of a bulk response is the number of successfully indexed documents, not time
+            indexed_items += response.took
 
         update_train_list(self.app_config, list(defects_per_project.items()))
 
         time_passed = round(time() - t_start, 2)
         LOGGER.info(
             f"Indexing {len(launch_ids)} launches of projects '{projects_str}' finished: {launch_ids_str}. "
-            f"It took {time_passed} sec., indexing took {total_took} sec."
+            f"It took {time_passed} sec., {indexed_items} test items indexed."
         )
 
     @staticmethod
@@ -144,56 +142,46 @@ class IndexService:
         return normalized
 
     def defect_update(self, defect_update_info: DefectUpdate) -> list[int]:
-        """Update defect types and issue history for provided test items."""
+        """Update defect types and issue history for provided test items.
+
+        Updates are sent for all requested Test Items without checking first which of them are indexed: a script update
+        of a missing document fails on its own, and such Test Items are reported as not updated, so ReportPortal
+        re-indexes them.
+
+        :param defect_update_info: Defect update request
+        :return: IDs of Test Items which were not updated
+        """
         LOGGER.info("Started updating defect types")
         t_start = time()
 
         project_id = defect_update_info.project
         is_auto_analyzed = defect_update_info.isAutoAnalyzed
         normalized_updates = self._normalize_items_to_update(defect_update_info.itemsToUpdate)
-        test_item_ids = list(normalized_updates.keys())
 
-        batch_size = self.app_config.esChunkNumber
-        found_test_items: set[str] = set()
-        history_updates: list[TestItemHistoryData] = []
-        defect_num = 0
-
-        for i in range(int(len(test_item_ids) / batch_size) + 1):
-            batch_ids = test_item_ids[i * batch_size : (i + 1) * batch_size]
-            if not batch_ids:
-                continue
-            existing_items = self.os_client.get_test_items_by_ids(project_id, batch_ids)
-            for item in existing_items:
-                defect_num += 1
-                found_test_items.add(item.test_item_id)
-                update_payload = normalized_updates.get(item.test_item_id)
-                if not update_payload:
-                    continue
-
-                issue_type = request_factory.transform_issue_type_into_lowercase(update_payload["issue_type"])
-                issue_comment = update_payload["issue_comment"]
-                timestamp = update_payload["timestamp"]
-
-                history_updates.append(
-                    TestItemHistoryData(
-                        test_item_id=item.test_item_id,
-                        is_auto_analyzed=is_auto_analyzed,
-                        issue_type=issue_type,
-                        timestamp=timestamp,
-                        issue_comment=issue_comment,
-                    )
-                )
+        history_updates: list[TestItemHistoryData] = [
+            TestItemHistoryData(
+                test_item_id=test_item_id,
+                is_auto_analyzed=is_auto_analyzed,
+                issue_type=request_factory.transform_issue_type_into_lowercase(update_payload["issue_type"]),
+                timestamp=update_payload["timestamp"],
+                issue_comment=update_payload["issue_comment"],
+            )
+            for test_item_id, update_payload in normalized_updates.items()
+        ]
 
         failed_test_items: set[str] = set()
+        defect_num = 0
         if history_updates:
             response = self.os_client.bulk_update_issue_history(project_id, history_updates)
-            # Documents can disappear between the search and the update, e.g. if a cleanup request came in between,
-            # ReportPortal re-indexes such Test Items when they are reported as not updated
-            failed_test_items.update(response.failed_ids)
+            defect_num = response.took
+            if response.errors and not response.failed_ids:
+                # The whole request failed, e.g. the index does not exist, so nothing was updated
+                failed_test_items.update(normalized_updates.keys())
+            else:
+                # Missing Test Items, e.g. not indexed or removed by a cleanup request, fail individually
+                failed_test_items.update(response.failed_ids)
         update_train(self.app_config, int(project_id), defect_num)
-        items_not_updated = [
-            int(test_item_id) for test_item_id in (set(test_item_ids) - found_test_items) | failed_test_items
-        ]
+        items_not_updated = sorted(int(test_item_id) for test_item_id in failed_test_items)
         LOGGER.debug("Not updated test items: %s", items_not_updated)
         LOGGER.info("Finished updating defect types. It took %.2f sec", time() - t_start)
         return items_not_updated

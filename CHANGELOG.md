@@ -3,6 +3,8 @@
 ## [Unreleased]
 ### Added
 - `ANALYZER_QUERY_TERMS_BUDGET` config parameter to limit the number of message terms in one Test Item query, by @HardNorth
+- OpenDAL datastore client with `s3-compatible`, `aws-s3`, `azure` and `gcs` datastore types, compatible with ReportPortal API service configuration, by @HardNorth
+- `DATASTORE_AZURE_*`, `DATASTORE_GCS_*` and `DATASTORE_OPENDAL_OPTIONS` config parameters for OpenDAL datastore types, by @HardNorth
 ### Changed
 - Log Item-centric storage approach changed to Test Item-centric one, by @HardNorth
 - Status code detection improved, by @HardNorth

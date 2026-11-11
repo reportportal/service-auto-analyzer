@@ -97,6 +97,9 @@ if minio_use_tls:
 if not datastore_endpoint and minio_short_host:
     use_tls = to_bool(minio_use_tls) if minio_use_tls else False
     datastore_endpoint = f"http{'s' if use_tls else ''}://{minio_short_host}"
+if not datastore_endpoint and datastore_type == "s3-compatible":
+    # Mute Sonar about hardcoded HTTP URL, since this is a hostname inside a docker-compose file
+    datastore_endpoint = "http://minio:9000"  # NOSONAR
 
 # Handle all datastore region settings, old and new
 datastore_region = os.getenv("DATASTORE_REGION")
@@ -119,6 +122,8 @@ if old_datastore_region:
     )
     if not datastore_region:
         datastore_region = old_datastore_region
+if not datastore_region and datastore_type in {"s3-compatible", "aws-s3"}:
+    datastore_region = "us-east-1"
 
 # Handle all datastore bucket prefix settings, old and new
 datastore_default_bucket_name = os.getenv("DATASTORE_DEFAULTBUCKETNAME")
@@ -151,6 +156,13 @@ if datastore_default_bucket_name:
 else:
     if not datastore_bucket_prefix:
         datastore_bucket_prefix = "prj-"
+    # OpenDAL datastore types are bound to one bucket: the first part of the prefix path if it has one,
+    # otherwise the same default bucket as in ReportPortal API service
+    datastore_prefix_path = datastore_bucket_prefix.replace("\\", "/").strip("/")
+    if "/" in datastore_prefix_path:
+        datastore_default_bucket_name = datastore_prefix_path.split("/")[0]
+    else:
+        datastore_default_bucket_name = "rp-bucket"
 
 datastore_bucket_postfix = os.getenv("DATASTORE_BUCKETPOSTFIX", "")
 
@@ -218,8 +230,17 @@ APP_CONFIG = ApplicationConfig(
     datastoreRegion=datastore_region,
     datastoreBucketPrefix=datastore_bucket_prefix,
     datastoreBucketPostfix=datastore_bucket_postfix,
+    datastoreDefaultBucketName=datastore_default_bucket_name,
     datastoreAccessKey=datastore_access_key,
     datastoreSecretKey=datastore_secret_key,
+    datastoreAzureAccountName=os.getenv("DATASTORE_AZURE_ACCOUNTNAME"),
+    datastoreAzureAccountKey=os.getenv("DATASTORE_AZURE_ACCOUNTKEY"),
+    datastoreAzureEndpoint=os.getenv("DATASTORE_AZURE_ENDPOINT"),
+    datastoreAzureContainer=os.getenv("DATASTORE_AZURE_CONTAINER") or datastore_default_bucket_name,
+    datastoreGcsBucket=os.getenv("DATASTORE_GCS_BUCKET") or datastore_default_bucket_name,
+    datastoreGcsCredentialsPath=os.getenv("DATASTORE_GCS_CREDENTIALSPATH"),
+    datastoreGcsEndpoint=os.getenv("DATASTORE_GCS_ENDPOINT"),
+    datastoreOpendalOptions=utils.parse_string_map(os.getenv("DATASTORE_OPENDAL_OPTIONS")),
     filesystemDefaultPath=os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
     # HTTP endpoint settings
     analyzerHttpPort=int(os.getenv("ANALYZER_HTTP_PORT", "5001")),

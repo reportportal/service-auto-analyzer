@@ -195,7 +195,7 @@ def test_train_uses_os_client_and_issue_history(model_type: ModelType) -> None:
         _make_similar_hit(candidate_si, 1.0),
     ]
     os_client.search = mock.Mock(side_effect=lambda _p, _r: iter(project_hits))
-    os_client.msearch_grouped = mock.Mock(side_effect=lambda _p, _q: iter([similar_hits]))
+    os_client.msearch_grouped = mock.Mock(side_effect=lambda _p, queries: iter([similar_hits] * (len(queries) // 2)))
 
     training = AnalysisModelTraining(
         APP_CONFIG,
@@ -221,11 +221,12 @@ def test_train_uses_os_client_and_issue_history(model_type: ModelType) -> None:
     issue_history_query = os_client.search.call_args_list[0][0][1]
     assert issue_history_query["query"]["nested"]["path"] == "issue_history"
 
-    # One search per Test Item with issue history
-    assert os_client.msearch_grouped.call_count == 4
+    # One query per Test Item with issue history, all of them in one multi search
+    os_client.msearch_grouped.assert_called_once()
     project_id, queries = os_client.msearch_grouped.call_args_list[0][0]
     assert project_id == 123
-    assert len(queries) == 2
+    assert len(queries) == 8, "multi search should have a header and a body for each of 4 Test Items"
+    assert queries[0::2] == [{}] * 4
     item_query = queries[1]["query"]["function_score"]["query"]["bool"]
     log_clauses = item_query["must"][0]["bool"]["should"]
     assert [clause["nested"]["inner_hits"]["name"] for clause in log_clauses] == ["log_0", "log_1"]
@@ -257,3 +258,81 @@ def test_unsupported_configured_features_are_excluded() -> None:
     assert training.baseline_model is None
     assert training.features == [40, 41, 42]
     assert training.monotonous_features == [40]
+
+
+def _make_item(test_item_id: str, issue_type: str, message: str) -> TestItemIndexData:
+    return TestItemIndexData(
+        test_item_id=test_item_id,
+        test_item_name=f"item {test_item_id}",
+        unique_id=f"uid-{test_item_id}",
+        test_case_hash=int(test_item_id),
+        launch_id="10",
+        launch_name="launch",
+        issue_type=issue_type,
+        is_auto_analyzed=False,
+        start_time="2025-01-01 00:00:00",
+        logs=[_make_log_data(f"{test_item_id}0", 0, message)],
+    )
+
+
+def _get_query_excluded_issue_type(query: dict) -> str:
+    """Get the issue type excluded by a similar items query, or an empty string if no issue type is excluded."""
+    must_not = query["query"]["function_score"]["query"]["bool"]["must_not"]
+    return next((clause["term"]["issue_type"] for clause in must_not if "issue_type" in clause.get("term", {})), "")
+
+
+def test_similar_items_are_searched_in_batches_with_second_round_for_negatives() -> None:
+    """First searches of all request Test Items go in batches, then the searches for negative cases, in batches too."""
+    search_cfg = _make_search_config().model_copy(update={"AnalysisQueryBatchSize": 2})
+    object_saver = mock.Mock()
+    object_saver.get_folder_objects.return_value = []
+    model_chooser = ModelChooser(APP_CONFIG, search_cfg, object_saver=object_saver)
+    os_client = OsClient(APP_CONFIG, os_client=mock.Mock())
+    training = AnalysisModelTraining(
+        APP_CONFIG, search_cfg, ModelType.auto_analysis, model_chooser, os_client=os_client
+    )
+
+    # Item 1 finds only Test Items of its own issue type, item 2 finds mixed ones, item 3 finds nothing
+    requests = [
+        (_make_item("1", "pb001", "auth failed while reading account"), "pb001"),
+        (_make_item("2", "ab001", "database timeout on select"), "ab001"),
+        (_make_item("3", "si001", "network is unreachable"), "si001"),
+    ]
+    same_type_hit = _make_similar_hit(_make_item("11", "pb001", "auth failed while reading account"), 3.0)
+    mixed_hits = [
+        _make_similar_hit(_make_item("21", "ab001", "database timeout on select"), 3.0),
+        _make_similar_hit(_make_item("22", "pb001", "database timeout on select"), 2.0),
+    ]
+    first_round = {"1": [same_type_hit], "2": mixed_hits, "3": []}
+    negative_hits = {
+        "1": [same_type_hit, _make_similar_hit(_make_item("12", "ab001", "auth failed while reading account"), 1.0)],
+        "3": [_make_similar_hit(_make_item("31", "pb001", "network is unreachable"), 1.0)],
+    }
+
+    def respond(_project_id, body):
+        groups = []
+        for query in body[1::2]:
+            must_not = query["query"]["function_score"]["query"]["bool"]["must_not"]
+            request_id = next(
+                clause["term"]["test_item_id"] for clause in must_not if "test_item_id" in clause.get("term", {})
+            )
+            groups.append(
+                negative_hits[request_id] if _get_query_excluded_issue_type(query) else first_round[request_id]
+            )
+        return iter(groups)
+
+    os_client.msearch_grouped = mock.Mock(side_effect=respond)
+
+    results = training._collect_similar_hits(123, requests)
+
+    # 3 first searches in batches of 2, then 2 searches for negatives in one batch
+    calls = os_client.msearch_grouped.call_args_list
+    assert len(calls) == 3
+    assert [len(msearch_call[0][1]) // 2 for msearch_call in calls] == [2, 1, 2]
+    assert all(msearch_call[0][0] == 123 for msearch_call in calls)
+    first_round_queries = calls[0][0][1][1::2] + calls[1][0][1][1::2]
+    assert [_get_query_excluded_issue_type(query) for query in first_round_queries] == ["", "", ""]
+    second_round_queries = calls[2][0][1][1::2]
+    assert [_get_query_excluded_issue_type(query) for query in second_round_queries] == ["pb001", "si001"]
+
+    assert [[hit.source.test_item_id for hit in hits] for hits in results] == [["11", "12"], ["21", "22"], ["31"]]

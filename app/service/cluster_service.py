@@ -537,18 +537,20 @@ class ClusterService:
         query["query"]["bool"]["should"].append({"term": {"launch_name": launch_info.launch.launchName}})
         return self._get_query_with_start_time_decay(query)
 
-    def _find_similar_logs(
-        self, log: Log, launch_info: LaunchInfoForClustering, min_should_match: float
+    def _collect_similar_logs(
+        self, log: Log, launch_info: LaunchInfoForClustering, hits: list[Hit[TestItemIndexData]]
     ) -> dict[int, Log]:
+        """Collect found logs, which can join the cluster of the given log.
+
+        :param log: Log of the launch, which is the first one in its cluster
+        :param launch_info: Clustering request
+        :param hits: Test Items found for the log, best scored first
+        :return: The given log with index 0 and suitable found logs
+        """
         log_dict_part: dict[int, Log] = {0: log}
-        query = self._build_search_similar_items_query(
-            log,
-            launch_info,
-            min_should_match=text_processing.prepare_es_min_should_match(min_should_match),
-        )
         path = MERGED_LOGS_PATH if log.merged else LOGS_PATH
         ind = 0
-        for hit in self.os_client.search(launch_info.project, query):
+        for hit in hits:
             inner_hits = hit.inner_hits
             if not inner_hits:
                 continue
@@ -593,13 +595,37 @@ class ClusterService:
         launch_info: LaunchInfoForClustering,
         min_match_threshold: float,
     ) -> dict[int, ClusterInfo]:
-        additional_clusters: dict[int, ClusterInfo] = {}
-        for global_group_idx, global_group in groups.items():
-            first_item_ind = global_group[0]
-            log = logs[first_item_ind]
-            min_should_match = utils.calculate_threshold_for_text(log.message, min_match_threshold)
+        """Find clusters of previous launches, which groups of the launch logs can join.
 
-            similar_logs = self._find_similar_logs(log, launch_info, min_should_match)
+        Group queries do not depend on each other, so they are sent in batches of multi searches. Each query returns
+        only its best scored Test Items, not all matching ones, so the cost does not grow with the index size.
+
+        :param groups: Groups of the launch logs: group index mapped to indexes of its logs in `logs`
+        :param logs: Logs of the launch
+        :param launch_info: Clustering request
+        :param min_match_threshold: Minimum similarity of logs in one cluster in the range [0.0, 1.0]
+        :return: Group index mapped to the found cluster, only for groups which found one
+        """
+        planned: list[tuple[int, Log, float]] = []
+        queries: list[dict[str, Any]] = []
+        for global_group_idx, global_group in groups.items():
+            log = logs[global_group[0]]
+            min_should_match = utils.calculate_threshold_for_text(log.message, min_match_threshold)
+            planned.append((global_group_idx, log, min_should_match))
+            queries.append(
+                self._build_search_similar_items_query(
+                    log,
+                    launch_info,
+                    min_should_match=text_processing.prepare_es_min_should_match(min_should_match),
+                )
+            )
+
+        additional_clusters: dict[int, ClusterInfo] = {}
+        found_hits = self.os_client.msearch_batched(
+            launch_info.project, queries, self.search_cfg.AnalysisQueryBatchSize
+        )
+        for (global_group_idx, log, min_should_match), hits in zip(planned, found_hits):
+            similar_logs = self._collect_similar_logs(log, launch_info, hits)
 
             new_cluster = create_new_cluster(similar_logs, launch_info, min_should_match)
             if new_cluster:

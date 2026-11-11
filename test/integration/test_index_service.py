@@ -74,13 +74,8 @@ def test_index_logs_groups_by_project_and_passes_config() -> None:
 
 def test_defect_update_updates_issue_history_and_docs() -> None:
     os_client = mock.Mock()
-    existing_items = [
-        _make_index_item("1001", "ti001"),
-        _make_index_item("1002", "ti002"),
-    ]
-    os_client.get_test_items_by_ids.return_value = existing_items
-    os_client.bulk_index_raw.return_value = BulkResponse(took=2, errors=False)
-    os_client.bulk_update_issue_history.return_value = BulkResponse(took=2, errors=False)
+    # Test Item 9999 is not indexed, so its script update fails with a missing document error
+    os_client.bulk_update_issue_history.return_value = BulkResponse(took=2, errors=True, failed_ids=["9999"])
 
     service = IndexService(APP_CONFIG, os_client=os_client)
 
@@ -100,17 +95,15 @@ def test_defect_update_updates_issue_history_and_docs() -> None:
 
     not_updated = service.defect_update(DefectUpdate(**defect_update_info))
 
-    os_client.get_test_items_by_ids.assert_called_once_with(123, ["1001", "1002", "9999"])
-
-    project_id, doc_updates = os_client.bulk_update_issue_history.call_args[0]
+    # Updates are sent for all requested Test Items at once, without searching for them first
+    os_client.search.assert_not_called()
+    os_client.msearch_grouped.assert_not_called()
+    os_client.bulk_update_issue_history.assert_called_once()
+    project_id, history_updates = os_client.bulk_update_issue_history.call_args[0]
     assert project_id == 123
-    assert len(doc_updates) == 2
-    doc_ids = {doc.test_item_id for doc in doc_updates}
-    assert doc_ids == {"1001", "1002"}
-    assert {doc.issue_type for doc in doc_updates} == {"pb001", "si002"}
-
-    history_updates: list[TestItemHistoryData] = os_client.bulk_update_issue_history.call_args[0][1]
-    assert {entry.test_item_id for entry in history_updates} == {"1001", "1002"}
+    assert len(history_updates) == 3
+    assert [entry.test_item_id for entry in history_updates] == ["1001", "1002", "9999"]
+    assert [entry.issue_type for entry in history_updates] == ["pb001", "si002", "ab003"]
 
     first_entry = next(entry for entry in history_updates if entry.test_item_id == "1001")
     assert first_entry.issue_type == "pb001"
@@ -124,13 +117,12 @@ def test_defect_update_updates_issue_history_and_docs() -> None:
     assert second_entry.timestamp == timestamp
     assert second_entry.is_auto_analyzed is False
 
-    assert set(not_updated) == {9999}
+    assert not_updated == [9999]
 
 
 def test_defect_update_reports_items_which_disappeared_before_update() -> None:
     os_client = mock.Mock()
-    os_client.get_test_items_by_ids.return_value = [_make_index_item("1001"), _make_index_item("1002")]
-    os_client.bulk_update_issue_history.return_value = BulkResponse(took=1, errors=True, failed_ids=["1002"])
+    os_client.bulk_update_issue_history.return_value = BulkResponse(took=1, errors=True, failed_ids=["1002", "9999"])
 
     service = IndexService(APP_CONFIG, os_client=os_client)
 
@@ -138,12 +130,27 @@ def test_defect_update_reports_items_which_disappeared_before_update() -> None:
     not_updated = service.defect_update(DefectUpdate(**defect_update_info))
 
     os_client.bulk_update_issue_history.assert_called_once()
-    assert sorted(not_updated) == [1002, 9999]
+    assert not_updated == [1002, 9999]
+
+
+def test_defect_update_reports_all_items_when_the_update_request_fails() -> None:
+    """If the whole update failed, e.g. the index does not exist, no Test Item was updated."""
+    os_client = mock.Mock()
+    os_client.bulk_update_issue_history.return_value = BulkResponse(took=0, errors=True)
+
+    service = IndexService(APP_CONFIG, os_client=os_client)
+
+    defect_update_info = {"project": 123, "itemsToUpdate": {"1001": "ab001", "1002": "ab001"}}
+    with mock.patch("app.service.index_service.update_train") as update_train_mock:
+        not_updated = service.defect_update(DefectUpdate(**defect_update_info))
+
+    os_client.bulk_update_issue_history.assert_called_once()
+    assert not_updated == [1001, 1002]
+    update_train_mock.assert_called_once_with(APP_CONFIG, 123, 0)
 
 
 def test_defect_update_accepts_timestamp_with_nanoseconds() -> None:
     os_client = mock.Mock()
-    os_client.get_test_items_by_ids.return_value = [_make_index_item("1001")]
     os_client.bulk_update_issue_history.return_value = BulkResponse(took=1, errors=False)
 
     service = IndexService(APP_CONFIG, os_client=os_client)

@@ -17,6 +17,7 @@
 from datetime import datetime
 from typing import Optional
 
+from app.commons.error_hash import compute_error_hash
 from app.commons.model.launch_objects import ERROR_LOGGING_LEVEL, Launch, Log
 from app.commons.model.test_item_index import LogData, TestItemIndexData
 from app.commons.prepared_log import PreparedLogMessage
@@ -200,6 +201,7 @@ def prepare_test_items(
                 issue_type=issue_type,
                 start_time=test_item_time,
                 log_count=len(prepared_logs),
+                error_hash=compute_error_hash(prepared_logs),
                 logs=prepared_logs,
                 issue_history=[],
             )

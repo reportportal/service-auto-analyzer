@@ -12,30 +12,45 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+"""Unit tests for utils module."""
+
+from typing import Optional
+
 import pytest
 
-from app.utils.utils import parse_string_map, put_if_set
+from app.commons.model.launch_objects import AnalyzerConf
+from app.utils.utils import find_min_should_match_threshold, is_no_defect, put_if_set
+from test import DEFAULT_SEARCH_CONFIG
 
 
 @pytest.mark.parametrize(
-    "value, expected",
+    "project_min_should_match, global_min_should_match, expected",
+    [(95, "80%", 95), (0, "80%", 80), (0, "60%", 60)],
+    ids=["project_setting", "global_default", "other_global_default"],
+)
+def test_find_min_should_match_threshold(project_min_should_match: int, global_min_should_match: str, expected: int):
+    search_config = DEFAULT_SEARCH_CONFIG.model_copy(update={"MinShouldMatch": global_min_should_match})
+
+    assert (
+        find_min_should_match_threshold(AnalyzerConf(minShouldMatch=project_min_should_match), search_config)
+        == expected
+    )
+
+
+@pytest.mark.parametrize(
+    "issue_type, expected",
     [
-        (None, {}),
-        ("", {}),
-        ("  ", {}),
-        ("{}", {}),
-        ('{"endpoint": "http://localhost:9000"}', {"endpoint": "http://localhost:9000"}),
-        ('{"enable_virtual_host_style": true, "retries": 3}', {"enable_virtual_host_style": "true", "retries": "3"}),
+        ("nd001", True),
+        ("ND001", True),
+        ("nd_flaky", True),
+        ("pb001", False),
+        ("ti001", False),
+        ("", False),
+        (None, False),
     ],
 )
-def test_parse_string_map(value, expected):
-    assert parse_string_map(value) == expected
-
-
-@pytest.mark.parametrize("value", ["not a json", '["a", "b"]', '"string"', "{"])
-def test_parse_string_map_invalid(value):
-    with pytest.raises(ValueError):
-        parse_string_map(value)
+def test_is_no_defect(issue_type: Optional[str], expected: bool) -> None:
+    assert is_no_defect(issue_type) is expected
 
 
 @pytest.mark.parametrize("value", [None, "", 0, [], {}])

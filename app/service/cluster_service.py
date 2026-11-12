@@ -17,7 +17,7 @@ import json
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
-from time import time
+from time import monotonic
 from typing import Any, Optional
 
 import numpy as np
@@ -33,6 +33,7 @@ from app.commons.model.launch_objects import (
     LaunchInfoForClustering,
     SearchConfig,
 )
+from app.commons.model.processing import Reply
 from app.commons.model.test_item_index import (
     ClusterLogData,
     LogClusterData,
@@ -42,6 +43,7 @@ from app.commons.model.test_item_index import (
 )
 from app.commons.os_client import OsClient
 from app.commons.prepared_log import PreparedLogMessageClustering
+from app.commons.query_builder import BOOST_NEUTRAL, build_more_like_this_query, build_status_codes_exact_query
 from app.utils import text_processing, utils
 
 LOGGER = logging.getLogger("analyzerApp.clusterService")
@@ -467,28 +469,28 @@ class ClusterService:
         path = MERGED_LOGS_PATH if queried_log.merged else LOGS_PATH
         log_id_field = "log_ids" if queried_log.merged else "log_id"
         nested_must = [
-            utils.build_more_like_this_query(
+            build_more_like_this_query(
                 min_should_match,
                 queried_log.message,
                 field_name=f"{path}.whole_message",
-                boost=utils.BOOST_NEUTRAL,
+                boost=BOOST_NEUTRAL,
                 max_query_terms=self.search_cfg.MaxQueryTerms,
             )
         ]
         found_exceptions = queried_log.data.found_exceptions
         if found_exceptions and found_exceptions.strip():
             nested_must.append(
-                utils.build_more_like_this_query(
+                build_more_like_this_query(
                     "1",
                     found_exceptions,
                     field_name=f"{path}.found_exceptions",
-                    boost=utils.BOOST_NEUTRAL,
+                    boost=BOOST_NEUTRAL,
                     override_min_should_match="1",
                     max_query_terms=self.search_cfg.MaxQueryTerms,
                 )
             )
         # Clustering requires the same codes in the same order, so the exact sequence is matched.
-        status_codes_query = utils.build_status_codes_exact_query(
+        status_codes_query = build_status_codes_exact_query(
             queried_log.data.potential_status_codes or "", field_name=f"{path}.potential_status_codes"
         )
         if status_codes_query:
@@ -636,11 +638,19 @@ class ClusterService:
                 additional_clusters[global_group_idx] = new_cluster
         return additional_clusters
 
-    def find_clusters(self, launch_info: LaunchInfoForClustering) -> ClusterResult:
+    def find_clusters(self, launch_info: LaunchInfoForClustering) -> list[Reply]:
+        """Find clusters of similar logs in a launch.
+
+        :param launch_info: The launch to clusterize
+        :return: The reply with the found clusters
+        """
+        return [Reply(self._find_clusters(launch_info).model_dump_json())]
+
+    def _find_clusters(self, launch_info: LaunchInfoForClustering) -> ClusterResult:
         LOGGER.info(
             f"Started clusterizing logs for launch {launch_info.launch.launchId} in project {launch_info.project}"
         )
-        t_start = time()
+        t_start = monotonic()
         errors_found = []
         errors_count = 0
         common_clusters: list[ClusterInfo] = []
@@ -702,7 +712,7 @@ class ClusterService:
             launch_info.launch.launchId: {
                 "not_found": int(len(common_clusters) == 0),
                 "items_to_process": len(unique_log_ids),
-                "processed_time": time() - t_start,
+                "processed_time": monotonic() - t_start,
                 "found_clusters": len(common_clusters),
                 "launch_id": launch_info.launch.launchId,
                 "launch_name": launch_info.launch.launchName,
@@ -718,7 +728,7 @@ class ClusterService:
         }
 
         LOGGER.debug(f"Stats info: {json.dumps(results_to_share)}")
-        LOGGER.info("Processed the launch. It took %.2f sec.", time() - t_start)
+        LOGGER.info("Processed the launch. It took %.2f sec.", monotonic() - t_start)
         LOGGER.info("Finished clustering for the launch with %d clusters.", len(common_clusters))
         for cluster in common_clusters:
             # Put readable text instead of tokens

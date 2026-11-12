@@ -19,6 +19,7 @@ from typing import Any, Optional
 from app.commons import logging, model_chooser
 from app.commons.model import launch_objects, ml
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig, SuggestAnalysisResult
+from app.commons.model.processing import Reply, to_json_list
 from app.commons.os_client import OsClient
 from app.service.auto_analyzer_service import AutoAnalyzerService
 from app.service.clean_index_service import CleanIndexService
@@ -95,27 +96,6 @@ def prepare_train_info(train_info: dict) -> ml.TrainInfo:
     return ml.TrainInfo(**train_info)
 
 
-def to_json(response: list | dict) -> str:
-    """Function for serializing response to JSON format"""
-    return json.dumps(response)
-
-
-def prepare_analyze_response_data(response: list) -> str:
-    """Function for serializing response from analyze request"""
-    return to_json([resp.model_dump() for resp in response])
-
-
-def prepare_index_response_data(response: Any) -> str:
-    """Function for serializing response from index request
-    and other objects, which are pydantic objects"""
-    return response.model_dump_json()
-
-
-def to_str(response: Any) -> str:
-    """Function for serializing int object"""
-    return str(response)
-
-
 def same_data(data: Any) -> Any:
     """Function for returning data without changes"""
     return data
@@ -126,20 +106,25 @@ def raise_exception(message: str) -> None:
     raise RuntimeError(message)
 
 
-def log_suggest_info_index_warning(s: list[SuggestAnalysisResult]) -> Any:
-    json_str = json.dumps([j.model_dump() for j in s])
+def log_suggest_info_index_warning(s: list[SuggestAnalysisResult]) -> list[Reply]:
+    json_str = to_json_list(s)
     LOGGER.warning("Deprecated 'index_suggest_info' route called with: " + json_str)
-    return {}
+    return [Reply(json.dumps({}))]
 
 
-def log_suggest_info_remove_warning(s: int) -> int:
+def log_suggest_info_remove_warning(s: int) -> list[Reply]:
     LOGGER.warning(f"Deprecated 'remove_suggest_info' route called with: {s}")
-    return s
+    return [Reply(str(s))]
 
 
-def log_suggest_info_update_warning(s: Any) -> int:
+def log_suggest_info_update_warning(s: Any) -> list[Reply]:
     LOGGER.warning(f"Deprecated 'update_suggest_info' route called with: {json.dumps(s)}")
-    return 1
+    return [Reply(json.dumps(1))]
+
+
+def echo(data: Any) -> list[Reply]:
+    """Test route: reply with the request body."""
+    return [Reply(str(data))]
 
 
 class ServiceProcessor:
@@ -160,66 +145,54 @@ class ServiceProcessor:
         "index": {
             "handler": lambda s: s.index_service.index_logs,
             "prepare_data_func": prepare_launches,
-            "prepare_response_data": prepare_index_response_data,
         },
         "defect_update": {
             "handler": lambda s: s.index_service.defect_update,
             "prepare_data_func": prepare_update,
-            "prepare_response_data": to_json,
         },
         "analyze": {
             "handler": lambda s: AutoAnalyzerService(
                 s.model_chooser, s.app_config, s.search_config, os_client=s.os_client
             ).analyze_logs,
             "prepare_data_func": prepare_launches,
-            "prepare_response_data": prepare_analyze_response_data,
         },
         "delete": {
             "handler": lambda s: s.clean_index_service.delete_index,
             "prepare_data_func": to_int,
-            "prepare_response_data": to_str,
         },
         "clean": {
             "handler": lambda s: s.clean_index_service.delete_logs,
             "prepare_data_func": prepare_clean_index,
-            "prepare_response_data": to_str,
         },
         "item_remove": {
             "handler": lambda s: s.clean_index_service.delete_test_items,
             "prepare_data_func": prepare_delete_test_items,
-            "prepare_response_data": to_str,
         },
         "launch_remove": {
             "handler": lambda s: s.clean_index_service.delete_launches,
             "prepare_data_func": prepare_delete_launches,
-            "prepare_response_data": to_str,
         },
         "remove_by_launch_start_time": {
             "handler": lambda s: s.clean_index_service.remove_by_launch_start_time,
             "prepare_data_func": prepare_remove_by_dates,
-            "prepare_response_data": to_str,
         },
         "remove_by_log_time": {
             "handler": lambda s: s.clean_index_service.remove_by_log_time,
             "prepare_data_func": prepare_remove_by_dates,
-            "prepare_response_data": to_str,
         },
         "search": {
             "handler": lambda s: SearchService(s.app_config, s.search_config, os_client=s.os_client).search_logs,
             "prepare_data_func": prepare_search_logs,
-            "prepare_response_data": prepare_analyze_response_data,
         },
         "suggest": {
             "handler": lambda s: SuggestService(
                 s.model_chooser, s.app_config, s.search_config, os_client=s.os_client
             ).suggest_items,
             "prepare_data_func": prepare_test_item_info,
-            "prepare_response_data": prepare_analyze_response_data,
         },
         "cluster": {
             "handler": lambda s: ClusterService(s.app_config, s.search_config, os_client=s.os_client).find_clusters,
             "prepare_data_func": prepare_launch_info,
-            "prepare_response_data": prepare_index_response_data,
         },
         "namespace_finder": {
             "handler": lambda s: NamespaceFinderService(s.app_config).update_chosen_namespaces,
@@ -230,45 +203,38 @@ class ServiceProcessor:
                 s.app_config, s.search_config, os_client=s.os_client
             ).suggest_patterns,
             "prepare_data_func": to_int,
-            "prepare_response_data": prepare_index_response_data,
         },
         "index_suggest_info": {
             "handler": lambda _: log_suggest_info_index_warning,
             "prepare_data_func": prepare_suggest_info_list,
-            "prepare_response_data": to_json,
         },
         "remove_suggest_info": {
             "handler": lambda _: log_suggest_info_remove_warning,
             "prepare_data_func": to_int,
-            "prepare_response_data": to_str,
         },
         "update_suggest_info": {
             "handler": lambda _: log_suggest_info_update_warning,
             "prepare_data_func": same_data,
-            "prepare_response_data": to_json,
         },
         "remove_models": {
             "handler": lambda _: lambda x: LOGGER.warning(
                 f"Deprecated 'remove_models' route called with {json.dumps(x)}"
             ),
             "prepare_data_func": same_data,
-            "prepare_response_data": to_str,
         },
         "get_model_info": {
             "handler": lambda _: lambda x: LOGGER.warning(
                 f"Deprecated 'get_model_info' route called with {json.dumps(x)}"
             ),
             "prepare_data_func": same_data,
-            "prepare_response_data": to_json,
         },
         "noop_sleep": {
             "handler": lambda _: lambda x: time.sleep(x),
             "prepare_data_func": same_data,
         },
         "noop_echo": {
-            "handler": lambda _: lambda x: x,
+            "handler": lambda _: echo,
             "prepare_data_func": same_data,
-            "prepare_response_data": to_str,
         },
         "noop_fail": {
             "handler": lambda _: lambda x: raise_exception("Intentional failure for testing purposes: " + str(x)),
@@ -334,12 +300,16 @@ class ServiceProcessor:
         LOGGER.debug(f"Routing configuration built: {config.keys()}")
         return config
 
-    def process(self, routing_key: str, body: Any) -> Optional[str]:
-        """Process request based on routing key and body data"""
+    def process(self, routing_key: str, body: Any) -> Optional[list[Reply]]:
+        """Process request based on routing key and body data.
+
+        :param routing_key: Routing key of the request
+        :param body: Parsed JSON body of the request
+        :return: The replies of the service, or None if there is nothing to send
+        """
         config = self._routing_config[routing_key]
         request_processor = config["handler"]
         prepare_data_func = config.get("prepare_data_func", None)
-        prepare_response_data = config.get("prepare_response_data", None)
 
         # Prepare message body if needed
         message = body
@@ -350,17 +320,6 @@ class ServiceProcessor:
                 LOGGER.exception("Failed to prepare message body", exc_info=exc)
                 return None
 
-        response = request_processor(message)
+        replies: Optional[list[Reply]] = request_processor(message)
         LOGGER.debug("Finished processing request")
-
-        # Prepare response if applicable
-        if response is None or not prepare_response_data:
-            return None
-
-        try:
-            response_body = prepare_response_data(response)
-        except Exception as exc:
-            LOGGER.exception("Failed to prepare response body", exc_info=exc)
-            return None
-
-        return response_body
+        return replies

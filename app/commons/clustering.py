@@ -15,7 +15,7 @@
 import hashlib
 import heapq
 from collections import defaultdict
-from time import time
+from time import monotonic
 
 import numpy as np
 from scipy.sparse import csr_matrix
@@ -93,7 +93,7 @@ def __similarity_grouping(
 
 
 def __unite_groups_by_hashes(messages: list[list[str]], threshold: float = 0.95) -> dict[int, list[int]]:
-    start_time = time()
+    start_time = monotonic()
     hash_prints = __calculate_hashes(messages)
     if not any(hash_prints):
         return {}
@@ -101,7 +101,7 @@ def __unite_groups_by_hashes(messages: list[list[str]], threshold: float = 0.95)
     rearranged_groups: dict[int, list[int]] = defaultdict(list)
     for key, cluster in hash_groups.items():
         rearranged_groups[cluster].append(key)
-    LOGGER.debug("Time for finding hash groups: %.2f s", time() - start_time)
+    LOGGER.debug("Time for finding hash groups: %.2f s", monotonic() - start_time)
     return dict(rearranged_groups)
 
 
@@ -110,7 +110,7 @@ def __find_groups_by_similarity(messages: list[list[str]], threshold: float = 0.
         return {}
     groups_to_check = __unite_groups_by_hashes(messages, threshold=threshold)
     group_id = 0
-    start_time = time()
+    start_time = monotonic()
     rearranged_groups: dict[int, list[int]] = {}
     for hash_cluster_id, group in groups_to_check.items():
         selected_texts: list[list[str]] = [messages[i] for i in group]
@@ -125,7 +125,7 @@ def __find_groups_by_similarity(messages: list[list[str]], threshold: float = 0.
             rearranged_groups[cluster].append(real_id)
         new_group_id += 1
         group_id = new_group_id
-    LOGGER.debug("Time for finding groups: %.2f s", time() - start_time)
+    LOGGER.debug("Time for finding groups: %.2f s", monotonic() - start_time)
     return rearranged_groups
 
 

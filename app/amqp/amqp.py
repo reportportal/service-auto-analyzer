@@ -137,7 +137,7 @@ class AmqpClient:
         :return: The AMQP connection
         """
         my_connection = self.__connection
-        if my_connection is None or my_connection:
+        if my_connection is None or my_connection.is_closed:
             my_connection = self._connect_with_retry()
             self.__connection = my_connection
         return my_connection
@@ -201,9 +201,6 @@ class AmqpClient:
                 "version": self._config.appVersion,
             },
         )
-
-    def _declare_response_exchange(self) -> None:
-        self._do_declare_exchange(self._config.analyzerResponseExchange, self._config.analyzerResponseExchangeType)
 
     @staticmethod
     def _bind_queue(
@@ -301,10 +298,13 @@ class AmqpClient:
     def publish_response(self, data: str) -> None:
         """Publish an analyzer response message to the configured response queue.
 
+        The response exchange is not declared: ReportPortal owns it and declares it with its own settings, so a
+        declaration with other settings is rejected by the broker.
+
         :param str data: The data to publish
         """
         self.__send_to_queue(
-            self._declare_response_exchange,
+            None,
             exchange=self._config.analyzerResponseExchange,
             routing_key=self._config.analyzerResponseQueue,
             properties=BasicProperties(content_type="application/json"),

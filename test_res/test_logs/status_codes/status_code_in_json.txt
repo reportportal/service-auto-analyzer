@@ -1,0 +1,9 @@
+Verify that for https://test.example.com/api/v1/User/reminders Response Codes are equal  - Expected: 'BadRequest'; Actual: 'InternalServerError'
+Original response:
+{ "statusCode": 500, "message": "Internal server error", "activityId": "923c5632-dec4-4991-9e1f-71e6193f3172" }
+  Expected: BadRequest
+  But was:  InternalServerError
+
+   at Core.Common.VerifyThat.AreEqual(Object expected, Object actual, String message, Boolean logInfo, Boolean logWarn, StringBuilder warnMessage) in D:\path\TO\test\3\s\src\TestFramework\Core\Common\VerifyThat.cs:line 168
+   at Core.Utils.VerifyBuilderResponseGeneric2`2.ResponseCodeIs(HttpStatusCode expectedHttpStatusCode, String cinemaId) in D:\path\TO\test\3\s\src\TestFramework\Core\Utils\VerifyBuilder.cs:line 316
+   at Tests.User.GetUserRemindersTests.TestGetRemindersNotLoggedInUser() in D:\path\TO\test\3\s\src\TestFramework\Tests\User\GetUserRemindersTests.cs:line 115

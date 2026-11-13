@@ -1,0 +1,954 @@
+#  Copyright 2025 EPAM Systems
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+"""OpenSearch client for Test Item-centric indexing approach."""
+
+import json
+import traceback
+from datetime import datetime, timezone
+from logging import DEBUG
+from time import time
+from typing import Any, Callable, Iterable, Iterator, Optional, Sequence
+
+import opensearchpy.helpers
+import urllib3
+from opensearchpy import OpenSearch, RequestsHttpConnection, TransportError
+from urllib3.exceptions import InsecureRequestWarning
+
+from app.commons import logging
+from app.commons.model.db import Hit
+from app.commons.model.launch_objects import ApplicationConfig, BulkResponse, Response
+from app.commons.model.test_item_index import (
+    LogClusterData,
+    LogData,
+    MergedLogsClusterData,
+    TestItemHistoryData,
+    TestItemIndexData,
+)
+from app.utils import text_processing, utils
+
+INDEX_SETTINGS_FILE = "index_settings.json"
+TEST_ITEM_INDEX_MAPPINGS_FILE = "test_item_index_mappings.json"
+HEALTH_CHECK_TIMEOUT = 10
+# Removes logs with the given IDs from a Test Item, together with merged small log entries which contain them, and
+# deletes the Test Item if no logs remain
+REMOVE_LOGS_SCRIPT = """
+    Set ids = new HashSet(params.log_ids);
+    List logs = ctx._source.logs;
+    if (logs == null || !logs.removeIf(log -> ids.contains(String.valueOf(log.log_id)))) {
+        ctx.op = 'noop';
+        return;
+    }
+    if (logs.isEmpty()) {
+        ctx.op = 'delete';
+        return;
+    }
+    ctx._source.log_count = logs.size();
+    List mergedLogs = ctx._source.merged_small_logs;
+    if (mergedLogs != null) {
+        mergedLogs.removeIf(merged -> {
+            if (merged.log_ids == null) {
+                return false;
+            }
+            for (def mergedId : merged.log_ids) {
+                if (ids.contains(String.valueOf(mergedId))) {
+                    return true;
+                }
+            }
+            return false;
+        });
+    }
+"""
+
+LOGGER = logging.getLogger("analyzerApp.osClient")
+
+
+def get_test_item_index_name(project_id: str | int, prefix: str) -> str:
+    """
+    Build the Test Item index name for a given project.
+
+    :param project_id: The project identifier
+    :param prefix: Index name prefix from configuration
+    :return: Full index name
+    """
+    return f"{prefix}{project_id}"
+
+
+def build_script_update_body(
+    index_name: str, test_item_id: str, source: str, params: dict[str, Any]
+) -> dict[str, Any]:
+    """
+    Build a bulk operation body, which updates a Test Item document with a Painless script.
+
+    :param index_name: The index name
+    :param test_item_id: The Test Item document ID
+    :param source: The Painless script source
+    :param params: The script parameters
+    :return: Bulk operation body
+    """
+    return {
+        "_op_type": "update",
+        "_index": index_name,
+        "_id": test_item_id,
+        "script": {"source": source, "params": params},
+    }
+
+
+class OsClient:
+    """OpenSearch client for Test Item-centric document indexing."""
+
+    app_config: ApplicationConfig
+    _os_client: OpenSearch
+    host: str
+    _checked_indexes: set[str]
+
+    def __init__(
+        self,
+        app_config: ApplicationConfig,
+        *,
+        os_client: Optional[OpenSearch] = None,
+    ) -> None:
+        """Initialize the OpenSearch client.
+
+        :param app_config: Application configuration
+        :param os_client: Optional pre-configured OpenSearch client for testing
+        """
+        self.app_config = app_config
+        self.host = app_config.esHost
+        if os_client:
+            LOGGER.debug("Creating service using provided client")
+            self._os_client = os_client
+        else:
+            LOGGER.debug(f"Creating service using host URL: {text_processing.remove_credentials_from_url(self.host)}")
+            self._os_client = self._create_os_client(app_config)
+        self._checked_indexes = set()
+
+    def _create_os_client(self, app_config: ApplicationConfig) -> OpenSearch:
+        """Create an OpenSearch client with the given configuration.
+
+        :param app_config: Application configuration
+        :return: Configured OpenSearch client
+        """
+        if not app_config.esVerifyCerts:
+            urllib3.disable_warnings(InsecureRequestWarning)
+        kwargs: dict[str, Any] = {
+            "timeout": 30,
+            "max_retries": 5,
+            "retry_on_timeout": True,
+            "use_ssl": app_config.esUseSsl,
+            "verify_certs": app_config.esVerifyCerts,
+            "ssl_show_warn": app_config.esSslShowWarn,
+            "ca_certs": app_config.esCAcert,
+            "client_cert": app_config.esClientCert,
+            "client_key": app_config.esClientKey,
+        }
+
+        if app_config.esUser:
+            kwargs["http_auth"] = (app_config.esUser, app_config.esPassword)
+
+        if app_config.turnOffSslVerification:
+            kwargs["connection_class"] = RequestsHttpConnection
+
+        return OpenSearch([self.host], **kwargs)
+
+    def is_healthy(self) -> bool:
+        """Check whether OpenSearch is healthy.
+
+        The request goes through the configured OpenSearch client, so it honors the same TLS and
+        authentication settings as all other requests.
+
+        :return: True if cluster status is green or yellow
+        """
+        if not self.host:
+            LOGGER.error("OpenSearch host is not set")
+            return False
+
+        try:
+            res = self._os_client.cluster.health(params={"request_timeout": HEALTH_CHECK_TIMEOUT})
+        except Exception as err:
+            LOGGER.exception("Error requesting OpenSearch cluster health", exc_info=err)
+            return False
+        return res.get("status", "") in {"green", "yellow"} if res else False
+
+    def _delete_index(self, index_name: str) -> bool:
+        try:
+            self._os_client.indices.delete(index=index_name)
+            self._checked_indexes.discard(index_name)
+            LOGGER.debug(f"Index '{index_name}' deleted")
+            return True
+        except Exception as err:
+            LOGGER.exception(f"Failed to delete index: {index_name}", exc_info=err)
+            return False
+
+    def delete_index(self, project_id: str | int) -> bool:
+        """Delete the Test Item index for a project.
+
+        :param project_id: The project identifier
+        :return: True if deletion was successful
+        """
+        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
+        LOGGER.info(f"Deleting index: {index_name}")
+        result = self._delete_index(index_name)
+        old_suggest_index = f"{index_name}_suggest"  # for sake of cleanup
+        if self._index_exists(old_suggest_index, print_error=False):
+            result = result and self._delete_index(old_suggest_index)
+        return result
+
+    def _create_index(self, index_name: str) -> Response:
+        """
+        Create a Test Item index in OpenSearch.
+
+        :param index_name: The index name to create
+        :return: Response with acknowledgment status
+        """
+        LOGGER.info(f"Creating Test Item index: {index_name}")
+        response = self._os_client.indices.create(
+            index=index_name,
+            body={
+                "settings": utils.read_resource_file(INDEX_SETTINGS_FILE, to_json=True),
+                "mappings": utils.read_resource_file(TEST_ITEM_INDEX_MAPPINGS_FILE, to_json=True),
+            },
+        )
+        LOGGER.debug(f"Index '{index_name}' created")
+        return Response(**response)
+
+    def _index_exists(self, index_name: str, print_error: bool = True) -> bool:
+        """Check whether an index exists.
+
+        :param index_name: The index name to check
+        :param print_error: Whether to log errors
+        :return: True if index exists
+        """
+        try:
+            index = self._os_client.indices.get(index=index_name)
+            return index is not None
+        except Exception as err:
+            if print_error:
+                LOGGER.exception(f"Index '{index_name}' was not found", exc_info=err)
+            return False
+
+    def _ensure_index_checked(self, index_name: str) -> bool:
+        """Check whether an index exists, asking OpenSearch at most once per index.
+
+        `_index_exists` issues `indices.get`, which returns the index's whole metadata including
+        its mappings. Callers that guard every request with it pay that round trip per request, so
+        the answer is cached here.
+
+        Only a positive answer is cached: a missing index may be created later in the process
+        lifetime (indexing creates it on demand), so a negative has to be re-checked. An index
+        deleted through this client drops out of the cache in `_delete_index`; one deleted
+        out-of-process stays cached, and the request that follows fails in the caller's own error
+        handling rather than being skipped by the guard.
+
+        :param index_name: The index name to check
+        :return: True if the index exists
+        """
+        if index_name in self._checked_indexes:
+            return True
+        if self._index_exists(index_name, print_error=False):
+            self._checked_indexes.add(index_name)
+            return True
+        return False
+
+    def _ensure_index_exists(self, index_name: str) -> bool:
+        """Ensure the Test Item index exists, creating it if necessary.
+
+        Existence checks are cached by `_ensure_index_checked`; the cache is cleared on
+        application restart.
+
+        :param index_name: The index name to check/create
+        :return: True if index exists or was created successfully
+        """
+        if self._ensure_index_checked(index_name):
+            return True
+
+        try:
+            response = self._create_index(index_name)
+            if response.acknowledged:
+                self._checked_indexes.add(index_name)
+                return True
+            return False
+        except Exception as err:
+            LOGGER.exception(f"Failed to ensure index exists: {index_name}", exc_info=err)
+            return False
+
+    def _update_settings_after_read_only(self) -> None:
+        """Reset read-only settings on all indices after disk space recovery."""
+        try:
+            self._os_client.indices.put_settings(index="_all", body={"index.blocks.read_only_allow_delete": None})
+        except Exception as err:
+            LOGGER.exception("Failed to reset read-only settings on indices", exc_info=err)
+
+    def _execute_bulk(
+        self,
+        bodies: list[dict[str, Any]],
+        refresh: bool = True,
+        chunk_size: Optional[int] = None,
+    ) -> BulkResponse:
+        """Execute bulk indexing operation.
+
+        :param bodies: List of bulk operation bodies
+        :param refresh: Whether to refresh the index after indexing
+        :param chunk_size: Optional chunk size for bulk operations
+        :return: BulkResponse with indexing results
+        """
+        if not bodies:
+            return BulkResponse(took=0, errors=False)
+
+        start_time = time()
+        LOGGER.debug(f"Indexing {len(bodies)} documents")
+        es_chunk_number = self.app_config.esChunkNumber
+        if chunk_size is not None:
+            es_chunk_number = chunk_size
+
+        try:
+            try:
+                success_count, errors = opensearchpy.helpers.bulk(
+                    self._os_client,
+                    bodies,
+                    chunk_size=es_chunk_number,
+                    request_timeout=30,
+                    refresh=refresh,
+                    raise_on_error=False,
+                )
+            except TransportError:
+                formatted_exception = traceback.format_exc()
+                LOGGER.warning(f"Bulk indexing failed, retrying: {formatted_exception}")
+                self._update_settings_after_read_only()
+                success_count, errors = opensearchpy.helpers.bulk(
+                    self._os_client,
+                    bodies,
+                    chunk_size=es_chunk_number,
+                    request_timeout=30,
+                    refresh=refresh,
+                    raise_on_error=False,
+                )
+
+            # Each error is a single-key dict: {"<op_type>": {"_id": ..., "status": ..., "error": ...}}
+            failed_ids = [str(next(iter(error.values())).get("_id")) for error in errors]
+            if errors:
+                error_str = ", ".join([str(error) for error in errors])
+                LOGGER.error(f"{len(errors)} of {len(bodies)} bulk operations failed: {error_str}")
+            LOGGER.debug(f"{success_count} documents were successfully indexed")
+            LOGGER.debug("Finished indexing for %.2f s", time() - start_time)
+            return BulkResponse(took=success_count, errors=len(errors) > 0, failed_ids=failed_ids)
+        except Exception as exc:
+            LOGGER.exception("Error in bulk indexing", exc_info=exc)
+            return BulkResponse(took=0, errors=True)
+
+    def bulk_index_raw(
+        self,
+        bodies: list[dict[str, Any]],
+        refresh: bool = True,
+        chunk_size: Optional[int] = None,
+    ) -> BulkResponse:
+        """Bulk index raw document bodies.
+
+        Useful for update and delete operations.
+
+        :param bodies: List of bulk operation bodies
+        :param refresh: Whether to refresh the index after indexing
+        :param chunk_size: Optional chunk size for bulk operations
+        :return: BulkResponse with indexing results
+        """
+        if not bodies:
+            return BulkResponse(took=0, errors=False)
+
+        index_names = {body["_index"] for body in bodies}
+
+        for index_name in index_names:
+            if not self._ensure_index_exists(index_name):
+                LOGGER.error(f"Failed to ensure index exists: {index_name}")
+                return BulkResponse(took=0, errors=True)
+
+        return self._execute_bulk(bodies, refresh, chunk_size)
+
+    def _prepare_bulk_bodies(self, index_name: str, test_items: list[TestItemIndexData]) -> list[dict[str, Any]]:
+        """Prepare bulk index bodies from TestItemIndexData objects.
+
+        :param index_name: Target index name
+        :param test_items: List of TestItemIndexData objects
+        :return: List of bulk operation bodies
+        """
+        bodies: list[dict[str, Any]] = []
+        for item in test_items:
+            bodies.append(
+                {
+                    "_op_type": "index",
+                    "_index": index_name,
+                    "_id": item.test_item_id,
+                    "_source": item.to_index_dict(),
+                }
+            )
+        return bodies
+
+    def bulk_index(
+        self,
+        project_id: str | int,
+        test_items: list[TestItemIndexData],
+        refresh: bool = True,
+        chunk_size: Optional[int] = None,
+    ) -> BulkResponse:
+        """Bulk index Test Item documents.
+
+        Automatically ensures the index exists before indexing.
+
+        :param project_id: The project identifier
+        :param test_items: List of TestItemIndexData objects to index
+        :param refresh: Whether to refresh the index after indexing
+        :param chunk_size: Optional chunk size for bulk operations
+        :return: BulkResponse with indexing results
+        """
+        if not test_items:
+            return BulkResponse(took=0, errors=False)
+
+        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
+        bodies = self._prepare_bulk_bodies(index_name, test_items)
+
+        return self.bulk_index_raw(bodies, refresh, chunk_size)
+
+    def _delete_by_query(
+        self,
+        index_name: str,
+        ids: list[str],
+        query_builder: Callable[[list[str]], dict[str, Any]],
+        chunk_size: Optional[int] = None,
+    ) -> int:
+        """Delete documents by query in batches.
+
+        :param index_name: Target index name
+        :param ids: List of IDs to include in deletion query
+        :param query_builder: Function to build the deletion query from IDs
+        :param chunk_size: Optional chunk size for bulk operations
+        :return: Total number of deleted documents
+        """
+        batch_size = self.app_config.esChunkNumber
+        if chunk_size is not None:
+            batch_size = chunk_size
+
+        deleted = 0
+        for i in range(int(len(ids) / batch_size) + 1):
+            batch_ids = ids[i * batch_size : (i + 1) * batch_size]
+            if not batch_ids:
+                continue
+            try:
+                result = self._execute_delete_by_query(index_name, query_builder(batch_ids))
+                deleted += result.get("deleted", 0)
+                if result.get("version_conflicts", 0):
+                    # Conflicting documents were changed while being deleted and are kept, the second pass removes
+                    # them from the fresh index state
+                    LOGGER.warning(
+                        f"{result['version_conflicts']} documents changed during deletion in '{index_name}', retrying"
+                    )
+                    result = self._execute_delete_by_query(index_name, query_builder(batch_ids))
+                    deleted += result.get("deleted", 0)
+            except Exception as err:
+                LOGGER.exception("Error in delete_by_query", exc_info=err)
+        return deleted
+
+    def _execute_delete_by_query(self, index_name: str, body: dict[str, Any]) -> dict[str, Any]:
+        """Delete documents by query and make the deletion visible to searches immediately.
+
+        Requests, which follow a deletion, such as analysis after the index cleanup, must not find deleted documents.
+
+        :param index_name: Target index name
+        :param body: Deletion query
+        :return: OpenSearch response
+        """
+        return self._os_client.delete_by_query(index=index_name, body=body, refresh=True, conflicts="proceed")
+
+    def delete_test_items(self, project_id: str | int, test_item_ids: list[str]) -> int:
+        """Delete Test Items by their IDs.
+
+        :param project_id: The project identifier
+        :param test_item_ids: List of test item IDs to delete
+        :return: Number of deleted documents
+        """
+        if not test_item_ids:
+            return 0
+
+        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
+        LOGGER.info(f"Deleting {len(test_item_ids)} test items from '{index_name}'")
+        t_start = time()
+
+        if not self._ensure_index_checked(index_name):
+            return 0
+
+        deleted = self._delete_by_query(
+            index_name,
+            test_item_ids,
+            lambda ids: {"query": {"terms": {"test_item_id": ids}}},
+        )
+        LOGGER.info(f"Deleted {deleted} test items in {round(time() - t_start, 2)} sec")
+        return deleted
+
+    def delete_by_launch_ids(self, project_id: str | int, launch_ids: list[str]) -> int:
+        """Delete Test Items by launch IDs.
+
+        :param project_id: The project identifier
+        :param launch_ids: List of launch IDs whose test items should be deleted
+        :return: Number of deleted documents
+        """
+        if not launch_ids:
+            return 0
+
+        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
+        LOGGER.info(f"Deleting test items for {len(launch_ids)} launches from '{index_name}'")
+        t_start = time()
+
+        if not self._ensure_index_checked(index_name):
+            return 0
+
+        deleted = self._delete_by_query(
+            index_name,
+            launch_ids,
+            lambda ids: {"query": {"terms": {"launch_id": ids}}},
+        )
+        LOGGER.info(f"Deleted {deleted} test items in {round(time() - t_start, 2)} sec")
+        return deleted
+
+    def _time_range_query(
+        self, time_field: str, gte_time: str, lte_time: str, for_scan: bool = False
+    ) -> dict[str, Any]:
+        """Build a time range query.
+
+        :param time_field: The field to query on
+        :param gte_time: Greater than or equal time
+        :param lte_time: Less than or equal time
+        :param for_scan: Whether to include size for scan operations
+        :return: Query dictionary
+        """
+        query: dict[str, Any] = {"query": {"range": {time_field: {"gte": gte_time, "lte": lte_time}}}}
+        if for_scan:
+            query["size"] = self.app_config.esChunkNumber
+        return query
+
+    def delete_by_launch_start_time_range(self, project_id: str | int, start_date: str, end_date: str) -> int:
+        """Delete Test Items by launch start time range.
+
+        :param project_id: The project identifier
+        :param start_date: Start date in 'yyyy-MM-dd HH:mm:ss' or 'yyyy-MM-dd' format
+        :param end_date: End date in 'yyyy-MM-dd HH:mm:ss' or 'yyyy-MM-dd' format
+        :return: Number of deleted documents
+        """
+        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
+        if not self._ensure_index_checked(index_name):
+            return 0
+
+        query = self._time_range_query("launch_start_time", start_date, end_date)
+        try:
+            result = self._execute_delete_by_query(index_name, query)
+            return result.get("deleted", 0)
+        except Exception as err:
+            LOGGER.exception("Error in delete_by_launch_start_time_range", exc_info=err)
+            return 0
+
+    def search(
+        self, project_id: str | int, query: dict[str, Any], *, size: Optional[int] = None
+    ) -> Iterator[Hit[TestItemIndexData]]:
+        """Scroll through all documents matching a query and yield them as a generator.
+
+        This is a scroll (`opensearchpy.helpers.scan`) meant to export every match: the `size` of the query body
+        only sets the page size and is overridden by the `size` argument of the scan, and the `sort` of the query
+        is replaced with `_doc`, so documents are not scored. It also takes at least two requests: the search and
+        the scroll cleanup. To get the top N best scored documents, use `msearch_grouped` or `msearch_batched`.
+
+        :param project_id: The project identifier
+        :param query: OpenSearch query
+        :param size: Optional custom page size for the scroll
+        :return: Iterator of typed search hits
+        """
+        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
+        if not self._ensure_index_checked(index_name):
+            return
+
+        try:
+            kwargs: dict[str, Any] = {}
+            if size:
+                kwargs["size"] = size
+            for doc in opensearchpy.helpers.scan(self._os_client, query=query, index=index_name, **kwargs):
+                yield Hit[TestItemIndexData].from_dict(doc)
+        except Exception as err:
+            LOGGER.exception("Error in search", exc_info=err)
+
+    def msearch_grouped(
+        self, project_id: str | int, queries: Iterable[dict[str, Any]]
+    ) -> Iterator[list[Hit[TestItemIndexData]]]:
+        """Execute several search operations at once, yielding each query's hits separately.
+
+        One group is yielded per response, in submission order, so a caller matches a group to the
+        query that produced it by position and does not have to re-derive the correspondence. A
+        caller that finishes with a group before taking the next one also holds only that group's
+        models at a time.
+
+        :param project_id: The project identifier
+        :param queries: OpenSearch query iterable object, alternating header and body per query
+        :return: Iterator of hit lists, one per submitted query, in submission order
+        """
+        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
+        if not self._ensure_index_checked(index_name):
+            return
+
+        try:
+            if LOGGER.is_enabled_for(DEBUG):
+                LOGGER.debug(f"Executing queries: {json.dumps(queries)}")
+            results = self._os_client.msearch(body=queries, index=index_name)
+            responses = results["responses"] or []
+        except Exception as err:
+            LOGGER.exception("Error in msearch", exc_info=err)
+            return
+
+        # A multi search reports a failed query as an `error` on its own response and still
+        # returns the others, so one bad query must not cost the whole batch. An empty group is
+        # yielded in its place: callers match groups to queries by position, and dropping a group
+        # would shift every later one onto the wrong query.
+        for position, res in enumerate(responses):
+            try:
+                error = res.get("error")
+                if error:
+                    LOGGER.error(
+                        "Query %d of %d in the msearch to '%s' failed: %s",
+                        position + 1,
+                        len(responses),
+                        index_name,
+                        error,
+                    )
+                    group: list[Hit[TestItemIndexData]] = []
+                else:
+                    group = [Hit[TestItemIndexData].from_dict(hit) for hit in res.get("hits", {}).get("hits", [])]
+            except Exception as err:
+                LOGGER.exception(
+                    "Unable to read response %d of %d in the msearch to '%s'",
+                    position + 1,
+                    len(responses),
+                    index_name,
+                    exc_info=err,
+                )
+                group = []
+            if LOGGER.is_enabled_for(DEBUG):
+                LOGGER.debug(f"Queries result group: {json.dumps([res.model_dump() for res in group])}")
+            yield group
+
+    def msearch_batched(
+        self, project_id: str | int, queries: Sequence[dict[str, Any]], batch_size: int
+    ) -> Iterator[list[Hit[TestItemIndexData]]]:
+        """Execute independent search queries in batches of multi searches, yielding each query's hits separately.
+
+        One multi search takes up to `batch_size` queries, so the request count is proportional to the query count
+        divided by the batch size instead of the query count. A batch is consumed before the next one is sent, so only
+        one batch of responses is held at a time.
+
+        Exactly one group is yielded per query, in submission order: a query, which got no response, e.g. because the
+        index does not exist or the request failed, yields an empty group.
+
+        :param project_id: The project identifier
+        :param queries: Query bodies, without multi search headers
+        :param batch_size: Maximum number of queries in one multi search
+        :return: Iterator of hit lists, one per query, in submission order
+        """
+        batch_size = max(batch_size, 1)
+        for offset in range(0, len(queries), batch_size):
+            batch = queries[offset : offset + batch_size]
+            body: list[dict[str, Any]] = []
+            for query in batch:
+                body.append({})
+                body.append(query)
+            received = 0
+            for group in self.msearch_grouped(project_id, body):
+                received += 1
+                yield group
+            if 0 < received < len(batch):
+                LOGGER.warning(
+                    "Got %d responses for %d queries in the msearch to project %s",
+                    received,
+                    len(batch),
+                    str(project_id),
+                )
+            for _ in range(received, len(batch)):
+                yield []
+
+    def bulk_update_issue_history(self, project_id: str | int, updates: list[TestItemHistoryData]) -> BulkResponse:
+        """Bulk update issue_history for multiple Test Items.
+
+        :param project_id: The project identifier
+        :param updates: List of TestItemUpdateData payloads
+        :return: BulkResponse with update results
+        """
+        if not updates:
+            return BulkResponse(took=0, errors=False)
+
+        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
+        if not self._ensure_index_checked(index_name):
+            LOGGER.error(f"Index not exists: {index_name}")
+            return BulkResponse(took=0, errors=True)
+
+        bodies: list[dict[str, Any]] = []
+        for update in updates:
+            entry = update.to_update_dict()
+            bodies.append(
+                {
+                    "_op_type": "update",
+                    "_index": index_name,
+                    "_id": update.test_item_id,
+                    "script": {
+                        "source": """
+                            ctx._source.issue_type = params.entry.issue_type;
+                            ctx._source.is_auto_analyzed = params.entry.is_auto_analyzed;
+                            if (ctx._source.issue_history == null) {
+                                ctx._source.issue_history = [];
+                            }
+                            ctx._source.issue_history.add(params.entry);
+                        """,
+                        "params": {"entry": entry},
+                    },
+                }
+            )
+
+        return self._execute_bulk(bodies)
+
+    def bulk_update_cluster_info(
+        self,
+        project_id: str | int,
+        updates: list[LogClusterData],
+        merged_updates: Optional[list[MergedLogsClusterData]] = None,
+        refresh: bool = False,
+        chunk_size: Optional[int] = None,
+    ) -> BulkResponse:
+        """Bulk update cluster information for nested logs and merged small log entries.
+
+        :param project_id: The project identifier
+        :param updates: List of LogClusterData update payloads for nested logs
+        :param merged_updates: Optional list of MergedLogsClusterData payloads, which replace merged small log entries
+                               of Test Items, together with their cluster information
+        :param refresh: Whether to refresh the index after update
+        :param chunk_size: Optional chunk size for bulk operations
+        :return: BulkResponse with update results
+        """
+        if not updates and not merged_updates:
+            return BulkResponse(took=0, errors=False)
+
+        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
+        if not self._ensure_index_checked(index_name):
+            LOGGER.error(f"Index not exists: {index_name}")
+            return BulkResponse(took=0, errors=True)
+
+        script_source = """
+            if (ctx._source.logs != null) {
+                for (int i = 0; i < ctx._source.logs.size(); i++) {
+                    if (ctx._source.logs[i].log_id == params.log_id) {
+                        ctx._source.logs[i].cluster_id = params.cluster_id;
+                        ctx._source.logs[i].cluster_message = params.cluster_message;
+                        ctx._source.logs[i].cluster_with_numbers = params.cluster_with_numbers;
+                    }
+                }
+            }
+        """
+
+        bodies = [
+            build_script_update_body(index_name, update.test_item_id, script_source, update.to_update_params())
+            for update in updates
+        ]
+        for merged_update in merged_updates or []:
+            bodies.append(
+                build_script_update_body(
+                    index_name,
+                    merged_update.test_item_id,
+                    "ctx._source.merged_small_logs = params.merged_small_logs;",
+                    merged_update.to_update_params(),
+                )
+            )
+
+        return self._execute_bulk(bodies, refresh=refresh, chunk_size=chunk_size)
+
+    def _remove_logs_with_predicate(
+        self,
+        project_id: str | int,
+        query: dict[str, Any],
+        predicate: Callable[[LogData], bool],
+    ) -> int:
+        """
+        Remove logs matching predicate from Test Items and delete empty Test Items.
+
+        :param project_id: Project identifier
+        :param query: Query to fetch candidate Test Items
+        :param predicate: Predicate to decide which logs to remove
+        :return: Number of removed logs
+        """
+        my_query = {
+            **query,
+            "_source": ["launch_id", "logs", "test_item_id", "log_count", "merged_small_logs"],
+            "size": self.app_config.esChunkNumber,
+        }
+        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
+        bodies: list[dict[str, Any]] = []
+        removed_logs = 0
+
+        for hit in self.search(project_id, my_query):
+            source = hit.source
+            logs = list(source.logs or [])
+            remaining_logs: list[LogData] = []
+            removed_log_ids: set[str] = set()
+            removed_from_item = 0
+
+            for log in logs:
+                if predicate(log):
+                    removed_from_item += 1
+                    removed_log_ids.add(log.log_id)
+                else:
+                    remaining_logs.append(log)
+
+            if removed_from_item == 0:
+                continue
+
+            removed_logs += removed_from_item
+            if not remaining_logs:
+                bodies.append({"_op_type": "delete", "_index": index_name, "_id": source.test_item_id})
+            else:
+                doc: dict[str, Any] = {
+                    "logs": [log.model_dump() for log in remaining_logs],
+                    "log_count": len(remaining_logs),
+                }
+                if source.merged_small_logs:
+                    # Merged entries which contain removed logs are not valid anymore
+                    doc["merged_small_logs"] = [
+                        merged_log.model_dump()
+                        for merged_log in source.merged_small_logs
+                        if removed_log_ids.isdisjoint(merged_log.log_ids)
+                    ]
+                bodies.append(
+                    {
+                        "_op_type": "update",
+                        "_index": index_name,
+                        "_id": source.test_item_id,
+                        "doc": doc,
+                    }
+                )
+
+        if not bodies:
+            return removed_logs
+
+        bulk_response = self._execute_bulk(bodies)
+        if bulk_response.errors:
+            LOGGER.error("Errors encountered while removing logs for project %s", project_id)
+        return removed_logs
+
+    def _execute_update_by_query(self, index_name: str, body: dict[str, Any]) -> dict[str, Any]:
+        """Update documents by query and make the update visible to searches immediately.
+
+        :param index_name: Target index name
+        :param body: Update query with the script
+        :return: OpenSearch response
+        """
+        return self._os_client.update_by_query(index=index_name, body=body, refresh=True, conflicts="proceed")
+
+    def delete_logs_by_ids(self, project_id: str | int, log_ids: list[str]) -> int:
+        """
+        Delete logs by their identifiers and remove Test Items that become empty.
+
+        The logs are removed on the OpenSearch side with an update by query, without fetching Test Items.
+
+        :param project_id: Project identifier
+        :param log_ids: List of log identifiers to delete
+        :return: Number of changed Test Items, updated and deleted ones together
+        """
+        if not log_ids:
+            return 0
+
+        index_name = get_test_item_index_name(project_id, self.app_config.esProjectIndexPrefix)
+        LOGGER.info(f"Deleting {len(log_ids)} logs from '{index_name}'")
+        t_start = time()
+
+        if not self._ensure_index_checked(index_name):
+            return 0
+
+        unique_log_ids = list(dict.fromkeys(str(log_id) for log_id in log_ids))
+        batch_size = self.app_config.esChunkNumber
+        changed = 0
+        for i in range(0, len(unique_log_ids), batch_size):
+            batch_ids = unique_log_ids[i : i + batch_size]
+            body = {
+                "query": {"nested": {"path": "logs", "query": {"terms": {"logs.log_id": batch_ids}}}},
+                "script": {"source": REMOVE_LOGS_SCRIPT, "lang": "painless", "params": {"log_ids": batch_ids}},
+            }
+            try:
+                result = self._execute_update_by_query(index_name, body)
+                changed += result.get("updated", 0) + result.get("deleted", 0)
+                if result.get("version_conflicts", 0):
+                    # Conflicting Test Items were changed while being updated and are kept as is, the second pass
+                    # removes the logs from the fresh index state
+                    LOGGER.warning(
+                        f"{result['version_conflicts']} test items changed during log deletion in '{index_name}', "
+                        "retrying"
+                    )
+                    result = self._execute_update_by_query(index_name, body)
+                    changed += result.get("updated", 0) + result.get("deleted", 0)
+                if result.get("failures"):
+                    LOGGER.error(f"Failed to delete logs from some test items in '{index_name}': {result['failures']}")
+            except Exception as err:
+                LOGGER.exception("Error in update_by_query", exc_info=err)
+        LOGGER.info(f"Deleted logs from {changed} test items in {round(time() - t_start, 2)} sec")
+        return changed
+
+    @staticmethod
+    def _normalize_datetime(value: str) -> Optional[datetime]:
+        """Parse and normalize datetime strings to naive UTC for comparisons."""
+        try:
+            normalized = value.replace("Z", "+00:00")
+            parsed = datetime.fromisoformat(normalized)
+        except ValueError:
+            parsed = None
+
+        if parsed is None:
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+                try:
+                    parsed = datetime.strptime(value, fmt)
+                    break
+                except ValueError:
+                    continue
+
+        if parsed and parsed.tzinfo:
+            return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+        return parsed
+
+    def delete_by_log_time_range(self, project_id: str | int, start_date: str, end_date: str) -> int:
+        """
+        Delete logs by log_time range and remove Test Items that become empty.
+
+        :param project_id: Project identifier
+        :param start_date: Start of the log_time interval
+        :param end_date: End of the log_time interval
+        :return: Number of deleted logs
+        """
+        start_dt = self._normalize_datetime(start_date)
+        end_dt = self._normalize_datetime(end_date)
+
+        def is_in_range(log: LogData) -> bool:
+            log_time = log.log_time
+            if not log_time:
+                return False
+            log_dt = self._normalize_datetime(log_time)
+            if start_dt and end_dt and log_dt:
+                return start_dt <= log_dt <= end_dt
+            return start_date <= log_time <= end_date
+
+        query = {
+            "query": {
+                "nested": {
+                    "path": "logs",
+                    "query": {"range": {"logs.log_time": {"gte": start_date, "lte": end_date}}},
+                }
+            }
+        }
+
+        return self._remove_logs_with_predicate(project_id, query, is_in_range)

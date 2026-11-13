@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 """Common interface class for Storage types."""
+
 from abc import ABCMeta, abstractmethod
 from typing import Any
 

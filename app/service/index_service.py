@@ -12,160 +12,176 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import json
-from collections import deque
+from collections import defaultdict
+from datetime import datetime
 from time import time
 from typing import Optional
 
-import opensearchpy.helpers
-
 from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory
-from app.commons.esclient import EsClient
-from app.commons.model.launch_objects import ApplicationConfig, Launch, TestItem
+from app.commons.model.launch_objects import ApplicationConfig, DefectUpdate, ItemUpdate, Launch
 from app.commons.model.ml import ModelType, TrainInfo
-from app.utils import text_processing, utils
+from app.commons.model.test_item_index import TestItemHistoryData, TestItemIndexData
+from app.commons.os_client import OsClient
 
 LOGGER = logging.getLogger("analyzerApp.indexService")
+
+
+def format_timestamp(timestamp: datetime) -> str:
+    """Format timestamp for use in indexing"""
+    return timestamp.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def current_timestamp() -> str:
+    """Return current timestamp in indexing format."""
+    return format_timestamp(datetime.now())
+
+
+def update_train_list(app_config: ApplicationConfig, update_list: list[tuple[int, int]]):
+    if not update_list:
+        return
+    if app_config.amqpUrl:
+        amqp_client = AmqpClient(app_config)
+        for project_id, result_num in update_list:
+            if result_num and result_num > 0:
+                for model_type in [ModelType.suggestion, ModelType.auto_analysis, ModelType.defect_type]:
+                    amqp_client.send_to_inner_queue(
+                        "train_models",
+                        TrainInfo(
+                            model_type=model_type, project=project_id, gathered_metric_total=result_num
+                        ).model_dump_json(),
+                    )
+        amqp_client.close()
+
+
+def update_train(app_config: ApplicationConfig, project_id: int, result_num: int):
+    update_train_list(app_config, [(project_id, result_num)])
 
 
 class IndexService:
     """Service for indexing launches and managing launch-related data in OpenSearch"""
 
     app_config: ApplicationConfig
-    es_client: EsClient
+    os_client: OsClient
 
-    def __init__(self, app_config: ApplicationConfig, *, es_client: Optional[EsClient] = None):
+    def __init__(self, app_config: ApplicationConfig, *, os_client: Optional[OsClient] = None):
         """Initialize IndexService
 
         :param app_config: Application configuration object
-        :param es_client: Optional EsClient instance. If not provided, a new one will be created.
+        :param os_client: Optional OsClient instance. If not provided, a new one will be created.
         """
         self.app_config = app_config
-        self.es_client = es_client or EsClient(app_config=self.app_config)
-
-    def _to_launch_test_item_list(self, launches: list[Launch]) -> deque[tuple[Launch, TestItem]]:
-        test_item_queue = deque()
-        for launch in launches:
-            test_items = launch.testItems
-            launch.testItems = []
-            for test_item in test_items:
-                for log in test_item.logs:
-                    if str(log.clusterId) in launch.clusters:
-                        log.clusterMessage = launch.clusters[str(log.clusterId)]
-                test_item_queue.append((launch, test_item))
-        return test_item_queue
-
-    def _to_index_bodies(
-        self, project_with_prefix: str, test_item_queue: deque[tuple[Launch, TestItem]]
-    ) -> tuple[list[str], list[dict]]:
-        bodies = []
-        test_item_ids = []
-        while len(test_item_queue) > 0:
-            launch, test_item = test_item_queue.popleft()
-            logs_added = False
-            for log in test_item.logs:
-                if log.logLevel < utils.ERROR_LOGGING_LEVEL or not log.message.strip():
-                    continue
-
-                bodies.append(request_factory.prepare_log(launch, test_item, log, project_with_prefix))
-                logs_added = True
-            if logs_added:
-                test_item_ids.append(str(test_item.testItemId))
-        return test_item_ids, bodies
+        self.os_client = os_client or OsClient(app_config=self.app_config)
 
     def index_logs(self, launches: list[Launch]) -> None:
-        """Index launches to the index with project name"""
+        """Index launches grouped by project using Test Item-centric documents."""
+        if not launches:
+            return
+
         launch_ids = {str(launch_obj.launchId) for launch_obj in launches}
         launch_ids_str = ", ".join(launch_ids)
-        project = launches[0].project if launches else None
-        LOGGER.info(f"Indexing {len(launch_ids)} launches of project '{project}': {launch_ids_str}")
-        if project is None:
-            return None
+        projects = {str(launch_obj.project) for launch_obj in launches}
+        projects_str = ", ".join(projects)
+        LOGGER.info(f"Indexing {len(launch_ids)} launches of projects '{projects_str}': {launch_ids_str}")
         t_start = time()
-        test_item_queue = self._to_launch_test_item_list(launches)
-        project_with_prefix = text_processing.unite_project_name(project, self.app_config.esProjectIndexPrefix)
-        self.es_client.create_index_if_not_exists(project_with_prefix)
-        test_item_ids, bodies = self._to_index_bodies(project_with_prefix, test_item_queue)
-        self.es_client.bulk_index(bodies)
-        num_logs_with_defect_types = self.es_client.merge_logs(test_item_ids, project_with_prefix)
 
-        if self.app_config.amqpUrl and not self.app_config.disableTrain:
-            amqp_client = AmqpClient(self.app_config)
-            amqp_client.send_to_inner_queue(
-                "train_models",
-                TrainInfo(
-                    model_type=ModelType.defect_type, project=project, gathered_metric_total=num_logs_with_defect_types
-                ).json(),
+        project_test_items: dict[int, list[TestItemIndexData]] = defaultdict(list)
+        defects_per_project: dict[int, int] = defaultdict(int)
+
+        for launch in launches:
+            config = launch.analyzerConfig
+            prepared_items = request_factory.prepare_test_items(
+                launch,
+                number_of_logs_to_index=config.numberOfLogsToIndex,
+                minimal_log_level=config.minimumLogLevel,
+                similarity_threshold_to_drop=config.similarityThresholdToDrop,
             )
-            amqp_client.close()
+            project_test_items[launch.project].extend(prepared_items)
+            defects_per_project[launch.project] += sum(
+                1 for item in prepared_items if item.issue_type and not item.issue_type.startswith("ti")
+            )
+
+        indexed_items = 0
+        for project_id, test_items in project_test_items.items():
+            response = self.os_client.bulk_index(project_id, test_items)
+            # `took` of a bulk response is the number of successfully indexed documents, not time
+            indexed_items += response.took
+
+        update_train_list(self.app_config, list(defects_per_project.items()))
 
         time_passed = round(time() - t_start, 2)
         LOGGER.info(
-            f"Indexing {len(launch_ids)} launches of project '{project}' finished: {launch_ids_str}. "
-            f"It took {time_passed} sec."
+            f"Indexing {len(launch_ids)} launches of projects '{projects_str}' finished: {launch_ids_str}. "
+            f"It took {time_passed} sec., {indexed_items} test items indexed."
         )
 
-    def send_stats_info(self, stats_info: dict) -> None:
-        LOGGER.info("Started sending stats about analysis")
+    @staticmethod
+    def _normalize_items_to_update(
+        items_to_update: dict[int | str, str | ItemUpdate],
+    ) -> dict[str, dict[str, str]]:
+        """Normalize incoming itemsToUpdate payload to a uniform structure."""
+        normalized: dict[str, dict[str, str]] = {}
+        for key, raw_value in items_to_update.items():
+            item_id = str(key)
+            issue_comment = ""
+            if isinstance(raw_value, ItemUpdate):
+                issue_type = raw_value.issueType
+                issue_comment = raw_value.issueComment
+                # The last element is Java nanoseconds, which do not fit into Python microseconds
+                timestamp = format_timestamp(datetime(*raw_value.timestamp[:6]))
+            else:
+                issue_type = raw_value
+                timestamp = current_timestamp()
 
-        stat_info_array = []
-        for obj_info in stats_info.values():
-            rp_aa_stats_index = "rp_aa_stats"
-            if "method" in obj_info and obj_info["method"] == "training":
-                rp_aa_stats_index = "rp_model_train_stats"
-            self.es_client.create_index_for_stats_info(rp_aa_stats_index)
-            stat_info_array.append({"_index": rp_aa_stats_index, "_source": obj_info})
-        self.es_client.bulk_index(stat_info_array)
-        LOGGER.info("Finished sending stats about analysis")
+            if issue_type.strip():
+                normalized[item_id] = {
+                    "issue_type": issue_type,
+                    "issue_comment": issue_comment,
+                    "timestamp": timestamp,
+                }
+        return normalized
 
-    def defect_update(self, defect_update_info: dict) -> list[int]:
+    def defect_update(self, defect_update_info: DefectUpdate) -> list[int]:
+        """Update defect types and issue history for provided test items.
+
+        Updates are sent for all requested Test Items without checking first which of them are indexed: a script update
+        of a missing document fails on its own, and such Test Items are reported as not updated, so ReportPortal
+        re-indexes them.
+
+        :param defect_update_info: Defect update request
+        :return: IDs of Test Items which were not updated
+        """
         LOGGER.info("Started updating defect types")
         t_start = time()
-        test_item_ids = [int(key_) for key_ in defect_update_info["itemsToUpdate"].keys()]
-        is_auto_analyzed = defect_update_info.get("isAutoAnalyzed", False)
-        defect_update_info["itemsToUpdate"] = {
-            int(key_): val for key_, val in defect_update_info["itemsToUpdate"].items()
-        }
-        index_name = text_processing.unite_project_name(
-            defect_update_info["project"], self.app_config.esProjectIndexPrefix
-        )
-        if not self.es_client.index_exists(index_name):
-            return test_item_ids
-        batch_size = 1000
-        log_update_queries = []
-        found_test_items = set()
-        for i in range(int(len(test_item_ids) / batch_size) + 1):
-            sub_test_item_ids = test_item_ids[i * batch_size : (i + 1) * batch_size]
-            if not sub_test_item_ids:
-                continue
-            for log in opensearchpy.helpers.scan(
-                self.es_client.es_client,
-                query=self.es_client.get_test_items_by_ids_query(sub_test_item_ids),
-                index=index_name,
-            ):
-                issue_type = ""
-                try:
-                    test_item_id = int(log["_source"]["test_item"])
-                    found_test_items.add(test_item_id)
-                    issue_type = defect_update_info["itemsToUpdate"][test_item_id]
-                except:  # noqa
-                    pass
-                if issue_type.strip():
-                    log_update_queries.append(
-                        {
-                            "_op_type": "update",
-                            "_id": log["_id"],
-                            "_index": index_name,
-                            "doc": {"issue_type": issue_type, "is_auto_analyzed": is_auto_analyzed},
-                        }
-                    )
-        self.es_client.bulk_index(log_update_queries)
-        items_not_updated = list(set(test_item_ids) - found_test_items)
+
+        project_id = defect_update_info.project
+        is_auto_analyzed = defect_update_info.isAutoAnalyzed
+        normalized_updates = self._normalize_items_to_update(defect_update_info.itemsToUpdate)
+
+        history_updates: list[TestItemHistoryData] = [
+            TestItemHistoryData(
+                test_item_id=test_item_id,
+                is_auto_analyzed=is_auto_analyzed,
+                issue_type=request_factory.transform_issue_type_into_lowercase(update_payload["issue_type"]),
+                timestamp=update_payload["timestamp"],
+                issue_comment=update_payload["issue_comment"],
+            )
+            for test_item_id, update_payload in normalized_updates.items()
+        ]
+
+        failed_test_items: set[str] = set()
+        defect_num = 0
+        if history_updates:
+            response = self.os_client.bulk_update_issue_history(project_id, history_updates)
+            defect_num = response.took
+            if response.errors and not response.failed_ids:
+                # The whole request failed, e.g. the index does not exist, so nothing was updated
+                failed_test_items.update(normalized_updates.keys())
+            else:
+                # Missing Test Items, e.g. not indexed or removed by a cleanup request, fail individually
+                failed_test_items.update(response.failed_ids)
+        update_train(self.app_config, int(project_id), defect_num)
+        items_not_updated = sorted(int(test_item_id) for test_item_id in failed_test_items)
         LOGGER.debug("Not updated test items: %s", items_not_updated)
-        if self.app_config.amqpUrl:
-            amqp_client = AmqpClient(self.app_config)
-            amqp_client.send_to_inner_queue("update_suggest_info", json.dumps(defect_update_info))
-            amqp_client.close()
         LOGGER.info("Finished updating defect types. It took %.2f sec", time() - t_start)
         return items_not_updated

@@ -14,7 +14,7 @@
 
 import json
 import os
-import random
+import re
 import traceback
 import warnings
 from collections import Counter
@@ -22,15 +22,18 @@ from functools import wraps
 from typing import Any, Optional
 
 import numpy as np
-import requests
-from requests import RequestException
 
 from app.commons import logging
 from app.commons.model import launch_objects
-from app.utils.text_processing import remove_credentials_from_url, split_words
+from app.commons.model.launch_objects import SimilarityResult
+from app.utils.text_processing import split_words
 
 logger = logging.getLogger("analyzerApp.utils")
-ERROR_LOGGING_LEVEL = 40000
+
+NOT_CLASSIFIED_BASE_ISSUE_TYPE = "ti"
+CERTAIN_BASE_ISSUE_TYPES = {"ab", "pb", "si", "ti"}
+CLASSIFIED_BASE_ISSUE_TYPES = set(list(CERTAIN_BASE_ISSUE_TYPES) + ["nd"])
+ALL_BASE_ISSUE_TYPES = set(list(CLASSIFIED_BASE_ISSUE_TYPES) + [NOT_CLASSIFIED_BASE_ISSUE_TYPE])
 
 
 def ignore_warnings(func):
@@ -58,14 +61,43 @@ def read_json_file(folder: str, filename: str, to_json: bool = False) -> Any:
     return content if not to_json else json.loads(content)
 
 
-def validate_folder(folder_path: str) -> bool:
-    """Check that passed path points to a directory and it exists."""
-    return folder_path and folder_path.strip() and os.path.exists(folder_path) and os.path.isdir(folder_path)
+def read_resource_file(filename: str, to_json: bool = False) -> Any:
+    """Read fixture from file."""
+    return read_json_file("res", filename, to_json)
 
 
 def validate_file(file_path: str) -> bool:
     """Check that passed path points to a file and it exists."""
-    return file_path and file_path.strip() and os.path.exists(file_path) and os.path.isfile(file_path)
+    return bool(file_path and file_path.strip() and os.path.exists(file_path) and os.path.isfile(file_path))
+
+
+def parse_string_map(value: str | None) -> dict[str, str]:
+    """Parse a JSON object into a dictionary with string keys and values.
+
+    :param value: JSON object as a string, empty or `None` values give an empty dictionary
+    :return: the dictionary where all non-string values are converted to their JSON representation
+    :raises ValueError: if the value is not a valid JSON object
+    """
+    if not value or not value.strip():
+        return {}
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Unable to parse JSON object: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError(f"JSON object expected, got: {type(parsed).__name__}")
+    return {str(key): val if isinstance(val, str) else json.dumps(val) for key, val in parsed.items()}
+
+
+def put_if_set(dictionary: dict[str, Any], key: str, value: Any) -> None:
+    """Put the value into the dictionary only if the value is set, I.E. it is not `None` or empty.
+
+    :param dictionary: the dictionary to update
+    :param key: the key to put the value with
+    :param value: the value to put
+    """
+    if value:
+        dictionary[key] = value
 
 
 def extract_real_id(elastic_id):
@@ -73,43 +105,6 @@ def extract_real_id(elastic_id):
     if real_id.endswith("_m"):
         return int(real_id[:-2])
     return int(real_id)
-
-
-def jaccard_similarity(s1, s2):
-    return len(s1.intersection(s2)) / len(s1.union(s2)) if len(s1.union(s2)) > 0 else 0
-
-
-def send_request(
-    url: str, method: str, username: Optional[str], password: Optional[str], data: Optional[str] = None
-) -> Optional[Any]:
-    """Send request with specified url and http method"""
-
-    kwargs = {}
-    if username:
-        kwargs["auth"] = (username, password)
-
-    if data:
-        kwargs["data"] = data
-        kwargs["headers"] = {"Content-Type": "application/json"}
-
-    try:
-        response = requests.request(method.lower(), url, **kwargs)
-        response.raise_for_status()
-        if response.content:
-            return json.loads(response.text, strict=False)
-    except RequestException as err:
-        logger.exception(f"Error sending {method} request to URL: {remove_credentials_from_url(url)}", exc_info=err)
-    return None
-
-
-def extract_all_exceptions(bodies):
-    logs_with_exceptions = []
-    for log_body in bodies:
-        exceptions = [exc.strip() for exc in log_body["_source"]["found_exceptions"].split()]
-        logs_with_exceptions.append(
-            launch_objects.LogExceptionResult(logId=int(log_body["_id"]), foundExceptions=exceptions)
-        )
-    return logs_with_exceptions
 
 
 MINIMAL_VALUE_FOR_GOOD_PROPORTION = 2
@@ -125,97 +120,10 @@ def calculate_proportions_for_labels(labels: list[int]) -> float:
     return 0.0
 
 
-def balance_data(
-    train_data_indexes: list[int], train_labels: list[int], due_proportion: float
-) -> tuple[list[int], list[int], float]:
-    one_data = [train_data_indexes[i] for i in range(len(train_data_indexes)) if train_labels[i] == 1]
-    zero_data = [train_data_indexes[i] for i in range(len(train_data_indexes)) if train_labels[i] == 0]
-    zero_count = len(zero_data)
-    one_count = len(one_data)
-    min_count = min(zero_count, one_count)
-    max_count = max(zero_count, one_count)
-    if zero_count > one_count:
-        min_data = one_data
-        max_data = zero_data
-        min_label = 1
-        max_label = 0
-    else:
-        min_data = zero_data
-        max_data = one_data
-        min_label = 0
-        max_label = 1
-
-    all_data = []
-    all_data_labels = []
-    real_proportion = 0.0
-    if min_count > MINIMAL_VALUE_FOR_GOOD_PROPORTION:
-        real_proportion = np.round(min_count / max_count, 3)
-    if min_count > 0 and real_proportion < due_proportion:
-        all_data.extend(min_data)
-        all_data_labels.extend([min_label] * len(min_data))
-        random.seed(1763)
-        random.shuffle(max_data)
-        max_size = int(min_count * (1 / due_proportion) - 1)
-        all_data.extend(max_data[:max_size])
-        all_data_labels.extend([max_label] * max_size)
-        real_proportion = calculate_proportions_for_labels(all_data_labels)
-        if real_proportion / due_proportion >= 0.9:
-            real_proportion = due_proportion
-
-    random.seed(1257)
-    random.shuffle(all_data)
-    random.seed(1257)
-    random.shuffle(all_data_labels)
-    return all_data, all_data_labels, real_proportion
-
-
-def topological_sort(feature_graph: dict[int, list[int]]) -> list[int]:
-    visited = {}
-    for key_ in feature_graph:
-        visited[key_] = 0
-    stack = []
-
-    for key_ in feature_graph:
-        if visited[key_] == 0:
-            stack_vertices = [key_]
-            while len(stack_vertices):
-                vert = stack_vertices[-1]
-                if vert not in visited:
-                    continue
-                if visited[vert] == 1:
-                    stack_vertices.pop()
-                    visited[vert] = 2
-                    stack.append(vert)
-                else:
-                    visited[vert] = 1
-                    for key_i in feature_graph[vert]:
-                        if key_i not in visited:
-                            continue
-                        if visited[key_i] == 0:
-                            stack_vertices.append(key_i)
-    return stack
-
-
-def to_int_list(features_list: str) -> list[int]:
-    feature_numbers_list = []
-    for feature_name in features_list.split(";"):
-        feature_name = feature_name.split("_")[0]
-        feature_numbers_list.append(int(feature_name))
-    return feature_numbers_list
-
-
-def to_float_list(features_list: str) -> list[float]:
-    feature_numbers_list = []
-    for feature_name in features_list.split(";"):
-        feature_name = feature_name.split("_")[0]
-        feature_numbers_list.append(float(feature_name))
-    return feature_numbers_list
-
-
 def fill_previously_gathered_features(
     feature_list: list[list[float]], feature_ids: list[int]
 ) -> dict[int, list[list[float]]]:
-    previously_gathered_features = {}
+    previously_gathered_features: dict[int, list[list[float]]] = {}
     try:
         for i in range(len(feature_list)):
             for idx, feature in enumerate(feature_ids):
@@ -230,24 +138,30 @@ def fill_previously_gathered_features(
 
 
 def gather_feature_list(gathered_data_dict: dict[int, list[list[float]]], feature_ids: list[int]) -> list[list[float]]:
-    features_array: Optional[np.array] = None
+    if not gathered_data_dict:
+        return []
     axis_x_size = max([len(x) for x in gathered_data_dict.values()])
     if axis_x_size <= 0:
         return []
-    for idx, feature in enumerate(feature_ids):
+
+    # Initialize result list with empty lists for each row
+    result: list[list[float]] = [[] for _ in range(axis_x_size)]
+
+    for feature in feature_ids:
         if feature not in gathered_data_dict or len(gathered_data_dict[feature]) == 0:
             gathered_data_dict[feature] = [[0.0] for _ in range(axis_x_size)]
-        if features_array is None:
-            features_array = np.asarray(gathered_data_dict[feature])
-        else:
-            features_array = np.concatenate([features_array, gathered_data_dict[feature]], axis=1)
-    return features_array.tolist()
+
+        # Append features from this feature ID to each row
+        for row_idx, row in enumerate(gathered_data_dict[feature]):
+            result[row_idx].extend(row)
+
+    return result
 
 
 def extract_exception(err: Exception) -> str:
-    err_message = traceback.format_exception_only(type(err), err)
-    if len(err_message):
-        err_message = err_message[-1]
+    err_message_list = traceback.format_exception_only(type(err), err)
+    if len(err_message_list):
+        err_message = err_message_list[-1]
     else:
         err_message = ""
     return err_message
@@ -263,7 +177,7 @@ def get_allowed_number_of_missed(cur_threshold: float) -> int:
     return 0
 
 
-def calculate_threshold(text_size, cur_threshold, min_recalculated_threshold=0.8):
+def calculate_threshold(text_size: int, cur_threshold: float, min_recalculated_threshold: float = 0.8) -> float:
     if not text_size:
         return cur_threshold
     allowed_words_missed = get_allowed_number_of_missed(cur_threshold)
@@ -271,21 +185,39 @@ def calculate_threshold(text_size, cur_threshold, min_recalculated_threshold=0.8
     for _ in range(allowed_words_missed, 0, -1):
         threshold = (text_size - allowed_words_missed) / text_size
         if threshold >= min_recalculated_threshold:
-            new_threshold = round(threshold, 2)
+            new_threshold = round(threshold, 4)
             break
     return min(new_threshold, cur_threshold)
 
 
-def calculate_threshold_for_text(text, cur_threshold, min_recalculated_threshold=0.8):
+def calculate_threshold_for_text(text: str, cur_threshold: float, min_recalculated_threshold: float = 0.8):
     text_size = len(split_words(text))
     return calculate_threshold(text_size, cur_threshold, min_recalculated_threshold=min_recalculated_threshold)
+
+
+# Boost ladder for search clauses. Values are relative to each other only: a clause boosted
+# BOOST_ERROR_IDENTITY contributes roughly twice what BOOST_MESSAGE does, and so on.
+BOOST_NEUTRAL = 1.0
+"""No emphasis. For a clause that carries the query on its own, so its weight cannot rank anything."""
+
+BOOST_SUPPORTING = 2.0
+"""A field that corroborates a match without identifying it: numbers, params, URLs, paths."""
+
+BOOST_MESSAGE = 4.0
+"""The primary message field a candidate is matched on."""
+
+BOOST_ERROR_IDENTITY = 8.0
+"""A field that nearly identifies the failure: exception names, status codes."""
+
+CONTAINED_SEQUENCE_BOOST_FACTOR = 0.5
+"""Share of the boost given to a sequence found inside a longer one rather than matched whole."""
 
 
 def build_more_like_this_query(
     min_should_match: str,
     log_message,
     field_name: str = "message",
-    boost: float = 1.0,
+    boost: float = BOOST_NEUTRAL,
     override_min_should_match: Optional[str] = None,
     max_query_terms: int = 50,
 ):
@@ -302,22 +234,64 @@ def build_more_like_this_query(
     }
 
 
-def append_potential_status_codes(
-    query: dict[str, Any], log: dict[str, Any], *, boost: float = 8.0, max_query_terms: int = 50
-) -> None:
-    potential_status_codes = log["_source"]["potential_status_codes"].strip()
-    if potential_status_codes:
-        number_of_status_codes = str(len(set(potential_status_codes.split())))
-        query["query"]["bool"]["must"].append(
-            build_more_like_this_query(
-                "1",
-                potential_status_codes,
-                field_name="potential_status_codes",
-                boost=boost,
-                override_min_should_match=number_of_status_codes,
-                max_query_terms=max_query_terms,
-            )
-        )
+def build_status_codes_exact_query(
+    status_codes: str, field_name: str = "potential_status_codes", boost: float = BOOST_NEUTRAL
+) -> Optional[dict[str, Any]]:
+    """Build a clause matching the exact status code sequence.
+
+    `potential_status_codes` stores the codes as they appeared in the message, in order and
+    without de-duplication, so "expected status code 400, but was 401" is stored as `400 401`
+    while the inverse failure is stored as `401 400`. Those are different failures and must not
+    match each other, which rules out both `more_like_this` and `terms`: they test term overlap
+    and score the two identically.
+
+    :param status_codes: Status codes as stored in the field, whitespace separated
+    :param field_name: Field holding the codes; its `.exact` sub-field is matched
+    :param boost: Boost for the clause
+    :return: A term query on the `.exact` sub-field, or None when there are no codes
+    """
+    codes = status_codes.strip()
+    if not codes:
+        return None
+    return {"term": {f"{field_name}.exact": {"value": codes, "boost": boost}}}
+
+
+def build_status_codes_queries(
+    status_codes: str, field_name: str = "potential_status_codes", boost: float = BOOST_NEUTRAL
+) -> list[dict[str, Any]]:
+    """Build clauses that rank status code sequences by how exactly they match.
+
+    The exact sequence scores highest; the same sequence occurring inside a longer one still
+    matches, at half the boost. Order is preserved in both, unlike `more_like_this`.
+
+    :param status_codes: Status codes as stored in the field, whitespace separated
+    :param field_name: Field holding the codes
+    :param boost: Boost for an exact match; a contained match gets CONTAINED_SEQUENCE_BOOST_FACTOR of it
+    :return: Clauses to add to a `should`, empty when there are no codes
+    """
+    exact = build_status_codes_exact_query(status_codes, field_name=field_name, boost=boost)
+    if not exact:
+        return []
+    codes = status_codes.strip()
+    contained_boost = boost * CONTAINED_SEQUENCE_BOOST_FACTOR
+    return [exact, {"match_phrase": {field_name: {"query": codes, "boost": contained_boost}}}]
+
+
+def build_status_codes_filter(status_codes: str, field_name: str = "potential_status_codes") -> dict[str, Any]:
+    """Build a filter clause which leaves only logs with exactly the same status code sequence.
+
+    The sequence is compared as a whole, see `build_status_codes_exact_query`. A log without codes matches only logs
+    without codes, so a cut log which lost its "expected 409, but was 404" line does not match the full one.
+
+    :param status_codes: Status codes as stored in the field, whitespace separated
+    :param field_name: Field holding the codes; its `.exact` sub-field is matched
+    :return: A term query on the `.exact` sub-field, or a query for logs with no codes when there are no codes
+    """
+    exact = build_status_codes_exact_query(status_codes, field_name=field_name)
+    if exact:
+        return exact
+    # Logs without codes may store an empty string as well as no value at all, "?*" matches only non-empty values.
+    return {"bool": {"must_not": [{"wildcard": {f"{field_name}.exact": {"value": "?*"}}}]}}
 
 
 def extract_clustering_setting(cluster_id):
@@ -340,16 +314,6 @@ def create_path(query: dict, path: tuple[str, ...], value: Any) -> Any:
     if last_element not in current_node:
         current_node[last_element] = value
     return current_node[last_element]
-
-
-def compute_if_absent(on: dict[str, Any], key: str, default_value: Any) -> Any:
-    """Compute value for key in dictionary if it is absent.
-
-    It is here just to mute SonarLint warning about possible KeyError.
-    """
-    if key not in on:
-        on[key] = default_value
-    return on[key]
 
 
 def append_aa_ma_boosts(query: dict[str, Any], search_cfg: launch_objects.SearchConfig) -> None:
@@ -388,3 +352,64 @@ def append_aa_ma_boosts(query: dict[str, Any], search_cfg: launch_objects.Search
 def strip_path(path: str) -> str:
     """Strip trailing slashes from a path."""
     return path.strip().rstrip("/").rstrip("\\")
+
+
+def normalize_issue_type(issue_type: Any) -> str:
+    """
+    Normalize issue type to lowercase string.
+
+    :param issue_type: Raw issue type
+    :return: Normalized issue type
+    """
+    if issue_type is None:
+        return ""
+    return str(issue_type).strip().lower()
+
+
+def safe_int(value: Any) -> int:
+    """
+    Safely cast a value to integer.
+
+    :param value: Value to cast
+    :return: Integer value or 0 on failure
+    """
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def prepare_restrictions_by_issue_type(filter_no_defect: bool = True) -> list[dict[str, Any]]:
+    issue_type_filter = [{"wildcard": {"issue_type": {"value": "ti*", "case_insensitive": True}}}]
+    if filter_no_defect:
+        issue_type_filter.append({"wildcard": {"issue_type": {"value": "nd*", "case_insensitive": True}}})
+    return issue_type_filter
+
+
+def get_max_similarity_idx(per_log_similarity: list[SimilarityResult]) -> Optional[int]:
+    if not per_log_similarity:
+        return None
+    max_similarity = 0.0
+    best_log_idx = None
+    for log_idx, sim_obj in enumerate(per_log_similarity):
+        if max_similarity < sim_obj.similarity:
+            max_similarity = sim_obj.similarity
+            best_log_idx = log_idx
+    return best_log_idx
+
+
+def _get_base_issue_type(issue_type: str) -> str:
+    return issue_type[:2].lower() if issue_type else ""
+
+
+def is_supported_issue_type(issue_type: str) -> bool:
+    if not issue_type:
+        return False
+    base_type = _get_base_issue_type(issue_type)
+    return base_type in CLASSIFIED_BASE_ISSUE_TYPES and base_type != NOT_CLASSIFIED_BASE_ISSUE_TYPE
+
+
+def normalize_base_issue_type(issue_type: str) -> str:
+    if not issue_type:
+        return issue_type
+    return _get_base_issue_type(issue_type) if re.match(r"^[a-z]{2}\d{,3}$", issue_type) else issue_type

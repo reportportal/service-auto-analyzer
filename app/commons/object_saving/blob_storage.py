@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 """Base class for blob storage implementations (S3, Minio, etc.)."""
+
 import io
 import json
 import os.path

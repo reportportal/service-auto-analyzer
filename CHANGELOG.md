@@ -1,5 +1,26 @@
 # Changelog
+
 ## [Unreleased]
+### Added
+- `ANALYZER_QUERY_TERMS_BUDGET` config parameter to limit the number of message terms in one Test Item query, by @HardNorth
+- OpenDAL datastore client with `s3-compatible`, `aws-s3`, `azure` and `gcs` datastore types, compatible with ReportPortal API service configuration, by @HardNorth
+- `DATASTORE_AZURE_*`, `DATASTORE_GCS_*` and `DATASTORE_OPENDAL_OPTIONS` config parameters for OpenDAL datastore types, by @HardNorth
+### Changed
+- Log Item-centric storage approach changed to Test Item-centric one, by @HardNorth
+- Status code detection improved, by @HardNorth
+- Auto-analysis, suggestions and model training search for similar Test Items by all their logs in one query, by @HardNorth
+- Gradient Boosting featurization and prediction are Test Item-centric now, by @HardNorth
+- New Gradient Boosting feature set, independent of search engine specifics, by @HardNorth
+- `nltk` updated to `3.10.3` to address vulnerabilities, by @HardNorth
+- The analyzer doesn't declare the `analyzer-reply` exchange before publishing analysis results: ReportPortal owns it, and the declaration with other settings was rejected by the broker, by @HardNorth
+- Model training searches for similar Test Items in batches of `ANALYZER_QUERY_BATCH_SIZE` queries instead of one request per Test Item, by @HardNorth
+- Log deletion by IDs removes logs on the OpenSearch side with an update by query instead of fetching Test Items with a scroll and rewriting them, and returns the number of changed Test Items, by @HardNorth
+### Fixed
+- The indexing log message reported the number of indexed Test Items as seconds, by @HardNorth
+- With `DISABLE_TRAIN=true` the `train` queue had no consumer and could grow forever, now its messages are discarded, by @HardNorth
+- [Issue #279](https://github.com/reportportal/service-auto-analyzer/issues/279): Health check and read-only index recovery now use the OpenSearch client and honor `ES_VERIFY_CERTS`, `ES_CA_CERT`, `ES_CLIENT_CERT` and `ES_CLIENT_KEY`, by @HardNorth
+
+## [5.15.6]
 ### Fixed
 - `Boto3Client.get_folder_objects` now returns items exactly on the same depth as requested folder (not recursive), by @HardNorth
 ### Changed

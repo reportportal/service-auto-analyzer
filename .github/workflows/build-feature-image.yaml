@@ -38,11 +38,12 @@ jobs:
     uses: reportportal/.github/.github/workflows/build-docker-image.yaml@5d208acab22207a12d6b204373dc76b97d61bf8c
     with:
       aws-region: ${{ vars.AWS_REGION }}
+      build-platforms: ${{ vars.BUILD_PLATFORMS || 'linux/amd64,linux/arm64' }}
       image-tag: ${{ needs.variables-setup.outputs.tag }}
       version: ${{ needs.variables-setup.outputs.tag }}
       branch: ${{ github.head_ref }}
       date: ${{ needs.variables-setup.outputs.date }}
     secrets:
-      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       GH_USER: ${{ secrets.GH_USER }}
       GH_TOKEN: ${{ secrets.GH_TOKEN }}

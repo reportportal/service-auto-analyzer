@@ -13,11 +13,20 @@
 #  limitations under the License.
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from app.commons.model.db import Hit
 from app.commons.model.ml import ModelType
+from app.commons.model.test_item_index import TestItemIndexData
+
+ERROR_LOGGING_LEVEL: int = 40000
+
+
+def timestamp_factory() -> tuple[int, int, int, int, int, int, int]:
+    now = datetime.now().timetuple()
+    return now[0], now[1], now[2], now[3], now[4], now[5], now[6]
 
 
 class AnalyzerConf(BaseModel):
@@ -31,9 +40,14 @@ class AnalyzerConf(BaseModel):
     allMessagesShouldMatch: bool = False
     searchLogsMinShouldMatch: int = 95
     uniqueErrorsMinShouldMatch: int = 95
+    numberOfLogsToIndex: int = 20
+    minimumLogLevel: int = ERROR_LOGGING_LEVEL
+    similarityThresholdToDrop: float = 0.95
+    searchScoreMode: str = "avg"
 
 
 class ApplicationConfig(BaseModel):
+    """General application config object"""
 
     esHost: str = ""
     esUser: str = ""
@@ -63,7 +77,6 @@ class ApplicationConfig(BaseModel):
     amqpHandlerMaxRetries: int = 3
     amqpHandlerTaskTimeout: int = 600
     analyzerResponseExchange: str = "analyzer-reply"
-    analyzerResponseExchangeType: str = "direct"
     analyzerResponseQueue: str = "analysis.matches"
 
     analyzerHttpPort: int = 5001
@@ -83,13 +96,21 @@ class ApplicationConfig(BaseModel):
     datastoreRegion: str | None = None
     datastoreBucketPrefix: str = "prj-"
     datastoreBucketPostfix: str = ""
+    datastoreDefaultBucketName: str = "rp-bucket"
+    datastoreAzureAccountName: str | None = None
+    datastoreAzureAccountKey: str | None = None
+    datastoreAzureEndpoint: str | None = None
+    datastoreAzureContainer: str | None = None
+    datastoreGcsBucket: str | None = None
+    datastoreGcsCredentialsPath: str | None = None
+    datastoreGcsEndpoint: str | None = None
+    datastoreOpendalOptions: dict[str, str] = {}
     filesystemDefaultPath: str = "storage"
 
 
 class SearchConfig(BaseModel):
-    """Search config object"""
+    """Configuration object for full-text search engine and auto-analysis."""
 
-    SearchLogsMinSimilarity: float = 0.95
     MinShouldMatch: str = "80%"
     BoostAA: float = 0.0
     BoostMA: float = 5.0
@@ -113,6 +134,12 @@ class SearchConfig(BaseModel):
     AutoBoostModelMonotonousFeatures: str = ""
     MaxSuggestionsNumber: int = 3
     MaxAutoAnalysisItemsToProcess: int = 4000
+    # Queries per msearch request. Each in-flight query holds its whole response in memory
+    # until its group is consumed, so this trades round trips against peak memory.
+    AnalysisQueryBatchSize: int = 20
+    # Total number of message terms in one Test Item query, shared across its logs. OpenSearch limits
+    # the number of clauses in the whole query (1024 by default), and every term is a clause.
+    ItemQueryTermsBudget: int = 800
     DefectTypeModelNumEstimators: int = 5
     SuggestBoostModelNumEstimators: int = 50
     SuggestBoostModelMaxDepth: int = 5
@@ -136,12 +163,21 @@ class SimilarityResult(BaseModel):
     both_empty: bool
 
 
+class RelevantItem(BaseModel):
+    """Found Test Item hit, with the request Test Item it was compared to and its comparison metadata"""
+
+    mrHit: Hit[TestItemIndexData]
+    score: float = 0.0
+    compared_item: TestItemIndexData
+    original_position: int = -1
+
+
 class Log(BaseModel):
     """Log object"""
 
     logId: int
     logLevel: int = 0
-    logTime: list[int] = list(datetime.now().timetuple())[:7]
+    logTime: tuple[int, int, int, int, int, int, int] = Field(default_factory=timestamp_factory)
     message: str
     clusterId: int = 0
     clusterMessage: str = ""
@@ -156,7 +192,7 @@ class TestItem(BaseModel):
     issueType: str = ""
     issueDescription: str = ""
     originalIssueType: str = ""
-    startTime: list[int] = list(datetime.now().timetuple())[:7]
+    startTime: tuple[int, int, int, int, int, int, int] = Field(default_factory=timestamp_factory)
     endTime: Optional[list[int]] = None
     lastModified: Optional[list[int]] = None
     testCaseHash: int = 0
@@ -191,10 +227,24 @@ class Launch(BaseModel):
     launchName: str = ""
     launchNumber: int = 0
     previousLaunchId: int = 0
-    launchStartTime: list[int] = list(datetime.now().timetuple())[:7]
+    launchStartTime: tuple[int, int, int, int, int, int, int] = Field(default_factory=timestamp_factory)
     analyzerConfig: AnalyzerConf = AnalyzerConf()
     testItems: list[TestItem] = []
     clusters: dict = {}
+
+
+class ItemUpdate(BaseModel):
+    timestamp: tuple[int, int, int, int, int, int, int] = Field(default_factory=timestamp_factory)
+    issueType: str
+    issueComment: str = ""
+
+
+class DefectUpdate(BaseModel):
+    """Item update object"""
+
+    project: int | str
+    isAutoAnalyzed: bool = False
+    itemsToUpdate: dict[int | str, str | ItemUpdate]
 
 
 class LaunchInfoForClustering(BaseModel):
@@ -243,24 +293,17 @@ class SuggestAnalysisResult(BaseModel):
     isMergedLog: bool = False
     matchScore: float
     resultPosition: int
-    esScore: Optional[float]
-    esPosition: Optional[int]
-    modelFeatureNames: Optional[str]
-    modelFeatureValues: Optional[str]
-    modelInfo: Optional[str]
+    esScore: Optional[float] = 0.0
+    esPosition: Optional[int] = None
+    modelFeatureNames: Optional[str] = None
+    modelFeatureValues: Optional[str] = None
+    modelInfo: Optional[str] = None
     usedLogLines: int
     minShouldMatch: int
     processedTime: float
     userChoice: int = 0
     methodName: str
     clusterId: int = 0
-
-
-class CleanIndex(BaseModel):
-    """Clean index object"""
-
-    ids: list[int]
-    project: int
 
 
 class CleanIndexStrIds(BaseModel):
@@ -303,6 +346,7 @@ class BulkResponse(BaseModel):
 
     took: int
     errors: bool
+    failed_ids: list[str] = []
     items: list[str] = []
     logResults: list[LogExceptionResult] = []
     status: int = 0
@@ -339,9 +383,38 @@ class AnalysisCandidate(BaseModel):
     analyzerConfig: AnalyzerConf
     testItemId: int
     timeProcessed: float
-    candidates: list[tuple]
-    candidatesWithNoDefect: list[tuple[dict[str, Any], dict[str, Any]]]
+    candidates: tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]
+    candidatesWithNoDefect: Optional[tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]] = None
     project: int
     launchId: int
     launchName: str
     launchNumber: int = 0
+
+
+class DeleteLogsRequest(BaseModel):
+    """Clean index object"""
+
+    ids: list[int]
+    project: int
+
+
+class DeleteTestItemsRequest(BaseModel):
+    """Request payload for deleting Test Items."""
+
+    project: int | str
+    itemsToDelete: list[int | str]
+
+
+class DeleteLaunchesRequest(BaseModel):
+    """Request payload for deleting launches."""
+
+    project: int | str
+    launch_ids: list[int | str]
+
+
+class RemoveByDatesRequest(BaseModel):
+    """Request payload for removing logs by launch start time."""
+
+    project: int | str
+    interval_start_date: str
+    interval_end_date: str

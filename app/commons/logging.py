@@ -76,6 +76,9 @@ class Logger:
         my_kwargs = _process_kwargs(kwargs)
         self.__logger.critical(msg, *args, **my_kwargs)
 
+    def is_enabled_for(self, level: int) -> bool:
+        return self.__logger.isEnabledFor(level)
+
 
 def new_correlation_id() -> str:
     corr_id = base64.urlsafe_b64encode(uuid.uuid4().bytes).decode("utf-8").rstrip("=")

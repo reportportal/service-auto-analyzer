@@ -1,0 +1,4 @@
+HTTP Request failed with error code 404 Not Found
+Stacktrace:
+  at com.example.api.ApiClient.sendRequest(ApiClient.java:123)
+  at com.example.service.DataService.fetchData(DataService.java:45)

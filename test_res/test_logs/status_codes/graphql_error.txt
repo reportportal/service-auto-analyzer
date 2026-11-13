@@ -1,0 +1,3 @@
+com.example.error.DynamoException: Error communicating with Graph QL server
+Caused by: com.netflix.graphql.dgs.client.GraphQLClientException: 401 UNAUTHORIZED "GraphQL server https://example.com/approuter/v2/graphql responded with status code 401: ''. The request sent to the server was
+{"query":"mutation {enrollMembership{ id registrationDate } }","variables":{},"operationName":null}"

@@ -135,4 +135,4 @@ dmypy.json
 
 # AI agents config files
 AGENTS.md
-PROMPTS.md
+docs/PROMPTS.md

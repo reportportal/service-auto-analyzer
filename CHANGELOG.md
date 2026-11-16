@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unrelease]
+## [Unreleased]
 ### Added
 - Test Items are indexed with an `error_hash` field, a stateless identity of the failure built from exception messages, exceptions and status codes; the field is added to existing indices automatically, by @HardNorth
 - `ANALYZER_HASH_MATCH_SAME_TEST` config parameter to analyze a Test Item by the latest runs of the same test case failed with the same error before Gradient Boosting, disabled by default, by @HardNorth

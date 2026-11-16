@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""Common package for different Storage services (Minio, Filesystem, etc.)."""
+"""Common package for different Storage services (Minio, S3, OpenDAL, Filesystem, etc.)."""
 
 from app.commons.model.launch_objects import ApplicationConfig
 from app.commons.object_saving.object_saver import ObjectSaver

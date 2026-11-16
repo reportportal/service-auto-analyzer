@@ -14,7 +14,7 @@
 import os
 import time
 from multiprocessing import Pipe, Process
-from typing import Any, Callable, Optional, Protocol
+from typing import Any, Callable, Optional, Protocol, runtime_checkable
 
 from app.commons import logging
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
@@ -24,9 +24,10 @@ from app.service import ServiceProcessor
 LOGGER = logging.getLogger("analyzerApp.processing")
 
 
+@runtime_checkable
 class Processor(Protocol):
     @property
-    def pid(self) -> int:
+    def pid(self) -> Optional[int]:
         """Return the process ID of the processor."""
         ...
 
@@ -79,26 +80,20 @@ class DummyProcessor:
 
 
 class RealProcessor:
-    app_config: ApplicationConfig
-    search_config: SearchConfig
     parent_conn: Any
     child_conn: Any
     process: Process
 
     def __init__(
         self,
-        app_config: ApplicationConfig,
-        search_config: SearchConfig,
-        target: Callable[[Any, ApplicationConfig, SearchConfig], None],
+        target: Callable[[Any], None],
     ) -> None:
-        self.app_config = app_config
-        self.search_config = search_config
         self.parent_conn, self.child_conn = Pipe()
-        self.process = Process(target=target, args=(self.child_conn, self.app_config, self.search_config), daemon=True)
+        self.process = Process(target=target, args=[self.child_conn], daemon=True)
         self.process.start()
 
     @property
-    def pid(self) -> int:
+    def pid(self) -> Optional[int]:
         return self.process.pid
 
     def is_alive(self) -> bool:
@@ -137,17 +132,26 @@ class Worker:
     Contains the main worker function that runs in a separate process and processes messages.
     """
 
+    app_config: ApplicationConfig
+    search_config: SearchConfig
     _init_services: set[str]
+    _processor: ServiceProcessor
 
     def __init__(
         self,
+        app_config: ApplicationConfig,
+        search_config: SearchConfig,
         init_services: set[str],
     ):
         """Initialize worker with services to initialize and optional retry predicate.
 
+        :param ApplicationConfig app_config: Application configuration containing retry settings
+        :param SearchConfig search_config: Search configuration for the processor
         :param set[str] init_services: Set of service names to initialize in the worker process
         if a failed processing attempt should be retried
         """
+        self.app_config = app_config
+        self.search_config = search_config
         self._init_services = init_services
 
     def __process(self, processing_item: ProcessingItem, processor: ServiceProcessor) -> Optional[ProcessingResult]:
@@ -165,8 +169,6 @@ class Worker:
     def work(
         self,
         conn: Any,
-        app_config: ApplicationConfig,
-        search_config: SearchConfig,
     ) -> None:
         """Worker function that runs in separate process.
 
@@ -174,10 +176,8 @@ class Worker:
         handles retries based on the retry predicate, and sends results back through the connection.
 
         :param Any conn: Process connection object for communication with parent process
-        :param ApplicationConfig app_config: Application configuration containing retry settings
-        :param SearchConfig search_config: Search configuration for the processor
         """
-        processor = ServiceProcessor(app_config, search_config, services_to_init=self._init_services)
+        processor = ServiceProcessor(self.app_config, self.search_config, services_to_init=self._init_services)
         try:
             while True:
                 if not conn.poll():

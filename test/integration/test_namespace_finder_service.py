@@ -165,7 +165,7 @@ def test_update_chosen_namespaces_with_multiple_projects(test_launches: list[Lau
 
     # Create launches with different project IDs
     launch1 = test_launches[0]
-    launch2 = Launch(**test_launches[1].dict())
+    launch2 = Launch(**test_launches[1].model_dump())
     launch2.project = 456  # Different project ID
 
     # Create namespace_finder and service

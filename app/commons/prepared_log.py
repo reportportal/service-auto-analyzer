@@ -12,9 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Optional
-
-from typing_extensions import override
+from typing import Optional, override
 
 from app.utils import text_processing
 from app.utils.log_preparation import (
@@ -35,8 +33,9 @@ class PreparedLogMessage:
     number_of_lines: int
     _basic_message: Optional[str] = None
     _clean_message: Optional[str] = None
-    _test_and_methods: Optional[set[str]] = None
+    _test_and_methods: Optional[list[str]] = None
     _message: Optional[str] = None
+    _message_for_clustering: Optional[str] = None
     _message_no_params: Optional[str] = None
     _exception_message: Optional[str] = None
     _stacktrace: Optional[str] = None
@@ -76,7 +75,7 @@ class PreparedLogMessage:
         return self._clean_message
 
     @property
-    def test_and_methods(self) -> set[str]:
+    def test_and_methods(self) -> list[str]:
         if not self._test_and_methods:
             self._test_and_methods = text_processing.find_test_methods_in_text(self.clean_message)
         return self._test_and_methods
@@ -86,6 +85,19 @@ class PreparedLogMessage:
         if not self._message:
             self._message = prepare_message_no_numbers(self.clean_message, self.number_of_lines, self.test_and_methods)
         return self._message
+
+    @property
+    def message_for_clustering(self) -> str:
+        """Message which is compared with other messages to group logs into clusters.
+
+        Access tokens, GUIDs and HEX addresses are excluded: they differ from run to run, and otherwise logs which
+        differ only in them would not join one cluster.
+        """
+        if not self._message_for_clustering:
+            self._message_for_clustering = prepare_message(
+                clean_message_clustering(self.basic_message), self.number_of_lines, self.test_and_methods
+            )
+        return self._message_for_clustering
 
     @property
     def message_no_params(self) -> str:
@@ -166,7 +178,7 @@ class PreparedLogMessage:
     @property
     def exception_found(self) -> str:
         if not self._exception_found:
-            self._exception_found = text_processing.get_found_exceptions(self.exception_message_no_numbers)
+            self._exception_found = " ".join(text_processing.get_found_exceptions(self.exception_message_no_numbers))
         return self._exception_found
 
     @property

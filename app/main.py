@@ -19,30 +19,33 @@ import threading
 import warnings
 from signal import SIGINT, signal
 from sys import exit
-from typing import Any, Optional
+from typing import Any, Callable
 
 from flask import Flask, Response
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
 
 from app.amqp.amqp import AmqpClient
-from app.amqp.amqp_handler import AmqpRequestHandler, DirectAmqpRequestHandler, ProcessAmqpRequestHandler
+from app.amqp.amqp_handler import (
+    AmqpRequestHandler,
+    DirectAmqpRequestHandler,
+    DiscardingAmqpRequestHandler,
+    ProcessAmqpRequestHandler,
+)
 from app.commons import logging as my_logging
-from app.commons.esclient import EsClient
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
 from app.commons.model.ml import ModelType
+from app.commons.os_client import OsClient
 from app.utils import utils
 
 
-def to_bool(value: Optional[Any]) -> Optional[bool]:
+def to_bool(value: Any) -> bool:
     """Convert value of any type to boolean or raise ValueError.
 
     :param value: value to convert
     :return: boolean value
     :raises ValueError: if value is not boolean
     """
-    if value is None or value == "":
-        return None
     if value in {"TRUE", "True", "true", "1", "Y", "y", True}:
         return True
     if value in {"FALSE", "False", "false", "0", "N", "n", False}:
@@ -92,8 +95,11 @@ if minio_use_tls:
         stacklevel=2,
     )
 if not datastore_endpoint and minio_short_host:
-    use_tls = to_bool(minio_use_tls)
+    use_tls = to_bool(minio_use_tls) if minio_use_tls else False
     datastore_endpoint = f"http{'s' if use_tls else ''}://{minio_short_host}"
+if not datastore_endpoint and datastore_type == "s3-compatible":
+    # Mute Sonar about hardcoded HTTP URL, since this is a hostname inside a docker-compose file
+    datastore_endpoint = "http://minio:9000"  # NOSONAR
 
 # Handle all datastore region settings, old and new
 datastore_region = os.getenv("DATASTORE_REGION")
@@ -116,6 +122,8 @@ if old_datastore_region:
     )
     if not datastore_region:
         datastore_region = old_datastore_region
+if not datastore_region and datastore_type in {"s3-compatible", "aws-s3"}:
+    datastore_region = "us-east-1"
 
 # Handle all datastore bucket prefix settings, old and new
 datastore_default_bucket_name = os.getenv("DATASTORE_DEFAULTBUCKETNAME")
@@ -148,6 +156,13 @@ if datastore_default_bucket_name:
 else:
     if not datastore_bucket_prefix:
         datastore_bucket_prefix = "prj-"
+    # OpenDAL datastore types are bound to one bucket: the first part of the prefix path if it has one,
+    # otherwise the same default bucket as in ReportPortal API service
+    datastore_prefix_path = datastore_bucket_prefix.replace("\\", "/").strip("/")
+    if "/" in datastore_prefix_path:
+        datastore_default_bucket_name = datastore_prefix_path.split("/")[0]
+    else:
+        datastore_default_bucket_name = "rp-bucket"
 
 datastore_bucket_postfix = os.getenv("DATASTORE_BUCKETPOSTFIX", "")
 
@@ -215,8 +230,17 @@ APP_CONFIG = ApplicationConfig(
     datastoreRegion=datastore_region,
     datastoreBucketPrefix=datastore_bucket_prefix,
     datastoreBucketPostfix=datastore_bucket_postfix,
+    datastoreDefaultBucketName=datastore_default_bucket_name,
     datastoreAccessKey=datastore_access_key,
     datastoreSecretKey=datastore_secret_key,
+    datastoreAzureAccountName=os.getenv("DATASTORE_AZURE_ACCOUNTNAME"),
+    datastoreAzureAccountKey=os.getenv("DATASTORE_AZURE_ACCOUNTKEY"),
+    datastoreAzureEndpoint=os.getenv("DATASTORE_AZURE_ENDPOINT"),
+    datastoreAzureContainer=os.getenv("DATASTORE_AZURE_CONTAINER") or datastore_default_bucket_name,
+    datastoreGcsBucket=os.getenv("DATASTORE_GCS_BUCKET") or datastore_default_bucket_name,
+    datastoreGcsCredentialsPath=os.getenv("DATASTORE_GCS_CREDENTIALSPATH"),
+    datastoreGcsEndpoint=os.getenv("DATASTORE_GCS_ENDPOINT"),
+    datastoreOpendalOptions=utils.parse_string_map(os.getenv("DATASTORE_OPENDAL_OPTIONS")),
     filesystemDefaultPath=os.getenv("FILESYSTEM_DEFAULT_PATH", "storage").strip(),
     # HTTP endpoint settings
     analyzerHttpPort=int(os.getenv("ANALYZER_HTTP_PORT", "5001")),
@@ -230,7 +254,6 @@ APP_CONFIG = ApplicationConfig(
 )
 
 SEARCH_CONFIG = SearchConfig(
-    SearchLogsMinSimilarity=float(os.getenv("ES_LOGS_MIN_SHOULD_MATCH", "0.95")),
     MinShouldMatch=os.getenv("ES_MIN_SHOULD_MATCH", "80%"),
     BoostAA=float(os.getenv("ES_BOOST_AA", "0.0")),
     BoostMA=float(os.getenv("ES_BOOST_MA", "10.0")),
@@ -253,6 +276,8 @@ SEARCH_CONFIG = SearchConfig(
         os.getenv("ANALYZER_MAX_ITEMS_TO_PROCESS", os.getenv("MAX_AUTO_ANALYSIS_ITEMS_TO_PROCESS", "4000"))
     ),
     MlModelForSuggestions=os.getenv("ML_MODEL_FOR_SUGGESTIONS", ModelType.suggestion.name).strip(),
+    AnalysisQueryBatchSize=int(os.getenv("ANALYZER_QUERY_BATCH_SIZE", "20")),
+    ItemQueryTermsBudget=int(os.getenv("ANALYZER_QUERY_TERMS_BUDGET", "800")),
 )
 
 
@@ -281,10 +306,11 @@ def only_train(request: str) -> bool:
     return request == "train_models"
 
 
-def init_amqp_queues():
+def init_amqp_queues() -> list[tuple[str, threading.Thread, AmqpRequestHandler]]:
     """Initialize rabbitmq queues, exchange and starts threads for queue messages processing"""
-    _threads = []
+    _threads: list[tuple[str, threading.Thread, AmqpRequestHandler]] = []
 
+    handler_class: Callable[..., AmqpRequestHandler]
     if APP_CONFIG.debugMode:
         handler_class = DirectAmqpRequestHandler
     else:
@@ -303,7 +329,6 @@ def init_amqp_queues():
             "search",
             "suggest",
             "cluster",
-            "stats_info",
             "namespace_finder",
             "suggest_patterns",
             "index_suggest_info",
@@ -318,8 +343,12 @@ def init_amqp_queues():
             "remove_by_log_time",
         ],
     )
-    _train_amqp_handler = None
-    if not APP_CONFIG.disableTrain:
+    _train_amqp_handler: AmqpRequestHandler
+    if APP_CONFIG.disableTrain:
+        # Consume the "train" queue anyway and drop its messages, otherwise it grows forever
+        logger.info("Model training is disabled, messages of the 'train' queue are discarded.")
+        _train_amqp_handler = DiscardingAmqpRequestHandler(name="train_handler")
+    else:
         _train_amqp_handler = handler_class(
             APP_CONFIG,
             SEARCH_CONFIG,
@@ -344,22 +373,21 @@ def init_amqp_queues():
         )
     )
 
-    if _train_amqp_handler:
-        _threads.append(
-            (
-                "train",
-                create_thread(
-                    AmqpClient(APP_CONFIG).receive,
-                    (
-                        "train",
-                        _train_amqp_handler.handle_amqp_request,
-                        None,
-                    ),
+    _threads.append(
+        (
+            "train",
+            create_thread(
+                AmqpClient(APP_CONFIG).receive,
+                (
                     "train",
+                    _train_amqp_handler.handle_amqp_request,
+                    None,
                 ),
-                _train_amqp_handler,
-            )
+                "train",
+            ),
+            _train_amqp_handler,
         )
+    )
     return _threads
 
 
@@ -374,7 +402,7 @@ def read_version():
 
 def read_model_settings():
     """Reads paths to models"""
-    model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
+    model_settings = utils.read_resource_file("model_settings.json", to_json=True)
     if not model_settings or not isinstance(model_settings, dict):
         raise RuntimeError("Failed to read model settings")
 
@@ -386,7 +414,7 @@ def read_model_settings():
 my_logging.setup(APP_CONFIG)
 logger = my_logging.getLogger("analyzerApp")
 APP_CONFIG.appVersion = read_version()
-es_client = EsClient(APP_CONFIG)
+os_client = OsClient(APP_CONFIG)
 read_model_settings()
 
 application = create_application()
@@ -398,7 +426,7 @@ def get_health_status():
     status: dict[str, Any] = {"status": "healthy"}
     status_code = 200
     status["version"] = APP_CONFIG.appVersion
-    if not es_client.is_healthy():
+    if not os_client.is_healthy():
         logger.error("Analyzer health check status failed: %s", status)
         status["status"] = "OpenSearch is not healthy"
         status_code = 503
@@ -431,7 +459,7 @@ def get_health_status():
 
 
 # noinspection PyUnusedLocal
-def signal_handler(signal_received, frame):
+def signal_handler(_signal_received, _frame):
     print("The analyzer has stopped")
     exit(0)
 

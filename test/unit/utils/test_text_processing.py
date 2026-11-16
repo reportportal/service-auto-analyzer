@@ -1,22 +1,10 @@
-#  Copyright 2023 EPAM Systems
+#  Copyright 2026 EPAM Systems
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
 #  You may obtain a copy of the License at
 #
-#  https://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#  https://www.apache.org/licenses/LICENSE-2.0
+#      https://www.apache.org/licenses/LICENSE-2.0
 #
 #  Unless required by applicable law or agreed to in writing, software
 #  distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,7 +17,7 @@ import json
 import pytest
 
 from app.utils import log_preparation, text_processing, utils
-from test import read_file, read_file_lines
+from test import get_fixture, read_file, read_file_lines
 
 
 def test_delete_empty_lines():
@@ -44,6 +32,37 @@ def test_filter_empty_lines():
     expected = read_file_lines("test_res/test_logs", "reportportal-api-no-empty-lines.txt")
 
     assert text_processing.filter_empty_lines(log) == expected
+
+
+@pytest.mark.parametrize(
+    "text, max_line_length, min_line_length, expected_lines",
+    [
+        ("", 0, 0, 0),
+        ("one line", 0, 0, 1),
+        ("first\n\n  \nsecond", 0, 0, 2),
+        ("a" * 300, 0, 0, 1),
+        ("one line", 100, 0, 1),
+        ("first\n\n  \nsecond", 100, 0, 2),
+        ("a" * 100, 100, 0, 1),
+        ("a" * 101, 100, 0, 2),
+        ("a" * 300, 100, 0, 3),
+        ("a" * 150 + "\n" + "b" * 10, 100, 0, 3),
+        ("\n1\n2\n3", 100, 0, 3),
+        ("\n1\n2\n3", 100, 12, 1),
+        ("first\n\n  \nsecond", 100, 12, 1),
+        ("first line\nsecond line\nthird line", 100, 12, 2),
+        ("first line of error\nsecond line of error", 100, 12, 2),
+        ("Error:\n" + "a" * 100, 100, 12, 2),
+        ("a" * 150 + "\n" + "b" * 10, 100, 12, 3),
+        ("short\n" * 30, 100, 12, 10),
+    ],
+)
+def test_calculate_line_number(text, max_line_length, min_line_length, expected_lines):
+    assert text_processing.calculate_line_number(text, max_line_length, min_line_length) == expected_lines
+
+
+def test_calculate_line_number_default_min_line_length():
+    assert text_processing.calculate_line_number("\n1\n2\n3", text_processing.LINE_LENGTH) == 1
 
 
 def test_remove_starting_datetime():
@@ -175,7 +194,22 @@ def test_remove_webdriver_auxiliary_info_big(test_file, expected_file):
 def test_find_test_methods_in_text():
     logs = json.loads(read_file("test_res/test_logs", "example_logs.json"))
     for log in logs:
-        assert text_processing.find_test_methods_in_text(log["log"]) == set(log["expected_test_methods"])
+        found = text_processing.find_test_methods_in_text(log["log"])
+        # The order is the order of appearance in the text; the fixtures are unordered, so
+        # compare the contents and assert separately that the result carries no duplicates.
+        assert sorted(found) == sorted(log["expected_test_methods"])
+        assert len(found) == len(set(found))
+
+
+@pytest.mark.parametrize(
+    "text, expected_test_methods",
+    [
+        ("at Object.<anonymous> (/build/tests/login.spec.ts:10:5)", ["login.spec.ts"]),
+        ("at Context.eval (webpack:///./cypress/e2e/cart.cy.js:25:7)", ["cart.cy.js"]),
+    ],
+)
+def test_find_test_methods_in_text_spec_files(text, expected_test_methods):
+    assert text_processing.find_test_methods_in_text(text) == expected_test_methods
 
 
 @pytest.mark.parametrize(
@@ -233,7 +267,7 @@ def test_remove_credentials_from_url(url, expected_url):
 )
 def test_calculate_text_similarity_basic_cases(base_text, other_texts, expected_scores):
     """Test basic text similarity calculation cases"""
-    actual_scores = text_processing.calculate_text_similarity(base_text, *other_texts)
+    actual_scores = text_processing.calculate_text_similarity(base_text, other_texts)
 
     assert len(actual_scores) == len(expected_scores)
 
@@ -269,7 +303,7 @@ def test_calculate_text_similarity_basic_cases(base_text, other_texts, expected_
 )
 def test_preprocess_text_for_similarity(text, expected_preprocessing_contains):
     """Test text preprocessing for similarity calculation"""
-    processed = text_processing.preprocess_text_for_similarity(text)
+    processed = " ".join(text_processing.preprocess_text_for_similarity(text))
 
     # Check that the processed text is lowercase
     assert processed == processed.lower()
@@ -310,7 +344,7 @@ def test_preprocess_text_for_similarity(text, expected_preprocessing_contains):
 )
 def test_calculate_text_similarity_edge_cases(base_text, other_texts):
     """Test text similarity calculation with edge cases"""
-    actual_scores = text_processing.calculate_text_similarity(base_text, *other_texts)
+    actual_scores = text_processing.calculate_text_similarity(base_text, other_texts)
 
     # Basic validation
     assert len(actual_scores) == len(other_texts)
@@ -324,7 +358,7 @@ def test_calculate_text_similarity_edge_cases(base_text, other_texts):
 
 def test_calculate_text_similarity_no_other_texts():
     """Test calculate_text_similarity with no other texts provided"""
-    result = text_processing.calculate_text_similarity("base text")
+    result = text_processing.calculate_text_similarity("base text", [])
     assert result == []
 
 
@@ -338,14 +372,14 @@ def test_calculate_text_similarity_appium_exceptions():
     )
 
     # Test overall similarity
-    similarity_scores = text_processing.calculate_text_similarity(ios_exception, android_exception)
+    similarity_scores = text_processing.calculate_text_similarity(ios_exception, [android_exception])
     assert len(similarity_scores) == 1
     assert 0.0 <= similarity_scores[0].similarity <= 1.0
 
     # Test first line similarity
     ios_first_line = ios_exception.split("\n")[0]
     android_first_line = android_exception.split("\n")[0]
-    first_line_scores = text_processing.calculate_text_similarity(ios_first_line, android_first_line)
+    first_line_scores = text_processing.calculate_text_similarity(ios_first_line, [android_first_line])
     assert len(first_line_scores) == 1
     assert 0.0 <= first_line_scores[0].similarity <= 1.0
 
@@ -361,7 +395,7 @@ def test_calculate_text_similarity_appium_exceptions():
 )
 def test_calculate_text_similarity_multiple_texts(base_text, other_texts, expected_length):
     """Test that calculate_text_similarity handles multiple texts correctly"""
-    scores = text_processing.calculate_text_similarity(base_text, *other_texts)
+    scores = text_processing.calculate_text_similarity(base_text, other_texts)
     assert len(scores) == expected_length
 
     for score in scores:
@@ -394,9 +428,13 @@ HISTORY_TEXTS = [
 
 
 def test_calculate_text_similarity_script_scenarios():
-    previous_similarities = []
+    """Users complain that if they "slightly" change log message analyzer stops to classify test items because of IDF.
+
+    This test ensures that IDF is off for `calculate_text_similarity` function, which is used in classification.
+    """
+    previous_similarities = None
     for n in range(1, len(HISTORY_TEXTS) + 1):
-        result = text_processing.calculate_text_similarity(REQUEST_TEXT, *HISTORY_TEXTS[:n])
+        result = text_processing.calculate_text_similarity(REQUEST_TEXT, HISTORY_TEXTS[:n])
         assert len(result) == n
         if previous_similarities:
             for i, r in enumerate(previous_similarities):
@@ -404,6 +442,54 @@ def test_calculate_text_similarity_script_scenarios():
         previous_similarities = result
 
 
+@pytest.mark.parametrize(
+    "test_texts, expected_result",
+    [
+        (["a", "a", "a"], [2]),
+        (["a", "b", "a"], [1, 2]),
+        (["a", "b", "b"], [0, 2]),
+        (["a", "b", "a", "b"], [2, 3]),
+        (["a", "b", "a", "b", "a"], [3, 4]),
+        (["a", "b", "a", "b", "a", "c"], [3, 4, 5]),
+    ],
+)
+def test_find_last_unique_texts(test_texts, expected_result):
+    logs_left = text_processing.find_last_unique_texts(0.95, test_texts)
+    assert logs_left == expected_result
+
+
 def test_extract_paths():
     paths = text_processing.extract_paths(read_file("test_res/test_logs/webdriver", "webdriver_unexpected_output.txt"))
     assert paths is not None
+
+
+def test_detecting_messages():
+    example_logs = get_fixture("example_logs.json", to_json=True)
+    for idx, example in enumerate(example_logs):
+        det_message, stacktrace = text_processing.detect_log_description_and_stacktrace(example["log"])
+        assert det_message == example["detected_message"], f"Error in the test case number: {idx}"
+        assert stacktrace == example["stacktrace"], f"Error in the test case number: {idx}"
+
+
+def test_calculate_text_similarity_batch_matches_one_call_per_base_text():
+    """The batch compares every base text with every other text exactly as separate calls do."""
+    base_texts = [
+        "java.lang.NullPointerException at com.example.Service.call",
+        "",
+        "Connection refused to database host",
+        "java.lang.NullPointerException at com.example.Service.call",
+        "the a an",
+    ]
+    other_texts = [
+        "Connection refused to database server",
+        "java.lang.NullPointerException at com.example.Other.call",
+        "",
+        "the a an",
+        "Timeout waiting for element",
+    ]
+
+    batch = text_processing.calculate_text_similarity_batch(base_texts, other_texts)
+
+    assert len(batch) == len(base_texts)
+    for base_text, row in zip(base_texts, batch):
+        assert row == text_processing.calculate_text_similarity(base_text, other_texts)

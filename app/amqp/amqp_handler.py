@@ -115,29 +115,14 @@ class AtomicInteger:
             self._value += int(d)
             return self._value
 
-    def dec(self, d: int = 1) -> int:
-        """Atomically decrement the value and return the new value.
-
-        :param int d: Amount to decrement by (default: 1)
-        :return: The new value after decrementing
-        :rtype: int
-        """
-        return self.inc(-d)
-
-    @property
-    def value(self) -> int:
-        """Get the current value in a thread-safe manner.
-
-        :return: Current integer value
-        :rtype: int
-        """
-        with self._lock:
-            return self._value
-
 
 class AmqpRequestHandler(Protocol):
     processor: Processor
-    running_tasks: list[ProcessingItem]
+
+    @property
+    def running_tasks(self) -> list[ProcessingItem]:
+        """Tasks which run now."""
+        ...
 
     def handle_amqp_request(
         self,
@@ -159,7 +144,7 @@ class ProcessAmqpRequestHandler:
     queue_size: int
     routing_key_predicate: Callable[[str], bool]
     counter: AtomicInteger
-    queue: PriorityQueue[ProcessingItem]
+    queue: Queue[ProcessingItem]
     __running_tasks: Queue[ProcessingItem]
     processor: Processor
     _monitor_thread: Optional[threading.Thread]
@@ -167,7 +152,7 @@ class ProcessAmqpRequestHandler:
     _receiver_thread: Optional[threading.Thread]
     _shutdown: bool
     _init_services: set[str]
-    _retry_predicate: Optional[Callable[[ProcessingItem, Exception], bool]]
+    _retry_predicate: Optional[Callable[[ProcessingItem, Optional[Exception]], bool]]
 
     def __init__(
         self,
@@ -213,9 +198,7 @@ class ProcessAmqpRequestHandler:
 
         # Setup process communication
         self.processor = RealProcessor(
-            app_config,
-            search_config,
-            Worker(self._init_services).work,
+            Worker(app_config, search_config, self._init_services).work,
         )
         self._shutdown = False
 
@@ -273,9 +256,7 @@ class ProcessAmqpRequestHandler:
 
         # Create new processor instance
         self.processor = RealProcessor(
-            self.app_config,
-            self.search_config,
-            Worker(self._init_services).work,
+            Worker(self.app_config, self.search_config, self._init_services).work,
         )
         LOGGER.info("Successfully restarted processor process")
 
@@ -657,3 +638,46 @@ class DirectAmqpRequestHandler:
             if not self.__running_tasks.queue:
                 return []
             return list(self.__running_tasks.queue)
+
+
+class DiscardingAmqpRequestHandler(AmqpRequestHandler):
+    """Handler of the queue of a disabled feature: acks every message and drops it, so the queue doesn't grow.
+
+    The exchange is "fanout", so the queue receives every message published to the analyzer, whatever its routing
+    key. The body is not parsed, malformed messages are dropped the same way.
+    """
+
+    name: str
+    processor: Processor
+    discarded: int
+
+    def __init__(self, *, name: str, **_: Any) -> None:
+        """Create the handler.
+
+        :param name: Name of the handler for logs
+        """
+        self.name = name
+        self.processor = DummyProcessor()
+        self.discarded = 0
+
+    def handle_amqp_request(
+        self,
+        channel: BlockingChannel,
+        method: Basic.Deliver,
+        props: BasicProperties,
+        body: bytes,
+    ) -> None:
+        """Ack a message and drop it."""
+        if method.delivery_tag is not None:
+            channel.basic_ack(delivery_tag=method.delivery_tag)
+        self.discarded += 1
+        LOGGER.debug(f"Handler '{self.name}' discarded a '{method.routing_key}' message")
+
+    @property
+    def running_tasks(self) -> list[ProcessingItem]:
+        """Nothing runs: always empty."""
+        return []
+
+    def shutdown(self) -> None:
+        """Nothing to stop."""
+        LOGGER.info(f"Handler '{self.name}' stopped, {self.discarded} messages discarded")

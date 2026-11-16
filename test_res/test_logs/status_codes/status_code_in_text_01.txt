@@ -1,0 +1,4 @@
+API returned error status 500 Internal Server Error
+Stacktrace:
+  at com.example.api.RestTemplate.execute(RestTemplate.java:789)
+  at com.example.controller.ApiController.handleRequest(ApiController.java:234)

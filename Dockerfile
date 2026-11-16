@@ -1,4 +1,4 @@
-FROM dhi.io/python@sha256:b1ba38633fafa6319b6357f5eb68f0fcacb77fce5c053538395da4a0cc64e876 AS test
+FROM dhi.io/python@sha256:c7090b12d1050252ee964efa9190124c3053a8679bfd7fa33aff9d5123fb673c AS test
 USER root
 RUN apt-get update \
     && apt-get install -y --no-install-recommends make \
@@ -21,7 +21,7 @@ RUN "${VIRTUAL_ENV}/bin/pip" install --upgrade pip \
 RUN "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir -r requirements-dev.txt
 RUN make test-all
 
-FROM dhi.io/python@sha256:b1ba38633fafa6319b6357f5eb68f0fcacb77fce5c053538395da4a0cc64e876 AS builder
+FROM dhi.io/python@sha256:c7090b12d1050252ee964efa9190124c3053a8679bfd7fa33aff9d5123fb673c AS builder
 RUN apt-get update \
     && apt-get install -y --no-install-recommends make \
     && python -m venv /venv \
@@ -44,7 +44,7 @@ ARG APP_VERSION=""
 ARG RELEASE_MODE=false
 ARG GITHUB_TOKEN
 RUN if [ "$RELEASE_MODE" = "true" ]; then \
-        make release v=${APP_VERSION} githubtoken=${GITHUB_TOKEN}; \
+        make release v=${APP_VERSION} githubtoken="${GITHUB_TOKEN}"; \
     elif [ "${APP_VERSION}" != "" ]; then \
         echo "${APP_VERSION}" > VERSION; \
     fi
@@ -53,7 +53,7 @@ RUN mkdir -p -m 0744 /backend/storage \
     && cp -r /build/app /backend/ \
     && cp -r /build/res /backend/
 
-FROM dhi.io/python@sha256:5606a426decf2197dc9162e34d90c71f8e0a6ece4c2d3252c234dda215ffebe0
+FROM dhi.io/python@sha256:d730c81938acce56e361f94829e4979a542ada9195e54b32347478743147b5ac
 WORKDIR /backend
 COPY --from=builder /backend ./
 COPY --from=builder /venv /venv

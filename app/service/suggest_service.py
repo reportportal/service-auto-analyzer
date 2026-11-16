@@ -12,9 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import json
 import traceback
-from time import time
+from time import monotonic
 from typing import Any, Optional
 
 from app.commons import logging, request_factory, similarity_calculator
@@ -28,14 +27,20 @@ from app.commons.model.launch_objects import (
     TestItem,
     TestItemInfo,
 )
+from app.commons.model.processing import Reply, to_json_list
 from app.commons.model.test_item_index import TestItemIndexData
 from app.commons.model_chooser import ModelChooser
 from app.commons.namespace_finder import NamespaceFinder
 from app.commons.os_client import OsClient
-from app.commons.query_builder import TEST_ITEM_SOURCE_FIELDS, SuggestQueryBuilder, best_log_match
+from app.commons.query_builder import (
+    TEST_ITEM_SOURCE_FIELDS,
+    SuggestQueryBuilder,
+    add_constraints_for_launches_into_query_suggest,
+    add_start_time_decay,
+    best_log_match,
+)
 from app.commons.similarity_filter import SimilarityFilter, choose_message_fields
 from app.ml.predictor import PREDICTION_CLASSES, PredictionResult
-from app.service.analyzer_service import AnalyzerService
 from app.utils import utils
 
 LOGGER = logging.getLogger("analyzerApp.suggestService")
@@ -117,7 +122,7 @@ def rank_predictions(prediction_results: list[PredictionResult]) -> list[Predict
     )
 
 
-class SuggestService(AnalyzerService):
+class SuggestService:
     """The service serves suggestion lists in Make Decision modal."""
 
     app_config: ApplicationConfig
@@ -126,6 +131,7 @@ class SuggestService(AnalyzerService):
     namespace_finder: NamespaceFinder
     model_chooser: ModelChooser
     query_builder: SuggestQueryBuilder
+    launch_boost: float
 
     def __init__(
         self,
@@ -137,7 +143,7 @@ class SuggestService(AnalyzerService):
         self.model_chooser = model_chooser
         self.app_config = app_config
         self.search_cfg = search_cfg
-        super().__init__(search_cfg=self.search_cfg)
+        self.launch_boost = abs(self.search_cfg.BoostLaunch)
         self.os_client = os_client or OsClient(app_config=self.app_config)
         self.suggest_threshold = 0.4
         self.namespace_finder = NamespaceFinder(app_config)
@@ -173,8 +179,8 @@ class SuggestService(AnalyzerService):
         )
         if not query:
             return {}
-        query = self.add_constraints_for_launches_into_query_suggest(query, test_item_info)
-        return self.add_query_with_start_time_decay(query, request_item.start_time)
+        query = add_constraints_for_launches_into_query_suggest(query, test_item_info, self.launch_boost)
+        return add_start_time_decay(query, request_item.start_time, self.search_cfg.TimeWeightDecay)
 
     def _query_suggested_items(
         self,
@@ -272,7 +278,15 @@ class SuggestService(AnalyzerService):
                 return None, test_item_id_for_suggest
             return prepared_items[0], test_item_id_for_suggest
 
-    def suggest_items(self, test_item_info: TestItemInfo) -> list[SuggestAnalysisResult]:
+    def suggest_items(self, test_item_info: TestItemInfo) -> list[Reply]:
+        """Suggest issue types for a test item based on similar historical items.
+
+        :param test_item_info: The test item to suggest issue types for
+        :return: The reply with the suggestion results sorted by probability
+        """
+        return [Reply(to_json_list(self._suggest_items(test_item_info)))]
+
+    def _suggest_items(self, test_item_info: TestItemInfo) -> list[SuggestAnalysisResult]:
         """Suggest issue types for a test item based on similar historical items.
 
         :param test_item_info: The test item to suggest issue types for
@@ -281,7 +295,7 @@ class SuggestService(AnalyzerService):
         LOGGER.info(f"Started suggesting for test item with id: {test_item_info.testItemId}")
         LOGGER.debug(f"Started suggesting items by request: {test_item_info.model_dump_json()}")
 
-        t_start = time()
+        t_start = monotonic()
         results: list[SuggestAnalysisResult] = []
         errors_found: list[str] = []
         errors_count = 0
@@ -296,9 +310,7 @@ class SuggestService(AnalyzerService):
                 LOGGER.debug(f"Test item search request for suggestions: {request_item.model_dump_json()}")
                 searched_res = self._query_suggested_items(test_item_info, request_item)
                 LOGGER.info(f"Found {len(searched_res[1])} items by FTS (KNN)")
-                LOGGER.debug(
-                    "Items for suggestions by FTS (KNN): " + json.dumps([hit.model_dump() for hit in searched_res[1]])
-                )
+                LOGGER.debug("Items for suggestions by FTS (KNN): " + to_json_list(searched_res[1]))
                 searched_res = self._filter_by_similarity(test_item_info, searched_res)
                 LOGGER.info(f"{len(searched_res[1])} items left after filtering by similarity")
 
@@ -333,7 +345,7 @@ class SuggestService(AnalyzerService):
                     issue_type = result.data.mrHit.source.issue_type
                     LOGGER.debug(f"Test item '{identity}' with issue type '{issue_type}' has probability {prob:.2f}")
 
-                processed_time = time() - t_start
+                processed_time = monotonic() - t_start
 
                 request_logs = request_item.logs or []
                 for pos_idx, result in enumerate(unique_results[: self.search_cfg.MaxSuggestionsNumber]):
@@ -369,7 +381,9 @@ class SuggestService(AnalyzerService):
                         modelInfo=";".join(result.model_info_tags),
                         resultPosition=pos_idx,
                         usedLogLines=test_item_info.analyzerConfig.numberOfLogLines,
-                        minShouldMatch=self.find_min_should_match_threshold(test_item_info.analyzerConfig),
+                        minShouldMatch=utils.find_min_should_match_threshold(
+                            test_item_info.analyzerConfig, self.search_cfg
+                        ),
                         processedTime=processed_time,
                         clusterId=test_item_info.clusterId,
                         methodName="suggestion",
@@ -383,8 +397,7 @@ class SuggestService(AnalyzerService):
             LOGGER.exception(exc)
             errors_found.append(utils.extract_exception(exc))
             errors_count += 1
-        results_to_share = [res.model_dump(exclude={"modelFeatureNames", "modelFeatureValues"}) for res in results]
-        LOGGER.debug(f"Results: {json.dumps(results_to_share)}")
-        LOGGER.info(f"Processed the test item. It took {time() - t_start:.2f} sec. Errors: {errors_count}")
+        LOGGER.debug(f"Results: {to_json_list(results, exclude={'modelFeatureNames', 'modelFeatureValues'})}")
+        LOGGER.info(f"Processed the test item. It took {monotonic() - t_start:.2f} sec. Errors: {errors_count}")
         LOGGER.info(f"Finished suggesting for test item with {len(results)} results.")
         return results

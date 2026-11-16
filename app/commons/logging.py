@@ -17,7 +17,7 @@
 import base64
 import logging.config
 import uuid
-from threading import local
+from contextvars import ContextVar
 from typing import Any, Optional
 
 from app.commons.model.launch_objects import ApplicationConfig
@@ -25,7 +25,8 @@ from app.commons.model.launch_objects import ApplicationConfig
 CORRELATION_ID_PARAM: str = "correlation_id"
 CONFIG_FILE_PATH: str = "res/logging.conf"
 
-__INSTANCES = local()
+# A context variable, not a thread-local: asyncio tasks share one thread, but each task has its own context
+__CORRELATION_ID: ContextVar[Optional[str]] = ContextVar(CORRELATION_ID_PARAM, default=None)
 
 
 def _process_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -82,19 +83,19 @@ class Logger:
 
 def new_correlation_id() -> str:
     corr_id = base64.urlsafe_b64encode(uuid.uuid4().bytes).decode("utf-8").rstrip("=")
-    __INSTANCES.correlation_id = corr_id
+    __CORRELATION_ID.set(corr_id)
     return corr_id
 
 
 def get_correlation_id() -> str:
-    corr_id = getattr(__INSTANCES, CORRELATION_ID_PARAM, None)
+    corr_id = __CORRELATION_ID.get()
     if corr_id is None:
         corr_id = new_correlation_id()
     return corr_id
 
 
-def set_correlation_id(corr_id: str):
-    __INSTANCES.correlation_id = corr_id
+def set_correlation_id(corr_id: Optional[str]) -> None:
+    __CORRELATION_ID.set(corr_id)
 
 
 # Sonar complains about the name of this function, but it must have the same name as in standard library

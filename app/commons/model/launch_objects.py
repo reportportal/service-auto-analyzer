@@ -11,11 +11,11 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+from collections import Counter
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 from app.commons.model.db import Hit
 from app.commons.model.ml import ModelType
@@ -79,6 +79,11 @@ class ApplicationConfig(BaseModel):
     analyzerResponseExchange: str = "analyzer-reply"
     analyzerResponseQueue: str = "analysis.matches"
 
+    analyzerWorkers: int = 2
+    analyzerTrainWorkers: int = 1
+    analyzerMaxQueuedTasks: int = 50
+    analyzerMaxQueuedBytes: int = 256 * 1024 * 1024
+
     analyzerHttpPort: int = 5001
     analyzerPathToLog: str = "/tmp/config.log"
     analyzerPriority: int = 1
@@ -140,6 +145,10 @@ class SearchConfig(BaseModel):
     # Total number of message terms in one Test Item query, shared across its logs. OpenSearch limits
     # the number of clauses in the whole query (1024 by default), and every term is a clause.
     ItemQueryTermsBudget: int = 800
+    # Analyze a Test Item by the latest runs of the same test case failed with the same error, before Gradient Boosting
+    HashMatchSameTest: bool = False
+    # Analyze a Test Item by the latest Test Items of any test case failed with the same error, if they all agree
+    HashMatchAnyTest: bool = False
     DefectTypeModelNumEstimators: int = 5
     SuggestBoostModelNumEstimators: int = 50
     SuggestBoostModelMaxDepth: int = 5
@@ -418,3 +427,38 @@ class RemoveByDatesRequest(BaseModel):
     project: int | str
     interval_start_date: str
     interval_end_date: str
+
+
+class LaunchAnalysisStats(BaseModel):
+    """Statistics of the analysis of one launch, reported in the logs as `model_dump(mode="json")`."""
+
+    launch_id: int
+    launch_name: str
+    project_id: int
+    method: str = "auto_analysis"
+    number_of_log_lines: int
+    min_should_match: int
+    module_version: list[str]
+    items_to_process: int = 0
+    not_found: int = 0
+    processed_time: float = 0.0
+    model_info: set[str] = Field(default_factory=set)
+    # Number of results by the name of the handler which produced them
+    handler_results: Counter[str] = Field(default_factory=Counter)
+    errors: list[str] = Field(default_factory=list)
+    gathered_at: datetime = Field(default_factory=datetime.now, exclude=True)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def errors_count(self) -> int:
+        return len(self.errors)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def gather_date(self) -> str:
+        return self.gathered_at.strftime("%Y-%m-%d")
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def gather_datetime(self) -> str:
+        return self.gathered_at.strftime("%Y-%m-%d %H:%M:%S")

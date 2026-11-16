@@ -18,7 +18,7 @@ import string
 from typing import Any
 
 from app.commons.model.launch_objects import ApplicationConfig, SearchConfig
-from app.utils.utils import read_json_file
+from app.utils.file_utils import read_json_file
 
 DEFAULT_ES_CONFIG = ApplicationConfig(
     esHost="http://localhost:9200",

@@ -16,7 +16,7 @@ import pytest
 
 from app.commons import object_saving
 from app.ml.models.defect_type_model import DefectTypeModel
-from app.utils import utils
+from app.utils import file_utils
 
 WEB_DRIVER_ERROR = (
     "org.openqa.selenium.TimeoutException: Expected condition failed: waiting for visibility of "
@@ -28,7 +28,7 @@ WEB_DRIVER_ERROR = (
 
 @pytest.fixture(scope="session")
 def object_saver() -> object_saving.ObjectSaver:
-    model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
+    model_settings = file_utils.read_json_file("res", "model_settings.json", to_json=True)
     return object_saving.create_filesystem(model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"])
 
 

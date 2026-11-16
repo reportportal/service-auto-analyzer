@@ -30,6 +30,7 @@ from app.commons.os_client import OsClient
 from app.commons.trigger_manager import TriggerManager
 from app.service.clean_index_service import CleanIndexService
 from test import APP_CONFIG, DEFAULT_BOOST_LAUNCH
+from test.replies import payload
 
 
 def get_folder_objects(folder: str, __: str | int | None = None) -> list[str]:
@@ -119,7 +120,7 @@ def test_delete_logs_calls_correct_services(
     test_log_ids = [1, 2, 3, 4, 5]
     clean_index = DeleteLogsRequest(ids=test_log_ids, project=test_project_id)
 
-    result = clean_index_service.delete_logs(clean_index)
+    result = int(payload(clean_index_service.delete_logs(clean_index)))
 
     assert result == 5, "delete_logs should return the success count from OsClient"
     mocked_os_client.delete_logs_by_ids.assert_called_once_with(
@@ -137,7 +138,7 @@ def test_delete_test_items_calls_correct_services(
     test_item_ids = [10, 20, 30]
     remove_items_info = DeleteTestItemsRequest(project=test_project_id, itemsToDelete=test_item_ids)
 
-    result = clean_index_service.delete_test_items(remove_items_info)
+    result = int(payload(clean_index_service.delete_test_items(remove_items_info)))
 
     assert result == 5, "delete_test_items should return the number of deleted logs"
     mocked_os_client.delete_test_items.assert_called_once_with(
@@ -155,7 +156,7 @@ def test_delete_launches_calls_correct_services(
     test_launch_ids = [100, 200]
     launch_remove_info = DeleteLaunchesRequest(project=test_project_id, launch_ids=test_launch_ids)
 
-    result = clean_index_service.delete_launches(launch_remove_info)
+    result = int(payload(clean_index_service.delete_launches(launch_remove_info)))
 
     assert result == 5, "delete_launches should return the number of deleted logs"
     mocked_os_client.delete_by_launch_ids.assert_called_once_with(
@@ -178,7 +179,7 @@ def test_remove_by_launch_start_time_calls_correct_services(
         interval_end_date=end_date,
     )
 
-    result = clean_index_service.remove_by_launch_start_time(remove_by_launch_start_time_info)
+    result = int(payload(clean_index_service.remove_by_launch_start_time(remove_by_launch_start_time_info)))
 
     assert result == 5, "remove_by_launch_start_time should return the number of deleted logs"
     mocked_os_client.delete_by_launch_start_time_range.assert_called_once_with(test_project_id, start_date, end_date)
@@ -199,7 +200,7 @@ def test_remove_by_log_time_calls_correct_services(
         interval_end_date=end_date,
     )
 
-    result = clean_index_service.remove_by_log_time(remove_by_log_time_info)
+    result = int(payload(clean_index_service.remove_by_log_time(remove_by_log_time_info)))
 
     assert result == 5, "remove_by_log_time should return the number of deleted logs"
     mocked_os_client.delete_by_log_time_range.assert_called_once_with(test_project_id, start_date, end_date)
@@ -215,7 +216,7 @@ def test_delete_logs_with_empty_list(
     test_project_id = 999
     clean_index = DeleteLogsRequest(ids=[], project=test_project_id)
 
-    result = clean_index_service.delete_logs(clean_index)
+    result = int(payload(clean_index_service.delete_logs(clean_index)))
 
     assert result == 0
     mocked_os_client.delete_logs_by_ids.assert_called_once_with(test_project_id, [])
@@ -229,7 +230,7 @@ def test_delete_test_items_with_different_project(
     test_project_id = 111
     remove_items_info = DeleteTestItemsRequest(project=test_project_id, itemsToDelete=[1, 2, 3])
 
-    result = clean_index_service.delete_test_items(remove_items_info)
+    result = int(payload(clean_index_service.delete_test_items(remove_items_info)))
 
     assert result == 5
     mocked_os_client.delete_test_items.assert_called_once_with(test_project_id, ["1", "2", "3"])
@@ -241,7 +242,7 @@ def test_delete_index_calls_correct_services(
     """Test that delete_index method calls internal services with correct arguments."""
     test_project_id = 123
 
-    result = delete_clean_index_service.delete_index(test_project_id)
+    result = int(payload(delete_clean_index_service.delete_index(test_project_id)))
 
     assert result == 1, "delete_index should return 1 on success"
     mocked_os_client.delete_index.assert_called_once_with(test_project_id)
@@ -281,7 +282,7 @@ def test_delete_index_with_different_project_id(
 ) -> None:
     """Test delete_index with different project IDs"""
     test_project_id = 456
-    result = delete_clean_index_service.delete_index(test_project_id)
+    result = int(payload(delete_clean_index_service.delete_index(test_project_id)))
 
     assert result == 1
     mocked_os_client.delete_index.assert_called_once_with(test_project_id)

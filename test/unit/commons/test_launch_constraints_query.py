@@ -16,11 +16,15 @@ from unittest import mock
 
 import pytest
 
-from app.service.analyzer_service import AnalyzerService
+from app.commons.query_builder import (
+    add_constraints_for_launches_into_query,
+    add_constraints_for_launches_into_query_suggest,
+)
 from test import DEFAULT_BOOST_LAUNCH, DEFAULT_SEARCH_CONFIG
 
 DEFAULT_LAUNCH_NAME = "Test Launch"
 DEFAULT_LAUNCH_ID = 3
+LAUNCH_BOOST = abs(DEFAULT_SEARCH_CONFIG.BoostLaunch)
 
 DEFAULT_LAUNCH_NAME_SEARCH = {
     "must": [{"term": {"launch_name": DEFAULT_LAUNCH_NAME}}],
@@ -60,8 +64,7 @@ def test_add_constraints_for_launches_into_query(previous_launch_id, launch_mode
     launch.previousLaunchId = previous_launch_id
     launch.launchName = DEFAULT_LAUNCH_NAME
     launch.analyzerConfig.analyzerMode = launch_mode
-    analyzer = AnalyzerService(DEFAULT_SEARCH_CONFIG)
-    result = analyzer.add_constraints_for_launches_into_query({"query": {"bool": {}}}, launch)
+    result = add_constraints_for_launches_into_query({"query": {"bool": {}}}, launch, LAUNCH_BOOST)
     assert result["query"]["bool"] == expected_query
 
 
@@ -91,6 +94,5 @@ def test_add_constraints_for_launches_into_query_suggest(previous_launch_id, lau
     launch.previousLaunchId = previous_launch_id
     launch.launchName = DEFAULT_LAUNCH_NAME
     launch.analyzerConfig.analyzerMode = launch_mode
-    analyzer = AnalyzerService(DEFAULT_SEARCH_CONFIG)
-    result = analyzer.add_constraints_for_launches_into_query_suggest({"query": {"bool": {}}}, launch)
+    result = add_constraints_for_launches_into_query_suggest({"query": {"bool": {}}}, launch, LAUNCH_BOOST)
     assert result["query"]["bool"] == expected_query

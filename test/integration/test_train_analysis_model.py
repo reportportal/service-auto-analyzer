@@ -9,7 +9,7 @@ from app.commons.model_chooser import ModelChooser
 from app.commons.os_client import OsClient
 from app.commons.query_builder import get_log_inner_hits_name
 from app.ml.training.train_analysis_model import METRIC, AnalysisModelTraining
-from app.utils import utils
+from app.utils import file_utils
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
 
 
@@ -62,12 +62,12 @@ def _make_similar_hit(test_item: TestItemIndexData, score: float) -> Hit[TestIte
 
 
 def _make_search_config():
-    model_settings = utils.read_json_file("res", "model_settings.json", to_json=True)
+    model_settings = file_utils.read_json_file("res", "model_settings.json", to_json=True)
     return DEFAULT_SEARCH_CONFIG.model_copy(
         update={
-            "BoostModelFolder": utils.strip_path(model_settings["BOOST_MODEL_FOLDER"]),
-            "SuggestBoostModelFolder": utils.strip_path(model_settings["SUGGEST_BOOST_MODEL_FOLDER"]),
-            "GlobalDefectTypeModelFolder": utils.strip_path(model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]),
+            "BoostModelFolder": file_utils.strip_path(model_settings["BOOST_MODEL_FOLDER"]),
+            "SuggestBoostModelFolder": file_utils.strip_path(model_settings["SUGGEST_BOOST_MODEL_FOLDER"]),
+            "GlobalDefectTypeModelFolder": file_utils.strip_path(model_settings["GLOBAL_DEFECT_TYPE_MODEL_FOLDER"]),
         }
     )
 

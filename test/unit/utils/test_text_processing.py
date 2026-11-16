@@ -16,13 +16,13 @@ import json
 
 import pytest
 
-from app.utils import log_preparation, text_processing, utils
+from app.utils import file_utils, log_preparation, text_processing
 from test import get_fixture, read_file, read_file_lines
 
 
 def test_delete_empty_lines():
-    log = utils.read_file("test_res/test_logs", "reportportal-api.txt")
-    expected = utils.read_file("test_res/test_logs", "reportportal-api-no-empty-lines.txt")
+    log = file_utils.read_file("test_res/test_logs", "reportportal-api.txt")
+    expected = file_utils.read_file("test_res/test_logs", "reportportal-api-no-empty-lines.txt")
 
     assert text_processing.delete_empty_lines(log) == expected.rstrip("\n")
 
@@ -213,22 +213,6 @@ def test_find_test_methods_in_text_spec_files(text, expected_test_methods):
 
 
 @pytest.mark.parametrize(
-    "url, expected_url",
-    [
-        (
-            "amqp://user:password@10.68.56.88:5672/analyzer?heartbeat=30",  # NOSONAR
-            "amqp://10.68.56.88:5672/analyzer?heartbeat=30",  # NOSONAR
-        ),
-        ("amqps://rpuser:fkkf0+4pUn@192.68.56.88:5672", "amqps://192.68.56.88:5672"),  # NOSONAR
-        ("https://test123:aa-bb_cc@msgbroker.example.com/", "https://msgbroker.example.com/"),  # NOSONAR
-        ("https://test123:aa%20bb%40cc@msgbroker.example.com/", "https://msgbroker.example.com/"),  # NOSONAR
-    ],
-)
-def test_remove_credentials_from_url(url, expected_url):
-    assert text_processing.remove_credentials_from_url(url) == expected_url
-
-
-@pytest.mark.parametrize(
     "base_text, other_texts, expected_scores",
     [
         # Test identical texts
@@ -365,10 +349,10 @@ def test_calculate_text_similarity_no_other_texts():
 def test_calculate_text_similarity_appium_exceptions():
     """Test text similarity with appium exception files if available"""
     ios_exception = log_preparation.clean_message(
-        utils.read_file("test_res/test_logs/stacktraces", "appium_ios_exception.txt")
+        file_utils.read_file("test_res/test_logs/stacktraces", "appium_ios_exception.txt")
     )
     android_exception = log_preparation.clean_message(
-        utils.read_file("test_res/test_logs/stacktraces", "appium_android_exception.txt")
+        file_utils.read_file("test_res/test_logs/stacktraces", "appium_android_exception.txt")
     )
 
     # Test overall similarity

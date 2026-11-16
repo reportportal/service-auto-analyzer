@@ -20,7 +20,7 @@ from app.commons.model.launch_objects import Launch
 from app.commons.namespace_finder import CHOSEN_NAMESPACES_OBJECT, UNIQUE_WORDS_OBJECT, NamespaceFinder
 from app.commons.object_saving import ObjectSaver
 from app.service.namespace_finder_service import NamespaceFinderService
-from app.utils.utils import read_json_file
+from app.utils.file_utils import read_json_file
 from test import APP_CONFIG
 
 

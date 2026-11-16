@@ -12,15 +12,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import json
 from collections import defaultdict
 from datetime import datetime
-from time import time
+from time import monotonic
 from typing import Optional
 
-from app.amqp.amqp import AmqpClient
 from app.commons import logging, request_factory
 from app.commons.model.launch_objects import ApplicationConfig, DefectUpdate, ItemUpdate, Launch
 from app.commons.model.ml import ModelType, TrainInfo
+from app.commons.model.processing import Reply, ReplyType
 from app.commons.model.test_item_index import TestItemHistoryData, TestItemIndexData
 from app.commons.os_client import OsClient
 
@@ -37,25 +38,25 @@ def current_timestamp() -> str:
     return format_timestamp(datetime.now())
 
 
-def update_train_list(app_config: ApplicationConfig, update_list: list[tuple[int, int]]):
-    if not update_list:
-        return
-    if app_config.amqpUrl:
-        amqp_client = AmqpClient(app_config)
-        for project_id, result_num in update_list:
-            if result_num and result_num > 0:
-                for model_type in [ModelType.suggestion, ModelType.auto_analysis, ModelType.defect_type]:
-                    amqp_client.send_to_inner_queue(
-                        "train_models",
-                        TrainInfo(
-                            model_type=model_type, project=project_id, gathered_metric_total=result_num
-                        ).model_dump_json(),
-                    )
-        amqp_client.close()
+TRAIN_ROUTING_KEY = "train_models"
 
 
-def update_train(app_config: ApplicationConfig, project_id: int, result_num: int):
-    update_train_list(app_config, [(project_id, result_num)])
+def train_replies(update_list: list[tuple[int, int]]) -> list[Reply]:
+    """Model training requests for the projects with new defect types: one per model type.
+
+    :param update_list: (project ID, number of new defect types) pairs
+    :return: Replies to the training queue
+    """
+    return [
+        Reply(
+            TrainInfo(model_type=model_type, project=project_id, gathered_metric_total=result_num).model_dump_json(),
+            ReplyType.QUEUE_SEND,
+            TRAIN_ROUTING_KEY,
+        )
+        for project_id, result_num in update_list
+        if result_num and result_num > 0
+        for model_type in (ModelType.suggestion, ModelType.auto_analysis, ModelType.defect_type)
+    ]
 
 
 class IndexService:
@@ -73,17 +74,21 @@ class IndexService:
         self.app_config = app_config
         self.os_client = os_client or OsClient(app_config=self.app_config)
 
-    def index_logs(self, launches: list[Launch]) -> None:
-        """Index launches grouped by project using Test Item-centric documents."""
+    def index_logs(self, launches: list[Launch]) -> Optional[list[Reply]]:
+        """Index launches grouped by project using Test Item-centric documents.
+
+        :param launches: Launches to index
+        :return: Model training requests for the projects with new defect types, or None if there are none
+        """
         if not launches:
-            return
+            return None
 
         launch_ids = {str(launch_obj.launchId) for launch_obj in launches}
         launch_ids_str = ", ".join(launch_ids)
         projects = {str(launch_obj.project) for launch_obj in launches}
         projects_str = ", ".join(projects)
         LOGGER.info(f"Indexing {len(launch_ids)} launches of projects '{projects_str}': {launch_ids_str}")
-        t_start = time()
+        t_start = monotonic()
 
         project_test_items: dict[int, list[TestItemIndexData]] = defaultdict(list)
         defects_per_project: dict[int, int] = defaultdict(int)
@@ -101,19 +106,22 @@ class IndexService:
                 1 for item in prepared_items if item.issue_type and not item.issue_type.startswith("ti")
             )
 
-        indexed_items = 0
+        indexed_count = 0
+        any_errors = False
+
         for project_id, test_items in project_test_items.items():
             response = self.os_client.bulk_index(project_id, test_items)
-            # `took` of a bulk response is the number of successfully indexed documents, not time
-            indexed_items += response.took
+            indexed_count += response.took  # `took` holds the number of indexed documents
+            any_errors = any_errors or response.errors
 
-        update_train_list(self.app_config, list(defects_per_project.items()))
+        replies = train_replies(list(defects_per_project.items()))
 
-        time_passed = round(time() - t_start, 2)
+        time_passed = round(monotonic() - t_start, 2)
         LOGGER.info(
             f"Indexing {len(launch_ids)} launches of projects '{projects_str}' finished: {launch_ids_str}. "
-            f"It took {time_passed} sec., {indexed_items} test items indexed."
+            f"It took {time_passed} sec., {indexed_count} test items indexed."
         )
+        return replies or None
 
     @staticmethod
     def _normalize_items_to_update(
@@ -141,7 +149,7 @@ class IndexService:
                 }
         return normalized
 
-    def defect_update(self, defect_update_info: DefectUpdate) -> list[int]:
+    def defect_update(self, defect_update_info: DefectUpdate) -> list[Reply]:
         """Update defect types and issue history for provided test items.
 
         Updates are sent for all requested Test Items without checking first which of them are indexed: a script update
@@ -149,10 +157,10 @@ class IndexService:
         re-indexes them.
 
         :param defect_update_info: Defect update request
-        :return: IDs of Test Items which were not updated
+        :return: The reply with the IDs of Test Items which were not updated, then the model training requests
         """
         LOGGER.info("Started updating defect types")
-        t_start = time()
+        t_start = monotonic()
 
         project_id = defect_update_info.project
         is_auto_analyzed = defect_update_info.isAutoAnalyzed
@@ -180,8 +188,7 @@ class IndexService:
             else:
                 # Missing Test Items, e.g. not indexed or removed by a cleanup request, fail individually
                 failed_test_items.update(response.failed_ids)
-        update_train(self.app_config, int(project_id), defect_num)
         items_not_updated = sorted(int(test_item_id) for test_item_id in failed_test_items)
         LOGGER.debug("Not updated test items: %s", items_not_updated)
-        LOGGER.info("Finished updating defect types. It took %.2f sec", time() - t_start)
-        return items_not_updated
+        LOGGER.info("Finished updating defect types. It took %.2f sec", monotonic() - t_start)
+        return [Reply(json.dumps(items_not_updated))] + train_replies([(int(project_id), defect_num)])

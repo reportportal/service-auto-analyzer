@@ -17,7 +17,7 @@ import os
 import random
 from collections import Counter, defaultdict
 from datetime import datetime
-from time import time
+from time import monotonic
 from typing import Any, Optional, Type, TypeVar
 
 import numpy as np
@@ -282,7 +282,7 @@ class DefectTypeModelTraining:
         self, projects: list[int], stat_data_storage: Optional[DefaultDict[str, dict[str, Any]]]
     ) -> list[TrainingEntry[str]]:
         data: list[TrainingEntry[str]] = []
-        start_time = time()
+        start_time = monotonic()
         query = build_issue_history_query(self.app_config.esChunkNumber, ITEM_FIELDS_TO_RETRIEVE)
 
         for project in projects:
@@ -298,7 +298,7 @@ class DefectTypeModelTraining:
             for label, count in label_counts.items():
                 stat_data_storage[label]["data_size"] = count
             stat_data_storage["all"]["data_size"] = len(data)
-            stat_data_storage["all"]["time_spent"] = time() - start_time
+            stat_data_storage["all"]["time_spent"] = monotonic() - start_time
         return data
 
     def _train_several_times(
@@ -311,7 +311,7 @@ class DefectTypeModelTraining:
         return train_several_times(new_model, label, data, random_states, self.baseline_model)
 
     def train(self, project_info: TrainInfo) -> tuple[int, dict[str, dict[str, Any]]]:
-        start_time = time()
+        start_time = monotonic()
         model_name = f'{project_info.model_type.name}_model_{datetime.now().strftime("%Y-%m-%d")}'
         if self.search_cfg.GlobalDefectTypeModelFolder:
             baseline_model_folder = os.path.basename(self.search_cfg.GlobalDefectTypeModelFolder)
@@ -345,7 +345,7 @@ class DefectTypeModelTraining:
 
         unique_labels = {entry.issue_type for entry in data if entry.issue_type}
         for label in unique_labels:
-            time_training = time()
+            time_training = monotonic()
             LOGGER.info(f"Label to train the model {label}")
 
             baseline_model_results, new_model_results, bad_data_proportion, proportion_binary_labels = (
@@ -393,7 +393,7 @@ class DefectTypeModelTraining:
                 if train_log_info[label]["baseline_mean_metric"] > 0.001:
                     f1_baseline_models.append(train_log_info[label]["baseline_mean_metric"])
                     f1_chosen_models.append(train_log_info[label]["baseline_mean_metric"])
-            train_log_info[label]["time_spent"] += time() - time_training
+            train_log_info[label]["time_spent"] += monotonic() - time_training
 
         LOGGER.debug(f"Custom models were for labels: {custom_models}")
         if len(custom_models):
@@ -404,7 +404,7 @@ class DefectTypeModelTraining:
                 self.model_chooser.delete_old_model(project_info.model_type, project_info.project)
             new_model.save_model()
 
-        time_spent = time() - start_time
+        time_spent = monotonic() - start_time
         LOGGER.info("Finished for %d s", time_spent)
         train_log_info["all"]["time_spent"] = time_spent
         train_log_info["all"]["data_proportion"] = data_proportion_min

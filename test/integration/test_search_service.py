@@ -17,11 +17,12 @@ from unittest import mock
 import pytest
 
 from app.commons.model.db import Hit
-from app.commons.model.launch_objects import AnalyzerConf, SearchLogs
+from app.commons.model.launch_objects import AnalyzerConf, SearchLogInfo, SearchLogs
 from app.commons.model.test_item_index import LogData, TestItemIndexData
 from app.commons.os_client import OsClient
 from app.service.search_service import SearchService
 from test import APP_CONFIG, DEFAULT_SEARCH_CONFIG
+from test.replies import reply_models
 
 
 def _make_log_data(log_id: str, log_order: int, message: str, potential_status_codes: str = "") -> LogData:
@@ -83,7 +84,7 @@ def test_search_logs_builds_nested_query(search_service: SearchService, mocked_o
 
     mocked_os_client.search.return_value = iter([])
 
-    result = search_service.search_logs(search_request)
+    result = reply_models(search_service.search_logs(search_request), SearchLogInfo)
 
     mocked_os_client.search.assert_called_once()
     _, query = mocked_os_client.search.call_args[0]
@@ -137,7 +138,7 @@ def test_search_logs_filters_and_returns_best_log(search_service: SearchService,
         ]
     )
 
-    result = search_service.search_logs(search_request)
+    result = reply_models(search_service.search_logs(search_request), SearchLogInfo)
 
     assert len(result) == 1
     assert result[0].testItemId == 3001
@@ -187,7 +188,7 @@ def test_search_logs_filters_by_potential_status_codes(
         ]
     )
 
-    result = search_service.search_logs(search_request)
+    result = reply_models(search_service.search_logs(search_request), SearchLogInfo)
 
     assert {item.testItemId for item in result} == {3001, 3002}
     assert {item.logId for item in result} == {701, 702}
@@ -226,7 +227,7 @@ def test_search_logs_rejects_inverted_status_codes(search_service: SearchService
         ]
     )
 
-    result = search_service.search_logs(request)
+    result = reply_models(search_service.search_logs(request), SearchLogInfo)
 
     assert {item.testItemId for item in result} == {3001}
 
@@ -243,7 +244,7 @@ def test_search_logs_keeps_repeated_status_codes_distinct(
         ]
     )
 
-    result = search_service.search_logs(request)
+    result = reply_models(search_service.search_logs(request), SearchLogInfo)
 
     assert {item.testItemId for item in result} == {3001}
 
@@ -284,7 +285,7 @@ def test_search_logs_all_messages_should_match(search_service: SearchService, mo
         ]
     )
 
-    result = search_service.search_logs(search_request)
+    result = reply_models(search_service.search_logs(search_request), SearchLogInfo)
 
     assert len(result) == 1
     assert result[0].testItemId == 3001

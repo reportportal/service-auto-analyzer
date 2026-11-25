@@ -31,5 +31,6 @@ repos:
     hooks:
       - id: mypy
         language: system
-        args: [ "--ignore-missing-imports" ]
-        exclude: 'test/'
+        args: [ "--ignore-missing-imports", "app" ]
+        pass_filenames: false
+        files: ^app/

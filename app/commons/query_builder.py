@@ -245,7 +245,7 @@ def build_more_like_this_query(
     boost: float = BOOST_NEUTRAL,
     override_min_should_match: Optional[str] = None,
     max_query_terms: int = 50,
-):
+) -> dict[str, Any]:
     return {
         "more_like_this": {
             "fields": [field_name],

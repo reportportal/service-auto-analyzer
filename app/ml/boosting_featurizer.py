@@ -223,7 +223,7 @@ class BoostingFeaturizer:
             if identity in relevant_items:
                 continue
             relevant_items[identity] = RelevantItem(
-                mrHit=hit, score=hit.normalized_score, compared_item=request, original_position=position
+                mrHit=hit, compared_item=request, original_position=position
             )
         self._relevant_items = relevant_items
         return relevant_items

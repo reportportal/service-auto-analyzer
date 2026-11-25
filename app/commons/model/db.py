@@ -22,14 +22,8 @@ T = TypeVar("T")
 class Hit(BaseModel, Generic[T]):
     """Typed representation of an OpenSearch search hit."""
 
-    index: Optional[str] = Field(default=None, validation_alias="_index")
-    id: Optional[str] = Field(default=None, validation_alias="_id")
     score: Optional[float] = Field(default=None, validation_alias=AliasChoices("score", "_score"))
     source: T = Field(validation_alias=AliasChoices("source", "_source"))
-    normalized_score: float = 0.0
-    sort: Optional[list[Any]] = None
-    highlight: Optional[dict[str, Any]] = None
-    fields: Optional[dict[str, Any]] = None
     inner_hits: Optional[dict[str, Any]] = Field(default=None)
 
     @classmethod

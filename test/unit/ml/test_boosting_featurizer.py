@@ -88,8 +88,6 @@ def test_normalized_scores_are_filled_and_duplicates_dropped():
     request_item, normalized_hits = featurizer.all_results
     assert request_item is featurizer.raw_results[0]
     assert [hit.source.test_item_id for hit in normalized_hits] == ["1", "2"]
-    assert [hit.normalized_score for hit in normalized_hits] == [1.0, 0.5]
-    assert [hit.normalized_score for hit in hits] == [0.0, 0.0, 0.0]
 
 
 def test_auto_analysis_rows_are_top_items_of_issue_types():

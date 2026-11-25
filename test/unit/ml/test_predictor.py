@@ -391,7 +391,6 @@ class TestAutoAnalysisPredictor:
         assert [result.data.mrHit.source.test_item_id for result in results] == ["456", "789"]
         assert [result.label for result in results] == [1, 0]
         assert [result.original_position for result in results] == [0, 1]
-        assert [result.data.mrHit.normalized_score for result in results] == [1.0, pytest.approx(0.5 / 0.95)]
 
     def test_predict_result_structure(self):
         """Test that PredictionResult objects have correct structure."""

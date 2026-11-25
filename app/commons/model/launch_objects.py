@@ -176,7 +176,6 @@ class RelevantItem(BaseModel):
     """Found Test Item hit, with the request Test Item it was compared to and its comparison metadata"""
 
     mrHit: Hit[TestItemIndexData]
-    score: float = 0.0
     compared_item: TestItemIndexData
     original_position: int = -1
 

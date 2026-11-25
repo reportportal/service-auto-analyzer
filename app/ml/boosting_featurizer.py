@@ -66,7 +66,6 @@ class BoostingFeaturizer:
     feature_ids: list[int]
     defect_type_predict_model: Optional[DefectTypeModel]
     similarity_calculator: SimilarityCalculator
-    raw_results: tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]
     all_results: tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]
     used_model_info: set[str]
     _features: Optional[dict[int, Feature]]
@@ -90,31 +89,27 @@ class BoostingFeaturizer:
         self.used_model_info = set(defect_type_model.get_model_info()) if defect_type_model else set()
         self._features = None
         self._relevant_items = None
-        self.raw_results = results
-        self.all_results = self.normalize_results(results)
+        self.all_results = self.filter_non_unique_results(results)
 
     @staticmethod
-    def normalize_results(
+    def filter_non_unique_results(
         results: tuple[TestItemIndexData, list[Hit[TestItemIndexData]]],
     ) -> tuple[TestItemIndexData, list[Hit[TestItemIndexData]]]:
-        """Copy unique found Test Items and fill in their scores normalized by the maximum score.
+        """Leave only unique found Test Items.
 
         :param results: Request Test Item and found Test Items
-        :return: Request Test Item and copies of found Test Items with normalized scores, one per Test Item
+        :return: Request Test Item and unique found Test Items
         """
         request, hits = results
         seen_test_items: set[str] = set()
-        normalized_hits = []
+        unique_hits = []
         for hit in hits:
             test_item_id = str(hit.source.test_item_id)
             if test_item_id in seen_test_items:
                 continue
             seen_test_items.add(test_item_id)
-            normalized_hits.append(hit.model_copy(deep=True))
-        max_score = max((hit.score or 0.0 for hit in normalized_hits), default=0.0)
-        for hit in normalized_hits:
-            hit.normalized_score = (hit.score or 0.0) / (max_score if max_score > 0.0 else 1.0)
-        return request, normalized_hits
+            unique_hits.append(hit)
+        return request, unique_hits
 
     def get_used_model_info(self) -> list[str]:
         return list(self.used_model_info)
